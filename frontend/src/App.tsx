@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent } from 'react';
 import {
   Container,
   Typography,
@@ -15,7 +15,8 @@ import {
   Card,
   CardContent,
   CircularProgress,
-  Alert
+  Alert,
+  SelectChangeEvent
 } from '@mui/material';
 import { School, Psychology, Quiz } from '@mui/icons-material';
 import { ExamService } from './services/ExamService';
@@ -100,7 +101,7 @@ function App() {
                 fullWidth
                 label="Prüfungsthema"
                 value={examRequest.topic}
-                onChange={(e) => setExamRequest({ ...examRequest, topic: e.target.value })}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setExamRequest({ ...examRequest, topic: e.target.value })}
                 placeholder="z.B. Python Programmierung, Datenstrukturen, Webentwicklung..."
                 variant="outlined"
               />
@@ -112,7 +113,7 @@ function App() {
                 <Select
                   value={examRequest.difficulty}
                   label="Schwierigkeitsgrad"
-                  onChange={(e) => setExamRequest({ ...examRequest, difficulty: e.target.value })}
+                  onChange={(e: SelectChangeEvent) => setExamRequest({ ...examRequest, difficulty: e.target.value as 'easy' | 'medium' | 'hard' })}
                 >
                   <MenuItem value="easy">Einfach</MenuItem>
                   <MenuItem value="medium">Mittel</MenuItem>
@@ -127,7 +128,7 @@ function App() {
                 type="number"
                 label="Anzahl Fragen"
                 value={examRequest.question_count}
-                onChange={(e) => setExamRequest({ 
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setExamRequest({ 
                   ...examRequest, 
                   question_count: Math.max(1, Math.min(20, parseInt(e.target.value) || 5))
                 })}
@@ -141,7 +142,7 @@ function App() {
                 <Select
                   value={examRequest.language}
                   label="Sprache"
-                  onChange={(e) => setExamRequest({ ...examRequest, language: e.target.value })}
+                  onChange={(e: SelectChangeEvent) => setExamRequest({ ...examRequest, language: e.target.value as 'de' | 'en' })}
                 >
                   <MenuItem value="de">Deutsch</MenuItem>
                   <MenuItem value="en">English</MenuItem>
