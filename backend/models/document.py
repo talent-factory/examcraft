@@ -4,11 +4,14 @@ Speichert Metadaten hochgeladener Dokumente
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Enum
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 import enum
+import sys
+import os
 
-Base = declarative_base()
+# Add parent directory to path to import database
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database import Base
 
 class DocumentStatus(enum.Enum):
     UPLOADED = "uploaded"
@@ -33,7 +36,7 @@ class Document(Base):
     user_id = Column(String(100), nullable=True)
     
     # Extracted metadata from document processing
-    metadata = Column(JSON, nullable=True)
+    doc_metadata = Column(JSON, nullable=True)
     
     # Text content (für Fallback-Suche)
     content_preview = Column(Text, nullable=True)
@@ -59,7 +62,7 @@ class Document(Base):
             "mime_type": self.mime_type,
             "status": self.status.value if self.status else None,
             "user_id": self.user_id,
-            "metadata": self.metadata,
+            "metadata": self.doc_metadata,
             "content_preview": self.content_preview[:200] + "..." if self.content_preview and len(self.content_preview) > 200 else self.content_preview,
             "vector_collection": self.vector_collection,
             "created_at": self.created_at.isoformat() if self.created_at else None,

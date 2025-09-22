@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
     python3-dev \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching

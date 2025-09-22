@@ -11,11 +11,7 @@ from pydantic import BaseModel
 
 from services.document_service import DocumentService
 from models.document import Document, DocumentStatus
-
-# Database dependency (wird später durch echte DB-Session ersetzt)
-def get_db():
-    # TODO: Implement proper database session
-    return None
+from database import get_db
 
 # Aktuell ohne User Authentication - wird später hinzugefügt
 def get_current_user():
@@ -132,6 +128,17 @@ async def list_documents(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list documents: {str(e)}")
 
+# Health check endpoint (muss vor parametrisierten Routen stehen)
+@router.get("/health")
+async def health_check():
+    """Health check für Document Service"""
+    return {
+        "status": "healthy",
+        "service": "Document Upload Service",
+        "supported_formats": list(document_service.supported_formats.values()),
+        "max_file_size_mb": document_service.max_file_size // (1024 * 1024)
+    }
+
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: int,
@@ -232,21 +239,10 @@ async def get_document_status(
             "status": document.status.value,
             "created_at": document.created_at.isoformat() if document.created_at else None,
             "processed_at": document.processed_at.isoformat() if document.processed_at else None,
-            "metadata": document.metadata
+            "metadata": document.doc_metadata
         }
         
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
-
-# Health check endpoint
-@router.get("/health")
-async def health_check():
-    """Health check für Document Service"""
-    return {
-        "status": "healthy",
-        "service": "Document Upload Service",
-        "supported_formats": list(document_service.supported_formats.values()),
-        "max_file_size_mb": document_service.max_file_size // (1024 * 1024)
-    }

@@ -16,9 +16,12 @@ import {
   CardContent,
   CircularProgress,
   Alert,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Tabs,
+  Tab
 } from '@mui/material';
-import { School, Psychology, Quiz } from '@mui/icons-material';
+import { DocumentUpload } from './components/DocumentUpload';
+import { School, Psychology, Quiz, CloudUpload } from '@mui/icons-material';
 import { ExamService } from './services/ExamService';
 import { ExamRequest, ExamResponse } from './types/exam';
 import ExamDisplay from './components/ExamDisplay';
@@ -32,9 +35,10 @@ function App() {
     language: 'de'
   });
   
-  const [examResponse, setExamResponse] = useState<ExamResponse | null>(null);
+  const [exam, setExam] = useState<ExamResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState(0);
 
   const handleGenerateExam = async () => {
     if (!examRequest.topic.trim()) {
@@ -47,17 +51,16 @@ function App() {
     
     try {
       const response = await ExamService.generateExam(examRequest);
-      setExamResponse(response);
+      setExam(response);
     } catch (err) {
-      setError('Fehler beim Generieren der Prüfung. Bitte versuchen Sie es erneut.');
-      console.error('Error generating exam:', err);
+      setError(err instanceof Error ? err.message : 'Ein unbekannter Fehler ist aufgetreten.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleNewExam = () => {
-    setExamResponse(null);
+    setExam(null);
     setExamRequest({
       topic: '',
       difficulty: 'medium',
@@ -65,6 +68,16 @@ function App() {
       question_types: ['multiple_choice', 'open_ended'],
       language: 'de'
     });
+  };
+
+  const handleDocumentUploadComplete = (documentId: number, filename: string) => {
+    console.log(`Document uploaded successfully: ${filename} (ID: ${documentId})`);
+    // TODO: Hier können wir später eine Benachrichtigung anzeigen
+  };
+
+  const handleDocumentUploadError = (filename: string, error: string) => {
+    console.error(`Document upload failed for ${filename}: ${error}`);
+    // TODO: Hier können wir später eine Fehlerbenachrichtigung anzeigen
   };
 
   return (
@@ -81,117 +94,169 @@ function App() {
           KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Für OpenBook-Prüfungen mit Claude API Integration
+          Für OpenBook-Prüfungen mit Claude API Integration & Document Upload
         </Typography>
       </Box>
 
-      {!examResponse ? (
-        /* Exam Generation Form */
-        <Paper elevation={3} sx={{ p: 4, mb: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-            <Psychology sx={{ color: 'primary.main', mr: 2 }} />
-            <Typography variant="h5" component="h2">
-              Neue Prüfung erstellen
-            </Typography>
-          </Box>
+      {!exam ? (
+        <>
+          {/* Tab Navigation */}
+          <Paper elevation={2} sx={{ mb: 4 }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={(_, newValue: number) => setActiveTab(newValue)}
+              variant="fullWidth"
+              sx={{ borderBottom: 1, borderColor: 'divider' }}
+            >
+              <Tab label="KI-Prüfung erstellen" icon={<Psychology />} />
+              <Tab label="Dokumente hochladen" icon={<CloudUpload />} />
+            </Tabs>
+          </Paper>
 
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Prüfungsthema"
-                value={examRequest.topic}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setExamRequest({ ...examRequest, topic: e.target.value })}
-                placeholder="z.B. Python Programmierung, Datenstrukturen, Webentwicklung..."
-                variant="outlined"
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Schwierigkeitsgrad</InputLabel>
-                <Select
-                  value={examRequest.difficulty}
-                  label="Schwierigkeitsgrad"
-                  onChange={(e: SelectChangeEvent) => setExamRequest({ ...examRequest, difficulty: e.target.value as 'easy' | 'medium' | 'hard' })}
-                >
-                  <MenuItem value="easy">Einfach</MenuItem>
-                  <MenuItem value="medium">Mittel</MenuItem>
-                  <MenuItem value="hard">Schwer</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Anzahl Fragen"
-                value={examRequest.question_count}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setExamRequest({ 
-                  ...examRequest, 
-                  question_count: Math.max(1, Math.min(20, parseInt(e.target.value) || 5))
-                })}
-                inputProps={{ min: 1, max: 20 }}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Sprache</InputLabel>
-                <Select
-                  value={examRequest.language}
-                  label="Sprache"
-                  onChange={(e: SelectChangeEvent) => setExamRequest({ ...examRequest, language: e.target.value as 'de' | 'en' })}
-                >
-                  <MenuItem value="de">Deutsch</MenuItem>
-                  <MenuItem value="en">English</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                Fragetypen:
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip 
-                  label="Multiple Choice" 
-                  color="primary" 
-                  variant="filled"
-                />
-                <Chip 
-                  label="Offene Fragen" 
-                  color="primary" 
-                  variant="filled"
-                />
+          {/* Tab Content */}
+          {activeTab === 0 && (
+            /* Exam Generation Form */
+            <Paper elevation={3} sx={{ p: 4, mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Psychology sx={{ color: 'primary.main', mr: 2 }} />
+                <Typography variant="h5" component="h2">
+                  Neue Prüfung erstellen
+                </Typography>
               </Box>
-            </Grid>
-          </Grid>
 
-          {error && (
-            <Alert severity="error" sx={{ mt: 3 }}>
-              {error}
-            </Alert>
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Prüfungsthema"
+                    value={examRequest.topic}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setExamRequest({ ...examRequest, topic: e.target.value })}
+                    placeholder="z.B. Python Programmierung, Datenstrukturen, Webentwicklung..."
+                    variant="outlined"
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel>Schwierigkeitsgrad</InputLabel>
+                    <Select
+                      value={examRequest.difficulty}
+                      label="Schwierigkeitsgrad"
+                      onChange={(e: SelectChangeEvent) => setExamRequest({ ...examRequest, difficulty: e.target.value as 'easy' | 'medium' | 'hard' })}
+                    >
+                      <MenuItem value="easy">Einfach</MenuItem>
+                      <MenuItem value="medium">Mittel</MenuItem>
+                      <MenuItem value="hard">Schwer</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Anzahl Fragen"
+                    value={examRequest.question_count}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setExamRequest({
+                      ...examRequest,
+                      question_count: Math.max(1, Math.min(20, parseInt(e.target.value) || 5))
+                    })}
+                    inputProps={{ min: 1, max: 20 }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel>Sprache</InputLabel>
+                    <Select
+                      value={examRequest.language}
+                      label="Sprache"
+                      onChange={(e: SelectChangeEvent) => setExamRequest({ ...examRequest, language: e.target.value as 'de' | 'en' })}
+                    >
+                      <MenuItem value="de">Deutsch</MenuItem>
+                      <MenuItem value="en">English</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                    Fragetypen:
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {['multiple_choice', 'open_ended'].map((type) => (
+                      <Chip
+                        key={type}
+                        label={type === 'multiple_choice' ? 'Multiple Choice' : 'Offene Fragen'}
+                        color={examRequest.question_types.includes(type) ? 'primary' : 'default'}
+                        onClick={() => {
+                          const newTypes = examRequest.question_types.includes(type)
+                            ? examRequest.question_types.filter(t => t !== type)
+                            : [...examRequest.question_types, type];
+                          setExamRequest({ ...examRequest, question_types: newTypes });
+                        }}
+                        sx={{ cursor: 'pointer' }}
+                      />
+                    ))}
+                  </Box>
+                </Grid>
+              </Grid>
+
+              {error && (
+                <Alert severity="error" sx={{ mt: 3 }}>
+                  {error}
+                </Alert>
+              )}
+
+              <Box sx={{ textAlign: 'center', mt: 4 }}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={handleGenerateExam}
+                  disabled={loading || !examRequest.topic.trim()}
+                  startIcon={loading ? <CircularProgress size={20} /> : <Quiz />}
+                  sx={{ minWidth: 200 }}
+                >
+                  {loading ? 'Generiere Prüfung...' : 'Prüfung generieren'}
+                </Button>
+              </Box>
+            </Paper>
           )}
 
-          <Box sx={{ mt: 4, textAlign: 'center' }}>
-            <Button
-              variant="contained"
-              size="large"
-              onClick={handleGenerateExam}
-              disabled={loading || !examRequest.topic.trim()}
-              startIcon={loading ? <CircularProgress size={20} /> : <Quiz />}
-              sx={{ minWidth: 200 }}
-            >
-              {loading ? 'Generiere Prüfung...' : 'Prüfung generieren'}
-            </Button>
-          </Box>
-        </Paper>
+          {activeTab === 1 && (
+            /* Document Upload Tab */
+            <Paper elevation={3} sx={{ p: 4, mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <CloudUpload sx={{ color: 'primary.main', mr: 2 }} />
+                <Typography variant="h5" component="h2">
+                  Dokumente hochladen
+                </Typography>
+              </Box>
+
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Laden Sie Dokumente hoch, um daraus automatisch Prüfungsfragen zu generieren. 
+                Unterstützte Formate: PDF, DOC, DOCX, TXT, MD
+              </Typography>
+
+              <DocumentUpload
+                onUploadComplete={handleDocumentUploadComplete}
+                onUploadError={handleDocumentUploadError}
+                maxFiles={5}
+              />
+
+              <Alert severity="info" sx={{ mt: 3 }}>
+                <Typography variant="body2">
+                  <strong>Hinweis:</strong> Die RAG-basierte Fragenerstellung aus hochgeladenen Dokumenten 
+                  wird in Phase 2 implementiert. Aktuell können Sie Dokumente hochladen und verwalten.
+                </Typography>
+              </Alert>
+            </Paper>
+          )}
+        </>
       ) : (
         /* Exam Display */
         <Box>
-          <ExamDisplay exam={examResponse} onNewExam={handleNewExam} />
+          <ExamDisplay exam={exam} onNewExam={handleNewExam} />
         </Box>
       )}
 
@@ -199,11 +264,11 @@ function App() {
       <Card sx={{ mt: 4, bgcolor: 'info.light', color: 'info.contrastText' }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 1 }}>
-            🚀 Workshop Demo Version
+            🚀 Workshop Demo Version - Document Upload Feature
           </Typography>
           <Typography variant="body2">
-            Dies ist eine Demo-Version für den Workshop. In der finalen Version wird die Claude API 
-            für die intelligente Generierung von Prüfungsfragen verwendet.
+            Neu implementiert: Document Upload System mit Drag & Drop Interface. 
+            Die RAG-basierte Fragenerstellung aus Dokumenteninhalten folgt in Phase 2.
           </Typography>
         </CardContent>
       </Card>

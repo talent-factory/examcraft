@@ -12,6 +12,7 @@ import os
 from dotenv import load_dotenv
 from services.claude_service import ClaudeService
 from api.documents import router as documents_router
+from database import create_tables
 
 # Load environment variables
 load_dotenv()
@@ -36,6 +37,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize database tables
+create_tables()
 
 # Include routers
 app.include_router(documents_router)

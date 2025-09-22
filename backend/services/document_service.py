@@ -193,7 +193,7 @@ class DocumentService:
         document.status = status
         
         if metadata:
-            document.metadata = metadata
+            document.doc_metadata = metadata
             
         if status == DocumentStatus.PROCESSED:
             document.processed_at = datetime.utcnow()
