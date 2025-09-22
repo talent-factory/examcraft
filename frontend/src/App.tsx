@@ -20,7 +20,7 @@ import {
   Tabs,
   Tab
 } from '@mui/material';
-import { DocumentUpload } from './components/DocumentUpload';
+import { DocumentUpload } from './components/DocumentUpload_simple';
 import { School, Psychology, Quiz, CloudUpload } from '@mui/icons-material';
 import { ExamService } from './services/ExamService';
 import { ExamRequest, ExamResponse } from './types/exam';
