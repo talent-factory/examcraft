@@ -11,6 +11,7 @@ from typing import List, Optional
 import os
 from dotenv import load_dotenv
 from services.claude_service import ClaudeService
+from api.documents import router as documents_router
 
 # Load environment variables
 load_dotenv()
@@ -35,6 +36,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(documents_router)
 
 # Pydantic models
 class ExamRequest(BaseModel):

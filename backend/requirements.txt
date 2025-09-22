@@ -15,8 +15,8 @@ httpx==0.25.2
 
 # Environment and configuration
 python-dotenv==1.0.0
-pydantic==2.4.2
-pydantic-settings==2.0.3
+pydantic==2.7.0
+pydantic-settings==2.3.0
 
 # Security
 python-jose[cryptography]==3.3.0
@@ -29,3 +29,14 @@ python-multipart==0.0.6
 # Development
 pytest==7.4.3
 pytest-asyncio==0.21.1
+
+# Document Processing & Upload
+aiofiles==23.2.1                    # Async File Operations
+python-magic==0.4.27                # File Type Detection
+pypdf==3.17.1                       # PDF Processing Fallback
+python-docx==1.1.0                  # DOCX Processing
+docling==1.0.0                      # IBM Docling für Dokumentenverarbeitung
+
+# Vector Database & Embeddings
+chromadb==0.4.18                    # Lokale Vektor-Datenbank
+sentence-transformers==2.2.2        # Embedding-Modelle
