@@ -12,6 +12,9 @@ from pydantic import BaseModel
 from services.document_service import DocumentService
 from models.document import Document, DocumentStatus
 from database import get_db
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Aktuell ohne User Authentication - wird später hinzugefügt
 def get_current_user():
