@@ -168,7 +168,7 @@ const response = await ExamService.generateExam(request);
 
 > "Stellen Sie sich vor, Sie müssen für 50 Studierende eine Prüfung erstellen. Normalerweise dauert das Stunden. Mit ExamCraft AI dauert es Minuten."
 
-### Während der Demo
+### Durchführung der Demo
 
 > "Hier sehen Sie, wie einfach es ist: Thema eingeben, Einstellungen wählen, und die KI generiert sofort passende Fragen."
 
