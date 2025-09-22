@@ -1,8 +1,0 @@
-Dies ist ein Test-Dokument für das ExamCraft AI Document Upload System.
-
-Es enthält einige Beispielinhalte:
-- Mathematik: Was ist 2 + 2?
-- Geschichte: Wann wurde die Berliner Mauer gebaut?
-- Programmierung: Wie definiert man eine Funktion in Python?
-
-Diese Inhalte können später für die RAG-basierte Fragenerstellung verwendet werden.

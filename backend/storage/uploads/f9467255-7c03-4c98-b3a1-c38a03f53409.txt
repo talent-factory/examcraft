@@ -1,1 +1,0 @@
-Dies ist ein Test-Dokument für das Vector Search System. Es enthält wichtige Informationen über ExamCraft AI und die Implementierung von RAG-basierten Funktionen.

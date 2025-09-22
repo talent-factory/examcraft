@@ -38,3 +38,16 @@ docker/volumes/
 # Temporary files
 *.tmp
 *.temp
+
+# Upload storage (user files should not be in git)
+backend/storage/uploads/
+storage/uploads/
+
+# Vector database files (generated data)
+backend/mock_vector_db/
+mock_vector_db/
+
+# Test coverage reports
+frontend/coverage/
+backend/htmlcov/
+backend/.coverage

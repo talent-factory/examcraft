@@ -1,1 +1,0 @@
-ExamCraft AI ist ein intelligentes System fuer Pruefungserstellung. Es verwendet Vector Search und RAG-Technologien.
