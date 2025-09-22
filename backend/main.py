@@ -11,7 +11,7 @@ from typing import List, Optional
 import os
 from dotenv import load_dotenv
 from services.claude_service import ClaudeService
-from api import documents, vector_search
+from api import documents, vector_search, rag_exams
 from api.documents import router as documents_router
 from database import create_tables
 
@@ -45,6 +45,7 @@ create_tables()
 # Include routers
 app.include_router(documents.router)
 app.include_router(vector_search.router)
+app.include_router(rag_exams.router)
 
 # Pydantic models
 class ExamRequest(BaseModel):

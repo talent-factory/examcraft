@@ -67,18 +67,18 @@
 
 #### TASK-004: RAG-basierte Fragenerstellung
 
-- **Status**: 🔴 Nicht begonnen
-- **Assignee**: -
-- **Deadline**: -
+- **Status**: ✅ Abgeschlossen
+- **Assignee**: Daniel Senften
+- **Deadline**: 22.09.2025
 - **Beschreibung**: RAG Service für dokumentenbasierte Fragenerstellung
 
 **Akzeptanzkriterien**:
 
-- [ ] Context Retrieval aus Vector DB
-- [ ] RAG-Prompts für Claude API
-- [ ] Quality Assurance
-- [ ] Source Attribution
-- [ ] Fallback Strategies
+- [x] Context Retrieval aus Vector DB
+- [x] RAG-Prompts für Claude API
+- [x] Quality Assurance
+- [x] Source Attribution
+- [x] Fallback Strategies
 
 #### TASK-005: Document Management UI
 
