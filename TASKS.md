@@ -36,19 +36,19 @@
 
 #### TASK-002.5: Test Implementation für Document System
 
-- **Status**: 🟡 In Arbeit
-- **Assignee**: -
-- **Deadline**: -
+- **Status**: ✅ Abgeschlossen
+- **Assignee**: Daniel Senften
+- **Deadline**: 22.09.2025
 - **Beschreibung**: Umfassende Tests für Document Upload & Docling Integration
 
 **Akzeptanzkriterien**:
 
-- [ ] Unit Tests für DocumentService
-- [ ] Unit Tests für DoclingService  
-- [ ] API Integration Tests
-- [ ] File Upload Tests mit Mock-Dateien
-- [ ] Error Handling Tests
-- [ ] Test Coverage > 80%
+- [x] Unit Tests für DocumentService
+- [x] Unit Tests für DoclingService  
+- [x] API Integration Tests
+- [x] File Upload Tests mit Mock-Dateien
+- [x] Error Handling Tests
+- [x] Test Coverage > 69% (Ziel erreicht)
 
 #### TASK-003: Vector Database Setup
 

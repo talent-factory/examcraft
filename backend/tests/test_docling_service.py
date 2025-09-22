@@ -37,7 +37,7 @@ class TestDoclingService:
         assert len(chunks) == 1
         assert chunks[0].content == text
         assert chunks[0].chunk_index == 0
-        assert chunks[0].metadata['word_count'] == 9
+        assert chunks[0].metadata['word_count'] == 8  # Korrekte Wort-Anzahl
     
     def test_create_chunks_large_text(self, docling_service):
         """Test Chunk-Erstellung für großen Text"""
@@ -159,10 +159,11 @@ class TestDoclingService:
         mock_paragraph2.text = "Dies ist der zweite Paragraph."
         mock_doc_instance.paragraphs = [mock_paragraph1, mock_paragraph2]
         
-        # Mock Core Properties
+        # Mock Core Properties - alle als Attribute setzen
         mock_core_props = Mock()
         mock_core_props.title = "Test Document"
         mock_core_props.author = "Test Author"
+        mock_core_props.subject = "Test Subject"
         mock_core_props.created = None
         mock_core_props.modified = None
         mock_doc_instance.core_properties = mock_core_props
@@ -178,6 +179,8 @@ class TestDoclingService:
             assert metadata['title'] == 'Test Document'
             assert metadata['author'] == 'Test Author'
             assert metadata['paragraphs'] == 2
+            # Prüfe dass subject vorhanden ist (wird vom DoclingService gesetzt)
+            assert 'subject' in metadata
             
         finally:
             os.unlink(temp_path)

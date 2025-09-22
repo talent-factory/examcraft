@@ -82,15 +82,33 @@ class TestDocumentAPI:
             "id": 1,
             "filename": "doc1.txt",
             "original_filename": "document1.txt",
-            "status": "uploaded"
+            "file_size": 1000,
+            "mime_type": "text/plain",
+            "status": "uploaded",
+            "user_id": "demo_user",
+            "metadata": None,
+            "content_preview": None,
+            "vector_collection": "doc_123",
+            "created_at": "2023-01-01T00:00:00",
+            "updated_at": None,
+            "processed_at": None
         }
         
         mock_doc2 = Mock()
         mock_doc2.to_dict.return_value = {
             "id": 2,
             "filename": "doc2.pdf",
-            "original_filename": "document2.pdf", 
-            "status": "processed"
+            "original_filename": "document2.pdf",
+            "file_size": 2000,
+            "mime_type": "application/pdf", 
+            "status": "processed",
+            "user_id": "demo_user",
+            "metadata": {"pages": 5},
+            "content_preview": "PDF content preview...",
+            "vector_collection": "doc_456",
+            "created_at": "2023-01-01T00:00:00",
+            "updated_at": "2023-01-01T00:01:00",
+            "processed_at": "2023-01-01T00:01:00"
         }
         
         mock_get_docs.return_value = [mock_doc1, mock_doc2]
@@ -135,7 +153,17 @@ class TestDocumentAPI:
         mock_document.to_dict.return_value = {
             "id": 123,
             "filename": "test.txt",
-            "status": "uploaded"
+            "original_filename": "test_original.txt",
+            "file_size": 1000,
+            "mime_type": "text/plain",
+            "status": "uploaded",
+            "user_id": "demo_user",
+            "metadata": None,
+            "content_preview": None,
+            "vector_collection": "doc_123",
+            "created_at": "2023-01-01T00:00:00",
+            "updated_at": None,
+            "processed_at": None
         }
         mock_get_doc.return_value = mock_document
         
