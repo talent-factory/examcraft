@@ -267,7 +267,9 @@ class DocumentService:
             # Erstelle Content Preview (erste 200 Zeichen)
             if processed_doc.chunks:
                 first_chunk = processed_doc.chunks[0].content
-                content_preview = first_chunk[:200] + "..." if len(first_chunk) > 200 else first_chunk
+                # Entferne NUL-Zeichen die PostgreSQL nicht unterstützt
+                clean_chunk = first_chunk.replace('\x00', '').replace('\0', '')
+                content_preview = clean_chunk[:200] + "..." if len(clean_chunk) > 200 else clean_chunk
             else:
                 content_preview = "No content extracted"
             

@@ -480,7 +480,7 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = ({
                             </Grid>
                             {recommendations.quality_warning && (
                               <Grid item xs={12}>
-                                <Alert severity="warning" size="small">
+                                <Alert severity="warning">
                                   {recommendations.quality_warning}
                                 </Alert>
                               </Grid>

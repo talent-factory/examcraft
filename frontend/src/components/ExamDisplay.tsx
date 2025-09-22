@@ -69,7 +69,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
   const calculateScore = (): { correct: number; total: number; percentage: number } => {
     const total = exam.questions.length;
     const correct = exam.questions.reduce((count, question) => {
-      const userAnswer = getUserAnswer(question.id);
+      const userAnswer = getUserAnswer(String(question.id));
       return isCorrectAnswer(question, userAnswer) ? count + 1 : count;
     }, 0);
     const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
@@ -78,7 +78,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
   };
 
   const renderQuestion = (question: Question, index: number) => {
-    const userAnswer = getUserAnswer(question.id);
+    const userAnswer = getUserAnswer(String(question.id));
     const isCorrect = showResults ? isCorrectAnswer(question, userAnswer) : null;
 
     return (
@@ -115,7 +115,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
             <FormControl component="fieldset" fullWidth>
               <RadioGroup
                 value={userAnswer}
-                onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                onChange={(e) => handleAnswerChange(String(question.id), e.target.value)}
               >
                 {question.options.map((option, optionIndex) => (
                   <FormControlLabel
@@ -142,7 +142,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
               rows={4}
               placeholder="Ihre Antwort hier eingeben..."
               value={userAnswer}
-              onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+              onChange={(e) => handleAnswerChange(String(question.id), e.target.value)}
               disabled={showResults}
               variant="outlined"
             />

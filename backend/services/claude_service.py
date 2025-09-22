@@ -6,19 +6,144 @@ Handles communication with Anthropic's Claude API for intelligent question gener
 import os
 import httpx
 import json
+import asyncio
+import time
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import logging
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 class ClaudeService:
-    """Service for interacting with Claude API"""
+    """Service for interacting with Claude API with full production features"""
     
     def __init__(self):
         self.api_key = os.getenv("CLAUDE_API_KEY")
         self.base_url = "https://api.anthropic.com/v1/messages"
-        self.model = "claude-3-sonnet-20240229"
+        self.model = os.getenv("CLAUDE_MODEL", "claude-3-sonnet-20240229")
+        
+        # Rate limiting configuration
+        self.max_requests_per_minute = int(os.getenv("CLAUDE_MAX_RPM", "50"))
+        self.max_tokens_per_request = int(os.getenv("CLAUDE_MAX_TOKENS", "4000"))
+        
+        # Retry configuration
+        self.max_retries = int(os.getenv("CLAUDE_MAX_RETRIES", "3"))
+        self.retry_delay = float(os.getenv("CLAUDE_RETRY_DELAY", "1.0"))
+        
+        # Cost tracking
+        self.cost_per_input_token = 0.003 / 1000  # $3 per million input tokens
+        self.cost_per_output_token = 0.015 / 1000  # $15 per million output tokens
+        
+        # Demo mode fallback
+        self.demo_mode = not self.api_key or os.getenv("CLAUDE_DEMO_MODE", "false").lower() == "true"
+        
+        # Rate limiting tracking
+        self.request_timestamps = []
+        self.total_cost = 0.0
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        
+        if self.demo_mode:
+            logger.warning("Claude API running in DEMO MODE - using mock responses")
+        else:
+            logger.info(f"Claude API initialized with model: {self.model}")
+    
+    def _check_rate_limit(self) -> bool:
+        """Check if we're within rate limits"""
+        now = time.time()
+        # Remove timestamps older than 1 minute
+        self.request_timestamps = [ts for ts in self.request_timestamps if now - ts < 60]
+        
+        if len(self.request_timestamps) >= self.max_requests_per_minute:
+            return False
+        return True
+    
+    def _add_request_timestamp(self):
+        """Add current timestamp to rate limit tracking"""
+        self.request_timestamps.append(time.time())
+    
+    def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
+        """Calculate cost for API call"""
+        input_cost = input_tokens * self.cost_per_input_token
+        output_cost = output_tokens * self.cost_per_output_token
+        total_cost = input_cost + output_cost
+        
+        # Update totals
+        self.total_input_tokens += input_tokens
+        self.total_output_tokens += output_tokens
+        self.total_cost += total_cost
+        
+        return total_cost
+    
+    async def _make_api_request_with_retry(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Make API request with retry logic"""
+        last_exception = None
+        
+        for attempt in range(self.max_retries):
+            try:
+                # Check rate limit
+                if not self._check_rate_limit():
+                    wait_time = 60 - (time.time() - min(self.request_timestamps))
+                    logger.warning(f"Rate limit reached, waiting {wait_time:.1f}s")
+                    await asyncio.sleep(wait_time)
+                
+                self._add_request_timestamp()
+                
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        self.base_url,
+                        headers={
+                            "Content-Type": "application/json",
+                            "x-api-key": self.api_key,
+                            "anthropic-version": "2023-06-01"
+                        },
+                        json=payload
+                    )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        
+                        # Track usage and cost
+                        usage = result.get("usage", {})
+                        input_tokens = usage.get("input_tokens", 0)
+                        output_tokens = usage.get("output_tokens", 0)
+                        cost = self._calculate_cost(input_tokens, output_tokens)
+                        
+                        logger.info(f"Claude API call successful - Cost: ${cost:.4f}, Tokens: {input_tokens}+{output_tokens}")
+                        return result
+                    
+                    elif response.status_code == 429:  # Rate limited
+                        retry_after = int(response.headers.get("retry-after", self.retry_delay))
+                        logger.warning(f"Rate limited by API, waiting {retry_after}s")
+                        await asyncio.sleep(retry_after)
+                        continue
+                    
+                    else:
+                        error_msg = f"Claude API error {response.status_code}: {response.text}"
+                        logger.error(error_msg)
+                        raise Exception(error_msg)
+                        
+            except Exception as e:
+                last_exception = e
+                if attempt < self.max_retries - 1:
+                    wait_time = self.retry_delay * (2 ** attempt)  # Exponential backoff
+                    logger.warning(f"Claude API attempt {attempt + 1} failed: {e}, retrying in {wait_time}s")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Claude API failed after {self.max_retries} attempts: {e}")
+        
+        raise last_exception or Exception("Claude API request failed")
+    
+    def get_usage_stats(self) -> Dict[str, Any]:
+        """Get current usage statistics"""
+        return {
+            "total_cost": round(self.total_cost, 4),
+            "total_input_tokens": self.total_input_tokens,
+            "total_output_tokens": self.total_output_tokens,
+            "requests_last_minute": len(self.request_timestamps),
+            "demo_mode": self.demo_mode
+        }
         
     async def generate_questions(
         self, 
@@ -29,7 +154,7 @@ class ClaudeService:
         language: str = "de"
     ) -> List[Dict[str, Any]]:
         """
-        Generate exam questions using Claude API
+        Generate exam questions using Claude API with full production features
         
         Args:
             topic: The subject/topic for the questions
@@ -42,44 +167,32 @@ class ClaudeService:
             List of generated questions
         """
         
-        if not self.api_key:
-            logger.warning("Claude API key not configured, using demo questions")
+        # Use demo mode if API key not available or explicitly enabled
+        if self.demo_mode:
+            logger.info("Using demo mode for question generation")
             return self._generate_demo_questions(topic, difficulty, question_count, language)
         
         try:
             prompt = self._build_prompt(topic, difficulty, question_count, question_types, language)
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    self.base_url,
-                    headers={
-                        "Content-Type": "application/json",
-                        "x-api-key": self.api_key,
-                        "anthropic-version": "2023-06-01"
-                    },
-                    json={
-                        "model": self.model,
-                        "max_tokens": 2000,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": prompt
-                            }
-                        ]
-                    },
-                    timeout=30.0
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    content = result["content"][0]["text"]
-                    return self._parse_claude_response(content, topic, difficulty)
-                else:
-                    logger.error(f"Claude API error: {response.status_code} - {response.text}")
-                    return self._generate_demo_questions(topic, difficulty, question_count, language)
+            payload = {
+                "model": self.model,
+                "max_tokens": min(self.max_tokens_per_request, 4000),
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            }
+            
+            # Use new retry logic
+            result = await self._make_api_request_with_retry(payload)
+            content = result["content"][0]["text"]
+            return self._parse_claude_response(content, topic, difficulty)
                     
         except Exception as e:
-            logger.error(f"Error calling Claude API: {str(e)}")
+            logger.error(f"Claude API failed, falling back to demo mode: {str(e)}")
             return self._generate_demo_questions(topic, difficulty, question_count, language)
     
     def _build_prompt(
@@ -217,3 +330,52 @@ Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
             })
         
         return demo_questions[:question_count]
+    
+    def _parse_claude_response(self, content: str, topic: str, difficulty: str) -> List[Dict[str, Any]]:
+        """Parse Claude API response into structured questions"""
+        try:
+            # Try to parse JSON response
+            import re
+            
+            # Extract JSON from response if wrapped in text
+            json_match = re.search(r'\[.*\]', content, re.DOTALL)
+            if json_match:
+                questions_json = json_match.group()
+                questions = json.loads(questions_json)
+                return questions
+            
+            # Fallback: Parse structured text response
+            questions = []
+            lines = content.split('\n')
+            current_question = {}
+            
+            for line in lines:
+                line = line.strip()
+                if line.startswith('Q:') or line.startswith('Question:'):
+                    if current_question:
+                        questions.append(current_question)
+                    current_question = {
+                        'id': len(questions) + 1,
+                        'question': line.replace('Q:', '').replace('Question:', '').strip(),
+                        'type': 'open_ended',
+                        'difficulty': difficulty,
+                        'topic': topic
+                    }
+                elif line.startswith('A:') or line.startswith('Answer:'):
+                    if current_question:
+                        current_question['correct_answer'] = line.replace('A:', '').replace('Answer:', '').strip()
+                elif line.startswith('Options:') or line.startswith('Choices:'):
+                    current_question['type'] = 'multiple_choice'
+                    current_question['options'] = []
+                elif line.startswith(('a)', 'b)', 'c)', 'd)', 'A)', 'B)', 'C)', 'D)')):
+                    if 'options' in current_question:
+                        current_question['options'].append(line)
+            
+            if current_question:
+                questions.append(current_question)
+            
+            return questions if questions else self._generate_demo_questions(topic, difficulty, 1, 'de')
+            
+        except Exception as e:
+            logger.error(f"Failed to parse Claude response: {e}")
+            return self._generate_demo_questions(topic, difficulty, 1, 'de')

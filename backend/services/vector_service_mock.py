@@ -88,22 +88,36 @@ class VectorService:
         return {"name": collection_name or self.collection_name}
     
     async def create_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """
-        Mock Embedding-Erstellung
-        Generiert zufällige Embeddings für Demo
-        """
-        if not texts:
-            return []
-        
-        # Simuliere Verarbeitungszeit
-        await asyncio.sleep(0.1)
+        """Erstelle Mock Embeddings für Texte"""
+        await asyncio.sleep(0.1)  # Simuliere API Call
         
         # Generiere Mock Embeddings (384 Dimensionen)
         embeddings = []
         for text in texts:
-            # Verwende Text-Hash für konsistente "Embeddings"
-            random.seed(hash(text) % 2**32)
-            embedding = [random.uniform(-1, 1) for _ in range(384)]
+            # Verwende Text-basierte Features für bessere Similarity
+            words = text.lower().split()
+            
+            # Erstelle Feature-basierte Embeddings
+            embedding = []
+            for i in range(384):
+                # Verwende verschiedene Text-Features
+                if i < len(words):
+                    # Wort-basierte Features
+                    word_hash = hash(words[i]) % 1000
+                    embedding.append((word_hash / 1000.0) * 2 - 1)  # Normalisiere auf [-1, 1]
+                elif i < 100:
+                    # Längen-basierte Features
+                    embedding.append(len(text) / 1000.0 if len(text) < 1000 else 1.0)
+                elif i < 200:
+                    # Zeichen-basierte Features
+                    char_sum = sum(ord(c) for c in text[:10]) if text else 0
+                    embedding.append((char_sum % 1000) / 1000.0)
+                else:
+                    # Fülle mit konsistenten Werten basierend auf Text-Hash
+                    text_hash = hash(text + str(i)) % 2**32
+                    random.seed(text_hash)
+                    embedding.append(random.uniform(-0.5, 0.5))
+            
             embeddings.append(embedding)
         
         return embeddings

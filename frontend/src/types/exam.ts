@@ -9,7 +9,7 @@ export interface ExamRequest {
 }
 
 export interface Question {
-  id: string;
+  id: number | string;
   type: 'multiple_choice' | 'open_ended' | 'true_false' | 'short_answer';
   question: string;
   options?: string[];
@@ -17,18 +17,28 @@ export interface Question {
   explanation?: string;
   difficulty: string;
   topic: string;
+  // RAG-specific properties
+  sources?: string[];
+  confidence?: number;
 }
 
 export interface ExamResponse {
+  id?: string;
   exam_id: string;
   topic: string;
   questions: Question[];
+  difficulty?: string;
+  language?: string;
   created_at: string;
+  generation_time?: number;
   metadata: {
     difficulty: string;
     question_count: number;
     language: string;
     generated_by: string;
+    generation_time?: number;
+    quality_metrics?: any;
+    source_documents?: any;
   };
 }
 

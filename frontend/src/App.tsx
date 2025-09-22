@@ -342,19 +342,29 @@ function App() {
           <ExamDisplay 
             exam={{
               id: ragExam.exam_id,
+              exam_id: ragExam.exam_id,
               topic: ragExam.topic,
               questions: ragExam.questions.map((q, index) => ({
                 id: index + 1,
                 question: q.question_text,
-                type: q.question_type,
+                type: q.question_type as 'multiple_choice' | 'open_ended' | 'true_false' | 'short_answer',
                 options: q.options || [],
                 correct_answer: q.correct_answer || '',
-                explanation: Array.isArray(q.explanation) ? q.explanation.join('\n') : q.explanation || ''
+                explanation: Array.isArray(q.explanation) ? q.explanation.join('\n') : q.explanation || '',
+                difficulty: q.difficulty || 'medium',
+                topic: ragExam.topic,
+                sources: q.source_documents,
+                confidence: q.confidence_score
               })),
               difficulty: ragExam.questions[0]?.difficulty || 'medium',
               language: 'de',
               created_at: new Date().toISOString(),
+              generation_time: ragExam.generation_time,
               metadata: {
+                difficulty: 'medium',
+                question_count: ragExam.questions.length,
+                language: 'de',
+                generated_by: 'rag',
                 generation_time: ragExam.generation_time,
                 quality_metrics: ragExam.quality_metrics,
                 source_documents: ragExam.context_summary.source_documents

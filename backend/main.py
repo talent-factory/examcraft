@@ -33,7 +33,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://frontend:3000"],
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -90,6 +90,24 @@ async def health_check():
         "status": "healthy",
         "service": "ExamCraft AI Backend",
         "environment": os.getenv("ENVIRONMENT", "development")
+    }
+
+@app.get("/api/v1/claude/usage")
+async def get_claude_usage():
+    """Get Claude API usage statistics"""
+    return claude_service.get_usage_stats()
+
+@app.get("/api/v1/claude/health")
+async def get_claude_health():
+    """Get Claude API health status"""
+    stats = claude_service.get_usage_stats()
+    return {
+        "status": "healthy" if not stats["demo_mode"] else "demo_mode",
+        "service": "Claude API",
+        "demo_mode": stats["demo_mode"],
+        "api_key_configured": bool(claude_service.api_key),
+        "model": claude_service.model,
+        "usage": stats
     }
 
 # Demo endpoints for Workshop
