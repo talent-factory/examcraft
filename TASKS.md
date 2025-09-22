@@ -7,8 +7,8 @@
 #### TASK-001: Document Upload System
 
 - **Status**: ✅ Abgeschlossen
-- **Assignee**: -
-- **Deadline**: -
+- **Assignee**: Daniel Senften
+- **Deadline**: 22.09.2025
 - **Beschreibung**: Implementierung eines File-Upload-Systems für PDF, DOC, DOCX, TXT Dateien
 
 **Akzeptanzkriterien**:
@@ -22,8 +22,8 @@
 #### TASK-002: Docling Integration
 
 - **Status**: ✅ Abgeschlossen
-- **Assignee**: -
-- **Deadline**: -
+- **Assignee**: Daniel Senften
+- **Deadline**: 22.09.2025
 - **Beschreibung**: Integration von IBM Docling für strukturierte Dokumentenverarbeitung
 
 **Akzeptanzkriterien**:
@@ -33,6 +33,22 @@
 - [x] Metadata Extraktion
 - [x] Text Chunking Strategy
 - [x] Error Recovery
+
+#### TASK-002.5: Test Implementation für Document System
+
+- **Status**: 🟡 In Arbeit
+- **Assignee**: -
+- **Deadline**: -
+- **Beschreibung**: Umfassende Tests für Document Upload & Docling Integration
+
+**Akzeptanzkriterien**:
+
+- [ ] Unit Tests für DocumentService
+- [ ] Unit Tests für DoclingService  
+- [ ] API Integration Tests
+- [ ] File Upload Tests mit Mock-Dateien
+- [ ] Error Handling Tests
+- [ ] Test Coverage > 80%
 
 #### TASK-003: Vector Database Setup
 
