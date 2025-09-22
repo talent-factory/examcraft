@@ -33,7 +33,7 @@ import {
   Delete,
   Download,
   Psychology,
-  VectorIcon,
+  Timeline,
   CheckCircle,
   Error,
   Schedule,
@@ -76,7 +76,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       const docs = await DocumentService.getDocuments();
       setDocuments(docs);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Laden der Dokumente');
+      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
     } finally {
       setLoading(false);
     }
@@ -158,7 +158,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       setSelectedDocuments(prev => prev.filter(id => id !== deleteDialog.document!.id));
       setDeleteDialog({ open: false, document: null });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Löschen');
+      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Löschen');
     }
   };
 
@@ -167,7 +167,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       await DocumentService.downloadDocument(document.id, document.filename);
       handleMenuClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Download');
+      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Download');
     }
   };
 
@@ -315,7 +315,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                       {getFileIcon(document.mime_type)}
                       {document.has_vectors && (
                         <Tooltip title="Vector Embeddings verfügbar">
-                          <VectorIcon color="success" fontSize="small" />
+                          <Timeline color="success" fontSize="small" />
                         </Tooltip>
                       )}
                     </Box>
