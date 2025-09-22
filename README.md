@@ -18,7 +18,7 @@ ExamCraft AI ist eine moderne Webanwendung, die Dozierenden dabei hilft, qualita
 
 ## 🏗️ Architektur
 
-```
+```text
 ExamCraft/
 ├── backend/           # FastAPI Backend
 │   ├── main.py       # API Endpoints
@@ -46,26 +46,29 @@ ExamCraft/
 ### Installation
 
 1. **Repository klonen**
+
    ```bash
    git clone <repository-url>
    cd ExamCraft
    ```
 
 2. **Umgebung konfigurieren**
+
    ```bash
    cp .env.example .env
    # .env Datei bearbeiten und Claude API Key eintragen
    ```
 
 3. **Entwicklungsumgebung starten**
+
    ```bash
    ./start-dev.sh
    ```
 
 4. **Anwendung öffnen**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - API Dokumentation: http://localhost:8000/docs
+   - Frontend: <http://localhost:3000>
+   - Backend API: <http://localhost:8000>
+   - API Dokumentation: <http://localhost:8000/docs>
 
 ## 🛠️ Entwicklung
 
@@ -119,6 +122,7 @@ Diese Version enthält eine funktionsfähige Demo für Workshop-Zwecke:
 ## 🔧 Technologie-Stack
 
 ### Backend
+
 - **FastAPI** - Moderne Python Web API
 - **SQLAlchemy** - ORM für Datenbankzugriff
 - **PostgreSQL** - Relationale Datenbank
@@ -126,12 +130,14 @@ Diese Version enthält eine funktionsfähige Demo für Workshop-Zwecke:
 - **Pydantic** - Datenvalidierung und Serialisierung
 
 ### Frontend
+
 - **React 18** - UI Framework
 - **TypeScript** - Type-sichere Entwicklung
 - **Material-UI (MUI)** - Komponenten-Bibliothek
 - **Axios** - HTTP Client
 
 ### DevOps
+
 - **Docker & Docker Compose** - Containerisierung
 - **uvicorn** - ASGI Server
 - **nginx** - Reverse Proxy (Produktion)
@@ -139,6 +145,7 @@ Diese Version enthält eine funktionsfähige Demo für Workshop-Zwecke:
 ## 🎯 Roadmap
 
 ### Phase 1: Workshop Demo ✅
+
 - [x] Grundlegende Projektstruktur
 - [x] Docker-Umgebung Setup
 - [x] FastAPI Backend mit Demo-Endpoints
@@ -146,6 +153,7 @@ Diese Version enthält eine funktionsfähige Demo für Workshop-Zwecke:
 - [x] Prüfungserstellung und -anzeige
 
 ### Phase 2: Core Features
+
 - [ ] Claude API Integration
 - [ ] Benutzerauthentifizierung
 - [ ] Prüfungsverwaltung (CRUD)
@@ -153,6 +161,7 @@ Diese Version enthält eine funktionsfähige Demo für Workshop-Zwecke:
 - [ ] Export-Funktionen (PDF, Word)
 
 ### Phase 3: Erweiterte Features
+
 - [ ] Fragenkatalog-Verwaltung
 - [ ] Statistiken und Analytics
 - [ ] Benutzerrollen und Permissions
@@ -175,7 +184,7 @@ Dieses Projekt ist unter der MIT Lizenz lizenziert - siehe [LICENSE](LICENSE) Da
 
 - **Issues**: GitHub Issues für Bug Reports und Feature Requests
 - **Dokumentation**: `/docs` Ordner für detaillierte Dokumentation
-- **API Docs**: http://localhost:8000/docs (während Entwicklung)
+- **API Docs**: <http://localhost:8000/docs> (während Entwicklung)
 
 ---
 
