@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from models.document import Document, DocumentStatus
+from services.docling_service import DoclingService, ProcessedDocument
 from datetime import datetime
 import logging
 
@@ -30,6 +31,9 @@ class DocumentService:
         
         # Erstelle Upload-Verzeichnis falls nicht vorhanden
         os.makedirs(upload_dir, exist_ok=True)
+        
+        # Initialisiere Docling Service
+        self.docling_service = DoclingService()
         
     async def upload_document(
         self, 
@@ -225,3 +229,113 @@ class DocumentService:
             logger.error(f"Failed to delete document {document_id}: {str(e)}")
             db.rollback()
             return False
+    
+    async def process_document_content(
+        self, 
+        document_id: int, 
+        db: Session
+    ) -> Optional[ProcessedDocument]:
+        """
+        Verarbeite Dokumenteninhalt mit Docling Service
+        
+        Args:
+            document_id: ID des zu verarbeitenden Dokuments
+            db: Database Session
+            
+        Returns:
+            ProcessedDocument oder None bei Fehlern
+        """
+        document = self.get_document_by_id(document_id, db)
+        if not document:
+            logger.error(f"Document {document_id} not found")
+            return None
+        
+        try:
+            # Setze Status auf Processing
+            document.status = DocumentStatus.PROCESSING
+            db.commit()
+            
+            # Verarbeite Dokument mit Docling
+            processed_doc = await self.docling_service.process_document(
+                document_id=document.id,
+                file_path=document.file_path,
+                filename=document.original_filename,
+                mime_type=document.mime_type
+            )
+            
+            # Erstelle Content Preview (erste 200 Zeichen)
+            if processed_doc.chunks:
+                first_chunk = processed_doc.chunks[0].content
+                content_preview = first_chunk[:200] + "..." if len(first_chunk) > 200 else first_chunk
+            else:
+                content_preview = "No content extracted"
+            
+            # Aktualisiere Dokument mit verarbeiteten Daten
+            document.status = DocumentStatus.PROCESSED
+            document.doc_metadata = processed_doc.metadata
+            document.content_preview = content_preview
+            document.processed_at = datetime.utcnow()
+            
+            db.commit()
+            db.refresh(document)
+            
+            logger.info(f"Document {document_id} processed successfully with {processed_doc.total_chunks} chunks")
+            return processed_doc
+            
+        except Exception as e:
+            logger.error(f"Document processing failed for {document_id}: {str(e)}")
+            
+            # Setze Status auf Error
+            document.status = DocumentStatus.ERROR
+            document.doc_metadata = {
+                'error': str(e),
+                'processing_failed_at': datetime.utcnow().isoformat()
+            }
+            db.commit()
+            
+            return None
+    
+    async def get_document_chunks(
+        self, 
+        document_id: int, 
+        db: Session
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Hole verarbeitete Chunks eines Dokuments
+        
+        Args:
+            document_id: ID des Dokuments
+            db: Database Session
+            
+        Returns:
+            Liste der Chunks oder None
+        """
+        document = self.get_document_by_id(document_id, db)
+        if not document or document.status != DocumentStatus.PROCESSED:
+            return None
+        
+        try:
+            # Verarbeite Dokument erneut um Chunks zu erhalten
+            # In einer späteren Version könnten Chunks in der DB gespeichert werden
+            processed_doc = await self.docling_service.process_document(
+                document_id=document.id,
+                file_path=document.file_path,
+                filename=document.original_filename,
+                mime_type=document.mime_type
+            )
+            
+            # Konvertiere Chunks zu Dictionary Format
+            chunks_data = []
+            for chunk in processed_doc.chunks:
+                chunks_data.append({
+                    'chunk_index': chunk.chunk_index,
+                    'content': chunk.content,
+                    'page_number': chunk.page_number,
+                    'metadata': chunk.metadata
+                })
+            
+            return chunks_data
+            
+        except Exception as e:
+            logger.error(f"Failed to get chunks for document {document_id}: {str(e)}")
+            return None

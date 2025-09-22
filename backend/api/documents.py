@@ -246,3 +246,92 @@ async def get_document_status(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
+
+@router.post("/{document_id}/process")
+async def process_document(
+    document_id: int,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Verarbeite Dokument mit Docling Service
+    
+    - **document_id**: ID des zu verarbeitenden Dokuments
+    
+    Returns:
+        Processing-Status und Metadaten
+    """
+    try:
+        document = document_service.get_document_by_id(document_id, db)
+        
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        if document.user_id and document.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Starte Dokumentenverarbeitung
+        processed_doc = await document_service.process_document_content(document_id, db)
+        
+        if not processed_doc:
+            raise HTTPException(status_code=500, detail="Document processing failed")
+        
+        # Erstelle Zusammenfassung
+        summary = document_service.docling_service.get_document_summary(processed_doc)
+        
+        return {
+            "message": "Document processed successfully",
+            "document_id": document_id,
+            "processing_summary": summary
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
+
+@router.get("/{document_id}/chunks")
+async def get_document_chunks(
+    document_id: int,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Hole verarbeitete Text-Chunks eines Dokuments
+    
+    - **document_id**: ID des Dokuments
+    
+    Returns:
+        Liste der Text-Chunks mit Metadaten
+    """
+    try:
+        document = document_service.get_document_by_id(document_id, db)
+        
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        if document.user_id and document.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        if document.status != DocumentStatus.PROCESSED:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Document not processed yet. Current status: {document.status.value}"
+            )
+        
+        # Hole Chunks
+        chunks = await document_service.get_document_chunks(document_id, db)
+        
+        if chunks is None:
+            raise HTTPException(status_code=500, detail="Failed to retrieve document chunks")
+        
+        return {
+            "document_id": document_id,
+            "total_chunks": len(chunks),
+            "chunks": chunks
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get chunks: {str(e)}")

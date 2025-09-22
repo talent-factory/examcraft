@@ -6,33 +6,33 @@
 
 #### TASK-001: Document Upload System
 
-- **Status**: 🔴 Nicht begonnen
+- **Status**: ✅ Abgeschlossen
 - **Assignee**: -
 - **Deadline**: -
 - **Beschreibung**: Implementierung eines File-Upload-Systems für PDF, DOC, DOCX, TXT Dateien
 
 **Akzeptanzkriterien**:
 
-- [ ] Drag & Drop Interface
-- [ ] Multi-File Upload Support
-- [ ] Progress-Anzeige
-- [ ] File-Validation
-- [ ] Error Handling
+- [x] Drag & Drop Interface
+- [x] Multi-File Upload Support
+- [x] Progress-Anzeige
+- [x] File-Validation
+- [x] Error Handling
 
 #### TASK-002: Docling Integration
 
-- **Status**: 🔴 Nicht begonnen
+- **Status**: ✅ Abgeschlossen
 - **Assignee**: -
 - **Deadline**: -
 - **Beschreibung**: Integration von IBM Docling für strukturierte Dokumentenverarbeitung
 
 **Akzeptanzkriterien**:
 
-- [ ] Docling Service implementiert
-- [ ] PDF/DOC/DOCX Processing
-- [ ] Metadata Extraktion
-- [ ] Text Chunking Strategy
-- [ ] Error Recovery
+- [x] Docling Service implementiert
+- [x] PDF/DOC/DOCX Processing
+- [x] Metadata Extraktion
+- [x] Text Chunking Strategy
+- [x] Error Recovery
 
 #### TASK-003: Vector Database Setup
 
