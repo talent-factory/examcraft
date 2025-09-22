@@ -35,6 +35,17 @@
 - [ ] **Bessere Beispiel-Fragen** für verschiedene Fachbereiche
 - [ ] **Performance-Optimierung** für schnellere Antworten
 
+### 4. Document-Upload & RAG-Integration (NEUE PRIORITÄT)
+
+- [ ] **Docling Integration** für Dokumentenverarbeitung
+- [ ] **File Upload System** (PDF, DOC, DOCX, TXT)
+- [ ] **Lokale Vektor-Datenbank** Setup (ChromaDB/FAISS)
+- [ ] **Document Processing Pipeline** implementieren
+- [ ] **RAG-basierte Fragenerstellung** aus Dokumenteninhalten
+- [ ] **Document Management UI** für Upload und Verwaltung
+- [ ] **Chunk-basierte Speicherung** mit Metadaten
+- [ ] **Similarity Search** für relevante Inhalte
+
 ## 🚀 Phase 2: Core Features (Woche 3-8)
 
 ### Benutzerauthentifizierung & -verwaltung
@@ -194,6 +205,7 @@ Woche 13-16: Mobile App & Advanced Features
 
 ### Hoch/Hoch (Sofort angehen)
 
+- **Document-Upload & RAG-Integration** (NEUE PRIORITÄT)
 - Claude API Vollintegration
 - User Authentication
 - PDF Export
