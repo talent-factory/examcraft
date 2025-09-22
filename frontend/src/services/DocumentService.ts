@@ -242,7 +242,7 @@ export class DocumentService {
         }
         
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Unknown error';
         onError?.(file.name, errorMessage);
       }
     }
@@ -273,7 +273,7 @@ export class DocumentService {
         onComplete?.(documentId, result);
         
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Unknown error';
         onError?.(documentId, errorMessage);
       }
     }

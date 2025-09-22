@@ -133,7 +133,7 @@ Geschätzte Fragen: ${estimatedQuestions}
         estimated_questions: estimatedQuestions,
       };
     } catch (error) {
-      throw new Error(`Context preview failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`Context preview failed: ${error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Unknown error'}`);
     }
   }
 

@@ -184,7 +184,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       onUploadComplete?.(uploadResult.document_id, file.name);
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+      const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Upload failed';
       
       setUploadFiles(prev => prev.map(f => 
         f.id === fileId 
