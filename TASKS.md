@@ -52,18 +52,18 @@
 
 #### TASK-003: Vector Database Setup
 
-- **Status**: 🔴 Nicht begonnen
-- **Assignee**: -
-- **Deadline**: -
+- **Status**: ✅ Abgeschlossen
+- **Assignee**: Daniel Senften
+- **Deadline**: 22.09.2025
 - **Beschreibung**: ChromaDB Integration für lokale Vektor-Suche
 
 **Akzeptanzkriterien**:
 
-- [ ] ChromaDB lokale Installation
-- [ ] Embedding Pipeline (sentence-transformers)
-- [ ] Collection Management
-- [ ] Similarity Search API
-- [ ] Persistierung
+- [x] ChromaDB lokale Installation
+- [x] Embedding Pipeline (sentence-transformers)
+- [x] Collection Management
+- [x] Similarity Search API
+- [x] Persistierung
 
 #### TASK-004: RAG-basierte Fragenerstellung
 

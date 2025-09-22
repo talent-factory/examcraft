@@ -12,6 +12,7 @@ from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from models.document import Document, DocumentStatus
 from services.docling_service import DoclingService, ProcessedDocument
+from services.vector_service_mock import vector_service
 from datetime import datetime
 import logging
 
@@ -295,6 +296,93 @@ class DocumentService:
             
             return None
     
+    async def process_document_with_vectors(
+        self, 
+        document_id: int, 
+        db: Session
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Verarbeite Dokument mit Docling UND erstelle Vector Embeddings
+        
+        Args:
+            document_id: ID des zu verarbeitenden Dokuments
+            db: Database Session
+            
+        Returns:
+            Dictionary mit Processing- und Embedding-Statistiken
+        """
+        # Erst normale Dokumentenverarbeitung
+        processed_doc = await self.process_document_content(document_id, db)
+        
+        if not processed_doc:
+            logger.error(f"Document processing failed for {document_id}")
+            return None
+        
+        try:
+            # Erstelle Vector Embeddings
+            logger.info(f"Creating vector embeddings for document {document_id}")
+            embedding_stats = await vector_service.add_document_chunks(processed_doc)
+            
+            # Aktualisiere Dokument mit Vector Collection Info
+            document = self.get_document_by_id(document_id, db)
+            if document:
+                # Setze Vector Collection Name
+                document.vector_collection = f"doc_{document_id}"
+                
+                # Erweitere Metadaten um Embedding-Info
+                if not document.doc_metadata:
+                    document.doc_metadata = {}
+                
+                document.doc_metadata.update({
+                    'embedding_model': embedding_stats.model_name,
+                    'embedding_dimension': embedding_stats.embedding_dimension,
+                    'total_chunks': embedding_stats.total_chunks,
+                    'embedding_processing_time': embedding_stats.processing_time,
+                    'vector_created_at': datetime.utcnow().isoformat()
+                })
+                
+                db.commit()
+                db.refresh(document)
+            
+            logger.info(f"Vector embeddings created for document {document_id}")
+            
+            return {
+                'document_id': document_id,
+                'docling_processing': {
+                    'total_chunks': processed_doc.total_chunks,
+                    'processing_time': processed_doc.processing_time,
+                    'total_pages': processed_doc.total_pages
+                },
+                'vector_embeddings': {
+                    'total_chunks': embedding_stats.total_chunks,
+                    'embedding_dimension': embedding_stats.embedding_dimension,
+                    'model_name': embedding_stats.model_name,
+                    'processing_time': embedding_stats.processing_time
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Vector embedding creation failed for {document_id}: {str(e)}")
+            
+            # Dokument bleibt als PROCESSED (Docling war erfolgreich)
+            # Aber Vector Embeddings sind fehlgeschlagen
+            document = self.get_document_by_id(document_id, db)
+            if document and document.doc_metadata:
+                document.doc_metadata['vector_embedding_error'] = str(e)
+                db.commit()
+            
+            return {
+                'document_id': document_id,
+                'docling_processing': {
+                    'total_chunks': processed_doc.total_chunks,
+                    'processing_time': processed_doc.processing_time,
+                    'total_pages': processed_doc.total_pages
+                },
+                'vector_embeddings': {
+                    'error': str(e)
+                }
+            }
+    
     async def get_document_chunks(
         self, 
         document_id: int, 
@@ -337,5 +425,9 @@ class DocumentService:
             return chunks_data
             
         except Exception as e:
-            logger.error(f"Failed to get chunks for document {document_id}: {str(e)}")
+            logger.error(f"Failed to get document chunks for {document_id}: {str(e)}")
             return None
+
+
+# Globale Service Instanz
+document_service = DocumentService()

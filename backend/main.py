@@ -11,6 +11,7 @@ from typing import List, Optional
 import os
 from dotenv import load_dotenv
 from services.claude_service import ClaudeService
+from api import documents, vector_search
 from api.documents import router as documents_router
 from database import create_tables
 
@@ -42,7 +43,8 @@ app.add_middleware(
 create_tables()
 
 # Include routers
-app.include_router(documents_router)
+app.include_router(documents.router)
+app.include_router(vector_search.router)
 
 # Pydantic models
 class ExamRequest(BaseModel):

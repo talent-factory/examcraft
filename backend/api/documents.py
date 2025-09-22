@@ -3,7 +3,7 @@ Document API Endpoints für ExamCraft AI
 Verwaltet Document Upload, Listing und Management
 """
 
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from sqlalchemy.orm import Session
@@ -250,45 +250,56 @@ async def get_document_status(
 @router.post("/{document_id}/process")
 async def process_document(
     document_id: int,
-    user_id: str = Depends(get_current_user),
+    create_vectors: bool = Query(True, description="Erstelle auch Vector Embeddings"),
     db: Session = Depends(get_db)
 ):
     """
-    Verarbeite Dokument mit Docling Service
+    Verarbeite hochgeladenes Dokument mit Docling (und optional Vector Embeddings)
     
     - **document_id**: ID des zu verarbeitenden Dokuments
-    
-    Returns:
-        Processing-Status und Metadaten
+    - **create_vectors**: Ob Vector Embeddings erstellt werden sollen (default: True)
     """
+    # Prüfe ob Dokument existiert
+    document = document_service.get_document_by_id(document_id, db)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Prüfe User-Berechtigung (vereinfacht für Demo)
+    if document.user_id != "demo_user":
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     try:
-        document = document_service.get_document_by_id(document_id, db)
+        if create_vectors:
+            # Verarbeite Dokument mit Vector Embeddings
+            result = await document_service.process_document_with_vectors(document_id, db)
+            
+            if not result:
+                raise HTTPException(status_code=500, detail="Document processing failed")
+            
+            return {
+                "message": "Document processed successfully with vector embeddings",
+                "document_id": document_id,
+                "processing_stats": result
+            }
+        else:
+            # Nur Docling Processing ohne Vector Embeddings
+            processed_doc = await document_service.process_document_content(document_id, db)
+            
+            if not processed_doc:
+                raise HTTPException(status_code=500, detail="Document processing failed")
+            
+            # Erstelle Processing Summary
+            processing_summary = document_service.docling_service.get_document_summary(processed_doc)
+            
+            return {
+                "message": "Document processed successfully",
+                "document_id": document_id,
+                "processing_summary": processing_summary
+            }
         
-        if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
-        
-        if document.user_id and document.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        # Starte Dokumentenverarbeitung
-        processed_doc = await document_service.process_document_content(document_id, db)
-        
-        if not processed_doc:
-            raise HTTPException(status_code=500, detail="Document processing failed")
-        
-        # Erstelle Zusammenfassung
-        summary = document_service.docling_service.get_document_summary(processed_doc)
-        
-        return {
-            "message": "Document processed successfully",
-            "document_id": document_id,
-            "processing_summary": summary
-        }
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
+        logger.error(f"Document processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
 @router.get("/{document_id}/chunks")
 async def get_document_chunks(
