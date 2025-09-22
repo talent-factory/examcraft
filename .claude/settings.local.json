@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__linear__get_project",
+      "WebFetch(domain:linear.app)",
+      "mcp__linear__list_teams",
+      "mcp__linear__list_users",
+      "Read(//Users/daniel/.config/claude-code/**)",
+      "WebSearch",
+      "Bash(curl:*)",
+      "mcp__linear__list_projects",
+      "mcp__linear__linear_search_issues"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "enabledMcpjsonServers": [
+    "taskmaster-ai",
+    "linear"
+  ]
+}
