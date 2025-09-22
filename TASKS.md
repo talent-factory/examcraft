@@ -82,18 +82,18 @@
 
 #### TASK-005: Document Management UI
 
-- **Status**: 🔴 Nicht begonnen
+- **Status**: ✅ Abgeschlossen
 - **Assignee**: Daniel Senften
 - **Deadline**: 22.09.2025
 - **Beschreibung**: Frontend für Dokumentenverwaltung und RAG-Exam-Erstellung
 
 **Akzeptanzkriterien**:
 
-- [ ] Document Upload Component
-- [ ] Document Library View
-- [ ] Processing Status Display
-- [ ] RAG Exam Creator Interface
-- [ ] Document Preview
+- [x] Document Upload Component
+- [x] Document Library View
+- [x] Processing Status Display
+- [x] RAG Exam Creator Interface
+- [x] Document Preview
 
 ### 🟡 Hohe Priorität - Core Features
 
