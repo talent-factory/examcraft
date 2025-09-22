@@ -20,10 +20,14 @@ import {
   Tabs,
   Tab
 } from '@mui/material';
-import { DocumentUpload } from './components/DocumentUpload_simple';
-import { School, Psychology, Quiz, CloudUpload } from '@mui/icons-material';
+import { DocumentUpload as SimpleDocumentUpload } from './components/DocumentUpload_simple';
+import DocumentUpload from './components/DocumentUpload';
+import DocumentLibrary from './components/DocumentLibrary';
+import RAGExamCreator from './components/RAGExamCreator';
+import { School, Psychology, Quiz, CloudUpload, LibraryBooks, AutoAwesome } from '@mui/icons-material';
 import { ExamService } from './services/ExamService';
 import { ExamRequest, ExamResponse } from './types/exam';
+import { RAGExamResponse } from './types/document';
 import ExamDisplay from './components/ExamDisplay';
 
 function App() {
@@ -36,9 +40,13 @@ function App() {
   });
   
   const [exam, setExam] = useState<ExamResponse | null>(null);
+  const [ragExam, setRAGExam] = useState<RAGExamResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [documentRefreshTrigger, setDocumentRefreshTrigger] = useState(0);
+  const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
+  const [showRAGCreator, setShowRAGCreator] = useState(false);
 
   const handleGenerateExam = async () => {
     if (!examRequest.topic.trim()) {
@@ -61,6 +69,8 @@ function App() {
 
   const handleNewExam = () => {
     setExam(null);
+    setRAGExam(null);
+    setShowRAGCreator(false);
     setExamRequest({
       topic: '',
       difficulty: 'medium',
@@ -72,12 +82,27 @@ function App() {
 
   const handleDocumentUploadComplete = (documentId: number, filename: string) => {
     console.log(`Document uploaded successfully: ${filename} (ID: ${documentId})`);
-    // TODO: Hier können wir später eine Benachrichtigung anzeigen
+    setDocumentRefreshTrigger(prev => prev + 1);
   };
 
   const handleDocumentUploadError = (filename: string, error: string) => {
     console.error(`Document upload failed for ${filename}: ${error}`);
-    // TODO: Hier können wir später eine Fehlerbenachrichtigung anzeigen
+    setError(`Upload-Fehler für ${filename}: ${error}`);
+  };
+
+  const handleCreateRAGExam = (documentIds: number[]) => {
+    setSelectedDocuments(documentIds);
+    setShowRAGCreator(true);
+  };
+
+  const handleRAGExamGenerated = (exam: RAGExamResponse) => {
+    setRAGExam(exam);
+    setShowRAGCreator(false);
+  };
+
+  const handleBackFromRAGCreator = () => {
+    setShowRAGCreator(false);
+    setSelectedDocuments([]);
   };
 
   return (
@@ -98,7 +123,7 @@ function App() {
         </Typography>
       </Box>
 
-      {!exam ? (
+      {!exam && !ragExam && !showRAGCreator ? (
         <>
           {/* Tab Navigation */}
           <Paper elevation={2} sx={{ mb: 4 }}>
@@ -110,6 +135,8 @@ function App() {
             >
               <Tab label="KI-Prüfung erstellen" icon={<Psychology />} />
               <Tab label="Dokumente hochladen" icon={<CloudUpload />} />
+              <Tab label="Dokumentenbibliothek" icon={<LibraryBooks />} />
+              <Tab label="RAG-Prüfung erstellen" icon={<AutoAwesome />} />
             </Tabs>
           </Paper>
 
@@ -241,34 +268,113 @@ function App() {
               <DocumentUpload
                 onUploadComplete={handleDocumentUploadComplete}
                 onUploadError={handleDocumentUploadError}
-                maxFiles={5}
+                onAllUploadsComplete={() => setDocumentRefreshTrigger(prev => prev + 1)}
+                maxFiles={10}
               />
 
-              <Alert severity="info" sx={{ mt: 3 }}>
+              <Alert severity="success" sx={{ mt: 3 }}>
                 <Typography variant="body2">
-                  <strong>Hinweis:</strong> Die RAG-basierte Fragenerstellung aus hochgeladenen Dokumenten 
-                  wird in Phase 2 implementiert. Aktuell können Sie Dokumente hochladen und verwalten.
+                  <strong>Neu:</strong> RAG-basierte Fragenerstellung aus hochgeladenen Dokumenten 
+                  ist jetzt verfügbar! Wechseln Sie zur Dokumentenbibliothek, um Ihre Dokumente zu verwalten 
+                  und RAG-Prüfungen zu erstellen.
                 </Typography>
               </Alert>
             </Paper>
           )}
+
+          {activeTab === 2 && (
+            /* Document Library Tab */
+            <Paper elevation={3} sx={{ p: 4, mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <LibraryBooks sx={{ color: 'primary.main', mr: 2 }} />
+                <Typography variant="h5" component="h2">
+                  Dokumentenbibliothek
+                </Typography>
+              </Box>
+
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Verwalten Sie Ihre hochgeladenen Dokumente und erstellen Sie RAG-basierte Prüfungen.
+              </Typography>
+
+              <DocumentLibrary
+                onCreateRAGExam={handleCreateRAGExam}
+                refreshTrigger={documentRefreshTrigger}
+              />
+            </Paper>
+          )}
+
+          {activeTab === 3 && (
+            /* RAG Exam Creator Tab */
+            <Paper elevation={3} sx={{ p: 4, mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <AutoAwesome sx={{ color: 'primary.main', mr: 2 }} />
+                <Typography variant="h5" component="h2">
+                  RAG-Prüfung erstellen
+                </Typography>
+              </Box>
+
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Erstellen Sie intelligente Prüfungen basierend auf Ihren hochgeladenen Dokumenten 
+                mit Retrieval-Augmented Generation (RAG).
+              </Typography>
+
+              <RAGExamCreator
+                onExamGenerated={handleRAGExamGenerated}
+              />
+            </Paper>
+          )}
         </>
-      ) : (
-        /* Exam Display */
+      ) : showRAGCreator ? (
+        /* RAG Exam Creator */
+        <RAGExamCreator
+          selectedDocuments={selectedDocuments}
+          onExamGenerated={handleRAGExamGenerated}
+          onBack={handleBackFromRAGCreator}
+        />
+      ) : exam ? (
+        /* Regular Exam Display */
         <Box>
           <ExamDisplay exam={exam} onNewExam={handleNewExam} />
         </Box>
-      )}
+      ) : ragExam ? (
+        /* RAG Exam Display */
+        <Box>
+          <ExamDisplay 
+            exam={{
+              id: ragExam.exam_id,
+              topic: ragExam.topic,
+              questions: ragExam.questions.map((q, index) => ({
+                id: index + 1,
+                question: q.question_text,
+                type: q.question_type,
+                options: q.options || [],
+                correct_answer: q.correct_answer || '',
+                explanation: Array.isArray(q.explanation) ? q.explanation.join('\n') : q.explanation || ''
+              })),
+              difficulty: ragExam.questions[0]?.difficulty || 'medium',
+              language: 'de',
+              created_at: new Date().toISOString(),
+              metadata: {
+                generation_time: ragExam.generation_time,
+                quality_metrics: ragExam.quality_metrics,
+                source_documents: ragExam.context_summary.source_documents
+              }
+            }} 
+            onNewExam={handleNewExam} 
+          />
+        </Box>
+      ) : null}
 
       {/* Demo Info */}
-      <Card sx={{ mt: 4, bgcolor: 'info.light', color: 'info.contrastText' }}>
+      <Card sx={{ mt: 4, bgcolor: 'success.light', color: 'success.contrastText' }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 1 }}>
-            🚀 Workshop Demo Version - Document Upload Feature
+            🎉 TASK-005 Document Management UI - Vollständig implementiert!
           </Typography>
           <Typography variant="body2">
-            Neu implementiert: Document Upload System mit Drag & Drop Interface. 
-            Die RAG-basierte Fragenerstellung aus Dokumenteninhalten folgt in Phase 2.
+            ✅ Document Upload mit Drag & Drop • ✅ Dokumentenbibliothek mit Verwaltung • 
+            ✅ RAG-basierte Prüfungserstellung • ✅ Processing Status Display • 
+            ✅ Document Preview & Management
           </Typography>
         </CardContent>
       </Card>

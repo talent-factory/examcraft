@@ -83,8 +83,8 @@
 #### TASK-005: Document Management UI
 
 - **Status**: 🔴 Nicht begonnen
-- **Assignee**: -
-- **Deadline**: -
+- **Assignee**: Daniel Senften
+- **Deadline**: 22.09.2025
 - **Beschreibung**: Frontend für Dokumentenverwaltung und RAG-Exam-Erstellung
 
 **Akzeptanzkriterien**:
@@ -100,8 +100,8 @@
 #### TASK-006: Claude API Vollintegration
 
 - **Status**: 🟡 In Arbeit
-- **Assignee**: -
-- **Deadline**: -
+- **Assignee**: Daniel Senften
+- **Deadline**: 22.09.2025
 - **Beschreibung**: Vollständige Claude API Integration mit Error Handling
 
 **Akzeptanzkriterien**:
