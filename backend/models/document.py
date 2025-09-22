@@ -3,7 +3,7 @@ Document Model für ExamCraft AI
 Speichert Metadaten hochgeladener Dokumente
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Enum, Boolean
 from sqlalchemy.sql import func
 import enum
 import sys
@@ -44,6 +44,9 @@ class Document(Base):
     # Vector DB collection name
     vector_collection = Column(String(100), nullable=True)
     
+    # Flag ob Vektoren erstellt wurden
+    has_vectors = Column(Boolean, default=False, nullable=True)
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -65,6 +68,7 @@ class Document(Base):
             "metadata": self.doc_metadata,
             "content_preview": self.content_preview[:200] + "..." if self.content_preview and len(self.content_preview) > 200 else self.content_preview,
             "vector_collection": self.vector_collection,
+            "has_vectors": self.has_vectors,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "processed_at": self.processed_at.isoformat() if self.processed_at else None

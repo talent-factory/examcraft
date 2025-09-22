@@ -35,6 +35,7 @@ class DocumentResponse(BaseModel):
     metadata: Optional[dict]
     content_preview: Optional[str]
     vector_collection: Optional[str]
+    has_vectors: Optional[bool]
     created_at: Optional[str]
     updated_at: Optional[str]
     processed_at: Optional[str]

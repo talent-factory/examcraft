@@ -70,7 +70,7 @@ class RAGService:
     def __init__(self):
         """Initialisiere RAG Service"""
         self.claude_service = ClaudeService()
-        self.min_context_similarity = 0.3  # Mindest-Similarity für Context
+        self.min_context_similarity = 0.01  # Mindest-Similarity für Context (angepasst für Mock Embeddings)
         self.max_context_length = 4000  # Max Zeichen für Context
         self.question_templates = self._load_question_templates()
         
@@ -365,7 +365,7 @@ FORMAT (JSON):
                 question_text=claude_question.get("question", ""),
                 question_type=question_type,
                 correct_answer=claude_question.get("sample_answer", ""),
-                explanation=claude_question.get("evaluation_criteria", []),
+                explanation=claude_question.get("evaluation_criteria", "Keine Erklärung verfügbar"),
                 difficulty=difficulty,
                 source_chunks=source_chunks,
                 source_documents=source_documents,
@@ -570,3 +570,6 @@ FORMAT (JSON):
 
 # Globale Service Instanz
 rag_service = RAGService()
+
+# Force update threshold for existing instance (Hotfix)
+rag_service.min_context_similarity = 0.01

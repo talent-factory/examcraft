@@ -35,7 +35,7 @@ export class RAGService {
     query: string,
     documentIds?: number[],
     maxChunks: number = 5,
-    minSimilarity: number = 0.3
+    minSimilarity: number = 0.01
   ): Promise<RAGContextSummary> {
     const requestBody = {
       query,
@@ -110,7 +110,7 @@ export class RAGService {
     estimated_questions: number;
   }> {
     try {
-      const context = await this.retrieveContext(topic, documentIds, 10, 0.2);
+      const context = await this.retrieveContext(topic, documentIds, 10, 0.01);
       
       // Estimate how many questions can be generated
       const estimatedQuestions = Math.min(

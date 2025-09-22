@@ -195,6 +195,70 @@ class ClaudeService:
             logger.error(f"Claude API failed, falling back to demo mode: {str(e)}")
             return self._generate_demo_questions(topic, difficulty, question_count, language)
     
+    async def generate_exam_async(self, exam_request: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generate exam questions asynchronously for RAG integration
+        
+        Args:
+            exam_request: Dictionary with exam parameters
+                - topic: str
+                - difficulty: str
+                - question_count: int
+                - question_types: List[str]
+                - context: str (optional)
+                - language: str
+                
+        Returns:
+            Dictionary with generated questions
+        """
+        try:
+            topic = exam_request.get("topic", "")
+            difficulty = exam_request.get("difficulty", "medium")
+            question_count = exam_request.get("question_count", 1)
+            question_types = exam_request.get("question_types", ["multiple_choice"])
+            context = exam_request.get("context", "")
+            language = exam_request.get("language", "de")
+            
+            # Build enhanced prompt with context
+            if context:
+                enhanced_topic = f"{topic}\n\nKontext:\n{context}"
+            else:
+                enhanced_topic = topic
+            
+            # Generate questions using existing method
+            questions = await self.generate_questions(
+                topic=enhanced_topic,
+                difficulty=difficulty,
+                question_count=question_count,
+                question_types=question_types,
+                language=language
+            )
+            
+            return {
+                "questions": questions,
+                "topic": topic,
+                "difficulty": difficulty,
+                "question_count": len(questions),
+                "context_used": bool(context)
+            }
+            
+        except Exception as e:
+            logger.error(f"Exam generation failed: {str(e)}")
+            # Return fallback structure
+            return {
+                "questions": self._generate_demo_questions(
+                    exam_request.get("topic", "Fallback"),
+                    exam_request.get("difficulty", "medium"),
+                    exam_request.get("question_count", 1),
+                    exam_request.get("language", "de")
+                ),
+                "topic": exam_request.get("topic", "Fallback"),
+                "difficulty": exam_request.get("difficulty", "medium"),
+                "question_count": exam_request.get("question_count", 1),
+                "context_used": False,
+                "error": str(e)
+            }
+    
     def _build_prompt(
         self, 
         topic: str, 
@@ -294,7 +358,7 @@ Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
                 "Option D: Alle oben genannten"
             ],
             "correct_answer": "Option D: Alle oben genannten",
-            "explanation": "Alle Aspekte sind wichtig für ein vollständiges Verständnis des Themas.",
+            "explanation": f"Bei {topic} sind alle genannten Aspekte wichtig: Grundlegendes Verständnis bildet die Basis, praktische Anwendung zeigt die Relevanz, und theoretische Fundierung sorgt für tieferes Verständnis. Eine ganzheitliche Betrachtung ist daher am sinnvollsten.",
             "difficulty": difficulty,
             "topic": topic
         })
@@ -306,7 +370,7 @@ Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
             "question": f"Erklären Sie die praktische Bedeutung von {topic} in der realen Welt. Geben Sie konkrete Beispiele.",
             "options": None,
             "correct_answer": None,
-            "explanation": "Eine gute Antwort sollte praktische Anwendungen aufzeigen und konkrete Beispiele nennen. Bewertungskriterien: Verständnis (40%), Beispiele (30%), Struktur (30%).",
+            "explanation": f"Eine vollständige Antwort zu {topic} sollte folgende Elemente enthalten: 1) Praktische Anwendungsbereiche mit konkreten Beispielen, 2) Relevanz für verschiedene Branchen oder Lebensbereiche, 3) Vorteile und mögliche Herausforderungen. Bewertungskriterien: Fachliches Verständnis (40%), Konkrete Beispiele (30%), Strukturierte Darstellung (30%).",
             "difficulty": difficulty,
             "topic": topic
         })

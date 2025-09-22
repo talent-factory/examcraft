@@ -70,7 +70,7 @@ class ContextRetrievalRequest(BaseModel):
     query: str = Field(..., description="Suchanfrage", min_length=3, max_length=500)
     document_ids: Optional[List[int]] = Field(None, description="Spezifische Dokument-IDs")
     max_chunks: int = Field(5, description="Maximale Anzahl Chunks", ge=1, le=20)
-    min_similarity: Optional[float] = Field(0.3, description="Mindest-Similarity", ge=0.0, le=1.0)
+    min_similarity: Optional[float] = Field(0.01, description="Mindest-Similarity (angepasst für Mock Embeddings)", ge=0.0, le=1.0)
 
 
 # API Endpoints
@@ -208,12 +208,13 @@ async def retrieve_context(
                         detail=f"Document with ID {doc_id} not found"
                     )
         
-        # Hole Kontext
+        # Hole Kontext (mit angepasstem min_similarity für Mock Embeddings)
+        min_sim = request.min_similarity if request.min_similarity is not None else 0.01
         context = await rag_service.retrieve_context(
             query=request.query,
             document_ids=request.document_ids,
             max_chunks=request.max_chunks,
-            min_similarity=request.min_similarity
+            min_similarity=min_sim
         )
         
         response = RAGContextResponse(

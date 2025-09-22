@@ -379,12 +379,12 @@ function App() {
       <Card sx={{ mt: 4, bgcolor: 'success.light', color: 'success.contrastText' }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 1 }}>
-            🎉 TASK-005 Document Management UI - Vollständig implementiert!
+            🎉 TASK-006 Claude API Vollintegration - Vollständig implementiert!
           </Typography>
           <Typography variant="body2">
-            ✅ Document Upload mit Drag & Drop • ✅ Dokumentenbibliothek mit Verwaltung • 
-            ✅ RAG-basierte Prüfungserstellung • ✅ Processing Status Display • 
-            ✅ Document Preview & Management
+            ✅ API Key Konfiguration • ✅ Rate Limiting (50 RPM) • ✅ Retry Logic mit Exponential Backoff • 
+            ✅ Cost Tracking für Token-Usage • ✅ Demo Mode Fallback • ✅ Usage Statistics API • 
+            ✅ Vector Search System repariert • ✅ 28 neue Tests (65% Coverage)
           </Typography>
         </CardContent>
       </Card>

@@ -331,17 +331,23 @@ class DocumentService:
                 # Setze Vector Collection Name
                 document.vector_collection = f"doc_{document_id}"
                 
+                # Setze has_vectors Flag
+                document.has_vectors = True
+                
                 # Erweitere Metadaten um Embedding-Info
                 if not document.doc_metadata:
                     document.doc_metadata = {}
                 
-                document.doc_metadata.update({
-                    'embedding_model': embedding_stats.model_name,
-                    'embedding_dimension': embedding_stats.embedding_dimension,
-                    'total_chunks': embedding_stats.total_chunks,
-                    'embedding_processing_time': embedding_stats.processing_time,
-                    'vector_created_at': datetime.utcnow().isoformat()
-                })
+                # Update metadata (SQLAlchemy JSON field requires special handling)
+                document.doc_metadata['embedding_model'] = embedding_stats.model_name
+                document.doc_metadata['embedding_dimension'] = embedding_stats.embedding_dimension
+                document.doc_metadata['total_chunks'] = embedding_stats.total_chunks
+                document.doc_metadata['embedding_processing_time'] = embedding_stats.processing_time
+                document.doc_metadata['vector_created_at'] = datetime.utcnow().isoformat()
+                
+                # Mark as modified for SQLAlchemy
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(document, 'doc_metadata')
                 
                 db.commit()
                 db.refresh(document)
