@@ -21,7 +21,7 @@ ExamCraft AI ist eine moderne Webanwendung, die Dozierenden dabei hilft, qualita
 ```text
 ExamCraft/
 ├── backend/           # FastAPI Backend
-│   ├── main.py       # API Endpoints
+│   ├── main.py        # API Endpoints
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/          # React Frontend
@@ -32,7 +32,7 @@ ExamCraft/
 │   ├── package.json
 │   └── Dockerfile
 ├── docker-compose.yml # Orchestrierung
-└── start-dev.sh      # Development Startup
+└── start-dev.sh       # Development Startup
 ```
 
 ## 🚀 Quick Start
