@@ -1,0 +1,78 @@
+@startuml User_Workflow_Sequence
+!theme plain
+title Complete User Workflow - Document to Exam
+
+actor Educator
+participant "Web Browser" as Browser
+participant "React Frontend" as Frontend
+participant "FastAPI API" as API
+participant "Backend Services" as Services
+participant "AI/Vector Systems" as AI
+
+== Document Upload Phase ==
+Educator -> Browser: Access ExamCraft AI
+Browser -> Frontend: Load application
+Frontend --> Browser: Dashboard with upload interface
+
+Educator -> Browser: Drag & drop PDF document
+Browser -> Frontend: File upload event
+Frontend -> API: Upload document
+API -> Services: Process document
+Services -> AI: Extract and vectorize content
+AI --> Services: Processing complete
+Services --> API: Document ready
+API --> Frontend: Upload successful
+Frontend --> Browser: Show processing status
+
+== Question Generation Phase ==
+Educator -> Browser: Navigate to Generate Questions
+Browser -> Frontend: Load generation interface
+Frontend --> Browser: Show available documents
+
+Educator -> Browser: Select documents and topic
+Browser -> Frontend: Form submission
+Frontend -> API: Generate questions request
+API -> Services: Initiate RAG generation
+Services -> AI: Retrieve context and generate
+AI --> Services: Generated questions
+Services --> API: Questions with sources
+API --> Frontend: Question set
+Frontend --> Browser: Display questions
+
+== Review and Refine Phase ==
+Educator -> Browser: Review generated questions
+Browser -> Frontend: Show question editor
+
+alt Question needs editing
+  Educator -> Browser: Edit question
+  Browser -> Frontend: Update question
+  Frontend -> API: Save changes
+  API --> Frontend: Updated
+else Question is acceptable
+  Educator -> Browser: Approve question
+  Browser -> Frontend: Mark as approved
+end
+
+== Exam Export Phase ==
+Educator -> Browser: Request exam export
+Browser -> Frontend: Export dialog
+Frontend -> API: Generate exam PDF/Word
+API -> Services: Create formatted exam
+Services --> API: Export file ready
+API --> Frontend: Download link
+Frontend --> Browser: Trigger download
+
+note right of AI
+  RAG system ensures
+  questions are based
+  on actual document
+  content
+end note
+
+note right of Services
+  All operations are
+  logged for audit
+  and debugging
+end note
+
+@enduml

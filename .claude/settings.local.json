@@ -12,7 +12,11 @@
       "mcp__linear__linear_search_issues",
       "mcp__linear__list_issues",
       "mcp__linear-server__get_project",
-      "mcp__linear-server__list_issues"
+      "mcp__linear-server__list_issues",
+      "mcp__linear-server__update_issue",
+      "mcp__linear-server__create_comment",
+      "Bash(mkdir:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []
