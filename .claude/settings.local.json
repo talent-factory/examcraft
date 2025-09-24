@@ -18,7 +18,12 @@
       "Bash(mkdir:*)",
       "Bash(tree:*)",
       "Bash(python:*)",
-      "mcp__linear-server__update_project"
+      "mcp__linear-server__update_project",
+      "Bash(git push:*)",
+      "Bash(rm:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
