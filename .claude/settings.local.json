@@ -26,7 +26,8 @@
       "Bash(git commit:*)",
       "mcp__linear-server__create_issue",
       "mcp__linear-server__get_issue",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch \"\"demo/Praktische Algorithmik mit Python.pdf\"\" \"\"demo/Praktische Algorithmik mit Python.md\"\"' --prune-empty --tag-name-filter cat -- --all)"
     ],
     "deny": [],
     "ask": []
