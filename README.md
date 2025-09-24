@@ -1,74 +1,106 @@
 # ExamCraft AI 🚀
 
-KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API Integration.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![React 18](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Latest-green.svg)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+
+**KI-gestützte OpenSource-Plattform zur automatischen Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API Integration und RAG-basierter Dokumentenanalyse.**
 
 ## 🎯 Projektübersicht
 
-ExamCraft AI ist eine moderne Webanwendung, die Dozierenden dabei hilft, qualitativ hochwertige Prüfungsaufgaben automatisch zu generieren. Die Plattform nutzt künstliche Intelligenz (Claude API) zur Erstellung von kontextbezogenen, durchdachten Fragen für verschiedene Schwierigkeitsgrade und Fragetypen.
+ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwendung, die Dozierenden dabei hilft, qualitativ hochwertige Prüfungsaufgaben automatisch aus beliebigen Dokumenten zu generieren. Die Plattform kombiniert moderne KI (Claude API) mit RAG-Technologie (Retrieval-Augmented Generation) für kontextuelle, durchdachte Fragenerstellung.
 
-### ✨ Features
+### ✨ Kernfeatures
 
-- **🤖 KI-gestützte Fragenerstellung** mit Claude API
-- **📝 Multiple Fragetypen**: Multiple Choice, Offene Fragen, etc.
-- **🎚️ Anpassbare Schwierigkeitsgrade**: Einfach, Mittel, Schwer
-- **🌐 Mehrsprachig**: Deutsch und Englisch
-- **📊 Sofortige Auswertung** mit detailliertem Feedback
-- **💾 Moderne Tech-Stack**: FastAPI + React + PostgreSQL + Redis
-- **🐳 Docker-basiert** für einfache Entwicklung und Deployment
+- **🤖 RAG-basierte KI-Fragenerstellung** mit Claude API + PydanticAI
+- **📄 Multi-Format Dokumentenverarbeitung**: PDF, Word, Markdown
+- **🔍 Semantische Suche** mit ChromaDB Vector Storage
+- **🎯 Bloom Taxonomy Integration** für verschiedene Lernlevels
+- **📝 Strukturierte Musterlösungen** mit A/B/C Qualitätsstufen
+- **⚛️ Moderne Web-UI** mit React 18 + TypeScript + Tailwind CSS
+- **🐳 Container-basiert** für einfache Entwicklung und Deployment
+- **🚀 Production-Ready** mit Rate Limiting, Error Handling & Monitoring
 
 ## 🏗️ Architektur
 
 ```text
 ExamCraft/
-├── backend/           # FastAPI Backend
-│   ├── main.py        # API Endpoints
-│   ├── requirements.txt
-│   └── Dockerfile
-├── frontend/          # React Frontend
-│   ├── src/
-│   │   ├── components/
-│   │   ├── services/
-│   │   └── types/
-│   ├── package.json
-│   └── Dockerfile
-├── docker-compose.yml # Orchestrierung
-└── start-dev.sh       # Development Startup
+├── backend/              # FastAPI Backend Server
+│   ├── main.py          # REST API Endpoints
+│   ├── database.py      # PostgreSQL Connection
+│   ├── models.py        # Pydantic Data Models
+│   └── services/        # Business Logic Services
+├── frontend/            # React 18 + TypeScript Frontend
+│   ├── src/components/  # React UI Components
+│   ├── src/services/    # API Client Services
+│   ├── src/types/       # TypeScript Definitions
+│   └── public/          # Static Assets
+├── utils/               # Python Core Utilities
+│   ├── extraction.py    # Document Processing (PDF/DOC/MD)
+│   └── rag.py          # RAG System (ChromaDB + Embeddings)
+├── demo/                # Workshop Demo Materials
+│   ├── *.pdf           # Example Academic Documents
+│   └── *.md            # Generated Questions & Solutions
+├── docs/                # Project Documentation
+├── .claude/             # Claude Code Integration
+├── docker-compose.yml   # Multi-Container Orchestration
+├── start-dev.sh         # Development Environment Launcher
+└── pyproject.toml      # Python Dependencies & Config
 ```
 
 ## 🚀 Quick Start
 
 ### Voraussetzungen
 
-- Docker & Docker Compose
-- Git
-- Claude API Key (optional für Demo)
+- **Docker & Docker Compose** (für Container-basierte Entwicklung)
+- **Git** (für Repository-Management)
+- **Claude API Key** (für KI-Fragenerstellung, optional für lokale Tests)
+- **Python 3.13+** (für lokale Entwicklung ohne Docker)
 
-### Installation
+### 🐳 Docker Installation (Empfohlen)
 
 1. **Repository klonen**
 
    ```bash
-   git clone <repository-url>
-   cd ExamCraft
+   git clone https://github.com/yourusername/examcraft-ai.git
+   cd examcraft-ai
    ```
 
 2. **Umgebung konfigurieren**
 
    ```bash
    cp .env.example .env
-   # .env Datei bearbeiten und Claude API Key eintragen
+   # .env bearbeiten und CLAUDE_API_KEY eintragen (optional)
    ```
 
-3. **Entwicklungsumgebung starten**
+3. **Entwicklungsstack starten**
 
    ```bash
    ./start-dev.sh
+   # Oder manuell: docker-compose up -d
    ```
 
-4. **Anwendung öffnen**
-   - Frontend: <http://localhost:3000>
-   - Backend API: <http://localhost:8000>
-   - API Dokumentation: <http://localhost:8000/docs>
+4. **Services verfügbar unter:**
+   - **Frontend**: http://localhost:3000 (React Dashboard)
+   - **Backend API**: http://localhost:8000 (FastAPI Server)
+   - **API Dokumentation**: http://localhost:8000/docs (Swagger UI)
+   - **Database**: localhost:5432 (PostgreSQL)
+   - **Redis**: localhost:6379 (Caching)
+
+### 🐍 Lokale Python Installation
+
+```bash
+# Python Dependencies installieren
+pip install -e .
+
+# Backend starten
+cd backend && python main.py
+
+# Frontend entwickeln (separates Terminal)
+cd frontend && npm install && npm start
+```
 
 ## 🛠️ Entwicklung
 
