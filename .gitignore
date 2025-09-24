@@ -27,6 +27,7 @@ yarn.lock
 .idea/
 *.swp
 *.swo
+*.log
 
 # OS files
 .DS_Store
