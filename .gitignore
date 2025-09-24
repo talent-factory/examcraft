@@ -52,3 +52,6 @@ mock_vector_db/
 frontend/coverage/
 backend/htmlcov/
 backend/.coverage
+
+# MCP configuration with API keys
+.mcp.json
