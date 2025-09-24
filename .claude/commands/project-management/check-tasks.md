@@ -47,7 +47,7 @@ mcp__linear-server__get_issue id="<issue-id>"
 
 ## Expected Output Format
 
-```
+```text
 📋 ExamCraft AI - Linear Tasks Overview
 
 📊 STATUS SUMMARY:
@@ -97,12 +97,14 @@ mcp__linear-server__get_issue id="<issue-id>"
 ## Recommendation Logic
 
 **Priority Matrix:**
+
 1. **Urgent + No Dependencies** = Immediate Action
 2. **High + Prerequisites Met** = Next Sprint
 3. **Medium + Easy Implementation** = Quick Wins
 4. **Everything else** = Future Planning
 
 **Current Project State berücksichtigen:**
+
 - Core API ✅ (TF-52)
 - Frontend ✅ (TF-54)
 - Setup ✅ (TF-50)
@@ -110,6 +112,7 @@ mcp__linear-server__get_issue id="<issue-id>"
 - Vector Search ✅ (TF-55)
 
 **Dependencies tracking:**
+
 - Prüfe Parent/Child Issue Relationships
 - Identifiziere Blocker
 - Empfehle nur **ready-to-start** Tasks
@@ -117,10 +120,12 @@ mcp__linear-server__get_issue id="<issue-id>"
 ## Smart Insights
 
 Füge contextuelle Insights hinzu:
+
 - "Based on recent completions, focus on demo preparation"
 - "Core infrastructure is complete, time for user-facing features"
 - "Workshop deadline approaching - prioritize demo materials"
 
 Zeige auch **was NICHT empfohlen wird** und warum:
+
 - "Authentication (TF-57) not recommended: not needed for demo"
 - "Performance optimization (TF-61) can wait: core features work"
