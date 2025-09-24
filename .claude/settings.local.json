@@ -23,7 +23,10 @@
       "Bash(rm:*)",
       "Bash(git filter-branch:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "mcp__linear-server__create_issue",
+      "mcp__linear-server__get_issue",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
