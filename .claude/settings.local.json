@@ -17,7 +17,8 @@
       "mcp__linear-server__create_comment",
       "Bash(mkdir:*)",
       "Bash(tree:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "mcp__linear-server__update_project"
     ],
     "deny": [],
     "ask": []
