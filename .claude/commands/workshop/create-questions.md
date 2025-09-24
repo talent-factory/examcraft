@@ -1,13 +1,13 @@
 # Create Programming Questions from Academic Materials
 
-Erstelle qualitativ hochwertige Prüfungsfragen für BSc Informatik Studierende basierend auf bereitgestellten akademischen Materialien (typischerweise PDF-Dokumente) mit automatischer Musterlösungsgenerierung.
+Erstelle qualitativ hochwertige Prüfungsfragen für BSc Informatik Studierende basierend auf bereitgestellten akademischen Materialien (Markdown-Dokumente) mit automatischer Musterlösungsgenerierung.
 
 ## 🎯 Aufgabe
 
 Du sollst aus den bereitgestellten Unterlagen Prüfungsfragen erstellen, die:
 
-1. **Akademische PDF-Dokumente analysieren**:
-   - Lese und analysiere alle PDF-Dateien im `./demo/` Verzeichnis
+1. **Akademische Markdown-Dokumente analysieren**:
+   - Lese und analysiere alle Markdown-Dateien im `./demo/` Verzeichnis
    - Identifiziere relevante Konzepte, Algorithmen und Datenstrukturen
    - Extrahiere Code-Beispiele und theoretische Grundlagen
    - Verstehe den akademischen Kontext und das Niveau
@@ -19,13 +19,13 @@ Du sollst aus den bereitgestellten Unterlagen Prüfungsfragen erstellen, die:
    - **Typ**: Praxisorientierte Programmieraufgaben mit Verständnisfragen
 
 3. **Qualitätssicherung implementieren**:
-   - Validiere, dass Fragen das PDF-Material korrekt reflektieren
+   - Validiere, dass Fragen das Markdown-Material korrekt reflektieren
    - Stelle sicher, dass Code syntaktisch korrekt ist
    - Prüfe, dass Schwierigkeitsgrad angemessen ist
    - Verifiziere Vollständigkeit und Korrektheit der Musterlösungen
 
 4. **Strukturierte Ausgabe generieren**:
-   - Fragen als Markdown-Dateien im `./demo/` Verzeichnis
+   - Fragen als Markdown-Dateien im konfigurierten Ausgabeverzeichnis (Standard: `./output/`)
    - Separate Musterlösungen mit detaillierter Punkteverteilung
    - Konsistente Namenskonvention und Formatierung
 
@@ -41,7 +41,7 @@ Aufgabe {Nummer} | {Themenbereich} | {Maximale Punktzahl} Punkte
 
 ### Frage-Struktur
 
-1. **Kontext-Erklärung** (aus PDF abgeleitet)
+1. **Kontext-Erklärung** (aus Markdown-Dokument abgeleitet)
 2. **Programmvorgabe** (unvollständiger Python-Code)
 3. **Spezifische Aufgabenstellung** (welche Methode zu implementieren)
 4. **Bewertungskriterien** (was wird bewertet)
@@ -63,10 +63,10 @@ Aufgabe {Nummer} | {Themenbereich} | {Maximale Punktzahl} Punkte
 ### Schritt 1: Material-Analyse
 
 ```bash
-# PDF-Dateien im demo/ Verzeichnis identifizieren
-find ./demo -name "*.pdf" -type f
+# Markdown-Dateien im demo/ Verzeichnis identifizieren
+find ./demo -name "*.md" -type f
 
-# Für jede PDF-Datei:
+# Für jede Markdown-Datei:
 # - Vollständigen Inhalt mit Read-Tool erfassen
 # - Relevante Konzepte und Code-Beispiele extrahieren
 # - Schwierigkeitsgrad und Themen identifizieren
@@ -75,7 +75,7 @@ find ./demo -name "*.pdf" -type f
 ### Schritt 2: Fragen-Generierung
 
 ```python
-# Pro PDF oder Themenbereich:
+# Pro Markdown-Dokument oder Themenbereich:
 # 1. Identifiziere 3-5 Kern-Algorithmen/Konzepte
 # 2. Entwickle realistische Code-Vervollständigungsaufgaben
 # 3. Erstelle ausführbare Python-Grundgerüste
@@ -95,11 +95,11 @@ find ./demo -name "*.pdf" -type f
 ### Schritt 4: Ausgabe-Generierung
 
 ```text
-# Datei-Naming Convention:
-# frage_01_heapsort.md
-# loesung_01_heapsort.md
-# frage_02_priority_queue.md
-# loesung_02_priority_queue.md
+# Datei-Naming Convention (im Ausgabeverzeichnis):
+# ./output/frage_01_heapsort.md
+# ./output/loesung_01_heapsort.md
+# ./output/frage_02_priority_queue.md
+# ./output/loesung_02_priority_queue.md
 ```
 
 ## 🎯 Standard-Konfiguration
@@ -120,7 +120,7 @@ find ./demo -name "*.pdf" -type f
 # Aufgabe {N} | {Thema} | {Punkte} Punkte
 
 ## Kontext
-[Theoretischer Hintergrund aus PDF]
+[Theoretischer Hintergrund aus Markdown-Dokument]
 
 ## Aufgabenstellung
 [Spezifische Implementierungsaufgabe]
@@ -187,10 +187,22 @@ class ExampleAlgorithm:
 
 ## 🚀 Verwendung
 
+### Kommandozeilenoptionen
+
+| Option | Beschreibung | Standard |
+|--------|-------------|----------|
+| `--source` | Spezifische Markdown-Datei als Quelle | Alle `.md` Dateien in `./demo/` |
+| `--output` | Ausgabeverzeichnis für generierte Fragen | `./output/` |
+| `--count` | Anzahl der zu generierenden Fragen | 3 pro Themenbereich |
+| `--theme` | Spezifisches Thema/Fokus | Automatisch aus Material extrahiert |
+| `--difficulty` | Schwierigkeitsgrad (`basic`, `intermediate`, `advanced`) | `intermediate` |
+| `--points-range` | Punktebereich pro Frage (z.B. `10-20`) | `10-20` |
+
 ### Basic Usage
 
 ```bash
-# Standard-Anwendung für alle PDFs im demo/ Verzeichnis
+# Standard-Anwendung für alle Markdown-Dateien im demo/ Verzeichnis
+# Ausgabe in ./output/ (Standard)
 /create-questions
 
 # Mit spezifischem Thema
@@ -198,16 +210,22 @@ class ExampleAlgorithm:
 
 # Mit angepasster Fragenzahl
 /create-questions --count 5 --theme "Graph Algorithms"
+
+# Mit benutzerdefiniertem Ausgabeverzeichnis
+/create-questions --output "generated_questions"
 ```
 
 ### Advanced Usage
 
 ```bash
-# Für spezifisches PDF
-/create-questions --source "demo/algorithm_book.pdf" --theme "Dynamic Programming"
+# Für spezifische Markdown-Datei mit eigenem Ausgabeverzeichnis
+/create-questions --source "demo/Praktische Algorithmik mit Python.md" --theme "Dynamic Programming" --output "exam_questions"
 
 # Mit angepasster Schwierigkeit
 /create-questions --difficulty advanced --points-range 15-25
+
+# Vollständiges Beispiel mit allen Optionen
+/create-questions --source "demo/Heapsort und Priority Search Queues.md" --count 4 --theme "Heapsort" --difficulty intermediate --output "heapsort_exam" --points-range 12-18
 ```
 
 ## ⚠️ Best Practices & Guidelines
@@ -236,13 +254,13 @@ class ExampleAlgorithm:
 
 Vor Finalisierung jeder Frage:
 
-- [ ] PDF-Material korrekt analysiert und referenziert
+- [ ] Markdown-Material korrekt analysiert und referenziert
 - [ ] Python-Code syntaktisch korrekt und ausführbar
 - [ ] Musterlösung vollständig und korrekt
 - [ ] Punkteverteilung summiert sich zur Maximalpunktzahl
 - [ ] Schwierigkeitsgrad angemessen für BSc-Niveau
 - [ ] Aufgabenstellung eindeutig und verständlich
-- [ ] Dateien korrekt benannt und im `./demo/` Verzeichnis gespeichert
+- [ ] Dateien korrekt benannt und im konfigurierten Ausgabeverzeichnis gespeichert
 - [ ] Markdown-Formatierung konsistent und professionell
 
 ## 🎓 Pädagogische Ziele
@@ -256,4 +274,4 @@ Jede generierte Frage sollte:
 
 ---
 
-**Verwende diesen Befehl, um professionelle, akademisch fundierte Programmieraufgaben aus PDF-Materialien zu generieren, die sowohl pädagogisch wertvoll als auch fair bewertbar sind.**
+**Verwende diesen Befehl, um professionelle, akademisch fundierte Programmieraufgaben aus Markdown-Materialien zu generieren, die sowohl pädagogisch wertvoll als auch fair bewertbar sind.**
