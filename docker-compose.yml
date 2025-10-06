@@ -28,6 +28,28 @@ services:
     networks:
       - examcraft_network
 
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: examcraft_qdrant
+    ports:
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC API (optional)
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=INFO
+    networks:
+      - examcraft_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # FastAPI Backend
   backend:
     build:
@@ -37,6 +59,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://examcraft:examcraft_dev@postgres:5432/examcraft
       - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
+      - VECTOR_SERVICE_TYPE=qdrant
       - CLAUDE_API_KEY=${CLAUDE_API_KEY}
       - ENVIRONMENT=development
     ports:
@@ -47,6 +71,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - qdrant
     networks:
       - examcraft_network
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -74,6 +99,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  qdrant_data:
 
 networks:
   examcraft_network:

@@ -8,12 +8,18 @@ export enum DocumentStatus {
 export interface Document {
   id: number;
   filename: string;
+  original_filename: string;
+  title: string;
   mime_type: string;
   status: DocumentStatus;
   created_at: string;
   processed_at?: string;
   file_size?: number;
   has_vectors: boolean;
+  user_id?: string;
+  content_preview?: string;
+  vector_collection?: string;
+  updated_at?: string;
   metadata?: {
     total_chunks?: number;
     embedding_model?: string;

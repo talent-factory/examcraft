@@ -12,7 +12,7 @@ from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from models.document import Document, DocumentStatus
 from services.docling_service import DoclingService, ProcessedDocument
-from services.vector_service_mock import vector_service
+from services.vector_service_factory import get_vector_service
 from datetime import datetime
 import logging
 
@@ -323,6 +323,7 @@ class DocumentService:
         try:
             # Erstelle Vector Embeddings
             logger.info(f"Creating vector embeddings for document {document_id}")
+            vector_service = get_vector_service()
             embedding_stats = await vector_service.add_document_chunks(processed_doc)
             
             # Aktualisiere Dokument mit Vector Collection Info
@@ -392,24 +393,24 @@ class DocumentService:
             }
     
     async def get_document_chunks(
-        self, 
-        document_id: int, 
+        self,
+        document_id: int,
         db: Session
     ) -> Optional[List[Dict[str, Any]]]:
         """
         Hole verarbeitete Chunks eines Dokuments
-        
+
         Args:
             document_id: ID des Dokuments
             db: Database Session
-            
+
         Returns:
             Liste der Chunks oder None
         """
         document = self.get_document_by_id(document_id, db)
         if not document or document.status != DocumentStatus.PROCESSED:
             return None
-        
+
         try:
             # Verarbeite Dokument erneut um Chunks zu erhalten
             # In einer späteren Version könnten Chunks in der DB gespeichert werden
@@ -419,7 +420,7 @@ class DocumentService:
                 filename=document.original_filename,
                 mime_type=document.mime_type
             )
-            
+
             # Konvertiere Chunks zu Dictionary Format
             chunks_data = []
             for chunk in processed_doc.chunks:
@@ -429,11 +430,67 @@ class DocumentService:
                     'page_number': chunk.page_number,
                     'metadata': chunk.metadata
                 })
-            
+
             return chunks_data
-            
+
         except Exception as e:
             logger.error(f"Failed to get document chunks for {document_id}: {str(e)}")
+            return None
+
+    async def get_full_document_content(
+        self,
+        document_id: int,
+        db: Session
+    ) -> Optional[str]:
+        """
+        Hole vollständigen Dokumenteninhalt für Content Preview
+
+        Args:
+            document_id: ID des Dokuments
+            db: Database Session
+
+        Returns:
+            Vollständiger Dokumenteninhalt als String oder None
+        """
+        document = self.get_document_by_id(document_id, db)
+        if not document:
+            return None
+
+        try:
+            # Wenn Dokument noch nicht verarbeitet wurde, verarbeite es zuerst
+            if document.status == DocumentStatus.UPLOADED:
+                processed_doc = await self.process_document_content(document_id, db)
+                if not processed_doc:
+                    return None
+            elif document.status == DocumentStatus.PROCESSING:
+                # Dokument wird gerade verarbeitet, warte kurz und prüfe erneut
+                return None
+            elif document.status == DocumentStatus.ERROR:
+                # Dokument konnte nicht verarbeitet werden
+                return None
+
+            # Verarbeite Dokument um vollständigen Inhalt zu erhalten
+            processed_doc = await self.docling_service.process_document(
+                document_id=document.id,
+                file_path=document.file_path,
+                filename=document.original_filename,
+                mime_type=document.mime_type
+            )
+
+            if not processed_doc or not processed_doc.chunks:
+                return None
+
+            # Kombiniere alle Chunks zu vollständigem Inhalt
+            full_content = []
+            for chunk in processed_doc.chunks:
+                # Entferne NUL-Zeichen die PostgreSQL nicht unterstützt
+                clean_content = chunk.content.replace('\x00', '').replace('\0', '')
+                full_content.append(clean_content)
+
+            return '\n\n'.join(full_content)
+
+        except Exception as e:
+            logger.error(f"Failed to get full document content for {document_id}: {str(e)}")
             return None
 
 

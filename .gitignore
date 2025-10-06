@@ -9,6 +9,8 @@ wheels/
 # Virtual environments
 .venv
 .env
+.env.production
+.env.render
 
 # Node.js dependencies
 node_modules/
@@ -55,3 +57,5 @@ backend/.coverage
 
 # MCP configuration with API keys
 .mcp.json
+backend/chroma_db/chroma.sqlite3
+backend/mock_vector_db/mock_vectors.json

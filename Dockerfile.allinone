@@ -1,0 +1,107 @@
+# ExamCraft AI - All-in-One Container für Render.com
+# Enthält: Backend (FastAPI) + Frontend (React) + PostgreSQL + Redis + Qdrant
+# Für schnelles Deployment und Testing
+
+FROM ubuntu:22.04
+
+# Verhindere interaktive Prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System Dependencies installieren
+RUN apt-get update && apt-get install -y \
+    # Python
+    python3.11 \
+    python3-pip \
+    python3.11-dev \
+    # Node.js
+    curl \
+    # PostgreSQL
+    postgresql-15 \
+    postgresql-contrib-15 \
+    # Redis
+    redis-server \
+    # Qdrant Dependencies
+    wget \
+    # Nginx für Frontend
+    nginx \
+    # Utilities
+    supervisor \
+    gcc \
+    g++ \
+    libpq-dev \
+    libmagic1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js 18 installieren
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
+# Qdrant Binary herunterladen
+RUN wget https://github.com/qdrant/qdrant/releases/download/v1.7.4/qdrant-x86_64-unknown-linux-gnu.tar.gz \
+    && tar -xzf qdrant-x86_64-unknown-linux-gnu.tar.gz \
+    && mv qdrant /usr/local/bin/ \
+    && rm qdrant-x86_64-unknown-linux-gnu.tar.gz
+
+# Arbeitsverzeichnis
+WORKDIR /app
+
+# Backend Dependencies
+COPY backend/requirements.txt /app/backend/
+RUN pip3 install --no-cache-dir -r /app/backend/requirements.txt
+
+# Frontend Dependencies und Build
+COPY frontend/package*.json /app/frontend/
+WORKDIR /app/frontend
+RUN npm install
+COPY frontend/ /app/frontend/
+RUN npm run build
+
+# Backend Code kopieren
+WORKDIR /app
+COPY backend/ /app/backend/
+COPY utils/ /app/utils/
+
+# Nginx Konfiguration
+COPY docker/nginx-allinone.conf /etc/nginx/sites-available/default
+
+# Supervisor Konfiguration für alle Services
+COPY docker/supervisord-allinone.conf /etc/supervisor/conf.d/supervisord.conf
+
+# PostgreSQL initialisieren
+RUN service postgresql start && \
+    su - postgres -c "psql -c \"CREATE USER examcraft WITH PASSWORD 'examcraft_prod';\"" && \
+    su - postgres -c "psql -c \"CREATE DATABASE examcraft OWNER examcraft;\"" && \
+    service postgresql stop
+
+# Verzeichnisse erstellen
+RUN mkdir -p /app/backend/storage/uploads \
+    && mkdir -p /var/lib/qdrant/storage \
+    && mkdir -p /var/log/supervisor \
+    && mkdir -p /var/run/postgresql
+
+# Berechtigungen
+RUN chown -R postgres:postgres /var/lib/postgresql \
+    && chown -R postgres:postgres /var/run/postgresql \
+    && chmod -R 755 /app
+
+# Environment Variables (werden von Render.com überschrieben)
+ENV DATABASE_URL=postgresql://examcraft:examcraft_prod@localhost:5432/examcraft
+ENV REDIS_URL=redis://localhost:6379
+ENV QDRANT_URL=http://localhost:6333
+ENV VECTOR_SERVICE_TYPE=qdrant
+ENV ENVIRONMENT=production
+ENV PYTHONPATH=/app
+
+# Port für Nginx (Frontend + Backend Proxy)
+EXPOSE 8080
+
+# Health Check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/api/v1/health || exit 1
+
+# Startup Script
+COPY docker/start-allinone.sh /start.sh
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]
+
