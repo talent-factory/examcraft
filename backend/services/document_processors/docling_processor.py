@@ -58,8 +58,9 @@ class DoclingProcessor:
         self.chunk_overlap = chunk_overlap
         
         # Konfiguriere Docling Pipeline
+        # OCR deaktiviert für schnellere Verarbeitung (nur Text-PDFs)
         self.pipeline_options = PdfPipelineOptions()
-        self.pipeline_options.do_ocr = True
+        self.pipeline_options.do_ocr = False  # Deaktiviert OCR (verhindert Model-Download)
         self.pipeline_options.do_table_structure = True
         self.pipeline_options.table_structure_options.mode = TableFormatMode.ACCURATE
         
