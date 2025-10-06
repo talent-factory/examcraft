@@ -11,7 +11,23 @@ from pathlib import Path
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
-from docling_core.types.doc import ImageRefMode, TableFormatMode
+
+# Try to import TableFormatMode from different locations (API changed in newer versions)
+try:
+    from docling_core.types.doc import ImageRefMode, TableFormatMode
+except ImportError:
+    try:
+        from docling_core.types.doc import ImageRefMode
+        from docling_core.types.doc.table import TableFormatMode
+    except ImportError:
+        # Fallback: Define TableFormatMode locally if not available
+        class TableFormatMode:
+            ACCURATE = "accurate"
+            FAST = "fast"
+
+        class ImageRefMode:
+            PLACEHOLDER = "placeholder"
+            EMBEDDED = "embedded"
 
 from services.docling_service import DocumentChunk, ProcessedDocument
 
