@@ -22,10 +22,12 @@ try:
 except ImportError:
     QDRANT_AVAILABLE = False
 
-# Sentence Transformers für Embeddings
+# NumPy für Embeddings (immer benötigt)
+import numpy as np
+
+# Sentence Transformers für Embeddings (optional)
 try:
     from sentence_transformers import SentenceTransformer
-    import numpy as np
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False

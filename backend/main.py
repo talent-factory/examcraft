@@ -30,10 +30,11 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS middleware
+# CORS middleware - Production-ready configuration
+cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -91,6 +92,58 @@ async def health_check():
         "service": "ExamCraft AI Backend",
         "environment": os.getenv("ENVIRONMENT", "development")
     }
+
+@app.get("/api/v1/health")
+async def api_health_check():
+    """Detailed health check endpoint for production monitoring"""
+    from services.vector_service_factory import vector_service
+    import redis
+    from database import engine
+
+    health_status = {
+        "status": "healthy",
+        "version": "1.0.0",
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "services": {}
+    }
+
+    # Check Database
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        health_status["services"]["database"] = "connected"
+    except Exception as e:
+        health_status["services"]["database"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+
+    # Check Redis
+    try:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        r = redis.from_url(redis_url)
+        r.ping()
+        health_status["services"]["redis"] = "connected"
+    except Exception as e:
+        health_status["services"]["redis"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+
+    # Check Vector Database
+    try:
+        # get_collection_stats() ist nicht async, gibt dict zurück
+        stats = vector_service.get_collection_stats()
+        if stats and isinstance(stats, dict):
+            health_status["services"]["vector_db"] = "connected"
+            health_status["services"]["vector_db_type"] = os.getenv("VECTOR_SERVICE_TYPE", "qdrant")
+        else:
+            health_status["services"]["vector_db"] = "available"
+    except Exception as e:
+        health_status["services"]["vector_db"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+
+    # Check Claude API
+    health_status["services"]["claude_api"] = "configured" if os.getenv("CLAUDE_API_KEY") else "not_configured"
+
+    return health_status
 
 @app.get("/api/v1/claude/usage")
 async def get_claude_usage():
