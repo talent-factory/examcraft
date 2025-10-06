@@ -94,12 +94,13 @@ async def health_check():
     # Read version from pyproject.toml
     version = "unknown"
     try:
-        pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
+        pyproject_path = Path(__file__).parent / "pyproject.toml"
         with open(pyproject_path, "rb") as f:
             pyproject = tomllib.load(f)
             version = pyproject.get("project", {}).get("version", "unknown")
-    except Exception:
-        version = "0.1.0"  # Fallback
+    except Exception as e:
+        # Fallback to default version
+        version = "0.1.0"
 
     # Get processor type
     processor_type = os.getenv("DOCUMENT_PROCESSOR_TYPE", "auto")
