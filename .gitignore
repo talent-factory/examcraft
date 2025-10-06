@@ -9,6 +9,8 @@ wheels/
 # Virtual environments
 .venv
 .env
+.env.production
+.env.render
 
 # Node.js dependencies
 node_modules/
