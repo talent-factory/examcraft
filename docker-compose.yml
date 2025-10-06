@@ -64,9 +64,12 @@ services:
       - QDRANT_URL=http://qdrant:6333
       - VECTOR_SERVICE_TYPE=qdrant
       - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ENVIRONMENT=development
       - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-unknown}
       - DOCUMENT_PROCESSOR_TYPE=${DOCUMENT_PROCESSOR_TYPE:-auto}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
     ports:
       - "8000:8000"
     volumes:

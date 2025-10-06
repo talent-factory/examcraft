@@ -49,6 +49,7 @@ markdown==3.5.1                     # Markdown Processing
 
 # Vector Database & Embeddings
 qdrant-client==1.7.0                # Qdrant Vector Database Client
-# sentence-transformers==2.7.0      # REMOVED: Too large for Render.com build (500MB+)
+openai>=1.0.0                       # OpenAI API for Embeddings (production)
+# sentence-transformers==2.7.0      # Sentence Embeddings (optional, for local development)
 # chromadb==0.4.15                  # REMOVED: Replaced by Qdrant
 numpy>=1.24.3                       # Numerische Operations (für Embeddings, Docling compatible)
