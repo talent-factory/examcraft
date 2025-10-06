@@ -11,7 +11,7 @@ from docx import Document as DocxDocument
 import markdown
 import re
 
-from backend.services.docling_service import DocumentChunk, ProcessedDocument
+from services.docling_service import DocumentChunk, ProcessedDocument
 
 logger = logging.getLogger(__name__)
 

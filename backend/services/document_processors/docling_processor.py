@@ -13,7 +13,7 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling_core.types.doc import ImageRefMode, TableFormatMode
 
-from backend.services.docling_service import DocumentChunk, ProcessedDocument
+from services.docling_service import DocumentChunk, ProcessedDocument
 
 logger = logging.getLogger(__name__)
 
