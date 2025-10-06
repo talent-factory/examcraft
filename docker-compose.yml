@@ -68,8 +68,8 @@ services:
       - ENVIRONMENT=development
       - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-unknown}
       - DOCUMENT_PROCESSOR_TYPE=${DOCUMENT_PROCESSOR_TYPE:-legacy}
-      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-sentence-transformers}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
     ports:
       - "8000:8000"
     volumes:
