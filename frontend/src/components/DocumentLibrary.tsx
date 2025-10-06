@@ -4,7 +4,6 @@ import {
   Typography,
   Card,
   CardContent,
-  CardActions,
   Button,
   Chip,
   Grid,
@@ -21,7 +20,10 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
-  Divider
+  Divider,
+  Tabs,
+  Tab,
+  Paper
 } from '@mui/material';
 import {
   Description,
@@ -64,6 +66,9 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     open: false,
     document: null
   });
+  const [previewTab, setPreviewTab] = useState(0);
+  const [documentContent, setDocumentContent] = useState<string | null>(null);
+  const [contentLoading, setContentLoading] = useState(false);
 
   useEffect(() => {
     loadDocuments();
@@ -139,9 +144,25 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     setMenuAnchor(null);
   };
 
-  const handlePreview = (document: Document) => {
+  const handlePreview = async (document: Document) => {
     setPreviewDialog({ open: true, document });
+    setPreviewTab(0);
+    setDocumentContent(null);
     handleMenuClose();
+
+    // Load content if document is processed
+    if (document.status === 'processed') {
+      setContentLoading(true);
+      try {
+        const contentData = await DocumentService.getDocumentContent(document.id);
+        setDocumentContent(contentData.content);
+      } catch (err) {
+        console.error('Failed to load document content:', err);
+        setDocumentContent('Fehler beim Laden des Dokumentinhalts.');
+      } finally {
+        setContentLoading(false);
+      }
+    }
   };
 
   const handleDelete = (document: Document) => {
@@ -330,9 +351,9 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     </IconButton>
                   </Box>
 
-                  {/* Filename */}
-                  <Typography variant="subtitle1" noWrap title={document.filename}>
-                    {document.filename}
+                  {/* Document Title */}
+                  <Typography variant="subtitle1" noWrap title={document.title}>
+                    {document.title}
                   </Typography>
 
                   {/* Status */}
@@ -426,7 +447,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         <DialogTitle>Dokument löschen</DialogTitle>
         <DialogContent>
           <Typography>
-            Möchten Sie das Dokument "{deleteDialog.document?.filename}" wirklich löschen?
+            Möchten Sie das Dokument "{deleteDialog.document?.title}" wirklich löschen?
             Diese Aktion kann nicht rückgängig gemacht werden.
           </Typography>
         </DialogContent>
@@ -444,51 +465,148 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       <Dialog
         open={previewDialog.open}
         onClose={() => setPreviewDialog({ open: false, document: null })}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
       >
         <DialogTitle>
-          Dokument-Vorschau: {previewDialog.document?.filename}
+          Dokument-Vorschau: {previewDialog.document?.title}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ p: 0 }}>
           {previewDialog.document && (
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                Metadaten
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="body2">
-                    <strong>Dateigröße:</strong> {formatFileSize(previewDialog.document.file_size || 0)}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2">
-                    <strong>MIME-Type:</strong> {previewDialog.document.mime_type}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2">
-                    <strong>Status:</strong> {previewDialog.document.status}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2">
-                    <strong>Vektoren:</strong> {previewDialog.document.has_vectors ? 'Ja' : 'Nein'}
-                  </Typography>
-                </Grid>
-              </Grid>
-              
-              {previewDialog.document.metadata && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Verarbeitungsdetails
-                  </Typography>
-                  <pre style={{ fontSize: '0.75rem', overflow: 'auto' }}>
-                    {JSON.stringify(previewDialog.document.metadata, null, 2)}
-                  </pre>
-                </Box>
-              )}
+            <Box sx={{ width: '100%' }}>
+              {/* Tabs */}
+              <Tabs
+                value={previewTab}
+                onChange={(_, newValue) => setPreviewTab(newValue)}
+                sx={{ borderBottom: 1, borderColor: 'divider', px: 3 }}
+              >
+                <Tab label="Metadaten" />
+                <Tab
+                  label="Inhalt"
+                  disabled={previewDialog.document.status !== 'processed'}
+                />
+              </Tabs>
+
+              {/* Tab Content */}
+              <Box sx={{ p: 3 }}>
+                {previewTab === 0 && (
+                  <Box>
+                    <Typography variant="h6" gutterBottom>
+                      Dokument-Informationen
+                    </Typography>
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                      <Grid item xs={6}>
+                        <Typography variant="body2">
+                          <strong>Originaldatei:</strong> {previewDialog.document.original_filename}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2">
+                          <strong>Dateigröße:</strong> {formatFileSize(previewDialog.document.file_size || 0)}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2">
+                          <strong>MIME-Type:</strong> {previewDialog.document.mime_type}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2">
+                          <strong>Status:</strong> {previewDialog.document.status}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2">
+                          <strong>Vektoren:</strong> {previewDialog.document.has_vectors ? 'Ja' : 'Nein'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Typography variant="body2">
+                          <strong>Hochgeladen:</strong> {formatDate(previewDialog.document.created_at)}
+                        </Typography>
+                      </Grid>
+                      {previewDialog.document.processed_at && (
+                        <Grid item xs={6}>
+                          <Typography variant="body2">
+                            <strong>Verarbeitet:</strong> {formatDate(previewDialog.document.processed_at)}
+                          </Typography>
+                        </Grid>
+                      )}
+                    </Grid>
+
+                    {previewDialog.document.content_preview && (
+                      <Box sx={{ mb: 3 }}>
+                        <Typography variant="h6" gutterBottom>
+                          Inhaltsvorschau
+                        </Typography>
+                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+                            {previewDialog.document.content_preview}
+                          </Typography>
+                        </Paper>
+                      </Box>
+                    )}
+
+                    {previewDialog.document.metadata && (
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          Verarbeitungsdetails
+                        </Typography>
+                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', maxHeight: 300, overflow: 'auto' }}>
+                          <pre style={{ fontSize: '0.75rem', margin: 0, fontFamily: 'monospace' }}>
+                            {JSON.stringify(previewDialog.document.metadata, null, 2)}
+                          </pre>
+                        </Paper>
+                      </Box>
+                    )}
+                  </Box>
+                )}
+
+                {previewTab === 1 && (
+                  <Box>
+                    <Typography variant="h6" gutterBottom>
+                      Vollständiger Dokumentinhalt
+                    </Typography>
+                    {contentLoading ? (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                        <CircularProgress />
+                      </Box>
+                    ) : documentContent ? (
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 3,
+                          bgcolor: 'grey.50',
+                          maxHeight: 500,
+                          overflow: 'auto',
+                          fontFamily: 'monospace',
+                          fontSize: '0.875rem',
+                          lineHeight: 1.6
+                        }}
+                      >
+                        <Typography
+                          component="pre"
+                          sx={{
+                            whiteSpace: 'pre-wrap',
+                            margin: 0,
+                            fontFamily: 'inherit',
+                            fontSize: 'inherit'
+                          }}
+                        >
+                          {documentContent}
+                        </Typography>
+                      </Paper>
+                    ) : (
+                      <Alert severity="info">
+                        {previewDialog.document.status !== 'processed'
+                          ? 'Dokument muss erst verarbeitet werden, um den Inhalt anzuzeigen.'
+                          : 'Kein Inhalt verfügbar.'
+                        }
+                      </Alert>
+                    )}
+                  </Box>
+                )}
+              </Box>
             </Box>
           )}
         </DialogContent>
