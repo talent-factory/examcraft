@@ -27,7 +27,7 @@ ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwen
 
 ```text
 ExamCraft/
-├── backend/              # FastAPI Backend Server
+├── backend/             # FastAPI Backend Server
 │   ├── main.py          # REST API Endpoints
 │   ├── database.py      # PostgreSQL Connection
 │   ├── models.py        # Pydantic Data Models
@@ -39,15 +39,15 @@ ExamCraft/
 │   └── public/          # Static Assets
 ├── utils/               # Python Core Utilities
 │   ├── extraction.py    # Document Processing (PDF/DOC/MD)
-│   └── rag.py          # RAG System (ChromaDB + Embeddings)
+│   └── rag.py           # RAG System (ChromaDB + Embeddings)
 ├── demo/                # Workshop Demo Materials
-│   ├── *.pdf           # Example Academic Documents
-│   └── *.md            # Generated Questions & Solutions
+│   ├── *.pdf            # Example Academic Documents
+│   └── *.md             # Generated Questions & Solutions
 ├── docs/                # Project Documentation
 ├── .claude/             # Claude Code Integration
 ├── docker-compose.yml   # Multi-Container Orchestration
 ├── start-dev.sh         # Development Environment Launcher
-└── pyproject.toml      # Python Dependencies & Config
+└── pyproject.toml       # Python Dependencies & Config
 ```
 
 ## 🚀 Quick Start

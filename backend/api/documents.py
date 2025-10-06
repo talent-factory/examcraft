@@ -28,6 +28,7 @@ class DocumentResponse(BaseModel):
     id: int
     filename: str
     original_filename: str
+    title: str  # Neues Feld für bessere UI-Anzeige
     file_size: int
     mime_type: str
     status: str
@@ -305,6 +306,52 @@ async def process_document(
         logger.error(f"Document processing failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
+@router.get("/{document_id}/content")
+async def get_document_content(
+    document_id: int,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Hole vollständigen Dokumenteninhalt für Vorschau
+
+    - **document_id**: ID des Dokuments
+
+    Returns:
+        Vollständiger Dokumenteninhalt als Text
+    """
+    try:
+        document = document_service.get_document_by_id(document_id, db)
+
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        if document.user_id and document.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Hole vollständigen Inhalt vom Document Service
+        content = await document_service.get_full_document_content(document_id, db)
+
+        if content is None:
+            # Fallback auf content_preview wenn verfügbar
+            if document.content_preview:
+                content = document.content_preview
+            else:
+                raise HTTPException(status_code=404, detail="Document content not available")
+
+        return {
+            "document_id": document_id,
+            "title": document.doc_metadata.get('title', document.original_filename) if document.doc_metadata else document.original_filename,
+            "content": content,
+            "content_length": len(content) if content else 0,
+            "metadata": document.doc_metadata
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get content: {str(e)}")
+
 @router.get("/{document_id}/chunks")
 async def get_document_chunks(
     document_id: int,
@@ -313,39 +360,39 @@ async def get_document_chunks(
 ):
     """
     Hole verarbeitete Text-Chunks eines Dokuments
-    
+
     - **document_id**: ID des Dokuments
-    
+
     Returns:
         Liste der Text-Chunks mit Metadaten
     """
     try:
         document = document_service.get_document_by_id(document_id, db)
-        
+
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
         if document.user_id and document.user_id != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
-        
+
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Document not processed yet. Current status: {document.status.value}"
             )
-        
+
         # Hole Chunks
         chunks = await document_service.get_document_chunks(document_id, db)
-        
+
         if chunks is None:
             raise HTTPException(status_code=500, detail="Failed to retrieve document chunks")
-        
+
         return {
             "document_id": document_id,
             "total_chunks": len(chunks),
             "chunks": chunks
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

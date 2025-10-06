@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from io import BytesIO
 
 from main import app
-from services.vector_service_mock import VectorService, SearchResult, EmbeddingStats
+from services.qdrant_vector_service import SearchResult, EmbeddingStats  # Use Qdrant types
 from services.docling_service import ProcessedDocument, DocumentChunk
 
 
@@ -24,7 +24,7 @@ class TestVectorSearchAPI:
     @pytest.fixture
     def mock_vector_service(self):
         """Mock Vector Service für Tests"""
-        return Mock(spec=VectorService)
+        return Mock()
     
     @pytest.fixture
     def sample_search_results(self):
@@ -61,26 +61,33 @@ class TestVectorSearchAPI:
     def test_vector_search_health_success(self, client):
         """Test Vector Search Health Check (Success)"""
         with patch('api.vector_search.vector_service') as mock_service:
-            mock_service.get_collection_stats.return_value = {
-                "collection_name": "test_collection",
-                "total_chunks": 10,
-                "embedding_model": "test-model",
-                "persist_directory": "./test_db"
-            }
-            mock_service._embedding_model = None
-            
-            response = client.get("/api/v1/search/health")
-            
-            assert response.status_code == 200
-            data = response.json()
-            
-            assert data["status"] == "healthy"
-            assert data["service"] == "Vector Search Service"
-            assert data["collection_name"] == "test_collection"
-            assert data["total_chunks"] == 10
-            assert data["embedding_model"] == "test-model"
-            assert data["model_loaded"] is False
-            assert data["persist_directory"] == "./test_db"
+            with patch('api.vector_search.get_service_info') as mock_get_service_info:
+                mock_service.get_collection_stats.return_value = {
+                    "collection_name": "test_collection",
+                    "total_chunks": 10,
+                    "embedding_model": "test-model",
+                    "qdrant_url": "http://test:6333"
+                }
+                mock_service._embedding_model = None
+                mock_get_service_info.return_value = {
+                    "service_type": "qdrant",
+                    "service_class": "QdrantVectorService"
+                }
+
+                response = client.get("/api/v1/search/health")
+
+                assert response.status_code == 200
+                data = response.json()
+
+                assert data["status"] == "healthy"
+                assert data["service"] == "Vector Search Service"
+                assert data["service_type"] == "qdrant"
+                assert data["service_class"] == "QdrantVectorService"
+                assert data["collection_name"] == "test_collection"
+                assert data["total_chunks"] == 10
+                assert data["embedding_model"] == "test-model"
+                assert data["model_loaded"] is False
+                assert data["qdrant_url"] == "http://test:6333"
     
     def test_vector_search_health_failure(self, client):
         """Test Vector Search Health Check (Failure)"""
@@ -407,6 +414,60 @@ class TestVectorSearchAPI:
         assert response.status_code == 500
         data = response.json()
         assert data["detail"] == "Reindexing failed"
+
+    def test_get_vector_service_info_success(self, client):
+        """Test Vector Service Info Endpoint (Success)"""
+        with patch('api.vector_search.get_service_info') as mock_get_service_info:
+            with patch('api.vector_search.vector_service') as mock_service:
+                mock_get_service_info.return_value = {
+                    "service_type": "qdrant",
+                    "service_class": "QdrantVectorService",
+                    "service_module": "services.qdrant_vector_service",
+                    "qdrant_url": "http://localhost:6333",
+                    "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+                    "collection_name": "examcraft_documents"
+                }
+                mock_service.get_collection_stats.return_value = {
+                    "collection_name": "examcraft_documents",
+                    "total_chunks": 25,
+                    "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+                    "qdrant_url": "http://localhost:6333"
+                }
+
+                response = client.get("/api/v1/search/service-info")
+
+                assert response.status_code == 200
+                data = response.json()
+
+                assert "service_info" in data
+                assert "collection_stats" in data
+                assert "features" in data
+
+                service_info = data["service_info"]
+                assert service_info["service_type"] == "qdrant"
+                assert service_info["service_class"] == "QdrantVectorService"
+                assert service_info["qdrant_url"] == "http://localhost:6333"
+
+                features = data["features"]
+                assert features["async_operations"] is True
+                assert features["similarity_search"] is True
+                assert features["document_filtering"] is True
+
+    def test_get_vector_service_info_error(self, client):
+        """Test Vector Service Info Endpoint (Error)"""
+        with patch('api.vector_search.get_service_info') as mock_get_service_info:
+            with patch('api.vector_search.vector_service') as mock_service:
+                mock_get_service_info.return_value = {"service_type": "qdrant"}
+                mock_service.get_collection_stats.side_effect = Exception("Service unavailable")
+
+                response = client.get("/api/v1/search/service-info")
+
+                assert response.status_code == 200  # Endpoint returns 200 even on errors
+                data = response.json()
+
+                assert "error" in data
+                assert "service_info" in data
+                assert "Service unavailable" in data["error"]
 
 
 class TestVectorSearchModels:
