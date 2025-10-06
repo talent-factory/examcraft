@@ -53,8 +53,8 @@ services:
   # FastAPI Backend
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
       args:
         BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-unknown}
     container_name: examcraft_backend
@@ -71,6 +71,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./pyproject.toml:/app/pyproject.toml:ro
       - /app/__pycache__
     depends_on:
       - postgres
