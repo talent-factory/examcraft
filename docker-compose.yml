@@ -55,6 +55,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-unknown}
     container_name: examcraft_backend
     environment:
       - DATABASE_URL=postgresql://examcraft:examcraft_dev@postgres:5432/examcraft
@@ -63,6 +65,8 @@ services:
       - VECTOR_SERVICE_TYPE=qdrant
       - CLAUDE_API_KEY=${CLAUDE_API_KEY}
       - ENVIRONMENT=development
+      - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-unknown}
+      - DOCUMENT_PROCESSOR_TYPE=${DOCUMENT_PROCESSOR_TYPE:-auto}
     ports:
       - "8000:8000"
     volumes:
