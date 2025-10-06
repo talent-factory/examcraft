@@ -26,11 +26,11 @@ class DocumentProcessorFactory:
     def create_processor() -> Union['DoclingProcessor', 'LegacyProcessor']:
         """
         Erstelle Document Processor basierend auf Konfiguration
-        
+
         Returns:
             DoclingProcessor oder LegacyProcessor
         """
-        processor_type = os.getenv("DOCUMENT_PROCESSOR_TYPE", "auto").lower()
+        processor_type = os.getenv("DOCUMENT_PROCESSOR_TYPE", "auto").lower().strip()
         
         logger.info(f"Creating document processor (type: {processor_type})")
         
