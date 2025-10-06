@@ -157,6 +157,31 @@ export class DocumentService {
   }
 
   /**
+   * Get full document content (for preview)
+   */
+  static async getDocumentContent(documentId: number): Promise<{
+    document_id: number;
+    title: string;
+    content: string;
+    content_length: number;
+    metadata?: any;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}/content`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to fetch document content: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
    * Get document chunks (for preview)
    */
   static async getDocumentChunks(documentId: number): Promise<any[]> {

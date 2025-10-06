@@ -9,7 +9,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
-from services.vector_service_mock import vector_service, SearchResult
+from services.vector_service_factory import vector_service, get_service_info
+from services.qdrant_vector_service import SearchResult  # Import from Qdrant service for type hints
 from services.document_service import document_service
 import logging
 
@@ -292,24 +293,69 @@ async def vector_search_health():
     try:
         # Teste Vector Service
         stats = vector_service.get_collection_stats()
-        
+
         # Teste Embedding Model (lazy loading)
         model_loaded = vector_service._embedding_model is not None
-        
-        return {
+
+        # Hole Service-Informationen
+        service_info = get_service_info()
+
+        health_data = {
             "status": "healthy",
             "service": "Vector Search Service",
+            "service_type": service_info.get("service_type", "unknown"),
+            "service_class": service_info.get("service_class", "unknown"),
             "collection_name": stats["collection_name"],
             "total_chunks": stats["total_chunks"],
             "embedding_model": stats["embedding_model"],
-            "model_loaded": model_loaded,
-            "persist_directory": stats["persist_directory"]
+            "model_loaded": model_loaded
         }
-        
+
+        # Füge spezifische Service-Informationen hinzu
+        if "qdrant_url" in stats:
+            health_data["qdrant_url"] = stats["qdrant_url"]
+        elif "persist_directory" in stats:
+            health_data["persist_directory"] = stats["persist_directory"]
+
+        return health_data
+
     except Exception as e:
         logger.error(f"Vector search health check failed: {str(e)}")
         return {
             "status": "unhealthy",
             "service": "Vector Search Service",
             "error": str(e)
+        }
+
+
+@router.get("/service-info")
+async def get_vector_service_info():
+    """
+    Hole detaillierte Informationen über den aktuell verwendeten Vector Service
+
+    Zeigt:
+    - Service Type (Qdrant, ChromaDB, Mock)
+    - Konfiguration und URLs
+    - Verfügbare Features
+    """
+    try:
+        service_info = get_service_info()
+        stats = vector_service.get_collection_stats()
+
+        return {
+            "service_info": service_info,
+            "collection_stats": stats,
+            "features": {
+                "async_operations": True,
+                "similarity_search": True,
+                "document_filtering": True,
+                "metadata_support": True,
+                "collection_management": True
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to get service info: {e}")
+        return {
+            "error": str(e),
+            "service_info": get_service_info()
         }
