@@ -103,17 +103,17 @@ Wenn du dir bei einer Antwort unsicher bist, sage das ehrlich und gib einen nied
                 max_chunks=max_context_chunks
             )
             
-            # 2. Build enhanced user prompt with context
+            # 2. Build enhanced user prompt with context and history
             enhanced_prompt = self._build_enhanced_prompt(
                 user_message=user_message,
                 document_context=document_context,
-                sources=sources
+                sources=sources,
+                chat_history=chat_history
             )
-            
-            # 3. PydanticAI Agent ausführen
+
+            # 3. PydanticAI Agent ausführen (ohne message_history Parameter)
             result = await self.agent.run(
-                user_prompt=enhanced_prompt,
-                message_history=self._format_chat_history(chat_history)
+                user_prompt=enhanced_prompt
             )
             
             return {
@@ -131,18 +131,31 @@ Wenn du dir bei einer Antwort unsicher bist, sage das ehrlich und gib einen nied
         self,
         user_message: str,
         document_context: str,
-        sources: List[Dict[str, Any]]
+        sources: List[Dict[str, Any]],
+        chat_history: Optional[List[Dict[str, str]]] = None
     ) -> str:
-        """Baut erweiterten Prompt mit Dokumentenkontext"""
-        
+        """Baut erweiterten Prompt mit Dokumentenkontext und Chat-Historie"""
+
         # Quellenübersicht
         source_overview = "\n".join([
             f"- Quelle {i+1}: {s.get('metadata', {}).get('title', 'Unbekannt')} "
             f"(Relevanz: {s.get('score', 0):.0%})"
             for i, s in enumerate(sources)
         ])
-        
-        prompt = f"""**DOKUMENTENKONTEXT:**
+
+        # Chat-Historie formatieren (falls vorhanden)
+        history_text = ""
+        if chat_history and len(chat_history) > 0:
+            history_lines = []
+            for msg in chat_history[-5:]:  # Nur letzte 5 Nachrichten
+                role = "Benutzer" if msg["role"] == "user" else "Assistent"
+                history_lines.append(f"{role}: {msg['content'][:200]}...")  # Gekürzt
+            history_text = f"""**BISHERIGE KONVERSATION:**
+{chr(10).join(history_lines)}
+
+"""
+
+        prompt = f"""{history_text}**DOKUMENTENKONTEXT:**
 
 {document_context}
 
@@ -153,16 +166,12 @@ Wenn du dir bei einer Antwort unsicher bist, sage das ehrlich und gib einen nied
 {user_message}
 
 **ANWEISUNGEN:**
-Beantworte die Frage basierend auf dem obigen Dokumentenkontext. 
+Beantworte die Frage basierend auf dem obigen Dokumentenkontext.
 Zitiere die Quellen in deiner Antwort (z.B. "Laut Quelle 1...").
 Gib einen Konfidenz-Score zwischen 0.0 und 1.0 an, wie sicher du dir bei der Antwort bist.
 """
         return prompt
-    
-    def _format_chat_history(self, history: List[Dict[str, str]]) -> List[tuple]:
-        """Formatiert Chat-Historie für PydanticAI"""
-        return [(msg["role"], msg["content"]) for msg in history]
-    
+
     async def retrieve_relevant_context(
         self,
         query: str,
