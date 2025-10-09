@@ -375,16 +375,18 @@ function App() {
         </Box>
       ) : null}
 
-      {/* Demo Info */}
-      <Card sx={{ mt: 4, bgcolor: 'success.light', color: 'success.contrastText' }}>
+      {/* System Status */}
+      <Card sx={{ mt: 4, bgcolor: 'info.light', color: 'info.contrastText' }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 1 }}>
-            🎉 TASK-006 Claude API Vollintegration - Vollständig implementiert!
+            📊 ExamCraft AI - System Status
           </Typography>
           <Typography variant="body2">
-            ✅ API Key Konfiguration • ✅ Rate Limiting (50 RPM) • ✅ Retry Logic mit Exponential Backoff • 
-            ✅ Cost Tracking für Token-Usage • ✅ Demo Mode Fallback • ✅ Usage Statistics API • 
-            ✅ Vector Search System repariert • ✅ 28 neue Tests (65% Coverage)
+            🤖 <strong>KI-Modell:</strong> Claude Sonnet 4 (neueste Generation) •
+            🔍 <strong>Embeddings:</strong> OpenAI text-embedding-3-small (1536 dim) •
+            📚 <strong>Vector DB:</strong> Qdrant mit semantischer Suche •
+            📄 <strong>Dokumente:</strong> PDF, DOC, Markdown Support •
+            ✅ <strong>Status:</strong> Production Ready
           </Typography>
         </CardContent>
       </Card>

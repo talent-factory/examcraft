@@ -2,6 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Build arguments
+ARG BUILD_TIMESTAMP
+ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -11,13 +15,16 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy pyproject.toml for version info
+COPY pyproject.toml /app/pyproject.toml
+
 # Copy application code
-COPY . .
+COPY backend/ .
 
 # Expose port
 EXPOSE 8000
