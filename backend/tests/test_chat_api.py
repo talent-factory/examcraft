@@ -20,27 +20,36 @@ class TestChatAPI:
     @pytest.fixture
     def sample_documents(self, test_db):
         """Sample Documents für Tests"""
-        from models.document import Document
-        
+        from models.document import Document, DocumentStatus
+
+        # Titel wird über doc_metadata gesetzt (title ist read-only Property)
         doc1 = Document(
-            id=1,
-            title="Test Dokument 1",
             filename="test1.pdf",
+            original_filename="test1.pdf",
+            file_path="/tmp/test1.pdf",
+            file_size=1000,
             mime_type="application/pdf",
-            status="processed"
+            status=DocumentStatus.PROCESSED,
+            user_id="demo_user",
+            doc_metadata={"title": "Test Dokument 1"}
         )
         doc2 = Document(
-            id=2,
-            title="Test Dokument 2",
             filename="test2.pdf",
+            original_filename="test2.pdf",
+            file_path="/tmp/test2.pdf",
+            file_size=2000,
             mime_type="application/pdf",
-            status="processed"
+            status=DocumentStatus.PROCESSED,
+            user_id="demo_user",
+            doc_metadata={"title": "Test Dokument 2"}
         )
-        
+
         test_db.add(doc1)
         test_db.add(doc2)
         test_db.commit()
-        
+        test_db.refresh(doc1)
+        test_db.refresh(doc2)
+
         return [doc1, doc2]
     
     def test_create_chat_session(self, client, sample_documents):
