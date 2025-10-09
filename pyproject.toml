@@ -10,3 +10,8 @@ dependencies = [
     "docling>=2.9.0",
     "pypdf>=6.1.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
