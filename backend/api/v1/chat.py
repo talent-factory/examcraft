@@ -452,6 +452,7 @@ def convert_chat_to_document(
             file_size=len(document_content.encode('utf-8')),
             mime_type="text/markdown",
             status=DocumentStatus.PROCESSED,
+            user_id="demo_user",  # Wichtig: Damit Dokument in Bibliothek erscheint
             doc_metadata={"title": title, "source": "chat_export", "session_id": str(session_id)},
             content_preview=document_content[:500],  # Erste 500 Zeichen
             has_vectors=False
