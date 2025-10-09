@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Container, Typography, Button, Dialog, DialogContent, DialogTitle, IconButton } from '@mui/material';
-import { MessageSquare, X } from 'lucide-react';
+import { MessageSquare, X, Trash2 } from 'lucide-react';
 import { DocumentSelector } from './DocumentSelector';
 import { ChatInterface } from './ChatInterface';
 
@@ -91,6 +91,32 @@ export const DocumentChatPage: React.FC = () => {
     loadChatSessions(); // Refresh list
   };
 
+  const handleDeleteSession = async (sessionId: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Verhindere onClick auf Parent
+
+    if (!window.confirm('Möchten Sie diese Chat-Session wirklich löschen?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/v1/chat/sessions/${sessionId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) throw new Error('Delete failed');
+
+      // Wenn aktuell geöffnet, schließen
+      if (currentSessionId === sessionId) {
+        setCurrentSessionId(null);
+      }
+
+      loadChatSessions(); // Refresh list
+    } catch (error) {
+      console.error('Failed to delete chat session:', error);
+      alert('Fehler beim Löschen der Chat-Session');
+    }
+  };
+
   const currentSession = chatSessions.find(s => s.id === currentSessionId);
 
   return (
@@ -171,17 +197,31 @@ export const DocumentChatPage: React.FC = () => {
                     border: '1px solid',
                     borderColor: 'divider',
                     cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
                     '&:hover': { bgcolor: 'action.hover' }
                   }}
                   onClick={() => handleOpenSession(session.id)}
                 >
-                  <Typography variant="h6">{session.title}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {session.message_count} Nachrichten • {session.document_ids.length} Dokument(e)
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Zuletzt aktualisiert: {new Date(session.updated_at).toLocaleString('de-CH')}
-                  </Typography>
+                  <Box flex={1}>
+                    <Typography variant="h6">{session.title}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {session.message_count} Nachrichten • {session.document_ids.length} Dokument(e)
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Zuletzt aktualisiert: {new Date(session.updated_at).toLocaleString('de-CH')}
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={(e) => handleDeleteSession(session.id, e)}
+                    sx={{ ml: 2 }}
+                    title="Chat löschen"
+                  >
+                    <Trash2 size={18} />
+                  </IconButton>
                 </Box>
               ))}
             </Box>
