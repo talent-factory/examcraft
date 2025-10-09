@@ -10,17 +10,20 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 from dotenv import load_dotenv
-from services.claude_service import ClaudeService
-from api import documents, vector_search, rag_exams
-from api.documents import router as documents_router
-from api.v1 import chat as chat_api
-from database import create_tables
 
 # Load environment variables
 load_dotenv()
 
-# Initialize services
-claude_service = ClaudeService()
+# Lazy-loaded services (to reduce memory at startup)
+_claude_service = None
+
+def get_claude_service():
+    """Lazy-load Claude service only when needed"""
+    global _claude_service
+    if _claude_service is None:
+        from services.claude_service import ClaudeService
+        _claude_service = ClaudeService()
+    return _claude_service
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -41,14 +44,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize database tables
-create_tables()
+# Startup event - Initialize database tables
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup"""
+    from database import create_tables
+    create_tables()
 
-# Include routers
-app.include_router(documents.router)
-app.include_router(vector_search.router)
-app.include_router(rag_exams.router)
-app.include_router(chat_api.router)  # Chat API
+# Include routers (lazy-loaded to reduce startup memory)
+@app.on_event("startup")
+async def load_routers():
+    """Load API routers on startup"""
+    from api import documents, vector_search, rag_exams
+    from api.v1 import chat as chat_api
+
+    app.include_router(documents.router)
+    app.include_router(vector_search.router)
+    app.include_router(rag_exams.router)
+    app.include_router(chat_api.router)
 
 # Pydantic models
 class ExamRequest(BaseModel):
@@ -185,11 +198,13 @@ async def api_health_check():
 @app.get("/api/v1/claude/usage")
 async def get_claude_usage():
     """Get Claude API usage statistics"""
+    claude_service = get_claude_service()
     return claude_service.get_usage_stats()
 
 @app.get("/api/v1/claude/health")
 async def get_claude_health():
     """Get Claude API health status"""
+    claude_service = get_claude_service()
     stats = claude_service.get_usage_stats()
     return {
         "status": "healthy" if not stats["demo_mode"] else "demo_mode",
@@ -209,6 +224,7 @@ async def generate_exam(request: ExamRequest):
     """
     try:
         # Use Claude service to generate questions
+        claude_service = get_claude_service()
         question_data = await claude_service.generate_questions(
             topic=request.topic,
             difficulty=request.difficulty,
@@ -241,7 +257,7 @@ async def generate_exam(request: ExamRequest):
                 "difficulty": request.difficulty,
                 "question_count": len(questions),
                 "language": request.language,
-                "generated_by": "ExamCraft AI with Claude" if claude_service.api_key else "ExamCraft AI Demo"
+                "generated_by": "ExamCraft AI with Claude" if get_claude_service().api_key else "ExamCraft AI Demo"
             }
         )
         
