@@ -10,9 +10,13 @@ import asyncio
 import json
 from datetime import datetime
 
-from services.vector_service_mock import vector_service, SearchResult
+from services.vector_service_factory import get_vector_service
+from services.qdrant_vector_service import SearchResult
 from services.claude_service import ClaudeService
 from services.document_service import document_service
+
+# Initialize vector service
+vector_service = get_vector_service()
 
 logger = logging.getLogger(__name__)
 
@@ -174,12 +178,20 @@ FORMAT (JSON):
                 n_results=max_chunks * 2,  # Mehr holen für Filterung
                 document_ids=document_ids
             )
-            
+
+            # DEBUG: Log search results
+            logger.info(f"Vector search returned {len(search_results)} results for query '{query}'")
+            if search_results:
+                logger.info(f"Top result: score={search_results[0].similarity_score:.4f}, doc_id={search_results[0].document_id}")
+
             # Filtere nach Similarity
             filtered_results = [
-                result for result in search_results 
+                result for result in search_results
                 if result.similarity_score >= min_sim
             ][:max_chunks]
+
+            # DEBUG: Log filtered results
+            logger.info(f"After filtering (min_sim={min_sim}): {len(filtered_results)} results")
             
             if not filtered_results:
                 logger.warning(f"No relevant context found for query: {query}")
