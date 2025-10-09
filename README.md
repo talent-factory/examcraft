@@ -16,7 +16,8 @@ ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwen
 
 - **🤖 RAG-basierte KI-Fragenerstellung** mit Claude API + PydanticAI
 - **📄 Multi-Format Dokumentenverarbeitung**: PDF, Word, Markdown
-- **🔍 Semantische Suche** mit ChromaDB Vector Storage
+- **🔬 IBM Docling Integration** - Advanced Document Processing mit automatischem Fallback
+- **🔍 Semantische Suche** mit Qdrant Vector Database
 - **🎯 Bloom Taxonomy Integration** für verschiedene Lernlevels
 - **📝 Strukturierte Musterlösungen** mit A/B/C Qualitätsstufen
 - **⚛️ Moderne Web-UI** mit React 18 + TypeScript + Tailwind CSS

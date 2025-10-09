@@ -27,8 +27,15 @@ def create_vector_service() -> Union['QdrantVectorService', 'VectorService', 'Ve
         try:
             from services.qdrant_vector_service import QdrantVectorService
             qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
-            service = QdrantVectorService(qdrant_url=qdrant_url)
-            logger.info(f"Using QdrantVectorService at {qdrant_url}")
+            embedding_provider = os.getenv("EMBEDDING_PROVIDER", "openai")  # "openai" or "sentence-transformers"
+            embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")  # OpenAI default
+
+            service = QdrantVectorService(
+                qdrant_url=qdrant_url,
+                embedding_provider=embedding_provider,
+                embedding_model=embedding_model
+            )
+            logger.info(f"Using QdrantVectorService at {qdrant_url} with {embedding_provider} provider")
             return service
         except ImportError as e:
             logger.warning(f"Failed to import QdrantVectorService: {e}")

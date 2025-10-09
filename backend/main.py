@@ -88,11 +88,46 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint with version and deployment info"""
+    from datetime import datetime
+    import tomllib
+    from pathlib import Path
+
+    # Read version from pyproject.toml
+    version = "unknown"
+    try:
+        pyproject_path = Path(__file__).parent / "pyproject.toml"
+        with open(pyproject_path, "rb") as f:
+            pyproject = tomllib.load(f)
+            version = pyproject.get("project", {}).get("version", "unknown")
+    except Exception as e:
+        # Fallback to default version
+        version = "0.1.0"
+
+    # Get processor type
+    processor_type = os.getenv("DOCUMENT_PROCESSOR_TYPE", "auto")
+
+    # Get actual processor in use
+    try:
+        from services.document_processors.processor_factory import document_processor
+        processor_class = document_processor.__class__.__name__
+    except Exception:
+        processor_class = "unknown"
+
+    # Build timestamp (set during Docker build)
+    build_timestamp = os.getenv("BUILD_TIMESTAMP", "unknown")
+
     return {
         "status": "healthy",
         "service": "ExamCraft AI Backend",
-        "environment": os.getenv("ENVIRONMENT", "development")
+        "version": version,
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "build_timestamp": build_timestamp,
+        "processor": {
+            "configured": processor_type,
+            "active": processor_class
+        },
+        "timestamp": datetime.utcnow().isoformat() + "Z"
     }
 
 @app.get("/api/v1/health")
