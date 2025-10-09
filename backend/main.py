@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from services.claude_service import ClaudeService
 from api import documents, vector_search, rag_exams
 from api.documents import router as documents_router
+from api.v1 import chat as chat_api
 from database import create_tables
 
 # Load environment variables
@@ -24,8 +25,8 @@ claude_service = ClaudeService()
 # Initialize FastAPI app
 app = FastAPI(
     title="ExamCraft AI API",
-    description="KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben für OpenBook-Prüfungen",
-    version="0.1.0",
+    description="KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Document ChatBot",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -47,6 +48,7 @@ create_tables()
 app.include_router(documents.router)
 app.include_router(vector_search.router)
 app.include_router(rag_exams.router)
+app.include_router(chat_api.router)  # Chat API
 
 # Pydantic models
 class ExamRequest(BaseModel):
