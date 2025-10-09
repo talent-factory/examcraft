@@ -26,7 +26,7 @@ from database import get_db
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from models.chat_db import ChatSession as DBChatSession, ChatMessage as DBChatMessage
-from models.document import Document as DBDocument
+from models.document import Document as DBDocument, DocumentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -441,15 +441,20 @@ def convert_chat_to_document(
         )
 
         # Erstelle neues Dokument
-        title = document_title or f"Chat Wissen: {session.title}"
+        title = document_title or f"Chat: {session.title}"
+        filename = f"chat_export_{session.created_at.strftime('%Y%m%d_%H%M%S')}.md"
 
+        # Speichere Titel in doc_metadata (wird von @property title gelesen)
         new_document = DBDocument(
-            title=title,
-            filename=f"chat_export_{session.created_at.strftime('%Y%m%d_%H%M%S')}.md",
+            filename=filename,
+            original_filename=filename,
+            file_path=f"/tmp/chat_exports/{filename}",  # Virtueller Pfad
+            file_size=len(document_content.encode('utf-8')),
             mime_type="text/markdown",
-            status="processed",
-            total_pages=1,
-            total_chunks=0  # Wird später beim Processing gesetzt
+            status=DocumentStatus.PROCESSED,
+            doc_metadata={"title": title, "source": "chat_export", "session_id": str(session_id)},
+            content_preview=document_content[:500],  # Erste 500 Zeichen
+            has_vectors=False
         )
 
         db.add(new_document)
