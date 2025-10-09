@@ -10,9 +10,13 @@ import asyncio
 import json
 from datetime import datetime
 
-from services.vector_service_mock import vector_service, SearchResult
+from services.vector_service_factory import get_vector_service
+from services.qdrant_vector_service import SearchResult
 from services.claude_service import ClaudeService
 from services.document_service import document_service
+
+# Initialize vector service
+vector_service = get_vector_service()
 
 logger = logging.getLogger(__name__)
 
@@ -80,69 +84,131 @@ class RAGService:
         """Lade Prompt-Templates für verschiedene Fragetypen"""
         return {
             "multiple_choice": """
-Basierend auf dem folgenden Kontext, erstelle eine Multiple-Choice-Frage:
+Du bist ein Experte für die Erstellung von OpenBook-Prüfungsfragen für akademische Kurse.
 
-KONTEXT:
+KONTEXT AUS DOKUMENTEN:
 {context}
 
-ANFORDERUNGEN:
-- Erstelle eine präzise Frage zum Thema: {topic}
+AUFGABE:
+Erstelle eine anspruchsvolle Multiple-Choice-Frage zum Thema "{topic}" basierend AUSSCHLIESSLICH auf dem obigen Kontext.
+
+ANFORDERUNGEN FÜR OPENBOOK-PRÜFUNGEN:
+- Die Frage muss SPEZIFISCHE Details, Konzepte oder Zusammenhänge aus dem Kontext abfragen
 - Schwierigkeitsgrad: {difficulty}
 - Sprache: {language}
-- 4 Antwortoptionen (A, B, C, D)
-- Nur eine korrekte Antwort
-- Plausible Distraktoren
-- Kurze Erklärung der korrekten Antwort
+- Vermeide generische Fragen wie "Was ist wichtig bei..." oder "Welche Aspekte sind relevant..."
+- Fokussiere auf KONKRETE Fakten, Algorithmen, Formeln, Definitionen oder Prozesse aus dem Text
+- Die Frage soll Verständnis und Anwendung prüfen, nicht nur Auswendiglernen
+
+ANTWORTOPTIONEN:
+- Erstelle 4 Optionen (A, B, C, D)
+- Nur EINE korrekte Antwort
+- Distraktoren müssen plausibel sein und häufige Missverständnisse widerspiegeln
+- Vermeide offensichtlich falsche oder absurde Optionen
+- Keine "Alle oben genannten" oder "Keine der genannten" Optionen
 
 FORMAT (JSON):
 {{
-    "question": "Fragetext hier",
-    "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
+    "question": "Konkrete, spezifische Frage basierend auf dem Kontext",
+    "options": [
+        "A) Spezifische Option mit konkreten Details",
+        "B) Plausible Alternative mit ähnlichem Konzept",
+        "C) Häufiges Missverständnis oder verwandtes Konzept",
+        "D) Weitere plausible aber falsche Option"
+    ],
     "correct_answer": "A",
-    "explanation": "Erklärung warum A korrekt ist"
+    "explanation": "Detaillierte Erklärung mit Verweis auf den Kontext, warum A korrekt ist und warum die anderen Optionen falsch sind"
 }}
+
+BEISPIEL GUTER FRAGEN:
+- "Welche Zeitkomplexität hat Heap-Sort im Worst-Case und warum?"
+- "Was ist der entscheidende Unterschied zwischen Max-Heap und Min-Heap bei der Implementierung?"
+- "In welcher Phase des Heap-Sort Algorithmus wird die Heap-Eigenschaft wiederhergestellt?"
+
+BEISPIEL SCHLECHTER FRAGEN (VERMEIDE):
+- "Was ist ein wichtiger Aspekt von Heap-Sort?" (zu generisch)
+- "Welche der folgenden Aussagen ist korrekt?" (zu vage)
+- "Was sollte man über Heap-Sort wissen?" (nicht spezifisch)
 """,
             
             "open_ended": """
-Basierend auf dem folgenden Kontext, erstelle eine offene Frage:
+Du bist ein Experte für die Erstellung von OpenBook-Prüfungsfragen für akademische Kurse.
 
-KONTEXT:
+KONTEXT AUS DOKUMENTEN:
 {context}
 
-ANFORDERUNGEN:
-- Erstelle eine durchdachte offene Frage zum Thema: {topic}
+AUFGABE:
+Erstelle eine anspruchsvolle offene Frage zum Thema "{topic}" basierend AUSSCHLIESSLICH auf dem obigen Kontext.
+
+ANFORDERUNGEN FÜR OPENBOOK-PRÜFUNGEN:
+- Die Frage muss TIEFES Verständnis und ANWENDUNG von Konzepten aus dem Kontext prüfen
 - Schwierigkeitsgrad: {difficulty}
 - Sprache: {language}
-- Frage sollte kritisches Denken fördern
-- Musterlösung mit Bewertungskriterien
+- Fördere kritisches Denken, Analyse und Synthese
+- Vermeide reine Reproduktionsfragen ("Definieren Sie...", "Listen Sie auf...")
+- Fokussiere auf Erklärungen, Vergleiche, Anwendungen oder Problemlösungen
+
+FRAGETYPEN (wähle passend):
+- Erklärungsfragen: "Erklären Sie, warum/wie..."
+- Vergleichsfragen: "Vergleichen Sie X und Y hinsichtlich..."
+- Anwendungsfragen: "Wie würden Sie X anwenden, um Problem Y zu lösen?"
+- Analysefragen: "Analysieren Sie die Vor- und Nachteile von..."
 
 FORMAT (JSON):
 {{
-    "question": "Fragetext hier",
-    "sample_answer": "Beispiel einer guten Antwort",
-    "evaluation_criteria": ["Kriterium 1", "Kriterium 2", "Kriterium 3"]
+    "question": "Konkrete, anspruchsvolle offene Frage",
+    "sample_answer": "Detaillierte Musterantwort mit spezifischen Punkten aus dem Kontext",
+    "evaluation_criteria": [
+        "Kriterium 1: Spezifischer Aspekt der Antwort",
+        "Kriterium 2: Weiterer wichtiger Punkt",
+        "Kriterium 3: Tiefe des Verständnisses"
+    ]
 }}
+
+BEISPIEL GUTER FRAGEN:
+- "Erklären Sie den Heapify-Prozess und warum er für die Effizienz von Heap-Sort entscheidend ist."
+- "Vergleichen Sie Heap-Sort mit Quick-Sort hinsichtlich Zeitkomplexität und Speicherbedarf."
+- "Analysieren Sie, in welchen Szenarien Heap-Sort gegenüber anderen Sortieralgorithmen vorzuziehen ist."
 """,
             
             "true_false": """
-Basierend auf dem folgenden Kontext, erstelle eine Wahr/Falsch-Frage:
+Du bist ein Experte für die Erstellung von OpenBook-Prüfungsfragen für akademische Kurse.
 
-KONTEXT:
+KONTEXT AUS DOKUMENTEN:
 {context}
 
-ANFORDERUNGEN:
-- Erstelle eine eindeutige Wahr/Falsch-Aussage zum Thema: {topic}
+AUFGABE:
+Erstelle eine anspruchsvolle Wahr/Falsch-Aussage zum Thema "{topic}" basierend AUSSCHLIESSLICH auf dem obigen Kontext.
+
+ANFORDERUNGEN FÜR OPENBOOK-PRÜFUNGEN:
+- Die Aussage muss SPEZIFISCHE Details oder Zusammenhänge aus dem Kontext prüfen
 - Schwierigkeitsgrad: {difficulty}
 - Sprache: {language}
-- Klare, eindeutige Aussage
-- Begründung für die korrekte Antwort
+- Vermeide triviale oder offensichtliche Aussagen
+- Die Aussage sollte subtile Unterschiede oder häufige Missverständnisse adressieren
+- Klare, eindeutige Formulierung ohne Mehrdeutigkeiten
+
+GUTE AUSSAGEN:
+- Enthalten spezifische technische Details aus dem Kontext
+- Prüfen Verständnis von Zusammenhängen, nicht nur Fakten
+- Sind nicht durch bloßes Raten lösbar
 
 FORMAT (JSON):
 {{
-    "statement": "Aussage hier",
+    "statement": "Präzise, spezifische Aussage basierend auf dem Kontext",
     "correct_answer": true,
-    "explanation": "Erklärung warum die Aussage wahr/falsch ist"
+    "explanation": "Detaillierte Erklärung mit Verweis auf den Kontext, warum die Aussage wahr/falsch ist"
 }}
+
+BEISPIEL GUTER AUSSAGEN:
+- "Die Worst-Case-Zeitkomplexität von Heap-Sort ist O(n log n), unabhängig von der Eingabereihenfolge."
+- "Bei einem Max-Heap ist der Wert jedes Knotens größer oder gleich den Werten seiner Kindknoten."
+- "Heap-Sort ist ein stabiler Sortieralgorithmus, der die relative Reihenfolge gleicher Elemente beibehält."
+
+BEISPIEL SCHLECHTER AUSSAGEN (VERMEIDE):
+- "Heap-Sort ist ein Sortieralgorithmus." (zu trivial)
+- "Heap-Sort ist wichtig." (zu vage)
+- "Heap-Sort wird verwendet." (nicht spezifisch)
 """
         }
     
@@ -174,12 +240,20 @@ FORMAT (JSON):
                 n_results=max_chunks * 2,  # Mehr holen für Filterung
                 document_ids=document_ids
             )
-            
+
+            # DEBUG: Log search results
+            logger.info(f"Vector search returned {len(search_results)} results for query '{query}'")
+            if search_results:
+                logger.info(f"Top result: score={search_results[0].similarity_score:.4f}, doc_id={search_results[0].document_id}")
+
             # Filtere nach Similarity
             filtered_results = [
-                result for result in search_results 
+                result for result in search_results
                 if result.similarity_score >= min_sim
             ][:max_chunks]
+
+            # DEBUG: Log filtered results
+            logger.info(f"After filtering (min_sim={min_sim}): {len(filtered_results)} results")
             
             if not filtered_results:
                 logger.warning(f"No relevant context found for query: {query}")
@@ -290,13 +364,20 @@ FORMAT (JSON):
                 raise ValueError(f"Unknown question type: {question_type}")
             
             context_text = self._prepare_context_text(context)
-            
+
             prompt = template.format(
                 context=context_text,
                 topic=topic,
                 difficulty=difficulty,
                 language=language
             )
+
+            # DEBUG: Log prompt to verify new template is used
+            logger.info(f"=== QUESTION GENERATION PROMPT ===")
+            logger.info(f"Question Type: {question_type}, Topic: {topic}, Difficulty: {difficulty}")
+            logger.info(f"Prompt length: {len(prompt)} chars")
+            logger.info(f"Prompt starts with: {prompt[:200]}...")
+            logger.info(f"===================================")
             
             # Generiere mit Claude API
             response = await self.claude_service.generate_exam_async({

@@ -31,7 +31,16 @@ try:
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
-    import random
+
+# OpenAI für Embeddings (production)
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+# Fallback für Mock Embeddings
+import random
 
 from services.docling_service import DocumentChunk, ProcessedDocument
 
@@ -84,21 +93,24 @@ class QdrantVectorService:
     def __init__(
         self,
         qdrant_url: str = "http://localhost:6333",
-        embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
-        collection_name: str = "examcraft_documents"
+        embedding_model: str = "text-embedding-3-small",
+        collection_name: str = "examcraft_documents",
+        embedding_provider: str = "openai"  # "openai" or "sentence-transformers"
     ):
         """
         Initialisiere Qdrant Vector Service
-        
+
         Args:
             qdrant_url: URL des Qdrant Servers
-            embedding_model: Sentence Transformer Modell
+            embedding_model: Embedding Model Name (OpenAI oder Sentence Transformers)
             collection_name: Name der Qdrant Collection
+            embedding_provider: "openai" oder "sentence-transformers"
         """
         self.qdrant_url = qdrant_url
         self.embedding_model_name = embedding_model
         self.collection_name = collection_name
-        
+        self.embedding_provider = embedding_provider.lower()
+
         # Initialisiere Qdrant Client (falls verfügbar)
         if QDRANT_AVAILABLE:
             try:
@@ -110,12 +122,26 @@ class QdrantVectorService:
         else:
             self.client = None
             logger.warning("Qdrant client not available - using fallback implementation")
-        
-        # Initialisiere Embedding Model (lazy loading)
+
+        # Initialisiere OpenAI Client (falls OpenAI Provider)
+        self._openai_client = None
+        if self.embedding_provider == "openai" and OPENAI_AVAILABLE:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if api_key:
+                try:
+                    self._openai_client = OpenAI(api_key=api_key)
+                    logger.info(f"OpenAI client initialized for embeddings: {embedding_model}")
+                except Exception as e:
+                    logger.error(f"Failed to initialize OpenAI client: {e}")
+                    self._openai_client = None
+            else:
+                logger.warning("OPENAI_API_KEY not found in environment")
+
+        # Initialisiere Embedding Model (lazy loading für Sentence Transformers)
         self._embedding_model = None
         self._executor = ThreadPoolExecutor(max_workers=2)
-        
-        logger.info(f"QdrantVectorService initialized with model: {embedding_model}")
+
+        logger.info(f"QdrantVectorService initialized with provider: {embedding_provider}, model: {embedding_model}")
     
     @property
     def embedding_model(self):
@@ -145,15 +171,18 @@ class QdrantVectorService:
             collection_exists = any(col.name == name for col in collections.collections)
             
             if not collection_exists:
+                # Bestimme Embedding-Dimension basierend auf Provider
+                embedding_dim = 1536 if self.embedding_provider == "openai" else 384
+
                 # Erstelle neue Collection
                 self.client.create_collection(
                     collection_name=name,
                     vectors_config=VectorParams(
-                        size=384,  # Dimension für all-MiniLM-L6-v2
+                        size=embedding_dim,
                         distance=Distance.COSINE
                     )
                 )
-                logger.info(f"Created new collection: {name}")
+                logger.info(f"Created new collection: {name} with dimension {embedding_dim}")
             else:
                 logger.info(f"Using existing collection: {name}")
             
@@ -165,30 +194,58 @@ class QdrantVectorService:
     async def create_embeddings(self, texts: List[str]) -> np.ndarray:
         """
         Erstelle Embeddings für Text-Liste (async)
-        
+
         Args:
             texts: Liste von Texten
-            
+
         Returns:
             NumPy Array mit Embeddings
         """
         if not texts:
             return np.array([])
-        
-        if not self.embedding_model:
-            # Fallback: Mock Embeddings
-            logger.warning("Using mock embeddings - embedding model not available")
-            return np.array([[random.random() for _ in range(384)] for _ in texts])
-        
-        # Führe Embedding-Erstellung in Thread Pool aus (CPU-intensiv)
-        loop = asyncio.get_event_loop()
-        embeddings = await loop.run_in_executor(
-            self._executor,
-            self.embedding_model.encode,
-            texts
-        )
-        
-        return embeddings
+
+        # OpenAI Embeddings
+        if self.embedding_provider == "openai" and self._openai_client:
+            try:
+                logger.info(f"Creating OpenAI embeddings for {len(texts)} texts")
+                # OpenAI API Call (async)
+                response = await asyncio.to_thread(
+                    self._openai_client.embeddings.create,
+                    input=texts,
+                    model=self.embedding_model_name
+                )
+                embeddings = [item.embedding for item in response.data]
+                logger.info(f"Successfully created {len(embeddings)} OpenAI embeddings")
+                return np.array(embeddings)
+            except Exception as e:
+                logger.error(f"OpenAI embeddings failed: {e}")
+                # Fallback zu Mock Embeddings
+                logger.warning("Falling back to mock embeddings")
+                return np.array([[random.random() for _ in range(1536)] for _ in texts])
+
+        # Sentence Transformers Embeddings
+        if self.embedding_provider == "sentence-transformers" and self.embedding_model:
+            try:
+                logger.info(f"Creating Sentence Transformer embeddings for {len(texts)} texts")
+                # Führe Embedding-Erstellung in Thread Pool aus (CPU-intensiv)
+                loop = asyncio.get_event_loop()
+                embeddings = await loop.run_in_executor(
+                    self._executor,
+                    self.embedding_model.encode,
+                    texts
+                )
+                logger.info(f"Successfully created {len(embeddings)} Sentence Transformer embeddings")
+                return np.array(embeddings)
+            except Exception as e:
+                logger.error(f"Sentence Transformer embeddings failed: {e}")
+                # Fallback zu Mock Embeddings
+                logger.warning("Falling back to mock embeddings")
+                return np.array([[random.random() for _ in range(384)] for _ in texts])
+
+        # Fallback: Mock Embeddings
+        logger.warning(f"Using mock embeddings - no embedding provider available (provider: {self.embedding_provider})")
+        embedding_dim = 1536 if self.embedding_provider == "openai" else 384
+        return np.array([[random.random() for _ in range(embedding_dim)] for _ in texts])
     
     async def add_document_chunks(
         self,
