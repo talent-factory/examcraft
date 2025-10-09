@@ -21,7 +21,7 @@ class ClaudeService:
     def __init__(self):
         self.api_key = os.getenv("CLAUDE_API_KEY")
         self.base_url = "https://api.anthropic.com/v1/messages"
-        self.model = os.getenv("CLAUDE_MODEL", "claude-3-sonnet-20240229")
+        self.model = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
         
         # Rate limiting configuration
         self.max_requests_per_minute = int(os.getenv("CLAUDE_MAX_RPM", "50"))
