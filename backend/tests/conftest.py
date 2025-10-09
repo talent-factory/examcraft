@@ -5,31 +5,97 @@ Pytest Configuration und Fixtures für ExamCraft AI Tests
 import pytest
 import tempfile
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
 from database import Base
 from main import app
 
+# Test Database Configuration
+# Verwende 'postgres' als Host im Docker-Netzwerk, 'localhost' außerhalb
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres")  # Docker: postgres, Lokal: localhost
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    f"postgresql://examcraft:examcraft_dev@{POSTGRES_HOST}:5432/examcraft_test"
+)
+
 # Test Database Setup
 @pytest.fixture(scope="session")
 def test_engine():
-    """Erstelle Test-Database Engine"""
-    # Verwende SQLite für Tests
-    engine = create_engine("sqlite:///./test.db", connect_args={"check_same_thread": False})
+    """
+    Erstelle Test-Database Engine mit PostgreSQL
+
+    Verwendet eine separate Test-Datenbank um Produktionsdaten zu schützen.
+    Die Datenbank wird vor jedem Test-Run neu erstellt.
+    """
+    # Erstelle Engine für postgres Database (um Test-DB zu erstellen/löschen)
+    admin_url = TEST_DATABASE_URL.rsplit('/', 1)[0] + '/postgres'
+    admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+
+    # Extrahiere Test-DB Namen
+    test_db_name = TEST_DATABASE_URL.split('/')[-1]
+
+    # Lösche Test-DB falls vorhanden und erstelle neu
+    with admin_engine.connect() as conn:
+        # Beende alle Verbindungen zur Test-DB
+        conn.execute(text(f"""
+            SELECT pg_terminate_backend(pg_stat_activity.pid)
+            FROM pg_stat_activity
+            WHERE pg_stat_activity.datname = '{test_db_name}'
+            AND pid <> pg_backend_pid()
+        """))
+
+        # Lösche Test-DB
+        conn.execute(text(f"DROP DATABASE IF EXISTS {test_db_name}"))
+
+        # Erstelle Test-DB
+        conn.execute(text(f"CREATE DATABASE {test_db_name}"))
+
+    admin_engine.dispose()
+
+    # Erstelle Engine für Test-DB
+    engine = create_engine(TEST_DATABASE_URL)
+
+    # Erstelle alle Tabellen
     Base.metadata.create_all(bind=engine)
+
     yield engine
-    # Cleanup
-    os.remove("./test.db")
+
+    # Cleanup: Lösche Test-DB nach allen Tests
+    engine.dispose()
+
+    admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+    with admin_engine.connect() as conn:
+        conn.execute(text(f"""
+            SELECT pg_terminate_backend(pg_stat_activity.pid)
+            FROM pg_stat_activity
+            WHERE pg_stat_activity.datname = '{test_db_name}'
+            AND pid <> pg_backend_pid()
+        """))
+        conn.execute(text(f"DROP DATABASE IF EXISTS {test_db_name}"))
+    admin_engine.dispose()
 
 @pytest.fixture(scope="function")
 def test_db(test_engine):
-    """Erstelle Test-Database Session"""
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+    """
+    Erstelle Test-Database Session mit Transaction Rollback
+
+    Jeder Test läuft in einer eigenen Transaction die nach dem Test
+    zurückgerollt wird. Dadurch bleiben Tests isoliert.
+    """
+    connection = test_engine.connect()
+    transaction = connection.begin()
+
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=connection)
     session = TestingSessionLocal()
+
     yield session
+
+    # Rollback Transaction nach Test
     session.close()
+    transaction.rollback()
+    connection.close()
 
 @pytest.fixture(scope="function")
 def client():
