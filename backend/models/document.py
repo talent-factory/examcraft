@@ -66,6 +66,11 @@ class Document(Base):
 
     def to_dict(self):
         """Convert to dictionary for API responses"""
+        # Extrahiere Titel aus Metadaten, sonst Original-Filename
+        title = self.original_filename  # Default fallback
+        if self.doc_metadata and isinstance(self.doc_metadata, dict):
+            title = self.doc_metadata.get('title', self.original_filename)
+
         return {
             "id": self.id,
             "filename": self.filename,
