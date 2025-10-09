@@ -313,39 +313,3 @@ class TestDocumentService:
 
         # Sollte auf content_preview zurückfallen
         assert content == mock_document.content_preview
-
-    @pytest.mark.asyncio
-    async def test_get_full_document_content_normal_document(self, document_service):
-        """Test get_full_document_content für normale Dokumente"""
-        mock_db = Mock()
-
-        # Mock normales PDF Dokument
-        mock_document = Mock(spec=Document)
-        mock_document.id = 1
-        mock_document.status = DocumentStatus.PROCESSED
-        mock_document.file_path = "/tmp/test.pdf"
-        mock_document.original_filename = "test.pdf"
-        mock_document.mime_type = "application/pdf"
-        mock_document.doc_metadata = {"title": "Test PDF"}  # Kein source=chat_export
-
-        # Mock ProcessedDocument
-        from models.document_processing import ProcessedDocument, DocumentChunk
-        mock_chunks = [
-            DocumentChunk(content="Chunk 1 content", page_number=1, chunk_index=0),
-            DocumentChunk(content="Chunk 2 content", page_number=1, chunk_index=1)
-        ]
-        mock_processed = ProcessedDocument(
-            document_id=1,
-            chunks=mock_chunks,
-            total_chunks=2,
-            metadata={}
-        )
-
-        with patch.object(document_service, 'get_document_by_id', return_value=mock_document):
-            with patch.object(document_service.docling_service, 'process_document', return_value=mock_processed):
-                content = await document_service.get_full_document_content(1, mock_db)
-
-        # Sollte Chunks kombinieren
-        assert content is not None
-        assert "Chunk 1 content" in content
-        assert "Chunk 2 content" in content

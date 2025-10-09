@@ -5,15 +5,14 @@ SQLAlchemy Setup und Session Management
 
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Database URL - für Development verwenden wir PostgreSQL aus Docker
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
+    "DATABASE_URL",
     "postgresql://examcraft:examcraft_dev@localhost:5432/examcraft"
 )
 
