@@ -24,7 +24,7 @@ import { DocumentUpload as SimpleDocumentUpload } from './components/DocumentUpl
 import DocumentUpload from './components/DocumentUpload';
 import DocumentLibrary from './components/DocumentLibrary';
 import RAGExamCreator from './components/RAGExamCreator';
-import DocumentChatPage from './components/DocumentChat/DocumentChatPage';
+import { DocumentChatPage } from './components/DocumentChat/DocumentChatPage';
 import { School, Psychology, Quiz, CloudUpload, LibraryBooks, AutoAwesome, Chat } from '@mui/icons-material';
 import { ExamService } from './services/ExamService';
 import { ExamRequest, ExamResponse } from './types/exam';
