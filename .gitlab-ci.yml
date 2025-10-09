@@ -50,8 +50,7 @@ test:backend:
     changes:
       - backend/**/*.py
       - backend/requirements.txt
-  tags:
-    - docker
+      - .gitlab-ci.yml
 
 test:frontend:
   stage: test
@@ -70,8 +69,7 @@ test:frontend:
   only:
     changes:
       - frontend/**/*
-  tags:
-    - docker
+      - .gitlab-ci.yml
 
 # ============================================
 # BUILD STAGE
@@ -92,8 +90,6 @@ build:backend:
   only:
     - develop
     - main
-  tags:
-    - docker
 
 build:frontend:
   stage: build
@@ -110,8 +106,6 @@ build:frontend:
   only:
     - develop
     - main
-  tags:
-    - docker
 
 # ============================================
 # DEPLOY STAGE (Optional)
@@ -135,8 +129,6 @@ deploy:staging:
   environment:
     name: staging
     url: https://examcraft-backend-c0bm.onrender.com
-  tags:
-    - docker
 
 deploy:production:
   stage: deploy
@@ -156,6 +148,4 @@ deploy:production:
   environment:
     name: production
     url: https://examcraft-production.onrender.com
-  tags:
-    - docker
 
