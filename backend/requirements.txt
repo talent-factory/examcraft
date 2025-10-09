@@ -11,13 +11,13 @@ psycopg2-binary==2.9.7
 redis==5.0.1
 
 # HTTP client for Claude API
-httpx>=0.27.2
+httpx==0.27.2
 
 # Environment and configuration
 python-dotenv==1.0.0
-pydantic>=2.10.0
-pydantic-settings>=2.3.0
-pydantic-ai>=0.0.15                 # PydanticAI for ChatBot (fixed griffe issue)
+pydantic==2.10.3
+pydantic-settings==2.7.0
+pydantic-ai==0.0.16                 # PydanticAI for ChatBot (fixed griffe issue)
 
 # Security
 python-jose[cryptography]==3.3.0
@@ -49,7 +49,7 @@ markdown==3.5.1                     # Markdown Processing
 
 # Vector Database & Embeddings
 qdrant-client==1.7.0                # Qdrant Vector Database Client
-openai>=1.0.0                       # OpenAI API for Embeddings (production)
+openai==1.59.5                      # OpenAI API for Embeddings (production) - pinned for fast builds
 # sentence-transformers==2.7.0      # Sentence Embeddings (optional, for local development)
 # chromadb==0.4.15                  # REMOVED: Replaced by Qdrant
-numpy>=1.24.3                       # Numerische Operations (für Embeddings, Docling compatible)
+numpy==1.26.4                       # Numerische Operations (für Embeddings, Docling compatible)
