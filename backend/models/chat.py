@@ -62,9 +62,26 @@ class ChatSessionListItem(BaseModel):
     created_at: datetime
     updated_at: datetime
     last_message_preview: Optional[str] = None
-    
+
     class Config:
         from_attributes = True
+
+
+class ChatExportResponse(BaseModel):
+    """Response Model für Chat-Export"""
+    session_id: UUID
+    format: str = Field(..., pattern="^(markdown|json)$")
+    content: str
+    filename: str
+
+
+class ChatToDocumentResponse(BaseModel):
+    """Response Model für Chat-zu-Dokument Konvertierung"""
+    session_id: UUID
+    document_id: int
+    document_title: str
+    success: bool
+    message: str
 
 
 class ChatRequest(BaseModel):

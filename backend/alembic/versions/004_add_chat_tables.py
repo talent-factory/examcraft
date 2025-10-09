@@ -1,7 +1,7 @@
 """Add chat tables for document chatbot
 
 Revision ID: 004
-Revises: 003
+Revises: None
 Create Date: 2025-10-09
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 # revision identifiers, used by Alembic.
 revision = '004'
-down_revision = '003'
+down_revision = None
 branch_labels = None
 depends_on = None
 
@@ -23,14 +23,14 @@ def upgrade():
     op.create_table(
         'chat_sessions',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
-        sa.Column('user_id', sa.Integer, sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=True),  # Nullable for demo mode
+        sa.Column('user_id', sa.Integer, nullable=True),  # No FK constraint - users table may not exist
         sa.Column('title', sa.String(255), nullable=False),
         sa.Column('document_ids', sa.ARRAY(sa.Integer), nullable=False),
         sa.Column('created_at', sa.DateTime, server_default=sa.func.now(), nullable=False),
         sa.Column('updated_at', sa.DateTime, server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False),
         sa.Column('message_count', sa.Integer, default=0, nullable=False),
         sa.Column('is_exported_as_document', sa.Boolean, default=False, nullable=False),
-        sa.Column('exported_document_id', sa.Integer, sa.ForeignKey('documents.id', ondelete='SET NULL'), nullable=True),
+        sa.Column('exported_document_id', sa.Integer, nullable=True),  # No FK constraint - will be added later if needed
     )
     
     # Chat Messages Table
