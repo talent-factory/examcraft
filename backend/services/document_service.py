@@ -457,6 +457,15 @@ class DocumentService:
             return None
 
         try:
+            # Spezialbehandlung für Chat-Exports
+            if document.doc_metadata and document.doc_metadata.get('source') == 'chat_export':
+                # Vollständiger Content ist in doc_metadata gespeichert
+                full_content = document.doc_metadata.get('full_content')
+                if full_content:
+                    return full_content
+                # Fallback auf content_preview wenn full_content nicht vorhanden
+                return document.content_preview or "Chat-Content nicht verfügbar"
+
             # Wenn Dokument noch nicht verarbeitet wurde, verarbeite es zuerst
             if document.status == DocumentStatus.UPLOADED:
                 processed_doc = await self.process_document_content(document_id, db)

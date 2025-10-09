@@ -16,6 +16,8 @@ try:
     from chromadb.config import Settings
     CHROMADB_AVAILABLE = True
 except ImportError:
+    chromadb = None  # type: ignore
+    Settings = None  # type: ignore
     CHROMADB_AVAILABLE = False
 
 # NumPy für Embeddings (immer benötigt)
@@ -121,7 +123,7 @@ class VectorService:
                 self._embedding_model = None
         return self._embedding_model
     
-    def get_or_create_collection(self, collection_name: Optional[str] = None) -> chromadb.Collection:
+    def get_or_create_collection(self, collection_name: Optional[str] = None):
         """Hole oder erstelle ChromaDB Collection"""
         name = collection_name or self.collection_name
         

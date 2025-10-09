@@ -24,7 +24,8 @@ import { DocumentUpload as SimpleDocumentUpload } from './components/DocumentUpl
 import DocumentUpload from './components/DocumentUpload';
 import DocumentLibrary from './components/DocumentLibrary';
 import RAGExamCreator from './components/RAGExamCreator';
-import { School, Psychology, Quiz, CloudUpload, LibraryBooks, AutoAwesome } from '@mui/icons-material';
+import { DocumentChatPage } from './components/DocumentChat/DocumentChatPage';
+import { School, Psychology, Quiz, CloudUpload, LibraryBooks, AutoAwesome, Chat } from '@mui/icons-material';
 import { ExamService } from './services/ExamService';
 import { ExamRequest, ExamResponse } from './types/exam';
 import { RAGExamResponse } from './types/document';
@@ -127,8 +128,8 @@ function App() {
         <>
           {/* Tab Navigation */}
           <Paper elevation={2} sx={{ mb: 4 }}>
-            <Tabs 
-              value={activeTab} 
+            <Tabs
+              value={activeTab}
               onChange={(_, newValue: number) => setActiveTab(newValue)}
               variant="fullWidth"
               sx={{ borderBottom: 1, borderColor: 'divider' }}
@@ -137,6 +138,7 @@ function App() {
               <Tab label="Dokumente hochladen" icon={<CloudUpload />} />
               <Tab label="Dokumentenbibliothek" icon={<LibraryBooks />} />
               <Tab label="RAG-Prüfung erstellen" icon={<AutoAwesome />} />
+              <Tab label="Dokument ChatBot" icon={<Chat />} />
             </Tabs>
           </Paper>
 
@@ -314,13 +316,32 @@ function App() {
               </Box>
 
               <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Erstellen Sie intelligente Prüfungen basierend auf Ihren hochgeladenen Dokumenten 
+                Erstellen Sie intelligente Prüfungen basierend auf Ihren hochgeladenen Dokumenten
                 mit Retrieval-Augmented Generation (RAG).
               </Typography>
 
               <RAGExamCreator
                 onExamGenerated={handleRAGExamGenerated}
               />
+            </Paper>
+          )}
+
+          {activeTab === 4 && (
+            /* Document ChatBot Tab */
+            <Paper elevation={3} sx={{ p: 4, mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Chat sx={{ color: 'primary.main', mr: 2 }} />
+                <Typography variant="h5" component="h2">
+                  Dokument ChatBot
+                </Typography>
+              </Box>
+
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                Chatten Sie mit Ihren hochgeladenen Dokumenten. Der ChatBot nutzt RAG-Technologie,
+                um präzise Antworten basierend auf Ihren Dokumenten zu geben.
+              </Typography>
+
+              <DocumentChatPage />
             </Paper>
           )}
         </>

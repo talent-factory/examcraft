@@ -54,19 +54,23 @@ class Document(Base):
     
     def __repr__(self):
         return f"<Document(id={self.id}, filename='{self.filename}', status='{self.status}')>"
-    
+
+    @property
+    def title(self) -> str:
+        """
+        Extrahiert Titel aus Metadaten oder verwendet Original-Filename als Fallback
+        """
+        if self.doc_metadata and isinstance(self.doc_metadata, dict):
+            return self.doc_metadata.get('title', self.original_filename)
+        return self.original_filename
+
     def to_dict(self):
         """Convert to dictionary for API responses"""
-        # Extrahiere Titel aus Metadaten, sonst Original-Filename
-        title = self.original_filename  # Default fallback
-        if self.doc_metadata and isinstance(self.doc_metadata, dict):
-            title = self.doc_metadata.get('title', self.original_filename)
-
         return {
             "id": self.id,
             "filename": self.filename,
             "original_filename": self.original_filename,
-            "title": title,  # Neues Feld für bessere UI
+            "title": self.title,  # Verwendet @property
             "file_size": self.file_size,
             "mime_type": self.mime_type,
             "status": self.status.value if self.status else None,

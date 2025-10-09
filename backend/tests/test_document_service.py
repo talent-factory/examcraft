@@ -266,8 +266,50 @@ class TestDocumentService:
     def test_delete_document_not_found(self, document_service):
         """Test Dokument-Löschung wenn nicht gefunden"""
         mock_db = Mock()
-        
+
         with patch.object(document_service, 'get_document_by_id', return_value=None):
             result = document_service.delete_document(123, mock_db)
-        
+
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_get_full_document_content_chat_export(self, document_service):
+        """Test get_full_document_content für Chat-Exports (TF-111 Fix)"""
+        mock_db = Mock()
+
+        # Mock Chat-Export Dokument
+        mock_document = Mock(spec=Document)
+        mock_document.id = 1
+        mock_document.doc_metadata = {
+            "source": "chat_export",
+            "full_content": "# Wissensdokumentation\n\nDies ist der vollständige Chat-Content mit mehr als 500 Zeichen. " * 20
+        }
+        mock_document.content_preview = "# Wissensdokumentation\n\nDies ist..."
+
+        with patch.object(document_service, 'get_document_by_id', return_value=mock_document):
+            content = await document_service.get_full_document_content(1, mock_db)
+
+        # Sollte full_content aus doc_metadata zurückgeben
+        assert content is not None
+        assert content == mock_document.doc_metadata["full_content"]
+        assert len(content) > 500
+
+    @pytest.mark.asyncio
+    async def test_get_full_document_content_chat_export_fallback(self, document_service):
+        """Test get_full_document_content Fallback für alte Chat-Exports"""
+        mock_db = Mock()
+
+        # Mock altes Chat-Export Dokument ohne full_content
+        mock_document = Mock(spec=Document)
+        mock_document.id = 1
+        mock_document.doc_metadata = {
+            "source": "chat_export"
+            # Kein full_content (alte Exports)
+        }
+        mock_document.content_preview = "# Wissensdokumentation\n\nPreview..."
+
+        with patch.object(document_service, 'get_document_by_id', return_value=mock_document):
+            content = await document_service.get_full_document_content(1, mock_db)
+
+        # Sollte auf content_preview zurückfallen
+        assert content == mock_document.content_preview

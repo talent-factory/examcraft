@@ -10,9 +10,14 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from services.vector_service_factory import vector_service, get_service_info
-from services.qdrant_vector_service import SearchResult  # Import from Qdrant service for type hints
 from services.document_service import document_service
 import logging
+
+# SearchResult type - will be provided by vector service
+try:
+    from services.qdrant_vector_service import SearchResult
+except ImportError:
+    from services.vector_service import SearchResult
 
 logger = logging.getLogger(__name__)
 
