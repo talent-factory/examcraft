@@ -18,7 +18,7 @@ class TestChatAPI:
         return TestClient(app)
     
     @pytest.fixture
-    def sample_documents(self, db_session):
+    def sample_documents(self, test_db):
         """Sample Documents für Tests"""
         from models.document import Document
         
@@ -37,9 +37,9 @@ class TestChatAPI:
             status="processed"
         )
         
-        db_session.add(doc1)
-        db_session.add(doc2)
-        db_session.commit()
+        test_db.add(doc1)
+        test_db.add(doc2)
+        test_db.commit()
         
         return [doc1, doc2]
     
@@ -258,15 +258,104 @@ class TestChatAPI:
             "title": "Test Chat"
         })
         session_id = session_response.json()["id"]
-        
+
         # Konvertiere
         response = client.post(f"/api/v1/chat/sessions/{session_id}/to-document")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert data["success"] is True
         assert "document_id" in data
         assert "document_title" in data
-        assert "Chat Wissen" in data["document_title"]
+        assert "Chat:" in data["document_title"]
+
+    def test_convert_chat_to_document_with_user_id(self, client, sample_documents, test_db):
+        """Test dass Chat-Export user_id setzt (TF-111 Fix)"""
+        from models.document import Document as DBDocument
+
+        # Erstelle Session
+        session_response = client.post("/api/v1/chat/sessions", json={
+            "document_ids": [1],
+            "title": "Test Chat"
+        })
+        session_id = session_response.json()["id"]
+
+        # Konvertiere zu Dokument
+        response = client.post(f"/api/v1/chat/sessions/{session_id}/to-document")
+
+        assert response.status_code == 200
+        data = response.json()
+        document_id = data["document_id"]
+
+        # Prüfe dass user_id gesetzt ist
+        doc = test_db.query(DBDocument).filter(DBDocument.id == document_id).first()
+        assert doc is not None
+        assert doc.user_id == "demo_user"  # Wichtig für Sichtbarkeit in Bibliothek
+
+    def test_convert_chat_to_document_full_content(self, client, sample_documents, test_db):
+        """Test dass vollständiger Chat-Content gespeichert wird (TF-111 Fix)"""
+        from models.document import Document as DBDocument
+
+        # Erstelle Session mit Nachricht
+        session_response = client.post("/api/v1/chat/sessions", json={
+            "document_ids": [1],
+            "title": "Test Chat"
+        })
+        session_id = session_response.json()["id"]
+
+        # Mock ChatBot für Nachricht
+        with patch('api.v1.chat.chatbot_service.generate_response') as mock_generate:
+            mock_generate.return_value = {
+                "content": "Dies ist eine sehr lange Antwort " * 50,  # > 500 Zeichen
+                "sources": [],
+                "confidence": 0.9
+            }
+
+            # Sende Nachricht
+            client.post("/api/v1/chat/message", json={
+                "session_id": session_id,
+                "message": "Test Frage"
+            })
+
+        # Konvertiere zu Dokument
+        response = client.post(f"/api/v1/chat/sessions/{session_id}/to-document")
+
+        assert response.status_code == 200
+        data = response.json()
+        document_id = data["document_id"]
+
+        # Prüfe dass vollständiger Content in doc_metadata gespeichert ist
+        doc = test_db.query(DBDocument).filter(DBDocument.id == document_id).first()
+        assert doc is not None
+        assert doc.doc_metadata is not None
+        assert "full_content" in doc.doc_metadata
+        assert len(doc.doc_metadata["full_content"]) > 500  # Mehr als Preview
+        assert "source" in doc.doc_metadata
+        assert doc.doc_metadata["source"] == "chat_export"
+
+    def test_convert_chat_to_document_metadata(self, client, sample_documents, test_db):
+        """Test dass Chat-Export korrekte Metadaten hat"""
+        from models.document import Document as DBDocument
+
+        # Erstelle Session
+        session_response = client.post("/api/v1/chat/sessions", json={
+            "document_ids": [1],
+            "title": "Zusammenfassung"
+        })
+        session_id = session_response.json()["id"]
+
+        # Konvertiere
+        response = client.post(f"/api/v1/chat/sessions/{session_id}/to-document")
+
+        assert response.status_code == 200
+        document_id = response.json()["document_id"]
+
+        # Prüfe Metadaten
+        doc = test_db.query(DBDocument).filter(DBDocument.id == document_id).first()
+        assert doc.doc_metadata["title"] == "Chat: Zusammenfassung"
+        assert doc.doc_metadata["source"] == "chat_export"
+        assert doc.doc_metadata["session_id"] == session_id
+        assert doc.mime_type == "text/markdown"
+        assert doc.status.value == "processed"
 
