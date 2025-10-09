@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, FileText, Loader2, Download, FileDown } from 'lucide-react';
 import { Button } from '@mui/material';
 import { TextField, Card, CardContent, CardHeader, Typography, Box, Chip, IconButton } from '@mui/material';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface ChatMessage {
   id?: string;
@@ -221,12 +223,61 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
           borderRadius: 2,
           p: 2,
           bgcolor: isUser ? 'primary.main' : 'grey.100',
-          color: isUser ? 'primary.contrastText' : 'text.primary'
+          color: isUser ? 'primary.contrastText' : 'text.primary',
+          '& h1, & h2, & h3, & h4, & h5, & h6': {
+            mt: 2,
+            mb: 1,
+            fontWeight: 'bold'
+          },
+          '& h1': { fontSize: '1.5rem' },
+          '& h2': { fontSize: '1.3rem' },
+          '& h3': { fontSize: '1.1rem' },
+          '& p': { mb: 1 },
+          '& ul, & ol': {
+            pl: 3,
+            mb: 1
+          },
+          '& li': { mb: 0.5 },
+          '& code': {
+            bgcolor: isUser ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)',
+            px: 0.5,
+            py: 0.25,
+            borderRadius: 0.5,
+            fontFamily: 'monospace',
+            fontSize: '0.9em'
+          },
+          '& pre': {
+            bgcolor: isUser ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)',
+            p: 1.5,
+            borderRadius: 1,
+            overflow: 'auto',
+            mb: 1
+          },
+          '& pre code': {
+            bgcolor: 'transparent',
+            p: 0
+          },
+          '& blockquote': {
+            borderLeft: '3px solid',
+            borderColor: isUser ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
+            pl: 2,
+            ml: 0,
+            fontStyle: 'italic'
+          },
+          '& a': {
+            color: isUser ? 'inherit' : 'primary.main',
+            textDecoration: 'underline'
+          }
         }}
       >
-        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-          {message.content}
-        </Typography>
+        <Box sx={{
+          '& > *:first-of-type': { mt: 0 },
+          '& > *:last-child': { mb: 0 }
+        }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {message.content}
+          </ReactMarkdown>
+        </Box>
         
         {/* Source Citations */}
         {message.sources && message.sources.length > 0 && (
