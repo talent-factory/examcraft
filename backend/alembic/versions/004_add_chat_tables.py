@@ -23,7 +23,7 @@ def upgrade():
     op.create_table(
         'chat_sessions',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
-        sa.Column('user_id', sa.Integer, nullable=True),  # No FK constraint - users table may not exist
+        sa.Column('user_id', sa.String(100), nullable=True),  # Temporär als String, bis User-Management implementiert ist
         sa.Column('title', sa.String(255), nullable=False),
         sa.Column('document_ids', sa.ARRAY(sa.Integer), nullable=False),
         sa.Column('created_at', sa.DateTime, server_default=sa.func.now(), nullable=False),
