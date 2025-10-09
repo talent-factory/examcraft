@@ -364,13 +364,20 @@ BEISPIEL SCHLECHTER AUSSAGEN (VERMEIDE):
                 raise ValueError(f"Unknown question type: {question_type}")
             
             context_text = self._prepare_context_text(context)
-            
+
             prompt = template.format(
                 context=context_text,
                 topic=topic,
                 difficulty=difficulty,
                 language=language
             )
+
+            # DEBUG: Log prompt to verify new template is used
+            logger.info(f"=== QUESTION GENERATION PROMPT ===")
+            logger.info(f"Question Type: {question_type}, Topic: {topic}, Difficulty: {difficulty}")
+            logger.info(f"Prompt length: {len(prompt)} chars")
+            logger.info(f"Prompt starts with: {prompt[:200]}...")
+            logger.info(f"===================================")
             
             # Generiere mit Claude API
             response = await self.claude_service.generate_exam_async({
