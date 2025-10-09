@@ -445,6 +445,7 @@ def convert_chat_to_document(
         filename = f"chat_export_{session.created_at.strftime('%Y%m%d_%H%M%S')}.md"
 
         # Speichere Titel in doc_metadata (wird von @property title gelesen)
+        # Vollständiger Content wird in doc_metadata gespeichert
         new_document = DBDocument(
             filename=filename,
             original_filename=filename,
@@ -453,8 +454,13 @@ def convert_chat_to_document(
             mime_type="text/markdown",
             status=DocumentStatus.PROCESSED,
             user_id="demo_user",  # Wichtig: Damit Dokument in Bibliothek erscheint
-            doc_metadata={"title": title, "source": "chat_export", "session_id": str(session_id)},
-            content_preview=document_content[:500],  # Erste 500 Zeichen
+            doc_metadata={
+                "title": title,
+                "source": "chat_export",
+                "session_id": str(session_id),
+                "full_content": document_content  # Vollständiger Chat-Content
+            },
+            content_preview=document_content[:500],  # Erste 500 Zeichen für Vorschau
             has_vectors=False
         )
 
