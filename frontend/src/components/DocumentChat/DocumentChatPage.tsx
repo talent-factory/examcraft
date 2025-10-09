@@ -34,9 +34,11 @@ export const DocumentChatPage: React.FC = () => {
 
   const loadDocuments = async () => {
     try {
-      const response = await fetch('/api/v1/documents');
+      const response = await fetch('/api/v1/documents/');
       const data = await response.json();
-      setDocuments(data.filter((doc: Document) => doc.status === 'processed'));
+      // API returns { documents: [...], total: N }
+      const docs = data.documents || data;
+      setDocuments(Array.isArray(docs) ? docs.filter((doc: Document) => doc.status === 'processed') : []);
     } catch (error) {
       console.error('Failed to load documents:', error);
     }
