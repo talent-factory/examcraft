@@ -339,6 +339,14 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                           <Timeline color="success" fontSize="small" />
                         </Tooltip>
                       )}
+                      {document.metadata?.source === 'chat_export' && (
+                        <Chip
+                          label="Chat"
+                          size="small"
+                          color="info"
+                          sx={{ height: 20, fontSize: '0.7rem' }}
+                        />
+                      )}
                     </Box>
                     <IconButton
                       size="small"
