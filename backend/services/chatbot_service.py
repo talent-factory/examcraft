@@ -180,8 +180,7 @@ Gib einen Konfidenz-Score zwischen 0.0 und 1.0 an, wie sicher du dir bei der Ant
             search_results = await self.vector_service.similarity_search(
                 query=query,
                 document_ids=document_ids,
-                top_k=max_chunks,
-                min_similarity=0.3  # Niedrigere Schwelle für Chat
+                n_results=max_chunks
             )
             
             # Kombiniere Chunks zu Context
