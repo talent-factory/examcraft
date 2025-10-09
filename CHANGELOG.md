@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - TF-111: Document ChatBot Feature (2025-01-09)
+
+#### Features
+- **Interactive Document ChatBot** - RAG-powered conversational interface
+  - Real-time chat with uploaded documents
+  - Context-aware responses using Claude API
+  - Source citations with page references
+  - Chat history persistence in PostgreSQL
+  - Export conversations as Markdown documents
+
+- **Chat-to-Document Export** - Convert conversations to reusable documents
+  - Full conversation export with metadata
+  - Automatic title generation from chat context
+  - Integration with document library
+  - Markdown formatting with timestamps
+  - User attribution for library visibility
+
+- **Enhanced Document Model** - Improved metadata handling
+  - Dynamic `title` property from `doc_metadata`
+  - Fallback to `original_filename` if no title
+  - Support for chat-export source type
+  - Full content storage in metadata for chat exports
+
+#### Technical Changes
+- New API Endpoints:
+  - `POST /api/v1/chat/sessions` - Create chat session
+  - `POST /api/v1/chat/message` - Send message
+  - `GET /api/v1/chat/sessions/{id}` - Get session details
+  - `POST /api/v1/chat/sessions/{id}/to-document` - Export to document
+  - `GET /api/v1/chat/sessions/{id}/download` - Download as Markdown
+
+- Enhanced Services:
+  - `backend/services/chatbot_service.py` - PydanticAI-based chat logic
+  - `backend/services/chat_export_service.py` - Conversation export
+  - `backend/services/document_service.py` - Chat-export handling
+
+- Database Models:
+  - `backend/models/chat_db.py` - ChatSession & ChatMessage tables
+  - Enhanced `Document` model with `@property title`
+
+#### Frontend Components
+- New React Components:
+  - `ChatInterface.tsx` - Main chat UI
+  - `ChatSidebar.tsx` - Session management
+  - `MessageList.tsx` - Conversation display
+  - `ChatInput.tsx` - Message input with file upload
+
+#### Testing
+- Comprehensive test suite with PostgreSQL integration:
+  - `backend/tests/test_chat_api.py` - Chat API tests (3 tests)
+  - `backend/tests/test_document_model.py` - Document model tests (6 tests)
+  - `backend/tests/test_document_service.py` - Service tests (2 chat-export tests)
+  - PostgreSQL-based integration tests with transaction isolation
+  - 28/28 tests passing (100% pass rate)
+
+#### Bug Fixes
+- Fixed Markdown rendering in chat responses
+- Fixed PydanticAI message history handling
+- Fixed export button functionality (download & save)
+- Fixed missing documents in library after export
+- Fixed incomplete chat history in document preview
+- Fixed SQLAlchemy deprecation warnings
+- Removed obsolete test dependencies
+
+#### Documentation
+- Updated `backend/tests/README.md` - PostgreSQL test infrastructure
+- Added comprehensive test documentation
+- Updated `.claude/rules/CLAUDE.md` - Project status
+
+---
+
 ### Added - TF-110: IBM Docling Integration (2025-01-06)
 
 #### Features
