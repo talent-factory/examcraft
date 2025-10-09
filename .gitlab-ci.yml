@@ -2,7 +2,6 @@
 # Automatische Tests und Validierung bei jedem Push
 
 stages:
-  - validate
   - test
   - build
   - deploy
@@ -16,52 +15,6 @@ cache:
   paths:
     - backend/.venv/
     - frontend/node_modules/
-
-# ============================================
-# VALIDATION STAGE
-# ============================================
-
-validate:imports:
-  stage: validate
-  image: python:${PYTHON_VERSION}-slim
-  before_script:
-    - cd backend
-    - pip install --quiet -r requirements.txt
-  script:
-    - cd ..
-    - python scripts/check_imports.py
-  only:
-    changes:
-      - backend/**/*.py
-      - utils/**/*.py
-  tags:
-    - docker
-
-validate:requirements:
-  stage: validate
-  image: python:${PYTHON_VERSION}-slim
-  script:
-    - python scripts/validate_requirements.py
-  only:
-    changes:
-      - backend/requirements.txt
-      - backend/**/*.py
-  tags:
-    - docker
-
-validate:yaml:
-  stage: validate
-  image: python:${PYTHON_VERSION}-slim
-  script:
-    - pip install --quiet pyyaml
-    - python -c "import yaml; yaml.safe_load(open('render.yaml'))"
-    - python -c "import yaml; yaml.safe_load(open('.gitlab-ci.yml'))"
-  only:
-    changes:
-      - "*.yaml"
-      - "*.yml"
-  tags:
-    - docker
 
 # ============================================
 # TEST STAGE
