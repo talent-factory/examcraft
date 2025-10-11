@@ -280,26 +280,48 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 
 ---
 
-## 📊 Pricing (Planned)
+## 📊 Pricing (Based on TF-116 Monetization Strategy)
 
-### 🆓 Free Tier
-- 50 questions/month
+### 🆓 Free Tier - Community Edition
 - 5 documents
+- 20 questions/month
+- 1 user
 - Basic features
 - Community support
+- **Perfect for**: Individual educators, hobby projects
 
-### 💼 Professional ($29/month)
-- Unlimited questions
-- Unlimited documents
-- All v1.x features
+### 🚀 Starter (€19/month)
+- 50 documents
+- 200 questions/month
+- 3 users
+- All core features
 - Email support
+- **Perfect for**: Small teaching teams
 
-### 🏢 Enterprise (Custom)
+### 💼 Professional (€49/month)
+- Unlimited documents
+- 1,000 questions/month
+- 10 users
+- ChatBot feature
+- All v1.x features
+- Priority email support
+- **Perfect for**: Departments, larger teams
+
+### 🏢 Enterprise (€149/month)
+- Unlimited everything
+- Unlimited users
+- Priority support
 - SSO integration
-- Multi-tenancy
-- API access
-- Dedicated support
+- Advanced analytics
 - SLA guarantee
+- **Perfect for**: Universities, institutions
+
+### 🏛️ Self-Hosted Enterprise Edition
+- **Setup Fee**: €999 (one-time)
+- **License**: €99/month per 10 users
+- **Support**: €299/year
+- **Features**: On-premise deployment, SSO/LDAP, custom branding, SLA
+- **Perfect for**: Large universities, compliance-critical organizations
 
 ---
 
