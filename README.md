@@ -12,6 +12,21 @@
 
 ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwendung, die Dozierenden dabei hilft, qualitativ hochwertige Prüfungsaufgaben automatisch aus beliebigen Dokumenten zu generieren. Die Plattform kombiniert moderne KI (Claude API) mit RAG-Technologie (Retrieval-Augmented Generation) für kontextuelle, durchdachte Fragenerstellung.
 
+## 📚 Dokumentation
+
+### 📊 Für Stakeholder & Kunden
+
+- **[📊 Executive Summary](docs/EXECUTIVE_SUMMARY.md)** - Business-Übersicht, Marktchancen, Finanzprognosen
+- **[🎯 Feature-Übersicht](docs/FEATURES.md)** - Vollständige Feature-Liste mit Use Cases und Benefits
+- **[📅 Release Timeline](docs/RELEASE_TIMELINE.md)** - Detaillierte Roadmap mit quartalsweisen Releases
+- **[🗺️ Product Roadmap](docs/ROADMAP.md)** - Langfristige Vision und Feature-Vergleichsmatrix
+
+### 🔧 Für Entwickler
+
+- **[🚀 Deployment Guide](docs/RENDER_DEPLOYMENT.md)** - Production Deployment auf Render.com
+- **[📖 API Dokumentation](http://localhost:8000/docs)** - Interaktive API-Docs (lokal)
+- **[🔧 Development Setup](#-quick-start)** - Lokale Entwicklungsumgebung (siehe unten)
+
 ### ✨ Kernfeatures
 
 - **🤖 RAG-basierte KI-Fragenerstellung** mit Claude API + PydanticAI
