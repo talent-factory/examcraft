@@ -54,56 +54,120 @@
 
 ## 💼 Business Model
 
-### Revenue Streams
+### Three-Pillar Monetization Strategy
 
-#### 1. SaaS Subscriptions (Primary)
+#### 1. Open Source (GitHub) - Community Edition 🌟
+
+**License**: MIT or Apache 2.0
+**Strategy**: Community building, lead generation, brand awareness
+**Features**: Basic functionality, self-hosting, limited question generation
+**Target Audience**: Hobby projects, universities, developers
+**Revenue**: Indirect (leads for premium tiers)
+
+#### 2. Freemium SaaS (Render.com) 💳
+
+**Platform**: Render.com Hosting
 
 **Free Tier** - Lead Generation
-- 50 questions/month
 - 5 documents
-- Basic features
-- **Target**: 10,000 users by Q4 2026
+- 20 questions/month
+- 1 user
+- **Target**: 500 free signups in first 3 months
 
-**Professional** - $29/month
-- Unlimited questions
+**Starter** - €19/month
+- 50 documents
+- 200 questions/month
+- 3 users
+- **Target**: 25 paying customers by Month 6
+
+**Professional** - €49/month
 - Unlimited documents
-- All v1.x features
-- Email support
-- **Target**: 500 users by Q4 2026
+- 1,000 questions/month
+- 10 users
+- ChatBot feature
+- **Target**: 75 paying customers by Month 9
 
-**Enterprise** - Custom Pricing
+**Enterprise** - €149/month
+- Unlimited everything
+- Priority support
 - SSO integration
-- Multi-tenancy
-- API access
-- Dedicated support
-- SLA guarantee
-- **Target**: 10 institutions by Q4 2026
+- **Target**: 150 paying customers by Month 12
 
-#### 2. API Access (Future)
-- Pay-per-question pricing
-- Integration with existing LMS
-- White-label solutions
+#### 3. Self-Hosted Enterprise Edition 🏢
 
-#### 3. Professional Services (Future)
-- Custom integrations
-- Training & onboarding
-- Consulting services
+**Setup Fee**: €999 (one-time)
+**License**: €99/month per 10 users
+**Support**: €299/year
+**Features**: On-premise, SSO, LDAP, custom branding, SLA
+**Target Audience**: Large universities, compliance-critical organizations
+**Target**: First enterprise deal by Q2 2026
 
-### Financial Projections (Conservative)
+### Financial Projections (First Year - Based on TF-116)
 
-| Metric | Q4 2026 | Q4 2027 | Q4 2028 |
-|--------|---------|---------|---------|
-| Free Users | 10,000 | 50,000 | 200,000 |
-| Professional | 500 | 2,500 | 10,000 |
-| Enterprise | 10 | 50 | 200 |
-| **MRR** | **$15K** | **$75K** | **$300K** |
-| **ARR** | **$180K** | **$900K** | **$3.6M** |
+**Month 1-3**: Open Source Launch
+- Community Building
+- 0 MRR
+
+**Month 3-6**: Freemium Launch
+- 25 paying customers
+- **€2,500 MRR** (Break-even)
+
+**Month 6-9**: Growth Phase
+- 75 paying customers
+- **€7,500 MRR**
+
+**Month 9-12**: Scale
+- 150 paying customers
+- **€15,000 MRR**
+
+**First Enterprise Deal**: ~Month 8-10
+- +€999 setup fee
+- +€99/month recurring
+
+**Year 1 Target**: **€15,000 MRR (~€180K ARR)**
+
+### Cost Structure (Monthly at Scale)
+
+```
+Infrastructure:
+  Render.com Hosting:        €150-250
+  Qdrant Cloud:              €100
+  PostgreSQL:                €50
+  Redis:                     €30
+                             ----------
+                             €330-430
+
+AI & Operations:
+  Claude API (150 customers): €300-500
+  Stripe Fees (3%):          ~€450 (at €15k MRR)
+  Email Service:             €50
+  Monitoring Tools:          €100
+                             ----------
+                             €900-1,100
+
+Marketing & Growth:
+  Content/Ads:               €1,000-2,000
+  Tools (Analytics):         €200
+                             ----------
+                             €1,200-2,200
+
+Support & Misc:
+  Support Tools:             €100
+  Domain & SSL:              €10
+  Misc:                      €100
+                             ----------
+                             €210
+
+TOTAL MONTHLY COSTS:         €2,640-3,940
+```
+
+**Break-even**: ~€4,000 MRR (40-50 paying customers)
 
 **Assumptions**:
 - 5% free → paid conversion
-- 2% professional → enterprise upgrade
-- $29/month professional tier
-- $500/month average enterprise deal
+- <5% monthly churn
+- Average customer value: €35/month (mixed tiers)
+- First enterprise deal: Month 8-10
 - 10% monthly churn
 
 ---
@@ -193,50 +257,92 @@
 
 ---
 
-## 🎯 Go-to-Market Strategy
+## 🎯 Go-to-Market Strategy (Based on TF-116)
 
-### Phase 1: Open Source Launch (Q1 2026)
+### Phase 1: Open Source Preparation (Weeks 1-4)
+
+**Timeline**: October 2025
+**Issue**: TF-112 - GitHub Release Ready
 
 **Objective**: Build community & credibility
 
 **Tactics**:
 - 🌟 GitHub release with MIT license
-- 📝 Technical blog posts & tutorials
-- 🎥 YouTube demo videos
+- 📝 Complete documentation (README, CONTRIBUTING, etc.)
+- 🎥 Demo video creation
 - 🐦 Social media campaign
-- 📧 Outreach to EdTech influencers
+- 📧 Beta tester list building
 
-**Target**: 1,000 GitHub stars, 100 active users
+**Success Criteria**:
+- 100+ GitHub stars in first 2 weeks
+- 10+ contributors
+- 50+ issues/PRs
+- Product Hunt: Top 5 Product of the Day
+
+**Target**: Open Source Launch by **October 31, 2025**
 
 ---
 
-### Phase 2: Freemium SaaS (Q2 2026)
+### Phase 2: Freemium SaaS Setup (Weeks 5-10)
+
+**Timeline**: November-December 2025
+**Issue**: TF-113 - Render.com Deployment with Stripe
 
 **Objective**: Convert users to paid plans
 
 **Tactics**:
-- 🆓 Free tier with generous limits
-- 💼 Professional tier launch
+- 🆓 Render.com multi-service setup
+- 💳 Payment integration (Stripe)
+- 🔒 Tier system & rate limiting
+- 👥 User management & multi-tenancy
 - 📊 Usage analytics & conversion optimization
-- 📧 Email nurture campaigns
-- 🎓 Webinars & workshops
 
-**Target**: 500 professional subscribers
+**Success Criteria**:
+- 500+ free signups in first 3 months
+- 25+ paying customers after 6 months
+- €2,500 MRR (break-even)
+- <5% churn rate
+- NPS >40
+
+**Target**: Beta Launch with 100 testers by **December 2025**
 
 ---
 
-### Phase 3: Enterprise Sales (Q3-Q4 2026)
+### Phase 3: Marketing & Acquisition (Parallel to Phase 2)
+
+**Timeline**: December 2025 - January 2026
+**Issue**: TF-115 - Customer Acquisition
+
+**Objective**: Drive user acquisition
+
+**Tactics**:
+- 🌐 Landing page & SEO
+- 📝 Content marketing (blog, tutorials)
+- 🎓 Beta program (100 testers)
+- 🚀 Product Hunt launch
+- 📧 Email nurture campaigns
+- 🎥 Webinars & workshops
+
+**Target**: First 25 paying customers by **January 2026**
+
+---
+
+### Phase 4: Enterprise Edition (Month 4-6)
+
+**Timeline**: April-June 2026
+**Issue**: TF-114 - Self-Hosted Offering
 
 **Objective**: Land institutional customers
 
 **Tactics**:
-- 🏢 Direct sales to universities
-- 🤝 Partnerships with LMS providers
+- 🏢 Kubernetes/Docker Compose setup
+- 🔐 SSO/SAML integration
+- 📜 License management system
+- 💼 Enterprise sales process
+- 🤝 Partnerships with universities
 - 📊 Case studies & ROI calculators
-- 🎤 Conference presentations
-- 📰 PR & media coverage
 
-**Target**: 10 enterprise contracts
+**Target**: First enterprise deal by **Q2 2026**
 
 ---
 
@@ -264,17 +370,32 @@
    - Qdrant vector database (scalable)
    - React 18 (modern UX)
 
+### Market Analysis (Based on TF-116)
+
+**Direct Competition**: Currently **no direct competitor** for AI-powered OpenBook exam generation with RAG in DACH region.
+
+**Indirect Competition**:
+- **Generic Exam Generators**: ExamSoft, Questionmark (expensive, no AI)
+- **AI Writing Tools**: ChatGPT, Claude (not specialized for exams)
+- **Assessment Platforms**: Moodle, Canvas (no automatic generation)
+
+**Our Advantages**:
+- ✅ **Technology**: Claude API + RAG = State-of-the-art
+- ✅ **Specialization**: OpenBook exams (niche focus)
+- ✅ **DACH Focus**: GDPR-compliant, German support
+- ✅ **Open Source**: Community-driven, transparent
+
 ### Competitive Matrix
 
-| Feature | ExamCraft AI | Competitor A | Competitor B | Competitor C |
-|---------|--------------|--------------|--------------|--------------|
-| AI Generation | ✅ Claude 3.5 | ❌ GPT-3.5 | ❌ Manual | ✅ GPT-4 |
-| RAG System | ✅ Qdrant | ❌ None | ❌ None | ⚠️ Basic |
-| Bloom's Taxonomy | ✅ Built-in | ❌ Manual | ✅ Built-in | ❌ Manual |
-| Question Bank | ✅ v1.1 | ✅ Yes | ✅ Yes | ❌ No |
-| Analytics | ✅ v1.2 | ⚠️ Basic | ✅ Advanced | ❌ No |
-| Open Source | ✅ MIT | ❌ Proprietary | ❌ Proprietary | ❌ Proprietary |
-| Pricing | $29/mo | $99/mo | $49/mo | Free |
+| Feature | ExamCraft AI | Generic Generators | AI Tools | LMS Platforms |
+|---------|--------------|-------------------|----------|---------------|
+| AI Generation | ✅ Claude 3.5 | ❌ Manual | ✅ GPT-4 | ❌ None |
+| RAG System | ✅ Qdrant | ❌ None | ❌ None | ❌ None |
+| Bloom's Taxonomy | ✅ Built-in | ⚠️ Manual | ❌ No | ⚠️ Basic |
+| Question Bank | ✅ v1.1 | ✅ Yes | ❌ No | ✅ Yes |
+| Analytics | ✅ v1.2 | ⚠️ Basic | ❌ No | ✅ Advanced |
+| Open Source | ✅ MIT | ❌ Proprietary | ❌ Proprietary | ⚠️ Some |
+| Pricing | €19-149/mo | €99+/mo | €20/mo | Included |
 
 ---
 
@@ -364,50 +485,111 @@
 
 ---
 
-## 🔒 Risk Mitigation
+## 🔒 Risk Mitigation (Based on TF-116)
 
 ### Technical Risks
 
-| Risk | Mitigation |
-|------|------------|
-| AI hallucinations | RAG system grounds in actual documents |
-| Scalability issues | Cloud-native architecture (Render.com) |
-| API rate limits | Caching + fallback to demo mode |
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| Claude API outages | High | Medium | Fallback to other LLMs (GPT-4, Gemini) |
+| Scaling issues | Medium | Low | Load testing, auto-scaling on Render.com |
+| Data quality | High | Medium | Human-in-the-loop review system |
+| AI hallucinations | High | Medium | RAG system grounds in actual documents |
+| API rate limits | Medium | Medium | Caching + fallback to demo mode |
 
 ### Business Risks
 
-| Risk | Mitigation |
-|------|------------|
-| Low adoption | Freemium model + open source community |
-| Competition | Unique RAG + Bloom's Taxonomy differentiation |
-| Regulatory changes | GDPR/FERPA compliance built-in |
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| Low conversion rate | High | Medium | A/B testing, onboarding optimization |
+| High churn rate | High | Medium | Customer success program |
+| Slow growth | Medium | Medium | Diversified marketing channels |
+| Low adoption | Medium | Low | Freemium model + open source community |
+| Competition | Medium | Low | Unique RAG + Bloom's Taxonomy differentiation |
 
 ### Market Risks
 
-| Risk | Mitigation |
-|------|------------|
-| Economic downturn | Focus on ROI (time savings) |
-| AI commoditization | Continuous innovation + pedagogy focus |
-| Privacy concerns | On-premise enterprise option (v2.0) |
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| Economic downturn | Medium | Medium | Focus on ROI (time savings) |
+| AI commoditization | Medium | High | Continuous innovation + pedagogy focus |
+| Privacy concerns | High | Low | On-premise enterprise option (Phase 4) |
+| Regulatory changes | Medium | Low | GDPR/FERPA compliance built-in |
+
+---
+
+## 🌐 Domain Strategy (Based on TF-116)
+
+### Current Status
+- ❌ **examcraft.ie** is already taken (Irish education tool)
+- ⚠️ **.ai domains** cost €75-80/year (minimum 2 years registration)
+- ✅ **.io/.com** are cheaper and more established
+
+### Top Recommendations
+
+**Tier 1 - Premium Choices**
+1. **examcraft.ai** - Perfect for AI focus, but expensive
+2. **examcrafter.ai** - Alternative with "Crafter" suffix
+3. **craftexam.ai** - Reversed variant
+
+**Tier 2 - Balanced Options**
+4. **examcraft.io** - Tech startup standard, cheaper than .ai
+5. **examcrafter.io** - IO variant
+6. **getexamcraft.com** - "Get" prefix (like GetStream, GetFeedback)
+7. **tryexamcraft.com** - "Try" prefix for trial focus
+
+**Tier 3 - Alternative Names**
+8. **examgenai.com** - "ExamGen AI" - short and catchy
+9. **aiexamcraft.com** - AI prefix
+10. **examcraft-ai.com** - With hyphen
+
+**Recommendation**: Check **examcraft.ai** and **examcraft.io** first - both are short, memorable, and branding-friendly. If taken, go with **getexamcraft.com** or **examcrafter.ai**.
+
+---
+
+## 📅 Timeline (Based on TF-116)
+
+```
+October 2025:        Open Source Launch (TF-112)
+November 2025:       Freemium Infrastructure (TF-113)
+December 2025:       Beta Program & Marketing (TF-115)
+January 2026:        Public SaaS Launch
+February-March 2026: Growth & Optimization
+April-June 2026:     Enterprise Edition (TF-114)
+```
+
+**Budget**: €15,000-25,000 (Marketing + Infrastructure)
+**Expected Outcome**: €15,000 MRR, profitable SaaS business
 
 ---
 
 ## 📞 Contact & Next Steps
 
-**Founder**: [Your Name]  
-**Email**: founder@examcraft.ai  
-**Website**: https://examcraft.ai  
-**GitHub**: https://github.com/yourusername/examcraft  
-**LinkedIn**: [Your LinkedIn]
+**Founder**: Daniel Senften
+**Email**: daniel.senften@talent-factory.ch
+**GitLab**: https://gitlab.com/talent-factory/software/examcraft
+**Linear**: https://linear.app/talent-factory/project/examcraft-ai-0872b24233e2
 
-### Next Steps
+### Immediate Next Steps (This Week)
 
-1. **Schedule Demo** - See ExamCraft AI in action
-2. **Review Roadmap** - Discuss feature priorities
-3. **Pilot Program** - Beta test with your institution
-4. **Partnership Discussion** - Explore collaboration opportunities
+1. **Domain Registration** - Check availability and register final choice
+2. **TF-112 Start** - Begin Open Source preparation
+3. **Repository Cleanup** - Prepare GitLab for public release
+
+### Next 2 Weeks
+
+1. **README.md Enhancement** - Complete documentation
+2. **Demo Video Creation** - Record product walkthrough
+3. **Beta Tester List** - Build initial user base
+
+### Month 1
+
+1. **Open Source Launch** - GitHub/GitLab public release
+2. **Product Hunt Campaign** - Launch announcement
+3. **Community Building** - Start engagement
 
 ---
 
-**Last Updated**: October 2025 | **Version**: 1.0.0 | **Status**: Production Ready 🚀
+**Last Updated**: January 2025 | **Version**: 1.0.0 | **Status**: Production Ready 🚀
+**Related Issues**: TF-116 (Monetization), TF-112 (Open Source), TF-113 (Freemium), TF-114 (Enterprise), TF-115 (Marketing)
 
