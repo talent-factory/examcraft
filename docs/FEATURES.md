@@ -93,7 +93,7 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 
 ## 🚀 Coming Soon
 
-### 📦 v1.1 - Enhanced Editing & Organization (Q1 2025)
+### 📦 v1.1 - Enhanced Editing & Organization (Q1 2026)
 
 #### 🎨 Interactive Question Editor
 
@@ -141,7 +141,7 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 
 ---
 
-### 📦 v1.2 - Analytics & Quality (Q2 2025)
+### 📦 v1.2 - Analytics & Quality (Q2 2026)
 
 #### 📊 Question Analytics Dashboard
 
@@ -172,7 +172,7 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 
 ---
 
-### 📦 v1.3 - Advanced Features (Q3 2025)
+### 📦 v1.3 - Advanced Features (Q3 2026)
 
 #### 📚 Multi-Document Question Generation
 
@@ -203,7 +203,7 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 
 ---
 
-### 📦 v1.4 - Student Features (Q4 2025)
+### 📦 v1.4 - Student Features (Q4 2026)
 
 #### 🎓 Adaptive Learning Paths
 
@@ -327,5 +327,5 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 
 ---
 
-**Last Updated**: January 2025 | **Version**: 1.0.0
+**Last Updated**: October 2025 | **Version**: 1.0.0
 

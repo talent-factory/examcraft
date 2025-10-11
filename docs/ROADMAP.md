@@ -63,7 +63,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 
 ## 🚀 Upcoming Releases
 
-### 📦 v1.1 - Enhanced Editing & Organization (Q1 2025)
+### 📦 v1.1 - Enhanced Editing & Organization (Q1 2026)
 
 **Focus**: Professional question management and editing capabilities
 
@@ -113,11 +113,11 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - 🎯 Guaranteed alignment with learning objectives
 - 📤 Direct export to your LMS
 
-**Estimated Release**: March 2025
+**Estimated Release**: March 2026
 
 ---
 
-### 📦 v1.2 - Analytics & Quality Assurance (Q2 2025)
+### 📦 v1.2 - Analytics & Quality Assurance (Q2 2026)
 
 **Focus**: Data-driven question improvement and quality metrics
 
@@ -150,11 +150,11 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - 🔄 Continuous improvement cycle
 - ✨ Better questions with each iteration
 
-**Estimated Release**: June 2025
+**Estimated Release**: June 2026
 
 ---
 
-### 📦 v1.3 - Advanced Generation & Collaboration (Q3 2025)
+### 📦 v1.3 - Advanced Generation & Collaboration (Q3 2026)
 
 **Focus**: Multi-document synthesis and team workflows
 
@@ -187,11 +187,11 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - ✅ Peer review before exams go live
 - 📝 Institutional knowledge preservation
 
-**Estimated Release**: September 2025
+**Estimated Release**: September 2026
 
 ---
 
-### 📦 v1.4 - Student-Facing Features (Q4 2025)
+### 📦 v1.4 - Student-Facing Features (Q4 2026)
 
 **Focus**: Personalized learning and mobile accessibility
 
@@ -225,11 +225,11 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - 🔔 Stay motivated with reminders
 - 🏆 Engaging learning experience
 
-**Estimated Release**: December 2025
+**Estimated Release**: December 2026
 
 ---
 
-### 📦 v2.0 - Enterprise & Advanced AI (2026)
+### 📦 v2.0 - Enterprise & Advanced AI (2027)
 
 **Focus**: Institutional features and cutting-edge AI capabilities
 
@@ -258,13 +258,13 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **API Access** - Integrate with existing systems
 - **SLA & Support** - Dedicated enterprise support
 
-**Estimated Release**: 2026
+**Estimated Release**: 2027
 
 ---
 
 ## 🎯 Feature Comparison Matrix
 
-| Feature | v1.0 (Current) | v1.1 (Q1 2025) | v1.2 (Q2 2025) | v1.3 (Q3 2025) | v1.4 (Q4 2025) |
+| Feature | v1.0 (Current) | v1.1 (Q1 2026) | v1.2 (Q2 2026) | v1.3 (Q3 2026) | v1.4 (Q4 2026) |
 |---------|----------------|----------------|----------------|----------------|----------------|
 | Document Processing | ✅ | ✅ | ✅ | ✅ | ✅ |
 | AI Question Generation | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -320,5 +320,5 @@ Built with:
 
 ---
 
-**Last Updated**: January 2025 | **Version**: 1.0.0 | **Status**: Production Ready 🚀
+**Last Updated**: October 2025 | **Version**: 1.0.0 | **Status**: Production Ready 🚀
 
