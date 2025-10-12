@@ -128,7 +128,7 @@
 
 ### Cost Structure (Monthly at Scale)
 
-```
+```text
 Infrastructure:
   Render.com Hosting:        €150-250
   Qdrant Cloud:              €100
@@ -521,24 +521,29 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 ## 🌐 Domain Strategy (Based on TF-116)
 
 ### Current Status
+
 - ❌ **examcraft.ie** is already taken (Irish education tool)
+
 - ⚠️ **.ai domains** cost €75-80/year (minimum 2 years registration)
 - ✅ **.io/.com** are cheaper and more established
 
 ### Top Recommendations
 
-**Tier 1 - Premium Choices**
+#### Tier 1 - Premium Choices
+
 1. **examcraft.ai** - Perfect for AI focus, but expensive
 2. **examcrafter.ai** - Alternative with "Crafter" suffix
 3. **craftexam.ai** - Reversed variant
 
-**Tier 2 - Balanced Options**
+#### Tier 2 - Balanced Options
+
 4. **examcraft.io** - Tech startup standard, cheaper than .ai
 5. **examcrafter.io** - IO variant
 6. **getexamcraft.com** - "Get" prefix (like GetStream, GetFeedback)
 7. **tryexamcraft.com** - "Try" prefix for trial focus
 
-**Tier 3 - Alternative Names**
+#### Tier 3 - Alternative Names
+
 8. **examgenai.com** - "ExamGen AI" - short and catchy
 9. **aiexamcraft.com** - AI prefix
 10. **examcraft-ai.com** - With hyphen
@@ -549,7 +554,7 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 
 ## 📅 Timeline (Based on TF-116)
 
-```
+```text
 October 2025:        Open Source Launch (TF-112)
 November 2025:       Freemium Infrastructure (TF-113)
 December 2025:       Beta Program & Marketing (TF-115)
@@ -566,9 +571,9 @@ April-June 2026:     Enterprise Edition (TF-114)
 ## 📞 Contact & Next Steps
 
 **Founder**: Daniel Senften
-**Email**: daniel.senften@talent-factory.ch
-**GitLab**: https://gitlab.com/talent-factory/software/examcraft
-**Linear**: https://linear.app/talent-factory/project/examcraft-ai-0872b24233e2
+**Email**: <daniel.senften@talent-factory.ch>
+**GitLab**: <https://gitlab.com/talent-factory/software/examcraft>
+**Linear**: <https://linear.app/talent-factory/project/examcraft-ai-0872b24233e2>
 
 ### Immediate Next Steps (This Week)
 
@@ -592,4 +597,3 @@ April-June 2026:     Enterprise Edition (TF-114)
 
 **Last Updated**: January 2025 | **Version**: 1.0.0 | **Status**: Production Ready 🚀
 **Related Issues**: TF-116 (Monetization), TF-112 (Open Source), TF-113 (Freemium), TF-114 (Enterprise), TF-115 (Marketing)
-

@@ -24,6 +24,46 @@ class PromptService:
         self.db = db
         self.vector_service = PromptVectorService()
 
+    def list_prompts(
+        self,
+        category: Optional[str] = None,
+        use_case: Optional[str] = None,
+        is_active: Optional[bool] = None
+    ) -> List[Prompt]:
+        """
+        List all prompts with optional filters.
+
+        Args:
+            category: Filter by category
+            use_case: Filter by use case
+            is_active: Filter by active status
+
+        Returns:
+            List of Prompt objects
+        """
+        query = self.db.query(Prompt)
+
+        if category:
+            query = query.filter(Prompt.category == category)
+        if use_case:
+            query = query.filter(Prompt.use_case == use_case)
+        if is_active is not None:
+            query = query.filter(Prompt.is_active == is_active)
+
+        return query.order_by(desc(Prompt.created_at)).all()
+
+    def get_prompt_by_id(self, prompt_id: str) -> Optional[Prompt]:
+        """
+        Get a single prompt by ID.
+
+        Args:
+            prompt_id: Prompt UUID
+
+        Returns:
+            Prompt object or None
+        """
+        return self.db.query(Prompt).filter(Prompt.id == prompt_id).first()
+
     def get_prompt_by_name(
         self, name: str, version: Optional[int] = None
     ) -> Optional[Prompt]:

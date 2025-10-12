@@ -47,7 +47,9 @@
       "Bash(DOCKER_DEFAULT_PLATFORM=linux/amd64 docker-compose --pull never up -d postgres redis)",
       "Bash(markdownlint:*)",
       "Bash(tee:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(npx markdownlint:*)",
+      "Bash(npx markdownlint-cli2:*)"
     ],
     "deny": [],
     "ask": []

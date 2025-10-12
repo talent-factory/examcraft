@@ -78,7 +78,7 @@ Alternativ können Sie die `render.yaml` erweitern:
 # In render.yaml hinzufügen:
 services:
   # ... existing services ...
-  
+
   # Qdrant Vector Database
   - type: web
     name: examcraft-qdrant
@@ -107,6 +107,7 @@ Dann Blueprint neu deployen.
 ## Option 2: Qdrant Cloud (Empfohlen für Production)
 
 ### Vorteile
+
 - ✅ Managed Service (keine Wartung)
 - ✅ Automatische Backups
 - ✅ Bessere Performance
@@ -178,12 +179,15 @@ VECTOR_SERVICE_TYPE=mock
 ## Empfehlung
 
 ### Für Development/Testing
+
 → **Mock Service** oder **Qdrant Cloud Free Tier**
 
 ### Für Production
+
 → **Qdrant Cloud** (einfacher, zuverlässiger, managed)
 
 ### Für Self-Hosted Production
+
 → **Render.com Web Service** (volle Kontrolle, aber mehr Wartung)
 
 ## Troubleshooting
@@ -245,4 +249,3 @@ python scripts/import_to_qdrant_cloud.py \
 ---
 
 **Empfehlung**: Starten Sie mit **Qdrant Cloud Free Tier** für schnelles Setup, upgraden Sie später bei Bedarf.
-

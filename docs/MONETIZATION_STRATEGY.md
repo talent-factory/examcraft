@@ -207,38 +207,38 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 
 ### Infrastructure Costs
 
-```
+```text
 Render.com Hosting:        €150-250
 Qdrant Cloud:              €100
 PostgreSQL:                €50
 Redis:                     €30
                            ----------
 Subtotal:                  €330-430
-```text
+```
 
 ### AI & Operations
 
-```
+```text
 Claude API (150 customers): €300-500
 Stripe Fees (3%):          ~€450 (at €15k MRR)
 Email Service:             €50
 Monitoring Tools:          €100
                            ----------
 Subtotal:                  €900-1,100
-```text
+```
 
 ### Marketing & Growth
 
-```
+```text
 Content/Ads:               €1,000-2,000
 Tools (Analytics):         €200
                            ----------
 Subtotal:                  €1,200-2,200
-```text
+```
 
 ### Support & Miscellaneous
 
-```
+```text
 Support Tools:             €100
 Domain & SSL:              €10
 Miscellaneous:             €100
