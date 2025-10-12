@@ -10,6 +10,8 @@ import os
 
 from models.chat import ChatBotResponse
 from services.qdrant_vector_service import QdrantVectorService
+from services.prompt_service import PromptService
+from database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -38,20 +40,62 @@ class DocumentChatBotService:
                 model_name=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
                 api_key=api_key
             )
-            
-            # PydanticAI Agent mit System Prompt
+
+            # Initialize PromptService for dynamic prompt loading
+            self.db = SessionLocal()
+            self.prompt_service = PromptService(self.db)
+
+            # Load system prompt from Knowledge Base
+            system_prompt = self._load_system_prompt_from_kb()
+
+            # PydanticAI Agent mit dynamischem System Prompt
             self.agent = Agent(
                 model=self.model,
-                system_prompt=self._build_system_prompt(),
+                system_prompt=system_prompt,
                 result_type=ChatBotResponse
             )
-        
+
         # Vector Service für RAG
         from services.vector_service_factory import get_vector_service
         self.vector_service = get_vector_service()
-    
-    def _build_system_prompt(self) -> str:
-        """System Prompt für dokumentbasierten ChatBot"""
+
+    def __del__(self):
+        """Cleanup database session"""
+        if hasattr(self, 'db'):
+            self.db.close()
+
+    def _load_system_prompt_from_kb(self) -> str:
+        """
+        Load system prompt dynamically from Knowledge Base.
+        Falls back to hardcoded prompt if not found.
+        """
+        try:
+            # Try to load from Knowledge Base
+            prompt = self.prompt_service.get_prompt_for_use_case(
+                use_case="chatbot_document_qa",
+                category="system_prompt"
+            )
+
+            if prompt:
+                logger.info(f"Loaded system prompt from KB: {prompt.name} (v{prompt.version})")
+
+                # Log usage
+                self.prompt_service.log_prompt_usage(
+                    prompt=prompt,
+                    use_case="chatbot_document_qa"
+                )
+
+                return prompt.content
+            else:
+                logger.warning("No system prompt found in KB, using fallback")
+                return self._build_fallback_system_prompt()
+
+        except Exception as e:
+            logger.error(f"Failed to load system prompt from KB: {e}")
+            return self._build_fallback_system_prompt()
+
+    def _build_fallback_system_prompt(self) -> str:
+        """Fallback System Prompt wenn Knowledge Base nicht verfügbar"""
         return """Du bist ein hilfreicher Assistent, der Fragen zu hochgeladenen Dokumenten beantwortet.
 
 Deine Aufgaben:
