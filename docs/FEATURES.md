@@ -255,21 +255,24 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 
 ### 👨‍🏫 For Educators
 
-**Scenario 1: Creating a Midterm Exam**
+#### Scenario 1: Creating a Midterm Exam
+
 1. Upload lecture slides and textbook chapters
 2. Generate 30 questions across Bloom levels
 3. Use auto-composer to create balanced exam
 4. Export to Moodle XML
 5. **Time saved**: 4 hours → 30 minutes
 
-**Scenario 2: Improving Question Quality**
+#### Scenario 2: Improving Question Quality
+
 1. Review analytics for previous exam
 2. Identify questions with low discrimination
 3. Use AI suggestions to improve clarity
 4. Get student feedback on new version
 5. **Result**: 25% improvement in question quality
 
-**Scenario 3: Collaborative Exam Creation**
+#### Scenario 3: Collaborative Exam Creation
+
 1. Generate initial question set
 2. Assign questions to colleagues for review
 3. Incorporate feedback via inline comments
@@ -280,14 +283,16 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 
 ### 🎓 For Students
 
-**Scenario 1: Exam Preparation**
+#### Scenario 1: Exam Preparation
+
 1. Access practice questions from course materials
 2. Get personalized recommendations based on performance
 3. Use spaced repetition for optimal retention
 4. Track progress over time
 5. **Result**: Better prepared, higher confidence
 
-**Scenario 2: Mobile Learning**
+#### Scenario 2: Mobile Learning
+
 1. Download questions for offline practice
 2. Study during commute with flashcard mode
 3. Sync progress when back online
@@ -299,6 +304,7 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 ## 📊 Pricing (Based on TF-116 Monetization Strategy)
 
 ### 🆓 Free Tier - Community Edition
+
 - 5 documents
 - 20 questions/month
 - 1 user
@@ -307,6 +313,7 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 - **Perfect for**: Individual educators, hobby projects
 
 ### 🚀 Starter (€19/month)
+
 - 50 documents
 - 200 questions/month
 - 3 users
@@ -315,6 +322,7 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 - **Perfect for**: Small teaching teams
 
 ### 💼 Professional (€49/month)
+
 - Unlimited documents
 - 1,000 questions/month
 - 10 users
@@ -324,6 +332,7 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 - **Perfect for**: Departments, larger teams
 
 ### 🏢 Enterprise (€149/month)
+
 - Unlimited everything
 - Unlimited users
 - Priority support
@@ -333,6 +342,7 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 - **Perfect for**: Universities, institutions
 
 ### 🏛️ Self-Hosted Enterprise Edition
+
 - **Setup Fee**: €999 (one-time)
 - **License**: €99/month per 10 users
 - **Support**: €299/year
@@ -366,4 +376,3 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 ---
 
 **Last Updated**: October 2025 | **Version**: 1.0.0
-

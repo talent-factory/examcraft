@@ -13,6 +13,7 @@ Dieser Ansatz deployed **alle Services in einem einzigen Docker Container**:
 ## 📊 Wann All-in-One verwenden?
 
 ### ✅ Gut für:
+
 - Schnelles Deployment und Testing
 - Proof-of-Concept / Demo
 - Entwicklungsumgebung
@@ -20,6 +21,7 @@ Dieser Ansatz deployed **alle Services in einem einzigen Docker Container**:
 - Einfache Wartung
 
 ### ❌ Nicht ideal für:
+
 - High-Traffic Production
 - Skalierbare Anwendungen
 - Mission-Critical Systems
@@ -286,12 +288,15 @@ effective_cache_size = 256MB
 ## ✅ Empfehlung
 
 ### Für schnelles Testing/Demo:
+
 → **All-in-One Container** (dieser Ansatz)
 
 ### Für Production:
+
 → **Multi-Service Setup** (siehe render-deployment.md)
 
 ### Hybrid-Ansatz:
+
 → All-in-One für Backend+Frontend, managed DBs für PostgreSQL/Redis
 
 ## 🆘 Support
@@ -308,4 +313,3 @@ Bei Problemen:
 **Empfohlener Plan**: Standard ($25/month)
 **Build Zeit**: ~5-10 Minuten
 **Startup Zeit**: ~30-60 Sekunden
-

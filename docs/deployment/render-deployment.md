@@ -7,11 +7,13 @@ Dieses Dokument beschreibt das Production Deployment von ExamCraft AI auf Render
 ## 📋 Voraussetzungen
 
 ### Render.com Account
+
 - Kostenloses oder bezahltes Render.com Konto
 - GitHub/GitLab Repository verbunden
 - Zugriff auf Environment Variables
 
 ### Externe Services
+
 - **Claude API Key** (Anthropic)
 - **Qdrant Cloud** Account (optional, für Vector Database)
 
@@ -22,6 +24,7 @@ Dieses Dokument beschreibt das Production Deployment von ExamCraft AI auf Render
 Der einfachste Weg ist die Verwendung der `render.yaml` Blueprint-Datei:
 
 1. **Repository zu Render.com verbinden**
+
    ```bash
    # In Render.com Dashboard:
    # 1. "New" → "Blueprint"
@@ -31,14 +34,14 @@ Der einfachste Weg ist die Verwendung der `render.yaml` Blueprint-Datei:
    ```
 
 2. **Environment Variables konfigurieren**
-   
+
    Folgende Secrets müssen manuell gesetzt werden:
-   
+
    ```bash
    # Backend Service
    CLAUDE_API_KEY=sk-ant-...           # Anthropic API Key
    QDRANT_URL=https://xyz.qdrant.io   # Qdrant Cloud URL (optional)
-   
+
    # Optional: Qdrant Cloud Credentials
    QDRANT_API_KEY=your_qdrant_api_key
    ```
@@ -75,6 +78,7 @@ Health Check Path:
 ```
 
 **Environment Variables:**
+
 ```bash
 PYTHON_VERSION=3.11.0
 ENVIRONMENT=production
@@ -102,6 +106,7 @@ frontend/build
 ```
 
 **Environment Variables:**
+
 ```bash
 NODE_VERSION=18.18.0
 REACT_APP_API_URL=${{examcraft-backend.URL}}
@@ -133,11 +138,12 @@ Maxmemory Policy: allkeys-lru
 ### Option A: Qdrant Cloud (Empfohlen für Production)
 
 1. **Qdrant Cloud Account erstellen**
-   - Gehe zu https://cloud.qdrant.io
+   - Gehe zu <https://cloud.qdrant.io>
    - Erstelle kostenlosen Cluster
    - Notiere Cluster URL und API Key
 
 2. **Environment Variables setzen**
+
    ```bash
    QDRANT_URL=https://xyz-abc.qdrant.io:6333
    QDRANT_API_KEY=your_api_key_here
@@ -163,6 +169,7 @@ Qdrant kann auch als Docker-Container auf Render.com deployed werden:
 ```
 
 **Qdrant Dockerfile** (`docker/Qdrant.Dockerfile`):
+
 ```dockerfile
 FROM qdrant/qdrant:latest
 
@@ -252,6 +259,7 @@ render logs examcraft-backend
 ```
 
 **Lösung:**
+
 - Environment Variables überprüfen
 - Database Connection String validieren
 - Qdrant URL und API Key testen
@@ -264,6 +272,7 @@ render logs examcraft-backend
 ```
 
 **Lösung:**
+
 ```python
 # backend/main.py
 app.add_middleware(
@@ -283,6 +292,7 @@ curl https://your-qdrant-url.qdrant.io:6333/collections
 ```
 
 **Fallback zu Mock Service:**
+
 ```bash
 # Temporär Mock Service verwenden
 VECTOR_SERVICE_TYPE=mock
@@ -337,18 +347,21 @@ databases:
 ## 💰 Cost Estimation
 
 ### Free Tier
+
 - Backend: Free (750 hours/month)
 - Frontend: Free (100 GB bandwidth)
 - PostgreSQL: Free (90 days, dann $7/month)
 - Redis: Free (25 MB)
 
 ### Starter Tier (~$20/month)
+
 - Backend: $7/month
 - Frontend: Free
 - PostgreSQL: $7/month
 - Redis: $7/month
 
 ### Production Tier (~$50/month)
+
 - Backend: $25/month (Standard)
 - Frontend: Free
 - PostgreSQL: $20/month (Pro)
@@ -372,7 +385,7 @@ git push origin main
 
 ## 📞 Support
 
-- **Render.com Docs**: https://render.com/docs
+- **Render.com Docs**: <https://render.com/docs>
 - **ExamCraft Issues**: GitHub Issues
 - **Community**: Discord/Slack Channel
 
@@ -381,4 +394,3 @@ git push origin main
 **Status**: ✅ Production Ready
 **Last Updated**: 2025-10-06
 **Maintained by**: Talent Factory Team
-

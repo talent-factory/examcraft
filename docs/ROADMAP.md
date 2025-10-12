@@ -21,18 +21,21 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 ## ✅ Released Features (v1.0 - Production)
 
 ### 🏗️ Core Infrastructure
+
 - **Project Setup & Architecture** - Modern tech stack with FastAPI + React 18
 - **Docker Deployment** - Production-ready containerization
 - **CI/CD Pipeline** - Automated testing and deployment via GitLab
 - **Production Hosting** - Deployed on Render.com with auto-scaling
 
 ### 📄 Document Processing
+
 - **Multi-Format Support** - PDF, DOC, DOCX, Markdown processing
 - **IBM Docling Integration** - Advanced document extraction with layout preservation
 - **Semantic Chunking** - Intelligent content segmentation for optimal RAG performance
 - **Document Management** - Upload, organize, and manage course materials
 
 ### 🤖 AI-Powered Question Generation
+
 - **Claude API Integration** - Powered by Anthropic's Claude 3.5 Sonnet
 - **PydanticAI Framework** - Type-safe AI agent orchestration
 - **Bloom's Taxonomy Support** - Questions aligned with cognitive learning levels
@@ -40,12 +43,14 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Difficulty Calibration** - Automatic difficulty level assignment
 
 ### 🔍 RAG System
+
 - **Qdrant Vector Database** - Cloud-hosted vector storage for semantic search
 - **Semantic Search** - Find relevant content across all documents
 - **Context-Aware Generation** - Questions grounded in actual course materials
 - **Source Attribution** - Automatic citation of source documents
 
 ### 💬 Document ChatBot
+
 - **Interactive Q&A** - NotebookLM-style conversations with documents
 - **Multi-Turn Dialogue** - Context-aware follow-up questions
 - **Source References** - Every answer includes document citations
@@ -53,6 +58,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Session Management** - Save and resume chat sessions
 
 ### ⚛️ Modern Web Interface
+
 - **React 18 Dashboard** - Responsive, intuitive user interface
 - **TypeScript** - Type-safe frontend development
 - **TanStack Query** - Efficient data fetching and caching
@@ -68,6 +74,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 **Focus**: Professional question management and editing capabilities
 
 #### 🎨 Interactive Question Editor
+
 **Status**: `In Development` | **Story Points**: 13 | **Priority**: High
 
 - **WYSIWYG Editor** - TipTap-based rich text editing
@@ -84,6 +91,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - 🎯 Professional formatting without technical knowledge
 
 #### 🏦 Question Bank & Tagging System
+
 **Status**: `Planned` | **Story Points**: 13 | **Priority**: High
 
 - **Centralized Library** - All questions in one searchable repository
@@ -99,6 +107,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - 📊 Better organization with hierarchical tagging
 
 #### 📋 Exam Template Library & Auto-Composition
+
 **Status**: `Planned` | **Story Points**: 13 | **Priority**: High
 
 - **Pre-built Templates** - Midterm, Final, Quiz, Custom formats
@@ -122,6 +131,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 **Focus**: Data-driven question improvement and quality metrics
 
 #### 📊 Question Analytics & Quality Metrics
+
 **Status**: `Planned` | **Story Points**: 8 | **Priority**: Medium
 
 - **Performance Tracking** - Success rate, average time, discrimination index
@@ -137,6 +147,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - 📊 Data-driven curriculum decisions
 
 #### 💬 Student Feedback Integration
+
 **Status**: `Planned` | **Story Points**: 8 | **Priority**: Medium
 
 - **Post-Exam Surveys** - Collect clarity and difficulty ratings
@@ -159,6 +170,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 **Focus**: Multi-document synthesis and team workflows
 
 #### 📚 Multi-Document Question Generation
+
 **Status**: `Planned` | **Story Points**: 8 | **Priority**: Medium
 
 - **Cross-Reference Questions** - Combine knowledge from multiple sources
@@ -173,6 +185,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - 📖 Comprehensive assessment across course materials
 
 #### 👥 Collaborative Question Review Workflow
+
 **Status**: `Planned` | **Story Points**: 13 | **Priority**: Medium
 
 - **Review Assignments** - Assign questions to peer reviewers
@@ -196,6 +209,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 **Focus**: Personalized learning and mobile accessibility
 
 #### 🎓 Adaptive Learning Path Generator
+
 **Status**: `Planned` | **Story Points**: 21 | **Priority**: Low
 
 - **Performance Analysis** - Identify student strengths and weaknesses
@@ -211,6 +225,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - 🧠 Optimized retention with spaced repetition
 
 #### 📱 Mobile App (PWA)
+
 **Status**: `Planned` | **Story Points**: 21 | **Priority**: Low
 
 - **Offline-First** - Practice questions without internet
@@ -234,6 +249,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 **Focus**: Institutional features and cutting-edge AI capabilities
 
 #### 🔍 Plagiarism Detection
+
 **Status**: `Planned` | **Story Points**: 13 | **Priority**: Low
 
 - **Student-to-Student Similarity** - Detect copied answers
@@ -249,6 +265,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - ⚖️ Fair assessment for all students
 
 #### 🏢 Enterprise Features
+
 **Status**: `Planned` | **Story Points**: TBD | **Priority**: TBD
 
 - **SSO Integration** - SAML, OAuth, LDAP support
