@@ -2,7 +2,8 @@
 
 ## Übersicht
 
-Diese Skripte unterstützen die Migration von ChromaDB zu Qdrant und die Performance-Validierung des neuen Vector Database Systems.
+Diese Skripte unterstützen die Migration von ChromaDB zu Qdrant und die
+Performance-Validierung des neuen Vector Database Systems.
 
 ## Verfügbare Skripte
 
@@ -11,14 +12,16 @@ Diese Skripte unterstützen die Migration von ChromaDB zu Qdrant und die Perform
 **Zweck**: Vollständige Migration von ChromaDB zu Qdrant
 
 **Features**:
-- ✅ Automatische Datenextraktion aus ChromaDB
-- ✅ Batch-Processing für große Datenmengen
-- ✅ Datenvalidierung und Integritätsprüfung
-- ✅ Dry-Run Modus für sichere Tests
-- ✅ Umfassende Logging und Fehlerbehandlung
-- ✅ Rollback-Unterstützung
+
+- Automatische Datenextraktion aus ChromaDB
+- Batch-Processing für große Datenmengen
+- Datenvalidierung und Integritätsprüfung
+- Dry-Run Modus für sichere Tests
+- Umfassende Logging und Fehlerbehandlung
+- Rollback-Unterstützung
 
 **Usage**:
+
 ```bash
 # Vollständige Migration
 python scripts/migrate_chromadb_to_qdrant.py
@@ -38,6 +41,7 @@ python scripts/migrate_chromadb_to_qdrant.py --no-validate
 ```
 
 **Parameter**:
+
 - `--chromadb-dir`: ChromaDB Verzeichnis (default: `./chroma_db`)
 - `--qdrant-url`: Qdrant Server URL (default: `http://localhost:6333`)
 - `--collection`: Collection Name (default: `examcraft_documents`)
@@ -46,7 +50,8 @@ python scripts/migrate_chromadb_to_qdrant.py --no-validate
 - `--dry-run`: Nur Analyse, keine Migration
 
 **Output**:
-```
+
+```text
 🚀 Starting ChromaDB to Qdrant migration...
 Step 1: Checking source and target services...
 Step 2: Extracting data from ChromaDB...
@@ -67,14 +72,16 @@ Migration Statistics:
 **Zweck**: Performance-Vergleich zwischen Qdrant und ChromaDB
 
 **Features**:
-- ✅ Automatische Testdaten-Generierung
-- ✅ Document Addition Performance Tests
-- ✅ Similarity Search Performance Tests
-- ✅ Memory Usage Monitoring
-- ✅ Detaillierte Performance-Metriken
-- ✅ JSON Export der Ergebnisse
+
+- Automatische Testdaten-Generierung
+- Document Addition Performance Tests
+- Similarity Search Performance Tests
+- Memory Usage Monitoring
+- Detaillierte Performance-Metriken
+- JSON Export der Ergebnisse
 
 **Usage**:
+
 ```bash
 # Standard Performance Test
 python scripts/performance_test_qdrant.py
@@ -90,14 +97,17 @@ python scripts/performance_test_qdrant.py --docs 5 --chunks 10
 ```
 
 **Parameter**:
+
 - `--docs`: Anzahl Test-Dokumente (default: `10`)
 - `--chunks`: Chunks pro Dokument (default: `20`)
-- `--output`: Output-Datei für Ergebnisse (default: `performance_results.json`)
+- `--output`: Output-Datei für Ergebnisse (default:
+  `performance_results.json`)
 
 **Output**:
-```
+
+```text
 📊 PERFORMANCE TEST SUMMARY
-================================================================================
+============================================================
 
 🔄 DOCUMENT ADDITION PERFORMANCE:
 ChromaDB: 0.850s per doc, 23.5 chunks/s
@@ -111,7 +121,7 @@ Qdrant:   0.050s per query, 20.0 queries/s
 Addition: Qdrant (2.66x faster)
 Search:   Qdrant (3.00x faster)
 Memory:   Qdrant (1.40x more efficient)
-================================================================================
+============================================================
 ```
 
 ## Voraussetzungen
@@ -250,6 +260,7 @@ curl http://localhost:8000/api/v1/search/service-info
 ### Common Issues
 
 #### 1. Qdrant Connection Failed
+
 ```bash
 # Check Qdrant Status
 docker compose ps qdrant
@@ -263,6 +274,7 @@ curl http://localhost:6333/health
 ```
 
 #### 2. ChromaDB Data Not Found
+
 ```bash
 # Check ChromaDB Directory
 ls -la ./chroma_db/
@@ -276,6 +288,7 @@ print(service.get_collection_stats())
 ```
 
 #### 3. Migration Incomplete
+
 ```bash
 # Check Migration Status
 python scripts/migrate_chromadb_to_qdrant.py --dry-run
@@ -288,6 +301,7 @@ curl http://localhost:6333/collections/examcraft_documents
 ```
 
 #### 4. Performance Issues
+
 ```bash
 # Check Resource Limits
 docker stats
@@ -332,11 +346,12 @@ Bei Problemen:
 1. **Logs prüfen**: Migration und Performance Logs analysieren
 2. **Health Checks**: Service-Status überprüfen
 3. **Dry Run**: Migration-Skript im Test-Modus ausführen
-4. **Documentation**: Diese Anleitung und `docs/QDRANT_MIGRATION.md` konsultieren
+4. **Documentation**: Diese Anleitung und `docs/QDRANT_MIGRATION.md`
+   konsultieren
 5. **Fallback**: ChromaDB als Backup nutzen
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: 2025-09-25  
+**Version**: 1.0.0
+**Last Updated**: 2025-09-25
 **Maintainer**: ExamCraft AI Team

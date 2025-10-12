@@ -110,11 +110,13 @@ if __name__ == "__main__":
 ### Algorithmus-Verständnis (6 Punkte)
 
 **Insert-Operation (3 Punkte):**
+
 - **1 Punkt**: Verständnis, dass Element am Ende eingefügt wird
 - **1 Punkt**: Erkennen, dass "Bubble-Up" zur Wurzel erforderlich ist
 - **1 Punkt**: Korrekte Vater-Kind-Beziehung (`i // 2` für Vaterknoten)
 
 **Min-Extract-Operation (3 Punkte):**
+
 - **1 Punkt**: Verständnis, dass Wurzel das Minimum ist
 - **1 Punkt**: Erkennen, dass letztes Element an die Wurzel muss
 - **1 Punkt**: Verständnis des "Bubble-Down" Prozesses
@@ -122,11 +124,13 @@ if __name__ == "__main__":
 ### Korrekte Implementierung (8 Punkte)
 
 **Insert-Implementierung (3 Punkte):**
+
 - **1 Punkt**: `heap.append(x)` zum Anhängen
 - **1 Punkt**: Korrekte While-Schleife mit Bedingung `i > 1 and heap[i//2] > heap[i]`
 - **1 Punkt**: Korrektes Tauschen und Update von `i = i // 2`
 
 **Min-Extract-Implementierung (5 Punkte):**
+
 - **1 Punkt**: Rückgabe der Wurzel `heap[1]`
 - **1 Punkt**: Setzen des letzten Elements an die Wurzel mit `heap.pop()`
 - **1 Punkt**: Korrekte Schleifenbedingung `i <= n // 2`
@@ -136,34 +140,41 @@ if __name__ == "__main__":
 ### Code-Qualität & Edge-Cases (4 Punkte)
 
 **Edge-Case-Behandlung (2 Punkte):**
+
 - **1 Punkt**: Behandlung leerer Heap (`len(heap) <= 1`)
 - **1 Punkt**: Behandlung Heap mit nur einem Element
 
 **Code-Qualität (2 Punkte):**
+
 - **1 Punkt**: Aussagekräftige Variablennamen (`left`, `right`, `smallest`)
 - **1 Punkt**: Kommentare und saubere Struktur
 
 ## Erklärung
 
 ### Insert-Operation
+
 Das Element wird zunächst am Ende der Liste eingefügt, wodurch die Heap-Eigenschaft verletzt werden kann. Durch "Bubble-Up" wird das Element solange mit seinem Vaterknoten getauscht, bis die Min-Heap-Eigenschaft wieder erfüllt ist.
 
 ### Min-Extract-Operation
+
 Das minimale Element befindet sich immer an der Wurzel (`heap[1]`). Nach dem Entfernen wird das letzte Element an die Wurzel gesetzt, wodurch die Heap-Eigenschaft verletzt wird. Durch "Bubble-Down" wird das Element mit dem kleineren seiner Kinder getauscht, bis die Eigenschaft wieder erfüllt ist.
 
 ## Häufige Fehler
 
 **Insert-Operation:**
+
 - **Falsche Vater-Beziehung** (-1 Punkt): Verwendung von `i * 2` statt `i // 2`
 - **Fehlende Schleifenbedingung** (-1 Punkt): Vergessen von `i > 1`
 - **Fehlerhafte Tausch-Operation** (-1 Punkt): Inkorrekte Indizierung
 
 **Min-Extract-Operation:**
+
 - **Falsche Heap-Größe** (-1 Punkt): Nicht berücksichtigen, dass `heap[0] = None`
 - **Infinite Loops** (-2 Punkte): Falsche Schleifenbedingungen
 - **Edge-Cases ignoriert** (-1 Punkt): Keine Behandlung leerer/einelementiger Heaps
 - **Falsche Kind-Indizierung** (-1 Punkt): Rechtes Kind nicht korrekt berechnet
 
 **Allgemeine Abzüge:**
+
 - **Schlechte Code-Qualität** (-1 Punkt): Keine Kommentare, unklare Variablennamen
 - **Syntaxfehler** (-2 Punkte): Code nicht ausführbar

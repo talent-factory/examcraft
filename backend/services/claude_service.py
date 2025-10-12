@@ -288,21 +288,26 @@ Anforderungen:
 - Für Multiple-Choice: 4 Antwortoptionen mit einer korrekten Antwort
 - Für offene Fragen: Klare Fragestellung mit Bewertungskriterien
 
+WICHTIG für Code-Formatierung:
+- Code-Elemente (Funktionsnamen, Variablen, Klassen, Code-Snippets) MÜSSEN in Backticks gesetzt werden
+- Beispiel: `self._distribute_elements(arr)` statt self._distribute_elements(arr)
+- Dies gilt für Fragen, Optionen und Erklärungen
+
 Format als JSON:
 {{
   "questions": [
     {{
       "id": "q1",
       "type": "multiple_choice",
-      "question": "Fragetext hier",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correct_answer": "Option A",
-      "explanation": "Erklärung warum diese Antwort korrekt ist",
+      "question": "Fragetext hier (Code in `backticks`)",
+      "options": ["Option A (Code in `backticks`)", "Option B", "Option C", "Option D"],
+      "correct_answer": "Option A (Code in `backticks`)",
+      "explanation": "Erklärung warum diese Antwort korrekt ist (Code in `backticks`)",
       "difficulty": "{difficulty}",
       "topic": "{topic}"
     }},
     {{
-      "id": "q2", 
+      "id": "q2",
       "type": "open_ended",
       "question": "Offene Fragestellung hier",
       "options": null,

@@ -109,12 +109,14 @@ if __name__ == "__main__":
 ### MinHeapify Algorithmus (7 Punkte)
 
 **Grundlegende Logik (4 Punkte):**
+
 - **1 Punkt**: Korrekte Berechnung der Kind-Indizes (`left = 2*i`, `right = 2*i+1`)
 - **1 Punkt**: Finden des kleinsten Elements unter Knoten und Kindern
 - **1 Punkt**: Vergleiche mit linkem Kind (`heap[left] < heap[smallest]`)
 - **1 Punkt**: Vergleiche mit rechtem Kind (`heap[right] < heap[smallest]`)
 
 **Rekursion und Tausch (3 Punkte):**
+
 - **1 Punkt**: Korrektes Tauschen (`heap[i], heap[smallest] = heap[smallest], heap[i]`)
 - **1 Punkt**: Rekursiver Aufruf `minHeapify(heap, smallest)`
 - **1 Punkt**: Korrekte Rekursions-Bedingung (`smallest != i`)
@@ -122,41 +124,50 @@ if __name__ == "__main__":
 ### BuildHeap Implementierung (5 Punkte)
 
 **Schleifenlogik (3 Punkte):**
+
 - **1 Punkt**: Korrekter Startindex (`n // 2` - letzter innerer Knoten)
 - **1 Punkt**: Korrekte Schleife `range(n // 2, 0, -1)`
 - **1 Punkt**: Aufruf von `minHeapify(lst, i)` für jeden inneren Knoten
 
 **Heap-Konstruktion (2 Punkte):**
+
 - **1 Punkt**: Verständnis des "Bottom-Up" Ansatzes
 - **1 Punkt**: Korrekte Berechnung der Heap-Größe (`len(lst) - 1`)
 
 ### Rekursion und Edge-Cases (3 Punkte)
 
 **Rekursions-Implementierung (2 Punkte):**
+
 - **1 Punkt**: Rekursiver Abbruch (keine explizite Abbruchbedingung nötig)
 - **1 Punkt**: Korrekte rekursive Struktur
 
 **Edge-Cases (1 Punkt):**
+
 - **1 Punkt**: Behandlung von Knoten ohne/mit nur einem Kind
 
 ## Erklärung
 
 ### MinHeapify
+
 Die Funktion arbeitet nach dem "Sink-Down" Prinzip. Sie vergleicht einen Knoten mit seinen Kindern und tauscht ihn mit dem kleinsten, falls die Min-Heap-Eigenschaft verletzt ist. Danach wird rekursiv weitergemacht.
 
 ### BuildHeap
+
 Durch den "Bottom-Up" Ansatz wird die Heap-Eigenschaft effizient hergestellt. Blattknoten (die größere Indizes als `n//2` haben) erfüllen automatisch die Heap-Eigenschaft, da sie keine Kinder haben.
 
 **Zeitkomplexität:**
+
 - `minHeapify`: O(log n) - maximale Baumhöhe
 - `buildHeap`: O(n log n) im Worst-Case, aber tatsächlich O(n) bei genauerer Analyse
 
 ### Rekursions-Design
+
 Der rekursive Aufruf erfolgt nur bei Verletzung der Heap-Eigenschaft. Das Argument wird bei jedem Aufruf "größer" (tiefer im Baum), garantiert also Terminierung.
 
 ## Häufige Fehler
 
 **MinHeapify-Implementierung:**
+
 - **Falsche Kind-Indizes** (-2 Punkte): `left = i*2` statt `left = 2*i`
 - **Grenzen nicht beachtet** (-2 Punkte): Kein Check auf `left <= n` oder `right <= n`
 - **Iterativ statt rekursiv** (-2 Punkte): While-Schleife statt Rekursion
@@ -164,12 +175,14 @@ Der rekursive Aufruf erfolgt nur bei Verletzung der Heap-Eigenschaft. Das Argume
 - **Falsche Rekursions-Bedingung** (-1 Punkt): Aufruf auch bei `smallest == i`
 
 **BuildHeap-Implementierung:**
+
 - **Falscher Startindex** (-2 Punkte): Beginnt bei `n` statt `n//2`
 - **Falsche Schleifenrichtung** (-2 Punkte): Aufsteigende statt absteigende Schleife
 - **Blattknoten einbezogen** (-1 Punkt): Schleife bis `n` statt bis `1`
 - **Heap-Größe falsch** (-1 Punkt): `len(lst)` statt `len(lst)-1`
 
 **Allgemeine Abzüge:**
+
 - **Nicht-rekursive Lösung** (-3 Punkte): Aufgabe verlangte explizit Rekursion
 - **Syntaxfehler** (-2 Punkte): Code nicht ausführbar
 - **Schlechte Variablennamen** (-1 Punkt): Unklare Bezeichnungen

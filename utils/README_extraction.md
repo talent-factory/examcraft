@@ -19,7 +19,7 @@ Das Script nutzt die folgenden Dependencies, die bereits im Projekt konfiguriert
 
 ```bash
 uv add docling pypdf
-```
+```text
 
 ## Verwendung
 
@@ -37,7 +37,7 @@ uv run python utils/extraction.py --force-pypdf
 
 # Mit detaillierter Ausgabe
 uv run python utils/extraction.py --verbose
-```
+```text
 
 ### Kommandozeilenoptionen
 
@@ -64,7 +64,7 @@ uv run python utils/extraction.py --force-pypdf --log-file extraction.log
 
 # Hilfe anzeigen
 uv run python utils/extraction.py --help
-```
+```text
 
 ## Ausgabeformat
 
@@ -87,7 +87,7 @@ Das Script erstellt Markdown-Dateien mit folgender Struktur:
 ## Seite 2
 
 [Seiteninhalt...]
-```
+```text
 
 ## Verarbeitungsmethoden
 
@@ -128,7 +128,7 @@ setup_logging()           # Logging-Konfiguration
 extract_text_with_pypdf() # PyPDF-basierte Extraktion
 process_pdf_files()       # Batch-Verarbeitung
 main()                    # CLI-Interface
-```
+```text
 
 ### Erweiterungsmöglichkeiten
 

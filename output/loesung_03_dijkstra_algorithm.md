@@ -303,40 +303,48 @@ if __name__ == "__main__":
 ## Detaillierte Punkteverteilung
 
 ### Kürzeste Pfade (6 Punkte)
+
 - **Priority Queue Setup (2 Punkte)**: Korrekte Verwendung von `heapq` mit (distance, node) Tupeln
 - **Dijkstra-Hauptschleife (2 Punkte)**: Korrekte Implementierung des Greedy-Algorithmus
 - **Kantenrelaxierung (2 Punkte)**: Korrekte Aktualisierung der Distanzen
 
 **Häufige Fehler:**
+
 - Falsche Priority Queue Nutzung (-2 Punkte)
 - Fehlende Visited-Prüfung führt zu falschen Ergebnissen (-2 Punkte)
 - Negative Gewichte nicht behandelt (-1 Punkt)
 
 ### Pfadrekonstruktion (5 Punkte)
+
 - **Parent-Tracking (2 Punkte)**: Korrekte Speicherung der Vorgängerknoten
 - **Pfad-Rekonstruktion (2 Punkte)**: Vollständige Rückverfolgung und Umkehrung
 - **PathResult-Erstellung (1 Punkt)**: Korrekte Berechnung aller Felder
 
 **Häufige Fehler:**
+
 - Fehlende oder falsche Parent-Verfolgung (-3 Punkte)
 - Pfad nicht umgekehrt (-1 Punkt)
 - Falsche Kantenzahl (-1 Punkt)
 
 ### Single-Target Optimierung (4 Punkte)
+
 - **Early Termination (2 Punkte)**: Algorithmus stoppt bei Ziel-Erreichen
 - **Korrekte Implementierung (1 Punkt)**: Wiederverwendung von find_path
 - **Richtige Rückgabe (1 Punkt)**: Tuple-Format wie spezifiziert
 
 **Häufige Fehler:**
+
 - Keine Early Termination implementiert (-2 Punkte)
 - Falsches Rückgabeformat (-1 Punkt)
 
 ### Alternative Pfade (5 Punkte)
+
 - **Graph-Modifikation (2 Punkte)**: Temporärer Graph ohne spezifische Kanten
 - **Pfad-Unterscheidung (2 Punkte)**: Erkennung signifikant verschiedener Pfade
 - **Sortierung und Limitierung (1 Punkt)**: Korrekte Ausgabe-Formatierung
 
 **Häufige Fehler:**
+
 - Naive Implementierung ohne Graph-Modifikation (-3 Punkte)
 - Keine Pfad-Unterscheidung (-2 Punkte)
 - Falsche Sortierung (-1 Punkt)
