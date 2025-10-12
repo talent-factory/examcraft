@@ -22,7 +22,7 @@ import {
 } from '@mui/material';
 import { Save, Cancel, Preview, Code, History } from '@mui/icons-material';
 import { promptsApi, Prompt } from '../../api/promptsApi';
-import ReactMarkdown from 'react-markdown';
+import MarkdownRenderer from '../MarkdownRenderer';
 
 interface PromptEditorProps {
   promptId?: string;
@@ -237,7 +237,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                     }}
                   >
                     {formData.content ? (
-                      <ReactMarkdown>{formData.content}</ReactMarkdown>
+                      <MarkdownRenderer content={formData.content} />
                     ) : (
                       <Typography color="text.secondary" fontStyle="italic">
                         Keine Inhalte

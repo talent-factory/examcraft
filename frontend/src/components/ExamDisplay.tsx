@@ -30,6 +30,7 @@ import {
   Refresh
 } from '@mui/icons-material';
 import { ExamResponse, Question } from '../types/exam';
+import MarkdownRenderer from './MarkdownRenderer';
 
 interface ExamDisplayProps {
   exam: ExamResponse;
@@ -92,9 +93,9 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
               sx={{ mr: 2, mt: 0.5 }}
             />
             <Box sx={{ flex: 1 }}>
-              <Typography variant="h6" sx={{ mb: 1 }}>
-                {question.question}
-              </Typography>
+              <Box sx={{ mb: 1 }}>
+                <MarkdownRenderer content={question.question} variant="compact" />
+              </Box>
               <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
                 <Chip label={question.type === 'multiple_choice' ? 'Multiple Choice' : 'Offene Frage'} size="small" />
                 <Chip label={question.difficulty} size="small" color="secondary" />
@@ -157,9 +158,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
                 </Box>
               </AccordionSummary>
               <AccordionDetails>
-                <Typography variant="body2" color="text.secondary">
-                  {question.explanation}
-                </Typography>
+                <MarkdownRenderer content={question.explanation} variant="compact" />
               </AccordionDetails>
             </Accordion>
           )}

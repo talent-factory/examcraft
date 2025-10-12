@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, FileText, Loader2, Download, FileDown } from 'lucide-react';
 import { Button } from '@mui/material';
 import { TextField, Card, CardContent, CardHeader, Typography, Box, Chip, IconButton } from '@mui/material';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import MarkdownRenderer from '../MarkdownRenderer';
 
 interface ChatMessage {
   id?: string;
@@ -270,14 +269,7 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
           }
         }}
       >
-        <Box sx={{
-          '& > *:first-of-type': { mt: 0 },
-          '& > *:last-child': { mb: 0 }
-        }}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {message.content}
-          </ReactMarkdown>
-        </Box>
+        <MarkdownRenderer content={message.content} variant="compact" />
         
         {/* Source Citations */}
         {message.sources && message.sources.length > 0 && (

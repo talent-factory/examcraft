@@ -28,11 +28,13 @@
 ### System-Anforderungen
 
 **Browser-Unterstützung:**
+
 - Chrome/Edge 90+
 - Firefox 88+
 - Safari 14+
 
 **Empfohlene Auflösung:**
+
 - Desktop: 1920x1080 oder höher
 - Tablet: 1024x768 oder höher
 - Mobile: 375x667 oder höher
@@ -47,7 +49,7 @@
 
 Die ExamCraft AI Oberfläche besteht aus 6 Hauptbereichen:
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │  ExamCraft AI - Header                              │
 ├─────────────────────────────────────────────────────┤
@@ -64,6 +66,7 @@ Die ExamCraft AI Oberfläche besteht aus 6 Hauptbereichen:
 ```
 
 **Tab-Navigation:**
+
 - **KI-Prüfung erstellen** - Generiere Fragen zu einem Thema
 - **Dokumente hochladen** - Lade Kursmaterialien hoch
 - **Dokumentenbibliothek** - Verwalte hochgeladene Dokumente
@@ -95,12 +98,14 @@ Klicken Sie auf den Tab "Dokumente hochladen" in der Navigation.
 **2. Dateien auswählen**
 
 Sie haben zwei Möglichkeiten:
+
 - **Drag & Drop**: Ziehen Sie Dateien in den Upload-Bereich
 - **Datei-Browser**: Klicken Sie auf "Dateien auswählen"
 
 **3. Upload-Fortschritt überwachen**
 
 Während des Uploads sehen Sie:
+
 - Dateiname und Größe
 - Fortschrittsbalken (0-100%)
 - Status: "Wird verarbeitet..." → "Verarbeitet"
@@ -108,12 +113,14 @@ Während des Uploads sehen Sie:
 **4. Verarbeitung abwarten**
 
 Nach dem Upload werden die Dokumente automatisch:
+
 - Text extrahiert
 - In semantische Chunks aufgeteilt
 - In der Vektordatenbank indexiert
 - Für RAG-Suche vorbereitet
 
 **Verarbeitungszeit:**
+
 - PDF (10 Seiten): ~30 Sekunden
 - Word (20 Seiten): ~45 Sekunden
 - Markdown (5 Seiten): ~15 Sekunden
@@ -121,12 +128,14 @@ Nach dem Upload werden die Dokumente automatisch:
 ### Best Practices für Uploads
 
 ✅ **Empfohlen:**
+
 - Klare Dateinamen (z.B. `Algorithmen_Kapitel_3.pdf`)
 - Strukturierte Dokumente mit Überschriften
 - Hochwertige PDFs (nicht gescannt)
 - Batch-Upload von zusammengehörigen Dokumenten
 
 ❌ **Vermeiden:**
+
 - Gescannte PDFs ohne OCR
 - Passwortgeschützte Dateien
 - Sehr große Dateien (>50 MB)
@@ -141,6 +150,7 @@ Nach dem Upload werden die Dokumente automatisch:
 Die Dokumentenbibliothek zeigt alle hochgeladenen Dokumente in einer übersichtlichen Liste.
 
 **Angezeigte Informationen:**
+
 - Dateiname
 - Upload-Datum
 - Dateigröße
@@ -151,11 +161,13 @@ Die Dokumentenbibliothek zeigt alle hochgeladenen Dokumente in einer übersichtl
 ### Dokumente durchsuchen
 
 **Suchfunktion:**
+
 1. Geben Sie Suchbegriffe in das Suchfeld ein
 2. Ergebnisse werden in Echtzeit gefiltert
 3. Suche durchsucht: Dateiname, Tags, Inhalt
 
 **Filter:**
+
 - **Alle Formate** - Zeige alle Dokumente
 - **PDF** - Nur PDF-Dateien
 - **Word** - Nur Word-Dokumente
@@ -164,17 +176,20 @@ Die Dokumentenbibliothek zeigt alle hochgeladenen Dokumente in einer übersichtl
 ### Dokumente auswählen
 
 **Für RAG-Prüfung:**
+
 1. Aktivieren Sie die Checkboxen neben den gewünschten Dokumenten
 2. Klicken Sie auf "Prüfung aus Auswahl erstellen"
 3. Sie werden zum RAG-Prüfungs-Creator weitergeleitet
 
 **Mehrfachauswahl:**
+
 - Einzeln: Klicken Sie auf einzelne Checkboxen
 - Alle: Nutzen Sie "Alle auswählen" (falls verfügbar)
 
 ### Dokumente löschen
 
 **Einzelnes Dokument:**
+
 1. Klicken Sie auf das Löschen-Symbol (🗑️)
 2. Bestätigen Sie die Sicherheitsabfrage
 3. Dokument wird aus Bibliothek und Vektordatenbank entfernt
@@ -194,6 +209,7 @@ Diese Funktion generiert Fragen zu einem beliebigen Thema **ohne** hochgeladene 
 **1. Prüfungsthema eingeben**
 
 Geben Sie ein spezifisches Thema ein:
+
 - ✅ Gut: "Python Programmierung - Listen und Dictionaries"
 - ✅ Gut: "Datenstrukturen - Heapsort Algorithmus"
 - ❌ Schlecht: "Informatik" (zu allgemein)
@@ -214,6 +230,7 @@ Geben Sie ein spezifisches Thema ein:
 **4. Fragetypen auswählen**
 
 Aktivieren Sie die gewünschten Typen:
+
 - ☑️ **Multiple Choice** - 4 Antwortoptionen, 1 korrekt
 - ☑️ **Offene Fragen** - Freitext-Antworten
 
@@ -233,12 +250,14 @@ Aktivieren Sie die gewünschten Typen:
 Nach erfolgreicher Generierung sehen Sie:
 
 **Prüfungsübersicht:**
+
 - Thema
 - Anzahl Fragen
 - Schwierigkeitsgrad
 - Generierungszeit
 
 **Einzelne Fragen:**
+
 - Fragenummer
 - Fragetext
 - Antwortoptionen (bei Multiple Choice)
@@ -250,10 +269,12 @@ Nach erfolgreicher Generierung sehen Sie:
 ### Aktionen
 
 **Neue Prüfung erstellen:**
+
 - Klicken Sie auf "Neue Prüfung erstellen"
 - Kehrt zum Konfigurationsformular zurück
 
 **Exportieren:**
+
 - Aktuell: Manuelles Kopieren
 - Geplant (v1.1): PDF, JSON, Moodle XML Export
 
@@ -264,6 +285,7 @@ Nach erfolgreicher Generierung sehen Sie:
 ### Was ist RAG?
 
 **RAG** (Retrieval-Augmented Generation) kombiniert:
+
 - **Retrieval**: Semantische Suche in Ihren Dokumenten
 - **Generation**: KI-basierte Fragenerstellung
 
@@ -286,20 +308,24 @@ In der Dokumentenbibliothek:
 **2. RAG-Konfiguration**
 
 **Thema/Fokus:**
+
 - Geben Sie einen spezifischen Fokus ein
 - Beispiel: "Sortieralgorithmen Komplexität"
 - Leer lassen für allgemeine Fragen
 
 **Anzahl Fragen:**
+
 - 1-20 Fragen möglich
 - Empfohlen: 5-10 für beste Qualität
 
 **Fragetypen:**
+
 - Multiple Choice
 - Offene Fragen
 - True/False (falls verfügbar)
 
 **Schwierigkeitsgrad:**
+
 - Einfach / Mittel / Schwer
 
 **3. Generierung starten**
@@ -311,6 +337,7 @@ In der Dokumentenbibliothek:
 **4. Ergebnis prüfen**
 
 Jede Frage enthält:
+
 - **Fragentext**
 - **Antwortoptionen**
 - **Korrekte Antwort**
@@ -321,12 +348,14 @@ Jede Frage enthält:
 ### Qualitätsindikatoren
 
 **Confidence Score:**
+
 - 0.9-1.0: Sehr hohe Qualität ✅
 - 0.7-0.9: Gute Qualität ✅
 - 0.5-0.7: Akzeptabel ⚠️
 - <0.5: Überprüfung empfohlen ❌
 
 **Quellenangaben:**
+
 - Jede Frage zeigt verwendete Dokumente
 - Klicken Sie auf Quelle für Details
 - Überprüfen Sie Relevanz
@@ -334,8 +363,6 @@ Jede Frage enthält:
 ---
 
 ## 💬 Dokument ChatBot nutzen
-
-### Übersicht
 
 Der ChatBot ermöglicht interaktive Gespräche mit Ihren hochgeladenen Dokumenten - ähnlich wie NotebookLM.
 
@@ -354,12 +381,14 @@ Klicken Sie auf "Dokument ChatBot" in der Navigation.
 ### Chat starten
 
 **Beispiel-Fragen:**
+
 - "Erkläre mir den Heapsort Algorithmus"
 - "Was sind die Unterschiede zwischen Quicksort und Mergesort?"
 - "Welche Komplexität hat Dijkstra's Algorithmus?"
 - "Fasse Kapitel 3 zusammen"
 
 **Tipps für gute Fragen:**
+
 - ✅ Spezifisch und klar formuliert
 - ✅ Bezug auf Dokumentinhalt
 - ✅ Folge-Fragen möglich
@@ -369,11 +398,13 @@ Klicken Sie auf "Dokument ChatBot" in der Navigation.
 ### Antworten verstehen
 
 **Jede Antwort enthält:**
+
 - **Haupttext** - KI-generierte Antwort
 - **Quellen** - Relevante Textabschnitte
 - **Confidence** - Zuverlässigkeit (0-1)
 
 **Confidence-Interpretation:**
+
 - `>0.8`: Sehr zuverlässig
 - `0.6-0.8`: Zuverlässig
 - `<0.6`: Mit Vorsicht verwenden
@@ -381,11 +412,13 @@ Klicken Sie auf "Dokument ChatBot" in der Navigation.
 ### Chat-Historie
 
 **Funktionen:**
+
 - Alle Nachrichten werden gespeichert
 - Scrollen Sie nach oben für ältere Nachrichten
 - Kontext bleibt erhalten (Multi-Turn)
 
 **Neue Konversation:**
+
 - Wählen Sie ein anderes Dokument
 - Chat-Historie wird zurückgesetzt
 
@@ -399,22 +432,23 @@ Klicken Sie auf "Dokument ChatBot" in der Navigation.
 
 ## 🎛️ Prompt Management
 
-### Übersicht
-
 Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompts ohne Code-Änderungen.
 
 **Zugriff:**
+
 - Tab "Prompt Management" in der Navigation
 - Nur für Administratoren sichtbar
 
 ### Prompt Library
 
 **Ansicht:**
+
 - Grid-Layout mit allen Prompts
 - Suchfunktion
 - Kategorie-Filter
 
 **Angezeigte Informationen:**
+
 - Prompt-Name
 - Beschreibung
 - Kategorie (System/User/Template)
@@ -425,6 +459,7 @@ Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompt
 - Verwendungen
 
 **Aktionen:**
+
 - **Bearbeiten** - Prompt editieren
 - **Versionen** - Version History anzeigen
 - **Löschen** - Prompt entfernen
@@ -432,11 +467,13 @@ Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompt
 ### Prompt Editor
 
 **Neuen Prompt erstellen:**
+
 1. Klicken Sie "Neuer Prompt"
 2. Füllen Sie Formular aus
 3. Speichern
 
 **Formularfelder:**
+
 - **Name** - Eindeutiger Identifier (z.B. `system_prompt_question_generation`)
 - **Beschreibung** - Kurze Erklärung
 - **Kategorie** - System Prompt / User Prompt / Few-Shot Example / Template
@@ -446,10 +483,12 @@ Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompt
 - **Aktiv** - Sofort aktivieren?
 
 **Tabs:**
+
 - **Bearbeiten** - Markdown-Editor
 - **Vorschau** - Gerenderte Ansicht
 
 **Template-Variablen:**
+
 - Syntax: `{variable_name}`
 - Beispiel: `Generiere {count} Fragen zum Thema {topic}`
 - Werden zur Laufzeit ersetzt
@@ -457,17 +496,20 @@ Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompt
 ### Version History
 
 **Funktionen:**
+
 - Alle Versionen eines Prompts anzeigen
 - Vergleich zwischen Versionen
 - Rollback zu alter Version
 - Aktivierung/Deaktivierung
 
 **Versionierung:**
+
 - Automatische Versionsnummern (v1, v2, v3...)
 - Nur eine Version kann aktiv sein
 - Alte Versionen bleiben erhalten
 
 **Rollback:**
+
 1. Öffnen Sie Version History
 2. Wählen Sie gewünschte Version
 3. Klicken Sie "Aktivieren"
@@ -476,12 +518,14 @@ Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompt
 ### Usage Analytics
 
 **Metriken:**
+
 - **Verwendungen** - Anzahl Aufrufe
 - **Erfolgsrate** - % erfolgreiche Generierungen
 - **Ø Latenz** - Durchschnittliche Antwortzeit
 - **Tokens Total** - Gesamtverbrauch
 
 **Verwendungsverlauf:**
+
 - Letzte 100 Verwendungen
 - Timestamp
 - Use Case
@@ -492,18 +536,21 @@ Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompt
 ### Semantic Search
 
 **Prompt-Suche:**
+
 1. Wechseln Sie zu "Semantic Search" Tab
 2. Geben Sie Suchanfrage ein
 3. Optional: Filter setzen
 4. Klicken Sie "Suchen"
 
 **Filter:**
+
 - Kategorie
 - Use Case
 - Anzahl Ergebnisse (1-20)
 - Similarity Threshold (0-1)
 
 **Ergebnisse:**
+
 - Sortiert nach Relevanz
 - Similarity Score angezeigt
 - Klicken für Details
@@ -515,12 +562,14 @@ Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompt
 ### Dokumenten-Upload
 
 **Optimale Vorbereitung:**
+
 1. Strukturieren Sie Dokumente mit klaren Überschriften
 2. Verwenden Sie konsistente Formatierung
 3. Fügen Sie Metadaten hinzu (Titel, Autor, Datum)
 4. Vermeiden Sie Wasserzeichen und Hintergrundbilder
 
 **Batch-Upload:**
+
 - Laden Sie zusammengehörige Dokumente gemeinsam hoch
 - Beispiel: Alle Kapitel eines Lehrbuchs
 - Erleichtert spätere RAG-Prüfungen
@@ -528,17 +577,20 @@ Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompt
 ### Fragenerstellung
 
 **Themenformulierung:**
+
 - Spezifisch statt allgemein
 - Kontext angeben
 - Bloom-Level im Hinterkopf behalten
 
 **Beispiele:**
+
 - ✅ "Python Listen - Methoden append(), extend(), insert()"
 - ✅ "Algorithmen - Zeitkomplexität von Sortierverfahren"
 - ❌ "Python" (zu breit)
 - ❌ "Programmierung" (zu allgemein)
 
 **Qualitätskontrolle:**
+
 - Überprüfen Sie generierte Fragen
 - Achten Sie auf Confidence Scores
 - Passen Sie Schwierigkeitsgrad an
@@ -547,11 +599,13 @@ Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompt
 ### RAG-Prüfungen
 
 **Dokumentenauswahl:**
+
 - Wählen Sie relevante Dokumente
 - 3-5 Dokumente optimal
 - Zu viele Dokumente → niedrigere Qualität
 
 **Fokus setzen:**
+
 - Geben Sie spezifischen Fokus an
 - Hilft bei der Relevanz
 - Verbessert Confidence Scores
@@ -559,13 +613,15 @@ Das Prompt Management ermöglicht Administratoren die Verwaltung aller AI-Prompt
 ### ChatBot-Nutzung
 
 **Effektive Fragen:**
+
 - Beginnen Sie mit Überblicksfragen
 - Vertiefen Sie schrittweise
 - Nutzen Sie Folge-Fragen
 - Referenzieren Sie vorherige Antworten
 
 **Beispiel-Dialog:**
-```
+
+```text
 User: "Was ist Heapsort?"
 Bot: [Erklärt Heapsort]
 
@@ -584,6 +640,7 @@ Bot: [Analysiert Komplexität]
 
 **Q: Wie viele Dokumente kann ich hochladen?**
 A: Abhängig von Ihrem Plan:
+
 - Free: 5 Dokumente
 - Starter: 50 Dokumente
 - Professional: Unbegrenzt
@@ -608,7 +665,8 @@ A: Nein, ExamCraft AI benötigt Internetverbindung für AI-Funktionen.
 ### Fehlerbehebung
 
 **Q: Upload schlägt fehl - was tun?**
-A: 
+A:
+
 1. Prüfen Sie Dateigröße (<50 MB)
 2. Prüfen Sie Format (PDF, DOC, MD, TXT)
 3. Versuchen Sie es erneut
@@ -616,6 +674,7 @@ A:
 
 **Q: Fragen sind von schlechter Qualität?**
 A:
+
 1. Überprüfen Sie Themenformulierung
 2. Wählen Sie passenden Schwierigkeitsgrad
 3. Bei RAG: Prüfen Sie Dokumentenauswahl
@@ -623,6 +682,7 @@ A:
 
 **Q: ChatBot antwortet nicht korrekt?**
 A:
+
 1. Formulieren Sie Frage spezifischer
 2. Prüfen Sie, ob Thema im Dokument enthalten
 3. Wählen Sie anderes Dokument
@@ -637,6 +697,7 @@ A:
 **Symptom**: "Upload fehlgeschlagen"
 
 **Lösungen:**
+
 1. Prüfen Sie Internetverbindung
 2. Reduzieren Sie Dateigröße
 3. Konvertieren Sie Format
@@ -648,6 +709,7 @@ A:
 **Symptom**: "Fehler bei der Generierung"
 
 **Lösungen:**
+
 1. Warten Sie 30 Sekunden und versuchen Sie erneut
 2. Reduzieren Sie Anzahl Fragen
 3. Vereinfachen Sie Thema
@@ -658,6 +720,7 @@ A:
 **Symptom**: Langsame Ladezeiten
 
 **Lösungen:**
+
 1. Schließen Sie andere Browser-Tabs
 2. Leeren Sie Browser-Cache
 3. Aktualisieren Sie Browser
@@ -668,6 +731,7 @@ A:
 **Symptom**: Elemente werden nicht korrekt angezeigt
 
 **Lösungen:**
+
 1. Aktualisieren Sie Seite (F5)
 2. Leeren Sie Cache (Strg+Shift+R)
 3. Prüfen Sie Browser-Version
@@ -678,15 +742,18 @@ A:
 ## 📞 Support & Kontakt
 
 **Technischer Support:**
+
 - Email: support@examcraft.ai
 - Response Time: <24h (Werktage)
 
 **Dokumentation:**
+
 - [Vollständige Docs](https://docs.examcraft.ai)
 - [API Reference](https://api.examcraft.ai/docs)
 - [Video Tutorials](https://youtube.com/examcraft)
 
 **Community:**
+
 - [Discord Server](https://discord.gg/examcraft)
 - [GitHub Discussions](https://github.com/examcraft/discussions)
 
@@ -695,4 +762,3 @@ A:
 **Letzte Aktualisierung**: Oktober 2025  
 **Version**: 1.0.0  
 **Lizenz**: MIT License
-
