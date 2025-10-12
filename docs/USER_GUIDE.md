@@ -744,7 +744,7 @@ A:
 
 **Technischer Support:**
 
-- Email: support@examcraft.ai
+- Email: <support@examcraft.ai>
 - Response Time: <24h (Werktage)
 
 **Dokumentation:**

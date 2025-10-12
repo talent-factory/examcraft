@@ -58,13 +58,16 @@ docker-compose up --build -d
 ## Restart-Modi
 
 **Standard Restart**:
+
 - `docker-compose down && docker-compose up -d`
 
 **Full Rebuild**:
+
 - Wenn Code-Änderungen vorhanden sind
 - `docker-compose down && docker-compose up --build -d`
 
 **Clean Restart**:
+
 - Bei persistenten Problemen
 - Entfernt Volumes und Images (mit Bestätigung!)
 - `docker-compose down -v && docker system prune -f`
@@ -72,6 +75,7 @@ docker-compose up --build -d
 ## Environment Checks
 
 Vor dem Restart prüfen:
+
 - `.env` Datei vorhanden und konfiguriert
 - Docker läuft und hat genug Ressourcen
 - Ports 3000, 8000, 5432, 6379 sind frei
@@ -80,6 +84,7 @@ Vor dem Restart prüfen:
 ## Troubleshooting during Restart
 
 **Häufige Probleme**:
+
 - Port already in use → Force kill Prozesse
 - Volume permissions → `docker volume rm` problematischer Volumes
 - Out of disk space → `docker system prune -a`
@@ -125,6 +130,7 @@ Total restart time: 24 seconds
 ## Interaktive Optionen
 
 Frage bei kritischen Aktionen nach:
+
 - "Clean restart mit Volume-Löschung? (y/n)"
 - "Force rebuild aller Images? (y/n)"
 - "System cleanup vor Restart? (y/n)"

@@ -23,11 +23,12 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
 
 ## Schritt 1: PostgreSQL Database erstellen
 
-### Im Render Dashboard:
+### Im Render Dashboard
 
 1. Klicke **"New +"** → **"PostgreSQL"**
 
 2. Konfiguration:
+
    ```
    Name: examcraft-postgres
    Database: examcraft
@@ -49,7 +50,7 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
 
 ## Schritt 2: Backend Service erstellen
 
-### Im Render Dashboard:
+### Im Render Dashboard
 
 1. Klicke **"New +"** → **"Web Service"**
 
@@ -58,6 +59,7 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
    - Repository: `examcraft` (oder dein Fork)
 
 3. **Service Konfiguration:**
+
    ```
    Name: examcraft-backend
    Region: Frankfurt
@@ -67,6 +69,7 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
    ```
 
 4. **Build & Start Commands:**
+
    ```bash
    Build Command:
    cd backend && pip install -r requirements.txt
@@ -84,6 +87,7 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
    Klicke "Advanced" → "Add Environment Variable"
 
    **Erforderlich:**
+
    ```bash
    # Database (aus Schritt 1)
    DATABASE_URL=postgresql://examcraft_user:password@host/examcraft
@@ -105,6 +109,7 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
    ```
 
 7. **Health Check Path:**
+
    ```
    /api/v1/health
    ```
@@ -117,7 +122,7 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
 
 ## Schritt 3: Frontend Service erstellen
 
-### Im Render Dashboard:
+### Im Render Dashboard
 
 1. Klicke **"New +"** → **"Static Site"**
 
@@ -125,6 +130,7 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
    - Wähle dasselbe Repository wie Backend
 
 3. **Service Konfiguration:**
+
    ```
    Name: examcraft-frontend
    Branch: feature/tf-108-render-deployment
@@ -132,6 +138,7 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
    ```
 
 4. **Build Settings:**
+
    ```bash
    Build Command:
    cd frontend && npm install && npm run build
@@ -141,6 +148,7 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
    ```
 
 5. **Environment Variables:**
+
    ```bash
    NODE_VERSION=18.18.0
    
@@ -161,10 +169,11 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
 ### Option A: Qdrant Cloud (Empfohlen)
 
 1. **Qdrant Cloud Account:**
-   - Gehe zu https://cloud.qdrant.io
+   - Gehe zu <https://cloud.qdrant.io>
    - Registriere dich (kostenlos)
 
 2. **Cluster erstellen:**
+
    ```
    Name: examcraft-production
    Region: EU-Central (Frankfurt)
@@ -172,14 +181,16 @@ Diese Anleitung zeigt, wie Sie ExamCraft AI **manuell** auf Render.com deployen,
    ```
 
 3. **Credentials kopieren:**
+
    ```
    Cluster URL: https://abc-xyz.qdrant.io:6333
    API Key: qdr_xxxxxxxxxxxxxxxx
    ```
 
 4. **Backend Environment Variables aktualisieren:**
-   
+
    Gehe zu Backend Service → Environment Tab:
+
    ```bash
    QDRANT_URL=https://abc-xyz.qdrant.io:6333
    QDRANT_API_KEY=qdr_xxxxxxxxxxxxxxxx
@@ -203,11 +214,12 @@ VECTOR_SERVICE_TYPE=mock
 
 ## Schritt 5: Redis Cache (Optional)
 
-### Im Render Dashboard:
+### Im Render Dashboard
 
 1. Klicke **"New +"** → **"Redis"**
 
 2. Konfiguration:
+
    ```
    Name: examcraft-redis
    Region: Frankfurt
@@ -222,6 +234,7 @@ VECTOR_SERVICE_TYPE=mock
    - Kopiere "Internal Redis URL"
 
 5. **Backend Environment Variable aktualisieren:**
+
    ```bash
    REDIS_URL=redis://red-xxxxx:6379
    ```
@@ -237,6 +250,7 @@ curl https://examcraft-backend.onrender.com/api/v1/health
 ```
 
 **Erwartete Antwort:**
+
 ```json
 {
   "status": "healthy",
@@ -271,6 +285,7 @@ https://examcraft-backend.onrender.com/docs
 **Problem:** `pip install` Fehler
 
 **Lösung:**
+
 ```bash
 # Prüfe Build Logs im Dashboard
 # Häufige Ursachen:
@@ -285,6 +300,7 @@ https://examcraft-backend.onrender.com/docs
 **Problem:** Service crashed nach Start
 
 **Lösung:**
+
 ```bash
 # Prüfe Logs:
 # - Fehlende DATABASE_URL?
@@ -300,6 +316,7 @@ VECTOR_SERVICE_TYPE=mock
 **Problem:** CORS oder Connection Refused
 
 **Lösung:**
+
 ```bash
 # Prüfe REACT_APP_API_URL:
 # Muss HTTPS sein: https://examcraft-backend.onrender.com
@@ -314,6 +331,7 @@ CORS_ORIGINS=*
 **Problem:** Backend kann nicht zu PostgreSQL verbinden
 
 **Lösung:**
+
 ```bash
 # Prüfe DATABASE_URL Format:
 # Muss "Internal Database URL" sein
@@ -365,4 +383,3 @@ Health:       https://examcraft-backend.onrender.com/api/v1/health
 **Geschätzte Setup-Zeit:** 20-30 Minuten
 **Schwierigkeit:** Mittel
 **Empfohlen für:** Production Deployments
-

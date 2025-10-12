@@ -1,24 +1,25 @@
 # 🎛️ Admin Guide: Prompt Knowledge Base Management
 
-> **Vollständige Anleitung für Administratoren zur Verwaltung der AI-Prompts in ExamCraft AI**
+> **Vollständige Anleitung für Administratoren zur Verwaltung der**
+> **AI-Prompts in ExamCraft AI**
 
-**Version**: 1.0.0  
-**Stand**: Oktober 2025  
+**Version**: 1.0.0
+**Stand**: Oktober 2025
 **Zielgruppe**: System-Administratoren, Prompt Engineers
 
 ---
 
 ## 📖 Inhaltsverzeichnis
 
-1. [Übersicht](#übersicht)
-2. [Architektur](#architektur)
-3. [Prompt Library](#prompt-library)
-4. [Prompt Editor](#prompt-editor)
-5. [Version Control](#version-control)
-6. [Usage Analytics](#usage-analytics)
-7. [Semantic Search](#semantic-search)
-8. [Best Practices](#best-practices)
-9. [Troubleshooting](#troubleshooting)
+1. [Übersicht](#-übersicht)
+2. [Architektur](#️-architektur)
+3. [Prompt Library](#-prompt-library)
+4. [Prompt Editor](#️-prompt-editor)
+5. [Version Control](#-version-control)
+6. [Usage Analytics](#-usage-analytics)
+7. [Semantic Search](#-semantic-search)
+8. [Best Practices](#-best-practices)
+9. [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -26,7 +27,8 @@
 
 ### Was ist das Prompt Management System?
 
-Das Prompt Management System ermöglicht die **zentrale Verwaltung aller AI-Prompts** ohne Code-Änderungen. Es bietet:
+Das Prompt Management System ermöglicht die **zentrale Verwaltung aller
+AI-Prompts** ohne Code-Änderungen. Es bietet:
 
 - ✅ **Versionierung** - Alle Änderungen werden getrackt
 - ✅ **Rollback** - Zurück zu früheren Versionen
@@ -38,6 +40,7 @@ Das Prompt Management System ermöglicht die **zentrale Verwaltung aller AI-Prom
 ### Warum Prompt Management?
 
 **Vorteile:**
+
 - 🚀 **Schnellere Iteration** - Teste neue Prompts ohne Deployment
 - 📊 **Datengetrieben** - Entscheide basierend auf Metriken
 - 🔄 **Sicherheit** - Rollback bei Problemen
@@ -56,7 +59,7 @@ Das Prompt Management System ermöglicht die **zentrale Verwaltung aller AI-Prom
 
 ### System-Komponenten
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │  React Frontend (Material-UI)                       │
 │  ├─ Prompt Library                                  │
@@ -82,6 +85,7 @@ Das Prompt Management System ermöglicht die **zentrale Verwaltung aller AI-Prom
 ### Datenmodell
 
 **Tabelle: `prompts`**
+
 ```sql
 - id (UUID, PK)
 - name (VARCHAR, UNIQUE)
@@ -98,6 +102,7 @@ Das Prompt Management System ermöglicht die **zentrale Verwaltung aller AI-Prom
 ```
 
 **Tabelle: `prompt_usage_logs`**
+
 ```sql
 - id (UUID, PK)
 - prompt_id (UUID, FK)
@@ -133,6 +138,7 @@ Das Prompt Management System ermöglicht die **zentrale Verwaltung aller AI-Prom
 Die Prompt Library zeigt alle verfügbaren Prompts in einem Grid-Layout.
 
 **Features:**
+
 - 🔍 **Suche** - Durchsuche Name, Beschreibung, Tags
 - 🏷️ **Filter** - Nach Kategorie filtern
 - 📊 **Sortierung** - Nach Name, Datum, Verwendungen
@@ -141,21 +147,25 @@ Die Prompt Library zeigt alle verfügbaren Prompts in einem Grid-Layout.
 ### Kategorien
 
 **System Prompt** (Blau)
+
 - Grundlegende Instruktionen für AI
 - Definiert Verhalten und Rolle
 - Beispiel: "Du bist ein Experte für Prüfungsfragen..."
 
 **User Prompt** (Grün)
+
 - Spezifische Aufgaben für AI
 - Enthält konkrete Anweisungen
 - Beispiel: "Generiere 5 Multiple Choice Fragen zu {topic}"
 
 **Few-Shot Example** (Orange)
+
 - Beispiele für gewünschtes Output-Format
 - Hilft AI, Struktur zu verstehen
 - Beispiel: Beispiel-Frage mit Antworten
 
 **Template** (Lila)
+
 - Wiederverwendbare Prompt-Vorlagen
 - Enthält Variablen {variable}
 - Beispiel: "Erstelle {count} Fragen zum Thema {topic}"
@@ -163,16 +173,19 @@ Die Prompt Library zeigt alle verfügbaren Prompts in einem Grid-Layout.
 ### Aktionen
 
 **Bearbeiten** (✏️)
+
 - Öffnet Prompt Editor
 - Lädt aktuelle Version
 - Ermöglicht Änderungen
 
 **Versionen** (🕐)
+
 - Zeigt Version History
 - Ermöglicht Rollback
 - Vergleicht Versionen
 
 **Löschen** (🗑️)
+
 - Entfernt Prompt permanent
 - Sicherheitsabfrage erforderlich
 - **Achtung**: Kann nicht rückgängig gemacht werden!
@@ -180,11 +193,13 @@ Die Prompt Library zeigt alle verfügbaren Prompts in einem Grid-Layout.
 ### Suche & Filter
 
 **Suchfunktion:**
+
 - Echtzeit-Filterung
 - Durchsucht: Name, Beschreibung, Tags
 - Case-insensitive
 
 **Kategorie-Filter:**
+
 - Alle Kategorien
 - System Prompts
 - User Prompts
@@ -197,36 +212,42 @@ Die Prompt Library zeigt alle verfügbaren Prompts in einem Grid-Layout.
 
 ### Neuen Prompt erstellen
 
-**Schritt 1: Grundinformationen**
+#### Schritt 1: Grundinformationen
 
 **Name:**
+
 - Format: `snake_case`
 - Eindeutig im System
 - Beispiel: `system_prompt_question_generation`
 
 **Beschreibung:**
+
 - Kurze Erklärung (1-2 Sätze)
 - Zweck und Verwendung
 - Beispiel: "Generiert Multiple Choice Fragen aus Dokumenten"
 
-**Schritt 2: Kategorisierung**
+#### Schritt 2: Kategorisierung
 
 **Kategorie:**
+
 - Wähle passende Kategorie
 - Beeinflusst Verwendung im System
 
 **Use Case:**
+
 - Spezifischer Anwendungsfall
 - Beispiele: `question_generation`, `chatbot`, `evaluation`
 
 **Tags:**
+
 - Schlagwörter für Suche
 - Mehrere Tags möglich
 - Beispiele: `education`, `multiple-choice`, `bloom-taxonomy`
 
-**Schritt 3: Content erstellen**
+#### Schritt 3: Content erstellen
 
 **Editor-Tabs:**
+
 - **Bearbeiten** - Markdown-Editor
 - **Vorschau** - Gerenderte Ansicht
 
@@ -235,6 +256,7 @@ Die Prompt Library zeigt alle verfügbaren Prompts in einem Grid-Layout.
 Syntax: `{variable_name}`
 
 Beispiel:
+
 ```markdown
 Du bist ein Experte für {subject}.
 
@@ -247,6 +269,7 @@ Anforderungen:
 ```
 
 **Verfügbare Variablen:**
+
 - `{topic}` - Thema der Fragen
 - `{count}` - Anzahl Fragen
 - `{difficulty}` - Schwierigkeitsgrad
@@ -255,29 +278,34 @@ Anforderungen:
 - `{context}` - RAG-Kontext
 - `{bloom_level}` - Bloom-Taxonomie Level
 
-**Schritt 4: Aktivierung**
+#### Schritt 4: Aktivierung
 
 **Aktiv-Toggle:**
+
 - ☑️ **Aktiv** - Prompt wird sofort verwendet
 - ☐ **Inaktiv** - Prompt ist gespeichert, aber nicht aktiv
 
 **Empfehlung:**
+
 - Teste neue Prompts zuerst inaktiv
 - Aktiviere nach erfolgreichen Tests
 
 ### Bestehenden Prompt bearbeiten
 
 **Änderungen vornehmen:**
+
 1. Öffne Prompt in Editor
 2. Nehme Änderungen vor
 3. Speichere
 
 **Versionierung:**
+
 - Jede Speicherung erstellt neue Version
 - Alte Versionen bleiben erhalten
 - Nur neueste Version ist aktiv
 
 **Best Practice:**
+
 - Beschreibe Änderungen in Commit-Message
 - Teste vor Aktivierung
 - Überwache Usage Analytics nach Änderung
@@ -289,10 +317,12 @@ Anforderungen:
 ### Version History anzeigen
 
 **Zugriff:**
+
 - Klicke "Versionen" in Prompt Library
 - Oder: "Versionen anzeigen" in Editor
 
 **Anzeige:**
+
 - Tabelle mit allen Versionen
 - Sortiert nach Version (neueste zuerst)
 - Zeigt: Version, Status, Beschreibung, Datum
@@ -300,6 +330,7 @@ Anforderungen:
 ### Versionen vergleichen
 
 **Vorschau:**
+
 1. Klicke "Vorschau" bei gewünschter Version
 2. Dialog zeigt:
    - Beschreibung
@@ -308,18 +339,21 @@ Anforderungen:
    - Metadaten
 
 **Vergleich:**
+
 - Aktuell: Manueller Vergleich
 - Geplant (v1.1): Diff-Ansicht
 
 ### Rollback durchführen
 
 **Wann Rollback?**
+
 - Neue Version funktioniert nicht
 - Performance-Probleme
 - Qualitätsverschlechterung
 - Fehlerhafte Generierungen
 
 **Vorgehensweise:**
+
 1. Öffne Version History
 2. Finde gewünschte Version
 3. Klicke "Aktivieren"
@@ -327,6 +361,7 @@ Anforderungen:
 5. Alte Version wird aktiv
 
 **Wichtig:**
+
 - Nur eine Version kann aktiv sein
 - Rollback erstellt keine neue Version
 - Alte Version wird reaktiviert
@@ -334,16 +369,19 @@ Anforderungen:
 ### Versionsmanagement Best Practices
 
 **Naming Convention:**
+
 - v1.0 - Initial Release
 - v1.1 - Minor Update
 - v2.0 - Major Rewrite
 
 **Beschreibungen:**
+
 - Kurz und prägnant
 - Was wurde geändert?
 - Warum wurde geändert?
 
 **Testing:**
+
 - Teste neue Versionen vor Aktivierung
 - Überwache Metriken nach Rollout
 - Halte Rollback-Plan bereit
@@ -356,22 +394,26 @@ Anforderungen:
 
 **4 Haupt-Metriken:**
 
-**1. Verwendungen**
+#### 1. Verwendungen
+
 - Anzahl Aufrufe des Prompts
 - Zeigt Popularität
 - Hilft bei Priorisierung
 
-**2. Erfolgsrate**
+#### 2. Erfolgsrate
+
 - % erfolgreiche Generierungen
 - Indikator für Qualität
 - Ziel: >95%
 
-**3. Ø Latenz**
+#### 3. Ø Latenz
+
 - Durchschnittliche Antwortzeit in ms
 - Performance-Indikator
 - Ziel: <2000ms
 
-**4. Tokens Total**
+#### 4. Tokens Total
+
 - Gesamtverbrauch an Tokens
 - Kosten-Indikator
 - Optimierungspotential
@@ -379,6 +421,7 @@ Anforderungen:
 ### Verwendungsverlauf
 
 **Tabelle zeigt:**
+
 - Timestamp
 - Use Case
 - Tokens verwendet
@@ -386,24 +429,28 @@ Anforderungen:
 - Erfolg/Fehler
 
 **Filterung:**
+
 - Letzte 100 Verwendungen
 - Sortiert nach Datum (neueste zuerst)
 
 ### Interpretation
 
 **Erfolgsrate:**
+
 - >95%: Sehr gut ✅
 - 90-95%: Gut ✅
 - 80-90%: Akzeptabel ⚠️
 - <80%: Optimierung nötig ❌
 
 **Latenz:**
+
 - <1000ms: Sehr schnell ✅
 - 1000-2000ms: Schnell ✅
 - 2000-5000ms: Akzeptabel ⚠️
 - >5000ms: Zu langsam ❌
 
 **Token-Verbrauch:**
+
 - Vergleiche mit ähnlichen Prompts
 - Identifiziere Optimierungspotential
 - Reduziere unnötige Tokens
@@ -411,18 +458,21 @@ Anforderungen:
 ### Optimierung basierend auf Analytics
 
 **Niedrige Erfolgsrate:**
+
 1. Überprüfe Prompt-Formulierung
 2. Füge mehr Kontext hinzu
 3. Verbessere Beispiele
 4. Teste mit verschiedenen Inputs
 
 **Hohe Latenz:**
+
 1. Reduziere Prompt-Länge
 2. Entferne unnötige Instruktionen
 3. Optimiere Template-Variablen
 4. Prüfe API-Performance
 
 **Hoher Token-Verbrauch:**
+
 1. Kürze Prompt-Text
 2. Entferne Redundanzen
 3. Nutze effizientere Formulierungen
@@ -432,11 +482,13 @@ Anforderungen:
 
 ## 🔍 Semantic Search
 
-### Übersicht
+### Funktionsweise
 
-Semantic Search findet Prompts basierend auf **Bedeutung**, nicht nur Keywords.
+Semantic Search findet Prompts basierend auf **Bedeutung**, nicht nur
+Keywords.
 
 **Technologie:**
+
 - OpenAI Embeddings (text-embedding-3-small)
 - Qdrant Vector Database
 - Cosine Similarity
@@ -444,27 +496,32 @@ Semantic Search findet Prompts basierend auf **Bedeutung**, nicht nur Keywords.
 ### Suchparameter
 
 **Query:**
+
 - Natürlichsprachige Suchanfrage
 - Beispiel: "Generiere Multiple Choice Fragen für Informatik"
 
 **Filter:**
+
 - **Kategorie** - Einschränkung auf Kategorie
 - **Use Case** - Spezifischer Anwendungsfall
 - **Tags** - Schlagwörter
 
 **Advanced:**
+
 - **Limit** - Anzahl Ergebnisse (1-20)
 - **Score Threshold** - Minimum Similarity (0-1)
 
 ### Ergebnisse interpretieren
 
 **Similarity Score:**
+
 - 0.9-1.0: Sehr relevant ✅
 - 0.7-0.9: Relevant ✅
 - 0.5-0.7: Teilweise relevant ⚠️
 - <0.5: Wenig relevant ❌
 
 **Farbcodierung:**
+
 - Grün: >0.9
 - Blau: 0.7-0.9
 - Orange: 0.5-0.7
@@ -472,17 +529,20 @@ Semantic Search findet Prompts basierend auf **Bedeutung**, nicht nur Keywords.
 
 ### Anwendungsfälle
 
-**1. Ähnliche Prompts finden**
+#### 1. Ähnliche Prompts finden
+
 - Suche: "Fragen zu Algorithmen"
 - Finde alle relevanten Prompts
 - Vergleiche Ansätze
 
-**2. Duplikate identifizieren**
+#### 2. Duplikate identifizieren
+
 - Suche nach Prompt-Namen
 - Finde ähnliche Prompts
 - Konsolidiere wenn nötig
 
-**3. Best Practices entdecken**
+#### 3. Best Practices entdecken
+
 - Suche nach Use Case
 - Finde erfolgreiche Prompts
 - Lerne von Beispielen
@@ -494,6 +554,7 @@ Semantic Search findet Prompts basierend auf **Bedeutung**, nicht nur Keywords.
 ### Prompt-Erstellung
 
 **Struktur:**
+
 ```markdown
 # Rolle
 Du bist ein [Experte/Assistent] für [Bereich].
@@ -514,6 +575,7 @@ Du bist ein [Experte/Assistent] für [Bereich].
 ```
 
 **Dos:**
+
 - ✅ Klare, präzise Instruktionen
 - ✅ Konkrete Beispiele
 - ✅ Strukturierte Formatierung
@@ -521,6 +583,7 @@ Du bist ein [Experte/Assistent] für [Bereich].
 - ✅ Testen vor Aktivierung
 
 **Don'ts:**
+
 - ❌ Vage Formulierungen
 - ❌ Zu lange Prompts (>2000 Tokens)
 - ❌ Widersprüchliche Anweisungen
@@ -530,12 +593,14 @@ Du bist ein [Experte/Assistent] für [Bereich].
 ### Versionierung
 
 **Semantic Versioning:**
+
 - v1.0.0 - Major.Minor.Patch
 - Major: Breaking Changes
 - Minor: Neue Features
 - Patch: Bugfixes
 
 **Changelog:**
+
 - Dokumentiere alle Änderungen
 - Nutze Beschreibungsfeld
 - Referenziere Issues/Tickets
@@ -543,6 +608,7 @@ Du bist ein [Experte/Assistent] für [Bereich].
 ### Testing
 
 **Test-Prozess:**
+
 1. Erstelle Prompt (inaktiv)
 2. Teste mit verschiedenen Inputs
 3. Überprüfe Outputs
@@ -550,6 +616,7 @@ Du bist ein [Experte/Assistent] für [Bereich].
 5. Aktiviere wenn erfolgreich
 
 **Test-Szenarien:**
+
 - Normale Inputs
 - Edge Cases
 - Fehlerhafte Inputs
@@ -559,11 +626,13 @@ Du bist ein [Experte/Assistent] für [Bereich].
 ### Monitoring
 
 **Regelmäßige Checks:**
+
 - Wöchentlich: Usage Analytics
 - Monatlich: Erfolgsraten
 - Quartalsweise: Optimierungspotential
 
 **Alerts:**
+
 - Erfolgsrate <90%
 - Latenz >3000ms
 - Ungewöhnlich hoher Token-Verbrauch
@@ -574,33 +643,37 @@ Du bist ein [Experte/Assistent] für [Bereich].
 
 ### Häufige Probleme
 
-**Problem: Prompt wird nicht verwendet**
+#### Problem: Prompt wird nicht verwendet
 
 Lösungen:
+
 1. Prüfe ob Prompt aktiv ist
 2. Prüfe Use Case Zuordnung
 3. Prüfe ob neueste Version aktiv
 4. Restart Backend-Service
 
-**Problem: Niedrige Erfolgsrate**
+#### Problem: Niedrige Erfolgsrate
 
 Lösungen:
+
 1. Überprüfe Prompt-Formulierung
 2. Füge mehr Kontext hinzu
 3. Teste mit verschiedenen Inputs
 4. Vergleiche mit erfolgreichen Prompts
 
-**Problem: Hohe Latenz**
+#### Problem: Hohe Latenz
 
 Lösungen:
+
 1. Reduziere Prompt-Länge
 2. Optimiere Template-Variablen
 3. Prüfe API-Performance
 4. Kontaktiere Support
 
-**Problem: Semantic Search findet nichts**
+#### Problem: Semantic Search findet nichts
 
 Lösungen:
+
 1. Reduziere Score Threshold
 2. Erweitere Suchanfrage
 3. Entferne Filter
@@ -609,11 +682,13 @@ Lösungen:
 ### Logs & Debugging
 
 **Backend Logs:**
+
 ```bash
 docker-compose logs -f backend | grep prompt
 ```
 
 **Database Queries:**
+
 ```sql
 -- Alle aktiven Prompts
 SELECT * FROM prompts WHERE is_active = true;
@@ -629,6 +704,7 @@ GROUP BY prompt_id;
 ```
 
 **Vector Search Status:**
+
 ```bash
 # Qdrant Collection Info
 curl http://localhost:6333/collections/prompts_knowledge_base
@@ -639,16 +715,17 @@ curl http://localhost:6333/collections/prompts_knowledge_base
 ## 📞 Support
 
 **Technische Fragen:**
-- Email: admin@examcraft.ai
+
+- Email: <admin@examcraft.ai>
 - Slack: #prompt-management
 
 **Dokumentation:**
+
 - [API Docs](http://localhost:8000/docs)
 - [GitHub Wiki](https://github.com/examcraft/wiki)
 
 ---
 
-**Letzte Aktualisierung**: Oktober 2025  
-**Version**: 1.0.0  
+**Letzte Aktualisierung**: Oktober 2025
+**Version**: 1.0.0
 **Autor**: ExamCraft AI Team
-

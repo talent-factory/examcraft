@@ -3,6 +3,7 @@
 ## 🎯 Übersicht
 
 Dieser Ansatz deployed **alle Services in einem einzigen Docker Container**:
+
 - ✅ Backend (FastAPI)
 - ✅ Frontend (React)
 - ✅ PostgreSQL Database
@@ -10,9 +11,9 @@ Dieser Ansatz deployed **alle Services in einem einzigen Docker Container**:
 - ✅ Qdrant Vector Database
 - ✅ Nginx Reverse Proxy
 
-## 📊 Wann All-in-One verwenden?
+## 📊 Wann All-in-One verwenden
 
-### ✅ Gut für:
+### ✅ Gut für
 
 - Schnelles Deployment und Testing
 - Proof-of-Concept / Demo
@@ -20,7 +21,7 @@ Dieser Ansatz deployed **alle Services in einem einzigen Docker Container**:
 - Kostengünstiges Setup (nur 1 Service)
 - Einfache Wartung
 
-### ❌ Nicht ideal für:
+### ❌ Nicht ideal für
 
 - High-Traffic Production
 - Skalierbare Anwendungen
@@ -33,7 +34,7 @@ Dieser Ansatz deployed **alle Services in einem einzigen Docker Container**:
 
 #### Schritt 1: Neuen Web Service erstellen
 
-1. Gehe zu https://dashboard.render.com
+1. Gehe zu <https://dashboard.render.com>
 2. Klicke "New +" → "Web Service"
 3. Verbinde ExamCraft Repository
 
@@ -55,11 +56,13 @@ Plan: Starter ($7/month)
 #### Schritt 3: Environment Variables
 
 **Erforderlich:**
+
 ```bash
 CLAUDE_API_KEY=sk-ant-your_api_key_here
 ```
 
 **Optional (haben Defaults):**
+
 ```bash
 ENVIRONMENT=production
 VECTOR_SERVICE_TYPE=qdrant
@@ -92,7 +95,8 @@ Size: 1 GB
 
 ### Option 2: Via Render MCP Server
 
-Leider unterstützt der MCP Server aktuell keine Disk-Konfiguration, daher ist manuelles Setup empfohlen.
+Leider unterstützt der MCP Server aktuell keine Disk-Konfiguration,
+daher ist manuelles Setup empfohlen.
 
 ## 🔍 Service URLs
 
@@ -125,6 +129,7 @@ Der Container startet 5 Services via Supervisor:
 Health Check Endpoint: `/api/v1/health`
 
 Prüft:
+
 - ✅ Database Connection
 - ✅ Redis Connection
 - ✅ Qdrant Connection
@@ -134,14 +139,15 @@ Prüft:
 
 ### Via Render Dashboard
 
-```
+```text
 https://dashboard.render.com/web/[service-id]/logs
 ```
 
 ### Logs für einzelne Services
 
 Supervisor schreibt Logs nach:
-```
+
+```text
 /var/log/supervisor/postgresql.log
 /var/log/supervisor/redis.log
 /var/log/supervisor/qdrant.log
@@ -156,6 +162,7 @@ Supervisor schreibt Logs nach:
 **Problem**: Build schlägt fehl
 
 **Lösung**:
+
 ```bash
 # Lokal testen:
 docker build -f Dockerfile.allinone -t examcraft-allinone .
@@ -170,6 +177,7 @@ docker logs [container-id]
 **Problem**: Supervisor kann Services nicht starten
 
 **Lösung**:
+
 ```bash
 # In Container Shell gehen (via Render Dashboard):
 supervisorctl status
@@ -184,6 +192,7 @@ supervisorctl restart postgresql
 **Problem**: Nach Restart sind Daten weg
 
 **Lösung**:
+
 ```bash
 # Stelle sicher, dass Disks konfiguriert sind:
 # - /var/lib/postgresql/15/main (PostgreSQL)
@@ -198,6 +207,7 @@ df -h
 **Problem**: Container crashed mit OOM
 
 **Lösung**:
+
 ```bash
 # Upgrade zu größerem Plan:
 # Starter: 512MB RAM (zu wenig)
@@ -287,21 +297,22 @@ effective_cache_size = 256MB
 
 ## ✅ Empfehlung
 
-### Für schnelles Testing/Demo:
+### Für schnelles Testing/Demo
 
 → **All-in-One Container** (dieser Ansatz)
 
-### Für Production:
+### Für Production
 
 → **Multi-Service Setup** (siehe render-deployment.md)
 
-### Hybrid-Ansatz:
+### Hybrid-Ansatz
 
 → All-in-One für Backend+Frontend, managed DBs für PostgreSQL/Redis
 
 ## 🆘 Support
 
 Bei Problemen:
+
 1. Prüfe Render Dashboard Logs
 2. Teste lokal mit Docker
 3. Prüfe Supervisor Status

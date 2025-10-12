@@ -44,6 +44,7 @@
 **Ziel**: Endbenutzer befähigen, ExamCraft AI effektiv zu nutzen
 
 **Dokumente:**
+
 - **[USER_GUIDE.md](USER_GUIDE.md)** - Vollständiges Benutzerhandbuch
   - Erste Schritte
   - Dokumente hochladen & verwalten
@@ -62,6 +63,7 @@
 **Ziel**: Administratoren befähigen, das System zu konfigurieren und zu optimieren
 
 **Dokumente:**
+
 - **[ADMIN_PROMPT_MANAGEMENT.md](ADMIN_PROMPT_MANAGEMENT.md)** - Prompt Management Guide
   - Architektur & Datenmodell
   - Prompt Library Verwaltung
@@ -80,6 +82,7 @@
 **Ziel**: Stakeholder über Geschäftspotential und Strategie informieren
 
 **Dokumente:**
+
 - **[EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md)** - Executive Summary
   - Marktanalyse
   - Wettbewerbsvorteile
@@ -117,6 +120,7 @@
 **Ziel**: Entwickler befähigen, das System zu verstehen, zu erweitern und zu deployen
 
 **Dokumente:**
+
 - **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)** - Deployment Guide
   - Render.com Setup
   - Environment Variables
@@ -144,6 +148,7 @@
 **Ziel**: Screenshots und Diagramme für besseres Verständnis bereitstellen
 
 **Dokumente:**
+
 - **[SCREENSHOTS.md](SCREENSHOTS.md)** - Screenshot-Anleitung
   - 19 definierte Screenshots
   - Detaillierte Anweisungen
@@ -152,6 +157,7 @@
   - Integration in Docs
 
 **Verzeichnis:**
+
 - **[screenshots/](screenshots/)** - Screenshot-Sammlung
   - Hauptnavigation
   - KI-Prüfung erstellen
@@ -223,22 +229,27 @@
 ### Nach Thema
 
 **Erste Schritte:**
+
 - [USER_GUIDE.md - Erste Schritte](USER_GUIDE.md#erste-schritte)
 - [README.md - Quick Start](../README.md#quick-start)
 
 **Features:**
+
 - [FEATURES.md - Verfügbare Features](FEATURES.md#verfügbare-features)
 - [USER_GUIDE.md - Funktionsübersicht](USER_GUIDE.md#funktionsübersicht)
 
 **Deployment:**
+
 - [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)
 - [README.md - Docker Installation](../README.md#docker-installation)
 
 **Prompt Management:**
+
 - [ADMIN_PROMPT_MANAGEMENT.md](ADMIN_PROMPT_MANAGEMENT.md)
 - [USER_GUIDE.md - Prompt Management](USER_GUIDE.md#prompt-management)
 
 **Business:**
+
 - [EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md)
 - [MONETIZATION_STRATEGY.md](MONETIZATION_STRATEGY.md)
 - [ROADMAP.md](ROADMAP.md)
@@ -246,21 +257,25 @@
 ### Nach Rolle
 
 **Dozent/Lehrkraft:**
+
 1. [USER_GUIDE.md](USER_GUIDE.md) - Hauptdokumentation
 2. [FEATURES.md](FEATURES.md) - Feature-Übersicht
 3. [SCREENSHOTS.md](SCREENSHOTS.md) - Visuelle Anleitung
 
 **Administrator:**
+
 1. [ADMIN_PROMPT_MANAGEMENT.md](ADMIN_PROMPT_MANAGEMENT.md) - Prompt Management
 2. [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) - Deployment
 3. [QDRANT_MIGRATION.md](QDRANT_MIGRATION.md) - Vector DB Setup
 
 **Manager/Investor:**
+
 1. [EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md) - Business Overview
 2. [MONETIZATION_STRATEGY.md](MONETIZATION_STRATEGY.md) - Finanzmodell
 3. [ROADMAP.md](ROADMAP.md) - Produktvision
 
 **Entwickler:**
+
 1. [API Docs](http://localhost:8000/docs) - API Reference
 2. [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) - Deployment
 3. [README.md](../README.md) - Development Setup
@@ -272,6 +287,7 @@
 ### Dokumentations-Standards
 
 **Markdown-Konventionen:**
+
 - Überschriften: `#` für H1, `##` für H2, etc.
 - Listen: `-` für ungeordnet, `1.` für geordnet
 - Code: ` ``` ` für Code-Blöcke
@@ -279,6 +295,7 @@
 - Bilder: `![Alt](URL)`
 
 **Struktur:**
+
 - Inhaltsverzeichnis am Anfang
 - Klare Abschnitte mit Überschriften
 - Beispiele und Screenshots
@@ -286,6 +303,7 @@
 - Letzte Aktualisierung am Ende
 
 **Sprache:**
+
 - Deutsch für Benutzer-Docs
 - Englisch für technische Docs (optional)
 - Klare, präzise Formulierungen
@@ -315,14 +333,17 @@
 ## 📞 Support & Feedback
 
 **Dokumentations-Feedback:**
-- Email: docs@examcraft.ai
+
+- Email: <docs@examcraft.ai>
 - GitHub Issues: [Documentation](https://github.com/examcraft/issues?label=documentation)
 
 **Fragen zur Dokumentation:**
+
 - Slack: #documentation
 - Discord: #docs-help
 
 **Verbesserungsvorschläge:**
+
 - Pull Requests willkommen!
 - Issues für fehlende Dokumentation
 - Feedback zu Klarheit und Vollständigkeit
@@ -349,4 +370,3 @@ Vor jedem Release sicherstellen:
 **Letzte Aktualisierung**: Oktober 2025  
 **Version**: 1.0.0  
 **Maintainer**: ExamCraft AI Documentation Team
-
