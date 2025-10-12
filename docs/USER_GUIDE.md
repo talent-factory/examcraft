@@ -51,7 +51,7 @@ Die ExamCraft AI Oberfläche besteht aus 6 Hauptbereichen:
 ┌─────────────────────────────────────────────────────┐
 │  ExamCraft AI - Header                              │
 ├─────────────────────────────────────────────────────┤
-│  [KI-Prüfung] [Dokumente] [Bibliothek] [RAG]       │
+│  [KI-Prüfung] [Dokumente] [Bibliothek] [RAG]        │
 │  [ChatBot] [Prompt Management]                      │
 ├─────────────────────────────────────────────────────┤
 │                                                     │
@@ -374,9 +374,9 @@ Klicken Sie auf "Dokument ChatBot" in der Navigation.
 - **Confidence** - Zuverlässigkeit (0-1)
 
 **Confidence-Interpretation:**
-- >0.8: Sehr zuverlässig
-- 0.6-0.8: Zuverlässig
-- <0.6: Mit Vorsicht verwenden
+- `>0.8`: Sehr zuverlässig
+- `0.6-0.8`: Zuverlässig
+- `<0.6`: Mit Vorsicht verwenden
 
 ### Chat-Historie
 
