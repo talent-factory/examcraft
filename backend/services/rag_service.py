@@ -14,6 +14,8 @@ from services.vector_service_factory import get_vector_service
 from services.qdrant_vector_service import SearchResult
 from services.claude_service import ClaudeService
 from services.document_service import document_service
+from services.prompt_service import PromptService
+from database import SessionLocal
 
 # Initialize vector service
 vector_service = get_vector_service()
@@ -76,13 +78,59 @@ class RAGService:
         self.claude_service = ClaudeService()
         self.min_context_similarity = 0.01  # Mindest-Similarity für Context (angepasst für Mock Embeddings)
         self.max_context_length = 4000  # Max Zeichen für Context
+
+        # Initialize PromptService for dynamic prompt loading
+        self.db = SessionLocal()
+        self.prompt_service = PromptService(self.db)
+
+        # Load templates from Knowledge Base (with fallback)
         self.question_templates = self._load_question_templates()
-        
-        logger.info("RAG Service initialized")
+
+        logger.info("RAG Service initialized with dynamic prompt loading")
+
+    def __del__(self):
+        """Cleanup database session"""
+        if hasattr(self, 'db'):
+            self.db.close()
     
     def _load_question_templates(self) -> Dict[str, str]:
-        """Lade Prompt-Templates für verschiedene Fragetypen"""
-        return {
+        """
+        Lade Prompt-Templates dynamisch aus Knowledge Base.
+        Falls back to hardcoded templates if not found.
+        """
+        templates = {}
+        question_types = ["multiple_choice", "open_ended", "true_false"]
+
+        for q_type in question_types:
+            try:
+                # Try to load from Knowledge Base
+                prompt = self.prompt_service.get_prompt_for_use_case(
+                    use_case=f"question_generation_{q_type}",
+                    category="system_prompt"
+                )
+
+                if prompt:
+                    logger.info(f"Loaded {q_type} template from KB: {prompt.name} (v{prompt.version})")
+                    templates[q_type] = prompt.content
+
+                    # Log usage
+                    self.prompt_service.log_prompt_usage(
+                        prompt=prompt,
+                        use_case=f"question_generation_{q_type}"
+                    )
+                else:
+                    logger.warning(f"No template found in KB for {q_type}, using fallback")
+                    templates[q_type] = self._get_fallback_template(q_type)
+
+            except Exception as e:
+                logger.error(f"Failed to load {q_type} template from KB: {e}")
+                templates[q_type] = self._get_fallback_template(q_type)
+
+        return templates
+
+    def _get_fallback_template(self, question_type: str) -> str:
+        """Fallback templates wenn Knowledge Base nicht verfügbar"""
+        fallback_templates = {
             "multiple_choice": """
 Du bist ein Experte für die Erstellung von OpenBook-Prüfungsfragen für akademische Kurse.
 
@@ -211,6 +259,8 @@ BEISPIEL SCHLECHTER AUSSAGEN (VERMEIDE):
 - "Heap-Sort wird verwendet." (nicht spezifisch)
 """
         }
+
+        return fallback_templates.get(question_type, fallback_templates["multiple_choice"])
     
     async def retrieve_context(
         self,
