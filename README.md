@@ -21,6 +21,11 @@ ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwen
 - **[📅 Release Timeline](docs/RELEASE_TIMELINE.md)** - Detaillierte Roadmap mit quartalsweisen Releases
 - **[🗺️ Product Roadmap](docs/ROADMAP.md)** - Langfristige Vision und Feature-Vergleichsmatrix
 
+### 👥 Für Benutzer
+
+- **[📚 Benutzerhandbuch](docs/USER_GUIDE.md)** - Vollständige Anleitung für Dozenten und Lehrkräfte
+- **[🎛️ Admin Guide: Prompt Management](docs/ADMIN_PROMPT_MANAGEMENT.md)** - Verwaltung der AI-Prompts
+
 ### 🔧 Für Entwickler
 
 - **[🚀 Deployment Guide](docs/RENDER_DEPLOYMENT.md)** - Production Deployment auf Render.com
@@ -31,13 +36,15 @@ ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwen
 
 - **🤖 RAG-basierte KI-Fragenerstellung** mit Claude API + PydanticAI
 - **💬 Interaktiver Document ChatBot** - Konversationen mit hochgeladenen Dokumenten
+- **🎛️ Prompt Knowledge Base Management** - Zentrale Verwaltung aller AI-Prompts mit Versionierung
 - **📄 Multi-Format Dokumentenverarbeitung**: PDF, Word, Markdown
 - **🔬 IBM Docling Integration** - Advanced Document Processing mit automatischem Fallback
-- **🔍 Semantische Suche** mit Qdrant Vector Database
+- **🔍 Semantische Suche** mit Qdrant Vector Database (Dokumente + Prompts)
 - **🎯 Bloom Taxonomy Integration** für verschiedene Lernlevels
 - **📝 Strukturierte Musterlösungen** mit A/B/C Qualitätsstufen
 - **💾 Chat-Export Funktion** - Konversationen als Markdown-Dokumente speichern
-- **⚛️ Moderne Web-UI** mit React 18 + TypeScript + Tailwind CSS
+- **📊 Usage Analytics** - Überwachung von Prompt-Performance und Token-Verbrauch
+- **⚛️ Moderne Web-UI** mit React 18 + TypeScript + Material-UI
 - **🐳 Container-basiert** für einfache Entwicklung und Deployment
 - **🚀 Production-Ready** mit Rate Limiting, Error Handling & Monitoring
 

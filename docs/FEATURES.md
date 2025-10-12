@@ -49,6 +49,22 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 
 ---
 
+### 🎛️ Prompt Knowledge Base & Management
+
+**Manage and optimize AI prompts without code changes.**
+
+- ✅ **Centralized Prompt Library** - All AI prompts in one place
+- ✅ **Version Control** - Track changes and rollback if needed
+- ✅ **Semantic Search** - Find prompts by meaning, not just keywords
+- ✅ **Usage Analytics** - Monitor performance and token usage
+- ✅ **Template System** - Reusable prompts with variables
+- ✅ **Web-Based Editor** - Markdown preview and live editing
+- ✅ **Tag Management** - Organize by category and use case
+
+**Use Case**: Update question generation prompts to improve quality without deploying new code. Track which prompts perform best.
+
+---
+
 ### 🔍 RAG-Powered Semantic Search
 
 **Find exactly what you need across all your documents.**
