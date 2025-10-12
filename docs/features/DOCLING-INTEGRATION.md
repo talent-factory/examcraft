@@ -9,6 +9,7 @@ ExamCraft AI verwendet IBM Docling für erweiterte Dokumentenverarbeitung mit au
 ### IBM Docling Processor
 
 **Erweiterte Features:**
+
 - ✅ Advanced PDF-Layout-Erkennung
 - ✅ Tabellen-Extraktion mit Strukturerhaltung
 - ✅ Multi-Format-Support (PDF, DOCX, PPTX, XLSX, Images)
@@ -17,6 +18,7 @@ ExamCraft AI verwendet IBM Docling für erweiterte Dokumentenverarbeitung mit au
 - ✅ Erweiterte Metadaten-Extraktion (Sektionen, Tabellen, Bilder)
 
 **Unterstützte Formate:**
+
 - PDF (mit Layout-Erkennung)
 - DOCX, PPTX, XLSX
 - Images (mit OCR)
@@ -25,6 +27,7 @@ ExamCraft AI verwendet IBM Docling für erweiterte Dokumentenverarbeitung mit au
 ### Legacy Processor (Fallback)
 
 **Standard-Features:**
+
 - ✅ PDF-Verarbeitung mit PyPDF
 - ✅ DOCX-Verarbeitung mit python-docx
 - ✅ Markdown-Support
@@ -45,7 +48,7 @@ result = await document_processor.process_document(
     filename="document.pdf",
     mime_type="application/pdf"
 )
-```
+```text
 
 ### Processor-Auswahl
 
@@ -60,9 +63,10 @@ DOCUMENT_PROCESSOR_TYPE=legacy
 
 # Auto-Detection (Standard)
 DOCUMENT_PROCESSOR_TYPE=auto
-```
+```text
 
 **Auto-Detection Logik:**
+
 1. Versucht Docling zu laden
 2. Fällt auf Legacy zurück wenn Docling nicht verfügbar
 3. Loggt Warnung bei Fallback
@@ -76,7 +80,7 @@ DOCUMENT_PROCESSOR_TYPE=auto
 pip install docling==2.23.0
 pip install docling-core==2.48.4
 pip install docling-ibm-models==3.9.1
-```
+```text
 
 ### Legacy Dependencies (immer installiert)
 
@@ -84,7 +88,7 @@ pip install docling-ibm-models==3.9.1
 pip install pypdf==3.17.1
 pip install python-docx==1.1.2
 pip install markdown==3.5.1
-```
+```text
 
 ## Konfiguration
 
@@ -97,7 +101,7 @@ services:
   backend:
     environment:
       - DOCUMENT_PROCESSOR_TYPE=auto  # oder 'docling', 'legacy'
-```
+```text
 
 ### Lokale Entwicklung
 
@@ -105,7 +109,7 @@ In `.env`:
 
 ```bash
 DOCUMENT_PROCESSOR_TYPE=auto
-```
+```text
 
 ## Verwendung
 
@@ -127,7 +131,7 @@ result = await service.process_document(
 print(f"Chunks: {result.total_chunks}")
 print(f"Processing Time: {result.processing_time}s")
 print(f"Metadata: {result.metadata}")
-```
+```text
 
 ### Advanced Usage - Docling Features
 
@@ -155,7 +159,7 @@ print(f"Images: {result.metadata.get('image_count')}")
 # Zugriff auf extrahierte Tabellen
 for table in result.metadata.get('tables', []):
     print(f"Table Markdown:\n{table['markdown']}")
-```
+```text
 
 ### Legacy Processor Usage
 
@@ -173,7 +177,7 @@ result = await processor.process_document(
     filename="document.pdf",
     mime_type="application/pdf"
 )
-```
+```text
 
 ## Output Format
 
@@ -190,7 +194,7 @@ class ProcessedDocument:
     chunks: List[DocumentChunk]
     metadata: Dict[str, Any]
     processing_time: float
-```
+```text
 
 ### DocumentChunk
 
@@ -200,11 +204,12 @@ class DocumentChunk:
     content: str
     chunk_index: int
     metadata: Dict[str, Any]
-```
+```text
 
 ### Metadata Structure
 
 **Docling Processor:**
+
 ```json
 {
   "title": "Document Title",
@@ -217,30 +222,34 @@ class DocumentChunk:
     }
   ]
 }
-```
+```text
 
 **Legacy Processor:**
+
 ```json
 {
   "pages": 10,
   "title": "Document Title",
   "author": "Author Name"
 }
-```
+```text
 
 ## Performance
 
 ### Benchmarks
 
 **Small Documents (< 1000 words):**
+
 - Legacy: < 1s
 - Docling: < 2s
 
 **Medium Documents (1000-5000 words):**
+
 - Legacy: < 2s
 - Docling: < 5s
 
 **Large Documents (> 5000 words):**
+
 - Legacy: < 5s
 - Docling: < 10s
 
@@ -261,14 +270,14 @@ pytest backend/tests/test_processor_factory.py
 
 # Performance Tests
 pytest backend/tests/test_processor_performance.py
-```
+```text
 
 ### Integration Tests
 
 ```bash
 # End-to-End Document Processing
 pytest backend/tests/test_document_service.py
-```
+```text
 
 ## Troubleshooting
 
@@ -283,7 +292,7 @@ try:
     from docling_core.types.doc import TableFormatMode
 except ImportError:
     from docling_core.types.doc.table import TableFormatMode
-```
+```text
 
 ### Dependency Conflicts
 
@@ -293,13 +302,14 @@ except ImportError:
 
 ```bash
 pip install python-docx==1.1.2
-```
+```text
 
 ### Memory Issues
 
 **Problem:** Out of Memory bei großen Dokumenten
 
 **Lösungen:**
+
 1. Verwende Legacy Processor: `DOCUMENT_PROCESSOR_TYPE=legacy`
 2. Reduziere Chunk-Größe
 3. Verarbeite Dokumente sequentiell statt parallel
@@ -309,36 +319,42 @@ pip install python-docx==1.1.2
 ### Von Legacy zu Docling
 
 1. **Installiere Docling Dependencies:**
+
    ```bash
    pip install docling docling-core docling-ibm-models
-   ```
+```text
 
 2. **Setze Environment Variable:**
+
    ```bash
    export DOCUMENT_PROCESSOR_TYPE=docling
-   ```
+```text
 
 3. **Teste mit Sample-Dokumenten:**
+
    ```bash
    pytest backend/tests/test_docling_processor.py
-   ```
+```text
 
 4. **Vergleiche Ergebnisse:**
+
    ```bash
    pytest backend/tests/test_processor_performance.py
-   ```
+```text
 
 ### Von Docling zu Legacy (Rollback)
 
 1. **Setze Environment Variable:**
+
    ```bash
    export DOCUMENT_PROCESSOR_TYPE=legacy
-   ```
+```text
 
 2. **Restart Services:**
+
    ```bash
    docker-compose restart backend
-   ```
+```text
 
 ## Best Practices
 
@@ -380,7 +396,7 @@ except Exception as e:
     # Processing-Fehler
     logger.error(f"Document processing failed: {e}")
     raise
-```
+```text
 
 ## Roadmap
 
@@ -396,6 +412,6 @@ except Exception as e:
 ## Support
 
 Bei Fragen oder Problemen:
-- GitHub Issues: https://gitlab.com/talent-factory/software/examcraft/-/issues
-- Linear: TF-110
 
+- GitHub Issues: <https://gitlab.com/talent-factory/software/examcraft/-/issues>
+- Linear: TF-110

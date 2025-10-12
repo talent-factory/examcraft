@@ -1,27 +1,32 @@
-# Contributing to ExamCraft AI 🤝
+# Contributing to ExamCraft AI
 
-We welcome contributions to ExamCraft AI! This document provides guidelines for contributing to our OpenSource educational technology project.
+We welcome contributions to ExamCraft AI! This document provides guidelines
+for contributing to our OpenSource educational technology project.
 
-## 🚀 Quick Start for Contributors
+## Quick Start for Contributors
 
 1. **Fork** the repository on GitHub
-2. **Clone** your fork locally: `git clone https://github.com/yourusername/examcraft-ai.git`
+2. **Clone** your fork locally:
+   `git clone https://github.com/yourusername/examcraft-ai.git`
 3. **Setup** development environment: `./start-dev.sh`
 4. **Create** a feature branch: `git checkout -b feature/amazing-feature`
 5. **Make** your changes and **test** thoroughly
-6. **Commit** using conventional commits: `git commit -m 'feat: Add amazing feature'`
+6. **Commit** using conventional commits:
+   `git commit -m 'feat: Add amazing feature'`
 7. **Push** to your fork: `git push origin feature/amazing-feature`
 8. **Create** a Pull Request with a clear description
 
-## 🛠️ Development Environment
+## Development Environment
 
 ### Prerequisites
+
 - Docker & Docker Compose (recommended)
 - Python 3.13+ (for local development)
 - Node.js 18+ (for frontend development)
 - Claude API Key (optional, for testing KI features)
 
 ### Setup
+
 ```bash
 # Clone your fork
 git clone https://github.com/yourusername/examcraft-ai.git
@@ -36,9 +41,10 @@ cd examcraft-ai
 # API Docs: http://localhost:8000/docs
 ```
 
-## 📝 Code Standards
+## Code Standards
 
 ### Python (Backend & Utils)
+
 - **Style**: PEP 8 compliance required
 - **Type Hints**: All functions must include type hints
 - **Documentation**: Docstrings for all public functions
@@ -53,6 +59,7 @@ pytest backend/tests/
 ```
 
 ### TypeScript (Frontend)
+
 - **Style**: ESLint + Prettier configuration
 - **Types**: Strict TypeScript, no `any` types
 - **Components**: Functional components with hooks
@@ -67,51 +74,58 @@ npm run type-check
 npm test
 ```
 
-## 🎯 Types of Contributions
+## Types of Contributions
 
-### 🐛 Bug Reports
+### Bug Reports
+
 - Use GitHub Issues with the "bug" label
 - Include steps to reproduce, expected vs actual behavior
 - Provide system information (OS, Docker version, etc.)
 - Screenshots/logs are highly appreciated
 
-### ✨ Feature Requests
+### Feature Requests
+
 - Use GitHub Issues with the "enhancement" label
 - Clearly describe the use case and proposed solution
 - Consider educational impact and user experience
 - Check existing issues to avoid duplicates
 
-### 📚 Documentation
+### Documentation
+
 - README improvements, code comments, API documentation
 - Tutorial content, examples, educational materials
 - Translations (currently German/English)
 
-### 🧪 Testing
+### Testing
+
 - Unit tests for backend services
 - Integration tests for API endpoints
 - Frontend component tests
 - E2E testing scenarios
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ### Backend (`backend/`)
+
 - **FastAPI** REST API server
 - **SQLAlchemy** ORM with PostgreSQL
 - **Pydantic** data validation and serialization
 - **Claude API** integration via PydanticAI
 
 ### Document Processing (`utils/`)
+
 - **Docling** for PDF text extraction
 - **ChromaDB** for vector storage and semantic search
 - **sentence-transformers** for embeddings
 
 ### Frontend (`frontend/`)
+
 - **React 18** with TypeScript
 - **TanStack Query** for API state management
 - **Tailwind CSS** + shadcn/ui for styling
 - **React Router** for navigation
 
-## 🔐 Security Guidelines
+## Security Guidelines
 
 - **Never commit** API keys or sensitive data
 - **Use environment variables** for configuration
@@ -119,12 +133,15 @@ npm test
 - **Validate file uploads** to prevent malicious content
 - **Follow OWASP** best practices for web security
 
-## 🚢 Pull Request Process
+## Pull Request Process
 
-1. **Branch Naming**: Use descriptive names (`feature/add-export-format`, `fix/pdf-parsing-bug`)
+1. **Branch Naming**: Use descriptive names
+   (`feature/add-export-format`, `fix/pdf-parsing-bug`)
 
-2. **Commit Messages**: Follow [Conventional Commits](https://conventionalcommits.org/)
-   ```
+2. **Commit Messages**: Follow
+   [Conventional Commits](https://conventionalcommits.org/)
+
+   ```text
    feat: add new question type for multiple choice
    fix: resolve PDF parsing issue with special characters
    docs: update API documentation for question generation
@@ -144,17 +161,19 @@ npm test
    - Code coverage should not decrease
    - Documentation must be updated if needed
 
-## 🎓 Educational Impact
+## Educational Impact
 
 When contributing, consider:
+
 - **Pedagogical Value**: How does this improve education?
 - **Accessibility**: Can all users benefit from this feature?
 - **Internationalization**: Consider multi-language support
 - **Performance**: Impact on user experience and system resources
 
-## 🐞 Debugging & Development
+## Debugging & Development
 
 ### Backend Development
+
 ```bash
 # Run backend locally for debugging
 cd backend
@@ -168,6 +187,7 @@ docker-compose logs -f backend
 ```
 
 ### Frontend Development
+
 ```bash
 # Run frontend with hot reload
 cd frontend
@@ -178,9 +198,10 @@ npm run build
 npm run type-check
 ```
 
-## 📊 Testing Guidelines
+## Testing Guidelines
 
 ### Backend Testing
+
 ```bash
 # Run all backend tests
 pytest backend/tests/
@@ -193,6 +214,7 @@ pytest --cov=backend backend/tests/
 ```
 
 ### Frontend Testing
+
 ```bash
 # Run frontend tests
 npm test
@@ -204,21 +226,25 @@ npm run test:coverage
 npm run test:e2e
 ```
 
-## 📞 Getting Help
+## Getting Help
 
 - **GitHub Issues**: For bugs and feature requests
 - **GitHub Discussions**: For questions and community support
-- **Documentation**: Check `/docs` folder and API documentation at `/docs` endpoint
+- **Documentation**: Check `/docs` folder and API documentation at
+  `/docs` endpoint
 - **Code Review**: Request reviews from maintainers in PRs
 
-## 🙏 Recognition
+## Recognition
 
-All contributors will be recognized in our README.md and release notes. We appreciate every contribution, whether it's code, documentation, bug reports, or community support!
+All contributors will be recognized in our README.md and release notes.
+We appreciate every contribution, whether it's code, documentation, bug
+reports, or community support!
 
-## 📄 License
+## License
 
-By contributing to ExamCraft AI, you agree that your contributions will be licensed under the MIT License.
+By contributing to ExamCraft AI, you agree that your contributions will be
+licensed under the MIT License.
 
 ---
 
-**Happy Contributing!** 🚀 Let's build amazing educational technology together!
+**Happy Contributing!** Let's build amazing educational technology together!

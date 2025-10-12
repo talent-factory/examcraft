@@ -43,7 +43,7 @@ backend/
 └── models/
     ├── chat_db.py              # ChatSession & ChatMessage Models
     └── document.py             # Enhanced Document Model
-```
+```text
 
 ### Frontend Components
 
@@ -56,11 +56,12 @@ frontend/src/
 │   └── ChatInput.tsx           # Message Input
 └── services/
     └── chatService.ts          # API Client
-```
+```text
 
 ### Database Schema
 
 #### ChatSession Table
+
 ```sql
 CREATE TABLE chat_sessions (
     id UUID PRIMARY KEY,
@@ -72,9 +73,10 @@ CREATE TABLE chat_sessions (
     is_exported_as_document BOOLEAN,
     exported_document_id INTEGER
 );
-```
+```text
 
 #### ChatMessage Table
+
 ```sql
 CREATE TABLE chat_messages (
     id UUID PRIMARY KEY,
@@ -85,13 +87,14 @@ CREATE TABLE chat_messages (
     sources JSONB,
     confidence FLOAT
 );
-```
+```text
 
 ## API Endpoints
 
 ### Chat Session Management
 
 #### Create Session
+
 ```http
 POST /api/v1/chat/sessions
 Content-Type: application/json
@@ -100,21 +103,24 @@ Content-Type: application/json
   "document_ids": [1, 2, 3],
   "title": "Optional Session Title"
 }
-```
+```text
 
 #### Get Session
+
 ```http
 GET /api/v1/chat/sessions/{session_id}
-```
+```text
 
 #### List Sessions
+
 ```http
 GET /api/v1/chat/sessions
-```
+```text
 
 ### Chat Interaction
 
 #### Send Message
+
 ```http
 POST /api/v1/chat/message
 Content-Type: application/json
@@ -123,9 +129,10 @@ Content-Type: application/json
   "session_id": "uuid",
   "message": "What is the main topic of this document?"
 }
-```
+```text
 
 **Response:**
+
 ```json
 {
   "content": "The main topic is...",
@@ -139,11 +146,12 @@ Content-Type: application/json
   ],
   "confidence": 0.92
 }
-```
+```text
 
 ### Export Functions
 
 #### Export to Document
+
 ```http
 POST /api/v1/chat/sessions/{session_id}/to-document
 Content-Type: application/json
@@ -151,12 +159,13 @@ Content-Type: application/json
 {
   "document_title": "Optional Custom Title"
 }
-```
+```text
 
 #### Download as Markdown
+
 ```http
 GET /api/v1/chat/sessions/{session_id}/download
-```
+```text
 
 ## Implementation Details
 
@@ -198,7 +207,7 @@ Can you explain more?
 
 ### 🤖 Assistant (14:31:25)
 Certainly! ...
-```
+```text
 
 ### Document Model Enhancement
 
@@ -220,7 +229,7 @@ class Document(Base):
         if self.doc_metadata and "title" in self.doc_metadata:
             return self.doc_metadata["title"]
         return self.original_filename or "Untitled"
-```
+```text
 
 ## Testing
 
@@ -252,7 +261,7 @@ docker exec examcraft_backend pytest tests/test_document_model.py -v
 
 # Integration tests
 docker exec examcraft_backend pytest -m integration -v
-```
+```text
 
 ## Configuration
 
@@ -266,7 +275,7 @@ CLAUDE_MODEL=claude-3-5-sonnet-20241022
 # Chat Settings
 MAX_CHAT_HISTORY=10          # Maximum messages in context
 CHAT_TIMEOUT_SECONDS=30      # Response timeout
-```
+```text
 
 ### Feature Flags
 
@@ -275,7 +284,7 @@ CHAT_TIMEOUT_SECONDS=30      # Response timeout
 ENABLE_CHAT_EXPORT = True
 ENABLE_CHAT_DOWNLOAD = True
 MAX_SESSIONS_PER_USER = 50
-```
+```text
 
 ## Usage Examples
 
@@ -298,7 +307,7 @@ const response = await chatService.sendMessage({
 
 // Export to document
 const doc = await chatService.exportToDocument(session.id);
-```
+```text
 
 ## Known Limitations
 
@@ -331,4 +340,3 @@ const doc = await chatService.exportToDocument(session.id);
 ## License
 
 MIT License - See LICENSE file for details
-

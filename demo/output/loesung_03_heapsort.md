@@ -159,17 +159,20 @@ if __name__ == "__main__":
 ### MaxHeapify Implementierung (5 Punkte)
 
 **Grundlegende Logik (3 Punkte):**
+
 - **1 Punkt**: Korrekte Berechnung der Kind-Indizes (`left = 2*i`, `right = 2*i+1`)
 - **1 Punkt**: Finden des größten Elements (`heap[left] > heap[largest]`)
 - **1 Punkt**: Berücksichtigung des `heap_size` Parameters (`left <= heap_size`)
 
 **Max-Heap Spezifika (2 Punkte):**
+
 - **1 Punkt**: Vergleich für Max-Heap (größtes Element nach oben)
 - **1 Punkt**: Rekursiver Aufruf mit korrektem `heap_size`
 
 ### BuildMaxHeap Implementierung (4 Punkte)
 
 **Heap-Konstruktion (4 Punkte):**
+
 - **1 Punkt**: Korrekte Berechnung der Heap-Größe
 - **1 Punkt**: Schleife von letztem inneren Knoten zur Wurzel
 - **1 Punkt**: Aufruf von `maxHeapify` mit korrekter Heap-Größe
@@ -178,26 +181,31 @@ if __name__ == "__main__":
 ### HeapSort Algorithmus (8 Punkte)
 
 **Heap-Konstruktion (2 Punkte):**
+
 - **1 Punkt**: Aufruf von `buildMaxHeap(lst)` am Anfang
 - **1 Punkt**: Korrekte Initialisierung von `heap_size`
 
 **Sortier-Schleife (4 Punkte):**
+
 - **1 Punkt**: Korrekte Schleife `range(heap_size, 1, -1)`
 - **1 Punkt**: Tausch von Maximum mit letztem Element
 - **1 Punkt**: Reduzierung der Heap-Größe (`heap_size -= 1`)
 - **1 Punkt**: Aufruf von `maxHeapify(lst, 1, heap_size)`
 
 **Algorithmus-Verständnis (2 Punkte):**
+
 - **1 Punkt**: Verständnis der In-Place Sortierung
 - **1 Punkt**: Korrekte Schleifeninvariante umgesetzt
 
 ### Korrektheit und Effizienz (3 Punkte)
 
 **Funktionale Korrektheit (2 Punkte):**
+
 - **1 Punkt**: Algorithmus produziert korrekt sortierte Ausgabe
 - **1 Punkt**: Heap-Eigenschaft wird korrekt aufrecht erhalten
 
 **Effizienz (1 Punkt):**
+
 - **1 Punkt**: O(n log n) Zeitkomplexität eingehalten, In-Place implementiert
 
 ## Erklärung
@@ -211,10 +219,12 @@ Die unsortierte Liste wird in einen Max-Heap umgewandelt. Dies geschieht in O(n 
 Iterativ wird das Maximum (Wurzel) mit dem letzten Element getauscht und aus dem Heap entfernt. Der verkleinerte Heap wird durch `maxHeapify` repariert.
 
 **Schleifeninvariante:**
+
 - `lst[1:heap_size+1]` bildet einen Max-Heap mit den `heap_size` größten Elementen
 - `lst[heap_size+1:]` enthält die sortierten kleineren Elemente
 
 **Zeitkomplexität:**
+
 - Worst-Case: O(n log n)
 - Average-Case: O(n log n)
 - Best-Case: O(n log n)
@@ -228,16 +238,19 @@ Da wir aufsteigend sortieren wollen, benötigen wir das größte Element zuerst.
 ## Häufige Fehler
 
 **MaxHeapify-Implementierung:**
+
 - **Min- statt Max-Heap** (-3 Punkte): `heap[left] < heap[largest]` statt `>`
 - **heap_size ignoriert** (-2 Punkte): Vergleich ohne Berücksichtigung der aktuellen Heap-Größe
 - **Falsche Rekursion** (-1 Punkt): Aufruf ohne `heap_size` Parameter
 
 **BuildMaxHeap-Implementierung:**
+
 - **Falscher Heapify-Aufruf** (-2 Punkte): Ohne `heap_size` Parameter
 - **Falsche Schleifenrichtung** (-1 Punkt): Aufsteigend statt absteigend
 - **Min-Heap gebaut** (-2 Punkte): Verwendung von minHeapify statt maxHeapify
 
 **HeapSort-Algorithmus:**
+
 - **Keine Heap-Konstruktion** (-3 Punkte): buildMaxHeap nicht aufgerufen
 - **Falsche Tausch-Operation** (-2 Punkte): Falsche Indizes beim Tauschen
 - **Heap-Größe nicht reduziert** (-2 Punkte): `heap_size` bleibt konstant
@@ -245,6 +258,7 @@ Da wir aufsteigend sortieren wollen, benötigen wir das größte Element zuerst.
 - **Max-Heapify falsch aufgerufen** (-2 Punkte): Falsche Parameter oder Index
 
 **Allgemeine Abzüge:**
+
 - **Absteigende statt aufsteigende Sortierung** (-3 Punkte): Falsche Sortierrichtung
 - **Nicht In-Place** (-2 Punkte): Verwendung zusätzlicher Arrays
 - **Syntaxfehler** (-2 Punkte): Code nicht ausführbar

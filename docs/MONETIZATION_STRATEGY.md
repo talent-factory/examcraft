@@ -32,6 +32,7 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 **Timeline**: Launch October 31, 2025
 
 **Features**:
+
 - ✅ Basic document processing (PDF, Markdown)
 - ✅ Limited question generation (20 questions/month)
 - ✅ Self-hosting capability
@@ -41,18 +42,21 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 - ❌ No priority support
 
 **Target Audience**:
+
 - Hobby projects
 - Individual educators
 - Universities (self-hosted)
 - Open source contributors
 
 **Revenue Model**: Indirect
+
 - Leads for premium tiers
 - Community contributions
 - Brand awareness
 - Developer ecosystem
 
 **Success Metrics**:
+
 - 100+ GitHub stars in first 2 weeks
 - 10+ contributors
 - 50+ issues/PRs
@@ -68,6 +72,7 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 #### Pricing Tiers
 
 **🆓 Free Tier** - Lead Generation
+
 - 5 documents
 - 20 questions/month
 - 1 user
@@ -76,6 +81,7 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 - **Target**: 500 free signups in first 3 months
 
 **🚀 Starter** - €19/month
+
 - 50 documents
 - 200 questions/month
 - 3 users
@@ -84,6 +90,7 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 - **Target**: 25 paying customers by Month 6
 
 **💼 Professional** - €49/month
+
 - Unlimited documents
 - 1,000 questions/month
 - 10 users
@@ -93,6 +100,7 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 - **Target**: 75 paying customers by Month 9
 
 **🏢 Enterprise** - €149/month
+
 - Unlimited everything
 - Unlimited users
 - Priority support
@@ -104,18 +112,22 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 #### Revenue Projections
 
 **Month 1-3**: Open Source Launch
+
 - Community Building
 - 0 MRR
 
 **Month 3-6**: Freemium Launch
+
 - 25 paying customers
 - **€2,500 MRR** (Break-even)
 
 **Month 6-9**: Growth Phase
+
 - 75 paying customers
 - **€7,500 MRR**
 
 **Month 9-12**: Scale
+
 - 150 paying customers
 - **€15,000 MRR**
 
@@ -131,12 +143,14 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 **Target**: First enterprise deal by Q2 2026
 
 **Pricing**:
+
 - **Setup Fee**: €999 (one-time)
 - **License**: €99/month per 10 users
 - **Support**: €299/year
 - **Total Year 1**: €999 + €1,188 + €299 = **€2,486**
 
 **Features**:
+
 - ✅ On-premise deployment (Kubernetes/Docker Compose)
 - ✅ SSO/SAML integration
 - ✅ LDAP authentication
@@ -147,12 +161,14 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 - ✅ Air-gapped deployment option
 
 **Target Audience**:
+
 - Large universities (>10,000 students)
 - Government institutions
 - Compliance-critical organizations
 - GDPR-sensitive customers
 
 **Sales Process**:
+
 1. Inbound lead from SaaS tier
 2. Discovery call (needs assessment)
 3. Technical demo (IT team)
@@ -181,6 +197,7 @@ ExamCraft AI follows a **three-pillar monetization strategy**:
 | 12 | 1,200 | 150 | €15,000 | €180,000 |
 
 **First Enterprise Deal**: Month 8-10
+
 - +€999 setup fee
 - +€99/month recurring
 
@@ -197,7 +214,7 @@ PostgreSQL:                €50
 Redis:                     €30
                            ----------
 Subtotal:                  €330-430
-```
+```text
 
 ### AI & Operations
 
@@ -208,7 +225,7 @@ Email Service:             €50
 Monitoring Tools:          €100
                            ----------
 Subtotal:                  €900-1,100
-```
+```text
 
 ### Marketing & Growth
 
@@ -217,7 +234,7 @@ Content/Ads:               €1,000-2,000
 Tools (Analytics):         €200
                            ----------
 Subtotal:                  €1,200-2,200
-```
+```text
 
 ### Support & Miscellaneous
 
@@ -227,7 +244,7 @@ Domain & SSL:              €10
 Miscellaneous:             €100
                            ----------
 Subtotal:                  €210
-```
+```text
 
 **TOTAL MONTHLY COSTS**: €2,640-3,940
 
@@ -239,6 +256,7 @@ Subtotal:                  €210
 ## 🌐 Domain Strategy
 
 ### Current Status
+
 - ❌ **examcraft.ie** is already taken (Irish education tool)
 - ⚠️ **.ai domains** cost €75-80/year (minimum 2 years registration)
 - ✅ **.io/.com** are cheaper and more established
@@ -246,6 +264,7 @@ Subtotal:                  €210
 ### Top Recommendations
 
 **Tier 1 - Premium Choices**
+
 1. **examcraft.ai** - Perfect for AI focus, but expensive (~€160 for 2 years)
 2. **examcrafter.ai** - Alternative with "Crafter" suffix
 3. **craftexam.ai** - Reversed variant
@@ -273,6 +292,7 @@ Subtotal:                  €210
 **Issue**: [TF-112](https://linear.app/talent-factory/issue/TF-112) - GitHub Release Ready
 
 **Tasks**:
+
 - [ ] Repository cleanup (remove secrets, sensitive data)
 - [ ] Complete documentation (README, CONTRIBUTING, CODE_OF_CONDUCT)
 - [ ] Add MIT/Apache 2.0 license
@@ -290,6 +310,7 @@ Subtotal:                  €210
 **Issue**: [TF-113](https://linear.app/talent-factory/issue/TF-113) - Render.com Deployment with Stripe
 
 **Tasks**:
+
 - [ ] Render.com multi-service setup
 - [ ] Stripe payment integration
 - [ ] User authentication & authorization
@@ -309,6 +330,7 @@ Subtotal:                  €210
 **Issue**: [TF-115](https://linear.app/talent-factory/issue/TF-115) - Customer Acquisition
 
 **Tasks**:
+
 - [ ] Landing page design & development
 - [ ] SEO optimization
 - [ ] Content marketing (blog posts, tutorials)
@@ -328,6 +350,7 @@ Subtotal:                  €210
 **Issue**: [TF-114](https://linear.app/talent-factory/issue/TF-114) - Self-Hosted Offering
 
 **Tasks**:
+
 - [ ] Kubernetes deployment manifests
 - [ ] Docker Compose for simpler deployments
 - [ ] SSO/SAML integration (Keycloak, Auth0)
@@ -344,12 +367,14 @@ Subtotal:                  €210
 ## 🎯 Success Criteria
 
 ### Phase 1 Success (Open Source)
+
 - ✅ 100+ GitHub stars in first 2 weeks
 - ✅ 10+ contributors
 - ✅ 50+ issues/PRs
 - ✅ Product Hunt: Top 5 Product of the Day
 
 ### Phase 2 Success (Freemium SaaS)
+
 - ✅ 500+ free signups in first 3 months
 - ✅ 25+ paying customers after 6 months
 - ✅ €2,500 MRR (break-even)
@@ -357,6 +382,7 @@ Subtotal:                  €210
 - ✅ NPS >40
 
 ### Phase 3 Success (Growth)
+
 - ✅ €15,000 MRR after 12 months
 - ✅ 150+ paying customers
 - ✅ 1+ enterprise deal
@@ -376,4 +402,3 @@ Subtotal:                  €210
 ---
 
 **Last Updated**: January 2025 | **Owner**: Daniel Senften | **Status**: Planning 📋
-

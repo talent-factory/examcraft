@@ -42,7 +42,7 @@
 ### Zugriff auf ExamCraft AI
 
 1. Öffnen Sie Ihren Browser
-2. Navigieren Sie zu `http://localhost:3000` (lokale Installation)
+2. Navigieren Sie zu `<http://localhost:3000`> (lokale Installation)
 3. Die Hauptseite wird automatisch geladen
 
 ### Benutzeroberfläche-Übersicht
@@ -302,6 +302,7 @@ Nach erfolgreicher Generierung sehen Sie:
 **1. Dokumente auswählen**
 
 In der Dokumentenbibliothek:
+
 - Wählen Sie 1-10 Dokumente aus
 - Klicken Sie "Prüfung aus Auswahl erstellen"
 

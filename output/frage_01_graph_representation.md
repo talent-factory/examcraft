@@ -47,7 +47,6 @@ class Graph:
         """
         pass
 
-
 class GraphMatrix:
     """Graph-Implementierung mit Adjazenzmatrix-Repräsentation"""
 

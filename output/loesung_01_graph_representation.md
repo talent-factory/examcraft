@@ -38,7 +38,6 @@ class Graph:
         """
         return list(self.vertices[i].keys())
 
-
 class GraphMatrix:
     """Graph-Implementierung mit Adjazenzmatrix-Repräsentation"""
 

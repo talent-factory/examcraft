@@ -154,12 +154,14 @@ ANTWORTOPTIONEN:
 - Distraktoren müssen plausibel sein und häufige Missverständnisse widerspiegeln
 - Vermeide offensichtlich falsche oder absurde Optionen
 - Keine "Alle oben genannten" oder "Keine der genannten" Optionen
+- WICHTIG: Code-Elemente (Funktionsnamen, Variablen, Klassen) MÜSSEN in Backticks gesetzt werden
+  Beispiel: `self._distribute_elements(arr)` statt self._distribute_elements(arr)
 
 FORMAT (JSON):
 {{
     "question": "Konkrete, spezifische Frage basierend auf dem Kontext",
     "options": [
-        "A) Spezifische Option mit konkreten Details",
+        "A) Spezifische Option mit konkreten Details (Code in `backticks`)",
         "B) Plausible Alternative mit ähnlichem Konzept",
         "C) Häufiges Missverständnis oder verwandtes Konzept",
         "D) Weitere plausible aber falsche Option"

@@ -307,42 +307,50 @@ if __name__ == "__main__":
 ## Detaillierte Punkteverteilung
 
 ### Union-Find Implementation (6 Punkte)
+
 - **Find mit Pfadkompression (3 Punkte)**: Rekursive Pfadkompression für O(α(n))
 - **Union by Rank (2 Punkte)**: Optimale Baumhöhen-Verwaltung
 - **Komponenten-Zählung (1 Punkt)**: Korrekte Aktualisierung bei Union
 
 **Häufige Fehler:**
+
 - Keine Pfadkompression (-2 Punkte)
 - Union ohne Rank-Optimierung (-2 Punkte)
 - Falsche Komponenten-Aktualisierung (-1 Punkt)
 
 ### Kruskal's Algorithmus (7 Punkte)
+
 - **Kanten-Sortierung (1 Punkt)**: Aufsteigende Gewichts-Sortierung
 - **Union-Find Integration (3 Punkte)**: Korrekte Zyklusvermeidung
 - **MST-Aufbau (2 Punkte)**: Kanten hinzufügen bis |V|-1
 - **Zusammenhangsprüfung (1 Punkt)**: Erkennung unzusammenhängender Graphen
 
 **Häufige Fehler:**
+
 - Kanten nicht sortiert (-2 Punkte)
 - Zykluserkennung fehlt (-3 Punkte)
 - Falsche Abbruchbedingung (-1 Punkt)
 - Zusammenhang nicht geprüft (-1 Punkt)
 
 ### MST-Eigenschaften (4 Punkte)
+
 - **Gewichts-Berechnung (2 Punkte)**: Korrekte Summierung der MST-Kanten
 - **Verbundene Graph-Behandlung (1 Punkt)**: Unendlich bei unzusammenhängenden Graphen
 - **Edge-Case Behandlung (1 Punkt)**: Leere Graphen und Einzelknoten
 
 **Häufige Fehler:**
+
 - Unzusammenhängende Graphen falsch behandelt (-2 Punkte)
 - Edge Cases nicht berücksichtigt (-1 Punkt)
 
 ### Bottleneck MST (4 Punkte)
+
 - **MST-Pfadsuche (2 Punkte)**: BFS/DFS im MST zwischen source und target
 - **Maximale Kante finden (1 Punkt)**: Korrekte Max-Gewichts-Berechnung
 - **Adjazenzlisten-Aufbau (1 Punkt)**: Bidirektionale Graph-Repräsentation
 
 **Häufige Fehler:**
+
 - Pfadsuche im ursprünglichen Graph statt MST (-2 Punkte)
 - Falsche Max-Berechnung (-1 Punkt)
 - Unidirektionale Adjazenzliste (-1 Punkt)

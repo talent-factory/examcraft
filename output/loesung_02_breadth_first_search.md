@@ -201,42 +201,50 @@ if __name__ == "__main__":
 ## Detaillierte Punkteverteilung
 
 ### BFS-Traversierung (5 Punkte)
+
 - **Queue-Verwendung (2 Punkte)**: Korrekte Verwendung von `deque` für FIFO-Verhalten
 - **Visited-Set (1 Punkt)**: Vermeidung von Zyklen durch Besuchsmarkierung
 - **Korrekte Reihenfolge (2 Punkte)**: Breadth-first Besuchsreihenfolge
 
 **Häufige Fehler:**
+
 - Stack statt Queue verwenden (-2 Punkte)
 - Fehlende Visited-Markierung (-1 Punkt)
 - Falsche Initialisierung (-1 Punkt)
 
 ### Kürzeste Pfade (5 Punkte)
+
 - **Distanz-Tracking (2 Punkte)**: Korrekte Speicherung der Distanzen
 - **Incrementelle Distanzen (2 Punkte)**: `current_distance + 1` für Nachbarn
 - **Einmalige Besuche (1 Punkt)**: Vermeidung von Distanz-Updates
 
 **Häufige Fehler:**
+
 - Mehrfache Distanz-Updates (-2 Punkte)
 - Falsche Distanzberechnung (-2 Punkte)
 - Fehlende Startdistanz 0 (-1 Punkt)
 
 ### Pfadrekonstruktion (4 Punkte)
+
 - **Parent-Tracking (2 Punkte)**: Korrekte Speicherung der Vorgängerknoten
 - **Pfad-Rekonstruktion (1 Punkt)**: Rückverfolgung vom Ziel zum Start
 - **Pfad-Umkehrung (1 Punkt)**: Korrekte Start->Ziel Reihenfolge
 
 **Häufige Fehler:**
+
 - Fehlende Parent-Verfolgung (-2 Punkte)
 - Falsche Pfad-Reihenfolge (-1 Punkt)
 - Endlos-Schleifen bei Rekonstruktion (-2 Punkte)
 
 ### Zusammenhangskomponenten (4 Punkte)
+
 - **Globale Visited-Verfolgung (1 Punkt)**: Vermeidung doppelter Komponenten
 - **Vollständige Knotenmenge (1 Punkt)**: Berücksichtigung aller Graphknoten
 - **Komponentensammlung (1 Punkt)**: Korrekte Gruppierung zusammenhängender Knoten
 - **Sortierung nach Größe (1 Punkt)**: Größte Komponenten zuerst
 
 **Häufige Fehler:**
+
 - Nur explizite Knoten berücksichtigen (-1 Punkt)
 - Fehlende Sortierung (-1 Punkt)
 - Doppelte Knoten in Komponenten (-1 Punkt)

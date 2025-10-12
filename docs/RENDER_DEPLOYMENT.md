@@ -14,14 +14,16 @@
 
 ```bash
 DOCUMENT_PROCESSOR_TYPE=legacy
-```
+```text
 
 **Warum?**
+
 - Docling ist sehr speicherintensiv (~300-400 MB)
 - Legacy Processor benötigt nur ~50 MB
 - Für Free Tier (512 MB) ist Legacy Processor erforderlich
 
 **Optionen**:
+
 - `legacy` - Leichtgewichtiger Processor (empfohlen für Free Tier)
 - `docling` - Volle Features, benötigt >1 GB RAM
 - `auto` - Automatische Erkennung (Standard)
@@ -48,7 +50,7 @@ CORS_ORIGINS=https://your-frontend.onrender.com,https://examcraft.com
 
 # Environment
 ENVIRONMENT=production
-```
+```text
 
 ### 🔧 Render.com Setup
 
@@ -56,14 +58,17 @@ ENVIRONMENT=production
 
 1. **Service Type**: Web Service
 2. **Build Command**: 
+
    ```bash
    pip install -r backend/requirements.txt
-   ```
+```text
 3. **Start Command**:
+
    ```bash
    cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
-   ```
+```text
 4. **Instance Type**: 
+
    - **Free Tier**: 512 MB RAM (nur mit `DOCUMENT_PROCESSOR_TYPE=legacy`)
    - **Starter**: 512 MB RAM (nur mit `DOCUMENT_PROCESSOR_TYPE=legacy`)
    - **Starter Plus**: 2 GB RAM (empfohlen für `DOCUMENT_PROCESSOR_TYPE=docling`)
@@ -72,9 +77,10 @@ ENVIRONMENT=production
 
 1. **Service Type**: Static Site
 2. **Build Command**:
+
    ```bash
    cd frontend && npm install && npm run build
-   ```
+```text
 3. **Publish Directory**: `frontend/build`
 
 ### 📊 Memory-Verbrauch
@@ -89,6 +95,7 @@ ENVIRONMENT=production
 | **TOTAL** | **~240 MB** | **~540 MB** |
 
 **Fazit**: 
+
 - ✅ Free Tier (512 MB) funktioniert mit `DOCUMENT_PROCESSOR_TYPE=legacy`
 - ❌ Free Tier (512 MB) funktioniert NICHT mit Docling
 - ✅ Starter Plus (2 GB) funktioniert mit Docling
@@ -98,11 +105,13 @@ ENVIRONMENT=production
 #### "Out of memory (used over 512Mi)"
 
 **Lösung 1**: Environment Variable setzen
+
 ```bash
 DOCUMENT_PROCESSOR_TYPE=legacy
-```
+```text
 
 **Lösung 2**: Upgrade auf Starter Plus ($7/Monat)
+
 - 2 GB RAM
 - Volle Docling-Features
 
@@ -117,9 +126,10 @@ DOCUMENT_PROCESSOR_TYPE=legacy
 **Ursache**: System-Library fehlt
 
 **Lösung**: Bereits in `requirements.txt` enthalten:
+
 ```txt
 python-magic-bin==0.4.14  # Includes libmagic
-```
+```text
 
 ### 📝 Deployment Checklist
 
@@ -134,9 +144,9 @@ python-magic-bin==0.4.14  # Includes libmagic
 
 ### 🔗 Nützliche Links
 
-- **Health Check**: `https://your-backend.onrender.com/health`
-- **API Docs**: `https://your-backend.onrender.com/docs`
-- **Detailed Health**: `https://your-backend.onrender.com/api/v1/health`
+- **Health Check**: `<https://your-backend.onrender.com/health`>
+- **API Docs**: `<https://your-backend.onrender.com/docs`>
+- **Detailed Health**: `<https://your-backend.onrender.com/api/v1/health`>
 
 ### 💡 Best Practices
 
@@ -144,4 +154,3 @@ python-magic-bin==0.4.14  # Includes libmagic
 2. **Logs**: Aktiviere Render.com Logs für Debugging
 3. **Auto-Deploy**: Aktiviere Auto-Deploy für `main` Branch
 4. **Environment**: Nutze separate Environments für Staging/Production
-

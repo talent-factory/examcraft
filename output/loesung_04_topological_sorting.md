@@ -275,43 +275,51 @@ if __name__ == "__main__":
 ## Detaillierte Punkteverteilung
 
 ### Zykluserkennung (4 Punkte)
+
 - **DFS-Farbmarkierung (2 Punkte)**: Korrekte Verwendung von WHITE/GRAY/BLACK
 - **Zurück-Kanten-Erkennung (1 Punkt)**: GRAY-Nachbar = Zyklus
 - **Vollständige Knotenabdeckung (1 Punkt)**: Alle Knoten werden geprüft
 
 **Häufige Fehler:**
+
 - Nur explizite Graph-Knoten prüfen (-1 Punkt)
 - Falsche Farbzustände verwenden (-2 Punkte)
 - Zurück-Kanten nicht korrekt erkennen (-1 Punkt)
 
 ### Topologische Sortierung (5 Punkte)
+
 - **Zyklusprüfung zuerst (1 Punkt)**: Keine Sortierung bei Zyklen
 - **DFS Post-Order (2 Punkte)**: Korrekte finish_order Sammlung
 - **Reihenfolgen-Umkehrung (1 Punkt)**: finish_order umkehren für topologische Ordnung
 - **Vollständige Knotenabdeckung (1 Punkt)**: Alle Knoten werden sortiert
 
 **Häufige Fehler:**
+
 - Post-Order nicht implementiert (-2 Punkte)
 - Reihenfolge nicht umgekehrt (-1 Punkt)
 - Isolierte Knoten vergessen (-1 Punkt)
 
 ### Abhängigkeitsauflösung (4 Punkte)
+
 - **String-ID Mapping (1 Punkt)**: Bidirektionale Konvertierung String ↔ Int
 - **Graph-Umkehrung (1 Punkt)**: Abhängigkeiten → Items statt Items → Abhängigkeiten
 - **Topologische Anwendung (1 Punkt)**: Korrekte Verwendung der Sortierung
 - **Rückkonvertierung (1 Punkt)**: Integer-Ergebnis zu String-Liste
 
 **Häufige Fehler:**
+
 - Graph-Richtung falsch (-2 Punkte)
 - Fehlende String-Konvertierung (-1 Punkt)
 - Unvollständige Item-Sammlung (-1 Punkt)
 
 ### Längster Pfad (3 Punkte)
+
 - **Quellknoten-Identifikation (1 Punkt)**: Knoten ohne eingehende Kanten
 - **Topologische Verarbeitung (1 Punkt)**: Knoten in korrekter Reihenfolge
 - **Kantenrelaxierung (1 Punkt)**: Maximale Distanz-Updates
 
 **Häufige Fehler:**
+
 - Falsche Quellknoten-Erkennung (-1 Punkt)
 - Distanz-Initialisierung falsch (-1 Punkt)
 - Relaxierung für Minimum statt Maximum (-1 Punkt)
