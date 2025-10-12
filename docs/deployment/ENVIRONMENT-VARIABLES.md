@@ -19,6 +19,7 @@ python scripts/sync_env_to_render.py --generate-template
 ```
 
 **Output:**
+
 - ✅ Liste aller Required Variables
 - ✅ Liste aller Auto-Variables (von Render gesetzt)
 - ✅ Liste aller Optional Variables
@@ -46,7 +47,7 @@ CLAUDE_DEMO_MODE=false
 
 #### PostgreSQL Database URL
 
-1. Öffnen Sie: https://dashboard.render.com/d/dpg-d3hnug7diees73cgu7gg-a
+1. Öffnen Sie: <https://dashboard.render.com/d/dpg-d3hnug7diees73cgu7gg-a>
 2. Gehen Sie zum **"Info"** Tab
 3. Kopieren Sie die **"Internal Database URL"**
 4. Format: `postgresql://user:PASSWORD@host/database`
@@ -57,7 +58,7 @@ DATABASE_URL=postgresql://examcraft_postgres_jyxc_user:PASSWORD@dpg-d3hnug7diees
 
 #### Redis URL
 
-1. Öffnen Sie: https://dashboard.render.com/redis/red-d3hnug95pdvs73fe1u6g
+1. Öffnen Sie: <https://dashboard.render.com/redis/red-d3hnug95pdvs73fe1u6g>
 2. Kopieren Sie die **"Internal Redis URL"**
 
 ```bash
@@ -104,7 +105,7 @@ SECRET_KEY=YOUR_GENERATED_SECRET_KEY
 
 ### Schritt 1: Backend Service
 
-1. Öffnen Sie: https://dashboard.render.com/web/srv-d3hnuk1r0fns73chrjsg/env
+1. Öffnen Sie: <https://dashboard.render.com/web/srv-d3hnuk1r0fns73chrjsg/env>
 
 2. Klicken Sie **"Add Environment Variable"** für jede Variable
 
@@ -136,7 +137,7 @@ SECRET_KEY=YOUR_GENERATED_SECRET_KEY
 
 ### Schritt 2: Frontend Service
 
-1. Öffnen Sie: https://dashboard.render.com/static/srv-d3hnupvdiees73cgudp0/env
+1. Öffnen Sie: <https://dashboard.render.com/static/srv-d3hnupvdiees73cgudp0/env>
 
 2. Setzen Sie:
 
@@ -188,11 +189,13 @@ Diese Variables werden **automatisch** von Render.com gesetzt und müssen **nich
 ### Problem: DATABASE_URL fehlt
 
 **Symptom:**
+
 ```
 psycopg2.OperationalError: fe_sendauth: no password supplied
 ```
 
 **Lösung:**
+
 1. Gehen Sie zu PostgreSQL Dashboard
 2. Kopieren Sie "Internal Database URL"
 3. Setzen Sie im Backend Service als `DATABASE_URL`
@@ -200,11 +203,13 @@ psycopg2.OperationalError: fe_sendauth: no password supplied
 ### Problem: Qdrant Connection Error
 
 **Symptom:**
+
 ```
 {"error":"forbidden"}
 ```
 
 **Lösung:**
+
 1. Prüfen Sie `QDRANT_URL` (muss HTTPS sein)
 2. Prüfen Sie `QDRANT_API_KEY`
 3. Prüfen Sie Qdrant Cloud Dashboard
@@ -212,11 +217,13 @@ psycopg2.OperationalError: fe_sendauth: no password supplied
 ### Problem: CORS Error
 
 **Symptom:**
+
 ```
 Access to fetch at '...' from origin '...' has been blocked by CORS policy
 ```
 
 **Lösung:**
+
 1. Prüfen Sie `CORS_ORIGINS` im Backend
 2. Muss Frontend-URL enthalten
 3. Format: `https://examcraft.talent-factory.xyz,https://api.examcraft.talent-factory.xyz`
@@ -226,4 +233,3 @@ Access to fetch at '...' from origin '...' has been blocked by CORS policy
 - [Render.com Environment Variables Docs](https://render.com/docs/environment-variables)
 - [Render.com Secrets Management](https://render.com/docs/secrets)
 - [ExamCraft Deployment Guide](./render-deployment.md)
-

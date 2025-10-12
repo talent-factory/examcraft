@@ -137,6 +137,7 @@ Befunde: Herzgeräusch 3/6, Ödeme, erhöhte BNP-Werte.
 ```
 
 **Erwartete Fragen-Typen**:
+
 - Wissen: "Benenne die vier Herzklappen"
 - Verstehen: "Erkläre den Unterschied zwischen Systole und Diastole"
 - Anwenden: "Analysiere die Symptome des Fallbeispiels"

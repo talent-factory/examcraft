@@ -13,8 +13,8 @@ Du sollst:
    - Identifiziere fehlgeschlagene oder nicht laufende Services
 
 2. **Service Health Checks**:
-   - Backend API Health Check (http://localhost:8000/health)
-   - Frontend Erreichbarkeit (http://localhost:3000)
+   - Backend API Health Check (<http://localhost:8000/health>)
+   - Frontend Erreichbarkeit (<http://localhost:3000>)
    - PostgreSQL Verbindung testen
    - Redis Verbindung testen
 

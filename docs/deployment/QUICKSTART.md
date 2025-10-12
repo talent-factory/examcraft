@@ -4,7 +4,7 @@
 
 ### Schritt 1: Render.com Account (1 Minute)
 
-1. Gehe zu https://render.com
+1. Gehe zu <https://render.com>
 2. Registriere dich mit GitHub/GitLab Account
 3. Verbinde dein ExamCraft Repository
 
@@ -17,9 +17,9 @@
    - Render erkennt automatisch `render.yaml`
 
 2. **Environment Variables setzen:**
-   
+
    Klicke auf "Advanced" und füge hinzu:
-   
+
    ```bash
    # Backend Service
    CLAUDE_API_KEY=sk-ant-your_key_here
@@ -33,11 +33,12 @@
 ### Schritt 3: Qdrant Cloud Setup (2 Minuten)
 
 1. **Qdrant Cloud Account:**
-   - Gehe zu https://cloud.qdrant.io
+   - Gehe zu <https://cloud.qdrant.io>
    - Erstelle kostenlosen Account
    - Erstelle neuen Cluster (Free Tier)
 
 2. **Cluster URL kopieren:**
+
    ```bash
    # Beispiel URL:
    https://abc-xyz-123.qdrant.io:6333
@@ -55,6 +56,7 @@
    - Databases: ~1-2 Minuten
 
 2. **Services testen:**
+
    ```bash
    # Backend Health Check
    curl https://your-backend.onrender.com/api/v1/health
@@ -64,6 +66,7 @@
    ```
 
 3. **Automatischer Health Check:**
+
    ```bash
    # Lokales Script ausführen
    python scripts/check-render-services.py \
@@ -71,11 +74,11 @@
      https://your-frontend.onrender.com
    ```
 
-## ✅ Fertig!
+## ✅ Fertig
 
 Deine ExamCraft AI Instanz läuft jetzt auf Render.com!
 
-### Nächste Schritte:
+### Nächste Schritte
 
 - 📊 **Monitoring**: Render Dashboard → Metrics
 - 🔍 **Logs**: Render Dashboard → Logs
@@ -89,6 +92,7 @@ Deine ExamCraft AI Instanz läuft jetzt auf Render.com!
 **Problem:** Build failed oder Service crashed
 
 **Lösung:**
+
 ```bash
 # Logs prüfen
 render logs examcraft-backend --tail 100
@@ -104,6 +108,7 @@ render logs examcraft-backend --tail 100
 **Problem:** API Calls schlagen fehl
 
 **Lösung:**
+
 ```bash
 # CORS prüfen
 # Backend muss Frontend URL in CORS_ORIGINS haben
@@ -117,6 +122,7 @@ CORS_ORIGINS=https://your-frontend.onrender.com
 **Problem:** Vector Database nicht erreichbar
 
 **Lösung:**
+
 ```bash
 # Qdrant URL testen
 curl https://your-cluster.qdrant.io:6333/collections
@@ -127,8 +133,8 @@ VECTOR_SERVICE_TYPE=mock
 
 ## 📞 Support
 
-- **Render Docs**: https://render.com/docs
-- **Qdrant Docs**: https://qdrant.tech/documentation
+- **Render Docs**: <https://render.com/docs>
+- **Qdrant Docs**: <https://qdrant.tech/documentation>
 - **ExamCraft Issues**: GitHub Issues
 
 ---
@@ -136,4 +142,3 @@ VECTOR_SERVICE_TYPE=mock
 **Deployment Zeit**: ~10 Minuten
 **Kosten**: Free Tier verfügbar
 **Auto-Deploy**: ✅ Aktiviert
-

@@ -25,12 +25,14 @@
 ### Target Market
 
 **Primary**: Higher Education Institutions
+
 - 🎓 **20,000+** universities worldwide
 - 👨‍🏫 **1.5M+** faculty members globally
 - 💰 **$6B** EdTech assessment market (2024)
 - 📈 **12% CAGR** through 2030
 
 **Secondary**: Professional Certification Bodies
+
 - 📜 IT certifications (AWS, Microsoft, Cisco)
 - 🏥 Medical licensing (USMLE, MCAT prep)
 - 💼 Professional exams (CPA, CFA, PMP)
@@ -45,6 +47,7 @@
 | LMS Built-ins | Basic generators | Low quality | **Bloom's Taxonomy alignment** |
 
 **Our Moat**:
+
 - ✅ **RAG Technology** - Questions grounded in actual course materials
 - ✅ **Pedagogical AI** - Bloom's Taxonomy built-in
 - ✅ **Document Intelligence** - Advanced processing with IBM Docling
@@ -69,18 +72,21 @@
 **Platform**: Render.com Hosting
 
 **Free Tier** - Lead Generation
+
 - 5 documents
 - 20 questions/month
 - 1 user
 - **Target**: 500 free signups in first 3 months
 
 **Starter** - €19/month
+
 - 50 documents
 - 200 questions/month
 - 3 users
 - **Target**: 25 paying customers by Month 6
 
 **Professional** - €49/month
+
 - Unlimited documents
 - 1,000 questions/month
 - 10 users
@@ -88,6 +94,7 @@
 - **Target**: 75 paying customers by Month 9
 
 **Enterprise** - €149/month
+
 - Unlimited everything
 - Priority support
 - SSO integration
@@ -105,22 +112,27 @@
 ### Financial Projections (First Year - Based on TF-116)
 
 **Month 1-3**: Open Source Launch
+
 - Community Building
 - 0 MRR
 
 **Month 3-6**: Freemium Launch
+
 - 25 paying customers
 - **€2,500 MRR** (Break-even)
 
 **Month 6-9**: Growth Phase
+
 - 75 paying customers
 - **€7,500 MRR**
 
 **Month 9-12**: Scale
+
 - 150 paying customers
 - **€15,000 MRR**
 
 **First Enterprise Deal**: ~Month 8-10
+
 - +€999 setup fee
 - +€99/month recurring
 
@@ -164,6 +176,7 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Break-even**: ~€4,000 MRR (40-50 paying customers)
 
 **Assumptions**:
+
 - 5% free → paid conversion
 - <5% monthly churn
 - Average customer value: €35/month (mixed tiers)
@@ -180,6 +193,7 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Status**: 🟢 **LIVE IN PRODUCTION**
 
 **Core Features**:
+
 - ✅ Document Processing (PDF, DOC, Markdown)
 - ✅ AI Question Generation (Claude 3.5 Sonnet)
 - ✅ RAG System (Qdrant Vector DB)
@@ -188,6 +202,7 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 - ✅ Production Deployment (Render.com)
 
 **Metrics**:
+
 - 📊 10 core features delivered
 - ⏱️ 80% time savings for educators
 - 🎓 Full Bloom's Taxonomy support
@@ -201,11 +216,13 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Investment**: 39 Story Points (~6 weeks)
 
 **New Features**:
+
 - 🎨 Interactive Question Editor (WYSIWYG + AI suggestions)
 - 🏦 Question Bank & Tagging System
 - 📋 Exam Template Library & Auto-Composition
 
 **Expected Impact**:
+
 - ⏱️ 50% faster question refinement
 - 📚 Unlimited question reuse
 - ⚡ 5-minute exam creation
@@ -218,10 +235,12 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Investment**: 16 Story Points (~3 weeks)
 
 **New Features**:
+
 - 📊 Question Analytics Dashboard
 - 💬 Student Feedback Integration
 
 **Expected Impact**:
+
 - 📈 25% improvement in question quality
 - 🎯 Data-driven curriculum decisions
 
@@ -233,10 +252,12 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Investment**: 21 Story Points (~4 weeks)
 
 **New Features**:
+
 - 📚 Multi-Document Question Generation
 - 👥 Collaborative Review Workflow
 
 **Expected Impact**:
+
 - 🧠 Higher Bloom levels (Analyze, Evaluate, Create)
 - 🤝 Team-based quality assurance
 
@@ -248,10 +269,12 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Investment**: 42 Story Points (~8 weeks)
 
 **New Features**:
+
 - 🎓 Adaptive Learning Path Generator
 - 📱 Mobile App (PWA)
 
 **Expected Impact**:
+
 - 🎯 Personalized learning for students
 - 📱 Mobile-first study experience
 
@@ -267,6 +290,7 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Objective**: Build community & credibility
 
 **Tactics**:
+
 - 🌟 GitHub release with MIT license
 - 📝 Complete documentation (README, CONTRIBUTING, etc.)
 - 🎥 Demo video creation
@@ -274,6 +298,7 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 - 📧 Beta tester list building
 
 **Success Criteria**:
+
 - 100+ GitHub stars in first 2 weeks
 - 10+ contributors
 - 50+ issues/PRs
@@ -291,6 +316,7 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Objective**: Convert users to paid plans
 
 **Tactics**:
+
 - 🆓 Render.com multi-service setup
 - 💳 Payment integration (Stripe)
 - 🔒 Tier system & rate limiting
@@ -298,6 +324,7 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 - 📊 Usage analytics & conversion optimization
 
 **Success Criteria**:
+
 - 500+ free signups in first 3 months
 - 25+ paying customers after 6 months
 - €2,500 MRR (break-even)
@@ -316,6 +343,7 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Objective**: Drive user acquisition
 
 **Tactics**:
+
 - 🌐 Landing page & SEO
 - 📝 Content marketing (blog, tutorials)
 - 🎓 Beta program (100 testers)
@@ -335,6 +363,7 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Objective**: Land institutional customers
 
 **Tactics**:
+
 - 🏢 Kubernetes/Docker Compose setup
 - 🔐 SSO/SAML integration
 - 📜 License management system
@@ -375,11 +404,13 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 **Direct Competition**: Currently **no direct competitor** for AI-powered OpenBook exam generation with RAG in DACH region.
 
 **Indirect Competition**:
+
 - **Generic Exam Generators**: ExamSoft, Questionmark (expensive, no AI)
 - **AI Writing Tools**: ChatGPT, Claude (not specialized for exams)
 - **Assessment Platforms**: Moodle, Canvas (no automatic generation)
 
 **Our Advantages**:
+
 - ✅ **Technology**: Claude API + RAG = State-of-the-art
 - ✅ **Specialization**: OpenBook exams (niche focus)
 - ✅ **DACH Focus**: GDPR-compliant, German support
@@ -404,11 +435,13 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 ### Current Team
 
 **Development**: 1 Full-Stack Developer
+
 - FastAPI + React expertise
 - AI/ML background
 - DevOps experience
 
 **Advisors**: EdTech & AI experts
+
 - University professors (pedagogy)
 - AI researchers (RAG systems)
 - SaaS founders (go-to-market)
@@ -416,14 +449,17 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 ### Hiring Plan (2026)
 
 **Q2 2026**:
+
 - 1x Frontend Developer (React/TypeScript)
 - 1x Marketing Manager (Content + Growth)
 
 **Q3 2026**:
+
 - 1x Backend Developer (Python/FastAPI)
 - 1x Sales Executive (Enterprise)
 
 **Q4 2026**:
+
 - 1x Product Manager
 - 1x Customer Success Manager
 
@@ -467,18 +503,21 @@ TOTAL MONTHLY COSTS:         €2,640-3,940
 
 **Seed Round**: $500K  
 **Use of Funds**:
+
 - 💻 **Engineering** (50%): 2 developers for 12 months
 - 📈 **Marketing** (30%): Content, ads, conferences
 - 🏢 **Operations** (15%): Infrastructure, tools, legal
 - 💰 **Reserve** (5%): Contingency
 
 **Milestones**:
+
 - ✅ v1.1 release (Q1 2026)
 - ✅ 500 paid users (Q2 2026)
 - ✅ 10 enterprise customers (Q4 2026)
 - ✅ $180K ARR (Q4 2026)
 
 **Exit Strategy**:
+
 - Acquisition by LMS provider (Canvas, Moodle, Blackboard)
 - Acquisition by EdTech company (Coursera, Udemy, Chegg)
 - Strategic partnership with university consortium

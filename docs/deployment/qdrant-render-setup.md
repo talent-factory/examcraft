@@ -16,7 +16,7 @@ Da der Render MCP Server keine Docker-Image Deployments unterstützt, müssen Si
 
 #### Schritt 1: Neuen Web Service erstellen
 
-1. Gehe zu https://dashboard.render.com
+1. Gehe zu <https://dashboard.render.com>
 2. Klicke auf "New +" → "Web Service"
 3. Verbinde dein ExamCraft Repository
 
@@ -53,6 +53,7 @@ Size: 1 GB (Free) oder mehr
 ```
 
 Im Dashboard:
+
 1. Gehe zu Service Settings
 2. "Disks" Tab
 3. "Add Disk"
@@ -118,7 +119,7 @@ Dann Blueprint neu deployen.
 
 #### Schritt 1: Qdrant Cloud Account
 
-1. Gehe zu https://cloud.qdrant.io
+1. Gehe zu <https://cloud.qdrant.io>
 2. Registriere dich (kostenlos)
 3. Erstelle neuen Cluster:
    - Name: `examcraft-production`
@@ -128,6 +129,7 @@ Dann Blueprint neu deployen.
 #### Schritt 2: Cluster URL kopieren
 
 Nach Erstellung erhältst du:
+
 ```
 Cluster URL: https://abc-xyz-123.qdrant.io:6333
 API Key: qdr_xxxxxxxxxxxxxxxxxxxxxxxx
@@ -197,6 +199,7 @@ VECTOR_SERVICE_TYPE=mock
 **Problem**: Docker Build schlägt fehl
 
 **Lösung**:
+
 ```bash
 # Prüfe Dockerfile Syntax
 docker build -f docker/Qdrant.Dockerfile .
@@ -209,6 +212,7 @@ docker build -f docker/Qdrant.Dockerfile .
 **Problem**: Backend kann Qdrant nicht erreichen
 
 **Lösung**:
+
 ```bash
 # Prüfe QDRANT_URL Format:
 # Render Service: https://examcraft-qdrant.onrender.com
@@ -223,6 +227,7 @@ curl https://your-qdrant-url/collections
 **Problem**: Nach Restart sind Collections weg
 
 **Lösung**:
+
 ```bash
 # Stelle sicher, dass Disk Storage gemountet ist:
 # Mount Path: /qdrant/storage

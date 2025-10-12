@@ -70,11 +70,11 @@ Screenshots sollten aktualisiert werden, wenn:
 ## 📞 Kontakt
 
 Bei Fragen zur Screenshot-Erstellung wenden Sie sich an:
-- **Email**: docs@examcraft.ai
+
+- **Email**: <docs@examcraft.ai>
 - **GitHub**: [Issues](https://github.com/examcraft/issues)
 
 ---
 
 **Letzte Aktualisierung**: Oktober 2025  
 **Version**: 1.0.0
-

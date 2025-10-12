@@ -72,6 +72,7 @@ https://gitlab.com/talent-factory/software/examcraft/-/pipelines
 **Datei:** `backend/tests/test_imports.py`
 
 **Prüft:**
+
 - ✅ Kritische Dependencies (numpy, fastapi, pydantic)
 - ✅ Service-Module (vector_service, qdrant_vector_service)
 - ✅ API-Module (documents, vector_search, rag_exams)
@@ -107,6 +108,7 @@ pytest tests/test_api_documents.py -v
 ### Integration Tests
 
 **Erfordert:**
+
 - PostgreSQL
 - Redis
 - Qdrant (oder Mock)
@@ -307,20 +309,24 @@ git commit -m "Your message"
 ### Pipeline-Stages
 
 **1. Validate (schnell, ~1 Min)**
+
 - Import-Check
 - Requirements-Validation
 - YAML-Syntax
 
 **2. Test (~3-5 Min)**
+
 - Backend Unit Tests
 - Frontend Tests
 - Coverage Reports
 
 **3. Build (~5-10 Min)**
+
 - Docker Images
 - Push zu Registry
 
 **4. Deploy (manuell)**
+
 - Staging: develop Branch
 - Production: main Branch
 
@@ -388,4 +394,3 @@ Deployment (manuell)
 **Status**: ✅ Vollständig implementiert
 **Letzte Aktualisierung**: 2025-10-06
 **Verantwortlich**: TF-108 - Production Deployment
-

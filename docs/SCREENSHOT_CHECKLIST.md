@@ -5,7 +5,7 @@
 **Browser**: Chrome/Firefox  
 **Auflösung**: 1920x1080  
 **Zoom**: 100%  
-**URL**: http://localhost:3000
+**URL**: <http://localhost:3000>
 
 ---
 
@@ -48,19 +48,22 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/01_main_navigation.png`
 
 **Schritte:**
-1. Öffne http://localhost:3000
+
+1. Öffne <http://localhost:3000>
 2. Warte bis Seite vollständig geladen (alle Tabs sichtbar)
 3. Screenshot des gesamten Browser-Fensters
 4. **macOS**: `Cmd+Shift+4` → `Space` → Klick auf Browser-Fenster
 5. **Windows**: `Win+Shift+S` → Fenster auswählen
 
 **Erwartetes Ergebnis:**
+
 - Header mit "ExamCraft AI" Logo
 - 6 Tabs sichtbar: KI-Prüfung, Dokumente, Bibliothek, RAG, ChatBot, Prompt Management
 - Aktueller Tab: "KI-Prüfung erstellen" (Standard)
 - System Status Footer
 
 **Checkliste:**
+
 - [ ] Alle 6 Tabs sichtbar
 - [ ] Header vollständig
 - [ ] Footer sichtbar
@@ -74,6 +77,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/02_ai_exam_config.png`
 
 **Schritte:**
+
 1. Klicke auf Tab "KI-Prüfung erstellen" (falls nicht bereits aktiv)
 2. Fülle Formular mit Beispieldaten:
    - **Thema**: "Python Programmierung - Listen und Dictionaries"
@@ -86,11 +90,13 @@ docker-compose exec backend python scripts/seed_prompts.py
 5. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Formular vollständig ausgefüllt
 - Alle Eingabefelder sichtbar
 - "Prüfung generieren" Button sichtbar (noch nicht geklickt)
 
 **Checkliste:**
+
 - [ ] Thema eingegeben
 - [ ] Schwierigkeitsgrad ausgewählt
 - [ ] Anzahl Fragen gesetzt (5)
@@ -106,6 +112,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/03_ai_exam_result.png`
 
 **Schritte:**
+
 1. Klicke "Prüfung generieren" (mit Daten aus Screenshot 02)
 2. Warte 10-30 Sekunden bis Generierung abgeschlossen
 3. Scrolle zu den ersten 2-3 Fragen
@@ -114,6 +121,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 6. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Prüfungsübersicht (Thema, Anzahl, Schwierigkeit)
 - Mindestens 2 vollständige Fragen sichtbar
 - Jede Frage zeigt:
@@ -126,6 +134,7 @@ docker-compose exec backend python scripts/seed_prompts.py
   - Schwierigkeitsgrad (Sterne)
 
 **Checkliste:**
+
 - [ ] Prüfungsübersicht sichtbar
 - [ ] Mindestens 2 Fragen vollständig sichtbar
 - [ ] Korrekte Antwort grün markiert
@@ -140,18 +149,21 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/04_document_upload_empty.png`
 
 **Schritte:**
+
 1. Klicke auf Tab "Dokumente hochladen"
 2. Screenshot des leeren Upload-Bereichs
 3. **macOS**: `Cmd+Shift+4` → Bereich auswählen
 4. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Upload-Box mit Drag & Drop Zone
 - "Dateien auswählen" Button
 - Hinweis auf unterstützte Formate
 - Hinweis auf max. Dateigröße
 
 **Checkliste:**
+
 - [ ] Upload-Box sichtbar
 - [ ] "Dateien auswählen" Button sichtbar
 - [ ] Format-Hinweis sichtbar
@@ -165,6 +177,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/05_document_upload_progress.png`
 
 **Schritte:**
+
 1. Wähle eine PDF-Datei aus (z.B. aus `demo/` Verzeichnis)
 2. **Schnell**: Screenshot während Upload/Verarbeitung (ca. 50%)
 3. **Timing ist wichtig!** Bereite Screenshot-Tool vor
@@ -172,12 +185,14 @@ docker-compose exec backend python scripts/seed_prompts.py
 5. **Windows**: `Win+Shift+S` bereithalten
 
 **Erwartetes Ergebnis:**
+
 - Dateiname und Größe angezeigt
 - Fortschrittsbalken bei ca. 50%
 - Status: "Wird verarbeitet..."
 - Spinner-Animation (optional)
 
 **Checkliste:**
+
 - [ ] Dateiname sichtbar
 - [ ] Fortschrittsbalken sichtbar (nicht 0% oder 100%)
 - [ ] Status "Wird verarbeitet..." sichtbar
@@ -192,18 +207,21 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/06_document_upload_success.png`
 
 **Schritte:**
+
 1. Warte bis Upload vollständig abgeschlossen
 2. Screenshot der Erfolgsanzeige
 3. **macOS**: `Cmd+Shift+4` → Bereich auswählen
 4. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Grünes Häkchen ✅
 - Status: "Verarbeitet"
 - Anzahl extrahierte Seiten
 - "Weiteres Dokument hochladen" Button (optional)
 
 **Checkliste:**
+
 - [ ] Grünes Häkchen sichtbar
 - [ ] Status "Verarbeitet" sichtbar
 - [ ] Seitenanzahl angezeigt
@@ -216,6 +234,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/07_document_library.png`
 
 **Schritte:**
+
 1. Klicke auf Tab "Dokumentenbibliothek"
 2. Stelle sicher, dass 3-5 Dokumente vorhanden sind
 3. Screenshot der gesamten Bibliothek
@@ -223,6 +242,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 5. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Suchfeld oben
 - Format-Filter Dropdown
 - Liste mit 3-5 Dokumenten
@@ -235,6 +255,7 @@ docker-compose exec backend python scripts/seed_prompts.py
   - Löschen-Button
 
 **Checkliste:**
+
 - [ ] Suchfeld sichtbar
 - [ ] Filter sichtbar
 - [ ] Mindestens 3 Dokumente sichtbar
@@ -249,17 +270,20 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/08_document_selection.png`
 
 **Schritte:**
+
 1. In Dokumentenbibliothek: Wähle 2-3 Dokumente aus (Checkboxen aktivieren)
 2. Screenshot mit aktivierten Checkboxen
 3. **macOS**: `Cmd+Shift+4` → Bereich auswählen
 4. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - 2-3 aktivierte Checkboxen
 - Ausgewählte Zeilen hervorgehoben (optional)
 - "Prüfung aus Auswahl erstellen" Button aktiv
 
 **Checkliste:**
+
 - [ ] 2-3 Checkboxen aktiviert
 - [ ] Zeilen hervorgehoben
 - [ ] Button aktiv/hervorgehoben
@@ -272,6 +296,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/09_rag_exam_config.png`
 
 **Schritte:**
+
 1. Klicke "Prüfung aus Auswahl erstellen" (oder Tab "RAG-Prüfung erstellen")
 2. Fülle Formular mit Beispieldaten:
    - **Fokus**: "Sortieralgorithmen Komplexität"
@@ -283,11 +308,13 @@ docker-compose exec backend python scripts/seed_prompts.py
 5. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Ausgewählte Dokumente angezeigt
 - Formular ausgefüllt
 - "RAG-Prüfung generieren" Button sichtbar
 
 **Checkliste:**
+
 - [ ] Ausgewählte Dokumente sichtbar
 - [ ] Fokus eingegeben
 - [ ] Anzahl Fragen gesetzt
@@ -303,6 +330,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/10_rag_exam_result.png`
 
 **Schritte:**
+
 1. Klicke "RAG-Prüfung generieren"
 2. Warte 20-60 Sekunden bis abgeschlossen
 3. Screenshot einer Frage **mit Quellenangaben**
@@ -310,6 +338,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 5. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Frage mit Antwortoptionen
 - Korrekte Antwort (grün)
 - Erklärung
@@ -318,6 +347,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 - Bloom-Level Badge
 
 **Checkliste:**
+
 - [ ] Frage vollständig sichtbar
 - [ ] Quellenangaben sichtbar
 - [ ] Confidence Score sichtbar
@@ -331,6 +361,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/11_chatbot_overview.png`
 
 **Schritte:**
+
 1. Klicke auf Tab "Dokument ChatBot"
 2. Wähle ein Dokument aus Dropdown
 3. Screenshot der leeren Chat-Oberfläche
@@ -338,6 +369,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 5. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Dokument-Auswahl Dropdown (mit ausgewähltem Dokument)
 - Leerer Chat-Bereich
 - Eingabefeld für Fragen
@@ -345,6 +377,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 - "Chat exportieren" Button (optional)
 
 **Checkliste:**
+
 - [ ] Dropdown mit Dokument sichtbar
 - [ ] Chat-Bereich leer
 - [ ] Eingabefeld sichtbar
@@ -358,6 +391,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/12_chatbot_conversation.png`
 
 **Schritte:**
+
 1. Stelle Frage: "Erkläre mir den Heapsort Algorithmus"
 2. Warte auf Antwort (10-30 Sekunden)
 3. Screenshot der Konversation
@@ -365,6 +399,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 5. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - User-Nachricht (rechts, blau)
 - Bot-Antwort (links, grau)
 - Quellenangaben unter Antwort
@@ -372,6 +407,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 - Timestamp (optional)
 
 **Checkliste:**
+
 - [ ] User-Nachricht sichtbar
 - [ ] Bot-Antwort sichtbar
 - [ ] Quellenangaben sichtbar
@@ -385,18 +421,21 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/13_chatbot_export.png`
 
 **Schritte:**
+
 1. Klicke "Chat exportieren" Button
 2. Screenshot des Export-Dialogs
 3. **macOS**: `Cmd+Shift+4` → Bereich auswählen
 4. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Export-Dialog geöffnet
 - Format-Auswahl (Markdown/PDF)
 - Dateiname-Eingabe
 - "Exportieren" Button
 
 **Checkliste:**
+
 - [ ] Dialog geöffnet
 - [ ] Format-Auswahl sichtbar
 - [ ] Dateiname-Feld sichtbar
@@ -412,6 +451,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/14_prompt_library.png`
 
 **Schritte:**
+
 1. Klicke auf Tab "Prompt Management"
 2. Stelle sicher, dass 4-6 Prompts vorhanden sind (Seed-Daten)
 3. Screenshot des Grid-Layouts
@@ -419,6 +459,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 5. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Suchfeld oben
 - Kategorie-Filter Dropdown
 - Grid mit 4-6 Prompt-Karten
@@ -432,6 +473,7 @@ docker-compose exec backend python scripts/seed_prompts.py
   - Aktionen (Bearbeiten, Versionen, Löschen)
 
 **Checkliste:**
+
 - [ ] Suchfeld sichtbar
 - [ ] Filter sichtbar
 - [ ] Mindestens 4 Prompt-Karten sichtbar
@@ -446,6 +488,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/15_prompt_editor.png`
 
 **Schritte:**
+
 1. Klicke "Neuer Prompt" oder "Bearbeiten" bei einem Prompt
 2. Fülle Formular mit Beispieldaten (oder nutze bestehende)
 3. Stelle sicher, dass "Bearbeiten" Tab aktiv ist
@@ -454,6 +497,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 6. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Name Eingabefeld
 - Beschreibung Textarea
 - Kategorie Dropdown
@@ -465,6 +509,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 - "Speichern" Button
 
 **Checkliste:**
+
 - [ ] Alle Formularfelder sichtbar
 - [ ] "Bearbeiten" Tab aktiv
 - [ ] Content Editor sichtbar
@@ -479,17 +524,20 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/16_prompt_preview.png`
 
 **Schritte:**
+
 1. Im Editor: Wechsle zu "Vorschau" Tab
 2. Screenshot der gerenderten Markdown-Ansicht
 3. **macOS**: `Cmd+Shift+4` → Bereich auswählen
 4. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Gerenderte Markdown-Ansicht
 - Formatierung sichtbar (Überschriften, Listen, Code)
 - Template-Variablen hervorgehoben (optional)
 
 **Checkliste:**
+
 - [ ] "Vorschau" Tab aktiv
 - [ ] Markdown gerendert
 - [ ] Formatierung korrekt
@@ -502,18 +550,21 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/17_version_history.png`
 
 **Schritte:**
+
 1. Klicke "Versionen" bei einem Prompt (in Prompt Library)
 2. Screenshot der Version History Tabelle
 3. **macOS**: `Cmd+Shift+4` → Bereich auswählen
 4. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Tabelle mit allen Versionen
 - Spalten: Version, Status, Beschreibung, Erstellt am, Aktionen
 - Mindestens 2-3 Versionen sichtbar
 - Aktionen: Vorschau, Aktivieren
 
 **Checkliste:**
+
 - [ ] Tabelle sichtbar
 - [ ] Alle Spalten sichtbar
 - [ ] Mindestens 2 Versionen sichtbar
@@ -527,12 +578,14 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/18_usage_analytics.png`
 
 **Schritte:**
+
 1. Klicke "Analytics" oder öffne Usage Analytics für einen Prompt
 2. Screenshot des Analytics-Dashboards
 3. **macOS**: `Cmd+Shift+4` → Bereich auswählen
 4. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - 4 Metrik-Karten:
   - Verwendungen (Zahl)
   - Erfolgsrate (% mit Farbindikator)
@@ -541,6 +594,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 - Verwendungsverlauf Tabelle
 
 **Checkliste:**
+
 - [ ] Alle 4 Metrik-Karten sichtbar
 - [ ] Verwendungsverlauf Tabelle sichtbar
 - [ ] Farbindikatoren sichtbar
@@ -553,6 +607,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 **Datei**: `docs/screenshots/19_semantic_search.png`
 
 **Schritte:**
+
 1. Wechsle zu "Semantic Search" Tab (in Prompt Management)
 2. Gib Suchanfrage ein: "Generiere Multiple Choice Fragen"
 3. Klicke "Suchen"
@@ -561,6 +616,7 @@ docker-compose exec backend python scripts/seed_prompts.py
 6. **Windows**: `Win+Shift+S` → Bereich auswählen
 
 **Erwartetes Ergebnis:**
+
 - Suchanfrage Eingabefeld (ausgefüllt)
 - Filter (Kategorie, Use Case)
 - Advanced Settings (Limit, Score Threshold)
@@ -571,6 +627,7 @@ docker-compose exec backend python scripts/seed_prompts.py
   - Tags
 
 **Checkliste:**
+
 - [ ] Suchanfrage eingegeben
 - [ ] Filter sichtbar
 - [ ] Advanced Settings sichtbar
@@ -632,6 +689,7 @@ Nach Erstellung aller Screenshots:
    - ADMIN_PROMPT_MANAGEMENT.md mit Screenshots ergänzen
 
 2. **Git Commit**
+
    ```bash
    git add docs/screenshots/*.png
    git commit -m "📸 docs: Füge 19 Screenshots für Benutzerdokumentation hinzu"
@@ -650,4 +708,3 @@ Nach Erstellung aller Screenshots:
 **Voraussetzungen**: Laufende ExamCraft AI Instanz
 
 Viel Erfolg! 🚀
-

@@ -27,6 +27,7 @@
 **Beschreibung**: Die Hauptnavigation zeigt alle verfügbaren Funktionen in Tab-Form.
 
 **Elemente:**
+
 - Header mit ExamCraft AI Logo
 - 6 Haupttabs:
   - 🤖 KI-Prüfung erstellen
@@ -40,6 +41,7 @@
 **Screenshot-Datei**: `screenshots/01_main_navigation.png`
 
 **Wie erstellen:**
+
 1. Öffne `http://localhost:3000`
 2. Warte bis Seite vollständig geladen
 3. Screenshot des gesamten Fensters
@@ -54,6 +56,7 @@
 **Beschreibung**: Formular zur Konfiguration der themenbasierten Fragenerstellung.
 
 **Elemente:**
+
 - Thema-Eingabefeld
 - Schwierigkeitsgrad-Dropdown (Einfach/Mittel/Schwer)
 - Anzahl Fragen Slider (1-20)
@@ -64,6 +67,7 @@
 **Screenshot-Datei**: `screenshots/02_ai_exam_config.png`
 
 **Wie erstellen:**
+
 1. Klicke auf Tab "KI-Prüfung erstellen"
 2. Fülle Formular mit Beispieldaten:
    - Thema: "Python Programmierung - Listen und Dictionaries"
@@ -79,6 +83,7 @@
 **Beschreibung**: Anzeige der generierten Fragen mit Details.
 
 **Elemente:**
+
 - Prüfungsübersicht (Thema, Anzahl, Schwierigkeit)
 - Liste der Fragen mit:
   - Fragenummer
@@ -93,6 +98,7 @@
 **Screenshot-Datei**: `screenshots/03_ai_exam_result.png`
 
 **Wie erstellen:**
+
 1. Generiere Prüfung mit obiger Konfiguration
 2. Warte bis Generierung abgeschlossen
 3. Scrolle zu erster Frage
@@ -108,6 +114,7 @@
 **Beschreibung**: Drag & Drop Upload-Interface für Dokumente.
 
 **Elemente:**
+
 - Upload-Box mit Drag & Drop Zone
 - "Dateien auswählen" Button
 - Unterstützte Formate Hinweis
@@ -116,6 +123,7 @@
 **Screenshot-Datei**: `screenshots/04_document_upload_empty.png`
 
 **Wie erstellen:**
+
 1. Klicke auf Tab "Dokumente hochladen"
 2. Screenshot des leeren Upload-Bereichs
 3. Speichere als `04_document_upload_empty.png`
@@ -125,6 +133,7 @@
 **Beschreibung**: Anzeige während des Upload-Vorgangs.
 
 **Elemente:**
+
 - Dateiname und Größe
 - Fortschrittsbalken (0-100%)
 - Status: "Wird verarbeitet..."
@@ -133,6 +142,7 @@
 **Screenshot-Datei**: `screenshots/05_document_upload_progress.png`
 
 **Wie erstellen:**
+
 1. Starte Upload einer PDF-Datei
 2. Screenshot während Verarbeitung (ca. 50%)
 3. Speichere als `05_document_upload_progress.png`
@@ -142,6 +152,7 @@
 **Beschreibung**: Erfolgreiche Upload-Bestätigung.
 
 **Elemente:**
+
 - Grünes Häkchen
 - "Verarbeitet" Status
 - Anzahl extrahierte Seiten
@@ -150,6 +161,7 @@
 **Screenshot-Datei**: `screenshots/06_document_upload_success.png`
 
 **Wie erstellen:**
+
 1. Warte bis Upload abgeschlossen
 2. Screenshot der Erfolgsanzeige
 3. Speichere als `06_document_upload_success.png`
@@ -163,6 +175,7 @@
 **Beschreibung**: Liste aller hochgeladenen Dokumente.
 
 **Elemente:**
+
 - Suchfeld
 - Format-Filter Dropdown
 - Dokumentenliste mit:
@@ -177,6 +190,7 @@
 **Screenshot-Datei**: `screenshots/07_document_library.png`
 
 **Wie erstellen:**
+
 1. Klicke auf Tab "Dokumentenbibliothek"
 2. Stelle sicher, dass 3-5 Dokumente vorhanden sind
 3. Screenshot der gesamten Bibliothek
@@ -187,6 +201,7 @@
 **Beschreibung**: Mehrere Dokumente für RAG-Prüfung ausgewählt.
 
 **Elemente:**
+
 - 2-3 aktivierte Checkboxen
 - Hervorgehobene Zeilen
 - Aktiver "Prüfung erstellen" Button
@@ -194,6 +209,7 @@
 **Screenshot-Datei**: `screenshots/08_document_selection.png`
 
 **Wie erstellen:**
+
 1. Wähle 2-3 Dokumente aus
 2. Screenshot mit aktivierten Checkboxen
 3. Speichere als `08_document_selection.png`
@@ -207,6 +223,7 @@
 **Beschreibung**: Formular für RAG-basierte Fragenerstellung.
 
 **Elemente:**
+
 - Ausgewählte Dokumente Anzeige
 - Thema/Fokus Eingabefeld
 - Anzahl Fragen Slider
@@ -217,6 +234,7 @@
 **Screenshot-Datei**: `screenshots/09_rag_exam_config.png`
 
 **Wie erstellen:**
+
 1. Klicke auf Tab "RAG-Prüfung erstellen"
 2. Fülle Formular mit Beispieldaten:
    - Fokus: "Sortieralgorithmen Komplexität"
@@ -231,6 +249,7 @@
 **Beschreibung**: Generierte Fragen mit Quellenangaben.
 
 **Elemente:**
+
 - Frage mit Antwortoptionen
 - Korrekte Antwort (grün)
 - Erklärung
@@ -241,6 +260,7 @@
 **Screenshot-Datei**: `screenshots/10_rag_exam_result.png`
 
 **Wie erstellen:**
+
 1. Generiere RAG-Prüfung
 2. Warte bis abgeschlossen
 3. Screenshot einer Frage mit Quellenangaben
@@ -255,6 +275,7 @@
 **Beschreibung**: Interaktive Chat-Oberfläche mit Dokumentenauswahl.
 
 **Elemente:**
+
 - Dokument-Auswahl Dropdown
 - Chat-Historie Bereich
 - Eingabefeld für Fragen
@@ -264,6 +285,7 @@
 **Screenshot-Datei**: `screenshots/11_chatbot_overview.png`
 
 **Wie erstellen:**
+
 1. Klicke auf Tab "Dokument ChatBot"
 2. Wähle ein Dokument aus
 3. Screenshot der leeren Chat-Oberfläche
@@ -274,6 +296,7 @@
 **Beschreibung**: Beispiel-Konversation mit Antworten.
 
 **Elemente:**
+
 - User-Nachricht (rechts, blau)
 - Bot-Antwort (links, grau)
 - Quellenangaben unter Antwort
@@ -283,6 +306,7 @@
 **Screenshot-Datei**: `screenshots/12_chatbot_conversation.png`
 
 **Wie erstellen:**
+
 1. Stelle Frage: "Erkläre mir den Heapsort Algorithmus"
 2. Warte auf Antwort
 3. Screenshot der Konversation
@@ -293,6 +317,7 @@
 **Beschreibung**: Export-Dialog für Chat-Historie.
 
 **Elemente:**
+
 - Export-Format Auswahl (Markdown/PDF)
 - Dateiname Eingabe
 - "Exportieren" Button
@@ -301,6 +326,7 @@
 **Screenshot-Datei**: `screenshots/13_chatbot_export.png`
 
 **Wie erstellen:**
+
 1. Klicke "Chat exportieren"
 2. Screenshot des Export-Dialogs
 3. Speichere als `13_chatbot_export.png`
@@ -314,6 +340,7 @@
 **Beschreibung**: Grid-Übersicht aller AI-Prompts.
 
 **Elemente:**
+
 - Suchfeld
 - Kategorie-Filter Dropdown
 - Grid mit Prompt-Karten:
@@ -328,6 +355,7 @@
 **Screenshot-Datei**: `screenshots/14_prompt_library.png`
 
 **Wie erstellen:**
+
 1. Klicke auf Tab "Prompt Management"
 2. Stelle sicher, dass 4-6 Prompts vorhanden sind
 3. Screenshot des Grid-Layouts
@@ -338,6 +366,7 @@
 **Beschreibung**: Editor für Prompt-Erstellung/-Bearbeitung.
 
 **Elemente:**
+
 - Name Eingabefeld
 - Beschreibung Textarea
 - Kategorie Dropdown
@@ -351,6 +380,7 @@
 **Screenshot-Datei**: `screenshots/15_prompt_editor.png`
 
 **Wie erstellen:**
+
 1. Klicke "Neuer Prompt" oder "Bearbeiten"
 2. Fülle Formular mit Beispieldaten
 3. Screenshot des Editors (Bearbeiten-Tab)
@@ -361,6 +391,7 @@
 **Beschreibung**: Markdown-Vorschau des Prompt-Contents.
 
 **Elemente:**
+
 - Gerenderte Markdown-Ansicht
 - Formatierung (Überschriften, Listen, Code)
 - Template-Variablen hervorgehoben
@@ -368,6 +399,7 @@
 **Screenshot-Datei**: `screenshots/16_prompt_preview.png`
 
 **Wie erstellen:**
+
 1. Im Editor: Wechsle zu "Vorschau" Tab
 2. Screenshot der gerenderten Ansicht
 3. Speichere als `16_prompt_preview.png`
@@ -377,6 +409,7 @@
 **Beschreibung**: Tabelle mit allen Prompt-Versionen.
 
 **Elemente:**
+
 - Tabelle mit Spalten:
   - Version
   - Status (Aktiv/Inaktiv)
@@ -388,6 +421,7 @@
 **Screenshot-Datei**: `screenshots/17_version_history.png`
 
 **Wie erstellen:**
+
 1. Klicke "Versionen" bei einem Prompt
 2. Screenshot der Version History Tabelle
 3. Speichere als `17_version_history.png`
@@ -397,6 +431,7 @@
 **Beschreibung**: Dashboard mit Nutzungsstatistiken.
 
 **Elemente:**
+
 - 4 Metrik-Karten:
   - Verwendungen (Zahl)
   - Erfolgsrate (% mit Farbindikator)
@@ -412,6 +447,7 @@
 **Screenshot-Datei**: `screenshots/18_usage_analytics.png`
 
 **Wie erstellen:**
+
 1. Klicke "Analytics" bei einem Prompt
 2. Screenshot des Analytics-Dashboards
 3. Speichere als `18_usage_analytics.png`
@@ -421,6 +457,7 @@
 **Beschreibung**: Suchinterface für semantische Prompt-Suche.
 
 **Elemente:**
+
 - Suchanfrage Eingabefeld
 - Filter:
   - Kategorie Dropdown
@@ -438,6 +475,7 @@
 **Screenshot-Datei**: `screenshots/19_semantic_search.png`
 
 **Wie erstellen:**
+
 1. Wechsle zu "Semantic Search" Tab
 2. Gib Suchanfrage ein: "Generiere Multiple Choice Fragen"
 3. Screenshot mit Suchergebnissen
@@ -450,6 +488,7 @@
 ### Vorbereitung
 
 **Browser-Einstellungen:**
+
 - Verwende Chrome oder Firefox
 - Auflösung: 1920x1080 (Desktop)
 - Zoom: 100%
@@ -457,6 +496,7 @@
 - Verwende Inkognito-Modus für saubere UI
 
 **Daten vorbereiten:**
+
 1. Starte Development Stack: `./start-dev.sh`
 2. Lade Seed-Daten: `docker-compose exec backend python scripts/seed_prompts.py`
 3. Lade 3-5 Beispiel-PDFs hoch
@@ -466,28 +506,33 @@
 ### Screenshot-Tools
 
 **macOS:**
+
 - Ganzer Bildschirm: `Cmd + Shift + 3`
 - Ausgewählter Bereich: `Cmd + Shift + 4`
 - Fenster: `Cmd + Shift + 4` dann `Space`
 
 **Windows:**
+
 - Ganzer Bildschirm: `Win + Print`
 - Ausgewählter Bereich: `Win + Shift + S`
 - Snipping Tool: `Win + S`
 
 **Linux:**
+
 - GNOME: `Print` oder `Shift + Print`
 - KDE: `Spectacle`
 
 ### Nachbearbeitung
 
 **Empfohlene Tools:**
+
 - **macOS**: Preview, Pixelmator
 - **Windows**: Paint, Paint.NET
 - **Linux**: GIMP, Krita
 - **Cross-Platform**: Figma, Photopea
 
 **Bearbeitungsschritte:**
+
 1. Zuschneiden auf relevanten Bereich
 2. Größe anpassen (max. 1920px Breite)
 3. Komprimieren (PNG oder JPG, <500 KB)
@@ -499,6 +544,7 @@
 ### Dateiorganisation
 
 **Verzeichnisstruktur:**
+
 ```
 docs/screenshots/
 ├── 01_main_navigation.png
@@ -523,6 +569,7 @@ docs/screenshots/
 ```
 
 **Namenskonvention:**
+
 - Format: `{nummer}_{beschreibung}.png`
 - Kleinbuchstaben
 - Unterstriche statt Leerzeichen
@@ -531,17 +578,20 @@ docs/screenshots/
 ### Integration in Dokumentation
 
 **Markdown-Syntax:**
+
 ```markdown
 ![Beschreibung](screenshots/01_main_navigation.png)
 ```
 
 **Mit Bildunterschrift:**
+
 ```markdown
 ![Hauptnavigation](screenshots/01_main_navigation.png)
 *Abbildung 1: ExamCraft AI Hauptnavigation mit 6 Funktionsbereichen*
 ```
 
 **Mit Link:**
+
 ```markdown
 [![Hauptnavigation](screenshots/01_main_navigation.png)](screenshots/01_main_navigation.png)
 ```
@@ -577,4 +627,3 @@ Verwende diese Checkliste, um sicherzustellen, dass alle Screenshots erstellt wu
 **Letzte Aktualisierung**: Oktober 2025  
 **Version**: 1.0.0  
 **Autor**: ExamCraft AI Team
-

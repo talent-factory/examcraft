@@ -108,9 +108,9 @@ ExamCraft/
    ```
 
 4. **Services verfügbar unter:**
-   - **Frontend**: http://localhost:3000 (React Dashboard)
-   - **Backend API**: http://localhost:8000 (FastAPI Server)
-   - **API Dokumentation**: http://localhost:8000/docs (Swagger UI)
+   - **Frontend**: <http://localhost:3000> (React Dashboard)
+   - **Backend API**: <http://localhost:8000> (FastAPI Server)
+   - **API Dokumentation**: <http://localhost:8000/docs> (Swagger UI)
    - **Database**: localhost:5432 (PostgreSQL)
    - **Redis**: localhost:6379 (Caching)
 

@@ -86,6 +86,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Auto-Save** - Never lose your work with automatic drafts
 
 **Benefits for Educators**:
+
 - ⏱️ 50% faster question refinement
 - 📈 Higher quality questions with AI assistance
 - 🎯 Professional formatting without technical knowledge
@@ -102,6 +103,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Import/Export** - JSON, CSV, and QTI 2.1 formats
 
 **Benefits for Educators**:
+
 - 🔍 Find questions in seconds, not minutes
 - ♻️ Reuse questions across multiple exams
 - 📊 Better organization with hierarchical tagging
@@ -118,6 +120,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Multi-Format Export** - PDF (student + answer key), Moodle XML, Canvas JSON
 
 **Benefits for Educators**:
+
 - ⚡ Create balanced exams in minutes, not hours
 - 🎯 Guaranteed alignment with learning objectives
 - 📤 Direct export to your LMS
@@ -142,6 +145,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Automated Reports** - PDF/Excel exports for accreditation
 
 **Benefits for Educators**:
+
 - 📈 Continuously improve question quality
 - 🎯 Identify and fix problematic questions
 - 📊 Data-driven curriculum decisions
@@ -157,6 +161,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Trend Analysis** - Track question quality over time
 
 **Benefits for Educators**:
+
 - 👂 Listen to student perspectives
 - 🔄 Continuous improvement cycle
 - ✨ Better questions with each iteration
@@ -180,6 +185,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Source Attribution** - Track which documents contributed to each question
 
 **Benefits for Educators**:
+
 - 🧠 Test deeper understanding and connections
 - 🎓 Higher Bloom levels (Analyze, Evaluate, Create)
 - 📖 Comprehensive assessment across course materials
@@ -196,6 +202,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Audit Trail** - Complete history of all changes
 
 **Benefits for Educators**:
+
 - 🤝 Team-based quality assurance
 - ✅ Peer review before exams go live
 - 📝 Institutional knowledge preservation
@@ -220,6 +227,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Progress Tracking** - Visualize learning journey
 
 **Benefits for Students**:
+
 - 🎯 Personalized study plans
 - 📈 Faster mastery of difficult topics
 - 🧠 Optimized retention with spaced repetition
@@ -236,6 +244,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Dark Mode** - Comfortable studying any time
 
 **Benefits for Students**:
+
 - 📱 Study anywhere, anytime
 - 🔔 Stay motivated with reminders
 - 🏆 Engaging learning experience
@@ -260,6 +269,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 - **Detailed Reports** - Evidence-based plagiarism documentation
 
 **Benefits for Educators**:
+
 - 🛡️ Maintain academic integrity
 - 🤖 Detect AI-generated submissions
 - ⚖️ Fair assessment for all students
@@ -313,7 +323,7 @@ To become the leading AI-powered platform for creating high-quality, pedagogical
 
 We welcome feedback from educators and institutions! Help us prioritize features:
 
-- 📧 **Email**: feedback@examcraft.ai
+- 📧 **Email**: <feedback@examcraft.ai>
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/examcraft/discussions)
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/yourusername/examcraft/issues)
 - 💡 **Feature Requests**: [Feature Request Form](https://forms.gle/yourform)
@@ -329,6 +339,7 @@ ExamCraft AI is released under the [MIT License](LICENSE).
 ## 🙏 Acknowledgments
 
 Built with:
+
 - [Anthropic Claude](https://www.anthropic.com/) - AI-powered question generation
 - [Qdrant](https://qdrant.tech/) - Vector database for semantic search
 - [IBM Docling](https://github.com/DS4SD/docling) - Document processing
@@ -338,4 +349,3 @@ Built with:
 ---
 
 **Last Updated**: October 2025 | **Version**: 1.0.0 | **Status**: Production Ready 🚀
-

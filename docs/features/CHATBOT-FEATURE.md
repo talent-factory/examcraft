@@ -48,6 +48,7 @@ backend/
 ### Frontend Components
 
 ```
+
 frontend/src/
 ├── components/
 │   ├── ChatInterface.tsx       # Main Chat UI
@@ -56,6 +57,7 @@ frontend/src/
 │   └── ChatInput.tsx           # Message Input
 └── services/
     └── chatService.ts          # API Client
+
 ```text
 
 ### Database Schema
