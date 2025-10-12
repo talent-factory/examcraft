@@ -43,11 +43,14 @@ class PromptVectorService:
         """Creates collection if it doesn't exist"""
         try:
             self.qdrant_client.get_collection(self.collection_name)
-        except Exception:
-            self.qdrant_client.create_collection(
-                collection_name=self.collection_name,
-                vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
-            )
+        except Exception as e:
+            # Only create if collection doesn't exist (not other errors)
+            if "not found" in str(e).lower() or "does not exist" in str(e).lower():
+                self.qdrant_client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
+                )
+            # If collection already exists, silently continue
 
     def _generate_embedding(self, text: str) -> List[float]:
         """
