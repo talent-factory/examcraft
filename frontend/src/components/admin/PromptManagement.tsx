@@ -3,10 +3,11 @@ import { PromptLibrary } from './PromptLibrary';
 import { PromptEditor } from './PromptEditor';
 import { PromptVersionHistory } from './PromptVersionHistory';
 import { PromptUsageChart } from './PromptUsageChart';
+import { SemanticSearchTester } from './SemanticSearchTester';
 import { Box, Paper, Tabs, Tab } from '@mui/material';
-import { LibraryBooks, Edit, History, BarChart } from '@mui/icons-material';
+import { LibraryBooks, Edit, History, BarChart, Search } from '@mui/icons-material';
 
-type ViewMode = 'library' | 'editor' | 'versions' | 'analytics';
+type ViewMode = 'library' | 'editor' | 'versions' | 'analytics' | 'search';
 
 export const PromptManagement: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('library');
@@ -51,11 +52,40 @@ export const PromptManagement: React.FC = () => {
 
   return (
     <Box>
+      {/* Tab Navigation for different views */}
       {viewMode === 'library' && (
-        <PromptLibrary
-          onEditPrompt={handleEditPrompt}
-          onCreateNew={handleCreateNew}
-        />
+        <Box>
+          <Paper elevation={2} sx={{ mb: 3 }}>
+            <Tabs value={0} variant="fullWidth">
+              <Tab label="Prompt Library" icon={<LibraryBooks />} />
+              <Tab
+                label="Semantic Search"
+                icon={<Search />}
+                onClick={() => setViewMode('search')}
+              />
+            </Tabs>
+          </Paper>
+          <PromptLibrary
+            onEditPrompt={handleEditPrompt}
+            onCreateNew={handleCreateNew}
+          />
+        </Box>
+      )}
+
+      {viewMode === 'search' && (
+        <Box>
+          <Paper elevation={2} sx={{ mb: 3 }}>
+            <Tabs value={1} variant="fullWidth">
+              <Tab
+                label="Prompt Library"
+                icon={<LibraryBooks />}
+                onClick={() => setViewMode('library')}
+              />
+              <Tab label="Semantic Search" icon={<Search />} />
+            </Tabs>
+          </Paper>
+          <SemanticSearchTester />
+        </Box>
       )}
 
       {viewMode === 'editor' && (
