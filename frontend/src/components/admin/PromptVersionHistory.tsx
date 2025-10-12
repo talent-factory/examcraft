@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 import { ArrowBack, CheckCircle, Visibility, Restore } from '@mui/icons-material';
 import { promptsApi, Prompt } from '../../api/promptsApi';
-import ReactMarkdown from 'react-markdown';
+import MarkdownRenderer from '../MarkdownRenderer';
 
 interface PromptVersionHistoryProps {
   promptName: string;
@@ -217,7 +217,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
               Content:
             </Typography>
             <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
-              <ReactMarkdown>{previewVersion?.content || ''}</ReactMarkdown>
+              <MarkdownRenderer content={previewVersion?.content || ''} />
             </Paper>
           </Box>
           <Box>
