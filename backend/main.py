@@ -56,12 +56,13 @@ async def startup_event():
 async def load_routers():
     """Load API routers on startup"""
     from api import documents, vector_search, rag_exams
-    from api.v1 import chat as chat_api
+    from api.v1 import chat as chat_api, prompts as prompts_api
 
     app.include_router(documents.router)
     app.include_router(vector_search.router)
     app.include_router(rag_exams.router)
     app.include_router(chat_api.router)
+    app.include_router(prompts_api.router)
 
 # Pydantic models
 class ExamRequest(BaseModel):
