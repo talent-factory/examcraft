@@ -123,14 +123,26 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
                     key={optionIndex}
                     value={option}
                     control={<Radio />}
-                    label={option}
+                    label={
+                      <Box sx={{
+                        flex: 1,
+                        '& p': { m: 0 },
+                        '& code': {
+                          fontSize: '0.875rem',
+                          fontFamily: 'monospace'
+                        }
+                      }}>
+                        <MarkdownRenderer content={option} variant="compact" />
+                      </Box>
+                    }
                     disabled={showResults}
                     sx={{
                       backgroundColor: showResults && option === question.correct_answer ? 'success.light' : 'transparent',
                       borderRadius: 1,
                       px: 1,
                       py: 0.5,
-                      mb: 0.5
+                      mb: 0.5,
+                      alignItems: 'flex-start'
                     }}
                   />
                 ))}

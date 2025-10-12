@@ -2,14 +2,17 @@
 
 All notable changes to ExamCraft AI will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ### Added - TF-111: Document ChatBot Feature (2025-01-09)
 
 #### Features
+
 - **Interactive Document ChatBot** - RAG-powered conversational interface
   - Real-time chat with uploaded documents
   - Context-aware responses using Claude API
@@ -31,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full content storage in metadata for chat exports
 
 #### Technical Changes
+
 - New API Endpoints:
   - `POST /api/v1/chat/sessions` - Create chat session
   - `POST /api/v1/chat/message` - Send message
@@ -48,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced `Document` model with `@property title`
 
 #### Frontend Components
+
 - New React Components:
   - `ChatInterface.tsx` - Main chat UI
   - `ChatSidebar.tsx` - Session management
@@ -55,14 +60,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ChatInput.tsx` - Message input with file upload
 
 #### Testing
+
 - Comprehensive test suite with PostgreSQL integration:
   - `backend/tests/test_chat_api.py` - Chat API tests (3 tests)
   - `backend/tests/test_document_model.py` - Document model tests (6 tests)
-  - `backend/tests/test_document_service.py` - Service tests (2 chat-export tests)
+  - `backend/tests/test_document_service.py` - Service tests (2 tests)
   - PostgreSQL-based integration tests with transaction isolation
   - 28/28 tests passing (100% pass rate)
 
 #### Bug Fixes
+
 - Fixed Markdown rendering in chat responses
 - Fixed PydanticAI message history handling
 - Fixed export button functionality (download & save)
@@ -72,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed obsolete test dependencies
 
 #### Documentation
+
 - Updated `backend/tests/README.md` - PostgreSQL test infrastructure
 - Added comprehensive test documentation
 - Updated `.claude/rules/CLAUDE.md` - Project status
@@ -81,7 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - TF-110: IBM Docling Integration (2025-01-06)
 
 #### Features
-- **IBM Docling Processor** - Modern document processing with advanced features
+
+- **IBM Docling Processor** - Modern document processing with advanced
+features
   - Advanced PDF-Layout-Erkennung
   - Tabellen-Extraktion mit Strukturerhaltung
   - Multi-Format-Support (PDF, DOCX, PPTX, XLSX, Images)
@@ -101,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Backwards Compatible API
 
 #### Technical Changes
+
 - Neue Module:
   - `backend/services/document_processors/docling_processor.py`
   - `backend/services/document_processors/legacy_processor.py`
@@ -112,6 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Behält Backwards Compatible API
 
 #### Dependencies
+
 - Added:
   - `docling==2.23.0`
   - `docling-core==2.48.4`
@@ -121,6 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `numpy>=1.24.3` (flexible version for Docling compatibility)
 
 #### Testing
+
 - Added comprehensive test suite:
   - `backend/tests/test_docling_processor.py` - Unit tests for Docling
   - `backend/tests/test_legacy_processor.py` - Unit tests for Legacy
@@ -128,10 +141,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `backend/tests/test_processor_performance.py` - Performance benchmarks
 
 #### Documentation
+
 - Added `docs/features/DOCLING-INTEGRATION.md` - Complete integration guide
 - Updated `README.md` - Added Docling to core features
 
 #### Bug Fixes
+
 - Fixed import paths in document processors
 - Handled docling-core API changes with fallback imports
 - Resolved dependency conflicts (python-docx, numpy)
@@ -143,9 +158,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - TF-108: Production Deployment (2025-01-05)
 
 #### Deployment Infrastructure
+
 - **Render.com Multi-Service Architecture**
-  - Backend API: https://api.examcraft.talent-factory.xyz
-  - Frontend: https://examcraft.talent-factory.xyz
+  - Backend API: <https://api.examcraft.talent-factory.xyz>
+  - Frontend: <https://examcraft.talent-factory.xyz>
   - Qdrant Vector Database
   - PostgreSQL Database
   - Redis Cache
@@ -161,18 +177,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Service status monitoring
 
 #### CI/CD Pipeline
+
 - **GitLab CI/CD**
   - Automated testing on push
   - Pre-commit hooks for code quality
   - Deployment validation
 
 #### Documentation
+
 - Added deployment guides:
   - `docs/deployment/RENDER-DEPLOYMENT.md`
   - `docs/deployment/TESTING.md`
   - `docs/deployment/TROUBLESHOOTING.md`
 
 ### Fixed
+
 - Database connection issues (missing password in DATABASE_URL)
 - Health endpoint bugs (SQLAlchemy text() wrapper, async issues)
 - Build timeout (removed sentence-transformers)
@@ -185,17 +204,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - TF-103: Qdrant Migration
 
 #### Vector Database
+
 - **Migrated from ChromaDB to Qdrant**
   - Better performance and scalability
   - Production-ready vector search
   - Improved embedding management
 
 #### Features
+
 - Qdrant client integration
 - Vector search endpoints
 - Document reindexing functionality
 
 ### Changed
+
 - Removed ChromaDB dependencies
 - Updated vector search implementation
 - Optimized embedding storage
@@ -207,29 +229,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - Core Features
 
 #### Document Processing
+
 - PDF processing with PyPDF
 - DOCX processing with python-docx
 - Markdown support
 - Text chunking with overlap
 
 #### RAG System
+
 - ChromaDB vector storage (later migrated to Qdrant)
 - Semantic search
 - Context retrieval for question generation
 
 #### Question Generation
+
 - Claude API integration via PydanticAI
 - Bloom Taxonomy support
 - Structured answer generation
 - Quality levels (A/B/C)
 
 #### Frontend
+
 - React 18 + TypeScript
 - TanStack Query for API state
 - Tailwind CSS + shadcn/ui components
 - Responsive design
 
 #### Backend
+
 - FastAPI REST API
 - PostgreSQL database
 - Redis caching
@@ -242,12 +269,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - Initial Setup
 
 #### Project Structure
+
 - Backend (FastAPI)
 - Frontend (React)
 - Database (PostgreSQL)
 - Docker Compose setup
 
 #### Basic Features
+
 - Document upload
 - Basic text extraction
 - Simple question generation
@@ -257,27 +286,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Release Notes
 
 ### Version 1.0.0 - Production Release
-- ✅ Complete feature set implemented
-- ✅ Production deployment on Render.com
-- ✅ Comprehensive testing suite
-- ✅ Full documentation
-- ✅ CI/CD pipeline
+
+- Complete feature set implemented
+- Production deployment on Render.com
+- Comprehensive testing suite
+- Full documentation
+- CI/CD pipeline
 
 ### Version 0.9.0 - Qdrant Migration
-- ✅ Improved vector search performance
-- ✅ Production-ready database
-- ✅ Better scalability
+
+- Improved vector search performance
+- Production-ready database
+- Better scalability
 
 ### Version 0.8.0 - Core Features
-- ✅ RAG-based question generation
-- ✅ Multi-format document support
-- ✅ Modern web interface
+
+- RAG-based question generation
+- Multi-format document support
+- Modern web interface
 
 ---
 
 ## Roadmap
 
 ### Planned Features (TF-110 Continuation)
+
 - [ ] Table Extractor Analyzer
 - [ ] Layout Analyzer
 - [ ] Metadata Enricher
@@ -286,6 +319,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [ ] Document Caching
 
 ### Future Enhancements
+
 - [ ] User Authentication & Authorization (TF-57)
 - [ ] Question Review Interface (TF-60)
 - [ ] Exam Composition & Export (TF-56)
@@ -305,4 +339,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## License
 
 MIT License - See LICENSE file for details
-

@@ -44,7 +44,9 @@
       "Bash(docker-compose:*)",
       "Bash(docker:*)",
       "Bash(awk:*)",
-      "Bash(DOCKER_DEFAULT_PLATFORM=linux/amd64 docker-compose --pull never up -d postgres redis)"
+      "Bash(DOCKER_DEFAULT_PLATFORM=linux/amd64 docker-compose --pull never up -d postgres redis)",
+      "Bash(markdownlint:*)",
+      "Bash(tee:*)"
     ],
     "deny": [],
     "ask": []
