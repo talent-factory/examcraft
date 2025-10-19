@@ -52,10 +52,10 @@ Integration
 - **Prompt Knowledge Base** (TF-122) - Centralized Prompt Management
 - **Prompt Template Selector UI** (TF-146) - Frontend Komponente für Prompt-Auswahl
 - **Template-Variablen-System** (TF-145) - Dynamische Prompt-Konfiguration mit Jinja2
+- **RAG Service Integration** (TF-147) - Prompt-Konfiguration in Question Generation
 
 **BACKLOG FEATURES:**
 
-- RAG Service Integration (TF-147) - Prompt-Konfiguration in Question Generation
 - Question Review Interface (TF-60)
 - Exam Composition & Export (TF-56)
 - Authentication & User Management (TF-57)
@@ -75,6 +75,7 @@ Integration
 - Prompt Knowledge Base mit Versionierung
 - Template-Variablen-System mit Jinja2
 - Live-Preview für Prompt-Rendering
+- RAG Service Prompt-Integration mit Auto-Variable-Merging
 
 ## Entwicklungsumgebung
 

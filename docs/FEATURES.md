@@ -63,8 +63,9 @@ ExamCraft AI revolutionizes how educators create high-quality exam questions for
 - ✅ **Template Variables** - Dynamic prompt configuration with Jinja2
 - ✅ **Live Preview** - See rendered prompts in real-time
 - ✅ **Auto-Mapping** - Automatic variable filling from form fields
+- ✅ **RAG Integration** - Custom prompts in question generation workflow
 
-**Use Case**: Update question generation prompts to improve quality without deploying new code. Track which prompts perform best. Customize prompts with variables like difficulty, topic, and Bloom level without editing code.
+**Use Case**: Update question generation prompts to improve quality without deploying new code. Track which prompts perform best. Customize prompts with variables like difficulty, topic, and Bloom level without editing code. Select custom prompts when generating RAG-based exam questions.
 
 ---
 
