@@ -215,14 +215,49 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = ({
       setLoading(true);
       setError(null);
 
-      // Include prompt_ids in the request
+      // Build prompt_config from promptSelection and templateVariables
+      const promptConfig: RAGExamRequest['prompt_config'] = {};
+
+      // Auto-filled variables (from main form)
+      const autoVariables = getAutoTemplateVariables();
+
+      // Multiple Choice
+      if (promptSelection.multiple_choice) {
+        promptConfig.multiple_choice = {
+          prompt_id: promptSelection.multiple_choice,
+          variables: {
+            ...autoVariables,
+            ...templateVariables.multiple_choice
+          }
+        };
+      }
+
+      // Open-Ended
+      if (promptSelection.open_ended) {
+        promptConfig.open_ended = {
+          prompt_id: promptSelection.open_ended,
+          variables: {
+            ...autoVariables,
+            ...templateVariables.open_ended
+          }
+        };
+      }
+
+      // True/False
+      if (promptSelection.true_false) {
+        promptConfig.true_false = {
+          prompt_id: promptSelection.true_false,
+          variables: {
+            ...autoVariables,
+            ...templateVariables.true_false
+          }
+        };
+      }
+
+      // Include prompt_config in the request
       const requestWithPrompts: RAGExamRequest = {
         ...ragRequest,
-        prompt_ids: {
-          multiple_choice: promptSelection.multiple_choice,
-          open_ended: promptSelection.open_ended,
-          true_false: promptSelection.true_false
-        }
+        prompt_config: Object.keys(promptConfig).length > 0 ? promptConfig : undefined
       };
 
       const exam = await RAGService.generateRAGExam(requestWithPrompts);

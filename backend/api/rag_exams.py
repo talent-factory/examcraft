@@ -19,18 +19,30 @@ router = APIRouter(prefix="/api/v1/rag", tags=["RAG Exams"])
 
 
 # Pydantic Models
+class PromptConfig(BaseModel):
+    """Konfiguration für einen Prompt"""
+    prompt_id: str = Field(..., description="Prompt UUID")
+    variables: Optional[Dict[str, Any]] = Field(None, description="Template-Variablen für den Prompt")
+
+
 class RAGExamRequestModel(BaseModel):
     """Request Model für RAG-basierte Prüfungserstellung"""
     topic: str = Field(..., description="Thema der Prüfung", min_length=3, max_length=200)
     document_ids: Optional[List[int]] = Field(None, description="Spezifische Dokument-IDs (optional)")
     question_count: int = Field(5, description="Anzahl Fragen", ge=1, le=20)
     question_types: Optional[List[str]] = Field(
-        ["multiple_choice", "open_ended"], 
+        ["multiple_choice", "open_ended"],
         description="Fragetypen"
     )
     difficulty: str = Field("medium", description="Schwierigkeitsgrad")
     language: str = Field("de", description="Sprache")
     context_chunks_per_question: int = Field(3, description="Context Chunks pro Frage", ge=1, le=10)
+
+    # NEU: Prompt-Konfiguration pro Fragetyp
+    prompt_config: Optional[Dict[str, PromptConfig]] = Field(
+        None,
+        description="Prompt-Konfiguration pro Fragetyp (z.B. {'multiple_choice': {...}, 'open_ended': {...}})"
+    )
 
 
 class RAGQuestionResponse(BaseModel):
@@ -127,6 +139,17 @@ async def generate_rag_exam(
                 detail=f"Invalid difficulty: {request.difficulty}. Valid: {valid_difficulties}"
             )
         
+        # Konvertiere prompt_config von Pydantic zu dataclass
+        prompt_config_dict = None
+        if request.prompt_config:
+            from services.rag_service import PromptConfig as RAGPromptConfig
+            prompt_config_dict = {}
+            for question_type, config in request.prompt_config.items():
+                prompt_config_dict[question_type] = RAGPromptConfig(
+                    prompt_id=config.prompt_id,
+                    variables=config.variables
+                )
+
         # Erstelle RAG Request
         rag_request = RAGExamRequest(
             topic=request.topic,
@@ -135,7 +158,8 @@ async def generate_rag_exam(
             question_types=request.question_types,
             difficulty=request.difficulty,
             language=request.language,
-            context_chunks_per_question=request.context_chunks_per_question
+            context_chunks_per_question=request.context_chunks_per_question,
+            prompt_config=prompt_config_dict  # NEU: Prompt-Konfiguration
         )
         
         # Generiere RAG Exam
