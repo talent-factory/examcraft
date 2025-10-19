@@ -7,6 +7,7 @@ This package contains all SQLAlchemy ORM models for the application.
 from models.document import Document
 from models.chat_db import ChatSession, ChatMessage
 from models.prompt import Prompt, PromptTemplate, PromptUsageLog
+from models.question_review import QuestionReview, ReviewComment, ReviewHistory, ReviewStatus
 
 __all__ = [
     "Document",
@@ -15,4 +16,8 @@ __all__ = [
     "Prompt",
     "PromptTemplate",
     "PromptUsageLog",
+    "QuestionReview",
+    "ReviewComment",
+    "ReviewHistory",
+    "ReviewStatus",
 ]
