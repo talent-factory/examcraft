@@ -481,6 +481,240 @@ Difficulty: {{difficulty|default('medium')}}.
 
 ---
 
+## 🔗 RAG Integration (NEU)
+
+### Übersicht
+
+Das RAG Service Integration Feature ermöglicht die **Verwendung von custom Prompts** direkt im Question Generation Workflow. Benutzer können Prompt-Templates aus der Knowledge Base auswählen und mit Template-Variablen konfigurieren.
+
+**Features:**
+
+- ✅ **Prompt-Auswahl im UI** - Dropdown für jeden Fragetyp
+- ✅ **Template-Variablen-Editor** - Dynamische Konfiguration
+- ✅ **Auto-Variable-Merging** - Automatisches Befüllen aus Formular
+- ✅ **Live-Preview** - Echtzeit-Rendering des finalen Prompts
+- ✅ **Fallback-Mechanismus** - Default Templates bei Fehlern
+- ✅ **Usage Logging** - Tracking von custom Prompt-Verwendung
+
+### Workflow
+
+**1. Prompt-Auswahl:**
+
+Benutzer wählt im RAG-Prüfung-Erstellen-Dialog einen Prompt-Template:
+
+```text
+┌─────────────────────────────────────────┐
+│ Fragetyp: Multiple Choice               │
+├─────────────────────────────────────────┤
+│ Prompt-Template: [Dropdown]             │
+│ ├─ Default Prompt                       │
+│ ├─ Advanced MC Questions v2.1           │
+│ └─ Bloom Level 4-6 MC Questions         │
+└─────────────────────────────────────────┘
+```
+
+**2. Variable-Konfiguration:**
+
+System befüllt automatisch:
+
+| Variable | Quelle | Wert |
+|----------|--------|------|
+| `topic` | Thema-Feld | "Python Programming" |
+| `difficulty` | Dropdown | "medium" |
+| `language` | Dropdown | "de" |
+| `context` | Dokumente | (Backend) |
+
+Benutzer kann zusätzliche Variablen setzen:
+
+```text
+┌─────────────────────────────────────────┐
+│ Zusätzliche Template-Variablen:         │
+├─────────────────────────────────────────┤
+│ bloom_level: [5]                        │
+│ include_code: [✓]                       │
+│ question_count: [10]                    │
+└─────────────────────────────────────────┘
+```
+
+**3. Live-Preview:**
+
+Zeigt gerenderten Prompt in Echtzeit:
+
+```text
+┌─────────────────────────────────────────┐
+│ Prompt-Vorschau:                        │
+├─────────────────────────────────────────┤
+│ Generate 10 multiple choice questions   │
+│ about Python Programming with           │
+│ difficulty medium.                      │
+│                                         │
+│ Bloom Level: 5 (Evaluate)              │
+│ Include code examples: Yes              │
+│ Language: German                        │
+└─────────────────────────────────────────┘
+```
+
+**4. Question Generation:**
+
+Backend verwendet custom Prompt:
+
+```python
+# Backend: RAGService.generate_question()
+async def generate_question(
+    topic: str,
+    context: RAGContext,
+    question_type: str = "multiple_choice",
+    difficulty: str = "medium",
+    language: str = "de",
+    # NEU: Custom Prompt
+    prompt_id: Optional[str] = None,
+    prompt_variables: Optional[Dict[str, Any]] = None
+) -> RAGQuestion:
+    if prompt_id:
+        # Load custom prompt from Knowledge Base
+        prompt = prompt_service.render_prompt_by_id(
+            prompt_id=prompt_id,
+            variables={
+                "context": context_text,
+                "topic": topic,
+                "difficulty": difficulty,
+                "language": language,
+                **prompt_variables  # Merge custom variables
+            }
+        )
+    else:
+        # Fallback to default template
+        prompt = self.question_templates[question_type]
+```
+
+### API Integration
+
+**Request Format:**
+
+```json
+POST /api/v1/rag/generate-exam
+{
+  "topic": "Python Programming",
+  "question_count": 5,
+  "question_types": ["multiple_choice", "open_ended"],
+  "difficulty": "medium",
+  "language": "de",
+  "prompt_config": {
+    "multiple_choice": {
+      "prompt_id": "abc-123-def-456",
+      "variables": {
+        "bloom_level": "5",
+        "include_code": true
+      }
+    },
+    "open_ended": {
+      "prompt_id": "xyz-789-uvw-012",
+      "variables": {
+        "min_words": 200
+      }
+    }
+  }
+}
+```
+
+**Backward Compatibility:**
+
+Alte Requests ohne `prompt_config` funktionieren weiterhin:
+
+```json
+POST /api/v1/rag/generate-exam
+{
+  "topic": "Python Programming",
+  "question_count": 5,
+  "question_types": ["multiple_choice"],
+  "difficulty": "medium",
+  "language": "de"
+  // Kein prompt_config → Default Templates werden verwendet
+}
+```
+
+### Usage Logging
+
+**Automatisches Tracking:**
+
+Jede Verwendung eines custom Prompts wird geloggt:
+
+```python
+# Backend: PromptUsageLogger
+{
+  "prompt_id": "abc-123",
+  "use_case": "question_generation_multiple_choice",
+  "timestamp": "2025-10-19T17:00:00Z",
+  "variables_used": ["topic", "difficulty", "bloom_level"],
+  "success": true
+}
+```
+
+**Analytics Dashboard:**
+
+- Zeigt Verwendungshäufigkeit pro Prompt
+- Identifiziert beliebte Prompts
+- Hilft bei Optimierung und Wartung
+
+### Best Practices
+
+**1. Teste custom Prompts vor Verwendung:**
+
+- Verwende Live-Preview
+- Generiere Test-Fragen
+- Überprüfe Qualität
+
+**2. Dokumentiere Template-Variablen:**
+
+```text
+Prompt Name: "Advanced MC Questions v2.1"
+Description: "Generates Bloom Level 4-6 multiple choice questions with code examples.
+
+Variables:
+- topic: Subject area (required)
+- difficulty: easy/medium/hard (required)
+- bloom_level: 1-6 (default: 4)
+- include_code: true/false (default: true)
+- language: de/en (required)"
+```
+
+**3. Verwende Fallback-Mechanismus:**
+
+- System fällt automatisch auf default Templates zurück
+- Keine Fehler bei ungültigen Prompt-IDs
+- Logging für Debugging
+
+**4. Überwache Usage Analytics:**
+
+- Identifiziere problematische Prompts
+- Optimiere basierend auf Nutzung
+- Deaktiviere ungenutzte Prompts
+
+### Troubleshooting
+
+**Problem: Custom Prompt wird nicht verwendet**
+
+- ✅ Überprüfe Prompt-ID (UUID-Format)
+- ✅ Überprüfe Prompt-Status (is_active = true)
+- ✅ Überprüfe Backend-Logs für Fehler
+- ✅ Teste mit default Prompt
+
+**Problem: Variable-Merging funktioniert nicht**
+
+- ✅ Überprüfe Variablen-Namen (case-sensitive)
+- ✅ Überprüfe Jinja2-Syntax im Prompt
+- ✅ Teste mit Live-Preview
+- ✅ Überprüfe Browser-Console
+
+**Problem: Fallback wird immer verwendet**
+
+- ✅ Überprüfe Prompt-ID Validität
+- ✅ Überprüfe Prompt-Content (keine Syntax-Fehler)
+- ✅ Überprüfe Backend-Logs für Details
+- ✅ Teste Prompt-Rendering separat
+
+---
+
 ## 🕐 Version Control
 
 ### Version History anzeigen

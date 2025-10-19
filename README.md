@@ -38,6 +38,7 @@ ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwen
 - **💬 Interaktiver Document ChatBot** - Konversationen mit hochgeladenen Dokumenten
 - **🎛️ Prompt Knowledge Base Management** - Zentrale Verwaltung aller AI-Prompts mit Versionierung
 - **🔧 Template-Variablen-System** - Dynamische Prompt-Konfiguration mit Jinja2 und Live-Preview
+- **🔗 RAG-Prompt-Integration** - Custom Prompts in Question Generation Workflow
 - **📄 Multi-Format Dokumentenverarbeitung**: PDF, Word, Markdown
 - **🔬 IBM Docling Integration** - Advanced Document Processing mit automatischem Fallback
 - **🔍 Semantische Suche** mit Qdrant Vector Database (Dokumente + Prompts)
