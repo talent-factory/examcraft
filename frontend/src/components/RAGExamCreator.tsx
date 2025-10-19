@@ -46,13 +46,15 @@ import {
 } from '@mui/icons-material';
 import { RAGService } from '../services/RAGService';
 import { DocumentService } from '../services/DocumentService';
-import { 
-  RAGExamRequest, 
-  RAGExamResponse, 
-  Document, 
+import {
+  RAGExamRequest,
+  RAGExamResponse,
+  Document,
   QuestionTypesResponse,
-  RAGContextSummary 
+  RAGContextSummary
 } from '../types/document';
+import { PromptTemplateSelector } from './prompts';
+import { PromptSelection, QuestionType } from '../types/prompt';
 
 interface RAGExamCreatorProps {
   selectedDocuments?: number[];
@@ -83,9 +85,27 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = ({
     language: 'de',
     context_chunks_per_question: 3
   });
-  
+
   // Question Types
   const [questionTypes, setQuestionTypes] = useState<QuestionTypesResponse | null>(null);
+
+  // Prompt Selection
+  const [promptSelection, setPromptSelection] = useState<PromptSelection>({
+    multiple_choice: null,
+    open_ended: null,
+    true_false: null
+  });
+
+  // Template Variables for each question type
+  const [templateVariables, setTemplateVariables] = useState<{
+    multiple_choice: Record<string, any>;
+    open_ended: Record<string, any>;
+    true_false: Record<string, any>;
+  }>({
+    multiple_choice: {},
+    open_ended: {},
+    true_false: {}
+  });
   
   // Context Preview
   const [contextPreview, setContextPreview] = useState<{
@@ -104,6 +124,29 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = ({
   useEffect(() => {
     setRAGRequest(prev => ({ ...prev, document_ids: selectedDocs }));
   }, [selectedDocs]);
+
+  // Helper function to get automatic template variables from form fields
+  const getAutoTemplateVariables = (): Record<string, any> => {
+    // Map difficulty from German to English
+    const difficultyMap: Record<string, string> = {
+      'easy': 'easy',
+      'medium': 'medium',
+      'hard': 'hard'
+    };
+
+    // Map language from German to code
+    const languageMap: Record<string, string> = {
+      'de': 'de',
+      'en': 'en'
+    };
+
+    return {
+      topic: ragRequest.topic,
+      difficulty: difficultyMap[ragRequest.difficulty] || ragRequest.difficulty,
+      language: languageMap[ragRequest.language] || ragRequest.language,
+      // context will be auto-filled by backend
+    };
+  };
 
   const loadInitialData = async () => {
     try {
@@ -171,16 +214,26 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = ({
     try {
       setLoading(true);
       setError(null);
-      
-      const exam = await RAGService.generateRAGExam(ragRequest);
+
+      // Include prompt_ids in the request
+      const requestWithPrompts: RAGExamRequest = {
+        ...ragRequest,
+        prompt_ids: {
+          multiple_choice: promptSelection.multiple_choice,
+          open_ended: promptSelection.open_ended,
+          true_false: promptSelection.true_false
+        }
+      };
+
+      const exam = await RAGService.generateRAGExam(requestWithPrompts);
       setGeneratedExam(exam);
-      
+
       if (onExamGenerated) {
         onExamGenerated(exam);
       }
-      
+
       setActiveStep(3); // Move to results step
-      
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler bei der Prüfungserstellung');
     } finally {
@@ -395,6 +448,72 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = ({
                     ))}
                   </Box>
                 </Grid>
+
+                {/* Prompt Template Selection */}
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                    Prompt-Templates (Optional):
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Wählen Sie für jeden Fragetyp ein spezifisches Prompt-Template aus der Library.
+                    Wenn kein Template ausgewählt wird, werden die Standard-Prompts verwendet.
+                  </Typography>
+                </Grid>
+
+                {/* Multiple Choice Prompt Selector */}
+                {ragRequest.question_types.includes('multiple_choice') && (
+                  <Grid item xs={12}>
+                    <PromptTemplateSelector
+                      questionType={QuestionType.MULTIPLE_CHOICE}
+                      selectedPromptId={promptSelection.multiple_choice}
+                      onPromptSelect={(promptId) =>
+                        setPromptSelection(prev => ({ ...prev, multiple_choice: promptId }))
+                      }
+                      onVariablesChange={(variables) =>
+                        setTemplateVariables(prev => ({ ...prev, multiple_choice: variables }))
+                      }
+                      autoFilledVariables={getAutoTemplateVariables()}
+                      showPreview={true}
+                    />
+                  </Grid>
+                )}
+
+                {/* Open-Ended Prompt Selector */}
+                {ragRequest.question_types.includes('open_ended') && (
+                  <Grid item xs={12}>
+                    <PromptTemplateSelector
+                      questionType={QuestionType.OPEN_ENDED}
+                      selectedPromptId={promptSelection.open_ended}
+                      onPromptSelect={(promptId) =>
+                        setPromptSelection(prev => ({ ...prev, open_ended: promptId }))
+                      }
+                      onVariablesChange={(variables) =>
+                        setTemplateVariables(prev => ({ ...prev, open_ended: variables }))
+                      }
+                      autoFilledVariables={getAutoTemplateVariables()}
+                      showPreview={true}
+                    />
+                  </Grid>
+                )}
+
+                {/* True/False Prompt Selector */}
+                {ragRequest.question_types.includes('true_false') && (
+                  <Grid item xs={12}>
+                    <PromptTemplateSelector
+                      questionType={QuestionType.TRUE_FALSE}
+                      selectedPromptId={promptSelection.true_false}
+                      onPromptSelect={(promptId) =>
+                        setPromptSelection(prev => ({ ...prev, true_false: promptId }))
+                      }
+                      onVariablesChange={(variables) =>
+                        setTemplateVariables(prev => ({ ...prev, true_false: variables }))
+                      }
+                      autoFilledVariables={getAutoTemplateVariables()}
+                      showPreview={true}
+                    />
+                  </Grid>
+                )}
               </Grid>
 
               <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>

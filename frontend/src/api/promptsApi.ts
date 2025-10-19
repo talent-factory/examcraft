@@ -1,23 +1,18 @@
 import axios from 'axios';
+import type {
+  Prompt,
+  PromptTemplate,
+  TemplateVariable,
+  PromptRenderRequest,
+  PromptRenderResponse,
+  TemplateVariablesResponse,
+  QuestionType
+} from '../types/prompt';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 
-export interface Prompt {
-  id: string;
-  name: string;
-  content: string;
-  description?: string;
-  category: 'system_prompt' | 'user_prompt' | 'few_shot_example' | 'template';
-  tags: string[];
-  use_case?: string;
-  version: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  usage_count?: number;
-  tokens_estimated?: number;
-  parent_id?: string | null;
-}
+// Re-export types from prompt.ts for backward compatibility
+export type { Prompt, PromptTemplate } from '../types/prompt';
 
 export interface PromptSearchRequest {
   query: string;
@@ -50,18 +45,7 @@ export interface PromptUsageLog {
   timestamp: string;
 }
 
-export interface PromptTemplate {
-  id: string;
-  name: string;
-  description?: string;
-  category: 'question_generation' | 'chatbot' | 'evaluation';
-  template_content: string;
-  variables: string[];
-  example_usage?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+
 
 export const promptsApi = {
   // List all prompts
@@ -145,6 +129,42 @@ export const promptsApi = {
   // Get template by ID
   getTemplate: async (id: string): Promise<PromptTemplate> => {
     const response = await axios.get(`${API_BASE_URL}/api/v1/prompts/templates/${id}`);
+    return response.data;
+  },
+
+  // ===== NEW: Prompt Template Selection Functions =====
+
+  /**
+   * Get prompts for a specific question type
+   * Filters by use_case and category=system_prompt
+   */
+  getPromptsForQuestionType: async (questionType: QuestionType): Promise<Prompt[]> => {
+    const useCase = `question_generation_${questionType}`;
+    const response = await axios.get(`${API_BASE_URL}/api/v1/prompts`, {
+      params: {
+        use_case: useCase,
+        category: 'system_prompt',
+        is_active: true
+      }
+    });
+    return response.data;
+  },
+
+  /**
+   * Extract template variables from a prompt
+   * Returns list of variables with metadata
+   */
+  extractTemplateVariables: async (promptId: string): Promise<TemplateVariablesResponse> => {
+    const response = await axios.get(`${API_BASE_URL}/api/v1/prompts/${promptId}/variables`);
+    return response.data;
+  },
+
+  /**
+   * Render prompt template with variables for preview
+   * Returns rendered prompt text
+   */
+  renderPromptPreview: async (request: PromptRenderRequest): Promise<PromptRenderResponse> => {
+    const response = await axios.post(`${API_BASE_URL}/api/v1/prompts/render-preview`, request);
     return response.data;
   }
 };

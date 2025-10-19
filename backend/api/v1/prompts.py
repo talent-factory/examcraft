@@ -5,7 +5,7 @@ API for semantic search and management of the Prompt Knowledge Base.
 """
 
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -53,6 +53,30 @@ class CollectionStats(BaseModel):
     points_count: Optional[int] = None
     status: Optional[str] = None
     error: Optional[str] = None
+
+
+class TemplateVariablesResponse(BaseModel):
+    """Response model for template variable extraction"""
+
+    prompt_id: str
+    variables: List[str] = Field(description="List of template variable names")
+    prompt_content_preview: str = Field(description="First 200 chars of prompt content")
+
+
+class PromptRenderRequest(BaseModel):
+    """Request model for rendering a prompt with variables"""
+
+    prompt_id: Optional[str] = Field(None, description="Prompt ID to render (optional if content provided)")
+    prompt_content: Optional[str] = Field(None, description="Prompt content to render (optional if prompt_id provided)")
+    variables: Dict[str, Any] = Field(description="Variable values for template rendering")
+    strict: bool = Field(False, description="If True, raise error on undefined variables")
+
+
+class PromptRenderResponse(BaseModel):
+    """Response model for rendered prompt"""
+
+    rendered_content: str = Field(description="Rendered prompt text")
+    variables_used: List[str] = Field(description="List of variables that were rendered")
 
 
 def get_vector_service() -> PromptVectorService:
@@ -218,4 +242,109 @@ async def get_prompt(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get prompt: {str(e)}")
+
+
+@router.get("/{prompt_id}/variables", response_model=TemplateVariablesResponse)
+async def extract_template_variables(
+    prompt_id: str,
+    prompt_service: PromptService = Depends(get_prompt_service)
+):
+    """
+    Extract template variables from a prompt's content.
+
+    Returns a list of variable names found in the prompt using Jinja2 syntax.
+
+    Example:
+    - Prompt content: "Generate {{count}} questions about {{topic}}"
+    - Returns: ["count", "topic"]
+    """
+    try:
+        prompt = prompt_service.get_prompt_by_id(prompt_id)
+        if not prompt:
+            raise HTTPException(status_code=404, detail="Prompt not found")
+
+        variables = prompt_service.extract_template_variables(prompt.content)
+
+        return TemplateVariablesResponse(
+            prompt_id=str(prompt.id),
+            variables=variables,
+            prompt_content_preview=prompt.content[:200] + ("..." if len(prompt.content) > 200 else "")
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to extract variables: {str(e)}"
+        )
+
+
+@router.post("/render-preview", response_model=PromptRenderResponse)
+async def render_prompt_preview(
+    request: PromptRenderRequest,
+    prompt_service: PromptService = Depends(get_prompt_service)
+):
+    """
+    Render a prompt with given variables for preview.
+
+    Can render either:
+    1. An existing prompt by ID (provide prompt_id)
+    2. Custom prompt content (provide prompt_content)
+
+    Example request:
+    ```json
+    {
+      "prompt_id": "uuid-here",
+      "variables": {
+        "count": 5,
+        "topic": "Python Programming",
+        "difficulty": "medium"
+      },
+      "strict": false
+    }
+    ```
+
+    Returns the rendered prompt text with variables replaced.
+    """
+    try:
+        # Validate request
+        if not request.prompt_id and not request.prompt_content:
+            raise HTTPException(
+                status_code=400,
+                detail="Either prompt_id or prompt_content must be provided"
+            )
+
+        # Get prompt content
+        if request.prompt_id:
+            prompt = prompt_service.get_prompt_by_id(request.prompt_id)
+            if not prompt:
+                raise HTTPException(status_code=404, detail="Prompt not found")
+            prompt_content = prompt.content
+        else:
+            prompt_content = request.prompt_content
+
+        # Extract variables for response
+        variables_in_template = prompt_service.extract_template_variables(prompt_content)
+
+        # Render prompt
+        rendered = prompt_service.render_prompt_with_jinja2(
+            prompt_content,
+            request.variables,
+            strict=request.strict
+        )
+
+        return PromptRenderResponse(
+            rendered_content=rendered,
+            variables_used=variables_in_template
+        )
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to render prompt: {str(e)}"
+        )
 
