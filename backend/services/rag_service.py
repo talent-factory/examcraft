@@ -48,6 +48,13 @@ class RAGQuestion:
 
 
 @dataclass
+class PromptConfig:
+    """Konfiguration für einen Prompt"""
+    prompt_id: str
+    variables: Optional[Dict[str, Any]] = None
+
+
+@dataclass
 class RAGExamRequest:
     """Request für RAG-basierte Prüfungserstellung"""
     topic: str
@@ -57,6 +64,7 @@ class RAGExamRequest:
     difficulty: str = "medium"
     language: str = "de"
     context_chunks_per_question: int = 3
+    prompt_config: Optional[Dict[str, PromptConfig]] = None  # NEU: Prompt-Konfiguration pro Fragetyp
 
 
 @dataclass
@@ -390,18 +398,23 @@ BEISPIEL SCHLECHTER AUSSAGEN (VERMEIDE):
         context: RAGContext,
         question_type: str = "multiple_choice",
         difficulty: str = "medium",
-        language: str = "de"
+        language: str = "de",
+        # NEU: Prompt-Konfiguration
+        prompt_id: Optional[str] = None,
+        prompt_variables: Optional[Dict[str, Any]] = None
     ) -> RAGQuestion:
         """
         Generiere eine einzelne Frage basierend auf Kontext
-        
+
         Args:
             topic: Thema der Frage
             context: RAG Kontext
             question_type: Art der Frage
             difficulty: Schwierigkeitsgrad
             language: Sprache
-            
+            prompt_id: Optional Prompt UUID (falls None, wird default Template verwendet)
+            prompt_variables: Optional Template-Variablen für custom Prompt
+
         Returns:
             RAGQuestion Objekt
         """
@@ -409,20 +422,67 @@ BEISPIEL SCHLECHTER AUSSAGEN (VERMEIDE):
             # Prüfe ob Kontext verfügbar
             if not context.retrieved_chunks:
                 raise ValueError("No context available for question generation")
-            
-            # Bereite Prompt vor
-            template = self.question_templates.get(question_type)
-            if not template:
-                raise ValueError(f"Unknown question type: {question_type}")
-            
+
             context_text = self._prepare_context_text(context)
 
-            prompt = template.format(
-                context=context_text,
-                topic=topic,
-                difficulty=difficulty,
-                language=language
-            )
+            # Bereite Prompt vor (mit custom Prompt oder default Template)
+            if prompt_id:
+                # Verwende custom Prompt aus Knowledge Base
+                try:
+                    # Merge default variables mit custom variables
+                    variables = {
+                        "context": context_text,
+                        "topic": topic,
+                        "difficulty": difficulty,
+                        "language": language
+                    }
+
+                    if prompt_variables:
+                        variables.update(prompt_variables)
+
+                    # Rendere Prompt mit Jinja2
+                    prompt = self.prompt_service.render_prompt_by_id(
+                        prompt_id=prompt_id,
+                        variables=variables,
+                        strict=False  # Nicht-strikte Validierung für Backward-Compatibility
+                    )
+
+                    # Log usage
+                    prompt_obj = self.prompt_service.get_prompt_by_id(prompt_id)
+                    if prompt_obj:
+                        self.prompt_service.log_prompt_usage(
+                            prompt=prompt_obj,
+                            use_case=f"question_generation_{question_type}"
+                        )
+
+                    logger.info(f"Using custom prompt {prompt_id} for {question_type}")
+
+                except Exception as e:
+                    logger.error(f"Failed to load custom prompt {prompt_id}: {e}")
+                    logger.info(f"Falling back to default template for {question_type}")
+                    # Fallback auf default Template
+                    template = self.question_templates.get(question_type)
+                    if not template:
+                        raise ValueError(f"Unknown question type: {question_type}")
+
+                    prompt = template.format(
+                        context=context_text,
+                        topic=topic,
+                        difficulty=difficulty,
+                        language=language
+                    )
+            else:
+                # Verwende default Template
+                template = self.question_templates.get(question_type)
+                if not template:
+                    raise ValueError(f"Unknown question type: {question_type}")
+
+                prompt = template.format(
+                    context=context_text,
+                    topic=topic,
+                    difficulty=difficulty,
+                    language=language
+                )
 
             # DEBUG: Log prompt to verify new template is used
             logger.info(f"=== QUESTION GENERATION PROMPT ===")
@@ -624,15 +684,27 @@ BEISPIEL SCHLECHTER AUSSAGEN (VERMEIDE):
                     )
                 )
                 
+                # Hole Prompt-Config für diesen Fragetyp (falls vorhanden)
+                prompt_id = None
+                prompt_variables = None
+
+                if request.prompt_config and question_type in request.prompt_config:
+                    config = request.prompt_config[question_type]
+                    prompt_id = config.prompt_id
+                    prompt_variables = config.variables
+                    logger.info(f"Using custom prompt config for {question_type}: {prompt_id}")
+
                 # Generiere Frage
                 question = await self.generate_question(
                     topic=request.topic,
                     context=question_context,
                     question_type=question_type,
                     difficulty=request.difficulty,
-                    language=request.language
+                    language=request.language,
+                    prompt_id=prompt_id,
+                    prompt_variables=prompt_variables
                 )
-                
+
                 questions.append(question)
             
             end_time = asyncio.get_event_loop().time()

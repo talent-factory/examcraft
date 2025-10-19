@@ -52,6 +52,11 @@ export interface AvailableDocumentsResponse {
   documents: Document[];
 }
 
+export interface PromptConfig {
+  prompt_id: string;
+  variables?: Record<string, any>;
+}
+
 export interface RAGExamRequest {
   topic: string;
   document_ids?: number[];
@@ -60,10 +65,10 @@ export interface RAGExamRequest {
   difficulty: string;
   language: string;
   context_chunks_per_question?: number;
-  prompt_ids?: {
-    multiple_choice?: string | null;
-    open_ended?: string | null;
-    true_false?: string | null;
+  prompt_config?: {
+    multiple_choice?: PromptConfig;
+    open_ended?: PromptConfig;
+    true_false?: PromptConfig;
   };
 }
 
