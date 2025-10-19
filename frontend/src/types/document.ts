@@ -82,6 +82,12 @@ export interface RAGQuestion {
   source_chunks: string[];
   source_documents: string[];
   confidence_score: number;
+  bloom_level?: number;
+  estimated_time_minutes?: number;
+  quality_tier?: string;
+  review_status?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
 }
 
 export interface RAGContextSummary {

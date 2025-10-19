@@ -27,7 +27,8 @@ import DocumentLibrary from './components/DocumentLibrary';
 import RAGExamCreator from './components/RAGExamCreator';
 import { DocumentChatPage } from './components/DocumentChat/DocumentChatPage';
 import { PromptManagement } from './components/admin/PromptManagement';
-import { School, Psychology, Quiz, CloudUpload, LibraryBooks, AutoAwesome, Chat, Settings } from '@mui/icons-material';
+import ReviewQueue from './components/ReviewQueue';
+import { School, Psychology, Quiz, CloudUpload, LibraryBooks, AutoAwesome, Chat, Settings, RateReview } from '@mui/icons-material';
 import { ExamService } from './services/ExamService';
 import { ExamRequest, ExamResponse } from './types/exam';
 import { RAGExamResponse } from './types/document';
@@ -153,6 +154,7 @@ function App() {
               <Tab label="Dokumentenbibliothek" icon={<LibraryBooks />} />
               <Tab label="RAG-Prüfung erstellen" icon={<AutoAwesome />} />
               <Tab label="Dokument ChatBot" icon={<Chat />} />
+              <Tab label="Question Review" icon={<RateReview />} />
               <Tab label="Prompt Management" icon={<Settings />} />
             </Tabs>
           </Paper>
@@ -361,6 +363,11 @@ function App() {
           )}
 
           {activeTab === 5 && (
+            /* Question Review Tab */
+            <ReviewQueue />
+          )}
+
+          {activeTab === 6 && (
             /* Prompt Management Tab */
             <PromptManagement />
           )}
