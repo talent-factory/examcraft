@@ -27,6 +27,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from models.chat_db import ChatSession as DBChatSession, ChatMessage as DBChatMessage
 from models.document import Document as DBDocument, DocumentStatus
+from models.auth import User
+from utils.auth_utils import get_current_active_user
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +77,12 @@ def validate_documents_exist(
 @router.post("/sessions", response_model=ChatSessionResponse)
 def create_chat_session(
     session_create: ChatSessionCreate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
+    **Required:** Authenticated user
+
     Erstellt neue Chat-Session mit selektierten Dokumenten
 
     - Validiert Dokument-IDs
@@ -126,9 +131,12 @@ def create_chat_session(
 @router.post("/message", response_model=ChatMessage)
 def send_chat_message(
     chat_request: ChatRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
+    **Required:** Authenticated user
+
     Sendet Nachricht an ChatBot und erhält KI-generierte Antwort
 
     - Lädt Chat-Session und zugehörige Dokumente
@@ -209,9 +217,14 @@ def send_chat_message(
 @router.get("/sessions/{session_id}", response_model=ChatSessionResponse)
 def get_chat_session_endpoint(
     session_id: UUID,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Lädt komplette Chat-Session mit Historie"""
+    """
+    Lädt komplette Chat-Session mit Historie
+
+    **Required:** Authenticated user
+    """
     try:
         session = get_chat_session(session_id, db)
 
@@ -254,6 +267,7 @@ def get_chat_session_endpoint(
 def list_chat_sessions(
     limit: int = 20,
     offset: int = 0,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Listet alle Chat-Sessions des Benutzers"""
@@ -289,9 +303,14 @@ def list_chat_sessions(
 @router.delete("/sessions/{session_id}")
 def delete_chat_session(
     session_id: UUID,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Löscht Chat-Session und alle Nachrichten"""
+    """
+    Löscht Chat-Session und alle Nachrichten
+
+    **Required:** Authenticated user
+    """
     try:
         session = get_chat_session(session_id, db)
 
@@ -314,6 +333,7 @@ def delete_chat_session(
 def export_chat_session(
     session_id: UUID,
     export_format: str = "markdown",
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -394,6 +414,7 @@ def export_chat_session(
 def convert_chat_to_document(
     session_id: UUID,
     document_title: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """

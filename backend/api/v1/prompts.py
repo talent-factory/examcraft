@@ -14,6 +14,8 @@ from services.prompt_service import PromptService
 from database import get_db
 from sqlalchemy.orm import Session
 from models.prompt import Prompt, PromptTemplate
+from models.auth import User
+from utils.auth_utils import get_current_active_user, require_permission
 
 router = APIRouter(prefix="/api/v1/prompts", tags=["prompts"])
 
@@ -91,10 +93,14 @@ def get_prompt_service(db: Session = Depends(get_db)) -> PromptService:
 
 @router.post("/search", response_model=List[PromptSearchResult])
 async def search_prompts(
-    request: PromptSearchRequest, vector_service: PromptVectorService = Depends(get_vector_service)
+    request: PromptSearchRequest,
+    current_user: User = Depends(get_current_active_user),
+    vector_service: PromptVectorService = Depends(get_vector_service)
 ):
     """
     Semantic search over Prompt Knowledge Base.
+
+    **Required:** Authenticated user
 
     Example queries:
     - "Find a prompt for generating multiple choice questions"
@@ -119,10 +125,13 @@ async def search_prompts(
 
 @router.get("/stats", response_model=CollectionStats)
 async def get_collection_stats(
+    current_user: User = Depends(get_current_active_user),
     vector_service: PromptVectorService = Depends(get_vector_service)
 ):
     """
     Get statistics about the Qdrant collection.
+
+    **Required:** Authenticated user
 
     Returns:
     - vectors_count: Number of vectors in collection
@@ -140,6 +149,7 @@ async def list_prompts(
     category: Optional[str] = None,
     use_case: Optional[str] = None,
     is_active: Optional[bool] = None,
+    current_user: User = Depends(get_current_active_user),
     prompt_service: PromptService = Depends(get_prompt_service)
 ):
     """
@@ -183,10 +193,13 @@ async def list_prompts(
 
 @router.get("/templates", response_model=List[dict])
 async def list_templates(
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     List all prompt templates.
+
+    **Required:** Authenticated user
     """
     try:
         templates = db.query(PromptTemplate).filter(PromptTemplate.is_active == True).all()
@@ -212,9 +225,12 @@ async def list_templates(
 @router.get("/{prompt_id}", response_model=dict)
 async def get_prompt(
     prompt_id: str,
+    current_user: User = Depends(get_current_active_user),
     prompt_service: PromptService = Depends(get_prompt_service)
 ):
     """
+    **Required:** Authenticated user
+
     Get a single prompt by ID.
     """
     try:
@@ -247,9 +263,12 @@ async def get_prompt(
 @router.get("/{prompt_id}/variables", response_model=TemplateVariablesResponse)
 async def extract_template_variables(
     prompt_id: str,
+    current_user: User = Depends(get_current_active_user),
     prompt_service: PromptService = Depends(get_prompt_service)
 ):
     """
+    **Required:** Authenticated user
+
     Extract template variables from a prompt's content.
 
     Returns a list of variable names found in the prompt using Jinja2 syntax.
@@ -282,9 +301,12 @@ async def extract_template_variables(
 @router.post("/render-preview", response_model=PromptRenderResponse)
 async def render_prompt_preview(
     request: PromptRenderRequest,
+    current_user: User = Depends(get_current_active_user),
     prompt_service: PromptService = Depends(get_prompt_service)
 ):
     """
+    **Required:** Authenticated user
+
     Render a prompt with given variables for preview.
 
     Can render either:

@@ -1,3 +1,5 @@
+import { PromptConfig } from './prompt';
+
 export enum DocumentStatus {
   UPLOADED = 'uploaded',
   PROCESSING = 'processing',
@@ -50,11 +52,6 @@ export interface AvailableDocumentsResponse {
   processed_documents: number;
   documents_with_vectors: number;
   documents: Document[];
-}
-
-export interface PromptConfig {
-  prompt_id: string;
-  variables?: Record<string, any>;
 }
 
 export interface RAGExamRequest {
@@ -119,7 +116,7 @@ export interface RAGExamResponse {
   };
 }
 
-export interface QuestionType {
+export interface QuestionTypeInfo {
   type: string;
   name: string;
   description: string;
@@ -138,7 +135,7 @@ export interface SupportedLanguage {
 }
 
 export interface QuestionTypesResponse {
-  supported_types: QuestionType[];
+  supported_types: QuestionTypeInfo[];
   difficulty_levels: DifficultyLevel[];
   supported_languages: SupportedLanguage[];
 }

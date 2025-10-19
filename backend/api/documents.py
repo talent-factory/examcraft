@@ -3,7 +3,7 @@ Document API Endpoints für ExamCraft AI
 Verwaltet Document Upload, Listing und Management
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from sqlalchemy.orm import Session
@@ -11,14 +11,12 @@ from pydantic import BaseModel
 
 from services.document_service import DocumentService
 from models.document import Document, DocumentStatus
+from models.auth import User
 from database import get_db
+from utils.auth_utils import get_current_user, get_current_active_user, require_permission
 import logging
 
 logger = logging.getLogger(__name__)
-
-# Aktuell ohne User Authentication - wird später hinzugefügt
-def get_current_user():
-    return "demo_user"  # Placeholder
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 document_service = DocumentService()
@@ -54,25 +52,43 @@ class UploadResponse(BaseModel):
 @router.post("/upload", response_model=UploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
-    user_id: str = Depends(get_current_user),
+    http_request: Request = None,
+    current_user: User = Depends(require_permission("create_documents")),
     db: Session = Depends(get_db)
 ):
     """
     Upload ein neues Dokument
-    
+
+    **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
+
     - **file**: Dokument zum Upload (PDF, DOC, DOCX, TXT, MD)
-    - **user_id**: Wird automatisch aus Authentication extrahiert
-    
+
     Returns:
         UploadResponse mit Document ID und Status
     """
     try:
+        # Check document limit for institution
+        from utils.tenant_utils import SubscriptionLimits
+        SubscriptionLimits.check_document_limit(current_user.institution, db)
+
         document = await document_service.upload_document(
             file=file,
-            user_id=user_id,
+            user_id=str(current_user.id),
             db=db
         )
-        
+
+        # Set institution_id for multi-tenancy
+        document.institution_id = current_user.institution_id
+        db.commit()
+        db.refresh(document)
+
+        # Audit log: Document created
+        from services.audit_service import AuditService
+        AuditService.log_document_action(
+            db, AuditService.ACTION_CREATE_DOCUMENT, current_user.id, document.id,
+            request=http_request, additional_data={"filename": document.filename}
+        )
+
         return UploadResponse(
             document_id=document.id,
             filename=document.filename,
@@ -88,14 +104,16 @@ async def upload_document(
 @router.get("/", response_model=DocumentListResponse)
 async def list_documents(
     status: Optional[str] = Query(None, description="Filter by status"),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Liste alle Dokumente des aktuellen Users
-    
+
+    **Required:** Authenticated user
+
     - **status**: Optional filter by document status
-    
+
     Returns:
         Liste aller Dokumente mit Metadaten
     """
@@ -107,22 +125,28 @@ async def list_documents(
                 status_filter = DocumentStatus(status)
             except ValueError:
                 raise HTTPException(
-                    status_code=400, 
+                    status_code=400,
                     detail=f"Invalid status. Valid options: {[s.value for s in DocumentStatus]}"
                 )
-        
-        documents = document_service.get_documents_by_user(
-            user_id=user_id,
-            db=db,
-            status=status_filter
-        )
-        
+
+        # Tenant-aware query: Filter by institution_id
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+        tenant_context = get_tenant_context(current_user)
+
+        query = db.query(Document)
+        query = TenantFilter.filter_by_tenant(query, Document, tenant_context)
+
+        if status_filter:
+            query = query.filter(Document.status == status_filter)
+
+        documents = query.order_by(Document.created_at.desc()).all()
+
         # Convert to response format
         document_responses = []
         for doc in documents:
             doc_dict = doc.to_dict()
             document_responses.append(DocumentResponse(**doc_dict))
-        
+
         return DocumentListResponse(
             documents=document_responses,
             total=len(document_responses)
@@ -147,30 +171,33 @@ async def health_check():
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: int,
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Hole spezifisches Dokument nach ID
-    
+
+    **Required:** Authenticated user
+
     - **document_id**: ID des gewünschten Dokuments
-    
+
     Returns:
         Document Details mit Metadaten
     """
     try:
         document = document_service.get_document_by_id(document_id, db)
-        
+
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
-        
-        # Check if user owns this document (wenn User Auth implementiert ist)
-        if document.user_id and document.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
+
+        # Tenant-aware access control
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+        tenant_context = get_tenant_context(current_user)
+        TenantFilter.verify_tenant_access(document, tenant_context)
+
         doc_dict = document.to_dict()
         return DocumentResponse(**doc_dict)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -179,32 +206,45 @@ async def get_document(
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: int,
-    user_id: str = Depends(get_current_user),
+    http_request: Request = None,
+    current_user: User = Depends(require_permission("delete_documents")),
     db: Session = Depends(get_db)
 ):
     """
     Lösche Dokument und zugehörige Datei
-    
+
+    **Required Permission:** `delete_documents` (Dozent, Admin)
+
     - **document_id**: ID des zu löschenden Dokuments
-    
+
     Returns:
         Bestätigung der Löschung
     """
     try:
         # Check if document exists and user owns it
         document = document_service.get_document_by_id(document_id, db)
-        
+
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
-        
-        if document.user_id and document.user_id != user_id:
+
+        if document.user_id and document.user_id != str(current_user.id):
             raise HTTPException(status_code=403, detail="Access denied")
-        
+
+        # Store filename for audit log
+        filename = document.filename
+
         # Delete document
         success = document_service.delete_document(document_id, db)
-        
+
         if not success:
             raise HTTPException(status_code=500, detail="Failed to delete document")
+
+        # Audit log: Document deleted
+        from services.audit_service import AuditService
+        AuditService.log_document_action(
+            db, AuditService.ACTION_DELETE_DOCUMENT, current_user.id, document_id,
+            request=http_request, additional_data={"filename": filename}
+        )
         
         return JSONResponse(
             status_code=200,
@@ -219,26 +259,30 @@ async def delete_document(
 @router.get("/{document_id}/status")
 async def get_document_status(
     document_id: int,
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Hole Processing-Status eines Dokuments
-    
+
+    **Required:** Authenticated user
+
     - **document_id**: ID des Dokuments
-    
+
     Returns:
         Aktueller Processing-Status
     """
     try:
         document = document_service.get_document_by_id(document_id, db)
-        
+
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
-        
-        if document.user_id and document.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
+
+        # Tenant-aware access control
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+        tenant_context = get_tenant_context(current_user)
+        TenantFilter.verify_tenant_access(document, tenant_context)
+
         return {
             "document_id": document_id,
             "status": document.status.value,
@@ -256,11 +300,14 @@ async def get_document_status(
 async def process_document(
     document_id: int,
     create_vectors: bool = Query(True, description="Erstelle auch Vector Embeddings"),
+    current_user: User = Depends(require_permission("create_documents")),
     db: Session = Depends(get_db)
 ):
     """
     Verarbeite hochgeladenes Dokument mit Docling (und optional Vector Embeddings)
-    
+
+    **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
+
     - **document_id**: ID des zu verarbeitenden Dokuments
     - **create_vectors**: Ob Vector Embeddings erstellt werden sollen (default: True)
     """
@@ -268,9 +315,9 @@ async def process_document(
     document = document_service.get_document_by_id(document_id, db)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
-    
-    # Prüfe User-Berechtigung (vereinfacht für Demo)
-    if document.user_id != "demo_user":
+
+    # Prüfe User-Berechtigung
+    if document.user_id and document.user_id != str(current_user.id):
         raise HTTPException(status_code=403, detail="Access denied")
     
     try:
@@ -309,11 +356,13 @@ async def process_document(
 @router.get("/{document_id}/content")
 async def get_document_content(
     document_id: int,
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Hole vollständigen Dokumenteninhalt für Vorschau
+
+    **Required:** Authenticated user
 
     - **document_id**: ID des Dokuments
 
@@ -326,8 +375,10 @@ async def get_document_content(
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        if document.user_id and document.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
+        # Tenant-aware access control
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+        tenant_context = get_tenant_context(current_user)
+        TenantFilter.verify_tenant_access(document, tenant_context)
 
         # Hole vollständigen Inhalt vom Document Service
         content = await document_service.get_full_document_content(document_id, db)
@@ -355,11 +406,13 @@ async def get_document_content(
 @router.get("/{document_id}/chunks")
 async def get_document_chunks(
     document_id: int,
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Hole verarbeitete Text-Chunks eines Dokuments
+
+    **Required:** Authenticated user
 
     - **document_id**: ID des Dokuments
 
@@ -372,8 +425,10 @@ async def get_document_chunks(
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        if document.user_id and document.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
+        # Tenant-aware access control
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+        tenant_context = get_tenant_context(current_user)
+        TenantFilter.verify_tenant_access(document, tenant_context)
 
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(

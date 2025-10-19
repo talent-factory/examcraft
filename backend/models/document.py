@@ -3,7 +3,7 @@ Document Model für ExamCraft AI
 Speichert Metadaten hochgeladener Dokumente
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Enum, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Enum, Boolean, ForeignKey
 from sqlalchemy.sql import func
 import enum
 import sys
@@ -32,8 +32,11 @@ class Document(Base):
     # Processing status
     status = Column(Enum(DocumentStatus), default=DocumentStatus.UPLOADED)
     
-    # User association (für zukünftige User Authentication)
-    user_id = Column(String(100), nullable=True)
+    # User association
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True)
+
+    # Multi-Tenancy: Institution association
+    institution_id = Column(Integer, ForeignKey('institutions.id', ondelete='CASCADE'), nullable=True, index=True)
     
     # Extracted metadata from document processing
     doc_metadata = Column(JSON, nullable=True)
