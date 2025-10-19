@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
+from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 
@@ -25,13 +26,44 @@ def get_claude_service():
         _claude_service = ClaudeService()
     return _claude_service
 
-# Initialize FastAPI app
+
+# Lifespan event handler (replaces deprecated on_event)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan event handler for startup and shutdown events.
+    Replaces deprecated @app.on_event("startup") and @app.on_event("shutdown")
+    """
+    # Startup: Initialize database tables
+    from database import create_tables
+    create_tables()
+
+    # Startup: Load API routers
+    from api import documents, vector_search, rag_exams, question_review, auth
+    from api.v1 import chat as chat_api, prompts as prompts_api
+
+    app.include_router(auth.router)
+    app.include_router(documents.router)
+    app.include_router(vector_search.router)
+    app.include_router(rag_exams.router)
+    app.include_router(chat_api.router)
+    app.include_router(prompts_api.router)
+    app.include_router(question_review.router)
+
+    yield  # Application is running
+
+    # Shutdown: Cleanup (if needed in the future)
+    pass
+
+
+# Initialize FastAPI app with lifespan
 app = FastAPI(
     title="ExamCraft AI API",
     description="KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Document ChatBot",
     version="0.2.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # CORS middleware - Production-ready configuration
@@ -44,26 +76,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Startup event - Initialize database tables
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on startup"""
-    from database import create_tables
-    create_tables()
+# Rate Limiting middleware
+from middleware.rate_limit import RateLimitMiddleware
+rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+requests_per_minute = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+requests_per_hour = int(os.getenv("RATE_LIMIT_PER_HOUR", "1000"))
 
-# Include routers (lazy-loaded to reduce startup memory)
-@app.on_event("startup")
-async def load_routers():
-    """Load API routers on startup"""
-    from api import documents, vector_search, rag_exams, question_review
-    from api.v1 import chat as chat_api, prompts as prompts_api
-
-    app.include_router(documents.router)
-    app.include_router(vector_search.router)
-    app.include_router(rag_exams.router)
-    app.include_router(chat_api.router)
-    app.include_router(prompts_api.router)
-    app.include_router(question_review.router)
+app.add_middleware(
+    RateLimitMiddleware,
+    requests_per_minute=requests_per_minute,
+    requests_per_hour=requests_per_hour,
+    enabled=rate_limit_enabled
+)
 
 # Pydantic models
 class ExamRequest(BaseModel):

@@ -21,6 +21,9 @@ if config.config_file_name is not None:
 from database import Base
 from models.document import Document
 from models.chat_db import ChatSession, ChatMessage
+from models.auth import User, Role, Institution, UserSession, AuditLog
+from models.prompt import Prompt, PromptTemplate, PromptUsageLog
+from models.question_review import QuestionReview, ReviewComment, ReviewHistory
 
 target_metadata = Base.metadata
 

@@ -59,8 +59,12 @@ class QuestionReview(Base):
         nullable=False,
         index=True
     )
-    reviewed_by = Column(String(100), nullable=True)  # User ID
+    reviewed_by = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)  # User ID
     reviewed_at = Column(DateTime, nullable=True)
+
+    # Multi-Tenancy: Institution association
+    institution_id = Column(Integer, ForeignKey('institutions.id', ondelete='CASCADE'), nullable=True, index=True)
+    created_by = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)  # User who created the question
     
     # Exam Association
     exam_id = Column(String(100), nullable=True, index=True)  # RAG Exam ID

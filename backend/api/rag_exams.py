@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from services.rag_service import rag_service, RAGExamRequest, RAGExamResponse, RAGQuestion, RAGContext
 from services.document_service import document_service
+from models.auth import User
+from utils.auth_utils import get_current_active_user, require_permission
 import logging
 
 logger = logging.getLogger(__name__)
@@ -89,11 +91,14 @@ class ContextRetrievalRequest(BaseModel):
 @router.post("/generate-exam", response_model=RAGExamResponseModel)
 async def generate_rag_exam(
     request: RAGExamRequestModel,
+    current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db)
 ):
     """
     Generiere RAG-basierte Prüfung aus Dokumenten
-    
+
+    **Required Permission:** `create_questions` (Dozent, Assistant, Admin)
+
     - **topic**: Thema der Prüfung (3-200 Zeichen)
     - **document_ids**: Optional spezifische Dokumente
     - **question_count**: Anzahl Fragen (1-20, default: 5)
@@ -211,11 +216,14 @@ async def generate_rag_exam(
 @router.post("/retrieve-context", response_model=RAGContextResponse)
 async def retrieve_context(
     request: ContextRetrievalRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Hole relevanten Kontext aus Vector Database
-    
+
+    **Required:** Authenticated user
+
     - **query**: Suchanfrage für Kontext
     - **document_ids**: Optional spezifische Dokumente
     - **max_chunks**: Maximale Anzahl Chunks (1-20)
@@ -263,16 +271,19 @@ async def retrieve_context(
 @router.get("/available-documents")
 async def get_available_documents(
     processed_only: bool = Query(True, description="Nur verarbeitete Dokumente"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Hole verfügbare Dokumente für RAG-Prüfungserstellung
-    
+
+    **Required:** Authenticated user
+
     - **processed_only**: Nur verarbeitete Dokumente anzeigen (empfohlen)
     """
     try:
-        # Hole alle Dokumente (vereinfacht für Demo)
-        documents = document_service.get_documents_by_user("demo_user", db)
+        # Hole alle Dokumente des aktuellen Users
+        documents = document_service.get_documents_by_user(str(current_user.id), db)
         
         if processed_only:
             from models.document import DocumentStatus
