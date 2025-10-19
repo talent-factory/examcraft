@@ -329,6 +329,20 @@ In der Dokumentenbibliothek:
 
 - Einfach / Mittel / Schwer
 
+**Prompt-Auswahl (NEU):**
+
+- Wählen Sie für jeden Fragetyp einen Prompt-Template
+- **Live-Vorschau** zeigt den gerenderten Prompt
+- **Template-Variablen** werden automatisch befüllt:
+  - `topic` - aus Thema/Fokus-Feld
+  - `difficulty` - aus Schwierigkeitsgrad-Dropdown
+  - `language` - aus Sprache-Dropdown
+  - `context` - aus ausgewählten Dokumenten
+- **Zusätzliche Variablen** können manuell angepasst werden
+- Beispiel: `bloom_level`, `question_count`, `include_examples`
+
+**Tipp**: Nutzen Sie die Live-Vorschau, um zu sehen, wie der finale Prompt aussieht, bevor Sie die Generierung starten!
+
 **3. Generierung starten**
 
 - Klicken Sie "RAG-Prüfung generieren"

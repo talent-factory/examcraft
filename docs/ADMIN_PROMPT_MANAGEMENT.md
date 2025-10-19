@@ -15,11 +15,12 @@
 2. [Architektur](#️-architektur)
 3. [Prompt Library](#-prompt-library)
 4. [Prompt Editor](#️-prompt-editor)
-5. [Version Control](#-version-control)
-6. [Usage Analytics](#-usage-analytics)
-7. [Semantic Search](#-semantic-search)
-8. [Best Practices](#-best-practices)
-9. [Troubleshooting](#-troubleshooting)
+5. [Template Variables](#-template-variables-neu)
+6. [Version Control](#-version-control)
+7. [Usage Analytics](#-usage-analytics)
+8. [Semantic Search](#-semantic-search)
+9. [Best Practices](#-best-practices)
+10. [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -309,6 +310,174 @@ Anforderungen:
 - Beschreibe Änderungen in Commit-Message
 - Teste vor Aktivierung
 - Überwache Usage Analytics nach Änderung
+
+---
+
+## 🔧 Template Variables (NEU)
+
+### Übersicht
+
+Das Template-Variablen-System ermöglicht **dynamische Prompt-Konfiguration** ohne Code-Änderungen. Benutzer können Variablen wie `topic`, `difficulty`, `language` direkt im UI anpassen.
+
+**Features:**
+
+- ✅ **Jinja2 Template-Rendering** - Unterstützt `{{variable}}` und `{variable}` Syntax
+- ✅ **Variable Extraction API** - Automatische Erkennung von Template-Variablen
+- ✅ **Live-Preview** - Echtzeit-Rendering während der Eingabe
+- ✅ **Auto-Mapping** - Automatisches Befüllen aus Formular-Feldern
+- ✅ **Type Detection** - Automatische Erkennung von Variablen-Typen
+
+### Template-Syntax
+
+**Jinja2 Syntax (empfohlen):**
+
+```jinja2
+Generate {{count}} questions about {{topic}} with difficulty {{difficulty}}.
+
+Context:
+{{context}}
+
+Requirements:
+- Bloom Level: {{bloom_level}}
+- Language: {{language}}
+- Include code examples: {{include_code}}
+```
+
+**Simple Syntax (Backward Compatibility):**
+
+```text
+Topic: {topic}
+Difficulty: {difficulty}
+Language: {language}
+Context: {context}
+```
+
+**Beide Syntaxen werden unterstützt!**
+
+### Variable Extraction
+
+**Automatische Erkennung:**
+
+Das System extrahiert automatisch alle Variablen aus dem Prompt-Content:
+
+```python
+# Backend: GET /api/v1/prompts/{prompt_id}/variables
+{
+  "prompt_id": "abc-123",
+  "variables": ["topic", "difficulty", "language", "context"],
+  "prompt_content_preview": "Generate questions about {{topic}}..."
+}
+```
+
+**Unterstützte Variablen-Typen:**
+
+- `string` - Text-Eingabe (Standard)
+- `number` - Numerische Eingabe
+- `boolean` - Checkbox
+- `select` - Dropdown (wenn Optionen definiert)
+
+### Live-Preview
+
+**Echtzeit-Rendering:**
+
+Während der Benutzer Variablen-Werte eingibt, wird der Prompt in Echtzeit gerendert:
+
+```typescript
+// Frontend: POST /api/v1/prompts/render-preview
+{
+  "prompt_id": "abc-123",
+  "variables": {
+    "topic": "Python Programming",
+    "difficulty": "medium",
+    "language": "de"
+  }
+}
+
+// Response:
+{
+  "rendered_content": "Generate questions about Python Programming with difficulty medium...",
+  "variables_used": ["topic", "difficulty", "language"]
+}
+```
+
+**Debouncing:**
+
+- API-Calls werden um 800ms verzögert
+- Verhindert zu viele Requests während des Tippens
+- Optimiert Performance und Kosten
+
+### Auto-Mapping
+
+**Automatisches Befüllen:**
+
+Variablen, die bereits im Hauptformular existieren, werden automatisch befüllt:
+
+| Variable | Quelle | Mapping |
+|----------|--------|---------|
+| `topic` | Topic-Feld | Direkt |
+| `difficulty` | Schwierigkeit-Dropdown | easy/medium/hard |
+| `language` | Sprache-Dropdown | de/en |
+| `context` | Ausgewählte Dokumente | Backend |
+
+**Redundanz-Eliminierung:**
+
+- Auto-filled Variablen werden **nicht** im TemplateVariablesEditor angezeigt
+- Nur **zusätzliche** Variablen werden angezeigt
+- Editor versteckt sich komplett, wenn alle Variablen auto-filled sind
+
+### Best Practices
+
+**1. Verwende aussagekräftige Variablen-Namen:**
+
+```jinja2
+✅ GOOD: {{bloom_level}}, {{question_count}}, {{include_examples}}
+❌ BAD: {{x}}, {{var1}}, {{temp}}
+```
+
+**2. Dokumentiere Variablen in Description:**
+
+```text
+Description: "Generates multiple choice questions.
+Variables:
+- topic: Subject area (e.g., 'Python Programming')
+- difficulty: easy/medium/hard
+- count: Number of questions (1-10)"
+```
+
+**3. Verwende Default-Werte:**
+
+```jinja2
+Generate {{count|default(5)}} questions about {{topic}}.
+Difficulty: {{difficulty|default('medium')}}.
+```
+
+**4. Validiere Eingaben:**
+
+```jinja2
+{% if difficulty not in ['easy', 'medium', 'hard'] %}
+  Error: Invalid difficulty level
+{% endif %}
+```
+
+### Troubleshooting
+
+**Problem: Variable wird nicht erkannt**
+
+- ✅ Überprüfe Syntax: `{{variable}}` oder `{variable}`
+- ✅ Keine Leerzeichen: `{{ variable }}` funktioniert nicht
+- ✅ Nur alphanumerische Zeichen + Underscore
+
+**Problem: Live-Preview zeigt Fehler**
+
+- ✅ Überprüfe, ob alle Required Variables gesetzt sind
+- ✅ Aktiviere Strict-Mode für detaillierte Fehler
+- ✅ Überprüfe Jinja2-Syntax (z.B. geschlossene Tags)
+
+**Problem: Auto-Mapping funktioniert nicht**
+
+- ✅ Überprüfe Variablen-Namen (exakte Übereinstimmung)
+- ✅ Überprüfe Formular-Werte (nicht leer)
+- ✅ Überprüfe Browser-Console für Fehler
 
 ---
 

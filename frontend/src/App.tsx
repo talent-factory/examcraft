@@ -1,4 +1,5 @@
 import React, { useState, ChangeEvent } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   Container,
   Typography,
@@ -31,6 +32,17 @@ import { ExamService } from './services/ExamService';
 import { ExamRequest, ExamResponse } from './types/exam';
 import { RAGExamResponse } from './types/document';
 import ExamDisplay from './components/ExamDisplay';
+
+// Create a QueryClient instance for TanStack Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 function App() {
   const [examRequest, setExamRequest] = useState<ExamRequest>({
@@ -108,22 +120,23 @@ function App() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Header */}
-      <Box sx={{ textAlign: 'center', mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
-          <School sx={{ fontSize: 40, color: 'primary.main', mr: 2 }} />
-          <Typography variant="h3" component="h1" color="primary">
-            ExamCraft AI
+    <QueryClientProvider client={queryClient}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        {/* Header */}
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+            <School sx={{ fontSize: 40, color: 'primary.main', mr: 2 }} />
+            <Typography variant="h3" component="h1" color="primary">
+              ExamCraft AI
+            </Typography>
+          </Box>
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+            KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Für OpenBook-Prüfungen mit Claude API Integration & Document Upload
           </Typography>
         </Box>
-        <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-          KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Für OpenBook-Prüfungen mit Claude API Integration & Document Upload
-        </Typography>
-      </Box>
 
       {!exam && !ragExam && !showRAGCreator ? (
         <>
@@ -403,22 +416,23 @@ function App() {
         </Box>
       ) : null}
 
-      {/* System Status */}
-      <Card sx={{ mt: 4, bgcolor: 'info.light', color: 'info.contrastText' }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            📊 ExamCraft AI - System Status
-          </Typography>
-          <Typography variant="body2">
-            🤖 <strong>KI-Modell:</strong> Claude Sonnet 4 (neueste Generation) •
-            🔍 <strong>Embeddings:</strong> OpenAI text-embedding-3-small (1536 dim) •
-            📚 <strong>Vector DB:</strong> Qdrant mit semantischer Suche •
-            📄 <strong>Dokumente:</strong> PDF, DOC, Markdown Support •
-            ✅ <strong>Status:</strong> Production Ready
-          </Typography>
-        </CardContent>
-      </Card>
-    </Container>
+        {/* System Status */}
+        <Card sx={{ mt: 4, bgcolor: 'info.light', color: 'info.contrastText' }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 1 }}>
+              📊 ExamCraft AI - System Status
+            </Typography>
+            <Typography variant="body2">
+              🤖 <strong>KI-Modell:</strong> Claude Sonnet 4 (neueste Generation) •
+              🔍 <strong>Embeddings:</strong> OpenAI text-embedding-3-small (1536 dim) •
+              📚 <strong>Vector DB:</strong> Qdrant mit semantischer Suche •
+              📄 <strong>Dokumente:</strong> PDF, DOC, Markdown Support •
+              ✅ <strong>Status:</strong> Production Ready
+            </Typography>
+          </CardContent>
+        </Card>
+      </Container>
+    </QueryClientProvider>
   );
 }
 

@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import { Save, Cancel, Preview, Code, History } from '@mui/icons-material';
 import { promptsApi, Prompt } from '../../api/promptsApi';
+import { PromptCategory } from '../../types/prompt';
 import MarkdownRenderer from '../MarkdownRenderer';
 
 interface PromptEditorProps {
@@ -46,7 +47,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     name: '',
     content: '',
     description: '',
-    category: 'system_prompt',
+    category: PromptCategory.SYSTEM_PROMPT,
     use_case: '',
     tags: [],
     is_active: false

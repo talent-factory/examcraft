@@ -39,7 +39,7 @@ ExamCraft/
 Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API
 Integration
 
-### Aktueller Projektstatus (Stand: 10.10.2025)
+### Aktueller Projektstatus (Stand: 19.10.2025)
 
 **CORE FEATURES ABGESCHLOSSEN:**
 
@@ -49,9 +49,13 @@ Integration
 - **Question Generation Core API** (TF-52) - Claude API + PydanticAI
 - **Semantic Search & Vector Storage** (TF-55) - ChromaDB Integration
 - **Claude API Integration** (TF-59) - Rate Limiting + Cost Tracking
+- **Prompt Knowledge Base** (TF-122) - Centralized Prompt Management
+- **Prompt Template Selector UI** (TF-146) - Frontend Komponente für Prompt-Auswahl
+- **Template-Variablen-System** (TF-145) - Dynamische Prompt-Konfiguration mit Jinja2
 
 **BACKLOG FEATURES:**
 
+- RAG Service Integration (TF-147) - Prompt-Konfiguration in Question Generation
 - Question Review Interface (TF-60)
 - Exam Composition & Export (TF-56)
 - Authentication & User Management (TF-57)
@@ -68,6 +72,9 @@ Integration
 - RAG System mit ChromaDB
 - Document Processing (PDF, DOC, Markdown)
 - Semantic Search & Vector Storage
+- Prompt Knowledge Base mit Versionierung
+- Template-Variablen-System mit Jinja2
+- Live-Preview für Prompt-Rendering
 
 ## Entwicklungsumgebung
 

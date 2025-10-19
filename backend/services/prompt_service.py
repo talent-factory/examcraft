@@ -4,11 +4,13 @@ Service for dynamic Prompt Management.
 Combines PostgreSQL for structured queries and Qdrant for semantic search.
 """
 
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Set
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, func
 from datetime import datetime
 import uuid
+import re
+from jinja2 import Environment, Template, TemplateSyntaxError, UndefinedError, meta
 
 from models.prompt import Prompt, PromptTemplate, PromptUsageLog
 from services.prompt_vector_service import PromptVectorService
@@ -23,6 +25,12 @@ class PromptService:
     def __init__(self, db: Session):
         self.db = db
         self.vector_service = PromptVectorService()
+        # Initialize Jinja2 environment for template rendering
+        self.jinja_env = Environment(
+            autoescape=False,  # Don't escape HTML for prompts
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
 
     def list_prompts(
         self,
@@ -386,4 +394,139 @@ class PromptService:
             "avg_latency_ms": avg_latency,
             "period_days": days,
         }
+
+    def extract_template_variables(self, prompt_content: str) -> List[str]:
+        """
+        Extract template variables from prompt content.
+
+        Supports both Jinja2 {{variable}} and simple {variable} syntax.
+
+        Args:
+            prompt_content: Prompt content with template syntax
+
+        Returns:
+            List of unique variable names found in the template
+
+        Example:
+            >>> extract_template_variables("Generate {{count}} questions about {{topic}}")
+            ['count', 'topic']
+            >>> extract_template_variables("Context: {context}, Topic: {topic}")
+            ['context', 'topic']
+        """
+        variables = set()
+
+        try:
+            # Try Jinja2 parsing for {{variable}} syntax
+            env = self.jinja_env
+            ast = env.parse(prompt_content)
+            jinja_vars = meta.find_undeclared_variables(ast)
+            variables.update(jinja_vars)
+        except TemplateSyntaxError:
+            # Fallback to regex for {{variable}} syntax
+            pattern = r'\{\{([^}]+)\}\}'
+            matches = re.findall(pattern, prompt_content)
+            # Clean up variable names (remove whitespace and filters)
+            jinja_vars = [m.split('|')[0].strip() for m in matches]
+            variables.update(jinja_vars)
+
+        # Also extract simple {variable} syntax (non-Jinja2)
+        # Match {word} but not {{word}}
+        simple_pattern = r'(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})'
+        simple_matches = re.findall(simple_pattern, prompt_content)
+        variables.update(simple_matches)
+
+        return sorted(list(variables))
+
+    def render_prompt_with_jinja2(
+        self,
+        prompt_content: str,
+        variables: Dict[str, Any],
+        strict: bool = False
+    ) -> str:
+        """
+        Render prompt content with template engine.
+
+        Supports both Jinja2 {{variable}} and simple {variable} syntax.
+
+        Args:
+            prompt_content: Prompt content with template syntax
+            variables: Dictionary of variable values
+            strict: If True, raise error on undefined variables
+
+        Returns:
+            Rendered prompt text
+
+        Raises:
+            ValueError: If template syntax is invalid or variables are missing
+
+        Example:
+            >>> render_prompt_with_jinja2(
+            ...     "Generate {{count}} questions about {{topic}}",
+            ...     {"count": 5, "topic": "Python"}
+            ... )
+            'Generate 5 questions about Python'
+            >>> render_prompt_with_jinja2(
+            ...     "Context: {context}, Topic: {topic}",
+            ...     {"context": "...", "topic": "Python"}
+            ... )
+            'Context: ..., Topic: Python'
+        """
+        try:
+            if strict:
+                # Check for missing variables
+                required_vars = self.extract_template_variables(prompt_content)
+                missing_vars = set(required_vars) - set(variables.keys())
+                if missing_vars:
+                    raise ValueError(
+                        f"Missing required variables: {', '.join(sorted(missing_vars))}"
+                    )
+
+            # First, replace simple {variable} syntax with {{variable}} for Jinja2
+            # Match {word} but not {{word}}
+            def replace_simple_var(match):
+                var_name = match.group(1)
+                return f"{{{{{var_name}}}}}"
+
+            simple_pattern = r'(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})'
+            jinja_content = re.sub(simple_pattern, replace_simple_var, prompt_content)
+
+            # Now render with Jinja2
+            template = self.jinja_env.from_string(jinja_content)
+            rendered = template.render(**variables)
+            return rendered
+
+        except TemplateSyntaxError as e:
+            raise ValueError(f"Invalid template syntax: {str(e)}")
+        except UndefinedError as e:
+            raise ValueError(f"Undefined variable in template: {str(e)}")
+
+    def render_prompt_by_id(
+        self,
+        prompt_id: str,
+        variables: Dict[str, Any],
+        strict: bool = False
+    ) -> str:
+        """
+        Load and render a prompt by ID with given variables.
+
+        Args:
+            prompt_id: Prompt UUID
+            variables: Dictionary of variable values
+            strict: If True, raise error on undefined variables
+
+        Returns:
+            Rendered prompt text
+
+        Raises:
+            ValueError: If prompt not found or rendering fails
+        """
+        prompt = self.get_prompt_by_id(prompt_id)
+        if not prompt:
+            raise ValueError(f"Prompt with ID '{prompt_id}' not found")
+
+        return self.render_prompt_with_jinja2(
+            prompt.content,
+            variables,
+            strict=strict
+        )
 

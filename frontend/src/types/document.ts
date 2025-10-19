@@ -60,6 +60,11 @@ export interface RAGExamRequest {
   difficulty: string;
   language: string;
   context_chunks_per_question?: number;
+  prompt_ids?: {
+    multiple_choice?: string | null;
+    open_ended?: string | null;
+    true_false?: string | null;
+  };
 }
 
 export interface RAGQuestion {
