@@ -15,7 +15,7 @@ import { PasswordResetRequest } from './components/auth/PasswordResetRequest';
 import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { UserManagementPage } from './components/admin/UserManagementPage';
-import { RoleManagementPage } from './components/admin/RoleManagementPage';
+import RoleManagementPage from './components/admin/RoleManagementPage';
 import App from './App';
 
 // Create a QueryClient instance for TanStack Query
