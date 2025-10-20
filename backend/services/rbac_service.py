@@ -147,7 +147,7 @@ class RBACService:
         
         quota_limit = tier_quota.quota_limit
         if quota_limit == -1:
-            return {'allowed': True, 'quota_limit': -1, 'remaining': -1}  # Unlimited
+            return {'allowed': True, 'current_usage': 0, 'quota_limit': -1, 'remaining': -1}  # Unlimited
         
         # Aktuelle Nutzung ermitteln
         current_period_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
