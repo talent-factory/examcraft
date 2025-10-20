@@ -18,3 +18,5 @@ export * from './review';
 // Prompt Types
 export * from './prompt';
 
+// RBAC Types
+export * from './rbac';
