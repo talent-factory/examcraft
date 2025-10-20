@@ -57,34 +57,45 @@ export const AppWithAuth: React.FC = () => {
 
             {/* Protected Routes - Require authentication */}
             <Route
-              path="/*"
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <Routes>
-                      {/* Main App */}
-                      <Route path="/" element={<App />} />
-
-                      {/* Profile */}
-                      <Route path="/profile" element={<ProfilePage />} />
-
-                      {/* Admin Routes */}
-                      <Route
-                        path="/admin/users"
-                        element={
-                          <PermissionGuard requiredPermissions={['manage_users']}>
-                            <UserManagementPage />
-                          </PermissionGuard>
-                        }
-                      />
-
-                      {/* Redirect unknown routes to home */}
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
+                    <App />
                   </AppLayout>
                 </ProtectedRoute>
               }
             />
+
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ProfilePage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['manage_users']}>
+                    <AppLayout>
+                      <UserManagementPage />
+                    </AppLayout>
+                  </PermissionGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Redirect root to dashboard */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+            {/* Redirect unknown routes to dashboard */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

@@ -12,9 +12,15 @@ const apiClient = axios.create({
   },
 });
 
-// Request interceptor for logging
+// Request interceptor for auth token and logging
 apiClient.interceptors.request.use(
   (config) => {
+    // Add auth token if available
+    const token = localStorage.getItem('examcraft_access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     console.log(`Making ${config.method?.toUpperCase()} request to ${config.url}`);
     return config;
   },

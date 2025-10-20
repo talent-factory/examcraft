@@ -411,8 +411,10 @@ class AuthService:
             UserSession.token_jti == token_jti
         ).first()
 
+        # If session not found, allow token (stateless JWT validation)
+        # This allows tokens that were created before session tracking was implemented
         if not session:
-            return True  # Token not found = revoked
+            return False  # Token not found = allow (stateless mode)
 
         return not session.is_active
 
