@@ -7,13 +7,14 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
-import { ProtectedRoute, GuestRoute } from './components/guards';
+import { ProtectedRoute, GuestRoute, PermissionGuard } from './components/guards';
 import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
 import { OAuthCallback } from './components/auth/OAuthCallback';
 import { PasswordResetRequest } from './components/auth/PasswordResetRequest';
 import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
+import { UserManagementPage } from './components/admin/UserManagementPage';
 import App from './App';
 
 // Create a QueryClient instance for TanStack Query
@@ -63,10 +64,20 @@ export const AppWithAuth: React.FC = () => {
                     <Routes>
                       {/* Main App */}
                       <Route path="/" element={<App />} />
-                      
+
                       {/* Profile */}
                       <Route path="/profile" element={<ProfilePage />} />
-                      
+
+                      {/* Admin Routes */}
+                      <Route
+                        path="/admin/users"
+                        element={
+                          <PermissionGuard requiredPermissions={['manage_users']}>
+                            <UserManagementPage />
+                          </PermissionGuard>
+                        }
+                      />
+
                       {/* Redirect unknown routes to home */}
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
