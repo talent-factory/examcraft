@@ -98,13 +98,17 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
     const categoryFeatures = allFeatures
       .filter(f => (f.category || 'other') === category)
       .map(f => f.id);
-    
+
     const allSelected = categoryFeatures.every(id => selectedFeatures.includes(id));
-    
+
     if (allSelected) {
       setSelectedFeatures(prev => prev.filter(id => !categoryFeatures.includes(id)));
     } else {
-      setSelectedFeatures(prev => [...new Set([...prev, ...categoryFeatures])]);
+      // Merge arrays and remove duplicates without using Set spread
+      setSelectedFeatures(prev => {
+        const merged = [...prev, ...categoryFeatures];
+        return merged.filter((id, index) => merged.indexOf(id) === index);
+      });
     }
   };
 
