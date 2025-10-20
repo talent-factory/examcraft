@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
 
     # Startup: Load API routers
     from api import documents, vector_search, rag_exams, question_review, auth, admin, gdpr
-    from api.v1 import chat as chat_api, prompts as prompts_api
+    from api.v1 import chat as chat_api, prompts as prompts_api, rbac as rbac_api
 
     app.include_router(auth.router)
     app.include_router(admin.router)
@@ -50,6 +50,7 @@ async def lifespan(app: FastAPI):
     app.include_router(rag_exams.router)
     app.include_router(chat_api.router)
     app.include_router(prompts_api.router)
+    app.include_router(rbac_api.router)
     app.include_router(question_review.router)
 
     yield  # Application is running
