@@ -15,6 +15,7 @@ import { PasswordResetRequest } from './components/auth/PasswordResetRequest';
 import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { UserManagementPage } from './components/admin/UserManagementPage';
+import { RoleManagementPage } from './components/admin/RoleManagementPage';
 import App from './App';
 
 // Create a QueryClient instance for TanStack Query
@@ -85,6 +86,19 @@ export const AppWithAuth: React.FC = () => {
                   <PermissionGuard requiredPermissions={['manage_users']}>
                     <AppLayout>
                       <UserManagementPage />
+                    </AppLayout>
+                  </PermissionGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/roles"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['manage_users']}>
+                    <AppLayout>
+                      <RoleManagementPage />
                     </AppLayout>
                   </PermissionGuard>
                 </ProtectedRoute>
