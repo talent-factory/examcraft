@@ -7,14 +7,20 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
-import { ProtectedRoute, GuestRoute, PermissionGuard } from './components/guards';
-import { AppLayout } from './components/layout';
+import { ProtectedRoute, GuestRoute, PermissionGuard, RoleGuard } from './components/guards';
+import { DashboardLayout } from './components/layout/DashboardLayout';
 import { AuthPage } from './components/auth/AuthPage';
 import { OAuthCallback } from './components/auth/OAuthCallback';
 import { PasswordResetRequest } from './components/auth/PasswordResetRequest';
 import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { UserManagementPage } from './components/admin/UserManagementPage';
+import { Dashboard } from './pages/Dashboard';
+import { Documents } from './pages/Documents';
+import { Exams } from './pages/Exams';
+import { Review } from './pages/Review';
+import { Admin } from './pages/Admin';
+import { UserRole } from './types/auth';
 import App from './App';
 
 // Create a QueryClient instance for TanStack Query
@@ -60,9 +66,61 @@ export const AppWithAuth: React.FC = () => {
               path="/dashboard"
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <App />
-                  </AppLayout>
+                  <DashboardLayout>
+                    <Dashboard />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/documents"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['documents:read']}>
+                    <DashboardLayout>
+                      <Documents />
+                    </DashboardLayout>
+                  </PermissionGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/questions/generate"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['questions:create']}>
+                    <DashboardLayout>
+                      <Exams />
+                    </DashboardLayout>
+                  </PermissionGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/questions/review"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['questions:review']}>
+                    <DashboardLayout>
+                      <Review />
+                    </DashboardLayout>
+                  </PermissionGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/exams/compose"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['exams:create']}>
+                    <DashboardLayout>
+                      <Exams />
+                    </DashboardLayout>
+                  </PermissionGuard>
                 </ProtectedRoute>
               }
             />
@@ -71,9 +129,22 @@ export const AppWithAuth: React.FC = () => {
               path="/profile"
               element={
                 <ProtectedRoute>
-                  <AppLayout>
+                  <DashboardLayout>
                     <ProfilePage />
-                  </AppLayout>
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={[UserRole.ADMIN]}>
+                    <DashboardLayout>
+                      <Admin />
+                    </DashboardLayout>
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
@@ -82,11 +153,11 @@ export const AppWithAuth: React.FC = () => {
               path="/admin/users"
               element={
                 <ProtectedRoute>
-                  <PermissionGuard requiredPermissions={['manage_users']}>
-                    <AppLayout>
+                  <RoleGuard allowedRoles={[UserRole.ADMIN]}>
+                    <DashboardLayout>
                       <UserManagementPage />
-                    </AppLayout>
-                  </PermissionGuard>
+                    </DashboardLayout>
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
