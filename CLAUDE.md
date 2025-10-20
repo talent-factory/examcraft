@@ -84,12 +84,11 @@ Integration
 - **RAG Service Integration** (TF-147) - Prompt-Konfiguration in Question Generation
 - **Question Review Interface** (TF-60) - MVP mit Review Workflow
 - **Workshop Demo Materials** (TF-58) - Vollständig abgeschlossen
-- **Authentication & User Management** (TF-57) - Backend + Frontend (15/19 Tasks, 78.9%)
+- **Authentication & User Management** (TF-57) - Backend + Frontend (16/19 Tasks, 84.2%)
 
 **IN PROGRESS:**
 
 - **TF-57: Authentication & User Management** - Verbleibend:
-  - Frontend: Admin User Management UI
   - Frontend: Jest Tests
   - Security: GDPR Compliance
   - Documentation & E2E Tests
@@ -124,6 +123,7 @@ Integration
 - Session Management mit Redis
 - Rate Limiting Middleware
 - Audit Logging für Security Events
+- Admin User Management UI (User List, Edit, Role Assignment)
 
 ## Entwicklungsumgebung
 
