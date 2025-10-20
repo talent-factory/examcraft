@@ -3,9 +3,17 @@
  * Document management and upload
  */
 
-import React from 'react';
+import React, { useState } from 'react';
+import DocumentUpload from '../components/DocumentUpload';
+import DocumentLibrary from '../components/DocumentLibrary';
 
 export const Documents: React.FC = () => {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleDocumentUploaded = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -18,18 +26,20 @@ export const Documents: React.FC = () => {
         </p>
       </div>
 
-      {/* Content Placeholder */}
-      <div className="card p-12 text-center">
-        <div className="text-6xl mb-4">📄</div>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-          Dokumentenbibliothek
+      {/* Upload Section */}
+      <div className="card p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          Neues Dokument hochladen
         </h2>
-        <p className="text-gray-600 mb-6">
-          Diese Seite wird in Phase 3 mit der bestehenden DocumentUpload und DocumentLibrary Komponente integriert.
-        </p>
-        <div className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg font-medium">
-          Dokument hochladen
-        </div>
+        <DocumentUpload onUploadSuccess={handleDocumentUploaded} />
+      </div>
+
+      {/* Library Section */}
+      <div className="card p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          Meine Dokumente
+        </h2>
+        <DocumentLibrary refreshTrigger={refreshTrigger} />
       </div>
     </div>
   );

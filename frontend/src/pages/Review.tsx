@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import ReviewQueue from '../components/ReviewQueue';
 
 export const Review: React.FC = () => {
   return (
@@ -18,19 +19,8 @@ export const Review: React.FC = () => {
         </p>
       </div>
 
-      {/* Content Placeholder */}
-      <div className="card p-12 text-center">
-        <div className="text-6xl mb-4">✅</div>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-          Fragen-Review
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Diese Seite wird in Phase 3 mit der bestehenden ReviewQueue Komponente integriert.
-        </p>
-        <div className="inline-block px-6 py-3 bg-green-600 text-white rounded-lg font-medium">
-          Zur Review Queue
-        </div>
-      </div>
+      {/* Review Queue */}
+      <ReviewQueue />
     </div>
   );
 };

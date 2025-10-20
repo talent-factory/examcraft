@@ -3,9 +3,13 @@
  * Admin panel and settings
  */
 
-import React from 'react';
+import React, { useState } from 'react';
+import PromptManagement from '../components/PromptManagement';
+import UserManagementPage from '../components/admin/UserManagementPage';
 
 export const Admin: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'prompts' | 'users'>('prompts');
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -18,19 +22,44 @@ export const Admin: React.FC = () => {
         </p>
       </div>
 
-      {/* Content Placeholder */}
-      <div className="card p-12 text-center">
-        <div className="text-6xl mb-4">⚙️</div>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-          Admin-Panel
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Diese Seite wird in Phase 3 mit der bestehenden PromptManagement und Admin-Komponenten integriert.
-        </p>
-        <div className="inline-block px-6 py-3 bg-gray-600 text-white rounded-lg font-medium">
-          Zu den Admin-Tools
-        </div>
+      {/* Tab Navigation */}
+      <div className="flex gap-4 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => setActiveTab('prompts')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            activeTab === 'prompts'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Prompt-Verwaltung
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('users')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            activeTab === 'users'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Benutzer-Verwaltung
+        </button>
       </div>
+
+      {/* Tab Content */}
+      {activeTab === 'prompts' && (
+        <div className="card p-6">
+          <PromptManagement />
+        </div>
+      )}
+
+      {activeTab === 'users' && (
+        <div className="card p-6">
+          <UserManagementPage />
+        </div>
+      )}
     </div>
   );
 };
