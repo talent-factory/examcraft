@@ -73,7 +73,7 @@ services:
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
       - ./pyproject.toml:/app/pyproject.toml:ro
@@ -93,10 +93,10 @@ services:
       dockerfile: Dockerfile
     container_name: examcraft_frontend
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_API_URL=http://localhost:${BACKEND_PORT:-8000}
       - REACT_APP_ENVIRONMENT=development
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
