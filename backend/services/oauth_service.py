@@ -166,14 +166,20 @@ class OAuthService:
             )
             response.raise_for_status()
             user_info = response.json()
-            
+
+            # Truncate picture URL if too long (Google URLs can exceed 1000 chars)
+            picture_url = user_info.get('picture')
+            if picture_url and len(picture_url) > 1000:
+                # Simply truncate to 1000 chars to fit database constraint
+                picture_url = picture_url[:1000]
+
             return {
                 'provider_user_id': user_info['id'],
                 'email': user_info['email'],
                 'name': user_info.get('name', ''),
                 'first_name': user_info.get('given_name', ''),
                 'last_name': user_info.get('family_name', ''),
-                'picture': user_info.get('picture'),
+                'picture': picture_url,
                 'email_verified': user_info.get('verified_email', False),
                 'raw_user_info': user_info
             }
@@ -260,10 +266,11 @@ class OAuthService:
         default_institution = self.db.query(Institution).filter(
             Institution.name == "Default Institution"
         ).first()
-        
+
         if not default_institution:
             default_institution = Institution(
                 name="Default Institution",
+                slug="default-institution",
                 domain="default.examcraft.ai",
                 is_active=True
             )

@@ -142,7 +142,7 @@ class User(Base):
     display_name = Column(String(200), nullable=True)  # Optional custom display name
     
     # Profile
-    avatar_url = Column(String(500), nullable=True)
+    avatar_url = Column(String(1000), nullable=True)  # Increased for OAuth providers (Google URLs can be very long)
     bio = Column(Text, nullable=True)
     phone = Column(String(50), nullable=True)
     
@@ -325,7 +325,7 @@ class OAuthAccount(Base):
     # User Profile from OAuth Provider
     email = Column(String(255), nullable=True)  # Email from OAuth Provider
     name = Column(String(255), nullable=True)  # Full Name from OAuth Provider
-    picture = Column(String(500), nullable=True)  # Profile Picture URL
+    picture = Column(String(1000), nullable=True)  # Profile Picture URL (increased for OAuth providers)
 
     # Metadata
     raw_user_info = Column(Text, nullable=True)  # JSON string of raw OAuth user info

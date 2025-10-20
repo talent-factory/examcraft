@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 import logging
+import os
 
 from database import get_db
 from models.auth import User, Role, Institution, UserStatus, UserRole
@@ -68,6 +69,20 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=100)
 
 
+class RoleResponse(BaseModel):
+    """Role response"""
+    id: int
+    name: str
+    display_name: str
+    description: Optional[str]
+    permissions: list[str]
+    is_system_role: bool
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
 class UserProfileResponse(BaseModel):
     """User profile response"""
     id: int
@@ -78,9 +93,9 @@ class UserProfileResponse(BaseModel):
     is_superuser: bool
     institution_id: Optional[int]
     institution_name: Optional[str]
-    roles: list[str]
+    roles: list[RoleResponse]
     created_at: str
-    
+
     class Config:
         from_attributes = True
 
@@ -323,8 +338,33 @@ async def get_current_user_profile(
     Get current user profile
 
     - Returns user information
-    - Includes institution and roles
+    - Includes institution and roles with permissions
     """
+    import json
+
+    # Build role responses with parsed permissions
+    role_responses = []
+    for role in current_user.roles:
+        # Parse permissions from JSON string if needed
+        permissions = role.permissions
+        if isinstance(permissions, str):
+            try:
+                permissions = json.loads(permissions)
+            except json.JSONDecodeError:
+                permissions = []
+        elif not isinstance(permissions, list):
+            permissions = []
+
+        role_responses.append(RoleResponse(
+            id=role.id,
+            name=role.name,
+            display_name=role.display_name,
+            description=role.description,
+            permissions=permissions,
+            is_system_role=role.is_system_role,
+            created_at=role.created_at.isoformat()
+        ))
+
     return UserProfileResponse(
         id=current_user.id,
         email=current_user.email,
@@ -334,7 +374,7 @@ async def get_current_user_profile(
         is_superuser=current_user.is_superuser,
         institution_id=current_user.institution_id,
         institution_name=current_user.institution.name if current_user.institution else None,
-        roles=[role.name for role in current_user.roles],
+        roles=role_responses,
         created_at=current_user.created_at.isoformat()
     )
 
@@ -368,6 +408,31 @@ async def update_current_user_profile(
 
     logger.info(f"User profile updated: {current_user.email} (ID: {current_user.id})")
 
+    import json
+
+    # Build role responses with parsed permissions
+    role_responses = []
+    for role in current_user.roles:
+        # Parse permissions from JSON string if needed
+        permissions = role.permissions
+        if isinstance(permissions, str):
+            try:
+                permissions = json.loads(permissions)
+            except json.JSONDecodeError:
+                permissions = []
+        elif not isinstance(permissions, list):
+            permissions = []
+
+        role_responses.append(RoleResponse(
+            id=role.id,
+            name=role.name,
+            display_name=role.display_name,
+            description=role.description,
+            permissions=permissions,
+            is_system_role=role.is_system_role,
+            created_at=role.created_at.isoformat()
+        ))
+
     return UserProfileResponse(
         id=current_user.id,
         email=current_user.email,
@@ -377,7 +442,7 @@ async def update_current_user_profile(
         is_superuser=current_user.is_superuser,
         institution_id=current_user.institution_id,
         institution_name=current_user.institution.name if current_user.institution else None,
-        roles=[role.name for role in current_user.roles],
+        roles=role_responses,
         created_at=current_user.created_at.isoformat()
     )
 
@@ -481,7 +546,7 @@ class OAuthLoginResponse(BaseModel):
     provider: str
 
 
-@router.get("/oauth/{provider}/login", response_model=OAuthLoginResponse)
+@router.get("/oauth/{provider}/login")
 async def oauth_login(
     provider: str,
     request: Request,
@@ -492,7 +557,7 @@ async def oauth_login(
 
     **Supported Providers:** google, microsoft
 
-    Returns authorization URL to redirect user to OAuth provider
+    Redirects user directly to OAuth provider (Google, Microsoft, etc.)
     """
     if provider not in ['google', 'microsoft']:
         raise HTTPException(
@@ -501,6 +566,7 @@ async def oauth_login(
         )
 
     from services.oauth_service import OAuthService
+    from fastapi.responses import RedirectResponse
     oauth_service = OAuthService(db)
 
     # Generate callback URL
@@ -509,10 +575,8 @@ async def oauth_login(
 
     try:
         authorization_url = oauth_service.get_authorization_url(provider, redirect_uri)
-        return OAuthLoginResponse(
-            authorization_url=authorization_url,
-            provider=provider
-        )
+        # Direct redirect to OAuth provider
+        return RedirectResponse(url=authorization_url, status_code=302)
     except Exception as e:
         logger.error(f"OAuth login failed for {provider}: {str(e)}")
         raise HTTPException(
@@ -558,26 +622,26 @@ async def oauth_callback(
         # Find or create user
         user = oauth_service.find_or_create_user_from_oauth(provider, user_info, token)
 
-        # Generate JWT tokens
-        auth_service = AuthService(db)
-        access_token = auth_service.create_access_token(user.id)
-        refresh_token = auth_service.create_refresh_token(user.id)
-
-        # Create session
-        auth_service.create_session(
-            user_id=user.id,
-            refresh_token=refresh_token,
-            ip_address=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent")
+        # Generate JWT tokens and create session
+        tokens = AuthService.create_tokens_for_user(
+            user=user,
+            db=db,
+            user_agent=request.headers.get("user-agent"),
+            ip_address=request.client.host if request.client else None
         )
 
         logger.info(f"OAuth login successful for user {user.email} via {provider}")
 
-        return TokenResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer"
+        # Redirect to frontend with tokens
+        from fastapi.responses import RedirectResponse
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        redirect_url = (
+            f"{frontend_url}/auth/callback?"
+            f"access_token={tokens['access_token']}&"
+            f"refresh_token={tokens['refresh_token']}&"
+            f"token_type={tokens['token_type']}"
         )
+        return RedirectResponse(url=redirect_url)
 
     except ValueError as e:
         logger.error(f"OAuth callback failed for {provider}: {str(e)}")
