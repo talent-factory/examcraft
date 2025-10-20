@@ -24,7 +24,7 @@ import {
 import {
   CheckCircle as CheckIcon,
   Cancel as CancelIcon,
-  Infinity as InfinityIcon
+  AllInclusive as InfinityIcon
 } from '@mui/icons-material';
 import { SubscriptionTier, TierQuota, TIER_COLORS, RESOURCE_TYPE_LABELS } from '../../types/rbac';
 import RBACService from '../../services/RBACService';
