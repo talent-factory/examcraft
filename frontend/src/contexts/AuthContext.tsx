@@ -43,22 +43,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error: null,
   });
 
+  // Debug logging for state changes
+  useEffect(() => {
+    console.log('[AuthContext] State changed:', {
+      isAuthenticated: state.isAuthenticated,
+      isLoading: state.isLoading,
+      hasUser: !!state.user,
+      hasToken: !!state.accessToken,
+    });
+  }, [state.isAuthenticated, state.isLoading, state.user, state.accessToken]);
+
   /**
    * Load auth state from localStorage on mount
    */
   useEffect(() => {
     const loadAuthState = async () => {
       try {
+        console.log('[AuthContext] Loading auth state from localStorage...');
         const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
         const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-        const userJson = localStorage.getItem(USER_KEY);
 
-        if (accessToken && refreshToken && userJson) {
-          const user = JSON.parse(userJson) as User;
-          
-          // Verify token is still valid by fetching profile
+        console.log('[AuthContext] Tokens present:', !!accessToken, !!refreshToken);
+
+        if (accessToken && refreshToken) {
+          // Always fetch fresh profile instead of relying on cached user
           try {
+            console.log('[AuthContext] Verifying token with getProfile...');
             const profile = await AuthService.getProfile(accessToken);
+            console.log('[AuthContext] Token valid! Setting authenticated state for:', profile.email);
+
+            // Update localStorage with fresh user data
+            localStorage.setItem(USER_KEY, JSON.stringify(profile));
+
             setState({
               user: profile,
               accessToken,
@@ -68,15 +84,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               error: null,
             });
           } catch (error) {
+            console.error('[AuthContext] Token verification failed:', error);
             // Token expired, try to refresh
             try {
+              console.log('[AuthContext] Attempting token refresh...');
               const tokens = await AuthService.refreshToken({ refresh_token: refreshToken });
               const profile = await AuthService.getProfile(tokens.access_token);
-              
+
               localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
               localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
               localStorage.setItem(USER_KEY, JSON.stringify(profile));
-              
+
+              console.log('[AuthContext] Token refreshed successfully for:', profile.email);
               setState({
                 user: profile,
                 accessToken: tokens.access_token,
@@ -86,11 +105,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 error: null,
               });
             } catch (refreshError) {
+              console.error('[AuthContext] Token refresh failed:', refreshError);
               // Refresh failed, clear auth state
               localStorage.removeItem(ACCESS_TOKEN_KEY);
               localStorage.removeItem(REFRESH_TOKEN_KEY);
               localStorage.removeItem(USER_KEY);
-              
+
+              console.log('[AuthContext] Cleared auth state due to refresh failure');
               setState({
                 user: null,
                 accessToken: null,
@@ -102,10 +123,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         } else {
+          console.log('[AuthContext] No tokens found in localStorage, setting unauthenticated state');
           setState(prev => ({ ...prev, isLoading: false }));
         }
       } catch (error) {
-        console.error('Failed to load auth state:', error);
+        console.error('[AuthContext] Failed to load auth state:', error);
         setState(prev => ({ ...prev, isLoading: false }));
       }
     };
@@ -191,17 +213,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Logout
    */
   const logout = useCallback(async () => {
+    console.log('[AuthContext] Logout called');
     try {
       if (state.accessToken) {
         await AuthService.logout(state.accessToken);
       }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('[AuthContext] Logout error:', error);
     } finally {
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       localStorage.removeItem(REFRESH_TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
-      
+
+      console.log('[AuthContext] Cleared auth state and localStorage');
       setState({
         user: null,
         accessToken: null,

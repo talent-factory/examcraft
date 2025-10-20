@@ -39,11 +39,12 @@ async def lifespan(app: FastAPI):
     create_tables()
 
     # Startup: Load API routers
-    from api import documents, vector_search, rag_exams, question_review, auth, admin
+    from api import documents, vector_search, rag_exams, question_review, auth, admin, gdpr
     from api.v1 import chat as chat_api, prompts as prompts_api
 
     app.include_router(auth.router)
     app.include_router(admin.router)
+    app.include_router(gdpr.router)
     app.include_router(documents.router)
     app.include_router(vector_search.router)
     app.include_router(rag_exams.router)

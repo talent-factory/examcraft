@@ -3,7 +3,7 @@
  * Handles OAuth callback and token exchange
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import AuthService from '../../services/AuthService';
 
@@ -12,39 +12,54 @@ export const OAuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(true);
+  const hasProcessed = useRef(false);
 
   useEffect(() => {
     const handleCallback = async () => {
+      // Prevent double execution in React StrictMode
+      if (hasProcessed.current) {
+        console.log('[OAuthCallback] Already processed, skipping...');
+        return;
+      }
+      hasProcessed.current = true;
+
       try {
+        console.log('[OAuthCallback] Starting OAuth callback handling...');
+        console.log('[OAuthCallback] Current URL:', window.location.href);
+
         // Get tokens from URL parameters (backend redirects with tokens)
         const accessToken = searchParams.get('access_token');
         const refreshToken = searchParams.get('refresh_token');
         const errorParam = searchParams.get('error');
 
+        console.log('[OAuthCallback] Access Token present:', !!accessToken);
+        console.log('[OAuthCallback] Refresh Token present:', !!refreshToken);
+        console.log('[OAuthCallback] Error param:', errorParam);
+
         if (errorParam) {
+          console.error('[OAuthCallback] OAuth error:', errorParam);
           setError(`OAuth error: ${errorParam}`);
           setIsProcessing(false);
           return;
         }
 
         if (!accessToken || !refreshToken) {
+          console.error('[OAuthCallback] Missing tokens!');
           setError('Missing authentication tokens');
           setIsProcessing(false);
           return;
         }
 
+        console.log('[OAuthCallback] Storing tokens in localStorage...');
         // Store tokens in localStorage
         localStorage.setItem('examcraft_access_token', accessToken);
         localStorage.setItem('examcraft_refresh_token', refreshToken);
 
-        // Fetch user profile
-        const user = await AuthService.getProfile(accessToken);
-        localStorage.setItem('examcraft_user', JSON.stringify(user));
-
-        // Redirect to dashboard - AuthContext will pick up tokens from localStorage
+        console.log('[OAuthCallback] Redirecting to dashboard...');
+        // Redirect to dashboard - AuthContext will fetch user profile automatically
         navigate('/dashboard', { replace: true });
       } catch (err) {
-        console.error('OAuth callback error:', err);
+        console.error('[OAuthCallback] Error:', err);
         setError(err instanceof Error ? err.message : 'OAuth authentication failed');
         setIsProcessing(false);
       }

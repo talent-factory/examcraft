@@ -10,6 +10,7 @@ dependencies = [
     "docling>=2.9.0",
     "pypdf>=6.1.0",
     "email-validator>=2.3.0",
+    "alembic>=1.17.0",
 ]
 
 [dependency-groups]

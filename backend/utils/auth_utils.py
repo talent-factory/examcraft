@@ -6,7 +6,7 @@ Dependencies für Token Validation und User Authentication
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models.auth import User, UserStatus
@@ -63,8 +63,8 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Get user from database
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    # Get user from database with roles (needed for permission checks)
+    user = db.query(User).options(joinedload(User.roles)).filter(User.id == int(user_id)).first()
     
     if user is None:
         raise HTTPException(
@@ -176,7 +176,29 @@ def require_permission(required_permission: str):
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db)
     ) -> User:
-        if not current_user.has_permission(required_permission):
+        # DEBUG: Log permission check details
+        import json
+        print(f"\n=== PERMISSION CHECK DEBUG ===")
+        print(f"User: {current_user.email} (ID: {current_user.id})")
+        print(f"Required permission: {required_permission}")
+        print(f"is_superuser: {current_user.is_superuser}")
+        print(f"Number of roles: {len(current_user.roles)}")
+        for role in current_user.roles:
+            print(f"  Role: {role.name}")
+            print(f"    Permissions type: {type(role.permissions)}")
+            print(f"    Permissions value: {repr(role.permissions)[:100]}")
+            if isinstance(role.permissions, str):
+                try:
+                    perms = json.loads(role.permissions)
+                    print(f"    Parsed permissions: {perms}")
+                except Exception as e:
+                    print(f"    ERROR parsing: {e}")
+
+        has_perm = current_user.has_permission(required_permission)
+        print(f"has_permission result: {has_perm}")
+        print(f"=== END DEBUG ===\n")
+
+        if not has_perm:
             # Audit log: Permission denied
             from services.audit_service import AuditService
             AuditService.log_permission_denied(

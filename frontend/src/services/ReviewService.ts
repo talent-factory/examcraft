@@ -21,6 +21,18 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export class ReviewService {
   /**
+   * Get auth headers with token
+   */
+  private static getAuthHeaders(additionalHeaders: HeadersInit = {}): HeadersInit {
+    const token = localStorage.getItem('examcraft_access_token');
+    return {
+      'Content-Type': 'application/json',
+      ...additionalHeaders,
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+  }
+
+  /**
    * Get Review Queue with filters
    */
   static async getReviewQueue(filters?: ReviewFilters): Promise<ReviewQueueResponse> {
@@ -37,9 +49,7 @@ export class ReviewService {
       `${API_BASE_URL}/api/v1/questions/review?${params.toString()}`,
       {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
       }
     );
 
@@ -59,9 +69,7 @@ export class ReviewService {
       `${API_BASE_URL}/api/v1/questions/${questionId}/review`,
       {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
       }
     );
 
@@ -83,9 +91,7 @@ export class ReviewService {
       `${API_BASE_URL}/api/v1/questions/review`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify(request),
       }
     );
@@ -109,9 +115,7 @@ export class ReviewService {
       `${API_BASE_URL}/api/v1/questions/${questionId}/approve`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify(request),
       }
     );
@@ -135,9 +139,7 @@ export class ReviewService {
       `${API_BASE_URL}/api/v1/questions/${questionId}/reject`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify(request),
       }
     );
@@ -162,9 +164,7 @@ export class ReviewService {
       `${API_BASE_URL}/api/v1/questions/${questionId}/edit?editor_id=${encodeURIComponent(editorId)}`,
       {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify(updates),
       }
     );
@@ -182,7 +182,11 @@ export class ReviewService {
    */
   static async getComments(questionId: number): Promise<ReviewComment[]> {
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/questions/${questionId}/comments`
+      `${API_BASE_URL}/api/v1/questions/${questionId}/comments`,
+      {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      }
     );
 
     if (!response.ok) {
@@ -204,9 +208,7 @@ export class ReviewService {
       `${API_BASE_URL}/api/v1/questions/${questionId}/comments`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify(request),
       }
     );
@@ -227,9 +229,7 @@ export class ReviewService {
       `${API_BASE_URL}/api/v1/questions/${questionId}/history`,
       {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
       }
     );
 
@@ -249,9 +249,7 @@ export class ReviewService {
       `${API_BASE_URL}/api/v1/questions/review`,
       {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
       }
     );
 

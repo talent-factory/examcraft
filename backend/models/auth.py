@@ -175,6 +175,10 @@ class User(Base):
     # Preferences (JSON)
     preferences = Column(Text, nullable=True)  # JSON string für User Preferences
     
+    # GDPR Compliance
+    deletion_requested_at = Column(DateTime(timezone=True), nullable=True)  # When user requested deletion
+    scheduled_deletion_date = Column(DateTime(timezone=True), nullable=True)  # When account will be deleted
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -209,10 +213,20 @@ class User(Base):
     
     def has_permission(self, permission: str) -> bool:
         """Check if user has specific permission"""
+        import json
         for role in self.roles:
             if role.permissions:
-                # permissions is already a Python list (SQLAlchemy JSON type)
-                perms = role.permissions if isinstance(role.permissions, list) else []
+                # Parse permissions from JSON string to list
+                if isinstance(role.permissions, str):
+                    try:
+                        perms = json.loads(role.permissions)
+                    except (json.JSONDecodeError, TypeError):
+                        perms = []
+                elif isinstance(role.permissions, list):
+                    perms = role.permissions
+                else:
+                    perms = []
+
                 if permission in perms:
                     return True
         return False
