@@ -5,24 +5,21 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { OAuthProvider } from '../../types/auth';
 import AuthService from '../../services/AuthService';
-import { useAuth } from '../../contexts/AuthContext';
 
 export const OAuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        const code = searchParams.get('code');
-        const state = searchParams.get('state');
+        // Get tokens from URL parameters (backend redirects with tokens)
+        const accessToken = searchParams.get('access_token');
+        const refreshToken = searchParams.get('refresh_token');
         const errorParam = searchParams.get('error');
-        const providerParam = searchParams.get('provider') as OAuthProvider;
 
         if (errorParam) {
           setError(`OAuth error: ${errorParam}`);
@@ -30,30 +27,21 @@ export const OAuthCallback: React.FC = () => {
           return;
         }
 
-        if (!code || !state) {
-          setError('Missing OAuth parameters');
+        if (!accessToken || !refreshToken) {
+          setError('Missing authentication tokens');
           setIsProcessing(false);
           return;
         }
 
-        if (!providerParam) {
-          setError('Missing provider parameter');
-          setIsProcessing(false);
-          return;
-        }
-
-        // Exchange code for tokens
-        const tokens = await AuthService.handleOAuthCallback(providerParam, code, state);
-        
         // Store tokens in localStorage
-        localStorage.setItem('examcraft_access_token', tokens.access_token);
-        localStorage.setItem('examcraft_refresh_token', tokens.refresh_token);
-        
+        localStorage.setItem('examcraft_access_token', accessToken);
+        localStorage.setItem('examcraft_refresh_token', refreshToken);
+
         // Fetch user profile
-        const user = await AuthService.getProfile(tokens.access_token);
+        const user = await AuthService.getProfile(accessToken);
         localStorage.setItem('examcraft_user', JSON.stringify(user));
 
-        // Redirect to dashboard
+        // Redirect to dashboard - AuthContext will pick up tokens from localStorage
         navigate('/dashboard', { replace: true });
       } catch (err) {
         console.error('OAuth callback error:', err);
@@ -63,7 +51,7 @@ export const OAuthCallback: React.FC = () => {
     };
 
     handleCallback();
-  }, [searchParams, navigate, login]);
+  }, [searchParams, navigate]);
 
   if (error) {
     return (

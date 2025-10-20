@@ -14,12 +14,36 @@ ExamCraft/
 ├── backend/              # FastAPI Backend
 │   ├── main.py          # API Server
 │   ├── database.py      # Database Connection
-│   ├── models.py        # Pydantic Models
-│   └── services/        # Business Logic
+│   ├── models/          # SQLAlchemy Models
+│   │   ├── auth.py      # User, Role, Institution, Session, AuditLog
+│   │   ├── document.py  # Document Models
+│   │   └── question_review.py  # Question Review Models
+│   ├── api/             # API Endpoints
+│   │   ├── auth.py      # Authentication Endpoints
+│   │   ├── documents.py # Document Management
+│   │   └── v1/          # Versioned API
+│   ├── services/        # Business Logic
+│   │   ├── auth_service.py    # JWT Authentication
+│   │   ├── oauth_service.py   # Google/Microsoft OAuth
+│   │   ├── redis_service.py   # Session Management
+│   │   └── audit_service.py   # Security Logging
+│   ├── middleware/      # Middleware
+│   │   └── rate_limit.py      # Rate Limiting
+│   ├── utils/           # Utilities
+│   │   ├── auth_utils.py      # Auth Helpers
+│   │   ├── tenant_utils.py    # Multi-Tenant Helpers
+│   │   └── seed_roles.py      # Role Seeding
+│   └── tests/           # pytest Tests
 ├── frontend/            # React 18 + TypeScript Frontend
 │   ├── src/
-│   │   ├── components/  # React Components (Auth, Chat, etc.)
+│   │   ├── components/  # React Components
+│   │   │   ├── auth/    # Login, Register, OAuth
+│   │   │   ├── guards/  # Route Protection
+│   │   │   ├── profile/ # User Profile
+│   │   │   └── layout/  # Navigation
+│   │   ├── contexts/    # React Context (Auth)
 │   │   ├── services/    # API Services
+│   │   ├── types/       # TypeScript Types
 │   │   └── index.css    # Tailwind CSS Entry Point
 │   ├── public/          # Static Assets
 │   ├── tailwind.config.js  # Tailwind Configuration
@@ -30,7 +54,6 @@ ExamCraft/
 │   ├── extraction.py    # Document Processing
 │   └── rag.py          # RAG System
 ├── demo/                # Workshop Demo Materials
-├── docs/                # Documentation
 ├── .claude/             # Claude Code Commands
 ├── docker-compose.yml   # Container Orchestration
 └── pyproject.toml      # Python Dependencies
@@ -45,7 +68,7 @@ ExamCraft/
 Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API
 Integration
 
-### Aktueller Projektstatus (Stand: 19.10.2025)
+### Aktueller Projektstatus (Stand: 20.10.2025)
 
 **CORE FEATURES ABGESCHLOSSEN:**
 
@@ -59,13 +82,23 @@ Integration
 - **Prompt Template Selector UI** (TF-146) - Frontend Komponente für Prompt-Auswahl
 - **Template-Variablen-System** (TF-145) - Dynamische Prompt-Konfiguration mit Jinja2
 - **RAG Service Integration** (TF-147) - Prompt-Konfiguration in Question Generation
+- **Question Review Interface** (TF-60) - MVP mit Review Workflow
+- **Workshop Demo Materials** (TF-58) - Vollständig abgeschlossen
+- **Authentication & User Management** (TF-57) - Backend + Frontend (15/19 Tasks, 78.9%)
+
+**IN PROGRESS:**
+
+- **TF-57: Authentication & User Management** - Verbleibend:
+  - Frontend: Admin User Management UI
+  - Frontend: Jest Tests
+  - Security: GDPR Compliance
+  - Documentation & E2E Tests
 
 **BACKLOG FEATURES:**
 
-- Question Review Interface (TF-60)
 - Exam Composition & Export (TF-56)
-- Authentication & User Management (TF-57)
-- Workshop Demo Materials (TF-58)
+- Open Source Vorbereitung (TF-112)
+- Mintlify Dokumentation (TF-87)
 
 ### Implementierte Technologien
 
@@ -84,6 +117,13 @@ Integration
 - RAG Service Prompt-Integration mit Auto-Variable-Merging
 - Tailwind CSS v3 Integration mit CRACO
 - Modern Authentication UI (LoginForm, AuthPage)
+- JWT Authentication mit bcrypt Password Hashing
+- OAuth Integration (Google, Microsoft)
+- Role-Based Access Control (RBAC)
+- Multi-Tenant Architecture
+- Session Management mit Redis
+- Rate Limiting Middleware
+- Audit Logging für Security Events
 
 ## Entwicklungsumgebung
 

@@ -118,15 +118,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const login = useCallback(async (email: string, password: string) => {
     try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
-      
+      console.log('[AuthContext] login called, setting isLoading: true');
+      setState(prev => {
+        console.log('[AuthContext] Previous state:', prev);
+        return { ...prev, isLoading: true, error: null };
+      });
+
+      console.log('[AuthContext] Calling AuthService.login...');
       const tokens = await AuthService.login({ email, password });
+      console.log('[AuthContext] Login successful, fetching profile...');
       const user = await AuthService.getProfile(tokens.access_token);
-      
+
       localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
       localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
-      
+
+      console.log('[AuthContext] Setting authenticated state');
       setState({
         user,
         accessToken: tokens.access_token,
@@ -136,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error: null,
       });
     } catch (error) {
+      console.error('[AuthContext] Login error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
       setState(prev => ({
         ...prev,
@@ -306,10 +314,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hasPermission = useCallback((permission: string): boolean => {
     if (!state.user) return false;
     if (state.user.is_superuser) return true;
-    
-    return state.user.roles.some(role => 
-      role.permissions.includes(permission)
-    );
+
+    // Guard against undefined roles or permissions
+    if (!state.user.roles || !Array.isArray(state.user.roles)) return false;
+
+    return state.user.roles.some(role => {
+      // Ensure permissions is an array before checking
+      if (!role.permissions || !Array.isArray(role.permissions)) return false;
+      return role.permissions.includes(permission);
+    });
   }, [state.user]);
 
   /**
@@ -317,7 +330,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const hasRole = useCallback((role: UserRole): boolean => {
     if (!state.user) return false;
-    
+
+    // Guard against undefined roles
+    if (!state.user.roles || !Array.isArray(state.user.roles)) return false;
+
     return state.user.roles.some(r => r.name === role);
   }, [state.user]);
 

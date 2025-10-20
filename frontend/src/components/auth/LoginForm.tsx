@@ -27,6 +27,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[LoginForm] handleSubmit called, isLoading:', isLoading);
     clearError();
     setLocalError(null);
 
@@ -36,19 +37,27 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     }
 
     try {
+      console.log('[LoginForm] Calling login...');
       await login(email, password);
+      console.log('[LoginForm] Login successful, calling onSuccess');
       onSuccess?.();
     } catch (err) {
-      console.error('Login failed:', err);
+      console.error('[LoginForm] Login failed:', err);
     }
   };
 
-  const handleOAuthLogin = async (provider: OAuthProvider) => {
+  const handleOAuthLogin = (provider: OAuthProvider) => {
     try {
       clearError();
       setLocalError(null);
-      const response = await AuthService.getOAuthLoginUrl(provider);
-      window.location.href = response.authorization_url;
+
+      // Direct redirect to backend OAuth endpoint to avoid async delay
+      // This ensures the redirect happens immediately on user click, preventing browser blocking
+      const backendUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const redirectUrl = `${backendUrl}/api/auth/oauth/${provider}/login`;
+
+      console.log('[LoginForm] Redirecting to OAuth provider:', provider, redirectUrl);
+      window.location.href = redirectUrl;
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'OAuth login failed');
     }
@@ -93,7 +102,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               className="block w-full px-4 py-2.5 text-gray-900 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="you@example.com"
               disabled={isLoading}
-              autoComplete="email"
+              autoComplete="off"
             />
           </div>
 
@@ -111,7 +120,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 className="block w-full px-4 py-2.5 text-gray-900 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-11"
                 placeholder="••••••••"
                 disabled={isLoading}
-                autoComplete="current-password"
+                autoComplete="off"
               />
               <button
                 type="button"
@@ -161,6 +170,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           <button
             type="submit"
             disabled={isLoading}
+            onClick={(e) => {
+              // Prevent browser autocomplete from interfering with form submission
+              console.log('[LoginForm] Button clicked, isLoading:', isLoading);
+            }}
             className="w-full flex justify-center items-center py-2.5 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
             {isLoading ? (
@@ -188,11 +201,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
           {/* OAuth Buttons */}
           <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => handleOAuthLogin(OAuthProvider.GOOGLE)}
-              disabled={isLoading}
-              className="flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            <a
+              href={`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/auth/oauth/google/login`}
+              className="flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -201,7 +212,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
               Google
-            </button>
+            </a>
 
             <button
               type="button"
