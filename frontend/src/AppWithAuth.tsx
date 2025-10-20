@@ -7,7 +7,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
-import { ProtectedRoute, GuestRoute, PermissionGuard } from './components/guards';
+import { ProtectedRoute, GuestRoute, PermissionGuard, RoleGuard } from './components/guards';
 import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
 import { OAuthCallback } from './components/auth/OAuthCallback';
@@ -16,6 +16,7 @@ import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { UserManagementPage } from './components/admin/UserManagementPage';
 import RoleManagementPage from './components/admin/RoleManagementPage';
+import { UserRole } from './types/auth';
 import App from './App';
 
 // Create a QueryClient instance for TanStack Query
@@ -96,11 +97,11 @@ export const AppWithAuth: React.FC = () => {
               path="/admin/roles"
               element={
                 <ProtectedRoute>
-                  <PermissionGuard requiredPermissions={['manage_users']}>
+                  <RoleGuard allowedRoles={[UserRole.ADMIN]}>
                     <AppLayout>
                       <RoleManagementPage />
                     </AppLayout>
-                  </PermissionGuard>
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
