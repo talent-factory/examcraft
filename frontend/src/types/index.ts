@@ -21,16 +21,16 @@ export * from './prompt';
 // RBAC Types - Selective export to avoid conflicts with auth.ts
 export type {
   Feature,
-  RoleFeature,
+  FeatureCategory,
   TierQuota,
-  TierFeature,
-  Organization,
-  ResourceUsage,
-  PermissionAuditLog,
+  ResourceType,
   CreateRoleRequest,
   UpdateRoleFeaturesRequest,
   PermissionCheckResponse,
-  QuotaCheckResponse
+  QuotaCheckResponse,
+  FeatureGroup,
+  RoleWithPermissions,
+  TierWithQuotas
 } from './rbac';
 
 // Export RBAC types with aliases to avoid conflicts
