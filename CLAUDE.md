@@ -17,9 +17,15 @@ ExamCraft/
 │   ├── models.py        # Pydantic Models
 │   └── services/        # Business Logic
 ├── frontend/            # React 18 + TypeScript Frontend
-│   ├── src/components/  # React Components
-│   ├── src/services/    # API Services
-│   └── public/          # Static Assets
+│   ├── src/
+│   │   ├── components/  # React Components (Auth, Chat, etc.)
+│   │   ├── services/    # API Services
+│   │   └── index.css    # Tailwind CSS Entry Point
+│   ├── public/          # Static Assets
+│   ├── tailwind.config.js  # Tailwind Configuration
+│   ├── postcss.config.js   # PostCSS Configuration
+│   ├── craco.config.js     # CRA Override Configuration
+│   └── package.json        # NPM Dependencies
 ├── utils/               # Python Utilities
 │   ├── extraction.py    # Document Processing
 │   └── rag.py          # RAG System
@@ -76,6 +82,8 @@ Integration
 - Template-Variablen-System mit Jinja2
 - Live-Preview für Prompt-Rendering
 - RAG Service Prompt-Integration mit Auto-Variable-Merging
+- Tailwind CSS v3 Integration mit CRACO
+- Modern Authentication UI (LoginForm, AuthPage)
 
 ## Entwicklungsumgebung
 
@@ -105,6 +113,23 @@ ruff format backend/ utils/
 - **TypeScript**: Strikte Types, ESLint + Prettier
 - **Testing**: pytest (Backend), Jest (Frontend)
 - **Documentation**: Automatisch via FastAPI + TypeDoc
+- **CSS**: Tailwind CSS v3 Utility-First Approach
+
+### Frontend Konfiguration
+
+**Tailwind CSS Integration:**
+
+- `frontend/tailwind.config.js` - Content Scanning & Theme Config
+- `frontend/postcss.config.js` - PostCSS Plugins (Tailwind + Autoprefixer)
+- `frontend/craco.config.js` - CRA Webpack Override für PostCSS
+- `frontend/src/index.css` - Tailwind Directives (@tailwind base/components/utilities)
+
+**Build-System:**
+
+- Create React App (CRA) mit CRACO Override
+- Tailwind CSS v3.3.0 (kompatibel mit CRA)
+- PostCSS für CSS-Processing
+- Autoprefixer für Browser-Kompatibilität
 
 ## Implementierte Architektur
 
@@ -129,8 +154,10 @@ ruff format backend/ utils/
 4. **Frontend UI** (`frontend/`)
    - React 18 + TypeScript
    - TanStack Query für API State
-   - Tailwind CSS + shadcn/ui Components
+   - Material-UI (MUI) + Tailwind CSS v3
+   - Tailwind CSS Integration mit CRACO
    - Responsive Multi-Device Support
+   - Modern Authentication UI
 
 ### Design-Prinzipien (Umgesetzt)
 
