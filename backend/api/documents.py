@@ -317,7 +317,7 @@ async def process_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
     # Prüfe User-Berechtigung
-    if document.user_id and document.user_id != str(current_user.id):
+    if document.user_id and document.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     try:
