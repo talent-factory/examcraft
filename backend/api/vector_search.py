@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from services.vector_service_factory import vector_service, get_service_info
 from services.document_service import document_service
+from models.auth import User
+from utils.auth_utils import get_current_active_user
 import logging
 
 # SearchResult type - will be provided by vector service
@@ -65,11 +67,14 @@ class VectorStatsResponse(BaseModel):
 @router.post("/similarity", response_model=SearchResponse)
 async def similarity_search(
     search_query: SearchQuery,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Führe Similarity Search in der Vector Database durch
-    
+
+    **Required:** Authenticated user
+
     - **query**: Suchtext (1-1000 Zeichen)
     - **n_results**: Anzahl Ergebnisse (1-50, default: 5)
     - **document_ids**: Optional Filter für spezifische Dokumente
@@ -123,11 +128,14 @@ async def similarity_search(
 @router.get("/document/{document_id}/chunks", response_model=List[SearchResultResponse])
 async def get_document_vector_chunks(
     document_id: int,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Hole alle Vector Chunks eines spezifischen Dokuments
-    
+
+    **Required:** Authenticated user
+
     - **document_id**: ID des Dokuments
     """
     try:
@@ -165,10 +173,14 @@ async def get_document_vector_chunks(
 
 
 @router.get("/stats", response_model=VectorStatsResponse)
-async def get_vector_database_stats():
+async def get_vector_database_stats(
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Hole Statistiken über die Vector Database
-    
+
+    **Required:** Authenticated user
+
     Zeigt Informationen über:
     - Collection Name und Chunk-Anzahl
     - Verwendetes Embedding Model

@@ -39,7 +39,8 @@ import {
   CheckCircle,
   Error,
   Schedule,
-  CloudUpload
+  CloudUpload,
+  PlayArrow
 } from '@mui/icons-material';
 import { DocumentService } from '../services/DocumentService';
 import { Document, DocumentStatus } from '../types/document';
@@ -69,6 +70,15 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [previewTab, setPreviewTab] = useState(0);
   const [documentContent, setDocumentContent] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
+  const [processingDocumentId, setProcessingDocumentId] = useState<number | null>(null);
+
+  // Pagination state for large documents
+  const [documentChunks, setDocumentChunks] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalChunks, setTotalChunks] = useState(0);
+  const [chunksPageSize] = useState(10); // Chunks pro Seite
+  const [chunksLoading, setChunksLoading] = useState(false);
 
   useEffect(() => {
     loadDocuments();
@@ -148,20 +158,35 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     setPreviewDialog({ open: true, document });
     setPreviewTab(0);
     setDocumentContent(null);
+    setDocumentChunks([]);
+    setCurrentPage(1);
     handleMenuClose();
 
     // Load content if document is processed
     if (document.status === 'processed') {
-      setContentLoading(true);
-      try {
-        const contentData = await DocumentService.getDocumentContent(document.id);
-        setDocumentContent(contentData.content);
-      } catch (err) {
-        console.error('Failed to load document content:', err);
-        setDocumentContent('Fehler beim Laden des Dokumentinhalts.');
-      } finally {
-        setContentLoading(false);
-      }
+      // Try to load chunks with pagination first (for large documents)
+      await loadDocumentChunksPaginated(document.id, 1);
+    }
+  };
+
+  const loadDocumentChunksPaginated = async (documentId: number, page: number) => {
+    try {
+      setChunksLoading(true);
+      const response = await DocumentService.getDocumentChunksPaginated(
+        documentId,
+        page,
+        chunksPageSize
+      );
+
+      setDocumentChunks(response.chunks);
+      setCurrentPage(response.current_page);
+      setTotalPages(response.total_pages);
+      setTotalChunks(response.total_chunks);
+    } catch (err) {
+      console.error('Failed to load document chunks:', err);
+      setDocumentChunks([]);
+    } finally {
+      setChunksLoading(false);
     }
   };
 
@@ -189,6 +214,25 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       handleMenuClose();
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Download');
+    }
+  };
+
+  const handleProcess = async (document: Document) => {
+    try {
+      setProcessingDocumentId(document.id);
+      handleMenuClose();
+
+      // Start processing
+      await DocumentService.processDocument(document.id, true);
+
+      // Reload documents to show updated status
+      await loadDocuments();
+
+      setError(null);
+    } catch (err) {
+      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Verarbeiten des Dokuments');
+    } finally {
+      setProcessingDocumentId(null);
     }
   };
 
@@ -420,7 +464,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           </ListItemIcon>
           <ListItemText>Vorschau</ListItemText>
         </MenuItem>
-        
+
         <MenuItem onClick={() => {
           const doc = documents.find(d => d.id === menuAnchor?.documentId);
           if (doc) handleDownload(doc);
@@ -430,10 +474,35 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           </ListItemIcon>
           <ListItemText>Download</ListItemText>
         </MenuItem>
-        
+
+        {/* Process button - only show for UPLOADED documents */}
+        {menuAnchor && documents.find(d => d.id === menuAnchor.documentId)?.status === DocumentStatus.UPLOADED && (
+          <>
+            <Divider />
+            <MenuItem
+              onClick={() => {
+                const doc = documents.find(d => d.id === menuAnchor?.documentId);
+                if (doc) handleProcess(doc);
+              }}
+              disabled={processingDocumentId === menuAnchor.documentId}
+            >
+              <ListItemIcon>
+                {processingDocumentId === menuAnchor.documentId ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  <PlayArrow fontSize="small" />
+                )}
+              </ListItemIcon>
+              <ListItemText>
+                {processingDocumentId === menuAnchor.documentId ? 'Verarbeitung läuft...' : 'Verarbeiten'}
+              </ListItemText>
+            </MenuItem>
+          </>
+        )}
+
         <Divider />
-        
-        <MenuItem 
+
+        <MenuItem
           onClick={() => {
             const doc = documents.find(d => d.id === menuAnchor?.documentId);
             if (doc) handleDelete(doc);
@@ -560,6 +629,46 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                         <Typography variant="h6" gutterBottom>
                           Verarbeitungsdetails
                         </Typography>
+
+                        {/* Sections mit Hierarchie */}
+                        {previewDialog.document.metadata.sections_hierarchy && previewDialog.document.metadata.sections_hierarchy.length > 0 && (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
+                              Dokumentstruktur ({previewDialog.document.metadata.section_count} Abschnitte)
+                            </Typography>
+                            <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', maxHeight: 300, overflow: 'auto' }}>
+                              <Box sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                                {previewDialog.document.metadata.sections_hierarchy.map((section: any, idx: number) => (
+                                  <Box
+                                    key={idx}
+                                    sx={{
+                                      pl: `${(section.level - 1) * 1.5}rem`,
+                                      py: 0.5,
+                                      borderLeft: section.level > 1 ? '1px solid #ddd' : 'none',
+                                      ml: section.level > 1 ? 1 : 0
+                                    }}
+                                  >
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        fontSize: `${1 - (section.level - 1) * 0.05}rem`,
+                                        fontWeight: section.level === 1 ? 600 : 500,
+                                        color: section.level === 1 ? 'primary.main' : 'text.primary'
+                                      }}
+                                    >
+                                      {section.title}
+                                    </Typography>
+                                  </Box>
+                                ))}
+                              </Box>
+                            </Paper>
+                          </Box>
+                        )}
+
+                        {/* Fallback: Alle Metadaten als JSON */}
+                        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600, mt: 2 }}>
+                          Alle Metadaten
+                        </Typography>
                         <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', maxHeight: 300, overflow: 'auto' }}>
                           <pre style={{ fontSize: '0.75rem', margin: 0, fontFamily: 'monospace' }}>
                             {JSON.stringify(previewDialog.document.metadata, null, 2)}
@@ -572,38 +681,105 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
                 {previewTab === 1 && (
                   <Box>
-                    <Typography variant="h6" gutterBottom>
-                      Vollständiger Dokumentinhalt
-                    </Typography>
-                    {contentLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6">
+                        Dokumentinhalt ({totalChunks} Chunks)
+                      </Typography>
+                      {totalPages > 1 && (
+                        <Typography variant="body2" color="text.secondary">
+                          Seite {currentPage} von {totalPages}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {chunksLoading ? (
                       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                         <CircularProgress />
                       </Box>
-                    ) : documentContent ? (
-                      <Paper
-                        variant="outlined"
-                        sx={{
-                          p: 3,
-                          bgcolor: 'grey.50',
-                          maxHeight: 500,
-                          overflow: 'auto',
-                          fontFamily: 'monospace',
-                          fontSize: '0.875rem',
-                          lineHeight: 1.6
-                        }}
-                      >
-                        <Typography
-                          component="pre"
-                          sx={{
-                            whiteSpace: 'pre-wrap',
-                            margin: 0,
-                            fontFamily: 'inherit',
-                            fontSize: 'inherit'
-                          }}
-                        >
-                          {documentContent}
-                        </Typography>
-                      </Paper>
+                    ) : documentChunks.length > 0 ? (
+                      <Box>
+                        {/* Chunks Display */}
+                        <Box sx={{ mb: 3 }}>
+                          {documentChunks.map((chunk, index) => (
+                            <Paper
+                              key={`${currentPage}-${index}`}
+                              variant="outlined"
+                              sx={{
+                                p: 2,
+                                mb: 2,
+                                bgcolor: 'grey.50',
+                                borderLeft: 4,
+                                borderLeftColor: 'primary.main'
+                              }}
+                            >
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                Chunk {chunk.chunk_index + 1}
+                                {chunk.page_number && ` • Seite ${chunk.page_number}`}
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontFamily: 'monospace',
+                                  fontSize: '0.875rem',
+                                  lineHeight: 1.6,
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word'
+                                }}
+                              >
+                                {chunk.content}
+                              </Typography>
+                            </Paper>
+                          ))}
+                        </Box>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mt: 3 }}>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              disabled={currentPage === 1 || chunksLoading}
+                              onClick={() => loadDocumentChunksPaginated(previewDialog.document!.id, currentPage - 1)}
+                            >
+                              Zurück
+                            </Button>
+
+                            {/* Page numbers */}
+                            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                              {Array.from({ length: Math.min(5, totalPages) }, (_, i): number => {
+                                if (totalPages <= 5) {
+                                  return i + 1;
+                                } else if (currentPage <= 3) {
+                                  return i + 1;
+                                } else if (currentPage >= totalPages - 2) {
+                                  return totalPages - 4 + i;
+                                } else {
+                                  return currentPage - 2 + i;
+                                }
+                              }).map((pageNum) => (
+                                <Button
+                                  key={pageNum}
+                                  variant={currentPage === pageNum ? 'contained' : 'outlined'}
+                                  size="small"
+                                  onClick={() => loadDocumentChunksPaginated(previewDialog.document!.id, pageNum)}
+                                  disabled={chunksLoading}
+                                >
+                                  {pageNum}
+                                </Button>
+                              ))}
+                            </Box>
+
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              disabled={currentPage === totalPages || chunksLoading}
+                              onClick={() => loadDocumentChunksPaginated(previewDialog.document!.id, currentPage + 1)}
+                            >
+                              Weiter
+                            </Button>
+                          </Box>
+                        )}
+                      </Box>
                     ) : (
                       <Alert severity="info">
                         {previewDialog.document.status !== 'processed'

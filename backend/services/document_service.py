@@ -37,22 +37,22 @@ class DocumentService:
         self.docling_service = DoclingService()
         
     async def upload_document(
-        self, 
-        file: UploadFile, 
-        user_id: Optional[str] = None,
+        self,
+        file: UploadFile,
+        user_id: Optional[int] = None,
         db: Optional[Session] = None
     ) -> Document:
         """
         Upload und speichere Dokument
-        
+
         Args:
             file: FastAPI UploadFile Objekt
-            user_id: Optional User ID für Zuordnung
+            user_id: Optional User ID für Zuordnung (Integer)
             db: Database Session
-            
+
         Returns:
             Document: Erstelltes Document Objekt
-            
+
         Raises:
             HTTPException: Bei Validierungsfehlern
         """
@@ -232,30 +232,38 @@ class DocumentService:
             return False
     
     async def process_document_content(
-        self, 
-        document_id: int, 
-        db: Session
+        self,
+        document_id: int,
+        db: Optional[Session] = None
     ) -> Optional[ProcessedDocument]:
         """
         Verarbeite Dokumenteninhalt mit Docling Service
-        
+
         Args:
             document_id: ID des zu verarbeitenden Dokuments
-            db: Database Session
-            
+            db: Database Session (optional - erstellt neue Session wenn nicht vorhanden)
+
         Returns:
             ProcessedDocument oder None bei Fehlern
         """
-        document = self.get_document_by_id(document_id, db)
-        if not document:
-            logger.error(f"Document {document_id} not found")
-            return None
-        
+        # Erstelle neue Session wenn nicht vorhanden (für Background Tasks)
+        from database import SessionLocal
+        if db is None:
+            db = SessionLocal()
+            close_db = True
+        else:
+            close_db = False
+
         try:
+            document = self.get_document_by_id(document_id, db)
+            if not document:
+                logger.error(f"Document {document_id} not found")
+                return None
+
             # Setze Status auf Processing
             document.status = DocumentStatus.PROCESSING
             db.commit()
-            
+
             # Verarbeite Dokument mit Docling
             processed_doc = await self.docling_service.process_document(
                 document_id=document.id,
@@ -263,7 +271,7 @@ class DocumentService:
                 filename=document.original_filename,
                 mime_type=document.mime_type
             )
-            
+
             # Erstelle Content Preview (erste 200 Zeichen)
             if processed_doc.chunks:
                 first_chunk = processed_doc.chunks[0].content
@@ -272,89 +280,102 @@ class DocumentService:
                 content_preview = clean_chunk[:200] + "..." if len(clean_chunk) > 200 else clean_chunk
             else:
                 content_preview = "No content extracted"
-            
+
             # Aktualisiere Dokument mit verarbeiteten Daten
             document.status = DocumentStatus.PROCESSED
             document.doc_metadata = processed_doc.metadata
             document.content_preview = content_preview
             document.processed_at = datetime.utcnow()
-            
+
             db.commit()
             db.refresh(document)
-            
+
             logger.info(f"Document {document_id} processed successfully with {processed_doc.total_chunks} chunks")
             return processed_doc
-            
+
         except Exception as e:
             logger.error(f"Document processing failed for {document_id}: {str(e)}")
-            
+
             # Setze Status auf Error
-            document.status = DocumentStatus.ERROR
-            document.doc_metadata = {
-                'error': str(e),
-                'processing_failed_at': datetime.utcnow().isoformat()
-            }
-            db.commit()
-            
+            document = self.get_document_by_id(document_id, db)
+            if document:
+                document.status = DocumentStatus.ERROR
+                document.doc_metadata = {
+                    'error': str(e),
+                    'processing_failed_at': datetime.utcnow().isoformat()
+                }
+                db.commit()
+
             return None
+        finally:
+            if close_db:
+                db.close()
     
     async def process_document_with_vectors(
-        self, 
-        document_id: int, 
-        db: Session
+        self,
+        document_id: int,
+        db: Optional[Session] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Verarbeite Dokument mit Docling UND erstelle Vector Embeddings
-        
+
         Args:
             document_id: ID des zu verarbeitenden Dokuments
-            db: Database Session
-            
+            db: Database Session (optional - erstellt neue Session wenn nicht vorhanden)
+
         Returns:
             Dictionary mit Processing- und Embedding-Statistiken
         """
-        # Erst normale Dokumentenverarbeitung
-        processed_doc = await self.process_document_content(document_id, db)
-        
-        if not processed_doc:
-            logger.error(f"Document processing failed for {document_id}")
-            return None
-        
+        # Erstelle neue Session wenn nicht vorhanden (für Background Tasks)
+        from database import SessionLocal
+        if db is None:
+            db = SessionLocal()
+            close_db = True
+        else:
+            close_db = False
+
         try:
+            # Erst normale Dokumentenverarbeitung
+            processed_doc = await self.process_document_content(document_id, db)
+
+            if not processed_doc:
+                logger.error(f"Document processing failed for {document_id}")
+                return None
+
             # Erstelle Vector Embeddings
             logger.info(f"Creating vector embeddings for document {document_id}")
             vector_service = get_vector_service()
             embedding_stats = await vector_service.add_document_chunks(processed_doc)
-            
+
             # Aktualisiere Dokument mit Vector Collection Info
             document = self.get_document_by_id(document_id, db)
             if document:
                 # Setze Vector Collection Name
                 document.vector_collection = f"doc_{document_id}"
-                
+
                 # Setze has_vectors Flag
                 document.has_vectors = True
-                
+
                 # Erweitere Metadaten um Embedding-Info
                 if not document.doc_metadata:
                     document.doc_metadata = {}
-                
+
                 # Update metadata (SQLAlchemy JSON field requires special handling)
                 document.doc_metadata['embedding_model'] = embedding_stats.model_name
                 document.doc_metadata['embedding_dimension'] = embedding_stats.embedding_dimension
                 document.doc_metadata['total_chunks'] = embedding_stats.total_chunks
                 document.doc_metadata['embedding_processing_time'] = embedding_stats.processing_time
                 document.doc_metadata['vector_created_at'] = datetime.utcnow().isoformat()
-                
+
                 # Mark as modified for SQLAlchemy
                 from sqlalchemy.orm.attributes import flag_modified
                 flag_modified(document, 'doc_metadata')
-                
+
                 db.commit()
                 db.refresh(document)
-            
+
             logger.info(f"Vector embeddings created for document {document_id}")
-            
+
             return {
                 'document_id': document_id,
                 'docling_processing': {
@@ -369,17 +390,17 @@ class DocumentService:
                     'processing_time': embedding_stats.processing_time
                 }
             }
-            
+
         except Exception as e:
             logger.error(f"Vector embedding creation failed for {document_id}: {str(e)}")
-            
+
             # Dokument bleibt als PROCESSED (Docling war erfolgreich)
             # Aber Vector Embeddings sind fehlgeschlagen
             document = self.get_document_by_id(document_id, db)
             if document and document.doc_metadata:
                 document.doc_metadata['vector_embedding_error'] = str(e)
                 db.commit()
-            
+
             return {
                 'document_id': document_id,
                 'docling_processing': {
@@ -391,6 +412,9 @@ class DocumentService:
                     'error': str(e)
                 }
             }
+        finally:
+            if close_db:
+                db.close()
     
     async def get_document_chunks(
         self,

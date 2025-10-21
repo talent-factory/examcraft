@@ -1,22 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, FileText, Loader2, Download, FileDown } from 'lucide-react';
 import { Button } from '@mui/material';
-import { TextField, Card, CardContent, CardHeader, Typography, Box, Chip, IconButton } from '@mui/material';
+import { TextField, Card, CardContent, CardHeader, Typography, Box, Chip, IconButton, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import MarkdownRenderer from '../MarkdownRenderer';
+import { useAuth } from '../../contexts/AuthContext';
+import ChatService from '../../services/ChatService';
 
-interface ChatMessage {
-  id?: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  sources?: Array<{
-    document_id: number;
-    chunk_id: string;
-    score: number;
-    metadata: any;
-  }>;
-  confidence?: number;
-}
+// Use ChatMessage from ChatService
+import type { ChatMessage } from '../../services/ChatService';
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -24,14 +15,19 @@ interface ChatInterfaceProps {
   onClose?: () => void;
 }
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
-  sessionId, 
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({
+  sessionId,
   documentIds,
   onClose
 }) => {
+  const { accessToken } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionTitle, setSessionTitle] = useState('');
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportFileName, setExportFileName] = useState('');
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'json'>('markdown');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll zu neuesten Nachrichten
@@ -43,21 +39,24 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // Chat-Historie laden
   useEffect(() => {
-    loadChatHistory();
-  }, [sessionId]);
+    if (!accessToken) return;
 
-  const loadChatHistory = async () => {
-    try {
-      const response = await fetch(`/api/v1/chat/sessions/${sessionId}`);
-      const data = await response.json();
-      setMessages(data.messages || []);
-    } catch (error) {
-      console.error('Failed to load chat history:', error);
-    }
-  };
+    const loadChatHistory = async () => {
+      try {
+        const session = await ChatService.getSession(accessToken, sessionId);
+        setMessages(session.messages || []);
+        setSessionTitle(session.title || '');
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+        setMessages([]);
+      }
+    };
+
+    loadChatHistory();
+  }, [sessionId, accessToken]);
 
   const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+    if (!inputMessage.trim() || isLoading || !accessToken) return;
 
     const userMessage: ChatMessage = {
       role: 'user',
@@ -65,25 +64,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       timestamp: new Date().toISOString(),
     };
 
+    const messageContent = inputMessage;
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/v1/chat/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: inputMessage,
-          session_id: sessionId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      const assistantMessage: ChatMessage = await response.json();
+      const assistantMessage = await ChatService.sendMessage(accessToken, sessionId, messageContent);
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -98,45 +85,74 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
-  const handleExport = async (format: 'markdown' | 'json') => {
+  const handleExportClick = (format: 'markdown' | 'json') => {
+    // Setze Standard-Dateinamen basierend auf Chat-Titel
+    const defaultName = sessionTitle || `chat_${new Date().toISOString().split('T')[0]}`;
+    const extension = format === 'json' ? 'json' : 'md';
+    setExportFileName(`${defaultName}.${extension}`);
+    setExportFormat(format);
+    setShowExportDialog(true);
+  };
+
+  const handleExportConfirm = async () => {
+    if (!accessToken || !exportFileName.trim()) return;
+
     try {
-      const response = await fetch(`/api/v1/chat/sessions/${sessionId}/export?export_format=${format}`, {
-        method: 'POST'
+      // Stelle sicher, dass der Dateiname die richtige Endung hat
+      const fileExtension = exportFormat === 'json' ? '.json' : '.md';
+      const finalFileName = exportFileName.endsWith(fileExtension)
+        ? exportFileName
+        : `${exportFileName}${fileExtension}`;
+
+      // Download content from backend
+      const url = `http://localhost:8000/api/v1/chat/sessions/${sessionId}/download?format=${exportFormat}&filename=${encodeURIComponent(finalFileName)}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
       });
-      
-      if (!response.ok) throw new Error('Export failed');
-      
-      const data = await response.json();
-      
-      // Download file
-      const blob = new Blob([data.content], { 
-        type: format === 'json' ? 'application/json' : 'text/markdown' 
-      });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = data.filename;
-      a.click();
-      window.URL.revokeObjectURL(url);
+
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+
+      // WICHTIGER FIX: Erstelle einen data-URL statt blob-URL
+      // Dies zwingt den Browser, den download-Attribut zu respektieren
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const downloadLink = document.createElement('a');
+        downloadLink.href = dataUrl;
+        downloadLink.download = finalFileName;
+        downloadLink.style.display = 'none';
+
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+      };
+      reader.readAsDataURL(blob);
+
+      setShowExportDialog(false);
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Export fehlgeschlagen');
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      alert(`❌ Export fehlgeschlagen: ${errorMessage}`);
     }
   };
 
   const handleConvertToDocument = async () => {
+    if (!accessToken) return;
     try {
-      const response = await fetch(`/api/v1/chat/sessions/${sessionId}/to-document`, {
-        method: 'POST'
-      });
-      
-      if (!response.ok) throw new Error('Conversion failed');
-      
-      const data = await response.json();
-      alert(`✅ ${data.message}`);
+      const result = await ChatService.exportToDocument(accessToken, sessionId);
+      alert(`✅ Chat wurde als Dokument gespeichert: "${result.document_title || 'Neues Dokument'}"`);
     } catch (error) {
       console.error('Conversion failed:', error);
-      alert('Konvertierung fehlgeschlagen');
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      alert(`❌ Konvertierung fehlgeschlagen: ${errorMessage}`);
     }
   };
 
@@ -156,7 +172,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         }
         action={
           <Box>
-            <IconButton onClick={() => handleExport('markdown')} title="Als Markdown exportieren">
+            <IconButton onClick={() => handleExportClick('markdown')} title="Als Markdown exportieren">
               <Download size={20} />
             </IconButton>
             <IconButton onClick={handleConvertToDocument} title="Als Dokument speichern">
@@ -206,6 +222,36 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </Button>
         </Box>
       </CardContent>
+
+      {/* Export Dialog */}
+      <Dialog open={showExportDialog} onClose={() => setShowExportDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Chat als {exportFormat === 'json' ? 'JSON' : 'Markdown'} exportieren
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Geben Sie einen Namen für die Datei ein:
+          </Typography>
+          <TextField
+            fullWidth
+            value={exportFileName}
+            onChange={(e) => setExportFileName(e.target.value)}
+            placeholder="z.B. mein-chat.md"
+            autoFocus
+            onKeyPress={(e) => e.key === 'Enter' && handleExportConfirm()}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowExportDialog(false)}>Abbrechen</Button>
+          <Button
+            onClick={handleExportConfirm}
+            variant="contained"
+            disabled={!exportFileName.trim()}
+          >
+            Herunterladen
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 };
@@ -278,14 +324,18 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
               Quellen:
             </Typography>
             <Box display="flex" flexWrap="wrap" gap={0.5}>
-              {message.sources.map((source, idx) => (
-                <Chip
-                  key={idx}
-                  label={`${source.metadata?.title || 'Dokument'} (${(source.score * 100).toFixed(0)}%)`}
-                  size="small"
-                  variant="outlined"
-                />
-              ))}
+              {message.sources.map((source, idx) => {
+                const score = source.score ?? source.similarity_score ?? 0;
+                const title = source.metadata?.title || source.filename || 'Dokument';
+                return (
+                  <Chip
+                    key={idx}
+                    label={`${title} (${(score * 100).toFixed(0)}%)`}
+                    size="small"
+                    variant="outlined"
+                  />
+                );
+              })}
             </Box>
           </Box>
         )}

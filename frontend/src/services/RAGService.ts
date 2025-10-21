@@ -9,14 +9,24 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export class RAGService {
   /**
+   * Get auth headers with token
+   */
+  private static getAuthHeaders(additionalHeaders: HeadersInit = {}): HeadersInit {
+    const token = localStorage.getItem('examcraft_access_token');
+    return {
+      'Content-Type': 'application/json',
+      ...additionalHeaders,
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+  }
+
+  /**
    * Generate RAG-based exam from documents
    */
   static async generateRAGExam(request: RAGExamRequest): Promise<RAGExamResponse> {
     const response = await fetch(`${API_BASE_URL}/api/v1/rag/generate-exam`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify(request),
     });
 
@@ -46,9 +56,7 @@ export class RAGService {
 
     const response = await fetch(`${API_BASE_URL}/api/v1/rag/retrieve-context`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify(requestBody),
     });
 
@@ -66,9 +74,7 @@ export class RAGService {
   static async getQuestionTypes(): Promise<QuestionTypesResponse> {
     const response = await fetch(`${API_BASE_URL}/api/v1/rag/question-types`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -85,9 +91,7 @@ export class RAGService {
   static async checkHealth(): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/api/v1/rag/health`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {

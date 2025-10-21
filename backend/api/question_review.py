@@ -11,6 +11,8 @@ from datetime import datetime
 
 from database import get_db
 from models.question_review import QuestionReview, ReviewComment, ReviewHistory, ReviewStatus
+from models.auth import User
+from utils.auth_utils import get_current_active_user, require_permission
 import logging
 
 logger = logging.getLogger(__name__)
@@ -148,11 +150,14 @@ async def get_review_queue(
     exam_id: Optional[str] = None,
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Hole Review Queue mit Filtern
-    
+
+    **Required:** Authenticated user
+
     - **status**: Filter nach Review-Status
     - **difficulty**: Filter nach Schwierigkeitsgrad
     - **question_type**: Filter nach Fragetyp
@@ -201,10 +206,13 @@ async def get_review_queue(
 @router.get("/{question_id}/review", response_model=QuestionReviewDetailResponse)
 async def get_question_review(
     question_id: int,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Hole detaillierte Question Review mit Comments und History
+
+    **Required:** Authenticated user
     """
     try:
         question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
@@ -224,12 +232,19 @@ async def get_question_review(
 @router.post("/review", response_model=QuestionReviewResponse, status_code=201)
 async def create_question_review(
     request: QuestionReviewCreate,
+    current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db)
 ):
     """
     Erstelle neue Question Review
+
+    **Required Permission:** `create_questions` (Dozent, Assistant, Admin)
     """
     try:
+        # Check question generation limit for institution
+        from utils.tenant_utils import SubscriptionLimits
+        SubscriptionLimits.check_question_limit(current_user.institution, db)
+
         # Create Question Review
         question = QuestionReview(
             question_text=request.question_text,
@@ -247,7 +262,9 @@ async def create_question_review(
             estimated_time_minutes=request.estimated_time_minutes,
             quality_tier=request.quality_tier,
             exam_id=request.exam_id,
-            review_status=ReviewStatus.PENDING.value
+            review_status=ReviewStatus.PENDING.value,
+            institution_id=current_user.institution_id,  # Multi-tenancy
+            created_by=current_user.id  # Track creator
         )
         
         db.add(question)
@@ -264,7 +281,14 @@ async def create_question_review(
         )
         db.add(history)
         db.commit()
-        
+
+        # Audit log: Question created
+        from services.audit_service import AuditService
+        AuditService.log_question_action(
+            db, AuditService.ACTION_CREATE_QUESTION, current_user.id, question.id,
+            additional_data={"topic": question.topic, "difficulty": question.difficulty}
+        )
+
         logger.info(f"Created question review {question.id}")
         return question
         
@@ -278,11 +302,13 @@ async def create_question_review(
 async def edit_question(
     question_id: int,
     request: QuestionReviewUpdate,
-    editor_id: str = Query(..., min_length=1, max_length=100),
+    current_user: User = Depends(require_permission("edit_questions")),
     db: Session = Depends(get_db)
 ):
     """
     Bearbeite Question (Inline Editing)
+
+    **Required Permission:** `edit_questions` (Dozent, Assistant, Admin)
     """
     try:
         question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
@@ -338,13 +364,13 @@ async def edit_question(
                 old_status=old_status,
                 new_status=question.review_status,
                 changed_fields=changed_fields,
-                changed_by=editor_id,
+                changed_by=current_user.email,
                 change_reason="Question edited"
             )
             db.add(history)
             db.commit()
-        
-        logger.info(f"Edited question {question_id} by {editor_id}")
+
+        logger.info(f"Edited question {question_id} by {current_user.email}")
         return question
 
     except HTTPException:
@@ -359,10 +385,13 @@ async def edit_question(
 async def approve_question(
     question_id: int,
     request: ReviewActionRequest,
+    current_user: User = Depends(require_permission("approve_questions")),
     db: Session = Depends(get_db)
 ):
     """
     Genehmige Question
+
+    **Required Permission:** `approve_questions` (Dozent, Admin)
     """
     try:
         question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
@@ -374,7 +403,7 @@ async def approve_question(
 
         # Update Question
         question.review_status = ReviewStatus.APPROVED.value
-        question.reviewed_by = request.reviewer_id
+        question.reviewed_by = current_user.email
         question.reviewed_at = datetime.utcnow()
 
         db.commit()
@@ -386,7 +415,7 @@ async def approve_question(
             action="approved",
             old_status=old_status,
             new_status=ReviewStatus.APPROVED.value,
-            changed_by=request.reviewer_id,
+            changed_by=current_user.email,
             change_reason=request.reason or "Question approved"
         )
         db.add(history)
@@ -397,14 +426,21 @@ async def approve_question(
                 question_id=question.id,
                 comment_text=request.comment,
                 comment_type="approval_note",
-                author=request.reviewer_id,
+                author=current_user.email,
                 author_role="reviewer"
             )
             db.add(comment)
 
         db.commit()
 
-        logger.info(f"Approved question {question_id} by {request.reviewer_id}")
+        # Audit log: Question approved
+        from services.audit_service import AuditService
+        AuditService.log_question_action(
+            db, AuditService.ACTION_APPROVE_QUESTION, current_user.id, question_id,
+            additional_data={"reason": request.reason}
+        )
+
+        logger.info(f"Approved question {question_id} by {current_user.email}")
         return question
 
     except HTTPException:
@@ -419,10 +455,13 @@ async def approve_question(
 async def reject_question(
     question_id: int,
     request: ReviewActionRequest,
+    current_user: User = Depends(require_permission("approve_questions")),
     db: Session = Depends(get_db)
 ):
     """
     Lehne Question ab
+
+    **Required Permission:** `approve_questions` (Dozent, Admin)
     """
     try:
         question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
@@ -434,7 +473,7 @@ async def reject_question(
 
         # Update Question
         question.review_status = ReviewStatus.REJECTED.value
-        question.reviewed_by = request.reviewer_id
+        question.reviewed_by = current_user.email
         question.reviewed_at = datetime.utcnow()
 
         db.commit()
@@ -446,7 +485,7 @@ async def reject_question(
             action="rejected",
             old_status=old_status,
             new_status=ReviewStatus.REJECTED.value,
-            changed_by=request.reviewer_id,
+            changed_by=current_user.email,
             change_reason=request.reason or "Question rejected"
         )
         db.add(history)
@@ -457,14 +496,21 @@ async def reject_question(
                 question_id=question.id,
                 comment_text=request.comment,
                 comment_type="issue",
-                author=request.reviewer_id,
+                author=current_user.email,
                 author_role="reviewer"
             )
             db.add(comment)
 
         db.commit()
 
-        logger.info(f"Rejected question {question_id} by {request.reviewer_id}")
+        # Audit log: Question rejected
+        from services.audit_service import AuditService
+        AuditService.log_question_action(
+            db, AuditService.ACTION_REJECT_QUESTION, current_user.id, question_id,
+            additional_data={"reason": request.reason}
+        )
+
+        logger.info(f"Rejected question {question_id} by {current_user.email}")
         return question
 
     except HTTPException:
@@ -478,10 +524,13 @@ async def reject_question(
 @router.get("/{question_id}/comments", response_model=List[CommentResponse])
 async def get_comments(
     question_id: int,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Hole alle Comments für eine Question
+
+    **Required:** Authenticated user
     """
     try:
         # Check if question exists
@@ -508,10 +557,13 @@ async def get_comments(
 async def add_comment(
     question_id: int,
     request: CommentCreate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
     Füge Comment zu Question hinzu
+
+    **Required:** Authenticated user
     """
     try:
         # Check if question exists

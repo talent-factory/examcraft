@@ -8,6 +8,12 @@ from models.document import Document
 from models.chat_db import ChatSession, ChatMessage
 from models.prompt import Prompt, PromptTemplate, PromptUsageLog
 from models.question_review import QuestionReview, ReviewComment, ReviewHistory, ReviewStatus
+from models.auth import User, Role, Institution, UserSession, AuditLog, UserRole, UserStatus
+from models.rbac import (
+    Feature, RoleFeature, RBACRole,
+    SubscriptionTier, TierQuota, TierFeature,
+    Organization, ResourceUsage, PermissionAuditLog
+)
 
 __all__ = [
     "Document",
@@ -20,4 +26,21 @@ __all__ = [
     "ReviewComment",
     "ReviewHistory",
     "ReviewStatus",
+    "User",
+    "Role",
+    "Institution",
+    "UserSession",
+    "AuditLog",
+    "UserRole",
+    "UserStatus",
+    # RBAC Models
+    "Feature",
+    "RoleFeature",
+    "RBACRole",
+    "SubscriptionTier",
+    "TierQuota",
+    "TierFeature",
+    "Organization",
+    "ResourceUsage",
+    "PermissionAuditLog",
 ]

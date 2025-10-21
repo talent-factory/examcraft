@@ -22,7 +22,7 @@ services:
     image: redis:7-alpine
     container_name: examcraft_redis
     ports:
-      - "6379:6379"
+      - "6380:6379"  # Changed to 6380 to avoid conflict with other Redis instances
     volumes:
       - redis_data:/data
     networks:
@@ -65,13 +65,15 @@ services:
       - VECTOR_SERVICE_TYPE=qdrant
       - CLAUDE_API_KEY=${CLAUDE_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - ENVIRONMENT=development
       - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-unknown}
-      - DOCUMENT_PROCESSOR_TYPE=${DOCUMENT_PROCESSOR_TYPE:-legacy}
+      - DOCUMENT_PROCESSOR_TYPE=${DOCUMENT_PROCESSOR_TYPE:-docling}
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
       - ./pyproject.toml:/app/pyproject.toml:ro
@@ -91,10 +93,10 @@ services:
       dockerfile: Dockerfile
     container_name: examcraft_frontend
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_API_URL=http://localhost:${BACKEND_PORT:-8000}
       - REACT_APP_ENVIRONMENT=development
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules

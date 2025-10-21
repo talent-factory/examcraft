@@ -25,7 +25,7 @@ import {
   CloudUpload,
   Description,
   CheckCircle,
-  Error,
+  Error as ErrorIcon,
   Delete,
   Refresh,
   Schedule,
@@ -144,39 +144,42 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const uploadSingleFile = async (file: File, fileId: string) => {
     try {
       // Update status to uploading
-      setUploadFiles(prev => prev.map(f => 
-        f.id === fileId 
+      setUploadFiles(prev => prev.map(f =>
+        f.id === fileId
           ? { ...f, status: 'uploading', progress: 10 }
           : f
       ));
 
       // Upload file
       const uploadResult = await DocumentService.uploadDocument(file);
-      
+
       // Update with upload result
-      setUploadFiles(prev => prev.map(f => 
-        f.id === fileId 
-          ? { 
-              ...f, 
-              status: 'processing', 
-              progress: 50, 
+      setUploadFiles(prev => prev.map(f =>
+        f.id === fileId
+          ? {
+              ...f,
+              status: 'processing',
+              progress: 50,
               documentId: uploadResult.document_id,
-              result: uploadResult 
+              result: uploadResult
             }
           : f
       ));
 
-      // Process document
+      // Start processing (asynchron im Backend)
       const processingResult = await DocumentService.processDocument(uploadResult.document_id, true);
-      
+
+      // Warte auf Verarbeitung (polling)
+      await waitForDocumentProcessing(uploadResult.document_id, fileId);
+
       // Update with processing result
-      setUploadFiles(prev => prev.map(f => 
-        f.id === fileId 
-          ? { 
-              ...f, 
-              status: 'completed', 
+      setUploadFiles(prev => prev.map(f =>
+        f.id === fileId
+          ? {
+              ...f,
+              status: 'completed',
               progress: 100,
-              processingResult 
+              processingResult
             }
           : f
       ));
@@ -185,15 +188,54 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
     } catch (error) {
       const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Upload failed';
-      
-      setUploadFiles(prev => prev.map(f => 
-        f.id === fileId 
+
+      setUploadFiles(prev => prev.map(f =>
+        f.id === fileId
           ? { ...f, status: 'error', error: errorMessage }
           : f
       ));
 
       onUploadError?.(file.name, errorMessage);
     }
+  };
+
+  const waitForDocumentProcessing = async (documentId: number, fileId: string, maxWaitTime: number = 300000) => {
+    /**
+     * Warte auf Dokumentenverarbeitung durch Polling des Status
+     * maxWaitTime: Maximale Wartezeit in ms (default: 5 Minuten)
+     */
+    const startTime = Date.now();
+    const pollInterval = 2000; // Poll alle 2 Sekunden
+
+    while (Date.now() - startTime < maxWaitTime) {
+      try {
+        const status = await DocumentService.getProcessingStatus(documentId);
+
+        // Update progress
+        setUploadFiles(prev => prev.map(f =>
+          f.id === fileId
+            ? { ...f, progress: Math.min(95, 50 + (Date.now() - startTime) / maxWaitTime * 45) }
+            : f
+        ));
+
+        if (status.status === 'Verarbeitet' || status.status === 'processed') {
+          return; // Verarbeitung abgeschlossen
+        }
+
+        if (status.status === 'Fehler' || status.status === 'error') {
+          throw new Error(`Document processing failed: ${status.status}`);
+        }
+
+        // Warte vor nächstem Poll
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      } catch (error) {
+        console.error('Error checking document status:', error);
+        // Weiter versuchen
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+    }
+
+    throw new Error('Document processing timeout');
   };
 
   const startUpload = async () => {

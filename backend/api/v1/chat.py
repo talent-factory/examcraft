@@ -27,6 +27,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from models.chat_db import ChatSession as DBChatSession, ChatMessage as DBChatMessage
 from models.document import Document as DBDocument, DocumentStatus
+from models.auth import User
+from utils.auth_utils import get_current_active_user
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +77,12 @@ def validate_documents_exist(
 @router.post("/sessions", response_model=ChatSessionResponse)
 def create_chat_session(
     session_create: ChatSessionCreate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
+    **Required:** Authenticated user
+
     Erstellt neue Chat-Session mit selektierten Dokumenten
 
     - Validiert Dokument-IDs
@@ -126,9 +131,12 @@ def create_chat_session(
 @router.post("/message", response_model=ChatMessage)
 def send_chat_message(
     chat_request: ChatRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
+    **Required:** Authenticated user
+
     Sendet Nachricht an ChatBot und erhält KI-generierte Antwort
 
     - Lädt Chat-Session und zugehörige Dokumente
@@ -209,9 +217,14 @@ def send_chat_message(
 @router.get("/sessions/{session_id}", response_model=ChatSessionResponse)
 def get_chat_session_endpoint(
     session_id: UUID,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Lädt komplette Chat-Session mit Historie"""
+    """
+    Lädt komplette Chat-Session mit Historie
+
+    **Required:** Authenticated user
+    """
     try:
         session = get_chat_session(session_id, db)
 
@@ -254,6 +267,7 @@ def get_chat_session_endpoint(
 def list_chat_sessions(
     limit: int = 20,
     offset: int = 0,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Listet alle Chat-Sessions des Benutzers"""
@@ -289,9 +303,14 @@ def list_chat_sessions(
 @router.delete("/sessions/{session_id}")
 def delete_chat_session(
     session_id: UUID,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Löscht Chat-Session und alle Nachrichten"""
+    """
+    Löscht Chat-Session und alle Nachrichten
+
+    **Required:** Authenticated user
+    """
     try:
         session = get_chat_session(session_id, db)
 
@@ -314,6 +333,7 @@ def delete_chat_session(
 def export_chat_session(
     session_id: UUID,
     export_format: str = "markdown",
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -390,10 +410,124 @@ def export_chat_session(
         raise HTTPException(status_code=500, detail="Fehler beim Exportieren der Chat-Session")
 
 
+@router.get("/sessions/{session_id}/download")
+def download_chat_session(
+    session_id: UUID,
+    format: str = "markdown",
+    filename: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Lädt Chat-Konversation als Datei herunter
+
+    - Markdown: Für schnelle Dokumentation
+    - JSON: Für maschinelle Verarbeitung
+    """
+    try:
+        from fastapi.responses import StreamingResponse
+        import io
+
+        if format not in ["markdown", "json"]:
+            raise HTTPException(status_code=400, detail="Ungültiges Format. Erlaubt: markdown, json")
+
+        session = get_chat_session(session_id, db)
+
+        # Lade Messages
+        messages = db.query(DBChatMessage).filter(
+            DBChatMessage.session_id == session.id
+        ).order_by(DBChatMessage.timestamp).all()
+
+        # Lade Dokumente
+        documents = db.query(DBDocument).filter(
+            DBDocument.id.in_(session.document_ids)
+        ).all()
+
+        # Formatiere für Export
+        messages_data = [
+            {
+                "role": msg.role,
+                "content": msg.content,
+                "timestamp": msg.timestamp,
+                "sources": msg.sources,
+                "confidence": msg.confidence
+            }
+            for msg in messages
+        ]
+
+        documents_data = [
+            {"id": doc.id, "title": doc.title, "filename": doc.filename}
+            for doc in documents
+        ]
+
+        # Exportiere
+        if format == "markdown":
+            content = chat_export_service.export_as_markdown(
+                session_title=session.title,
+                created_at=session.created_at,
+                documents=documents_data,
+                messages=messages_data
+            )
+            # Verwende benutzerdefinierten Dateinamen oder generiere einen
+            if not filename:
+                filename = f"chat_{session.title.replace(' ', '_')}_{session.created_at.strftime('%Y%m%d')}.md"
+            media_type = "text/markdown"
+        else:  # json
+            content = chat_export_service.export_as_json(
+                session_id=session.id,
+                session_title=session.title,
+                created_at=session.created_at,
+                documents=documents_data,
+                messages=messages_data
+            )
+            # Verwende benutzerdefinierten Dateinamen oder generiere einen
+            if not filename:
+                filename = f"chat_{session.title.replace(' ', '_')}_{session.created_at.strftime('%Y%m%d')}.json"
+            media_type = "application/json"
+
+        logger.info(f"Downloaded chat session {session_id} as {format}")
+
+        # Erstelle BytesIO Stream
+        file_stream = io.BytesIO(content.encode('utf-8'))
+
+        # Verwende Response mit korrektem Content-Disposition Header
+        from fastapi.responses import Response
+
+        # Wenn ein Dateiname übergeben wurde, verwende ihn
+        # Ansonsten verwende den generierten Namen
+        if not filename:
+            filename = f"chat_{session.title.replace(' ', '_')}_{session.created_at.strftime('%Y%m%d')}"
+            if format == "markdown":
+                filename += ".md"
+            else:
+                filename += ".json"
+
+        # Setze Content-Disposition Header mit korrektem Format
+        # Format: attachment; filename="name.ext"
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+
+        logger.info(f"Download headers: {headers}")
+
+        return Response(
+            content=file_stream.getvalue(),
+            media_type=media_type,
+            headers=headers
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to download chat session: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Fehler beim Herunterladen der Chat-Session")
+
+
 @router.post("/sessions/{session_id}/to-document", response_model=ChatToDocumentResponse)
 def convert_chat_to_document(
     session_id: UUID,
     document_title: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -453,7 +587,7 @@ def convert_chat_to_document(
             file_size=len(document_content.encode('utf-8')),
             mime_type="text/markdown",
             status=DocumentStatus.PROCESSED,
-            user_id="demo_user",  # Wichtig: Damit Dokument in Bibliothek erscheint
+            user_id=current_user.id,  # Verwende aktuellen Benutzer
             doc_metadata={
                 "title": title,
                 "source": "chat_export",

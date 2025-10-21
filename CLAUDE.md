@@ -14,17 +14,46 @@ ExamCraft/
 ├── backend/              # FastAPI Backend
 │   ├── main.py          # API Server
 │   ├── database.py      # Database Connection
-│   ├── models.py        # Pydantic Models
-│   └── services/        # Business Logic
+│   ├── models/          # SQLAlchemy Models
+│   │   ├── auth.py      # User, Role, Institution, Session, AuditLog
+│   │   ├── document.py  # Document Models
+│   │   └── question_review.py  # Question Review Models
+│   ├── api/             # API Endpoints
+│   │   ├── auth.py      # Authentication Endpoints
+│   │   ├── documents.py # Document Management
+│   │   └── v1/          # Versioned API
+│   ├── services/        # Business Logic
+│   │   ├── auth_service.py    # JWT Authentication
+│   │   ├── oauth_service.py   # Google/Microsoft OAuth
+│   │   ├── redis_service.py   # Session Management
+│   │   └── audit_service.py   # Security Logging
+│   ├── middleware/      # Middleware
+│   │   └── rate_limit.py      # Rate Limiting
+│   ├── utils/           # Utilities
+│   │   ├── auth_utils.py      # Auth Helpers
+│   │   ├── tenant_utils.py    # Multi-Tenant Helpers
+│   │   └── seed_roles.py      # Role Seeding
+│   └── tests/           # pytest Tests
 ├── frontend/            # React 18 + TypeScript Frontend
-│   ├── src/components/  # React Components
-│   ├── src/services/    # API Services
-│   └── public/          # Static Assets
+│   ├── src/
+│   │   ├── components/  # React Components
+│   │   │   ├── auth/    # Login, Register, OAuth
+│   │   │   ├── guards/  # Route Protection
+│   │   │   ├── profile/ # User Profile
+│   │   │   └── layout/  # Navigation
+│   │   ├── contexts/    # React Context (Auth)
+│   │   ├── services/    # API Services
+│   │   ├── types/       # TypeScript Types
+│   │   └── index.css    # Tailwind CSS Entry Point
+│   ├── public/          # Static Assets
+│   ├── tailwind.config.js  # Tailwind Configuration
+│   ├── postcss.config.js   # PostCSS Configuration
+│   ├── craco.config.js     # CRA Override Configuration
+│   └── package.json        # NPM Dependencies
 ├── utils/               # Python Utilities
 │   ├── extraction.py    # Document Processing
 │   └── rag.py          # RAG System
 ├── demo/                # Workshop Demo Materials
-├── docs/                # Documentation
 ├── .claude/             # Claude Code Commands
 ├── docker-compose.yml   # Container Orchestration
 └── pyproject.toml      # Python Dependencies
@@ -39,7 +68,7 @@ ExamCraft/
 Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API
 Integration
 
-### Aktueller Projektstatus (Stand: 19.10.2025)
+### Aktueller Projektstatus (Stand: 20.10.2025)
 
 **CORE FEATURES ABGESCHLOSSEN:**
 
@@ -53,13 +82,22 @@ Integration
 - **Prompt Template Selector UI** (TF-146) - Frontend Komponente für Prompt-Auswahl
 - **Template-Variablen-System** (TF-145) - Dynamische Prompt-Konfiguration mit Jinja2
 - **RAG Service Integration** (TF-147) - Prompt-Konfiguration in Question Generation
+- **Question Review Interface** (TF-60) - MVP mit Review Workflow
+- **Workshop Demo Materials** (TF-58) - Vollständig abgeschlossen
+- **Authentication & User Management** (TF-57) - Backend + Frontend (16/19 Tasks, 84.2%)
+
+**IN PROGRESS:**
+
+- **TF-57: Authentication & User Management** - Verbleibend:
+  - Frontend: Jest Tests
+  - Security: GDPR Compliance
+  - Documentation & E2E Tests
 
 **BACKLOG FEATURES:**
 
-- Question Review Interface (TF-60)
 - Exam Composition & Export (TF-56)
-- Authentication & User Management (TF-57)
-- Workshop Demo Materials (TF-58)
+- Open Source Vorbereitung (TF-112)
+- Mintlify Dokumentation (TF-87)
 
 ### Implementierte Technologien
 
@@ -76,6 +114,16 @@ Integration
 - Template-Variablen-System mit Jinja2
 - Live-Preview für Prompt-Rendering
 - RAG Service Prompt-Integration mit Auto-Variable-Merging
+- Tailwind CSS v3 Integration mit CRACO
+- Modern Authentication UI (LoginForm, AuthPage)
+- JWT Authentication mit bcrypt Password Hashing
+- OAuth Integration (Google, Microsoft)
+- Role-Based Access Control (RBAC)
+- Multi-Tenant Architecture
+- Session Management mit Redis
+- Rate Limiting Middleware
+- Audit Logging für Security Events
+- Admin User Management UI (User List, Edit, Role Assignment)
 
 ## Entwicklungsumgebung
 
@@ -105,6 +153,23 @@ ruff format backend/ utils/
 - **TypeScript**: Strikte Types, ESLint + Prettier
 - **Testing**: pytest (Backend), Jest (Frontend)
 - **Documentation**: Automatisch via FastAPI + TypeDoc
+- **CSS**: Tailwind CSS v3 Utility-First Approach
+
+### Frontend Konfiguration
+
+**Tailwind CSS Integration:**
+
+- `frontend/tailwind.config.js` - Content Scanning & Theme Config
+- `frontend/postcss.config.js` - PostCSS Plugins (Tailwind + Autoprefixer)
+- `frontend/craco.config.js` - CRA Webpack Override für PostCSS
+- `frontend/src/index.css` - Tailwind Directives (@tailwind base/components/utilities)
+
+**Build-System:**
+
+- Create React App (CRA) mit CRACO Override
+- Tailwind CSS v3.3.0 (kompatibel mit CRA)
+- PostCSS für CSS-Processing
+- Autoprefixer für Browser-Kompatibilität
 
 ## Implementierte Architektur
 
@@ -129,8 +194,10 @@ ruff format backend/ utils/
 4. **Frontend UI** (`frontend/`)
    - React 18 + TypeScript
    - TanStack Query für API State
-   - Tailwind CSS + shadcn/ui Components
+   - Material-UI (MUI) + Tailwind CSS v3
+   - Tailwind CSS Integration mit CRACO
    - Responsive Multi-Device Support
+   - Modern Authentication UI
 
 ### Design-Prinzipien (Umgesetzt)
 

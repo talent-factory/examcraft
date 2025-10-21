@@ -9,14 +9,32 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export class DocumentService {
   /**
+   * Get auth headers with token
+   */
+  private static getAuthHeaders(additionalHeaders: HeadersInit = {}): HeadersInit {
+    const token = localStorage.getItem('examcraft_access_token');
+    return {
+      'Content-Type': 'application/json',
+      ...additionalHeaders,
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+  }
+
+  /**
    * Upload a document file
    */
   static async uploadDocument(file: File): Promise<DocumentUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
 
+    // For FormData, we must NOT set Content-Type header
+    // The browser will set it automatically with the correct multipart/form-data boundary
+    const token = localStorage.getItem('examcraft_access_token');
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+
     const response = await fetch(`${API_BASE_URL}/api/v1/documents/upload`, {
       method: 'POST',
+      headers,
       body: formData,
     });
 
@@ -32,16 +50,14 @@ export class DocumentService {
    * Process a document (extract text and create vectors)
    */
   static async processDocument(
-    documentId: number, 
+    documentId: number,
     createVectors: boolean = true
   ): Promise<DocumentProcessingResponse> {
     const response = await fetch(
       `${API_BASE_URL}/api/v1/documents/${documentId}/process?create_vectors=${createVectors}`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
       }
     );
 
@@ -59,9 +75,7 @@ export class DocumentService {
   static async getDocuments(): Promise<Document[]> {
     const response = await fetch(`${API_BASE_URL}/api/v1/documents/`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -81,9 +95,7 @@ export class DocumentService {
       `${API_BASE_URL}/api/v1/rag/available-documents?processed_only=${processedOnly}`,
       {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
       }
     );
 
@@ -101,9 +113,7 @@ export class DocumentService {
   static async getDocument(documentId: number): Promise<Document> {
     const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -120,9 +130,7 @@ export class DocumentService {
   static async deleteDocument(documentId: number): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -137,6 +145,7 @@ export class DocumentService {
   static async downloadDocument(documentId: number, filename: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}/download`, {
       method: 'GET',
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -168,9 +177,7 @@ export class DocumentService {
   }> {
     const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}/content`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -187,10 +194,39 @@ export class DocumentService {
   static async getDocumentChunks(documentId: number): Promise<any[]> {
     const response = await fetch(`${API_BASE_URL}/api/v1/search/document/${documentId}/chunks`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to fetch document chunks: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get document chunks with pagination (for large documents)
+   */
+  static async getDocumentChunksPaginated(
+    documentId: number,
+    page: number = 1,
+    pageSize: number = 10
+  ): Promise<{
+    document_id: number;
+    total_chunks: number;
+    total_pages: number;
+    current_page: number;
+    page_size: number;
+    chunks: any[];
+  }> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/documents/${documentId}/chunks-paginated?page=${page}&page_size=${pageSize}`,
+      {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      }
+    );
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -206,9 +242,7 @@ export class DocumentService {
   static async reindexDocument(documentId: number): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/api/v1/search/reindex/${documentId}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -225,9 +259,7 @@ export class DocumentService {
   static async getProcessingStatus(documentId: number): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}/status`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
