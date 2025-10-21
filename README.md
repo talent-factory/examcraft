@@ -1,16 +1,37 @@
 # ExamCraft AI 🚀
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Core Package](https://img.shields.io/badge/Core-Open%20Source-green.svg)]()
+[![Premium Package](https://img.shields.io/badge/Premium-Closed%20Source-orange.svg)]()
+[![Enterprise Package](https://img.shields.io/badge/Enterprise-Closed%20Source-red.svg)]()
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![React 18](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Latest-green.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 
-**KI-gestützte OpenSource-Plattform zur automatischen Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API Integration und RAG-basierter Dokumentenanalyse.**
+**KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API Integration und RAG-basierter Dokumentenanalyse.**
+
+> **Monorepo-Architektur:** ExamCraft AI verwendet eine Monorepo-Struktur mit Git Submodules für Premium und Enterprise Features. Das Core Package ist Open Source (MIT), während Premium und Enterprise Features proprietär sind.
 
 ## 🎯 Projektübersicht
 
 ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwendung, die Dozierenden dabei hilft, qualitativ hochwertige Prüfungsaufgaben automatisch aus beliebigen Dokumenten zu generieren. Die Plattform kombiniert moderne KI (Claude API) mit RAG-Technologie (Retrieval-Augmented Generation) für kontextuelle, durchdachte Fragenerstellung.
+
+### 📦 Package-Struktur
+
+```
+examcraft/
+├── packages/
+│   ├── core/          # ✅ Open Source (MIT) - Free Tier
+│   ├── premium/       # 🔒 Closed Source - Starter/Professional Tier
+│   └── enterprise/    # 🔒 Closed Source - Enterprise Tier
+├── docker-compose.yml              # Core Services
+├── docker-compose.premium.yml      # Premium Extension
+├── docker-compose.enterprise.yml   # Enterprise Extension
+└── MONOREPO_SETUP.md              # Detailed Setup Guide
+```
+
+**Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für detaillierte Informationen zur Monorepo-Struktur.**
 
 ## 📚 Dokumentation
 
@@ -32,49 +53,92 @@ ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwen
 - **[📖 API Dokumentation](http://localhost:8000/docs)** - Interaktive API-Docs (lokal)
 - **[🔧 Development Setup](#-quick-start)** - Lokale Entwicklungsumgebung (siehe unten)
 
-### ✨ Kernfeatures
+### 💎 Subscription Tiers
 
-- **🤖 RAG-basierte KI-Fragenerstellung** mit Claude API + PydanticAI
-- **💬 Interaktiver Document ChatBot** - Konversationen mit hochgeladenen Dokumenten
-- **🎛️ Prompt Knowledge Base Management** - Zentrale Verwaltung aller AI-Prompts mit Versionierung
-- **🔧 Template-Variablen-System** - Dynamische Prompt-Konfiguration mit Jinja2 und Live-Preview
-- **🔗 RAG-Prompt-Integration** - Custom Prompts in Question Generation Workflow
+| Feature | Free (Core) | Starter (€19/mo) | Professional (€49/mo) | Enterprise (€149/mo) |
+|---------|-------------|------------------|----------------------|---------------------|
+| **Documents** | 5 | 50 | Unlimited | Unlimited |
+| **Questions/Month** | 20 | 200 | 1000 | Unlimited |
+| **Users** | 1 | 3 | 10 | Unlimited |
+| **Document Upload** | ✅ | ✅ | ✅ | ✅ |
+| **Basic Question Generation** | ✅ | ✅ | ✅ | ✅ |
+| **Question Review** | ✅ | ✅ | ✅ | ✅ |
+| **RBAC System** | ✅ | ✅ | ✅ | ✅ |
+| **RAG Generation** | ❌ | ✅ | ✅ | ✅ |
+| **Document ChatBot** | ❌ | ❌ | ✅ | ✅ |
+| **Advanced Prompt Management** | ❌ | ❌ | ✅ | ✅ |
+| **Analytics Dashboard** | ❌ | ❌ | ✅ | ✅ |
+| **SSO/SAML** | ❌ | ❌ | ❌ | ✅ |
+| **Custom Branding** | ❌ | ❌ | ❌ | ✅ |
+| **API Access** | ❌ | ❌ | ❌ | ✅ |
+| **Priority Support** | ❌ | ❌ | ❌ | ✅ |
+
+### ✨ Core Features (Open Source)
+
 - **📄 Multi-Format Dokumentenverarbeitung**: PDF, Word, Markdown
 - **🔬 IBM Docling Integration** - Advanced Document Processing mit automatischem Fallback
-- **🔍 Semantische Suche** mit Qdrant Vector Database (Dokumente + Prompts)
-- **🎯 Bloom Taxonomy Integration** für verschiedene Lernlevels
-- **📝 Strukturierte Musterlösungen** mit A/B/C Qualitätsstufen
-- **💾 Chat-Export Funktion** - Konversationen als Markdown-Dokumente speichern
-- **📊 Usage Analytics** - Überwachung von Prompt-Performance und Token-Verbrauch
-- **⚛️ Moderne Web-UI** mit React 18 + TypeScript + Material-UI
+- **🤖 Basic Question Generation** mit Claude API + PydanticAI
+- **📝 Question Review Workflow** - Approve/Reject/Edit
+- **👥 User Management** - Authentication, Authorization, RBAC
+- **🔒 GDPR Compliance** - Data Export, Account Deletion
+- **⚛️ Moderne Web-UI** mit React 18 + TypeScript + Tailwind CSS
 - **🐳 Container-basiert** für einfache Entwicklung und Deployment
+
+### 🌟 Premium Features (Closed Source)
+
+- **🤖 RAG-basierte KI-Fragenerstellung** mit Vector Database (ChromaDB/Qdrant)
+- **💬 Interaktiver Document ChatBot** - NotebookLM-Style Konversationen
+- **🎛️ Advanced Prompt Management** - Versionierung, Template Variables, Semantic Search
+- **🔍 Semantische Suche** über Dokumente und Prompts
+- **📊 Analytics Dashboard** - Usage Metrics, Performance Tracking
+
+### 🏢 Enterprise Features (Closed Source)
+
+- **🔐 SSO/SAML Integration** - Single Sign-On mit SAML 2.0
+- **🎨 Custom Branding** - White-Label Lösung
+- **🔑 API Access Management** - REST API für Integrationen
+- **📈 Advanced Analytics** - BI Export, Custom Reports, Audit Logs
+- **☁️ On-Premise Deployment** - Self-Hosted Option
+- **🆘 Priority Support** - 24/7 Support, Dedicated Account Manager
 - **🚀 Production-Ready** mit Rate Limiting, Error Handling & Monitoring
 
 ## 🏗️ Architektur
 
 ```text
 ExamCraft/
-├── backend/             # FastAPI Backend Server
-│   ├── main.py          # REST API Endpoints
-│   ├── database.py      # PostgreSQL Connection
-│   ├── models.py        # Pydantic Data Models
-│   └── services/        # Business Logic Services
-├── frontend/            # React 18 + TypeScript Frontend
-│   ├── src/components/  # React UI Components
-│   ├── src/services/    # API Client Services
-│   ├── src/types/       # TypeScript Definitions
-│   └── public/          # Static Assets
-├── utils/               # Python Core Utilities
-│   ├── extraction.py    # Document Processing (PDF/DOC/MD)
-│   └── rag.py           # RAG System (ChromaDB + Embeddings)
-├── demo/                # Workshop Demo Materials
-│   ├── *.pdf            # Example Academic Documents
-│   └── *.md             # Generated Questions & Solutions
-├── docs/                # Project Documentation
-├── .claude/             # Claude Code Integration
-├── docker-compose.yml   # Multi-Container Orchestration
-├── start-dev.sh         # Development Environment Launcher
-└── pyproject.toml       # Python Dependencies & Config
+├── packages/
+│   ├── core/                       # ✅ Open Source (MIT License)
+│   │   ├── backend/                # FastAPI Backend Server
+│   │   │   ├── main.py             # REST API Endpoints
+│   │   │   ├── database.py         # PostgreSQL Connection
+│   │   │   ├── models/             # SQLAlchemy Models
+│   │   │   ├── services/           # Business Logic Services
+│   │   │   └── api/                # API Endpoints
+│   │   └── frontend/               # React 18 + TypeScript Frontend
+│   │       ├── src/components/     # React UI Components
+│   │       ├── src/services/       # API Client Services
+│   │       └── src/types/          # TypeScript Definitions
+│   ├── premium/                    # 🔒 Private Submodule (Proprietary)
+│   │   ├── backend/                # Premium Backend Features
+│   │   │   ├── api/v1/             # RAG, Chat, Prompts APIs
+│   │   │   ├── services/           # RAG, ChatBot, Vector Services
+│   │   │   └── models/             # Chat, Prompt Models
+│   │   └── frontend/               # Premium Frontend Components
+│   │       └── src/components/     # ChatBot, PromptEditor, RAG UI
+│   └── enterprise/                 # 🔒 Private Submodule (Proprietary)
+│       ├── backend/                # Enterprise Backend Features
+│       │   ├── api/v1/             # SSO, Branding, API Access, Analytics
+│       │   └── services/           # SSO, OAuth, Branding Services
+│       └── frontend/               # Enterprise Frontend Components
+│           └── src/components/     # SSO Config, Branding, API Management
+├── docker-compose.yml              # Core Services (PostgreSQL, Redis, Core)
+├── docker-compose.premium.yml      # Premium Extension (ChromaDB, Qdrant)
+├── docker-compose.enterprise.yml   # Enterprise Extension
+├── start-dev.sh                    # Start Core Only
+├── start-dev-premium.sh            # Start Core + Premium
+├── start-dev-enterprise.sh         # Start All Packages
+├── MONOREPO_SETUP.md               # Detailed Monorepo Setup Guide
+└── .gitmodules                     # Git Submodules Configuration
 ```
 
 ## 🚀 Quick Start
@@ -83,51 +147,74 @@ ExamCraft/
 
 - **Docker & Docker Compose** (für Container-basierte Entwicklung)
 - **Git** (für Repository-Management)
-- **Claude API Key** (für KI-Fragenerstellung, optional für lokale Tests)
+- **Claude API Key** (für KI-Fragenerstellung, optional für Core)
 - **Python 3.13+** (für lokale Entwicklung ohne Docker)
 
-### 🐳 Docker Installation (Empfohlen)
+### 🐳 Installation
 
-1. **Repository klonen**
-
-   ```bash
-   git clone https://github.com/yourusername/examcraft-ai.git
-   cd examcraft-ai
-   ```
-
-2. **Umgebung konfigurieren**
-
-   ```bash
-   cp .env.example .env
-   # .env bearbeiten und CLAUDE_API_KEY eintragen (optional)
-   ```
-
-3. **Entwicklungsstack starten**
-
-   ```bash
-   ./start-dev.sh
-   # Oder manuell: docker-compose up -d
-   ```
-
-4. **Services verfügbar unter:**
-   - **Frontend**: <http://localhost:3000> (React Dashboard)
-   - **Backend API**: <http://localhost:8000> (FastAPI Server)
-   - **API Dokumentation**: <http://localhost:8000/docs> (Swagger UI)
-   - **Database**: localhost:5432 (PostgreSQL)
-   - **Redis**: localhost:6379 (Caching)
-
-### 🐍 Lokale Python Installation
+#### Option 1: Core Only (Open Source - Free Tier)
 
 ```bash
-# Python Dependencies installieren
-pip install -e .
+# Repository klonen
+git clone https://github.com/talent-factory/examcraft.git
+cd examcraft
 
-# Backend starten
-cd backend && python main.py
+# Umgebung konfigurieren
+cp .env.example .env
+# Edit .env with your configuration
 
-# Frontend entwickeln (separates Terminal)
-cd frontend && npm install && npm start
+# Core Services starten
+./start-dev.sh
 ```
+
+**Access Points:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+#### Option 2: Core + Premium (Starter/Professional Tier)
+
+```bash
+# Repository mit Submodules klonen (requires access)
+git clone --recurse-submodules git@github.com:talent-factory/examcraft.git
+cd examcraft
+
+# Umgebung konfigurieren
+cp .env.example .env
+# Set ANTHROPIC_API_KEY in .env
+
+# Core + Premium Services starten
+./start-dev-premium.sh
+```
+
+**Additional Access Points:**
+- ChromaDB: http://localhost:8001
+- Qdrant: http://localhost:6333
+
+#### Option 3: All Features (Enterprise Tier)
+
+```bash
+# Repository mit allen Submodules klonen (requires access)
+git clone --recurse-submodules git@github.com:talent-factory/examcraft.git
+cd examcraft
+
+# Umgebung konfigurieren
+cp .env.example .env
+# Set ANTHROPIC_API_KEY, API_KEY_ENCRYPTION_KEY, OAuth credentials in .env
+
+# All Services starten
+./start-dev-enterprise.sh
+```
+
+### 📚 Weitere Informationen
+
+Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für:
+- Detaillierte Setup-Anleitung
+- Submodule-Verwaltung
+- Docker Compose Befehle
+- Troubleshooting
+
+
 
 ## 🛠️ Entwicklung
 
