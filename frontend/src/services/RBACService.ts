@@ -21,7 +21,7 @@ class RBACService {
    * Get authentication token from localStorage
    */
   private getAuthToken(): string | null {
-    return localStorage.getItem('access_token');
+    return localStorage.getItem('examcraft_access_token');
   }
 
   /**
