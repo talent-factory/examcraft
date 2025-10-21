@@ -287,7 +287,8 @@ class OAuthService:
             status='active',
             is_email_verified=user_info.get('email_verified', False),
             avatar_url=user_info.get('picture'),
-            password_hash=None  # OAuth-only user, no password
+            password_hash=None,  # OAuth-only user, no password
+            oauth_provider=provider  # Set OAuth provider
         )
         self.db.add(new_user)
         self.db.flush()  # Get user.id
