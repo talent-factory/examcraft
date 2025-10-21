@@ -50,6 +50,12 @@ export const useRoleBasedNavigation = () => {
       requiredPermissions: ['exams:create'],
     },
     {
+      label: 'Document Chat',
+      path: '/chat',
+      icon: '💬',
+      requiredPermissions: ['document_chatbot'],
+    },
+    {
       label: 'Prompt Library',
       path: '/prompts',
       icon: '💬',

@@ -16,6 +16,7 @@ import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { UserManagementPage } from './components/admin/UserManagementPage';
 import RoleManagementPage from './components/admin/RoleManagementPage';
+import { DocumentChatPage } from './components/DocumentChat/DocumentChatPage';
 import { Dashboard } from './pages/Dashboard';
 import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
@@ -120,6 +121,19 @@ export const AppWithAuth: React.FC = () => {
                   <PermissionGuard requiredPermissions={['exams:create']}>
                     <AppLayout>
                       <Exams />
+                    </AppLayout>
+                  </PermissionGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/chat"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['document_chatbot']}>
+                    <AppLayout>
+                      <DocumentChatPage />
                     </AppLayout>
                   </PermissionGuard>
                 </ProtectedRoute>
