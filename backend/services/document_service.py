@@ -37,22 +37,22 @@ class DocumentService:
         self.docling_service = DoclingService()
         
     async def upload_document(
-        self, 
-        file: UploadFile, 
-        user_id: Optional[str] = None,
+        self,
+        file: UploadFile,
+        user_id: Optional[int] = None,
         db: Optional[Session] = None
     ) -> Document:
         """
         Upload und speichere Dokument
-        
+
         Args:
             file: FastAPI UploadFile Objekt
-            user_id: Optional User ID für Zuordnung
+            user_id: Optional User ID für Zuordnung (Integer)
             db: Database Session
-            
+
         Returns:
             Document: Erstelltes Document Objekt
-            
+
         Raises:
             HTTPException: Bei Validierungsfehlern
         """
