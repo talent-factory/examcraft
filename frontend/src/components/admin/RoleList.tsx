@@ -127,13 +127,14 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
                       {role.name}
                     </Typography>
                   </Box>
-                  <IconButton
-                    size="small"
-                    onClick={() => onEditRole(role)}
-                    disabled={role.is_system_role}
-                  >
-                    <EditIcon />
-                  </IconButton>
+                  <Tooltip title={role.is_system_role ? "System-Rolle (mit Vorsicht bearbeiten)" : "Rolle bearbeiten"}>
+                    <IconButton
+                      size="small"
+                      onClick={() => onEditRole(role)}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
 
                 {role.description && (
