@@ -237,6 +237,11 @@ class OAuthService:
             oauth_account.email = user_info.get('email')
             oauth_account.name = user_info.get('name')
             oauth_account.picture = user_info.get('picture')
+
+            # Ensure user has oauth_provider set
+            if not oauth_account.user.oauth_provider:
+                oauth_account.user.oauth_provider = provider
+
             self.db.commit()
             self.db.refresh(oauth_account)
             return oauth_account.user
