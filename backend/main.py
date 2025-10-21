@@ -222,6 +222,23 @@ async def api_health_check():
     # Check Claude API
     health_status["services"]["claude_api"] = "configured" if os.getenv("CLAUDE_API_KEY") else "not_configured"
 
+    # Check Document Processor
+    processor_type = os.getenv("DOCUMENT_PROCESSOR_TYPE", "auto")
+    try:
+        from services.document_processors.processor_factory import document_processor
+        processor_class = document_processor.__class__.__name__
+        health_status["services"]["document_processor"] = {
+            "configured": processor_type,
+            "active": processor_class
+        }
+    except Exception as e:
+        health_status["services"]["document_processor"] = {
+            "configured": processor_type,
+            "active": "error",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+
     return health_status
 
 @app.get("/api/v1/claude/usage")
