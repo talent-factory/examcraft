@@ -288,12 +288,14 @@ class OAuthService:
             email=user_info['email'],
             first_name=user_info.get('first_name', 'Unknown'),
             last_name=user_info.get('last_name', 'User'),
+            display_name=user_info.get('name', f"{user_info.get('first_name', 'Unknown')} {user_info.get('last_name', 'User')}"),
             institution_id=default_institution.id,
             status='active',
             is_email_verified=user_info.get('email_verified', False),
             avatar_url=user_info.get('picture'),
             password_hash=None,  # OAuth-only user, no password
-            oauth_provider=provider  # Set OAuth provider
+            oauth_provider=provider,  # Set OAuth provider
+            oauth_id=user_info.get('provider_user_id')  # Set OAuth ID
         )
         self.db.add(new_user)
         self.db.flush()  # Get user.id
