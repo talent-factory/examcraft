@@ -28,6 +28,7 @@ export const DocumentChatPage: React.FC = () => {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [showDocumentSelector, setShowDocumentSelector] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     loadDocuments();
