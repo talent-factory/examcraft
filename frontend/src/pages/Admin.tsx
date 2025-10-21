@@ -6,9 +6,10 @@
 import React, { useState } from 'react';
 import { PromptManagement } from '../components/admin/PromptManagement';
 import { UserManagementPage } from '../components/admin/UserManagementPage';
+import RoleManagementPage from '../components/admin/RoleManagementPage';
 
 export const Admin: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'prompts' | 'users'>('prompts');
+  const [activeTab, setActiveTab] = useState<'prompts' | 'users' | 'roles'>('prompts');
 
   return (
     <div className="space-y-6">
@@ -46,6 +47,17 @@ export const Admin: React.FC = () => {
         >
           Benutzer-Verwaltung
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('roles')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            activeTab === 'roles'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Rollen & Berechtigungen
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -58,6 +70,12 @@ export const Admin: React.FC = () => {
       {activeTab === 'users' && (
         <div className="card p-6">
           <UserManagementPage />
+        </div>
+      )}
+
+      {activeTab === 'roles' && (
+        <div className="card p-6">
+          <RoleManagementPage />
         </div>
       )}
     </div>
