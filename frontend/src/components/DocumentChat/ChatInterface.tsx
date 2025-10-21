@@ -3,6 +3,8 @@ import { Send, FileText, Loader2, Download, FileDown } from 'lucide-react';
 import { Button } from '@mui/material';
 import { TextField, Card, CardContent, CardHeader, Typography, Box, Chip, IconButton } from '@mui/material';
 import MarkdownRenderer from '../MarkdownRenderer';
+import { useAuth } from '../../contexts/AuthContext';
+import ChatService from '../../services/ChatService';
 
 interface ChatMessage {
   id?: string;
@@ -24,11 +26,12 @@ interface ChatInterfaceProps {
   onClose?: () => void;
 }
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
-  sessionId, 
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({
+  sessionId,
   documentIds,
   onClose
 }) => {
+  const { accessToken } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -43,21 +46,23 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // Chat-Historie laden
   useEffect(() => {
-    loadChatHistory();
-  }, [sessionId]);
+    if (!accessToken) return;
 
-  const loadChatHistory = async () => {
-    try {
-      const response = await fetch(`/api/v1/chat/sessions/${sessionId}`);
-      const data = await response.json();
-      setMessages(data.messages || []);
-    } catch (error) {
-      console.error('Failed to load chat history:', error);
-    }
-  };
+    const loadChatHistory = async () => {
+      try {
+        const session = await ChatService.getSession(accessToken, sessionId);
+        setMessages(session.messages || []);
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+        setMessages([]);
+      }
+    };
+
+    loadChatHistory();
+  }, [sessionId, accessToken]);
 
   const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+    if (!inputMessage.trim() || isLoading || !accessToken) return;
 
     const userMessage: ChatMessage = {
       role: 'user',
@@ -65,25 +70,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       timestamp: new Date().toISOString(),
     };
 
+    const messageContent = inputMessage;
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/v1/chat/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: inputMessage,
-          session_id: sessionId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      const assistantMessage: ChatMessage = await response.json();
+      const assistantMessage = await ChatService.sendMessage(accessToken, sessionId, messageContent);
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -99,23 +92,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const handleExport = async (format: 'markdown' | 'json') => {
+    if (!accessToken) return;
     try {
-      const response = await fetch(`/api/v1/chat/sessions/${sessionId}/export?export_format=${format}`, {
-        method: 'POST'
-      });
-      
-      if (!response.ok) throw new Error('Export failed');
-      
-      const data = await response.json();
-      
+      const blob = await ChatService.downloadAsMarkdown(accessToken, sessionId);
+
       // Download file
-      const blob = new Blob([data.content], { 
-        type: format === 'json' ? 'application/json' : 'text/markdown' 
-      });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = data.filename;
+      a.download = `chat-${sessionId}.${format === 'json' ? 'json' : 'md'}`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
@@ -125,15 +110,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const handleConvertToDocument = async () => {
+    if (!accessToken) return;
     try {
-      const response = await fetch(`/api/v1/chat/sessions/${sessionId}/to-document`, {
-        method: 'POST'
-      });
-      
-      if (!response.ok) throw new Error('Conversion failed');
-      
-      const data = await response.json();
-      alert(`✅ ${data.message}`);
+      const result = await ChatService.exportToDocument(accessToken, sessionId);
+      alert(`✅ Chat wurde als Dokument gespeichert (ID: ${result.document_id})`);
     } catch (error) {
       console.error('Conversion failed:', error);
       alert('Konvertierung fehlgeschlagen');

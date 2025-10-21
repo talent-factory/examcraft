@@ -19,6 +19,7 @@ export interface ChatSession {
   message_count: number;
   created_at: string;
   updated_at: string;
+  messages?: ChatMessage[];
 }
 
 export interface ChatMessage {

@@ -3,6 +3,8 @@ import { Box, Container, Typography, Button, Dialog, DialogContent, DialogTitle,
 import { MessageSquare, X, Trash2 } from 'lucide-react';
 import { DocumentSelector } from './DocumentSelector';
 import { ChatInterface } from './ChatInterface';
+import { useAuth } from '../../contexts/AuthContext';
+import ChatService from '../../services/ChatService';
 
 interface Document {
   id: number;
@@ -21,6 +23,7 @@ interface ChatSession {
 }
 
 export const DocumentChatPage: React.FC = () => {
+  const { accessToken } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -45,32 +48,21 @@ export const DocumentChatPage: React.FC = () => {
   };
 
   const loadChatSessions = async () => {
+    if (!accessToken) return;
     try {
-      const response = await fetch('/api/v1/chat/sessions');
-      const data = await response.json();
-      setChatSessions(data);
+      const sessions = await ChatService.listSessions(accessToken);
+      setChatSessions(sessions);
     } catch (error) {
       console.error('Failed to load chat sessions:', error);
+      setChatSessions([]);
     }
   };
 
   const handleStartChat = async (documentIds: number[], title: string) => {
+    if (!accessToken) return;
     setIsLoading(true);
     try {
-      const response = await fetch('/api/v1/chat/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          document_ids: documentIds,
-          title: title
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create chat session');
-      }
-
-      const newSession = await response.json();
+      const newSession = await ChatService.createSession(accessToken, title, documentIds);
       setCurrentSessionId(newSession.id);
       setShowDocumentSelector(false);
       loadChatSessions(); // Refresh list
@@ -92,6 +84,7 @@ export const DocumentChatPage: React.FC = () => {
   };
 
   const handleDeleteSession = async (sessionId: string, event: React.MouseEvent) => {
+    if (!accessToken) return;
     event.stopPropagation(); // Verhindere onClick auf Parent
 
     if (!window.confirm('Möchten Sie diese Chat-Session wirklich löschen?')) {
@@ -99,11 +92,7 @@ export const DocumentChatPage: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`/api/v1/chat/sessions/${sessionId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) throw new Error('Delete failed');
+      await ChatService.deleteSession(accessToken, sessionId);
 
       // Wenn aktuell geöffnet, schließen
       if (currentSessionId === sessionId) {
