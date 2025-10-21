@@ -69,9 +69,13 @@ export const DocumentChatPage: React.FC = () => {
     setIsLoading(true);
     try {
       const newSession = await ChatService.createSession(accessToken, title, documentIds);
+
+      // Add new session to the list immediately
+      setChatSessions(prev => [...prev, newSession]);
+
+      // Set current session
       setCurrentSessionId(newSession.id);
       setShowDocumentSelector(false);
-      loadChatSessions(); // Refresh list
     } catch (error) {
       console.error('Failed to create chat session:', error);
       alert('Fehler beim Erstellen der Chat-Session');
