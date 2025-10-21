@@ -38,22 +38,32 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
 
   // Redirect to login if not authenticated
   if (!isAuthenticated || !user) {
+    console.log('[RoleGuard] Not authenticated:', { isAuthenticated, hasUser: !!user });
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Debug logging
+  console.log('[RoleGuard] Checking roles:', {
+    userRoles: user.roles?.map(r => r.name),
+    allowedRoles,
+    isSuperuser: user.is_superuser
+  });
+
   // Check if user has any of the allowed roles
-  const hasAllowedRole = user.is_superuser || user.roles.some(role => 
-    allowedRoles.includes(role.name)
+  const hasAllowedRole = user.is_superuser || user.roles?.some(role =>
+    allowedRoles.includes(role.name as UserRole)
   );
 
   // Show fallback or redirect if user doesn't have required role
   if (!hasAllowedRole) {
+    console.log('[RoleGuard] Access denied - user does not have required role');
     if (fallback) {
       return <>{fallback}</>;
     }
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
+  console.log('[RoleGuard] Access granted');
   return <>{children}</>;
 };
 
