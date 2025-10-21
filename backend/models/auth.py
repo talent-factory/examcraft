@@ -3,7 +3,7 @@ Authentication Models für ExamCraft AI
 User, Role, Institution Models für Multi-Tenant Authentication
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Table, Text, CheckConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Table, Text, CheckConstraint, ARRAY
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -74,11 +74,14 @@ class Institution(Base):
     # Status
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     
-    # Subscription Info (für zukünftige Freemium Features)
+    # Subscription Info (TF-116 Monetarisierungsstrategie)
     subscription_tier = Column(String(50), default="free", nullable=False)  # free, starter, professional, enterprise
-    max_users = Column(Integer, default=5, nullable=False)
-    max_documents = Column(Integer, default=100, nullable=False)
-    max_questions_per_month = Column(Integer, default=500, nullable=False)
+    features_enabled = Column(ARRAY(String), nullable=True)  # Optional: Manual feature overrides
+
+    # Quotas (basierend auf subscription_tier, siehe backend/config/features.py)
+    max_users = Column(Integer, default=1, nullable=False)
+    max_documents = Column(Integer, default=5, nullable=False)
+    max_questions_per_month = Column(Integer, default=20, nullable=False)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -86,9 +89,45 @@ class Institution(Base):
     
     # Relationships
     users = relationship("User", back_populates="institution", cascade="all, delete-orphan")
-    
+
     def __repr__(self):
         return f"<Institution(id={self.id}, name='{self.name}', slug='{self.slug}')>"
+
+    def has_feature(self, feature: str) -> bool:
+        """
+        Prüft ob Institution ein Feature hat (basierend auf Tier + manuelle Overrides)
+
+        Args:
+            feature: Feature-Name (z.B. "document_chatbot")
+
+        Returns:
+            True wenn Feature verfügbar
+        """
+        from backend.config.features import SubscriptionTier, Feature, has_feature as tier_has_feature
+
+        # Manuelle Feature-Overrides haben Vorrang
+        if self.features_enabled and feature in self.features_enabled:
+            return True
+
+        # Sonst: Prüfe gegen Tier
+        try:
+            tier = SubscriptionTier(self.subscription_tier)
+            feature_enum = Feature(feature)
+            return tier_has_feature(tier, feature_enum)
+        except (ValueError, KeyError):
+            return False
+
+    def get_quota(self, quota_name: str) -> int:
+        """
+        Gibt Quota-Limit zurück (nutzt DB-Werte statt Config)
+
+        Args:
+            quota_name: z.B. "max_documents"
+
+        Returns:
+            Quota-Limit (-1 für unlimited)
+        """
+        return getattr(self, quota_name, 0)
 
 
 class Role(Base):
