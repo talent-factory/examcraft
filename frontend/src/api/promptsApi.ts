@@ -11,6 +11,25 @@ import type {
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 
+// Create axios instance with auth interceptor
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+});
+
+// Add auth token to all requests
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('examcraft_access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Re-export types from prompt.ts for backward compatibility
 export type { Prompt, PromptTemplate } from '../types/prompt';
 
@@ -54,7 +73,7 @@ export const promptsApi = {
     use_case?: string;
     is_active?: boolean;
   }): Promise<Prompt[]> => {
-    const response = await axios.get(`${API_BASE_URL}/api/v1/prompts`, {
+    const response = await apiClient.get('/api/v1/prompts', {
       params: filters
     });
     return response.data;
@@ -62,25 +81,25 @@ export const promptsApi = {
 
   // Get single prompt by ID
   getPrompt: async (id: string): Promise<Prompt> => {
-    const response = await axios.get(`${API_BASE_URL}/api/v1/prompts/${id}`);
+    const response = await apiClient.get(`/api/v1/prompts/${id}`);
     return response.data;
   },
 
   // Create new prompt
   createPrompt: async (data: Partial<Prompt>): Promise<Prompt> => {
-    const response = await axios.post(`${API_BASE_URL}/api/v1/prompts`, data);
+    const response = await apiClient.post('/api/v1/prompts', data);
     return response.data;
   },
 
   // Update existing prompt
   updatePrompt: async (id: string, data: Partial<Prompt>): Promise<Prompt> => {
-    const response = await axios.put(`${API_BASE_URL}/api/v1/prompts/${id}`, data);
+    const response = await apiClient.put(`/api/v1/prompts/${id}`, data);
     return response.data;
   },
 
   // Create new version of prompt
   createVersion: async (id: string, content: string, description?: string): Promise<Prompt> => {
-    const response = await axios.post(`${API_BASE_URL}/api/v1/prompts/${id}/versions`, {
+    const response = await apiClient.post(`/api/v1/prompts/${id}/versions`, {
       content,
       description
     });
@@ -89,18 +108,18 @@ export const promptsApi = {
 
   // Delete prompt
   deletePrompt: async (id: string): Promise<void> => {
-    await axios.delete(`${API_BASE_URL}/api/v1/prompts/${id}`);
+    await apiClient.delete(`/api/v1/prompts/${id}`);
   },
 
   // Semantic search
   searchPrompts: async (searchRequest: PromptSearchRequest): Promise<PromptSearchResult[]> => {
-    const response = await axios.post(`${API_BASE_URL}/api/v1/prompts/search`, searchRequest);
+    const response = await apiClient.post('/api/v1/prompts/search', searchRequest);
     return response.data;
   },
 
   // Get usage logs
   getUsageLogs: async (promptId: string, limit = 100): Promise<PromptUsageLog[]> => {
-    const response = await axios.get(`${API_BASE_URL}/api/v1/prompts/${promptId}/usage`, {
+    const response = await apiClient.get(`/api/v1/prompts/${promptId}/usage`, {
       params: { limit }
     });
     return response.data;
@@ -108,13 +127,13 @@ export const promptsApi = {
 
   // Get version history
   getVersionHistory: async (promptName: string): Promise<Prompt[]> => {
-    const response = await axios.get(`${API_BASE_URL}/api/v1/prompts/versions/${promptName}`);
+    const response = await apiClient.get(`/api/v1/prompts/versions/${promptName}`);
     return response.data;
   },
 
   // Activate/Deactivate prompt
   toggleActive: async (id: string, is_active: boolean): Promise<Prompt> => {
-    const response = await axios.patch(`${API_BASE_URL}/api/v1/prompts/${id}/active`, {
+    const response = await apiClient.patch(`/api/v1/prompts/${id}/active`, {
       is_active
     });
     return response.data;
@@ -122,13 +141,13 @@ export const promptsApi = {
 
   // List templates
   listTemplates: async (): Promise<PromptTemplate[]> => {
-    const response = await axios.get(`${API_BASE_URL}/api/v1/prompts/templates`);
+    const response = await apiClient.get('/api/v1/prompts/templates');
     return response.data;
   },
 
   // Get template by ID
   getTemplate: async (id: string): Promise<PromptTemplate> => {
-    const response = await axios.get(`${API_BASE_URL}/api/v1/prompts/templates/${id}`);
+    const response = await apiClient.get(`/api/v1/prompts/templates/${id}`);
     return response.data;
   },
 
@@ -140,7 +159,7 @@ export const promptsApi = {
    */
   getPromptsForQuestionType: async (questionType: QuestionType): Promise<Prompt[]> => {
     const useCase = `question_generation_${questionType}`;
-    const response = await axios.get(`${API_BASE_URL}/api/v1/prompts`, {
+    const response = await apiClient.get('/api/v1/prompts', {
       params: {
         use_case: useCase,
         category: 'system_prompt',
@@ -155,7 +174,7 @@ export const promptsApi = {
    * Returns list of variables with metadata
    */
   extractTemplateVariables: async (promptId: string): Promise<TemplateVariablesResponse> => {
-    const response = await axios.get(`${API_BASE_URL}/api/v1/prompts/${promptId}/variables`);
+    const response = await apiClient.get(`/api/v1/prompts/${promptId}/variables`);
     return response.data;
   },
 
@@ -164,7 +183,7 @@ export const promptsApi = {
    * Returns rendered prompt text
    */
   renderPromptPreview: async (request: PromptRenderRequest): Promise<PromptRenderResponse> => {
-    const response = await axios.post(`${API_BASE_URL}/api/v1/prompts/render-preview`, request);
+    const response = await apiClient.post('/api/v1/prompts/render-preview', request);
     return response.data;
   }
 };
