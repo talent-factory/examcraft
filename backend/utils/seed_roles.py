@@ -39,14 +39,16 @@ def seed_default_roles(db: Session):
                 "view_questions",
                 "view_exams",
                 "view_analytics",
-                "manage_settings"
+                "manage_settings",
+                "create_documents",
+                "delete_documents"
             ],
             "is_system_role": True
         },
         {
             "name": UserRole.DOZENT.value,
             "display_name": "Dozent",
-            "description": "Create and manage questions and exams",
+            "description": "Create and manage questions, exams, and documents",
             "permissions": [
                 "create_questions",
                 "edit_questions",
@@ -57,19 +59,23 @@ def seed_default_roles(db: Session):
                 "delete_exams",
                 "view_questions",
                 "view_exams",
-                "view_analytics"
+                "view_analytics",
+                "create_documents",
+                "delete_documents"
             ],
             "is_system_role": True
         },
         {
             "name": UserRole.ASSISTANT.value,
             "display_name": "Assistant",
-            "description": "Review and edit questions",
+            "description": "Review and edit questions, create and manage documents",
             "permissions": [
                 "edit_questions",
                 "review_questions",
                 "view_questions",
-                "view_exams"
+                "view_exams",
+                "create_documents",
+                "delete_documents"
             ],
             "is_system_role": True
         },
