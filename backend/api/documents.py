@@ -30,7 +30,7 @@ class DocumentResponse(BaseModel):
     file_size: int
     mime_type: str
     status: str
-    user_id: Optional[str]
+    user_id: Optional[int]  # Fixed: user_id is Integer in database, not String
     metadata: Optional[dict]
     content_preview: Optional[str]
     vector_collection: Optional[str]
