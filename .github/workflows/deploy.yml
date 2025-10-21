@@ -1,0 +1,21 @@
+name: Deploy to Render.com
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-open-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy to Render (Free Tier)
+
+  deploy-premium:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/freemium'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Checkout Premium Features
+        run: git submodule update --init
+      - name: Deploy to Render (Paid Service)
