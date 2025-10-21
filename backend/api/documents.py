@@ -73,7 +73,7 @@ async def upload_document(
 
         document = await document_service.upload_document(
             file=file,
-            user_id=str(current_user.id),
+            user_id=current_user.id,
             db=db
         )
 
