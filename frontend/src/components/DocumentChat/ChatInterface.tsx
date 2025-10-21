@@ -6,19 +6,8 @@ import MarkdownRenderer from '../MarkdownRenderer';
 import { useAuth } from '../../contexts/AuthContext';
 import ChatService from '../../services/ChatService';
 
-interface ChatMessage {
-  id?: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  sources?: Array<{
-    document_id: number;
-    chunk_id: string;
-    score: number;
-    metadata: any;
-  }>;
-  confidence?: number;
-}
+// Use ChatMessage from ChatService
+import type { ChatMessage } from '../../services/ChatService';
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -258,14 +247,18 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
               Quellen:
             </Typography>
             <Box display="flex" flexWrap="wrap" gap={0.5}>
-              {message.sources.map((source, idx) => (
-                <Chip
-                  key={idx}
-                  label={`${source.metadata?.title || 'Dokument'} (${(source.score * 100).toFixed(0)}%)`}
-                  size="small"
-                  variant="outlined"
-                />
-              ))}
+              {message.sources.map((source, idx) => {
+                const score = source.score ?? source.similarity_score ?? 0;
+                const title = source.metadata?.title || source.filename || 'Dokument';
+                return (
+                  <Chip
+                    key={idx}
+                    label={`${title} (${(score * 100).toFixed(0)}%)`}
+                    size="small"
+                    variant="outlined"
+                  />
+                );
+              })}
             </Box>
           </Box>
         )}

@@ -23,17 +23,20 @@ export interface ChatSession {
 }
 
 export interface ChatMessage {
-  id: string;
-  session_id: string;
+  id?: string;
+  session_id?: string;
   role: 'user' | 'assistant';
   content: string;
+  timestamp: string;
   sources?: Array<{
     document_id: number;
-    filename: string;
-    similarity_score: number;
+    chunk_id?: string;
+    filename?: string;
+    score?: number;
+    similarity_score?: number;
+    metadata?: any;
   }>;
   confidence?: number;
-  timestamp: string;
 }
 
 export interface ChatRequest {
