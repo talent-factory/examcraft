@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useRoleBasedNavigation, NavigationItem } from '../../hooks/useRoleBasedNavigation';
-import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -64,9 +64,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
               aria-label={isExpanded ? 'Collapse' : 'Expand'}
             >
               {isExpanded ? (
-                <ChevronDownIcon className="w-4 h-4" />
+                <ChevronDown className="w-4 h-4" />
               ) : (
-                <ChevronRightIcon className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4" />
               )}
             </button>
           )}
