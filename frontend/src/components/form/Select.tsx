@@ -4,7 +4,7 @@
  */
 
 import React, { SelectHTMLAttributes } from 'react';
-import { ChevronDownIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon } from '@heroicons/react/solid';
 
 interface SelectOption {
   value: string | number;

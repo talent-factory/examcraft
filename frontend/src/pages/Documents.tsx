@@ -31,7 +31,7 @@ export const Documents: React.FC = () => {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
           Neues Dokument hochladen
         </h2>
-        <DocumentUpload onUploadSuccess={handleDocumentUploaded} />
+        <DocumentUpload onAllUploadsComplete={handleDocumentUploaded} />
       </div>
 
       {/* Library Section */}
