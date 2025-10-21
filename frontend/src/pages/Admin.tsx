@@ -4,8 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import PromptManagement from '../components/PromptManagement';
-import UserManagementPage from '../components/admin/UserManagementPage';
+import { PromptManagement } from '../components/admin/PromptManagement';
+import { UserManagementPage } from '../components/admin/UserManagementPage';
 
 export const Admin: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'prompts' | 'users'>('prompts');

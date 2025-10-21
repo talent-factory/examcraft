@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useRoleBasedNavigation, NavigationItem } from '../../hooks/useRoleBasedNavigation';
-import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/solid';
 
 interface SidebarProps {
   isOpen?: boolean;
