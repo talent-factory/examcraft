@@ -31,14 +31,19 @@ export const DocumentChatPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    if (!accessToken) return;
     loadDocuments();
     loadChatSessions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
   const loadDocuments = async () => {
+    if (!accessToken) return;
     try {
-      const response = await fetch('/api/v1/documents/');
+      const response = await fetch('/api/v1/documents/', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
       const data = await response.json();
       // API returns { documents: [...], total: N }
       const docs = data.documents || data;
