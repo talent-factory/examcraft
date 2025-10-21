@@ -193,7 +193,7 @@ class ChatService {
   async exportToDocument(
     accessToken: string,
     sessionId: string
-  ): Promise<{ document_id: number }> {
+  ): Promise<{ document_id: number; document_title: string; success: boolean; message: string }> {
     const response = await fetch(`${API_BASE_URL}/api/v1/chat/sessions/${sessionId}/to-document`, {
       method: 'POST',
       headers: {
@@ -210,10 +210,20 @@ class ChatService {
   }
 
   /**
-   * Download chat session as markdown
+   * Download chat session as markdown or JSON
    */
-  async downloadAsMarkdown(accessToken: string, sessionId: string): Promise<Blob> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/chat/sessions/${sessionId}/download`, {
+  async downloadChat(
+    accessToken: string,
+    sessionId: string,
+    format: 'markdown' | 'json' = 'markdown',
+    filename?: string
+  ): Promise<Blob> {
+    let url = `${API_BASE_URL}/api/v1/chat/sessions/${sessionId}/download?format=${format}`;
+    if (filename) {
+      url += `&filename=${encodeURIComponent(filename)}`;
+    }
+
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -221,7 +231,8 @@ class ChatService {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to download chat');
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to download chat');
     }
 
     return response.blob();

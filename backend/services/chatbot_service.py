@@ -7,6 +7,8 @@ from pydantic_ai.models.anthropic import AnthropicModel
 from typing import List, Dict, Any, Optional, Tuple
 import logging
 import os
+import json
+import re
 
 from models.chat import ChatBotResponse
 from services.qdrant_vector_service import QdrantVectorService
@@ -49,10 +51,11 @@ class DocumentChatBotService:
             system_prompt = self._load_system_prompt_from_kb()
 
             # PydanticAI Agent mit dynamischem System Prompt
+            # Nutze str als result_type für flexiblere Validierung
             self.agent = Agent(
                 model=self.model,
                 system_prompt=system_prompt,
-                result_type=ChatBotResponse
+                result_type=str
             )
 
         # Vector Service für RAG
@@ -155,17 +158,24 @@ Wenn du dir bei einer Antwort unsicher bist, sage das ehrlich und gib einen nied
                 chat_history=chat_history
             )
 
-            # 3. PydanticAI Agent ausführen (ohne message_history Parameter)
+            # 3. PydanticAI Agent ausführen
             result = await self.agent.run(
                 user_prompt=enhanced_prompt
             )
-            
+
+            # Parse die String-Antwort
+            response_text = result.data if isinstance(result.data, str) else str(result.data)
+
+            # Extrahiere Konfidenz und Zitationen aus der Antwort
+            confidence = self._extract_confidence(response_text)
+            citations = self._extract_citations(response_text)
+
             return {
-                "content": result.data.response,
-                "sources": self._enrich_sources(result.data.citations, sources),
-                "confidence": result.data.confidence
+                "content": response_text,
+                "sources": self._enrich_sources(citations, sources),
+                "confidence": confidence
             }
-            
+
         except Exception as e:
             logger.error(f"ChatBot generation failed: {e}", exc_info=True)
             # Fallback zu Demo-Modus bei Fehler
@@ -289,6 +299,58 @@ Gib einen Konfidenz-Score zwischen 0.0 und 1.0 an, wie sicher du dir bei der Ant
         
         return enriched
     
+    def _extract_confidence(self, response_text: str) -> float:
+        """
+        Extrahiere Konfidenz-Score aus der Antwort
+        Sucht nach Patterns wie "Konfidenz: 0.8" oder "confidence: 0.8"
+        """
+        try:
+            # Suche nach Konfidenz-Patterns
+            patterns = [
+                r'[Kk]onfidenz[:\s]+([0-9.]+)',
+                r'[Cc]onfidence[:\s]+([0-9.]+)',
+                r'Sicherheit[:\s]+([0-9.]+)',
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, response_text)
+                if match:
+                    confidence = float(match.group(1))
+                    return min(max(confidence, 0.0), 1.0)  # Clamp to [0, 1]
+
+            # Default: Mittlere Konfidenz
+            return 0.7
+        except Exception as e:
+            logger.debug(f"Failed to extract confidence: {e}")
+            return 0.7
+
+    def _extract_citations(self, response_text: str) -> List[Dict[str, Any]]:
+        """
+        Extrahiere Zitationen aus der Antwort
+        Sucht nach Patterns wie "Quelle 1:" oder "[1]"
+        """
+        try:
+            citations = []
+
+            # Suche nach Quelle-Patterns
+            patterns = [
+                r'[Qq]uelle\s+(\d+)[:\s]+([^,\n]+)',
+                r'\[(\d+)\]\s+([^,\n]+)',
+            ]
+
+            for pattern in patterns:
+                matches = re.finditer(pattern, response_text)
+                for match in matches:
+                    citations.append({
+                        "source_id": match.group(1),
+                        "text": match.group(2).strip()
+                    })
+
+            return citations
+        except Exception as e:
+            logger.debug(f"Failed to extract citations: {e}")
+            return []
+
     def _generate_demo_response(
         self,
         user_message: str,

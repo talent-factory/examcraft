@@ -3,13 +3,14 @@ Document API Endpoints für ExamCraft AI
 Verwaltet Document Upload, Listing und Management
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query, Request
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from services.document_service import DocumentService
+from services.vector_service_factory import vector_service
 from models.document import Document, DocumentStatus
 from models.auth import User
 from database import get_db
@@ -300,11 +301,15 @@ async def get_document_status(
 async def process_document(
     document_id: int,
     create_vectors: bool = Query(True, description="Erstelle auch Vector Embeddings"),
+    background_tasks: BackgroundTasks = None,
     current_user: User = Depends(require_permission("create_documents")),
     db: Session = Depends(get_db)
 ):
     """
     Verarbeite hochgeladenes Dokument mit Docling (und optional Vector Embeddings)
+
+    **ASYNCHRON:** Diese Endpoint startet die Verarbeitung im Hintergrund und antwortet sofort.
+    Nutze GET /{document_id}/status um den Verarbeitungsstatus zu prüfen.
 
     **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
 
@@ -319,35 +324,30 @@ async def process_document(
     # Prüfe User-Berechtigung
     if document.user_id and document.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     try:
-        if create_vectors:
-            # Verarbeite Dokument mit Vector Embeddings
-            result = await document_service.process_document_with_vectors(document_id, db)
-            
-            if not result:
-                raise HTTPException(status_code=500, detail="Document processing failed")
-            
-            return {
-                "message": "Document processed successfully with vector embeddings",
-                "document_id": document_id,
-                "processing_stats": result
-            }
-        else:
-            # Nur Docling Processing ohne Vector Embeddings
-            processed_doc = await document_service.process_document_content(document_id, db)
-            
-            if not processed_doc:
-                raise HTTPException(status_code=500, detail="Document processing failed")
-            
-            # Erstelle Processing Summary
-            processing_summary = document_service.docling_service.get_document_summary(processed_doc)
-            
-            return {
-                "message": "Document processed successfully",
-                "document_id": document_id,
-                "processing_summary": processing_summary
-            }
+        # Starte Verarbeitung im Hintergrund
+        if background_tasks:
+            if create_vectors:
+                background_tasks.add_task(
+                    document_service.process_document_with_vectors,
+                    document_id,
+                    db
+                )
+            else:
+                background_tasks.add_task(
+                    document_service.process_document_content,
+                    document_id,
+                    db
+                )
+
+        # Antworte sofort mit Status "processing"
+        return {
+            "message": "Document processing started in background",
+            "document_id": document_id,
+            "status": "processing",
+            "check_status_url": f"/api/v1/documents/{document_id}/status"
+        }
         
     except Exception as e:
         logger.error(f"Document processing failed: {str(e)}")
@@ -452,3 +452,89 @@ async def get_document_chunks(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get chunks: {str(e)}")
+
+@router.get("/{document_id}/chunks-paginated")
+async def get_document_chunks_paginated(
+    document_id: int,
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(10, ge=1, le=100, description="Number of chunks per page"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Hole verarbeitete Text-Chunks eines Dokuments mit Pagination (für große Dokumente)
+
+    **Required:** Authenticated user
+
+    - **document_id**: ID des Dokuments
+    - **page**: Seitennummer (1-indexed, default: 1)
+    - **page_size**: Anzahl Chunks pro Seite (1-100, default: 10)
+
+    Returns:
+        Paginierte Liste der Text-Chunks mit Metadaten
+    """
+    try:
+        document = document_service.get_document_by_id(document_id, db)
+
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Tenant-aware access control
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+        tenant_context = get_tenant_context(current_user)
+        TenantFilter.verify_tenant_access(document, tenant_context)
+
+        if document.status != DocumentStatus.PROCESSED:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Document not processed yet. Current status: {document.status.value}"
+            )
+
+        # Hole Chunks aus Vector Database (schneller als Neuverarbeitung!)
+        search_results = await vector_service.get_document_chunks(document_id)
+
+        if not search_results:
+            raise HTTPException(status_code=500, detail="Failed to retrieve document chunks from vector database")
+
+        # Konvertiere SearchResult zu Dictionary Format
+        chunks = []
+        for result in search_results:
+            chunks.append({
+                'chunk_index': result.chunk_index,
+                'content': result.content,
+                'page_number': result.metadata.get('page_number') if result.metadata else None,
+                'metadata': result.metadata
+            })
+
+        # Berechne Pagination
+        total_chunks = len(chunks)
+        total_pages = (total_chunks + page_size - 1) // page_size
+
+        # Validiere page
+        if page > total_pages and total_chunks > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Page {page} out of range. Total pages: {total_pages}"
+            )
+
+        # Berechne Start- und End-Index
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+
+        # Hole Chunks für diese Seite
+        paginated_chunks = chunks[start_idx:end_idx]
+
+        return {
+            "document_id": document_id,
+            "total_chunks": total_chunks,
+            "total_pages": total_pages,
+            "current_page": page,
+            "page_size": page_size,
+            "chunks": paginated_chunks
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get paginated chunks for document {document_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get paginated chunks: {str(e)}")

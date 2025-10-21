@@ -58,6 +58,11 @@ frontend/coverage/
 backend/htmlcov/
 backend/.coverage
 
+# Playwright test artifacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/.playwright/
+
 # MCP configuration with API keys
 .mcp.json
 backend/chroma_db/chroma.sqlite3

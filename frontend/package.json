@@ -37,6 +37,12 @@
     "start": "craco start",
     "build": "craco build",
     "test": "craco test",
+    "test:unit": "craco test --watchAll=false",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:all": "npm run test:unit && npm run test:e2e",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -60,7 +66,9 @@
   "proxy": "http://backend:8000",
   "devDependencies": {
     "@craco/craco": "^7.1.0",
+    "@playwright/test": "^1.56.1",
     "autoprefixer": "^10.4.21",
+    "playwright": "^1.56.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.3.0"
   }

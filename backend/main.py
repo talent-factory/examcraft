@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
     Replaces deprecated @app.on_event("startup") and @app.on_event("shutdown")
     """
     # Startup: Initialize database tables
-    from database import create_tables
+    from database import create_tables, SessionLocal
     create_tables()
 
     # Startup: Load API routers
@@ -52,6 +52,32 @@ async def lifespan(app: FastAPI):
     app.include_router(prompts_api.router)
     app.include_router(rbac_api.router)
     app.include_router(question_review.router)
+
+    # Startup: Reset any documents stuck in PROCESSING status
+    # (happens when backend restarts during document processing)
+    try:
+        from models.document import Document, DocumentStatus
+        db = SessionLocal()
+        try:
+            processing_docs = db.query(Document).filter(
+                Document.status == DocumentStatus.PROCESSING
+            ).all()
+
+            if processing_docs:
+                print(f"⚠️  Found {len(processing_docs)} documents stuck in PROCESSING status")
+                for doc in processing_docs:
+                    print(f"   - Resetting {doc.original_filename} (ID: {doc.id})")
+                    doc.status = DocumentStatus.UPLOADED
+                    doc.doc_metadata = doc.doc_metadata or {}
+                    if isinstance(doc.doc_metadata, dict):
+                        doc.doc_metadata['reset_at_startup'] = True
+
+                db.commit()
+                print(f"✅ Reset {len(processing_docs)} documents to UPLOADED status")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error resetting processing documents: {str(e)}")
 
     yield  # Application is running
 
@@ -70,11 +96,17 @@ app = FastAPI(
 )
 
 # CORS middleware - Production-ready configuration
-cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
+cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
+
+# Wenn "*" in den Origins ist, setze allow_credentials auf False
+# (CORS-Konflikt: allow_credentials=True und allow_origins="*" sind nicht kompatibel)
+allow_credentials = "*" not in cors_origins
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -206,6 +206,37 @@ export class DocumentService {
   }
 
   /**
+   * Get document chunks with pagination (for large documents)
+   */
+  static async getDocumentChunksPaginated(
+    documentId: number,
+    page: number = 1,
+    pageSize: number = 10
+  ): Promise<{
+    document_id: number;
+    total_chunks: number;
+    total_pages: number;
+    current_page: number;
+    page_size: number;
+    chunks: any[];
+  }> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/documents/${documentId}/chunks-paginated?page=${page}&page_size=${pageSize}`,
+      {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to fetch document chunks: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
    * Reindex document vectors
    */
   static async reindexDocument(documentId: number): Promise<any> {
