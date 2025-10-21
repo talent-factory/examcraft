@@ -1,0 +1,8 @@
+[submodule "packages/premium"]
+	path = packages/premium
+	url = git@github.com:talent-factory/examcraft-premium.git
+	branch = main
+[submodule "packages/enterprise"]
+	path = packages/enterprise
+	url = git@github.com:talent-factory/examcraft-enterprise.git
+	branch = main
