@@ -172,6 +172,13 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
           </Alert>
         )}
 
+        {role?.is_system_role && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            ⚠️ <strong>Achtung:</strong> Sie bearbeiten eine System-Rolle. Änderungen können die Funktionalität der Anwendung beeinträchtigen.
+            Bitte nur Features hinzufügen/entfernen, wenn Sie sicher sind, was Sie tun.
+          </Alert>
+        )}
+
         {!isEditMode && (
           <Box mb={3}>
             <TextField
