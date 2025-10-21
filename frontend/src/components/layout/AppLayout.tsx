@@ -1,10 +1,10 @@
 /**
  * App Layout Component
- * Main layout wrapper with navigation for authenticated pages
+ * Main layout wrapper with navigation and sidebar for authenticated pages
  */
 
 import React from 'react';
-import { NavigationBar } from './NavigationBar';
+import { DashboardLayout } from './DashboardLayout';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -12,12 +12,9 @@ interface AppLayoutProps {
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <NavigationBar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {children}
-      </main>
-    </div>
+    <DashboardLayout>
+      {children}
+    </DashboardLayout>
   );
 };
 

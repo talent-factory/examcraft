@@ -16,6 +16,11 @@ import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { UserManagementPage } from './components/admin/UserManagementPage';
 import RoleManagementPage from './components/admin/RoleManagementPage';
+import { Dashboard } from './pages/Dashboard';
+import { Documents } from './pages/Documents';
+import { Exams } from './pages/Exams';
+import { Review } from './pages/Review';
+import { Admin } from './pages/Admin';
 import { UserRole } from './types/auth';
 import App from './App';
 
@@ -63,8 +68,60 @@ export const AppWithAuth: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <App />
+                    <Dashboard />
                   </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/documents"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['documents:read']}>
+                    <AppLayout>
+                      <Documents />
+                    </AppLayout>
+                  </PermissionGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/questions/generate"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['questions:create']}>
+                    <AppLayout>
+                      <Exams />
+                    </AppLayout>
+                  </PermissionGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/questions/review"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['questions:review']}>
+                    <AppLayout>
+                      <Review />
+                    </AppLayout>
+                  </PermissionGuard>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/exams/compose"
+              element={
+                <ProtectedRoute>
+                  <PermissionGuard requiredPermissions={['exams:create']}>
+                    <AppLayout>
+                      <Exams />
+                    </AppLayout>
+                  </PermissionGuard>
                 </ProtectedRoute>
               }
             />
@@ -76,6 +133,19 @@ export const AppWithAuth: React.FC = () => {
                   <AppLayout>
                     <ProfilePage />
                   </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <RoleGuard allowedRoles={[UserRole.ADMIN]}>
+                    <AppLayout>
+                      <Admin />
+                    </AppLayout>
+                  </RoleGuard>
                 </ProtectedRoute>
               }
             />
