@@ -227,7 +227,7 @@ async def delete_document(
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        if document.user_id and document.user_id != str(current_user.id):
+        if document.user_id and document.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Access denied")
 
         # Store filename for audit log
