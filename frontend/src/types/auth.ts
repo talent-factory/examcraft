@@ -71,6 +71,7 @@ export interface User {
   roles: Role[];
   status: UserStatus;
   is_superuser: boolean;
+  oauth_provider?: string;  // OAuth provider (google, microsoft, etc.)
   last_login?: string;
   created_at: string;
   updated_at?: string;
