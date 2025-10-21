@@ -138,6 +138,25 @@ class AuthService {
   }
 
   /**
+   * Set password for OAuth-only users
+   */
+  async setPassword(accessToken: string, password: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/set-password`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to set password');
+    }
+  }
+
+  /**
    * Change password
    */
   async changePassword(accessToken: string, data: ChangePasswordRequest): Promise<void> {

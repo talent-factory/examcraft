@@ -1,9 +1,9 @@
 /**
  * Password Change Component
- * Change user password
+ * Change user password or set password for OAuth-only users
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ChangePasswordRequest } from '../../types/auth';
 
@@ -13,7 +13,15 @@ interface PasswordChangeProps {
 }
 
 export const PasswordChange: React.FC<PasswordChangeProps> = ({ onCancel, onSuccess }) => {
-  const { changePassword, isLoading, error, clearError } = useAuth();
+  const { user, changePassword, setPassword, isLoading, error, clearError } = useAuth();
+
+  // Determine if user is OAuth-only (no password set)
+  const isOAuthOnly = useMemo(() => {
+    // Check if user has oauth_provider but no password_hash
+    // We can infer this from the fact that they logged in via OAuth
+    return user?.oauth_provider !== undefined && user?.oauth_provider !== null;
+  }, [user]);
+
   const [formData, setFormData] = useState<ChangePasswordRequest>({
     current_password: '',
     new_password: '',
@@ -29,9 +37,18 @@ export const PasswordChange: React.FC<PasswordChangeProps> = ({ onCancel, onSucc
   };
 
   const validateForm = (): boolean => {
-    if (!formData.current_password || !formData.new_password || !confirmPassword) {
-      setLocalError('Please fill in all fields');
-      return false;
+    if (isOAuthOnly) {
+      // For OAuth users, only validate new password
+      if (!formData.new_password || !confirmPassword) {
+        setLocalError('Please fill in all fields');
+        return false;
+      }
+    } else {
+      // For regular users, validate all fields
+      if (!formData.current_password || !formData.new_password || !confirmPassword) {
+        setLocalError('Please fill in all fields');
+        return false;
+      }
     }
 
     if (formData.new_password !== confirmPassword) {
@@ -44,7 +61,7 @@ export const PasswordChange: React.FC<PasswordChangeProps> = ({ onCancel, onSucc
       return false;
     }
 
-    if (formData.current_password === formData.new_password) {
+    if (!isOAuthOnly && formData.current_password === formData.new_password) {
       setLocalError('New password must be different from current password');
       return false;
     }
@@ -63,16 +80,22 @@ export const PasswordChange: React.FC<PasswordChangeProps> = ({ onCancel, onSucc
     }
 
     try {
-      await changePassword(formData);
+      if (isOAuthOnly) {
+        // Set password for OAuth-only users
+        await setPassword(formData.new_password);
+      } else {
+        // Change password for regular users
+        await changePassword(formData);
+      }
       setSuccess(true);
       setFormData({ current_password: '', new_password: '' });
       setConfirmPassword('');
-      
+
       setTimeout(() => {
         onSuccess?.();
       }, 2000);
     } catch (err) {
-      console.error('Password change failed:', err);
+      console.error('Password operation failed:', err);
     }
   };
 
@@ -85,10 +108,12 @@ export const PasswordChange: React.FC<PasswordChangeProps> = ({ onCancel, onSucc
           <div className="text-center">
             <div className="mb-4 text-green-600 text-5xl">✓</div>
             <h2 className="text-2xl font-bold mb-4 text-gray-800">
-              Password Changed Successfully
+              {isOAuthOnly ? 'Password Set Successfully' : 'Password Changed Successfully'}
             </h2>
             <p className="text-gray-600 mb-6">
-              Your password has been updated. You can now use your new password to login.
+              {isOAuthOnly
+                ? 'Your password has been set. You can now login with your email and password.'
+                : 'Your password has been updated. You can now use your new password to login.'}
             </p>
           </div>
         </div>
@@ -100,7 +125,14 @@ export const PasswordChange: React.FC<PasswordChangeProps> = ({ onCancel, onSucc
     <div className="bg-white shadow rounded-lg">
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800">Change Password</h2>
+        <h2 className="text-xl font-semibold text-gray-800">
+          {isOAuthOnly ? 'Set Password' : 'Change Password'}
+        </h2>
+        {isOAuthOnly && (
+          <p className="text-sm text-gray-600 mt-1">
+            You're currently logged in via {user?.oauth_provider}. Set a password to enable email/password login.
+          </p>
+        )}
       </div>
 
       {/* Form */}
@@ -112,28 +144,30 @@ export const PasswordChange: React.FC<PasswordChangeProps> = ({ onCancel, onSucc
         )}
 
         <div className="space-y-6">
-          {/* Current Password */}
-          <div>
-            <label
-              htmlFor="current_password"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Current Password *
-            </label>
-            <div className="relative">
-              <input
-                type={showPasswords ? 'text' : 'password'}
-                id="current_password"
-                name="current_password"
-                value={formData.current_password}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
-                disabled={isLoading}
-                required
-                autoComplete="current-password"
-              />
+          {/* Current Password - Only for non-OAuth users */}
+          {!isOAuthOnly && (
+            <div>
+              <label
+                htmlFor="current_password"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Current Password *
+              </label>
+              <div className="relative">
+                <input
+                  type={showPasswords ? 'text' : 'password'}
+                  id="current_password"
+                  name="current_password"
+                  value={formData.current_password}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
+                  disabled={isLoading}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* New Password */}
           <div>
@@ -248,7 +282,9 @@ export const PasswordChange: React.FC<PasswordChangeProps> = ({ onCancel, onSucc
             disabled={isLoading}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Changing...' : 'Change Password'}
+            {isLoading
+              ? (isOAuthOnly ? 'Setting...' : 'Changing...')
+              : (isOAuthOnly ? 'Set Password' : 'Change Password')}
           </button>
         </div>
       </form>

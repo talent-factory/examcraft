@@ -138,6 +138,10 @@ export interface RefreshTokenRequest {
   refresh_token: string;
 }
 
+export interface SetPasswordRequest {
+  password: string;
+}
+
 export interface ChangePasswordRequest {
   current_password: string;
   new_password: string;
@@ -168,6 +172,7 @@ export interface UserResponse {
   roles: Role[];
   status: UserStatus;
   is_superuser: boolean;
+  oauth_provider?: string;  // OAuth provider (google, microsoft, etc.)
   last_login?: string;
   created_at: string;
 }
@@ -191,6 +196,7 @@ export interface AuthContextType extends AuthState {
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
+  setPassword: (password: string) => Promise<void>;
   changePassword: (data: ChangePasswordRequest) => Promise<void>;
   clearError: () => void;
   hasPermission: (permission: string) => boolean;

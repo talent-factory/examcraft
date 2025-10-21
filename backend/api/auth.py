@@ -63,6 +63,11 @@ class PasswordResetConfirm(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=100)
 
 
+class SetPasswordRequest(BaseModel):
+    """Set password for OAuth-only users"""
+    password: str = Field(..., min_length=8, max_length=100)
+
+
 class PasswordChangeRequest(BaseModel):
     """Password change request (authenticated user)"""
     current_password: str
@@ -93,6 +98,7 @@ class UserProfileResponse(BaseModel):
     is_superuser: bool
     institution_id: Optional[int]
     institution_name: Optional[str]
+    oauth_provider: Optional[str] = None  # OAuth provider (google, microsoft, etc.)
     roles: list[RoleResponse]
     created_at: str
 
@@ -374,6 +380,7 @@ async def get_current_user_profile(
         is_superuser=current_user.is_superuser,
         institution_id=current_user.institution_id,
         institution_name=current_user.institution.name if current_user.institution else None,
+        oauth_provider=current_user.oauth_provider,
         roles=role_responses,
         created_at=current_user.created_at.isoformat()
     )
@@ -442,9 +449,45 @@ async def update_current_user_profile(
         is_superuser=current_user.is_superuser,
         institution_id=current_user.institution_id,
         institution_name=current_user.institution.name if current_user.institution else None,
+        oauth_provider=current_user.oauth_provider,
         roles=role_responses,
         created_at=current_user.created_at.isoformat()
     )
+
+
+@router.post("/set-password", status_code=status.HTTP_204_NO_CONTENT)
+async def set_password(
+    request: SetPasswordRequest,
+    http_request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Set password for OAuth-only users (no existing password)
+
+    - Only works if user has no password (OAuth-only)
+    - Allows email/password login after this
+    - Does NOT revoke sessions (user stays logged in)
+    """
+    from services.audit_service import AuditService
+
+    # Check if user already has a password
+    if current_user.password_hash is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User already has a password. Use /change-password instead."
+        )
+
+    # Set password
+    current_user.password_hash = AuthService.get_password_hash(request.password)
+    db.commit()
+
+    # Audit log: Password set for OAuth user
+    AuditService.log_password_change(db, current_user.id, success=True, request=http_request)
+
+    logger.info(f"Password set for OAuth user: {current_user.email} (ID: {current_user.id})")
+
+    return None
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

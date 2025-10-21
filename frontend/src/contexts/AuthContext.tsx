@@ -11,7 +11,8 @@ import {
   UserRole,
   RegisterRequest,
   UpdateProfileRequest,
-  ChangePasswordRequest
+  ChangePasswordRequest,
+  SetPasswordRequest
 } from '../types/auth';
 import AuthService from '../services/AuthService';
 
@@ -298,6 +299,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [state.accessToken]);
 
   /**
+   * Set password for OAuth-only users
+   */
+  const setPassword = useCallback(async (password: string) => {
+    try {
+      if (!state.accessToken) {
+        throw new Error('Not authenticated');
+      }
+
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+      await AuthService.setPassword(state.accessToken, password);
+
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+      }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to set password';
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage,
+      }));
+      throw error;
+    }
+  }, [state.accessToken]);
+
+  /**
    * Change password
    */
   const changePassword = useCallback(async (data: ChangePasswordRequest) => {
@@ -305,11 +334,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!state.accessToken) {
         throw new Error('Not authenticated');
       }
-      
+
       setState(prev => ({ ...prev, isLoading: true, error: null }));
-      
+
       await AuthService.changePassword(state.accessToken, data);
-      
+
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -368,6 +397,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     refreshAccessToken,
     updateProfile,
+    setPassword,
     changePassword,
     clearError,
     hasPermission,
