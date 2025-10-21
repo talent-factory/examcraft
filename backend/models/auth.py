@@ -216,12 +216,18 @@ class User(Base):
         import json
         for role in self.roles:
             if role.permissions:
-                # Parse permissions from JSON string to list
+                # Parse permissions from JSON string or set string to list
                 if isinstance(role.permissions, str):
                     try:
+                        # Try JSON format first
                         perms = json.loads(role.permissions)
                     except (json.JSONDecodeError, TypeError):
-                        perms = []
+                        # Try set format: {perm1,perm2,perm3}
+                        if role.permissions.startswith('{') and role.permissions.endswith('}'):
+                            perms_str = role.permissions[1:-1]  # Remove { }
+                            perms = [p.strip() for p in perms_str.split(',') if p.strip()]
+                        else:
+                            perms = []
                 elif isinstance(role.permissions, list):
                     perms = role.permissions
                 else:
