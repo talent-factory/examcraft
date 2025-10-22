@@ -37,7 +37,7 @@ import {
   Psychology,
   Timeline,
   CheckCircle,
-  Error,
+  Error as ErrorIcon,
   Schedule,
   CloudUpload,
   PlayArrow
@@ -114,7 +114,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       case DocumentStatus.PROCESSED:
         return <Chip icon={<CheckCircle />} label="Verarbeitet" color="success" size="small" />;
       case DocumentStatus.ERROR:
-        return <Chip icon={<Error />} label="Fehler" color="error" size="small" />;
+        return <Chip icon={<ErrorIcon />} label="Fehler" color="error" size="small" />;
       default:
         return <Chip label="Unbekannt" color="default" size="small" />;
     }
