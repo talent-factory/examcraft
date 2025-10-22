@@ -36,7 +36,7 @@ services:
     environment:
       # Premium Feature Flags
       ENABLE_PREMIUM_FEATURES: "true"
-      DEFAULT_SUBSCRIPTION_TIER: starter
+      DEFAULT_SUBSCRIPTION_TIER: professional
       
       # Vector Database (Qdrant only - ChromaDB removed after migration)
       VECTOR_SERVICE_TYPE: qdrant
