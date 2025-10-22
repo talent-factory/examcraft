@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { PackageTierBadge } from './PackageTierBadge';
 
 export const NavigationBar: React.FC = () => {
   const { user, logout } = useAuth();
@@ -22,10 +23,12 @@ export const NavigationBar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 flex items-center space-x-4">
             <Link to="/dashboard" className="text-2xl font-bold text-primary-600 hover:text-primary-700 transition-colors">
               ExamCraft AI
             </Link>
+            {/* Package Tier Badge */}
+            <PackageTierBadge />
           </div>
 
           {/* User Menu */}
