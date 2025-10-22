@@ -7,13 +7,14 @@ Create Date: 2025-10-21 19:00:00.000000
 Fügt features_enabled Array-Spalte hinzu und aktualisiert Quotas
 gemäß TF-116 Monetarisierungsstrategie (Free Tier: 5 docs, 20 questions/month, 1 user)
 """
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '013'
-down_revision = '012'
+revision = "013"
+down_revision = "012"
 branch_labels = None
 depends_on = None
 
@@ -21,33 +22,33 @@ depends_on = None
 def upgrade() -> None:
     # Add features_enabled column (ARRAY of strings for manual feature overrides)
     op.add_column(
-        'institutions',
-        sa.Column('features_enabled', postgresql.ARRAY(sa.String()), nullable=True)
+        "institutions",
+        sa.Column("features_enabled", postgresql.ARRAY(sa.String()), nullable=True),
     )
 
     # Update default quotas to match Free Tier (TF-116)
     op.alter_column(
-        'institutions',
-        'max_documents',
-        server_default='5',
+        "institutions",
+        "max_documents",
+        server_default="5",
         existing_type=sa.Integer(),
-        existing_nullable=False
+        existing_nullable=False,
     )
 
     op.alter_column(
-        'institutions',
-        'max_questions_per_month',
-        server_default='20',
+        "institutions",
+        "max_questions_per_month",
+        server_default="20",
         existing_type=sa.Integer(),
-        existing_nullable=False
+        existing_nullable=False,
     )
 
     op.alter_column(
-        'institutions',
-        'max_users',
-        server_default='1',
+        "institutions",
+        "max_users",
+        server_default="1",
         existing_type=sa.Integer(),
-        existing_nullable=False
+        existing_nullable=False,
     )
 
     # Update existing institutions to Free Tier defaults (if they have old values)
@@ -73,28 +74,28 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Revert quota defaults to old values
     op.alter_column(
-        'institutions',
-        'max_users',
-        server_default='5',
+        "institutions",
+        "max_users",
+        server_default="5",
         existing_type=sa.Integer(),
-        existing_nullable=False
+        existing_nullable=False,
     )
 
     op.alter_column(
-        'institutions',
-        'max_questions_per_month',
-        server_default='500',
+        "institutions",
+        "max_questions_per_month",
+        server_default="500",
         existing_type=sa.Integer(),
-        existing_nullable=False
+        existing_nullable=False,
     )
 
     op.alter_column(
-        'institutions',
-        'max_documents',
-        server_default='100',
+        "institutions",
+        "max_documents",
+        server_default="100",
         existing_type=sa.Integer(),
-        existing_nullable=False
+        existing_nullable=False,
     )
 
     # Drop features_enabled column
-    op.drop_column('institutions', 'features_enabled')
+    op.drop_column("institutions", "features_enabled")

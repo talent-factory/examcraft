@@ -14,11 +14,14 @@ from main import app
 
 # Test Database Configuration
 # Verwende 'postgres' als Host im Docker-Netzwerk, 'localhost' außerhalb
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres")  # Docker: postgres, Lokal: localhost
+POSTGRES_HOST = os.getenv(
+    "POSTGRES_HOST", "postgres"
+)  # Docker: postgres, Lokal: localhost
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    f"postgresql://examcraft:examcraft_dev@{POSTGRES_HOST}:5432/examcraft_test"
+    f"postgresql://examcraft:examcraft_dev@{POSTGRES_HOST}:5432/examcraft_test",
 )
+
 
 # Test Database Setup
 @pytest.fixture(scope="session")
@@ -30,21 +33,23 @@ def test_engine():
     Die Datenbank wird vor jedem Test-Run neu erstellt.
     """
     # Erstelle Engine für postgres Database (um Test-DB zu erstellen/löschen)
-    admin_url = TEST_DATABASE_URL.rsplit('/', 1)[0] + '/postgres'
+    admin_url = TEST_DATABASE_URL.rsplit("/", 1)[0] + "/postgres"
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
 
     # Extrahiere Test-DB Namen
-    test_db_name = TEST_DATABASE_URL.split('/')[-1]
+    test_db_name = TEST_DATABASE_URL.split("/")[-1]
 
     # Lösche Test-DB falls vorhanden und erstelle neu
     with admin_engine.connect() as conn:
         # Beende alle Verbindungen zur Test-DB
-        conn.execute(text(f"""
+        conn.execute(
+            text(f"""
             SELECT pg_terminate_backend(pg_stat_activity.pid)
             FROM pg_stat_activity
             WHERE pg_stat_activity.datname = '{test_db_name}'
             AND pid <> pg_backend_pid()
-        """))
+        """)
+        )
 
         # Lösche Test-DB
         conn.execute(text(f"DROP DATABASE IF EXISTS {test_db_name}"))
@@ -67,14 +72,17 @@ def test_engine():
 
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
     with admin_engine.connect() as conn:
-        conn.execute(text(f"""
+        conn.execute(
+            text(f"""
             SELECT pg_terminate_backend(pg_stat_activity.pid)
             FROM pg_stat_activity
             WHERE pg_stat_activity.datname = '{test_db_name}'
             AND pid <> pg_backend_pid()
-        """))
+        """)
+        )
         conn.execute(text(f"DROP DATABASE IF EXISTS {test_db_name}"))
     admin_engine.dispose()
+
 
 @pytest.fixture(scope="function")
 def test_db(test_engine):
@@ -87,7 +95,9 @@ def test_db(test_engine):
     connection = test_engine.connect()
     transaction = connection.begin()
 
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=connection)
+    TestingSessionLocal = sessionmaker(
+        autocommit=False, autoflush=False, bind=connection
+    )
     session = TestingSessionLocal()
 
     yield session
@@ -97,11 +107,13 @@ def test_db(test_engine):
     transaction.rollback()
     connection.close()
 
+
 @pytest.fixture(scope="function")
 def client():
     """FastAPI Test Client"""
     with TestClient(app) as test_client:
         yield test_client
+
 
 @pytest.fixture(scope="function")
 def temp_upload_dir():
@@ -109,39 +121,40 @@ def temp_upload_dir():
     with tempfile.TemporaryDirectory() as temp_dir:
         yield temp_dir
 
+
 @pytest.fixture(scope="function")
 def sample_text_file():
     """Erstelle temporäre Test-Textdatei"""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write("Dies ist ein Test-Dokument für Unit Tests.\n")
         f.write("Es enthält mehrere Zeilen Text.\n")
         f.write("Perfekt für Testing-Zwecke.")
         temp_path = f.name
-    
+
     yield temp_path
-    
+
     # Cleanup
     if os.path.exists(temp_path):
         os.remove(temp_path)
+
 
 @pytest.fixture(scope="function")
 def sample_pdf_content():
     """Mock PDF-Inhalt für Tests"""
     return b"%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n"
 
+
 @pytest.fixture(scope="function")
 def mock_upload_file():
     """Mock UploadFile für Tests"""
     from io import BytesIO
     from fastapi import UploadFile
-    
+
     content = b"Test file content for upload testing"
     file_obj = BytesIO(content)
-    
+
     upload_file = UploadFile(
-        filename="test_document.txt",
-        file=file_obj,
-        size=len(content)
+        filename="test_document.txt", file=file_obj, size=len(content)
     )
-    
+
     return upload_file

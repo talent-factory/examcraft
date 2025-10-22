@@ -9,6 +9,7 @@ from typing import Dict, List
 
 class SubscriptionTier(str, Enum):
     """Subscription Tiers für Freemium-Modell"""
+
     FREE = "free"
     STARTER = "starter"
     PROFESSIONAL = "professional"
@@ -53,7 +54,6 @@ TIER_FEATURES: Dict[SubscriptionTier, List[Feature]] = {
         Feature.BASIC_QUESTION_GENERATION,
         Feature.DOCUMENT_LIBRARY,
     ],
-
     SubscriptionTier.STARTER: [
         # Free Features
         Feature.DOCUMENT_UPLOAD,
@@ -64,7 +64,6 @@ TIER_FEATURES: Dict[SubscriptionTier, List[Feature]] = {
         Feature.PROMPT_TEMPLATES,
         Feature.BATCH_PROCESSING,
     ],
-
     SubscriptionTier.PROFESSIONAL: [
         # Free + Starter Features
         Feature.DOCUMENT_UPLOAD,
@@ -80,7 +79,6 @@ TIER_FEATURES: Dict[SubscriptionTier, List[Feature]] = {
         Feature.QUESTION_REVIEW_WORKFLOW,
         Feature.EXPORT_FORMATS,
     ],
-
     SubscriptionTier.ENTERPRISE: [
         # All Features
         Feature.DOCUMENT_UPLOAD,
@@ -103,7 +101,7 @@ TIER_FEATURES: Dict[SubscriptionTier, List[Feature]] = {
         Feature.LDAP_INTEGRATION,
         Feature.AUDIT_LOGS,
         Feature.MULTI_ORGANIZATION,
-    ]
+    ],
 }
 
 
@@ -115,27 +113,24 @@ TIER_QUOTAS: Dict[SubscriptionTier, Dict[str, int]] = {
         "max_users": 1,
         "max_institutions": 1,
     },
-
     SubscriptionTier.STARTER: {
         "max_documents": 50,
         "max_questions_per_month": 200,
         "max_users": 3,
         "max_institutions": 1,
     },
-
     SubscriptionTier.PROFESSIONAL: {
         "max_documents": -1,  # Unlimited
         "max_questions_per_month": 1000,
         "max_users": 10,
         "max_institutions": 3,
     },
-
     SubscriptionTier.ENTERPRISE: {
         "max_documents": -1,  # Unlimited
         "max_questions_per_month": -1,  # Unlimited
         "max_users": -1,  # Unlimited
         "max_institutions": -1,  # Unlimited
-    }
+    },
 }
 
 

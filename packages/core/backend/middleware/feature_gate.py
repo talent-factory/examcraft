@@ -5,11 +5,17 @@ Ermöglicht Feature-basierte Zugriffskontrolle auf Basis des Subscription Tiers
 
 from functools import wraps
 from typing import Callable, Optional
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from backend.config.features import Feature, SubscriptionTier, has_feature, get_quota, is_unlimited
-from backend.models.auth import User, Institution
+from backend.config.features import (
+    Feature,
+    SubscriptionTier,
+    has_feature,
+    get_quota,
+    is_unlimited,
+)
+from backend.models.auth import User
 
 
 class FeatureGateException(HTTPException):
@@ -19,7 +25,7 @@ class FeatureGateException(HTTPException):
         self,
         feature: Feature,
         user_tier: SubscriptionTier,
-        required_tier: Optional[SubscriptionTier] = None
+        required_tier: Optional[SubscriptionTier] = None,
     ):
         detail = (
             f"Feature '{feature.value}' ist nicht in Ihrem aktuellen Plan "
@@ -31,10 +37,7 @@ class FeatureGateException(HTTPException):
         else:
             detail += "Bitte upgraden Sie Ihren Plan."
 
-        super().__init__(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=detail
-        )
+        super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
 
 class QuotaExceededException(HTTPException):
@@ -45,7 +48,7 @@ class QuotaExceededException(HTTPException):
         quota_name: str,
         current_usage: int,
         limit: int,
-        user_tier: SubscriptionTier
+        user_tier: SubscriptionTier,
     ):
         detail = (
             f"Quota '{quota_name}' überschritten: "
@@ -54,10 +57,7 @@ class QuotaExceededException(HTTPException):
             f"Bitte upgraden Sie Ihren Plan für höhere Limits."
         )
 
-        super().__init__(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=detail
-        )
+        super().__init__(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=detail)
 
 
 def get_user_tier(user: User) -> SubscriptionTier:
@@ -119,12 +119,12 @@ def require_feature(feature: Feature):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
             # Extrahiere User aus kwargs
-            user = kwargs.get('user') or kwargs.get('current_user')
+            user = kwargs.get("user") or kwargs.get("current_user")
 
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Authentication required"
+                    detail="Authentication required",
                 )
 
             # Prüfe Feature-Zugriff
@@ -137,12 +137,12 @@ def require_feature(feature: Feature):
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             # Extrahiere User aus kwargs
-            user = kwargs.get('user') or kwargs.get('current_user')
+            user = kwargs.get("user") or kwargs.get("current_user")
 
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Authentication required"
+                    detail="Authentication required",
                 )
 
             # Prüfe Feature-Zugriff
@@ -154,6 +154,7 @@ def require_feature(feature: Feature):
 
         # Return async oder sync wrapper basierend auf Funktion
         import inspect
+
         if inspect.iscoroutinefunction(func):
             return async_wrapper
         else:
@@ -163,10 +164,7 @@ def require_feature(feature: Feature):
 
 
 def check_quota(
-    user: User,
-    quota_name: str,
-    current_usage: int,
-    increment: int = 1
+    user: User, quota_name: str, current_usage: int, increment: int = 1
 ) -> bool:
     """
     Prüft ob ein Quota-Limit überschritten würde
@@ -223,13 +221,13 @@ def require_quota(quota_name: str, increment: int = 1):
     def decorator(func: Callable):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
-            user = kwargs.get('user') or kwargs.get('current_user')
-            db = kwargs.get('db')
+            user = kwargs.get("user") or kwargs.get("current_user")
+            db = kwargs.get("db")
 
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Authentication required"
+                    detail="Authentication required",
                 )
 
             # Ermittle current_usage basierend auf quota_name
@@ -242,13 +240,13 @@ def require_quota(quota_name: str, increment: int = 1):
 
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
-            user = kwargs.get('user') or kwargs.get('current_user')
-            db = kwargs.get('db')
+            user = kwargs.get("user") or kwargs.get("current_user")
+            db = kwargs.get("db")
 
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Authentication required"
+                    detail="Authentication required",
                 )
 
             # Ermittle current_usage basierend auf quota_name
@@ -260,6 +258,7 @@ def require_quota(quota_name: str, increment: int = 1):
             return func(*args, **kwargs)
 
         import inspect
+
         if inspect.iscoroutinefunction(func):
             return async_wrapper
         else:
@@ -284,14 +283,15 @@ def get_current_usage(db: Session, user: User, quota_name: str) -> int:
     # Beispiel für max_documents:
     if quota_name == "max_documents":
         from backend.models.document import Document
-        return db.query(Document).filter(
-            Document.institution_id == user.institution_id
-        ).count()
+
+        return (
+            db.query(Document)
+            .filter(Document.institution_id == user.institution_id)
+            .count()
+        )
 
     elif quota_name == "max_users":
-        return db.query(User).filter(
-            User.institution_id == user.institution_id
-        ).count()
+        return db.query(User).filter(User.institution_id == user.institution_id).count()
 
     # Fallback
     return 0

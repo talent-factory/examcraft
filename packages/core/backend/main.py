@@ -5,12 +5,12 @@ KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
+from middleware.rate_limit import RateLimitMiddleware
 
 # Load environment variables
 load_dotenv()
@@ -18,11 +18,13 @@ load_dotenv()
 # Lazy-loaded services (to reduce memory at startup)
 _claude_service = None
 
+
 def get_claude_service():
     """Lazy-load Claude service only when needed"""
     global _claude_service
     if _claude_service is None:
         from services.claude_service import ClaudeService
+
         _claude_service = ClaudeService()
     return _claude_service
 
@@ -36,11 +38,13 @@ async def lifespan(app: FastAPI):
     """
     # Startup: Initialize database tables
     from database import create_tables, SessionLocal
+
     create_tables()
 
     # Startup: Seed default roles
     try:
         from utils.seed_roles import seed_default_roles
+
         db = SessionLocal()
         try:
             created, updated = seed_default_roles(db)
@@ -67,20 +71,25 @@ async def lifespan(app: FastAPI):
     # (happens when backend restarts during document processing)
     try:
         from models.document import Document, DocumentStatus
+
         db = SessionLocal()
         try:
-            processing_docs = db.query(Document).filter(
-                Document.status == DocumentStatus.PROCESSING
-            ).all()
+            processing_docs = (
+                db.query(Document)
+                .filter(Document.status == DocumentStatus.PROCESSING)
+                .all()
+            )
 
             if processing_docs:
-                print(f"⚠️  Found {len(processing_docs)} documents stuck in PROCESSING status")
+                print(
+                    f"⚠️  Found {len(processing_docs)} documents stuck in PROCESSING status"
+                )
                 for doc in processing_docs:
                     print(f"   - Resetting {doc.original_filename} (ID: {doc.id})")
                     doc.status = DocumentStatus.UPLOADED
                     doc.doc_metadata = doc.doc_metadata or {}
                     if isinstance(doc.doc_metadata, dict):
-                        doc.doc_metadata['reset_at_startup'] = True
+                        doc.doc_metadata["reset_at_startup"] = True
 
                 db.commit()
                 print(f"✅ Reset {len(processing_docs)} documents to UPLOADED status")
@@ -102,11 +111,13 @@ app = FastAPI(
     version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # CORS middleware - Production-ready configuration
-cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
+cors_origins_str = os.getenv(
+    "CORS_ORIGINS", "http://localhost:3000,http://localhost:8000"
+)
 cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
 # Wenn "*" in den Origins ist, setze allow_credentials auf False
@@ -122,7 +133,6 @@ app.add_middleware(
 )
 
 # Rate Limiting middleware
-from middleware.rate_limit import RateLimitMiddleware
 rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
 requests_per_minute = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
 requests_per_hour = int(os.getenv("RATE_LIMIT_PER_HOUR", "1000"))
@@ -131,8 +141,9 @@ app.add_middleware(
     RateLimitMiddleware,
     requests_per_minute=requests_per_minute,
     requests_per_hour=requests_per_hour,
-    enabled=rate_limit_enabled
+    enabled=rate_limit_enabled,
 )
+
 
 # Pydantic models
 class ExamRequest(BaseModel):
@@ -141,6 +152,7 @@ class ExamRequest(BaseModel):
     question_count: int = 5
     question_types: List[str] = ["multiple_choice", "open_ended"]
     language: str = "de"
+
 
 class Question(BaseModel):
     id: str
@@ -152,12 +164,14 @@ class Question(BaseModel):
     difficulty: str
     topic: str
 
+
 class ExamResponse(BaseModel):
     exam_id: str
     topic: str
     questions: List[Question]
     created_at: str
     metadata: dict
+
 
 # Health check endpoint
 @app.get("/")
@@ -167,8 +181,9 @@ async def root():
         "message": "ExamCraft AI API",
         "status": "running",
         "version": "0.1.0",
-        "docs": "/docs"
+        "docs": "/docs",
     }
+
 
 @app.get("/health")
 async def health_check():
@@ -184,7 +199,7 @@ async def health_check():
         with open(pyproject_path, "rb") as f:
             pyproject = tomllib.load(f)
             version = pyproject.get("project", {}).get("version", "unknown")
-    except Exception as e:
+    except Exception:
         # Fallback to default version
         version = "0.1.0"
 
@@ -194,6 +209,7 @@ async def health_check():
     # Get actual processor in use
     try:
         from services.document_processors.processor_factory import document_processor
+
         processor_class = document_processor.__class__.__name__
     except Exception:
         processor_class = "unknown"
@@ -207,12 +223,10 @@ async def health_check():
         "version": version,
         "environment": os.getenv("ENVIRONMENT", "development"),
         "build_timestamp": build_timestamp,
-        "processor": {
-            "configured": processor_type,
-            "active": processor_class
-        },
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "processor": {"configured": processor_type, "active": processor_class},
+        "timestamp": datetime.utcnow().isoformat() + "Z",
     }
+
 
 @app.get("/api/v1/health")
 async def api_health_check():
@@ -225,12 +239,13 @@ async def api_health_check():
         "status": "healthy",
         "version": "1.0.0",
         "environment": os.getenv("ENVIRONMENT", "development"),
-        "services": {}
+        "services": {},
     }
 
     # Check Database
     try:
         from sqlalchemy import text
+
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         health_status["services"]["database"] = "connected"
@@ -254,7 +269,9 @@ async def api_health_check():
         stats = vector_service.get_collection_stats()
         if stats and isinstance(stats, dict):
             health_status["services"]["vector_db"] = "connected"
-            health_status["services"]["vector_db_type"] = os.getenv("VECTOR_SERVICE_TYPE", "qdrant")
+            health_status["services"]["vector_db_type"] = os.getenv(
+                "VECTOR_SERVICE_TYPE", "qdrant"
+            )
         else:
             health_status["services"]["vector_db"] = "available"
     except Exception as e:
@@ -262,32 +279,37 @@ async def api_health_check():
         health_status["status"] = "degraded"
 
     # Check Claude API
-    health_status["services"]["claude_api"] = "configured" if os.getenv("CLAUDE_API_KEY") else "not_configured"
+    health_status["services"]["claude_api"] = (
+        "configured" if os.getenv("CLAUDE_API_KEY") else "not_configured"
+    )
 
     # Check Document Processor
     processor_type = os.getenv("DOCUMENT_PROCESSOR_TYPE", "auto")
     try:
         from services.document_processors.processor_factory import document_processor
+
         processor_class = document_processor.__class__.__name__
         health_status["services"]["document_processor"] = {
             "configured": processor_type,
-            "active": processor_class
+            "active": processor_class,
         }
     except Exception as e:
         health_status["services"]["document_processor"] = {
             "configured": processor_type,
             "active": "error",
-            "error": str(e)
+            "error": str(e),
         }
         health_status["status"] = "degraded"
 
     return health_status
+
 
 @app.get("/api/v1/claude/usage")
 async def get_claude_usage():
     """Get Claude API usage statistics"""
     claude_service = get_claude_service()
     return claude_service.get_usage_stats()
+
 
 @app.get("/api/v1/claude/health")
 async def get_claude_health():
@@ -300,8 +322,9 @@ async def get_claude_health():
         "demo_mode": stats["demo_mode"],
         "api_key_configured": bool(claude_service.api_key),
         "model": claude_service.model,
-        "usage": stats
+        "usage": stats,
     }
+
 
 # Demo endpoints for Workshop
 @app.post("/api/v1/generate-exam", response_model=ExamResponse)
@@ -318,24 +341,24 @@ async def generate_exam(request: ExamRequest):
             difficulty=request.difficulty,
             question_count=request.question_count,
             question_types=request.question_types,
-            language=request.language
+            language=request.language,
         )
-        
+
         # Convert to Question objects
         questions = []
         for i, q_data in enumerate(question_data):
             question = Question(
-                id=q_data.get("id", f"q{i+1}"),
+                id=q_data.get("id", f"q{i + 1}"),
                 type=q_data.get("type", "multiple_choice"),
                 question=q_data.get("question", ""),
                 options=q_data.get("options"),
                 correct_answer=q_data.get("correct_answer"),
                 explanation=q_data.get("explanation"),
                 difficulty=q_data.get("difficulty", request.difficulty),
-                topic=q_data.get("topic", request.topic)
+                topic=q_data.get("topic", request.topic),
             )
             questions.append(question)
-        
+
         exam_response = ExamResponse(
             exam_id=f"exam_{hash(request.topic + str(request.question_count))}",
             topic=request.topic,
@@ -345,14 +368,17 @@ async def generate_exam(request: ExamRequest):
                 "difficulty": request.difficulty,
                 "question_count": len(questions),
                 "language": request.language,
-                "generated_by": "ExamCraft AI with Claude" if get_claude_service().api_key else "ExamCraft AI Demo"
-            }
+                "generated_by": "ExamCraft AI with Claude"
+                if get_claude_service().api_key
+                else "ExamCraft AI Demo",
+            },
         )
-        
+
         return exam_response
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating exam: {str(e)}")
+
 
 @app.get("/api/v1/topics")
 async def get_available_topics():
@@ -366,9 +392,10 @@ async def get_available_topics():
             "Machine Learning",
             "Softwarearchitektur",
             "Projektmanagement",
-            "Cybersecurity"
+            "Cybersecurity",
         ]
     }
+
 
 @app.get("/api/v1/exam/{exam_id}")
 async def get_exam(exam_id: str):
@@ -379,11 +406,13 @@ async def get_exam(exam_id: str):
             "exam_id": exam_id,
             "status": "completed",
             "topic": "Demo Topic",
-            "created_at": "2025-09-22T12:53:00Z"
+            "created_at": "2025-09-22T12:53:00Z",
         }
     else:
         raise HTTPException(status_code=404, detail="Exam not found")
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

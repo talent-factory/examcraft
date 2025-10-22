@@ -5,13 +5,13 @@ Revises: 008_add_institution_id_to_documents
 Create Date: 2025-10-21 10:05:00.000000
 
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '009'
-down_revision = '008'
+revision = "009"
+down_revision = "008"
 branch_labels = None
 depends_on = None
 
@@ -33,22 +33,21 @@ def upgrade() -> None:
 
     # Add the foreign key constraint
     op.create_foreign_key(
-        'documents_user_id_fkey',
-        'documents',
-        'users',
-        ['user_id'],
-        ['id'],
-        ondelete='CASCADE'
+        "documents_user_id_fkey",
+        "documents",
+        "users",
+        ["user_id"],
+        ["id"],
+        ondelete="CASCADE",
     )
 
 
 def downgrade() -> None:
     # Drop the foreign key constraint
-    op.drop_constraint('documents_user_id_fkey', 'documents', type_='foreignkey')
+    op.drop_constraint("documents_user_id_fkey", "documents", type_="foreignkey")
 
     # Alter the column type back to VARCHAR
     op.execute("""
         ALTER TABLE documents
         ALTER COLUMN user_id TYPE VARCHAR(100)
     """)
-

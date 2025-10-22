@@ -3,7 +3,7 @@ RBAC API Endpoints für ExamCraft AI
 REST API für RBAC Management (Roles, Features, Permissions, Quotas)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel, Field
@@ -13,7 +13,7 @@ from database import get_db
 from services.rbac_service import RBACService
 from utils.auth_utils import get_current_user
 from models.auth import User
-from models.rbac import Feature, RBACRole, SubscriptionTier, TierQuota, ResourceUsage
+from models.rbac import Feature, RBACRole, SubscriptionTier, TierQuota
 
 router = APIRouter(prefix="/api/v1/rbac", tags=["RBAC"])
 
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/api/v1/rbac", tags=["RBAC"])
 # PYDANTIC SCHEMAS
 # ============================================
 
+
 class FeatureResponse(BaseModel):
     id: str
     name: str
@@ -29,7 +30,7 @@ class FeatureResponse(BaseModel):
     description: Optional[str]
     category: Optional[str]
     is_active: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -42,7 +43,7 @@ class RoleResponse(BaseModel):
     is_system_role: bool
     is_active: bool
     features: List[FeatureResponse] = []
-    
+
     class Config:
         from_attributes = True
 
@@ -67,7 +68,7 @@ class SubscriptionTierResponse(BaseModel):
     price_yearly: float
     is_active: bool
     sort_order: int
-    
+
     class Config:
         from_attributes = True
 
@@ -76,7 +77,7 @@ class TierQuotaResponse(BaseModel):
     tier_id: str
     resource_type: str
     quota_limit: int
-    
+
     class Config:
         from_attributes = True
 
@@ -96,7 +97,7 @@ class ResourceUsageResponse(BaseModel):
     usage_count: int
     period_start: datetime
     period_end: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -105,25 +106,26 @@ class ResourceUsageResponse(BaseModel):
 # FEATURE ENDPOINTS
 # ============================================
 
+
 @router.get("/features", response_model=List[FeatureResponse])
 async def list_features(
     category: Optional[str] = None,
     active_only: bool = True,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Listet alle verfügbaren Features auf.
     Optional filterbar nach Kategorie.
     """
     query = db.query(Feature)
-    
+
     if category:
         query = query.filter(Feature.category == category)
-    
+
     if active_only:
-        query = query.filter(Feature.is_active == True)
-    
+        query = query.filter(Feature.is_active)
+
     features = query.all()
     return features
 
@@ -132,7 +134,7 @@ async def list_features(
 async def get_feature(
     feature_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Gibt Details zu einem spezifischen Feature zurück.
@@ -147,30 +149,30 @@ async def get_feature(
 # ROLE ENDPOINTS
 # ============================================
 
+
 @router.get("/roles", response_model=List[RoleResponse])
 async def list_roles(
     include_system_roles: bool = True,
     include_inactive: bool = False,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Listet alle Rollen auf.
     """
     rbac_service = RBACService(db)
     roles = rbac_service.list_roles(
-        include_system_roles=include_system_roles,
-        include_inactive=include_inactive
+        include_system_roles=include_system_roles, include_inactive=include_inactive
     )
-    
+
     # Features für jede Rolle laden
     result = []
     for role in roles:
         features = rbac_service.get_role_features(role.id)
         role_dict = RoleResponse.from_orm(role).dict()
-        role_dict['features'] = [FeatureResponse.from_orm(f) for f in features]
+        role_dict["features"] = [FeatureResponse.from_orm(f) for f in features]
         result.append(role_dict)
-    
+
     return result
 
 
@@ -178,7 +180,7 @@ async def list_roles(
 async def get_role(
     role_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Gibt Details zu einer spezifischen Rolle zurück.
@@ -186,12 +188,12 @@ async def get_role(
     role = db.query(RBACRole).filter(RBACRole.id == role_id).first()
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
-    
+
     rbac_service = RBACService(db)
     features = rbac_service.get_role_features(role.id)
-    
+
     role_dict = RoleResponse.from_orm(role).dict()
-    role_dict['features'] = [FeatureResponse.from_orm(f) for f in features]
+    role_dict["features"] = [FeatureResponse.from_orm(f) for f in features]
     return role_dict
 
 
@@ -199,7 +201,7 @@ async def get_role(
 async def create_role(
     request: CreateRoleRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Erstellt eine neue Custom-Rolle.
@@ -207,19 +209,19 @@ async def create_role(
     """
     # TODO: Check if user is admin
     rbac_service = RBACService(db)
-    
+
     try:
         role = rbac_service.create_custom_role(
             name=request.name,
             display_name=request.display_name,
             description=request.description,
             feature_ids=request.feature_ids,
-            created_by=current_user.id
+            created_by=current_user.id,
         )
-        
+
         features = rbac_service.get_role_features(role.id)
         role_dict = RoleResponse.from_orm(role).dict()
-        role_dict['features'] = [FeatureResponse.from_orm(f) for f in features]
+        role_dict["features"] = [FeatureResponse.from_orm(f) for f in features]
         return role_dict
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -230,7 +232,7 @@ async def update_role_features(
     role_id: str,
     request: UpdateRoleFeaturesRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Aktualisiert die Features einer Rolle.
@@ -238,16 +240,15 @@ async def update_role_features(
     """
     # TODO: Check if user is admin
     rbac_service = RBACService(db)
-    
+
     try:
         role = rbac_service.update_role_features(
-            role_id=role_id,
-            feature_ids=request.feature_ids
+            role_id=role_id, feature_ids=request.feature_ids
         )
-        
+
         features = rbac_service.get_role_features(role.id)
         role_dict = RoleResponse.from_orm(role).dict()
-        role_dict['features'] = [FeatureResponse.from_orm(f) for f in features]
+        role_dict["features"] = [FeatureResponse.from_orm(f) for f in features]
         return role_dict
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -257,29 +258,26 @@ async def update_role_features(
 # SUBSCRIPTION TIER ENDPOINTS
 # ============================================
 
+
 @router.get("/tiers", response_model=List[SubscriptionTierResponse])
 async def list_subscription_tiers(
-    active_only: bool = True,
-    db: Session = Depends(get_db)
+    active_only: bool = True, db: Session = Depends(get_db)
 ):
     """
     Listet alle Subscription Tiers auf.
     Öffentlicher Endpoint (kein Auth erforderlich).
     """
     query = db.query(SubscriptionTier)
-    
+
     if active_only:
-        query = query.filter(SubscriptionTier.is_active == True)
-    
+        query = query.filter(SubscriptionTier.is_active)
+
     tiers = query.order_by(SubscriptionTier.sort_order).all()
     return tiers
 
 
 @router.get("/tiers/{tier_id}/quotas", response_model=List[TierQuotaResponse])
-async def get_tier_quotas(
-    tier_id: str,
-    db: Session = Depends(get_db)
-):
+async def get_tier_quotas(tier_id: str, db: Session = Depends(get_db)):
     """
     Gibt alle Quotas für einen Subscription Tier zurück.
     Öffentlicher Endpoint (kein Auth erforderlich).
@@ -292,22 +290,21 @@ async def get_tier_quotas(
 # PERMISSION & QUOTA CHECK ENDPOINTS
 # ============================================
 
+
 @router.get("/check-permission/{feature_name}")
 async def check_feature_permission(
     feature_name: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Prüft ob der aktuelle User Zugriff auf ein Feature hat.
     """
     rbac_service = RBACService(db)
     has_access = rbac_service.user_has_feature_access(
-        user_id=current_user.id,
-        feature_name=feature_name,
-        log_access=False
+        user_id=current_user.id, feature_name=feature_name, log_access=False
     )
-    
+
     return {"has_access": has_access, "feature": feature_name}
 
 
@@ -316,20 +313,19 @@ async def check_resource_quota(
     resource_type: str,
     requested_amount: int = 1,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Prüft ob die Institution des Users noch Quota verfügbar hat.
     """
     if not current_user.institution_id:
         raise HTTPException(status_code=400, detail="User has no institution")
-    
+
     rbac_service = RBACService(db)
     quota_check = rbac_service.check_resource_quota(
         institution_id=current_user.institution_id,
         resource_type=resource_type,
-        requested_amount=requested_amount
+        requested_amount=requested_amount,
     )
-    
-    return quota_check
 
+    return quota_check

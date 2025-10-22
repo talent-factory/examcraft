@@ -18,6 +18,7 @@ class TestGDPREndpoints:
         """Test that GDPR module can be imported"""
         try:
             from api import gdpr
+
             assert gdpr.router is not None
             assert gdpr.router.prefix == "/api/v1/gdpr"
         except ImportError as e:
@@ -44,7 +45,6 @@ class TestGDPREndpoints:
         # All routes should require authentication (have dependencies)
         for route in gdpr.router.routes:
             # Check if route has dependencies (authentication)
-            if hasattr(route, 'dependant'):
+            if hasattr(route, "dependant"):
                 # Routes with dependencies are protected
                 assert route.dependant is not None
-

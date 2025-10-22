@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
-from services.rag_service import rag_service, RAGExamRequest, RAGExamResponse, RAGQuestion, RAGContext
+from services.rag_service import rag_service, RAGExamRequest
 from services.document_service import document_service
 from models.auth import User
 from utils.auth_utils import get_current_active_user, require_permission
@@ -23,32 +23,42 @@ router = APIRouter(prefix="/api/v1/rag", tags=["RAG Exams"])
 # Pydantic Models
 class PromptConfig(BaseModel):
     """Konfiguration für einen Prompt"""
+
     prompt_id: str = Field(..., description="Prompt UUID")
-    variables: Optional[Dict[str, Any]] = Field(None, description="Template-Variablen für den Prompt")
+    variables: Optional[Dict[str, Any]] = Field(
+        None, description="Template-Variablen für den Prompt"
+    )
 
 
 class RAGExamRequestModel(BaseModel):
     """Request Model für RAG-basierte Prüfungserstellung"""
-    topic: str = Field(..., description="Thema der Prüfung", min_length=3, max_length=200)
-    document_ids: Optional[List[int]] = Field(None, description="Spezifische Dokument-IDs (optional)")
+
+    topic: str = Field(
+        ..., description="Thema der Prüfung", min_length=3, max_length=200
+    )
+    document_ids: Optional[List[int]] = Field(
+        None, description="Spezifische Dokument-IDs (optional)"
+    )
     question_count: int = Field(5, description="Anzahl Fragen", ge=1, le=20)
     question_types: Optional[List[str]] = Field(
-        ["multiple_choice", "open_ended"],
-        description="Fragetypen"
+        ["multiple_choice", "open_ended"], description="Fragetypen"
     )
     difficulty: str = Field("medium", description="Schwierigkeitsgrad")
     language: str = Field("de", description="Sprache")
-    context_chunks_per_question: int = Field(3, description="Context Chunks pro Frage", ge=1, le=10)
+    context_chunks_per_question: int = Field(
+        3, description="Context Chunks pro Frage", ge=1, le=10
+    )
 
     # NEU: Prompt-Konfiguration pro Fragetyp
     prompt_config: Optional[Dict[str, PromptConfig]] = Field(
         None,
-        description="Prompt-Konfiguration pro Fragetyp (z.B. {'multiple_choice': {...}, 'open_ended': {...}})"
+        description="Prompt-Konfiguration pro Fragetyp (z.B. {'multiple_choice': {...}, 'open_ended': {...}})",
     )
 
 
 class RAGQuestionResponse(BaseModel):
     """Response Model für RAG-Frage"""
+
     question_text: str
     question_type: str
     options: Optional[List[str]] = None
@@ -62,6 +72,7 @@ class RAGQuestionResponse(BaseModel):
 
 class RAGContextResponse(BaseModel):
     """Response Model für RAG-Kontext"""
+
     query: str
     total_chunks: int
     total_similarity_score: float
@@ -71,6 +82,7 @@ class RAGContextResponse(BaseModel):
 
 class RAGExamResponseModel(BaseModel):
     """Response Model für RAG-Prüfung"""
+
     exam_id: str
     topic: str
     questions: List[RAGQuestionResponse]
@@ -81,10 +93,18 @@ class RAGExamResponseModel(BaseModel):
 
 class ContextRetrievalRequest(BaseModel):
     """Request Model für Context Retrieval"""
+
     query: str = Field(..., description="Suchanfrage", min_length=3, max_length=500)
-    document_ids: Optional[List[int]] = Field(None, description="Spezifische Dokument-IDs")
+    document_ids: Optional[List[int]] = Field(
+        None, description="Spezifische Dokument-IDs"
+    )
     max_chunks: int = Field(5, description="Maximale Anzahl Chunks", ge=1, le=20)
-    min_similarity: Optional[float] = Field(0.01, description="Mindest-Similarity (angepasst für Mock Embeddings)", ge=0.0, le=1.0)
+    min_similarity: Optional[float] = Field(
+        0.01,
+        description="Mindest-Similarity (angepasst für Mock Embeddings)",
+        ge=0.0,
+        le=1.0,
+    )
 
 
 # API Endpoints
@@ -92,7 +112,7 @@ class ContextRetrievalRequest(BaseModel):
 async def generate_rag_exam(
     request: RAGExamRequestModel,
     current_user: User = Depends(require_permission("create_questions")),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Generiere RAG-basierte Prüfung aus Dokumenten
@@ -114,18 +134,18 @@ async def generate_rag_exam(
                 document = document_service.get_document_by_id(doc_id, db)
                 if not document:
                     raise HTTPException(
-                        status_code=404, 
-                        detail=f"Document with ID {doc_id} not found"
+                        status_code=404, detail=f"Document with ID {doc_id} not found"
                     )
-                
+
                 # Prüfe ob Dokument verarbeitet ist
                 from models.document import DocumentStatus
+
                 if document.status != DocumentStatus.PROCESSED:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Document {doc_id} is not processed yet. Please process it first."
+                        detail=f"Document {doc_id} is not processed yet. Please process it first.",
                     )
-        
+
         # Validiere Question Types
         valid_types = ["multiple_choice", "open_ended", "true_false"]
         if request.question_types:
@@ -133,26 +153,26 @@ async def generate_rag_exam(
                 if qtype not in valid_types:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Invalid question type: {qtype}. Valid types: {valid_types}"
+                        detail=f"Invalid question type: {qtype}. Valid types: {valid_types}",
                     )
-        
+
         # Validiere Difficulty
         valid_difficulties = ["easy", "medium", "hard"]
         if request.difficulty not in valid_difficulties:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid difficulty: {request.difficulty}. Valid: {valid_difficulties}"
+                detail=f"Invalid difficulty: {request.difficulty}. Valid: {valid_difficulties}",
             )
-        
+
         # Konvertiere prompt_config von Pydantic zu dataclass
         prompt_config_dict = None
         if request.prompt_config:
             from services.rag_service import PromptConfig as RAGPromptConfig
+
             prompt_config_dict = {}
             for question_type, config in request.prompt_config.items():
                 prompt_config_dict[question_type] = RAGPromptConfig(
-                    prompt_id=config.prompt_id,
-                    variables=config.variables
+                    prompt_id=config.prompt_id, variables=config.variables
                 )
 
         # Erstelle RAG Request
@@ -164,48 +184,52 @@ async def generate_rag_exam(
             difficulty=request.difficulty,
             language=request.language,
             context_chunks_per_question=request.context_chunks_per_question,
-            prompt_config=prompt_config_dict  # NEU: Prompt-Konfiguration
+            prompt_config=prompt_config_dict,  # NEU: Prompt-Konfiguration
         )
-        
+
         # Generiere RAG Exam
         rag_response = await rag_service.generate_rag_exam(rag_request)
-        
+
         # Konvertiere zu Response Model
         questions_response = []
         for question in rag_response.questions:
-            questions_response.append(RAGQuestionResponse(
-                question_text=question.question_text,
-                question_type=question.question_type,
-                options=question.options,
-                correct_answer=question.correct_answer,
-                explanation=question.explanation,
-                difficulty=question.difficulty,
-                source_chunks=question.source_chunks or [],
-                source_documents=question.source_documents or [],
-                confidence_score=question.confidence_score
-            ))
-        
+            questions_response.append(
+                RAGQuestionResponse(
+                    question_text=question.question_text,
+                    question_type=question.question_type,
+                    options=question.options,
+                    correct_answer=question.correct_answer,
+                    explanation=question.explanation,
+                    difficulty=question.difficulty,
+                    source_chunks=question.source_chunks or [],
+                    source_documents=question.source_documents or [],
+                    confidence_score=question.confidence_score,
+                )
+            )
+
         context_response = RAGContextResponse(
             query=rag_response.context_summary.query,
             total_chunks=len(rag_response.context_summary.retrieved_chunks),
             total_similarity_score=rag_response.context_summary.total_similarity_score,
             source_documents=rag_response.context_summary.source_documents,
-            context_length=rag_response.context_summary.context_length
+            context_length=rag_response.context_summary.context_length,
         )
-        
+
         response = RAGExamResponseModel(
             exam_id=rag_response.exam_id,
             topic=rag_response.topic,
             questions=questions_response,
             context_summary=context_response,
             generation_time=rag_response.generation_time,
-            quality_metrics=rag_response.quality_metrics
+            quality_metrics=rag_response.quality_metrics,
         )
-        
-        logger.info(f"Generated RAG exam '{rag_response.exam_id}' with {len(questions_response)} questions")
-        
+
+        logger.info(
+            f"Generated RAG exam '{rag_response.exam_id}' with {len(questions_response)} questions"
+        )
+
         return response
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -217,7 +241,7 @@ async def generate_rag_exam(
 async def retrieve_context(
     request: ContextRetrievalRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Hole relevanten Kontext aus Vector Database
@@ -236,43 +260,46 @@ async def retrieve_context(
                 document = document_service.get_document_by_id(doc_id, db)
                 if not document:
                     raise HTTPException(
-                        status_code=404,
-                        detail=f"Document with ID {doc_id} not found"
+                        status_code=404, detail=f"Document with ID {doc_id} not found"
                     )
-        
+
         # Hole Kontext (mit angepasstem min_similarity für Mock Embeddings)
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
         context = await rag_service.retrieve_context(
             query=request.query,
             document_ids=request.document_ids,
             max_chunks=request.max_chunks,
-            min_similarity=min_sim
+            min_similarity=min_sim,
         )
-        
+
         response = RAGContextResponse(
             query=context.query,
             total_chunks=len(context.retrieved_chunks),
             total_similarity_score=context.total_similarity_score,
             source_documents=context.source_documents,
-            context_length=context.context_length
+            context_length=context.context_length,
         )
-        
-        logger.info(f"Retrieved context for query '{request.query}': {len(context.retrieved_chunks)} chunks")
-        
+
+        logger.info(
+            f"Retrieved context for query '{request.query}': {len(context.retrieved_chunks)} chunks"
+        )
+
         return response
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Context retrieval failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Context retrieval failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Context retrieval failed: {str(e)}"
+        )
 
 
 @router.get("/available-documents")
 async def get_available_documents(
     processed_only: bool = Query(True, description="Nur verarbeitete Dokumente"),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Hole verfügbare Dokumente für RAG-Prüfungserstellung
@@ -284,14 +311,14 @@ async def get_available_documents(
     try:
         # Hole alle Dokumente des aktuellen Users
         documents = document_service.get_documents_by_user(str(current_user.id), db)
-        
+
         if processed_only:
             from models.document import DocumentStatus
+
             documents = [
-                doc for doc in documents 
-                if doc.status == DocumentStatus.PROCESSED
+                doc for doc in documents if doc.status == DocumentStatus.PROCESSED
             ]
-        
+
         # Konvertiere zu Response Format
         available_docs = []
         for doc in documents:
@@ -301,31 +328,39 @@ async def get_available_documents(
                 "mime_type": doc.mime_type,
                 "status": doc.status.value,
                 "created_at": doc.created_at.isoformat() if doc.created_at else None,
-                "processed_at": doc.processed_at.isoformat() if doc.processed_at else None,
-                "file_size": getattr(doc, 'file_size', None),
-                "has_vectors": bool(doc.vector_collection)
+                "processed_at": doc.processed_at.isoformat()
+                if doc.processed_at
+                else None,
+                "file_size": getattr(doc, "file_size", None),
+                "has_vectors": bool(doc.vector_collection),
             }
-            
+
             # Füge Metadaten hinzu falls verfügbar
             if doc.doc_metadata:
                 doc_info["metadata"] = {
                     "total_chunks": doc.doc_metadata.get("total_chunks"),
                     "embedding_model": doc.doc_metadata.get("embedding_model"),
-                    "processing_time": doc.doc_metadata.get("processing_time")
+                    "processing_time": doc.doc_metadata.get("processing_time"),
                 }
-            
+
             available_docs.append(doc_info)
-        
+
         return {
             "total_documents": len(available_docs),
-            "processed_documents": len([d for d in available_docs if d["status"] == "processed"]),
-            "documents_with_vectors": len([d for d in available_docs if d["has_vectors"]]),
-            "documents": available_docs
+            "processed_documents": len(
+                [d for d in available_docs if d["status"] == "processed"]
+            ),
+            "documents_with_vectors": len(
+                [d for d in available_docs if d["has_vectors"]]
+            ),
+            "documents": available_docs,
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get available documents: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get documents: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get documents: {str(e)}"
+        )
 
 
 @router.get("/question-types")
@@ -339,42 +374,42 @@ async def get_supported_question_types():
                 "type": "multiple_choice",
                 "name": "Multiple Choice",
                 "description": "Frage mit 4 Antwortoptionen (A, B, C, D)",
-                "example": "Welche Aussage ist korrekt?"
+                "example": "Welche Aussage ist korrekt?",
             },
             {
-                "type": "open_ended", 
+                "type": "open_ended",
                 "name": "Offene Frage",
                 "description": "Frage die eine ausführliche Antwort erfordert",
-                "example": "Erläutern Sie die wichtigsten Konzepte..."
+                "example": "Erläutern Sie die wichtigsten Konzepte...",
             },
             {
                 "type": "true_false",
                 "name": "Wahr/Falsch",
                 "description": "Aussage die als wahr oder falsch bewertet wird",
-                "example": "Die folgende Aussage ist korrekt: ..."
-            }
+                "example": "Die folgende Aussage ist korrekt: ...",
+            },
         ],
         "difficulty_levels": [
             {
                 "level": "easy",
                 "name": "Einfach",
-                "description": "Grundlegende Fakten und Definitionen"
+                "description": "Grundlegende Fakten und Definitionen",
             },
             {
                 "level": "medium",
-                "name": "Mittel", 
-                "description": "Anwendung und Verständnis von Konzepten"
+                "name": "Mittel",
+                "description": "Anwendung und Verständnis von Konzepten",
             },
             {
                 "level": "hard",
                 "name": "Schwer",
-                "description": "Analyse, Synthese und kritisches Denken"
-            }
+                "description": "Analyse, Synthese und kritisches Denken",
+            },
         ],
         "supported_languages": [
             {"code": "de", "name": "Deutsch"},
-            {"code": "en", "name": "English"}
-        ]
+            {"code": "en", "name": "English"},
+        ],
     }
 
 
@@ -382,7 +417,7 @@ async def get_supported_question_types():
 async def rag_service_health():
     """
     Health Check für RAG Service
-    
+
     Prüft:
     - RAG Service Status
     - Vector Service Verfügbarkeit
@@ -391,17 +426,18 @@ async def rag_service_health():
     try:
         # Teste Vector Service
         from services.vector_service_mock import vector_service
+
         vector_stats = vector_service.get_collection_stats()
-        
+
         # Teste Claude Service (vereinfacht)
         claude_available = True
         try:
             claude_service = rag_service.claude_service
             # Einfacher Test ob Service initialisiert ist
             claude_available = claude_service is not None
-        except:
+        except Exception:
             claude_available = False
-        
+
         return {
             "status": "healthy",
             "service": "RAG Service",
@@ -409,30 +445,26 @@ async def rag_service_health():
                 "vector_service": {
                     "status": "available",
                     "total_chunks": vector_stats.get("total_chunks", 0),
-                    "embedding_model": vector_stats.get("embedding_model", "unknown")
+                    "embedding_model": vector_stats.get("embedding_model", "unknown"),
                 },
                 "claude_service": {
                     "status": "available" if claude_available else "unavailable",
-                    "fallback_enabled": True
+                    "fallback_enabled": True,
                 },
                 "rag_templates": {
                     "status": "loaded",
-                    "template_count": len(rag_service.question_templates)
-                }
+                    "template_count": len(rag_service.question_templates),
+                },
             },
             "supported_features": [
                 "context_retrieval",
-                "multi_type_questions", 
+                "multi_type_questions",
                 "source_attribution",
                 "quality_metrics",
-                "fallback_generation"
-            ]
+                "fallback_generation",
+            ],
         }
-        
+
     except Exception as e:
         logger.error(f"RAG service health check failed: {str(e)}")
-        return {
-            "status": "unhealthy",
-            "service": "RAG Service",
-            "error": str(e)
-        }
+        return {"status": "unhealthy", "service": "RAG Service", "error": str(e)}
