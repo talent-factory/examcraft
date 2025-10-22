@@ -69,8 +69,8 @@ services:
       # Database
       DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft
 
-      # Redis
-      REDIS_URL: redis://redis:6380/0
+      # Redis (internal port 6379, external port 6380)
+      REDIS_URL: redis://redis:6379/0
 
       # Qdrant
       QDRANT_URL: http://qdrant:6333
