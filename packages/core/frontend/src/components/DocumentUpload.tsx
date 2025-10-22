@@ -31,7 +31,8 @@ import {
   Schedule,
   PictureAsPdf,
   TextSnippet,
-  Code
+  Code,
+  Cancel
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import { DocumentService } from '../services/DocumentService';
@@ -40,12 +41,15 @@ import { DocumentUploadResponse, DocumentProcessingResponse } from '../types/doc
 interface UploadFile {
   file: File;
   id: string;
-  status: 'pending' | 'uploading' | 'processing' | 'completed' | 'error';
+  status: 'pending' | 'uploading' | 'processing' | 'completed' | 'error' | 'cancelled';
   progress: number;
   documentId?: number;
   error?: string;
   result?: DocumentUploadResponse;
   processingResult?: DocumentProcessingResponse;
+  abortController?: AbortController;
+  estimatedTimeRemaining?: number;
+  processingStartTime?: number;
 }
 
 interface DocumentUploadProps {
@@ -107,6 +111,20 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     }
   };
 
+  const formatTimeRemaining = (ms: number): string => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (hours > 0) {
+      return `~${hours}h ${minutes % 60}m verbleibend`;
+    } else if (minutes > 0) {
+      return `~${minutes}m ${seconds % 60}s verbleibend`;
+    } else {
+      return `~${seconds}s verbleibend`;
+    }
+  };
+
   const getStatusChip = (file: UploadFile) => {
     switch (file.status) {
       case 'pending':
@@ -114,9 +132,14 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       case 'uploading':
         return <Chip label="Upload..." color="info" size="small" />;
       case 'processing':
-        return <Chip label="Verarbeitung..." color="warning" size="small" />;
+        const timeLabel = file.estimatedTimeRemaining
+          ? `Verarbeitung... (${formatTimeRemaining(file.estimatedTimeRemaining)})`
+          : 'Verarbeitung...';
+        return <Chip label={timeLabel} color="warning" size="small" />;
       case 'completed':
         return <Chip label="Abgeschlossen" color="success" size="small" />;
+      case 'cancelled':
+        return <Chip label="Abgebrochen" color="default" size="small" />;
       case 'error':
         return <Chip label="Fehler" color="error" size="small" />;
       default:
@@ -125,7 +148,24 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   };
 
   const removeFile = (fileId: string) => {
+    // Cancel ongoing upload/processing if exists
+    const file = uploadFiles.find(f => f.id === fileId);
+    if (file?.abortController) {
+      file.abortController.abort();
+    }
     setUploadFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
+  const cancelFile = (fileId: string) => {
+    const file = uploadFiles.find(f => f.id === fileId);
+    if (file?.abortController) {
+      file.abortController.abort();
+      setUploadFiles(prev => prev.map(f =>
+        f.id === fileId
+          ? { ...f, status: 'cancelled', error: 'Upload cancelled by user' }
+          : f
+      ));
+    }
   };
 
   const retryFile = async (fileId: string) => {
@@ -142,16 +182,23 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   };
 
   const uploadSingleFile = async (file: File, fileId: string) => {
+    const abortController = new AbortController();
+
     try {
-      // Update status to uploading
+      // Update status to uploading with abort controller
       setUploadFiles(prev => prev.map(f =>
         f.id === fileId
-          ? { ...f, status: 'uploading', progress: 10 }
+          ? { ...f, status: 'uploading', progress: 10, abortController }
           : f
       ));
 
       // Upload file
       const uploadResult = await DocumentService.uploadDocument(file);
+
+      // Check if cancelled
+      if (abortController.signal.aborted) {
+        throw new Error('Upload cancelled');
+      }
 
       // Update with upload result
       setUploadFiles(prev => prev.map(f =>
@@ -161,7 +208,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               status: 'processing',
               progress: 50,
               documentId: uploadResult.document_id,
-              result: uploadResult
+              result: uploadResult,
+              processingStartTime: Date.now()
             }
           : f
       ));
@@ -169,8 +217,13 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       // Start processing (asynchron im Backend)
       const processingResult = await DocumentService.processDocument(uploadResult.document_id, true);
 
-      // Warte auf Verarbeitung (polling)
-      await waitForDocumentProcessing(uploadResult.document_id, fileId);
+      // Check if cancelled
+      if (abortController.signal.aborted) {
+        throw new Error('Processing cancelled');
+      }
+
+      // Warte auf Verarbeitung (polling) - 30 Minuten für große Dokumente
+      await waitForDocumentProcessing(uploadResult.document_id, fileId, abortController);
 
       // Update with processing result
       setUploadFiles(prev => prev.map(f =>
@@ -179,7 +232,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               ...f,
               status: 'completed',
               progress: 100,
-              processingResult
+              processingResult,
+              abortController: undefined
             }
           : f
       ));
@@ -187,11 +241,21 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       onUploadComplete?.(uploadResult.document_id, file.name);
 
     } catch (error) {
+      // Check if it was a cancellation
+      if (abortController.signal.aborted || (error && typeof error === 'object' && 'message' in error && (error as Error).message.includes('cancel'))) {
+        setUploadFiles(prev => prev.map(f =>
+          f.id === fileId
+            ? { ...f, status: 'cancelled', error: 'Upload cancelled by user', abortController: undefined }
+            : f
+        ));
+        return;
+      }
+
       const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Upload failed';
 
       setUploadFiles(prev => prev.map(f =>
         f.id === fileId
-          ? { ...f, status: 'error', error: errorMessage }
+          ? { ...f, status: 'error', error: errorMessage, abortController: undefined }
           : f
       ));
 
@@ -199,24 +263,49 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     }
   };
 
-  const waitForDocumentProcessing = async (documentId: number, fileId: string, maxWaitTime: number = 300000) => {
+  const waitForDocumentProcessing = async (
+    documentId: number,
+    fileId: string,
+    abortController: AbortController,
+    maxWaitTime: number = 1800000 // 30 Minuten für große Dokumente (300+ Seiten)
+  ) => {
     /**
      * Warte auf Dokumentenverarbeitung durch Polling des Status
-     * maxWaitTime: Maximale Wartezeit in ms (default: 5 Minuten)
+     * maxWaitTime: Maximale Wartezeit in ms (default: 30 Minuten)
      */
     const startTime = Date.now();
-    const pollInterval = 2000; // Poll alle 2 Sekunden
+    const pollInterval = 3000; // Poll alle 3 Sekunden
+    const warningThreshold = maxWaitTime * 0.8; // Warnung bei 80% der Zeit
 
     while (Date.now() - startTime < maxWaitTime) {
+      // Check if cancelled
+      if (abortController.signal.aborted) {
+        throw new Error('Processing cancelled by user');
+      }
+
       try {
         const status = await DocumentService.getProcessingStatus(documentId);
+        const elapsedTime = Date.now() - startTime;
+        const estimatedTimeRemaining = Math.max(0, maxWaitTime - elapsedTime);
 
-        // Update progress
+        // Calculate progress (50% → 95%)
+        const processingProgress = Math.min(95, 50 + (elapsedTime / maxWaitTime) * 45);
+
+        // Update progress with estimated time
         setUploadFiles(prev => prev.map(f =>
           f.id === fileId
-            ? { ...f, progress: Math.min(95, 50 + (Date.now() - startTime) / maxWaitTime * 45) }
+            ? {
+                ...f,
+                progress: processingProgress,
+                estimatedTimeRemaining: estimatedTimeRemaining
+              }
             : f
         ));
+
+        // Show warning if approaching timeout
+        if (elapsedTime > warningThreshold && elapsedTime < warningThreshold + pollInterval) {
+          console.warn(`Document processing taking longer than expected. ${Math.round(estimatedTimeRemaining / 1000)}s remaining.`);
+        }
 
         if (status.status === 'Verarbeitet' || status.status === 'processed') {
           return; // Verarbeitung abgeschlossen
@@ -229,13 +318,18 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         // Warte vor nächstem Poll
         await new Promise(resolve => setTimeout(resolve, pollInterval));
       } catch (error) {
+        // Check if cancelled
+        if (abortController.signal.aborted) {
+          throw new Error('Processing cancelled by user');
+        }
+
         console.error('Error checking document status:', error);
         // Weiter versuchen
         await new Promise(resolve => setTimeout(resolve, pollInterval));
       }
     }
 
-    throw new Error('Document processing timeout');
+    throw new Error(`Document processing timeout after ${maxWaitTime / 60000} minutes. Please try again or contact support for large documents.`);
   };
 
   const startUpload = async () => {
@@ -362,22 +456,36 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                   <ListItemSecondaryAction>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {getStatusChip(uploadFile)}
+                      {(uploadFile.status === 'uploading' || uploadFile.status === 'processing') && (
+                        <IconButton
+                          size="small"
+                          onClick={() => cancelFile(uploadFile.id)}
+                          title="Upload abbrechen"
+                          color="warning"
+                        >
+                          <Cancel />
+                        </IconButton>
+                      )}
                       {uploadFile.status === 'error' && (
                         <IconButton
                           size="small"
                           onClick={() => retryFile(uploadFile.id)}
                           disabled={isUploading}
+                          title="Erneut versuchen"
                         >
                           <Refresh />
                         </IconButton>
                       )}
-                      <IconButton
-                        size="small"
-                        onClick={() => removeFile(uploadFile.id)}
-                        disabled={isUploading}
-                      >
-                        <Delete />
-                      </IconButton>
+                      {(uploadFile.status === 'pending' || uploadFile.status === 'error' || uploadFile.status === 'cancelled') && (
+                        <IconButton
+                          size="small"
+                          onClick={() => removeFile(uploadFile.id)}
+                          disabled={isUploading}
+                          title="Entfernen"
+                        >
+                          <Delete />
+                        </IconButton>
+                      )}
                     </Box>
                   </ListItemSecondaryAction>
                 </ListItem>
