@@ -1,12 +1,11 @@
 """
-ExamCraft AI - Database Models
+ExamCraft AI - Database Models (Core Package)
 
-This package contains all SQLAlchemy ORM models for the application.
+This package contains all SQLAlchemy ORM models for the Core application.
+Premium features (Chat, Prompts) are available in the Premium package.
 """
 
 from models.document import Document
-from models.chat_db import ChatSession, ChatMessage
-from models.prompt import Prompt, PromptTemplate, PromptUsageLog
 from models.question_review import QuestionReview, ReviewComment, ReviewHistory, ReviewStatus
 from models.auth import User, Role, Institution, UserSession, AuditLog, UserRole, UserStatus
 from models.rbac import (
@@ -17,11 +16,6 @@ from models.rbac import (
 
 __all__ = [
     "Document",
-    "ChatSession",
-    "ChatMessage",
-    "Prompt",
-    "PromptTemplate",
-    "PromptUsageLog",
     "QuestionReview",
     "ReviewComment",
     "ReviewHistory",
