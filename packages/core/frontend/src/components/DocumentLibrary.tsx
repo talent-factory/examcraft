@@ -225,6 +225,9 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       // Start processing
       await DocumentService.processDocument(document.id, true);
 
+      // Wait for processing to complete with polling (30 minutes timeout)
+      await waitForDocumentProcessing(document.id);
+
       // Reload documents to show updated status
       await loadDocuments();
 
@@ -234,6 +237,44 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     } finally {
       setProcessingDocumentId(null);
     }
+  };
+
+  const waitForDocumentProcessing = async (
+    documentId: number,
+    maxWaitTime: number = 1800000 // 30 Minuten für große Dokumente
+  ) => {
+    const startTime = Date.now();
+    const pollInterval = 3000; // Poll alle 3 Sekunden
+    let pollCount = 0;
+
+    while (Date.now() - startTime < maxWaitTime) {
+      try {
+        const status = await DocumentService.getProcessingStatus(documentId);
+
+        // Reload document list every 5 polls (15 seconds) to show progress
+        pollCount++;
+        if (pollCount % 5 === 0) {
+          await loadDocuments();
+        }
+
+        if (status.status === 'Verarbeitet' || status.status === 'processed') {
+          return; // Verarbeitung abgeschlossen
+        }
+
+        if (status.status === 'Fehler' || status.status === 'error') {
+          throw new Error(`Document processing failed: ${status.status}`);
+        }
+
+        // Warte vor nächstem Poll
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      } catch (error) {
+        console.error('Error checking document status:', error);
+        // Weiter versuchen
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+    }
+
+    throw new Error(`Document processing timeout after ${maxWaitTime / 60000} minutes. Please try again or contact support for large documents.`);
   };
 
   const handleCreateRAGExam = () => {
