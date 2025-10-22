@@ -4,7 +4,12 @@ module.exports = {
       mode: 'extends',
       loaderOptions: (postcssLoaderOptions) => {
         postcssLoaderOptions.postcssOptions.plugins = [
-          'tailwindcss',
+          [
+            'tailwindcss',
+            {
+              config: './tailwind.config.js',
+            },
+          ],
           'autoprefixer',
         ];
         return postcssLoaderOptions;
