@@ -43,6 +43,8 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:all": "npm run test:unit && npm run test:e2e",
+    "lint": "eslint src --ext .ts,.tsx,.js,.jsx --max-warnings=0",
+    "lint:fix": "eslint src --ext .ts,.tsx,.js,.jsx --fix",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
