@@ -236,8 +236,8 @@ class User(Base):
 
     # Profile
     avatar_url = Column(
-        String(1000), nullable=True
-    )  # Increased for OAuth providers (Google URLs can be very long)
+        String(2000), nullable=True
+    )  # Increased for OAuth providers (Google URLs can be very long - up to 2000 chars)
     bio = Column(Text, nullable=True)
     phone = Column(String(50), nullable=True)
 
