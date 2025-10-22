@@ -50,9 +50,9 @@ pypdf==3.17.1                       # PDF Processing Fallback
 python-docx==1.1.2                  # DOCX Processing (required by Docling)
 markdown==3.5.1                     # Markdown Processing
 
-# Vector Database & Embeddings
-qdrant-client==1.7.0                # Qdrant Vector Database Client
-openai==1.59.5                      # OpenAI API for Embeddings (production) - pinned for fast builds
-# sentence-transformers==2.7.0      # Sentence Embeddings (optional, for local development)
-# chromadb==0.4.15                  # REMOVED: Replaced by Qdrant
+# Vector Database & Embeddings (Premium Features - moved to Premium package)
+# qdrant-client==1.7.3              # Qdrant Vector Database Client (Premium)
+# openai==1.59.5                    # OpenAI API for Embeddings (Premium)
+# sentence-transformers==2.7.0      # Sentence Embeddings (Premium)
+# chromadb==0.4.15                  # ChromaDB (Premium)
 numpy==1.26.4                       # Numerische Operations (für Embeddings, Docling compatible)
