@@ -12,6 +12,7 @@ export { UserManagementPage } from './UserManagementPage';
 // Institution Management
 export { InstitutionList } from './InstitutionList';
 export { InstitutionEditDialog } from './InstitutionEditDialog';
+export { InstitutionCreateDialog } from './InstitutionCreateDialog';
 export { InstitutionManagementPage } from './InstitutionManagementPage';
 
 // RBAC Management

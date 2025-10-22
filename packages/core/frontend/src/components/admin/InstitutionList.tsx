@@ -9,11 +9,13 @@ import { Institution } from '../../types/auth';
 
 interface InstitutionListProps {
   onEditInstitution: (institutionId: number) => void;
+  onCreateInstitution: () => void;
   onRefresh?: () => void;
 }
 
 export const InstitutionList: React.FC<InstitutionListProps> = ({
   onEditInstitution,
+  onCreateInstitution,
   onRefresh,
 }) => {
   const [institutions, setInstitutions] = useState<Institution[]>([]);
@@ -98,12 +100,20 @@ export const InstitutionList: React.FC<InstitutionListProps> = ({
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
         <h2 className="text-lg font-semibold text-gray-900">Institutions</h2>
-        <button
-          onClick={loadInstitutions}
-          className="text-sm text-primary-600 hover:text-primary-800"
-        >
-          🔄 Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={onCreateInstitution}
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm font-medium"
+          >
+            ➕ Create Institution
+          </button>
+          <button
+            onClick={loadInstitutions}
+            className="text-sm text-primary-600 hover:text-primary-800"
+          >
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
       {/* Table */}

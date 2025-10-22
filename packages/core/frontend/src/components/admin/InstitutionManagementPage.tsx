@@ -6,16 +6,26 @@
 import React, { useState } from 'react';
 import { InstitutionList } from './InstitutionList';
 import { InstitutionEditDialog } from './InstitutionEditDialog';
+import { InstitutionCreateDialog } from './InstitutionCreateDialog';
 
 export const InstitutionManagementPage: React.FC = () => {
   const [editInstitutionId, setEditInstitutionId] = useState<number | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleEditInstitution = (institutionId: number) => {
     setEditInstitutionId(institutionId);
   };
 
+  const handleCreateInstitution = () => {
+    setShowCreateDialog(true);
+  };
+
   const handleEditSuccess = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  const handleCreateSuccess = () => {
     setRefreshKey((prev) => prev + 1);
   };
 
@@ -38,7 +48,15 @@ export const InstitutionManagementPage: React.FC = () => {
         <InstitutionList
           key={refreshKey}
           onEditInstitution={handleEditInstitution}
+          onCreateInstitution={handleCreateInstitution}
           onRefresh={handleRefresh}
+        />
+
+        {/* Create Institution Dialog */}
+        <InstitutionCreateDialog
+          isOpen={showCreateDialog}
+          onClose={() => setShowCreateDialog(false)}
+          onSuccess={handleCreateSuccess}
         />
 
         {/* Edit Institution Dialog */}
