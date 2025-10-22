@@ -7,6 +7,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Typography, Alert } from '@mui/material';
 import AuthService from '../../services/AuthService';
+import { OAuthProvider } from '../../types/auth';
 
 export const OAuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -48,8 +49,12 @@ export const OAuthCallback: React.FC = () => {
         }
 
         console.log('[OAuthCallback] Exchanging code for tokens...');
+
+        // Extract provider from state or URL path
+        const provider: OAuthProvider = (state || window.location.pathname.split('/')[2] || 'google') as OAuthProvider;
+
         // Exchange code for tokens
-        const response = await AuthService.exchangeOAuthCode(code, state || '');
+        const response = await AuthService.handleOAuthCallback(provider, code, state || '');
         const { access_token: accessToken, refresh_token: refreshToken } = response;
 
         if (!accessToken || !refreshToken) {

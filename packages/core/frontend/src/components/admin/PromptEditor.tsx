@@ -75,8 +75,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.content) {
-      setError('Name und Content sind Pflichtfelder');
+    if (!formData.name || !formData.content || !formData.category || !formData.use_case) {
+      setError('Name, Content, Category und Use Case sind Pflichtfelder');
       return;
     }
 
@@ -89,7 +89,18 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
         await promptsApi.updatePrompt(promptId, formData);
         setSuccess('Prompt erfolgreich aktualisiert');
       } else {
-        await promptsApi.createPrompt(formData);
+        // Type assertion after validation
+        const newPrompt = {
+          name: formData.name,
+          content: formData.content,
+          category: formData.category,
+          use_case: formData.use_case,
+          description: formData.description,
+          tags: formData.tags || [],
+          is_active: formData.is_active ?? false
+        } as Omit<Prompt, 'id' | 'version' | 'created_at' | 'updated_at' | 'usage_count'>;
+
+        await promptsApi.createPrompt(newPrompt);
         setSuccess('Prompt erfolgreich erstellt');
       }
 
