@@ -15,11 +15,6 @@ services:
     environment:
       CHROMA_SERVER_AUTH_CREDENTIALS: examcraft_chroma_token
       CHROMA_SERVER_AUTH_PROVIDER: chromadb.auth.token.TokenAuthServerProvider
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"\]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # Qdrant Vector Database (Premium Feature - Alternative)
   qdrant:
@@ -32,11 +27,6 @@ services:
       - qdrant_data:/qdrant/storage
     environment:
       QDRANT__SERVICE__GRPC_PORT: 6334
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"\]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # Backend with Premium Features
   backend:
@@ -44,36 +34,22 @@ services:
       # Mount Premium Package
       - ./packages/premium/backend:/app/premium
     environment:
-      # Premium Feature Flags
+      # Enable Premium Features
       ENABLE_PREMIUM_FEATURES: "true"
       DEFAULT_SUBSCRIPTION_TIER: starter
       
-      # Vector Database
-      VECTOR_DB_TYPE: chromadb  # or 'qdrant'
-      CHROMADB_URL: http://chromadb:8000
-      CHROMADB_TOKEN: examcraft_chroma_token
-      QDRANT_URL: http://qdrant:6333
+      # Vector Database Configuration
+      VECTOR_DB_TYPE: chromadb
+      CHROMADB_HOST: chromadb
+      CHROMADB_PORT: 8000
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
       
       # RAG Configuration
       ENABLE_RAG_GENERATION: "true"
-      RAG_CHUNK_SIZE: 1000
-      RAG_CHUNK_OVERLAP: 200
-      
-      # Prompt Management
-      ENABLE_PROMPT_MANAGEMENT: "true"
-      PROMPT_VECTOR_COLLECTION: prompts
-      
-      # ChatBot
       ENABLE_DOCUMENT_CHATBOT: "true"
-      CHATBOT_MAX_HISTORY: 10
-      
-      # Claude API (Required for Premium)
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-    depends_on:
-      chromadb:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
+      ENABLE_PROMPT_MANAGEMENT: "true"
+      ENABLE_SEMANTIC_SEARCH: "true"
 
   # Frontend with Premium Features
   frontend:
@@ -81,10 +57,12 @@ services:
       # Mount Premium Package
       - ./packages/premium/frontend:/app/premium
     environment:
+      # Enable Premium Features
       REACT_APP_ENABLE_PREMIUM_FEATURES: "true"
-      REACT_APP_ENABLE_RAG: "true"
-      REACT_APP_ENABLE_CHATBOT: "true"
+      REACT_APP_ENABLE_RAG_GENERATION: "true"
+      REACT_APP_ENABLE_DOCUMENT_CHATBOT: "true"
       REACT_APP_ENABLE_PROMPT_MANAGEMENT: "true"
+      REACT_APP_ENABLE_SEMANTIC_SEARCH: "true"
 
 volumes:
   chromadb_data:
