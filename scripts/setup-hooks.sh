@@ -14,10 +14,17 @@ echo -e "${BLUE}ExamCraft AI - Pre-commit Hooks Setup${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
+# Check if uv is installed
+if ! command -v uv &> /dev/null; then
+    echo -e "${YELLOW}[ERROR]${NC} uv is not installed!"
+    echo -e "${YELLOW}[INFO]${NC} Please install uv first: https://docs.astral.sh/uv/getting-started/installation/"
+    exit 1
+fi
+
 # Check if pre-commit is installed
 if ! command -v pre-commit &> /dev/null; then
-    echo -e "${YELLOW}[INFO]${NC} Installing pre-commit..."
-    pip install pre-commit
+    echo -e "${YELLOW}[INFO]${NC} Installing pre-commit with uv..."
+    uv tool install pre-commit
 fi
 
 # Install pre-commit hooks
