@@ -100,7 +100,7 @@ export const PackageTierBadge: React.FC = () => {
   const detectPackageTier = async () => {
     try {
       // Get authenticated user's institution tier from backend
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('examcraft_access_token');
 
       if (!token) {
         // Not authenticated - fallback to free tier
