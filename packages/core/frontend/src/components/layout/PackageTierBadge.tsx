@@ -99,35 +99,28 @@ export const PackageTierBadge: React.FC = () => {
 
   const detectPackageTier = async () => {
     try {
-      // Get available tiers from backend
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/v1/rbac/tiers`);
+      // Get current/default tier from backend
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/v1/rbac/tiers/current`);
 
       if (response.ok) {
-        const tiers = await response.json();
+        const currentTier = await response.json();
 
-        // Determine package tier based on available tiers
-        // If we have 4 tiers (free, starter, professional, enterprise), we're on Premium/Enterprise
-        // If we only have 1 tier (free), we're on Core
+        // Map tier name to tier config
+        const tierName = currentTier.name;
 
-        if (tiers.length === 0) {
-          // No tiers available - fallback to Core
-          setTierInfo(TIER_CONFIG.free);
-        } else if (tiers.some((t: any) => t.name === 'enterprise')) {
-          // Enterprise tier available - show Enterprise package
+        if (tierName === 'enterprise') {
           setTierInfo(TIER_CONFIG.enterprise);
-        } else if (tiers.some((t: any) => t.name === 'professional')) {
-          // Professional tier available - show Professional package
+        } else if (tierName === 'professional') {
           setTierInfo(TIER_CONFIG.professional);
-        } else if (tiers.some((t: any) => t.name === 'starter')) {
-          // Starter tier available - show Starter package (Premium)
+        } else if (tierName === 'starter') {
           setTierInfo(TIER_CONFIG.starter);
         } else {
-          // Only free tier available - show Core package
+          // free or unknown tier
           setTierInfo(TIER_CONFIG.free);
         }
       } else {
         // API call failed - fallback to Core
-        console.warn('Failed to fetch tiers from backend, falling back to Core');
+        console.warn('Failed to fetch current tier from backend, falling back to Core');
         setTierInfo(TIER_CONFIG.free);
       }
     } catch (error) {
