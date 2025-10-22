@@ -123,6 +123,10 @@ class SubscriptionLimits:
         Raises:
             HTTPException: If limit exceeded
         """
+        # -1 means unlimited
+        if institution.max_users == -1:
+            return
+
         from models.auth import User, UserStatus
 
         active_users = (
@@ -150,6 +154,10 @@ class SubscriptionLimits:
         Raises:
             HTTPException: If limit exceeded
         """
+        # -1 means unlimited
+        if institution.max_documents == -1:
+            return
+
         document_count = (
             db.query(Document).filter(Document.institution_id == institution.id).count()
         )
@@ -168,6 +176,10 @@ class SubscriptionLimits:
         Raises:
             HTTPException: If limit exceeded
         """
+        # -1 means unlimited
+        if institution.max_questions_per_month == -1:
+            return
+
         from datetime import datetime, timezone
 
         # Count questions generated this month
