@@ -66,6 +66,43 @@ def create_tables():
         PermissionAuditLog,
     )
 
+    # Import Premium models (if available)
+    try:
+        import sys
+        import os
+        import importlib.util
+
+        # Check if premium package is mounted (Docker: /app/premium)
+        premium_models_path = '/app/premium/models'
+        if not os.path.exists(premium_models_path):
+            # Fallback for local development
+            premium_models_path = os.path.join(os.path.dirname(__file__), '..', '..', 'premium', 'backend', 'models')
+
+        if os.path.exists(premium_models_path):
+            # Import prompt models directly
+            prompt_spec = importlib.util.spec_from_file_location(
+                "premium_prompt_models",
+                os.path.join(premium_models_path, "prompt.py")
+            )
+            prompt_module = importlib.util.module_from_spec(prompt_spec)
+            prompt_spec.loader.exec_module(prompt_module)
+
+            # Import chat models directly
+            chat_spec = importlib.util.spec_from_file_location(
+                "premium_chat_models",
+                os.path.join(premium_models_path, "chat.py")
+            )
+            chat_module = importlib.util.module_from_spec(chat_spec)
+            chat_spec.loader.exec_module(chat_module)
+
+            print("✅ Premium models imported (Prompt Knowledge Base + ChatBot)")
+        else:
+            print("⚠️  Premium package not found - skipping premium models")
+    except Exception as e:
+        print(f"⚠️  Premium models not available: {e}")
+        import traceback
+        traceback.print_exc()
+
     Base.metadata.create_all(bind=engine)
     print("Database tables created successfully")
 
