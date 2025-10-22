@@ -276,6 +276,40 @@ async def list_subscription_tiers(
     return tiers
 
 
+@router.get("/tiers/current", response_model=SubscriptionTierResponse)
+async def get_current_tier(db: Session = Depends(get_db)):
+    """
+    Gibt den aktuellen/Standard Subscription Tier zurück.
+    Basiert auf der DEFAULT_SUBSCRIPTION_TIER Environment Variable.
+    Öffentlicher Endpoint (kein Auth erforderlich).
+    """
+    import os
+
+    default_tier_name = os.getenv("DEFAULT_SUBSCRIPTION_TIER", "free")
+
+    tier = (
+        db.query(SubscriptionTier)
+        .filter(SubscriptionTier.name == default_tier_name)
+        .first()
+    )
+
+    if not tier:
+        # Fallback to free tier if default not found
+        tier = (
+            db.query(SubscriptionTier)
+            .filter(SubscriptionTier.name == "free")
+            .first()
+        )
+
+    if not tier:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Subscription tier '{default_tier_name}' not found",
+        )
+
+    return tier
+
+
 @router.get("/tiers/{tier_id}/quotas", response_model=List[TierQuotaResponse])
 async def get_tier_quotas(tier_id: str, db: Session = Depends(get_db)):
     """
