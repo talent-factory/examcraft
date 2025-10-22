@@ -68,30 +68,44 @@ ExamCraft/
 Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API
 Integration
 
-### Aktueller Projektstatus (Stand: 20.10.2025)
+### Aktueller Projektstatus (Stand: 22.10.2025)
 
 **CORE FEATURES ABGESCHLOSSEN:**
 
 - **Project Setup & Architecture** (TF-50) - Vollständig implementiert
+- **Monorepo Structure** (TF-151) - Core/Premium/Enterprise Packages
 - **React Frontend Dashboard** (TF-54) - Production-ready
 - **Document Processing Pipeline** (TF-51) - PDF/DOC/Markdown Support
 - **Question Generation Core API** (TF-52) - Claude API + PydanticAI
-- **Semantic Search & Vector Storage** (TF-55) - ChromaDB Integration
+- **Semantic Search & Vector Storage** (TF-55) - Qdrant Integration (migrated from ChromaDB)
 - **Claude API Integration** (TF-59) - Rate Limiting + Cost Tracking
-- **Prompt Knowledge Base** (TF-122) - Centralized Prompt Management
+- **Prompt Knowledge Base** (TF-122) - Centralized Prompt Management + Seeding
 - **Prompt Template Selector UI** (TF-146) - Frontend Komponente für Prompt-Auswahl
 - **Template-Variablen-System** (TF-145) - Dynamische Prompt-Konfiguration mit Jinja2
 - **RAG Service Integration** (TF-147) - Prompt-Konfiguration in Question Generation
 - **Question Review Interface** (TF-60) - MVP mit Review Workflow
 - **Workshop Demo Materials** (TF-58) - Vollständig abgeschlossen
-- **Authentication & User Management** (TF-57) - Backend + Frontend (16/19 Tasks, 84.2%)
+- **Authentication & User Management** (TF-57) - Backend + Frontend + Tests (100%)
+- **RBAC & Subscription Tiers** - Unlimited Quotas (-1) Support
+- **Avatar Proxy** - Redis Caching für Google OAuth Avatars
+- **Institution Management** - Admin UI für Institution Creation
 
-**IN PROGRESS:**
+**RECENT BUG FIXES (22.10.2025):**
 
-- **TF-57: Authentication & User Management** - Verbleibend:
-  - Frontend: Jest Tests
-  - Security: GDPR Compliance
-  - Documentation & E2E Tests
+- ✅ Unlimited Quotas (-1) korrekt behandelt (Professional/Enterprise Tier)
+- ✅ PackageTierBadge zeigt korrektes Tier (localStorage Key Fix)
+- ✅ Avatar URLs 429 Rate Limiting behoben (Redis Proxy)
+- ✅ Premium Models in Database Schema integriert
+- ✅ Seed Prompts implementiert (5 Default Prompts)
+- ✅ Premium Component Override via Docker Volumes
+
+**TEST COVERAGE (NEW):**
+
+- ✅ 52 neue Tests für alle Bug Fixes
+- ✅ Backend: test_subscription_limits.py (12 Tests)
+- ✅ Backend: test_avatar_proxy.py (10 Tests)
+- ✅ Backend: test_seed_prompts.py (15 Tests)
+- ✅ Frontend: PackageTierBadge.test.tsx (15 Tests)
 
 **BACKLOG FEATURES:**
 
@@ -103,48 +117,66 @@ Integration
 
 **VOLLSTÄNDIG IMPLEMENTIERT:**
 
-- FastAPI + React 18 + TypeScript Stack
-- PostgreSQL + Redis Integration
-- Docker + Docker Compose Environment
-- Claude API Integration mit PydanticAI
-- RAG System mit ChromaDB
-- Document Processing (PDF, DOC, Markdown)
-- Semantic Search & Vector Storage
-- Prompt Knowledge Base mit Versionierung
-- Template-Variablen-System mit Jinja2
-- Live-Preview für Prompt-Rendering
-- RAG Service Prompt-Integration mit Auto-Variable-Merging
-- Tailwind CSS v3 Integration mit CRACO
-- Modern Authentication UI (LoginForm, AuthPage)
-- JWT Authentication mit bcrypt Password Hashing
-- OAuth Integration (Google, Microsoft)
-- Role-Based Access Control (RBAC)
-- Multi-Tenant Architecture
-- Session Management mit Redis
-- Rate Limiting Middleware
-- Audit Logging für Security Events
-- Admin User Management UI (User List, Edit, Role Assignment)
+- **Monorepo Architecture** - Core/Premium/Enterprise Packages mit Git Submodules
+- **FastAPI + React 18 + TypeScript Stack**
+- **PostgreSQL + Redis Integration**
+- **Docker + Docker Compose Environment** - Multi-File Compose mit Overrides
+- **Claude API Integration** mit PydanticAI
+- **RAG System** mit Qdrant (migrated from ChromaDB)
+- **Document Processing** (PDF, DOC, Markdown)
+- **Semantic Search & Vector Storage** mit Qdrant
+- **Prompt Knowledge Base** mit Versionierung & Seeding
+- **Template-Variablen-System** mit Jinja2
+- **Live-Preview** für Prompt-Rendering
+- **RAG Service Prompt-Integration** mit Auto-Variable-Merging
+- **Tailwind CSS v3 Integration** mit CRACO
+- **Modern Authentication UI** (LoginForm, AuthPage)
+- **JWT Authentication** mit bcrypt Password Hashing
+- **OAuth Integration** (Google, Microsoft)
+- **Avatar Proxy** mit Redis Caching (24h TTL)
+- **Role-Based Access Control (RBAC)**
+- **Subscription Tiers** (Free, Starter, Professional, Enterprise)
+- **Quota Enforcement** mit Unlimited Support (-1)
+- **Multi-Tenant Architecture**
+- **Session Management** mit Redis
+- **Rate Limiting Middleware**
+- **Audit Logging** für Security Events
+- **Admin User Management UI** (User List, Edit, Role Assignment)
+- **Institution Management UI** (Create, Edit, Delete)
+- **PackageTierBadge** mit dynamischer Tier-Erkennung
+- **Premium Component Override** via Docker Volume Mounts
 
 ## Entwicklungsumgebung
 
 ### Produktive Befehle
 
 ```bash
-# Development Stack starten
+# Development Stack starten (Core Only)
 ./start-dev.sh
 
-# Spezifische Services
-docker-compose up -d backend frontend postgres redis
+# Development Stack mit Premium Features
+./start-dev-premium.sh
+
+# Development Stack mit allen Features (Enterprise)
+./start-dev-enterprise.sh
+
+# Spezifische Services (Core + Premium)
+docker compose -f docker-compose.yml -f docker-compose.premium.yml up -d
 
 # Logs überwachen
-docker-compose logs -f backend
+docker compose -f docker-compose.yml -f docker-compose.premium.yml logs -f backend
 
-# Tests ausführen
-pytest backend/tests/
+# Tests ausführen (Backend)
+cd packages/core/backend
+pytest tests/
+
+# Tests ausführen (Frontend)
+cd packages/core/frontend
+npm test
 
 # Code-Qualität prüfen
-ruff check backend/ utils/
-ruff format backend/ utils/
+ruff check packages/core/backend/ utils/
+ruff format packages/core/backend/ utils/
 ```
 
 ### Code-Standards
