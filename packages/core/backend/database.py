@@ -39,7 +39,33 @@ def get_db():
 def create_tables():
     """
     Erstelle alle Tabellen in der Datenbank
+
+    WICHTIG: Importiert alle Models, damit sie bei Base registriert sind
     """
+    # Import all models to register them with Base
+    # This must be done before create_all() is called
+    from models import (
+        Document,
+        QuestionReview,
+        ReviewComment,
+        ReviewHistory,
+        User,
+        Role,
+        Institution,
+        UserSession,
+        AuditLog,
+        OAuthAccount,
+        Feature,
+        RoleFeature,
+        RBACRole,
+        SubscriptionTier,
+        TierQuota,
+        TierFeature,
+        Organization,
+        ResourceUsage,
+        PermissionAuditLog,
+    )
+
     Base.metadata.create_all(bind=engine)
     print("Database tables created successfully")
 
