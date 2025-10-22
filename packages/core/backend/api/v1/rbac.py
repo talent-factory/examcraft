@@ -11,7 +11,7 @@ from datetime import datetime
 
 from database import get_db
 from services.rbac_service import RBACService
-from utils.auth_utils import get_current_user
+from utils.auth_utils import get_current_user, get_current_active_user
 from models.auth import User
 from models.rbac import Feature, RBACRole, SubscriptionTier, TierQuota
 
@@ -282,6 +282,8 @@ async def get_current_tier(db: Session = Depends(get_db)):
     Gibt den aktuellen/Standard Subscription Tier zurück.
     Basiert auf der DEFAULT_SUBSCRIPTION_TIER Environment Variable.
     Öffentlicher Endpoint (kein Auth erforderlich).
+
+    **DEPRECATED**: Use /tiers/my instead to get the authenticated user's institution tier.
     """
     import os
 
@@ -305,6 +307,53 @@ async def get_current_tier(db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Subscription tier '{default_tier_name}' not found",
+        )
+
+    return tier
+
+
+@router.get("/tiers/my", response_model=SubscriptionTierResponse)
+async def get_my_tier(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Gibt den Subscription Tier der Institution des eingeloggten Users zurück.
+    Requires Authentication.
+
+    Returns:
+        SubscriptionTierResponse: Subscription tier of the user's institution
+    """
+    from models.auth import Institution
+
+    # Get user's institution
+    institution = db.query(Institution).filter(Institution.id == current_user.institution_id).first()
+
+    if not institution:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User's institution not found"
+        )
+
+    # Get subscription tier
+    tier = (
+        db.query(SubscriptionTier)
+        .filter(SubscriptionTier.name == institution.subscription_tier)
+        .first()
+    )
+
+    if not tier:
+        # Fallback to free tier if institution tier not found
+        tier = (
+            db.query(SubscriptionTier)
+            .filter(SubscriptionTier.name == "free")
+            .first()
+        )
+
+    if not tier:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Subscription tier '{institution.subscription_tier}' not found",
         )
 
     return tier
