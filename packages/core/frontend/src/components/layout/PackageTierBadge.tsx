@@ -99,34 +99,36 @@ export const PackageTierBadge: React.FC = () => {
 
   const detectPackageTier = async () => {
     try {
-      // Check environment variables first
-      const enablePremium = process.env.REACT_APP_ENABLE_PREMIUM_FEATURES === 'true';
-      const enableEnterprise = process.env.REACT_APP_ENABLE_ENTERPRISE_FEATURES === 'true';
-
-      // Try to get tier from backend
+      // Get available tiers from backend
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/v1/rbac/tiers`);
-      
+
       if (response.ok) {
         const tiers = await response.json();
-        // Use the highest available tier
-        if (enableEnterprise && tiers.some((t: any) => t.id === 'enterprise')) {
+
+        // Determine package tier based on available tiers
+        // If we have 4 tiers (free, starter, professional, enterprise), we're on Premium/Enterprise
+        // If we only have 1 tier (free), we're on Core
+
+        if (tiers.length === 0) {
+          // No tiers available - fallback to Core
+          setTierInfo(TIER_CONFIG.free);
+        } else if (tiers.some((t: any) => t.name === 'enterprise')) {
+          // Enterprise tier available - show Enterprise package
           setTierInfo(TIER_CONFIG.enterprise);
-        } else if (enablePremium && tiers.some((t: any) => t.id === 'professional')) {
+        } else if (tiers.some((t: any) => t.name === 'professional')) {
+          // Professional tier available - show Professional package
           setTierInfo(TIER_CONFIG.professional);
-        } else if (enablePremium && tiers.some((t: any) => t.id === 'starter')) {
+        } else if (tiers.some((t: any) => t.name === 'starter')) {
+          // Starter tier available - show Starter package (Premium)
           setTierInfo(TIER_CONFIG.starter);
         } else {
+          // Only free tier available - show Core package
           setTierInfo(TIER_CONFIG.free);
         }
       } else {
-        // Fallback to environment variables
-        if (enableEnterprise) {
-          setTierInfo(TIER_CONFIG.enterprise);
-        } else if (enablePremium) {
-          setTierInfo(TIER_CONFIG.starter);
-        } else {
-          setTierInfo(TIER_CONFIG.free);
-        }
+        // API call failed - fallback to Core
+        console.warn('Failed to fetch tiers from backend, falling back to Core');
+        setTierInfo(TIER_CONFIG.free);
       }
     } catch (error) {
       console.error('Failed to detect package tier:', error);
