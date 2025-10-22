@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { Chip, Tooltip, Box } from '@mui/material';
 import {
-  Workspace as CoreIcon,
+  Layers as CoreIcon,
   Star as PremiumIcon,
   Business as EnterpriseIcon,
   Info as InfoIcon
