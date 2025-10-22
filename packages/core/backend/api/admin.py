@@ -664,3 +664,149 @@ async def list_institutions(
         )
         for inst in institutions
     ]
+
+
+class UpdateInstitutionRequest(BaseModel):
+    """Request model for updating institution"""
+    name: Optional[str] = None
+    domain: Optional[str] = None
+    subscription_tier: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@router.patch("/institutions/{institution_id}", response_model=InstitutionResponse)
+async def update_institution(
+    institution_id: int,
+    update_data: UpdateInstitutionRequest,
+    current_user: User = Depends(require_permission("manage_users")),
+    db: Session = Depends(get_db),
+):
+    """
+    Update institution (Admin only)
+
+    - Updates institution details
+    - Automatically updates quotas when subscription_tier changes
+    - Requires 'manage_users' permission
+    """
+    from config.features import SubscriptionTier, TIER_QUOTAS
+
+    # Get institution
+    institution = db.query(Institution).filter(Institution.id == institution_id).first()
+    if not institution:
+        raise HTTPException(status_code=404, detail="Institution not found")
+
+    # Update fields
+    if update_data.name is not None:
+        institution.name = update_data.name
+        # Update slug from name
+        institution.slug = update_data.name.lower().replace(" ", "-")
+
+    if update_data.domain is not None:
+        institution.domain = update_data.domain
+
+    if update_data.is_active is not None:
+        institution.is_active = update_data.is_active
+
+    # Update subscription tier and quotas
+    if update_data.subscription_tier is not None:
+        # Validate tier
+        try:
+            tier = SubscriptionTier(update_data.subscription_tier)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid subscription tier. Must be one of: {', '.join([t.value for t in SubscriptionTier])}"
+            )
+
+        institution.subscription_tier = tier.value
+
+        # Update quotas based on tier
+        quotas = TIER_QUOTAS[tier]
+        institution.max_users = quotas["max_users"]
+        institution.max_documents = quotas["max_documents"]
+        institution.max_questions_per_month = quotas["max_questions_per_month"]
+
+    db.commit()
+    db.refresh(institution)
+
+    return InstitutionResponse(
+        id=institution.id,
+        name=institution.name,
+        slug=institution.slug,
+        domain=institution.domain,
+        subscription_tier=institution.subscription_tier,
+        max_users=institution.max_users,
+        max_documents=institution.max_documents,
+        max_questions_per_month=institution.max_questions_per_month,
+        is_active=institution.is_active,
+        created_at=institution.created_at.isoformat(),
+    )
+
+
+class CreateInstitutionRequest(BaseModel):
+    """Request model for creating institution"""
+    name: str
+    domain: str
+    subscription_tier: str = "free"
+
+
+@router.post("/institutions", response_model=InstitutionResponse, status_code=201)
+async def create_institution(
+    institution_data: CreateInstitutionRequest,
+    current_user: User = Depends(require_permission("manage_users")),
+    db: Session = Depends(get_db),
+):
+    """
+    Create new institution (Admin only)
+
+    - Creates new institution with specified tier
+    - Automatically sets quotas based on tier
+    - Requires 'manage_users' permission
+    """
+    from config.features import SubscriptionTier, TIER_QUOTAS
+
+    # Validate tier
+    try:
+        tier = SubscriptionTier(institution_data.subscription_tier)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid subscription tier. Must be one of: {', '.join([t.value for t in SubscriptionTier])}"
+        )
+
+    # Check if domain already exists
+    existing = db.query(Institution).filter(Institution.domain == institution_data.domain).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Institution with this domain already exists")
+
+    # Get quotas for tier
+    quotas = TIER_QUOTAS[tier]
+
+    # Create institution
+    institution = Institution(
+        name=institution_data.name,
+        slug=institution_data.name.lower().replace(" ", "-"),
+        domain=institution_data.domain,
+        subscription_tier=tier.value,
+        max_users=quotas["max_users"],
+        max_documents=quotas["max_documents"],
+        max_questions_per_month=quotas["max_questions_per_month"],
+        is_active=True,
+    )
+
+    db.add(institution)
+    db.commit()
+    db.refresh(institution)
+
+    return InstitutionResponse(
+        id=institution.id,
+        name=institution.name,
+        slug=institution.slug,
+        domain=institution.domain,
+        subscription_tier=institution.subscription_tier,
+        max_users=institution.max_users,
+        max_documents=institution.max_documents,
+        max_questions_per_month=institution.max_questions_per_month,
+        is_active=institution.is_active,
+        created_at=institution.created_at.isoformat(),
+    )

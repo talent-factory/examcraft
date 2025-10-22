@@ -9,6 +9,11 @@ export { UserEditDialog } from './UserEditDialog';
 export { RoleAssignmentDialog } from './RoleAssignmentDialog';
 export { UserManagementPage } from './UserManagementPage';
 
+// Institution Management
+export { InstitutionList } from './InstitutionList';
+export { InstitutionEditDialog } from './InstitutionEditDialog';
+export { InstitutionManagementPage } from './InstitutionManagementPage';
+
 // RBAC Management
 export { default as RoleList } from './RoleList';
 export { default as RoleEditorDialog } from './RoleEditorDialog';
