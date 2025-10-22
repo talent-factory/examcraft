@@ -99,8 +99,21 @@ export const PackageTierBadge: React.FC = () => {
 
   const detectPackageTier = async () => {
     try {
-      // Get current/default tier from backend
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/v1/rbac/tiers/current`);
+      // Get authenticated user's institution tier from backend
+      const token = localStorage.getItem('access_token');
+
+      if (!token) {
+        // Not authenticated - fallback to free tier
+        setTierInfo(TIER_CONFIG.free);
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/v1/rbac/tiers/my`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
       if (response.ok) {
         const currentTier = await response.json();
@@ -119,13 +132,13 @@ export const PackageTierBadge: React.FC = () => {
           setTierInfo(TIER_CONFIG.free);
         }
       } else {
-        // API call failed - fallback to Core
-        console.warn('Failed to fetch current tier from backend, falling back to Core');
+        // API call failed - fallback to free tier
+        console.warn('Failed to fetch user tier from backend, falling back to Free');
         setTierInfo(TIER_CONFIG.free);
       }
     } catch (error) {
       console.error('Failed to detect package tier:', error);
-      // Fallback to Core
+      // Fallback to free tier
       setTierInfo(TIER_CONFIG.free);
     } finally {
       setLoading(false);
