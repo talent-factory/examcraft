@@ -1,0 +1,61 @@
+version: '3.8'
+
+# Enterprise Features Extension
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.premium.yml -f docker-compose.enterprise.yml up
+
+services:
+  # Backend with Enterprise Features
+  backend:
+    volumes:
+      # Mount Enterprise Package
+      - ./packages/enterprise/backend:/app/enterprise
+    environment:
+      # Enterprise Feature Flags
+      ENABLE_ENTERPRISE_FEATURES: "true"
+      DEFAULT_SUBSCRIPTION_TIER: enterprise
+      
+      # SSO/SAML
+      ENABLE_SSO: "true"
+      SAML_ENTITY_ID: examcraft-ai
+      SAML_ACS_URL: http://localhost:8000/api/v1/sso/acs
+      SAML_METADATA_URL: http://localhost:8000/api/v1/sso/metadata
+      
+      # OAuth (Google, Microsoft)
+      ENABLE_OAUTH: "true"
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      OAUTH_REDIRECT_URI: http://localhost:3000/auth/callback
+      
+      # Custom Branding
+      ENABLE_CUSTOM_BRANDING: "true"
+      BRANDING_STORAGE_PATH: /app/storage/branding
+      
+      # API Access
+      ENABLE_API_ACCESS: "true"
+      API_KEY_ENCRYPTION_KEY: ${API_KEY_ENCRYPTION_KEY:-dev_encryption_key_change_in_production}
+      
+      # Advanced Analytics
+      ENABLE_ADVANCED_ANALYTICS: "true"
+      ANALYTICS_RETENTION_DAYS: 365
+      
+      # LDAP Integration (Optional)
+      ENABLE_LDAP: ${ENABLE_LDAP:-false}
+      LDAP_SERVER: ${LDAP_SERVER:-}
+      LDAP_BASE_DN: ${LDAP_BASE_DN:-}
+      LDAP_BIND_DN: ${LDAP_BIND_DN:-}
+      LDAP_BIND_PASSWORD: ${LDAP_BIND_PASSWORD:-}
+
+  # Frontend with Enterprise Features
+  frontend:
+    volumes:
+      # Mount Enterprise Package
+      - ./packages/enterprise/frontend:/app/enterprise
+    environment:
+      REACT_APP_ENABLE_ENTERPRISE_FEATURES: "true"
+      REACT_APP_ENABLE_SSO: "true"
+      REACT_APP_ENABLE_OAUTH: "true"
+      REACT_APP_ENABLE_CUSTOM_BRANDING: "true"
+      REACT_APP_ENABLE_API_ACCESS: "true"
+      REACT_APP_ENABLE_ADVANCED_ANALYTICS: "true"
