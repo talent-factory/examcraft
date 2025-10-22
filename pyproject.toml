@@ -11,6 +11,8 @@ dependencies = [
     "pypdf>=6.1.0",
     "email-validator>=2.3.0",
     "alembic>=1.17.0",
+    "qdrant-client>=1.15.0",
+    "sentence-transformers>=5.1.0",
 ]
 
 [dependency-groups]
