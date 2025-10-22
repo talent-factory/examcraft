@@ -14,14 +14,15 @@ RUN apt-get update && apt-get install -y \
     libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
+# Copy requirements and pyproject.toml first for better caching
 COPY packages/core/backend/requirements.txt .
+COPY pyproject.toml /app/pyproject.toml
 
-# Install Python dependencies
+# Install Python dependencies from requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy pyproject.toml for version info
-COPY pyproject.toml /app/pyproject.toml
+# Install additional dependencies from pyproject.toml (qdrant-client, sentence-transformers, etc.)
+RUN pip install --no-cache-dir -e .
 
 # Copy application code
 COPY packages/core/backend/ .
