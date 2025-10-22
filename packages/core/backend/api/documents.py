@@ -3,7 +3,16 @@ Document API Endpoints für ExamCraft AI
 Verwaltet Document Upload, Listing und Management
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query, Request, BackgroundTasks
+from fastapi import (
+    APIRouter,
+    UploadFile,
+    File,
+    HTTPException,
+    Depends,
+    Query,
+    Request,
+    BackgroundTasks,
+)
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from sqlalchemy.orm import Session
@@ -14,13 +23,14 @@ from services.vector_service_factory import vector_service
 from models.document import Document, DocumentStatus
 from models.auth import User
 from database import get_db
-from utils.auth_utils import get_current_user, get_current_active_user, require_permission
+from utils.auth_utils import get_current_active_user, require_permission
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 document_service = DocumentService()
+
 
 # Pydantic Models für API Responses
 class DocumentResponse(BaseModel):
@@ -40,9 +50,11 @@ class DocumentResponse(BaseModel):
     updated_at: Optional[str]
     processed_at: Optional[str]
 
+
 class DocumentListResponse(BaseModel):
     documents: List[DocumentResponse]
     total: int
+
 
 class UploadResponse(BaseModel):
     document_id: int
@@ -50,12 +62,13 @@ class UploadResponse(BaseModel):
     status: str
     message: str
 
+
 @router.post("/upload", response_model=UploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
     http_request: Request = None,
     current_user: User = Depends(require_permission("create_documents")),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Upload ein neues Dokument
@@ -70,12 +83,11 @@ async def upload_document(
     try:
         # Check document limit for institution
         from utils.tenant_utils import SubscriptionLimits
+
         SubscriptionLimits.check_document_limit(current_user.institution, db)
 
         document = await document_service.upload_document(
-            file=file,
-            user_id=current_user.id,
-            db=db
+            file=file, user_id=current_user.id, db=db
         )
 
         # Set institution_id for multi-tenancy
@@ -85,28 +97,34 @@ async def upload_document(
 
         # Audit log: Document created
         from services.audit_service import AuditService
+
         AuditService.log_document_action(
-            db, AuditService.ACTION_CREATE_DOCUMENT, current_user.id, document.id,
-            request=http_request, additional_data={"filename": document.filename}
+            db,
+            AuditService.ACTION_CREATE_DOCUMENT,
+            current_user.id,
+            document.id,
+            request=http_request,
+            additional_data={"filename": document.filename},
         )
 
         return UploadResponse(
             document_id=document.id,
             filename=document.filename,
             status=document.status.value,
-            message="Document uploaded successfully"
+            message="Document uploaded successfully",
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
+
 @router.get("/", response_model=DocumentListResponse)
 async def list_documents(
     status: Optional[str] = Query(None, description="Filter by status"),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Liste alle Dokumente des aktuellen Users
@@ -127,11 +145,12 @@ async def list_documents(
             except ValueError:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid status. Valid options: {[s.value for s in DocumentStatus]}"
+                    detail=f"Invalid status. Valid options: {[s.value for s in DocumentStatus]}",
                 )
 
         # Tenant-aware query: Filter by institution_id
         from utils.tenant_utils import TenantFilter, get_tenant_context
+
         tenant_context = get_tenant_context(current_user)
 
         query = db.query(Document)
@@ -149,14 +168,16 @@ async def list_documents(
             document_responses.append(DocumentResponse(**doc_dict))
 
         return DocumentListResponse(
-            documents=document_responses,
-            total=len(document_responses)
+            documents=document_responses, total=len(document_responses)
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list documents: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list documents: {str(e)}"
+        )
+
 
 # Health check endpoint (muss vor parametrisierten Routen stehen)
 @router.get("/health")
@@ -166,14 +187,15 @@ async def health_check():
         "status": "healthy",
         "service": "Document Upload Service",
         "supported_formats": list(document_service.supported_formats.values()),
-        "max_file_size_mb": document_service.max_file_size // (1024 * 1024)
+        "max_file_size_mb": document_service.max_file_size // (1024 * 1024),
     }
+
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: int,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Hole spezifisches Dokument nach ID
@@ -193,6 +215,7 @@ async def get_document(
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
+
         tenant_context = get_tenant_context(current_user)
         TenantFilter.verify_tenant_access(document, tenant_context)
 
@@ -204,12 +227,13 @@ async def get_document(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get document: {str(e)}")
 
+
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: int,
     http_request: Request = None,
     current_user: User = Depends(require_permission("delete_documents")),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Lösche Dokument und zugehörige Datei
@@ -242,26 +266,37 @@ async def delete_document(
 
         # Audit log: Document deleted
         from services.audit_service import AuditService
+
         AuditService.log_document_action(
-            db, AuditService.ACTION_DELETE_DOCUMENT, current_user.id, document_id,
-            request=http_request, additional_data={"filename": filename}
+            db,
+            AuditService.ACTION_DELETE_DOCUMENT,
+            current_user.id,
+            document_id,
+            request=http_request,
+            additional_data={"filename": filename},
         )
-        
+
         return JSONResponse(
             status_code=200,
-            content={"message": "Document deleted successfully", "document_id": document_id}
+            content={
+                "message": "Document deleted successfully",
+                "document_id": document_id,
+            },
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete document: {str(e)}"
+        )
+
 
 @router.get("/{document_id}/status")
 async def get_document_status(
     document_id: int,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Hole Processing-Status eines Dokuments
@@ -281,21 +316,27 @@ async def get_document_status(
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
+
         tenant_context = get_tenant_context(current_user)
         TenantFilter.verify_tenant_access(document, tenant_context)
 
         return {
             "document_id": document_id,
             "status": document.status.value,
-            "created_at": document.created_at.isoformat() if document.created_at else None,
-            "processed_at": document.processed_at.isoformat() if document.processed_at else None,
-            "metadata": document.doc_metadata
+            "created_at": document.created_at.isoformat()
+            if document.created_at
+            else None,
+            "processed_at": document.processed_at.isoformat()
+            if document.processed_at
+            else None,
+            "metadata": document.doc_metadata,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
+
 
 @router.post("/{document_id}/process")
 async def process_document(
@@ -303,7 +344,7 @@ async def process_document(
     create_vectors: bool = Query(True, description="Erstelle auch Vector Embeddings"),
     background_tasks: BackgroundTasks = None,
     current_user: User = Depends(require_permission("create_documents")),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Verarbeite hochgeladenes Dokument mit Docling (und optional Vector Embeddings)
@@ -330,15 +371,11 @@ async def process_document(
         if background_tasks:
             if create_vectors:
                 background_tasks.add_task(
-                    document_service.process_document_with_vectors,
-                    document_id,
-                    db
+                    document_service.process_document_with_vectors, document_id, db
                 )
             else:
                 background_tasks.add_task(
-                    document_service.process_document_content,
-                    document_id,
-                    db
+                    document_service.process_document_content, document_id, db
                 )
 
         # Antworte sofort mit Status "processing"
@@ -346,18 +383,19 @@ async def process_document(
             "message": "Document processing started in background",
             "document_id": document_id,
             "status": "processing",
-            "check_status_url": f"/api/v1/documents/{document_id}/status"
+            "check_status_url": f"/api/v1/documents/{document_id}/status",
         }
-        
+
     except Exception as e:
         logger.error(f"Document processing failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+
 
 @router.get("/{document_id}/content")
 async def get_document_content(
     document_id: int,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Hole vollständigen Dokumenteninhalt für Vorschau
@@ -377,6 +415,7 @@ async def get_document_content(
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
+
         tenant_context = get_tenant_context(current_user)
         TenantFilter.verify_tenant_access(document, tenant_context)
 
@@ -388,14 +427,18 @@ async def get_document_content(
             if document.content_preview:
                 content = document.content_preview
             else:
-                raise HTTPException(status_code=404, detail="Document content not available")
+                raise HTTPException(
+                    status_code=404, detail="Document content not available"
+                )
 
         return {
             "document_id": document_id,
-            "title": document.doc_metadata.get('title', document.original_filename) if document.doc_metadata else document.original_filename,
+            "title": document.doc_metadata.get("title", document.original_filename)
+            if document.doc_metadata
+            else document.original_filename,
             "content": content,
             "content_length": len(content) if content else 0,
-            "metadata": document.doc_metadata
+            "metadata": document.doc_metadata,
         }
 
     except HTTPException:
@@ -403,11 +446,12 @@ async def get_document_content(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get content: {str(e)}")
 
+
 @router.get("/{document_id}/chunks")
 async def get_document_chunks(
     document_id: int,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Hole verarbeitete Text-Chunks eines Dokuments
@@ -427,25 +471,28 @@ async def get_document_chunks(
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
+
         tenant_context = get_tenant_context(current_user)
         TenantFilter.verify_tenant_access(document, tenant_context)
 
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(
                 status_code=400,
-                detail=f"Document not processed yet. Current status: {document.status.value}"
+                detail=f"Document not processed yet. Current status: {document.status.value}",
             )
 
         # Hole Chunks
         chunks = await document_service.get_document_chunks(document_id, db)
 
         if chunks is None:
-            raise HTTPException(status_code=500, detail="Failed to retrieve document chunks")
+            raise HTTPException(
+                status_code=500, detail="Failed to retrieve document chunks"
+            )
 
         return {
             "document_id": document_id,
             "total_chunks": len(chunks),
-            "chunks": chunks
+            "chunks": chunks,
         }
 
     except HTTPException:
@@ -453,13 +500,14 @@ async def get_document_chunks(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get chunks: {str(e)}")
 
+
 @router.get("/{document_id}/chunks-paginated")
 async def get_document_chunks_paginated(
     document_id: int,
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(10, ge=1, le=100, description="Number of chunks per page"),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Hole verarbeitete Text-Chunks eines Dokuments mit Pagination (für große Dokumente)
@@ -481,30 +529,38 @@ async def get_document_chunks_paginated(
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
+
         tenant_context = get_tenant_context(current_user)
         TenantFilter.verify_tenant_access(document, tenant_context)
 
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(
                 status_code=400,
-                detail=f"Document not processed yet. Current status: {document.status.value}"
+                detail=f"Document not processed yet. Current status: {document.status.value}",
             )
 
         # Hole Chunks aus Vector Database (schneller als Neuverarbeitung!)
         search_results = await vector_service.get_document_chunks(document_id)
 
         if not search_results:
-            raise HTTPException(status_code=500, detail="Failed to retrieve document chunks from vector database")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to retrieve document chunks from vector database",
+            )
 
         # Konvertiere SearchResult zu Dictionary Format
         chunks = []
         for result in search_results:
-            chunks.append({
-                'chunk_index': result.chunk_index,
-                'content': result.content,
-                'page_number': result.metadata.get('page_number') if result.metadata else None,
-                'metadata': result.metadata
-            })
+            chunks.append(
+                {
+                    "chunk_index": result.chunk_index,
+                    "content": result.content,
+                    "page_number": result.metadata.get("page_number")
+                    if result.metadata
+                    else None,
+                    "metadata": result.metadata,
+                }
+            )
 
         # Berechne Pagination
         total_chunks = len(chunks)
@@ -514,7 +570,7 @@ async def get_document_chunks_paginated(
         if page > total_pages and total_chunks > 0:
             raise HTTPException(
                 status_code=400,
-                detail=f"Page {page} out of range. Total pages: {total_pages}"
+                detail=f"Page {page} out of range. Total pages: {total_pages}",
             )
 
         # Berechne Start- und End-Index
@@ -530,11 +586,15 @@ async def get_document_chunks_paginated(
             "total_pages": total_pages,
             "current_page": page,
             "page_size": page_size,
-            "chunks": paginated_chunks
+            "chunks": paginated_chunks,
         }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get paginated chunks for document {document_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get paginated chunks: {str(e)}")
+        logger.error(
+            f"Failed to get paginated chunks for document {document_id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get paginated chunks: {str(e)}"
+        )

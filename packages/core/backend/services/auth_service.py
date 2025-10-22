@@ -28,7 +28,7 @@ class AuthService:
     """
     Authentication Service für JWT Token Management
     """
-    
+
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """
@@ -42,8 +42,10 @@ class AuthService:
             True if password matches, False otherwise
         """
         return bcrypt.checkpw(
-            plain_password.encode('utf-8'),
-            hashed_password.encode('utf-8') if isinstance(hashed_password, str) else hashed_password
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8")
+            if isinstance(hashed_password, str)
+            else hashed_password,
         )
 
     @staticmethod
@@ -58,21 +60,20 @@ class AuthService:
             Hashed password
         """
         salt = bcrypt.gensalt()
-        hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
-        return hashed.decode('utf-8')
-    
+        hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+        return hashed.decode("utf-8")
+
     @staticmethod
     def create_access_token(
-        data: Dict[str, Any],
-        expires_delta: Optional[timedelta] = None
+        data: Dict[str, Any], expires_delta: Optional[timedelta] = None
     ) -> str:
         """
         Create a JWT access token
-        
+
         Args:
             data: Data to encode in token (user_id, email, etc.)
             expires_delta: Optional custom expiration time
-            
+
         Returns:
             Encoded JWT token
         """
@@ -81,30 +82,33 @@ class AuthService:
         if expires_delta:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            expire = datetime.now(timezone.utc) + timedelta(
+                minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+            )
 
         # Add standard JWT claims
-        to_encode.update({
-            "exp": expire,
-            "iat": datetime.now(timezone.utc),
-            "jti": secrets.token_urlsafe(32)  # JWT ID for token revocation
-        })
-        
+        to_encode.update(
+            {
+                "exp": expire,
+                "iat": datetime.now(timezone.utc),
+                "jti": secrets.token_urlsafe(32),  # JWT ID for token revocation
+            }
+        )
+
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
-    
+
     @staticmethod
     def create_refresh_token(
-        data: Dict[str, Any],
-        expires_delta: Optional[timedelta] = None
+        data: Dict[str, Any], expires_delta: Optional[timedelta] = None
     ) -> str:
         """
         Create a JWT refresh token
-        
+
         Args:
             data: Data to encode in token (user_id, email, etc.)
             expires_delta: Optional custom expiration time
-            
+
         Returns:
             Encoded JWT refresh token
         """
@@ -113,27 +117,31 @@ class AuthService:
         if expires_delta:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+            expire = datetime.now(timezone.utc) + timedelta(
+                days=REFRESH_TOKEN_EXPIRE_DAYS
+            )
 
         # Add standard JWT claims
-        to_encode.update({
-            "exp": expire,
-            "iat": datetime.now(timezone.utc),
-            "jti": secrets.token_urlsafe(32),  # JWT ID for token revocation
-            "type": "refresh"  # Mark as refresh token
-        })
-        
+        to_encode.update(
+            {
+                "exp": expire,
+                "iat": datetime.now(timezone.utc),
+                "jti": secrets.token_urlsafe(32),  # JWT ID for token revocation
+                "type": "refresh",  # Mark as refresh token
+            }
+        )
+
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
-    
+
     @staticmethod
     def decode_token(token: str) -> Optional[Dict[str, Any]]:
         """
         Decode and validate a JWT token
-        
+
         Args:
             token: JWT token to decode
-            
+
         Returns:
             Decoded token payload or None if invalid
         """
@@ -143,23 +151,23 @@ class AuthService:
         except JWTError as e:
             logger.error(f"JWT decode error: {e}")
             return None
-    
+
     @staticmethod
     def create_tokens_for_user(
         user: User,
         db: Session,
         user_agent: Optional[str] = None,
-        ip_address: Optional[str] = None
+        ip_address: Optional[str] = None,
     ) -> Dict[str, str]:
         """
         Create access and refresh tokens for a user and store session
-        
+
         Args:
             user: User object
             db: Database session
             user_agent: User agent string
             ip_address: IP address
-            
+
         Returns:
             Dictionary with access_token and refresh_token
         """
@@ -168,20 +176,20 @@ class AuthService:
             "sub": str(user.id),
             "email": user.email,
             "institution_id": user.institution_id,
-            "roles": [role.name for role in user.roles]
+            "roles": [role.name for role in user.roles],
         }
-        
+
         # Create tokens
         access_token = AuthService.create_access_token(token_data)
         refresh_token = AuthService.create_refresh_token(token_data)
-        
+
         # Decode tokens to get JTI
         access_payload = AuthService.decode_token(access_token)
         refresh_payload = AuthService.decode_token(refresh_token)
-        
+
         if not access_payload or not refresh_payload:
             raise ValueError("Failed to decode tokens")
-        
+
         # Create session record in database
         session = UserSession(
             user_id=user.id,
@@ -190,7 +198,7 @@ class AuthService:
             user_agent=user_agent,
             ip_address=ip_address,
             expires_at=datetime.fromtimestamp(refresh_payload["exp"]),
-            is_active=True
+            is_active=True,
         )
 
         db.add(session)
@@ -206,102 +214,102 @@ class AuthService:
                 data={
                     "ip_address": ip_address,
                     "user_agent": user_agent,
-                    "access_token_jti": access_payload["jti"]
+                    "access_token_jti": access_payload["jti"],
                 },
-                ttl_seconds=ttl_seconds
+                ttl_seconds=ttl_seconds,
             )
         except Exception as e:
             logger.warning(f"Failed to create Redis session: {str(e)}")
 
         logger.info(f"Created tokens for user {user.email} (ID: {user.id})")
-        
+
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "token_type": "bearer"
+            "token_type": "bearer",
         }
-    
+
     @staticmethod
     def refresh_access_token(
         refresh_token: str,
         db: Session,
         user_agent: Optional[str] = None,
-        ip_address: Optional[str] = None
+        ip_address: Optional[str] = None,
     ) -> Optional[Dict[str, str]]:
         """
         Refresh an access token using a refresh token
-        
+
         Args:
             refresh_token: Refresh token
             db: Database session
             user_agent: User agent string
             ip_address: IP address
-            
+
         Returns:
             Dictionary with new access_token or None if invalid
         """
         # Decode refresh token
         payload = AuthService.decode_token(refresh_token)
-        
+
         if not payload:
             logger.warning("Invalid refresh token")
             return None
-        
+
         # Check if it's a refresh token
         if payload.get("type") != "refresh":
             logger.warning("Token is not a refresh token")
             return None
-        
+
         # Check if session exists and is active
-        session = db.query(UserSession).filter(
-            UserSession.refresh_token_jti == payload["jti"],
-            UserSession.is_active == True
-        ).first()
-        
+        session = (
+            db.query(UserSession)
+            .filter(
+                UserSession.refresh_token_jti == payload["jti"], UserSession.is_active
+            )
+            .first()
+        )
+
         if not session:
             logger.warning(f"Session not found or inactive for JTI: {payload['jti']}")
             return None
-        
+
         # Check if session is expired
         if session.expires_at < datetime.now(timezone.utc):
             logger.warning(f"Session expired for user {session.user_id}")
             session.is_active = False
             db.commit()
             return None
-        
+
         # Get user
         user = db.query(User).filter(User.id == session.user_id).first()
-        
+
         if not user or user.status != UserStatus.ACTIVE.value:
             logger.warning(f"User not found or inactive: {session.user_id}")
             return None
-        
+
         # Create new access token
         token_data = {
             "sub": str(user.id),
             "email": user.email,
             "institution_id": user.institution_id,
-            "roles": [role.name for role in user.roles]
+            "roles": [role.name for role in user.roles],
         }
-        
+
         access_token = AuthService.create_access_token(token_data)
         access_payload = AuthService.decode_token(access_token)
-        
+
         if not access_payload:
             raise ValueError("Failed to decode new access token")
-        
+
         # Update session with new access token JTI
         session.token_jti = access_payload["jti"]
         session.last_activity_at = datetime.now(timezone.utc)
         db.commit()
-        
+
         logger.info(f"Refreshed access token for user {user.email} (ID: {user.id})")
-        
-        return {
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
-    
+
+        return {"access_token": access_token, "token_type": "bearer"}
+
     @staticmethod
     def revoke_token(token_jti: str, db: Session, ttl_seconds: int = 1800) -> bool:
         """
@@ -315,9 +323,9 @@ class AuthService:
         Returns:
             True if token was revoked, False otherwise
         """
-        session = db.query(UserSession).filter(
-            UserSession.token_jti == token_jti
-        ).first()
+        session = (
+            db.query(UserSession).filter(UserSession.token_jti == token_jti).first()
+        )
 
         if session:
             session.is_active = False
@@ -336,7 +344,7 @@ class AuthService:
 
         logger.warning(f"Token JTI not found: {token_jti}")
         return False
-    
+
     @staticmethod
     def revoke_all_user_sessions(user_id: int, db: Session) -> int:
         """
@@ -349,10 +357,11 @@ class AuthService:
         Returns:
             Number of sessions revoked
         """
-        sessions = db.query(UserSession).filter(
-            UserSession.user_id == user_id,
-            UserSession.is_active == True
-        ).all()
+        sessions = (
+            db.query(UserSession)
+            .filter(UserSession.user_id == user_id, UserSession.is_active)
+            .all()
+        )
 
         count = 0
         for session in sessions:
@@ -363,11 +372,15 @@ class AuthService:
             try:
                 blacklist = TokenBlacklist()
                 # Calculate remaining TTL
-                remaining_seconds = int((session.expires_at - datetime.now(timezone.utc)).total_seconds())
+                remaining_seconds = int(
+                    (session.expires_at - datetime.now(timezone.utc)).total_seconds()
+                )
                 if remaining_seconds > 0:
                     blacklist.add_token(session.token_jti, remaining_seconds)
                     if session.refresh_token_jti:
-                        blacklist.add_token(session.refresh_token_jti, remaining_seconds)
+                        blacklist.add_token(
+                            session.refresh_token_jti, remaining_seconds
+                        )
             except Exception as e:
                 logger.warning(f"Failed to add tokens to Redis blacklist: {str(e)}")
 
@@ -385,7 +398,7 @@ class AuthService:
         logger.info(f"Revoked {count} sessions for user {user_id}")
 
         return count
-    
+
     @staticmethod
     def is_token_revoked(token_jti: str, db: Session) -> bool:
         """
@@ -407,9 +420,9 @@ class AuthService:
             logger.warning(f"Redis blacklist check failed: {str(e)}")
 
         # Fallback: Database check
-        session = db.query(UserSession).filter(
-            UserSession.token_jti == token_jti
-        ).first()
+        session = (
+            db.query(UserSession).filter(UserSession.token_jti == token_jti).first()
+        )
 
         # If session not found, allow token (stateless JWT validation)
         # This allows tokens that were created before session tracking was implemented
@@ -417,4 +430,3 @@ class AuthService:
             return False  # Token not found = allow (stateless mode)
 
         return not session.is_active
-

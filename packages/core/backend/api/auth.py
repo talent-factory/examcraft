@@ -25,8 +25,10 @@ security = HTTPBearer()
 # Pydantic Models (Request/Response Schemas)
 # ============================================================================
 
+
 class RegisterRequest(BaseModel):
     """User registration request"""
+
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=100)
     first_name: str = Field(..., min_length=1, max_length=100)
@@ -36,12 +38,14 @@ class RegisterRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     """User login request"""
+
     email: EmailStr
     password: str
 
 
 class TokenResponse(BaseModel):
     """JWT token response"""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -49,33 +53,39 @@ class TokenResponse(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     """Refresh token request"""
+
     refresh_token: str
 
 
 class PasswordResetRequest(BaseModel):
     """Password reset request"""
+
     email: EmailStr
 
 
 class PasswordResetConfirm(BaseModel):
     """Password reset confirmation"""
+
     token: str
     new_password: str = Field(..., min_length=8, max_length=100)
 
 
 class SetPasswordRequest(BaseModel):
     """Set password for OAuth-only users"""
+
     password: str = Field(..., min_length=8, max_length=100)
 
 
 class PasswordChangeRequest(BaseModel):
     """Password change request (authenticated user)"""
+
     current_password: str
     new_password: str = Field(..., min_length=8, max_length=100)
 
 
 class RoleResponse(BaseModel):
     """Role response"""
+
     id: int
     name: str
     display_name: str
@@ -90,6 +100,7 @@ class RoleResponse(BaseModel):
 
 class UserProfileResponse(BaseModel):
     """User profile response"""
+
     id: int
     email: str
     first_name: str
@@ -108,6 +119,7 @@ class UserProfileResponse(BaseModel):
 
 class UserProfileUpdate(BaseModel):
     """User profile update request"""
+
     first_name: Optional[str] = Field(None, min_length=1, max_length=100)
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     bio: Optional[str] = Field(None, max_length=500)
@@ -118,15 +130,16 @@ class UserProfileUpdate(BaseModel):
 # API Endpoints
 # ============================================================================
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
+)
 async def register(
-    request: RegisterRequest,
-    http_request: Request,
-    db: Session = Depends(get_db)
+    request: RegisterRequest, http_request: Request, db: Session = Depends(get_db)
 ):
     """
     Register a new user
-    
+
     - Creates new user account
     - Assigns default 'viewer' role
     - Returns JWT tokens
@@ -135,35 +148,35 @@ async def register(
     existing_user = db.query(User).filter(User.email == request.email).first()
     if existing_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
-    
+
     # Get or create institution
     institution = None
     if request.institution_slug:
-        institution = db.query(Institution).filter(
-            Institution.slug == request.institution_slug
-        ).first()
+        institution = (
+            db.query(Institution)
+            .filter(Institution.slug == request.institution_slug)
+            .first()
+        )
         if not institution:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Institution not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Institution not found"
             )
     else:
         # Create personal institution for user
         institution = Institution(
             name=f"{request.first_name} {request.last_name}",
             slug=f"{request.email.split('@')[0]}-personal",
-            domain=request.email.split('@')[1],
+            domain=request.email.split("@")[1],
             subscription_tier="free",
             max_users=1,
             max_documents=10,
-            max_questions_per_month=50
+            max_questions_per_month=50,
         )
         db.add(institution)
         db.flush()  # Get institution.id
-    
+
     # Create user
     user = User(
         email=request.email,
@@ -172,11 +185,11 @@ async def register(
         last_name=request.last_name,
         institution_id=institution.id,
         status=UserStatus.ACTIVE.value,
-        is_superuser=False
+        is_superuser=False,
     )
     db.add(user)
     db.flush()  # Get user.id
-    
+
     # Assign default 'viewer' role
     viewer_role = db.query(Role).filter(Role.name == UserRole.VIEWER.value).first()
     if not viewer_role:
@@ -186,17 +199,18 @@ async def register(
             display_name="Viewer",
             description="Can view questions and exams",
             permissions=["view_questions", "view_exams"],
-            is_system_role=True
+            is_system_role=True,
         )
         db.add(viewer_role)
         db.flush()
-    
+
     user.roles.append(viewer_role)
     db.commit()
     db.refresh(user)
 
     # Audit log: User registration
     from services.audit_service import AuditService
+
     AuditService.log_register(db, user.id, user.email, request=http_request)
 
     # Create tokens
@@ -204,7 +218,7 @@ async def register(
         user,
         db,
         user_agent=http_request.headers.get("user-agent"),
-        ip_address=http_request.client.host if http_request.client else None
+        ip_address=http_request.client.host if http_request.client else None,
     )
 
     logger.info(f"New user registered: {user.email} (ID: {user.id})")
@@ -214,13 +228,11 @@ async def register(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
-    request: LoginRequest,
-    http_request: Request,
-    db: Session = Depends(get_db)
+    request: LoginRequest, http_request: Request, db: Session = Depends(get_db)
 ):
     """
     Login with email and password
-    
+
     - Validates credentials
     - Returns JWT tokens
     - Creates session record
@@ -233,12 +245,15 @@ async def login(
     if not user:
         # Audit log: Failed login (user not found)
         AuditService.log_login(
-            db, None, success=False, request=http_request,
-            error_message="User not found"
+            db,
+            None,
+            success=False,
+            request=http_request,
+            error_message="User not found",
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
+            detail="Incorrect email or password",
         )
 
     # Verify password
@@ -249,22 +264,24 @@ async def login(
 
         # Audit log: Failed login (wrong password)
         AuditService.log_login(
-            db, user.id, success=False, request=http_request,
-            error_message="Incorrect password"
+            db,
+            user.id,
+            success=False,
+            request=http_request,
+            error_message="Incorrect password",
         )
 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
+            detail="Incorrect email or password",
         )
-    
+
     # Check if user is active
     if user.status != UserStatus.ACTIVE.value:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Account is {user.status}"
+            status_code=status.HTTP_403_FORBIDDEN, detail=f"Account is {user.status}"
         )
-    
+
     # Reset failed login attempts
     user.failed_login_attempts = 0
     db.commit()
@@ -277,7 +294,7 @@ async def login(
         user,
         db,
         user_agent=http_request.headers.get("user-agent"),
-        ip_address=http_request.client.host if http_request.client else None
+        ip_address=http_request.client.host if http_request.client else None,
     )
 
     logger.info(f"User logged in: {user.email} (ID: {user.id})")
@@ -287,13 +304,11 @@ async def login(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
-    request: RefreshTokenRequest,
-    http_request: Request,
-    db: Session = Depends(get_db)
+    request: RefreshTokenRequest, http_request: Request, db: Session = Depends(get_db)
 ):
     """
     Refresh access token using refresh token
-    
+
     - Validates refresh token
     - Returns new access token
     """
@@ -301,15 +316,15 @@ async def refresh_token(
         request.refresh_token,
         db,
         user_agent=http_request.headers.get("user-agent"),
-        ip_address=http_request.client.host if http_request.client else None
+        ip_address=http_request.client.host if http_request.client else None,
     )
-    
+
     if not tokens:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token"
+            detail="Invalid or expired refresh token",
         )
-    
+
     return tokens
 
 
@@ -317,7 +332,7 @@ async def refresh_token(
 async def logout(
     http_request: Request,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Logout current user
@@ -329,6 +344,7 @@ async def logout(
 
     # Audit log: User logout
     from services.audit_service import AuditService
+
     AuditService.log_logout(db, current_user.id, request=http_request)
 
     logger.info(f"User logged out: {current_user.email} (revoked {count} sessions)")
@@ -338,7 +354,7 @@ async def logout(
 
 @router.get("/me", response_model=UserProfileResponse)
 async def get_current_user_profile(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Get current user profile
@@ -361,15 +377,17 @@ async def get_current_user_profile(
         elif not isinstance(permissions, list):
             permissions = []
 
-        role_responses.append(RoleResponse(
-            id=role.id,
-            name=role.name,
-            display_name=role.display_name,
-            description=role.description,
-            permissions=permissions,
-            is_system_role=role.is_system_role,
-            created_at=role.created_at.isoformat()
-        ))
+        role_responses.append(
+            RoleResponse(
+                id=role.id,
+                name=role.name,
+                display_name=role.display_name,
+                description=role.description,
+                permissions=permissions,
+                is_system_role=role.is_system_role,
+                created_at=role.created_at.isoformat(),
+            )
+        )
 
     return UserProfileResponse(
         id=current_user.id,
@@ -379,10 +397,12 @@ async def get_current_user_profile(
         status=current_user.status,
         is_superuser=current_user.is_superuser,
         institution_id=current_user.institution_id,
-        institution_name=current_user.institution.name if current_user.institution else None,
+        institution_name=current_user.institution.name
+        if current_user.institution
+        else None,
         oauth_provider=current_user.oauth_provider,
         roles=role_responses,
-        created_at=current_user.created_at.isoformat()
+        created_at=current_user.created_at.isoformat(),
     )
 
 
@@ -390,7 +410,7 @@ async def get_current_user_profile(
 async def update_current_user_profile(
     request: UserProfileUpdate,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Update current user profile
@@ -430,15 +450,17 @@ async def update_current_user_profile(
         elif not isinstance(permissions, list):
             permissions = []
 
-        role_responses.append(RoleResponse(
-            id=role.id,
-            name=role.name,
-            display_name=role.display_name,
-            description=role.description,
-            permissions=permissions,
-            is_system_role=role.is_system_role,
-            created_at=role.created_at.isoformat()
-        ))
+        role_responses.append(
+            RoleResponse(
+                id=role.id,
+                name=role.name,
+                display_name=role.display_name,
+                description=role.description,
+                permissions=permissions,
+                is_system_role=role.is_system_role,
+                created_at=role.created_at.isoformat(),
+            )
+        )
 
     return UserProfileResponse(
         id=current_user.id,
@@ -448,10 +470,12 @@ async def update_current_user_profile(
         status=current_user.status,
         is_superuser=current_user.is_superuser,
         institution_id=current_user.institution_id,
-        institution_name=current_user.institution.name if current_user.institution else None,
+        institution_name=current_user.institution.name
+        if current_user.institution
+        else None,
         oauth_provider=current_user.oauth_provider,
         roles=role_responses,
-        created_at=current_user.created_at.isoformat()
+        created_at=current_user.created_at.isoformat(),
     )
 
 
@@ -460,7 +484,7 @@ async def set_password(
     request: SetPasswordRequest,
     http_request: Request,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Set password for OAuth-only users (no existing password)
@@ -475,7 +499,7 @@ async def set_password(
     if current_user.password_hash is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User already has a password. Use /change-password instead."
+            detail="User already has a password. Use /change-password instead.",
         )
 
     # Set password
@@ -483,9 +507,13 @@ async def set_password(
     db.commit()
 
     # Audit log: Password set for OAuth user
-    AuditService.log_password_change(db, current_user.id, success=True, request=http_request)
+    AuditService.log_password_change(
+        db, current_user.id, success=True, request=http_request
+    )
 
-    logger.info(f"Password set for OAuth user: {current_user.email} (ID: {current_user.id})")
+    logger.info(
+        f"Password set for OAuth user: {current_user.email} (ID: {current_user.id})"
+    )
 
     return None
 
@@ -495,7 +523,7 @@ async def change_password(
     request: PasswordChangeRequest,
     http_request: Request,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Change password for authenticated user
@@ -507,15 +535,20 @@ async def change_password(
     from services.audit_service import AuditService
 
     # Verify current password
-    if not AuthService.verify_password(request.current_password, current_user.password_hash):
+    if not AuthService.verify_password(
+        request.current_password, current_user.password_hash
+    ):
         # Audit log: Failed password change
         AuditService.log_password_change(
-            db, current_user.id, success=False, request=http_request,
-            error_message="Current password is incorrect"
+            db,
+            current_user.id,
+            success=False,
+            request=http_request,
+            error_message="Current password is incorrect",
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect"
+            detail="Current password is incorrect",
         )
 
     # Update password
@@ -526,17 +559,20 @@ async def change_password(
     AuthService.revoke_all_user_sessions(current_user.id, db)
 
     # Audit log: Successful password change
-    AuditService.log_password_change(db, current_user.id, success=True, request=http_request)
+    AuditService.log_password_change(
+        db, current_user.id, success=True, request=http_request
+    )
 
-    logger.info(f"Password changed for user: {current_user.email} (ID: {current_user.id})")
+    logger.info(
+        f"Password changed for user: {current_user.email} (ID: {current_user.id})"
+    )
 
     return None
 
 
 @router.post("/password-reset", status_code=status.HTTP_204_NO_CONTENT)
 async def request_password_reset(
-    request: PasswordResetRequest,
-    db: Session = Depends(get_db)
+    request: PasswordResetRequest, db: Session = Depends(get_db)
 ):
     """
     Request password reset
@@ -559,8 +595,7 @@ async def request_password_reset(
 
 @router.post("/password-reset/confirm", status_code=status.HTTP_204_NO_CONTENT)
 async def confirm_password_reset(
-    request: PasswordResetConfirm,
-    db: Session = Depends(get_db)
+    request: PasswordResetConfirm, db: Session = Depends(get_db)
 ):
     """
     Confirm password reset with token
@@ -573,7 +608,7 @@ async def confirm_password_reset(
     # For now, just return error
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Password reset confirmation not yet implemented"
+        detail="Password reset confirmation not yet implemented",
     )
 
     return None
@@ -583,18 +618,16 @@ async def confirm_password_reset(
 # OAuth Endpoints
 # ============================================================================
 
+
 class OAuthLoginResponse(BaseModel):
     """OAuth login redirect response"""
+
     authorization_url: str
     provider: str
 
 
 @router.get("/oauth/{provider}/login")
-async def oauth_login(
-    provider: str,
-    request: Request,
-    db: Session = Depends(get_db)
-):
+async def oauth_login(provider: str, request: Request, db: Session = Depends(get_db)):
     """
     Initiate OAuth login flow
 
@@ -602,18 +635,19 @@ async def oauth_login(
 
     Redirects user directly to OAuth provider (Google, Microsoft, etc.)
     """
-    if provider not in ['google', 'microsoft']:
+    if provider not in ["google", "microsoft"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported OAuth provider: {provider}. Supported: google, microsoft"
+            detail=f"Unsupported OAuth provider: {provider}. Supported: google, microsoft",
         )
 
     from services.oauth_service import OAuthService
     from fastapi.responses import RedirectResponse
+
     oauth_service = OAuthService(db)
 
     # Generate callback URL
-    base_url = str(request.base_url).rstrip('/')
+    base_url = str(request.base_url).rstrip("/")
     redirect_uri = f"{base_url}/api/auth/oauth/{provider}/callback"
 
     try:
@@ -624,16 +658,13 @@ async def oauth_login(
         logger.error(f"OAuth login failed for {provider}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth login failed: {str(e)}"
+            detail=f"OAuth login failed: {str(e)}",
         )
 
 
 @router.get("/oauth/{provider}/callback", response_model=TokenResponse)
 async def oauth_callback(
-    provider: str,
-    code: str,
-    request: Request,
-    db: Session = Depends(get_db)
+    provider: str, code: str, request: Request, db: Session = Depends(get_db)
 ):
     """
     OAuth callback endpoint
@@ -642,22 +673,25 @@ async def oauth_callback(
 
     Exchanges authorization code for access token and creates/logs in user
     """
-    if provider not in ['google', 'microsoft']:
+    if provider not in ["google", "microsoft"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported OAuth provider: {provider}"
+            detail=f"Unsupported OAuth provider: {provider}",
         )
 
     from services.oauth_service import OAuthService
+
     oauth_service = OAuthService(db)
 
     # Generate callback URL (must match authorization request)
-    base_url = str(request.base_url).rstrip('/')
+    base_url = str(request.base_url).rstrip("/")
     redirect_uri = f"{base_url}/api/auth/oauth/{provider}/callback"
 
     try:
         # Exchange code for token
-        token = await oauth_service.exchange_code_for_token(provider, code, redirect_uri)
+        token = await oauth_service.exchange_code_for_token(
+            provider, code, redirect_uri
+        )
 
         # Get user info from OAuth provider
         user_info = await oauth_service.get_user_info(provider, token)
@@ -670,13 +704,14 @@ async def oauth_callback(
             user=user,
             db=db,
             user_agent=request.headers.get("user-agent"),
-            ip_address=request.client.host if request.client else None
+            ip_address=request.client.host if request.client else None,
         )
 
         logger.info(f"OAuth login successful for user {user.email} via {provider}")
 
         # Redirect to frontend with tokens
         from fastapi.responses import RedirectResponse
+
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         redirect_url = (
             f"{frontend_url}/auth/callback?"
@@ -688,14 +723,10 @@ async def oauth_callback(
 
     except ValueError as e:
         logger.error(f"OAuth callback failed for {provider}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"OAuth callback error for {provider}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth authentication failed: {str(e)}"
+            detail=f"OAuth authentication failed: {str(e)}",
         )
-

@@ -3,7 +3,7 @@ Tests für Authentication Service
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import timedelta
 from sqlalchemy.orm import Session
 
 from services.auth_service import AuthService
@@ -20,7 +20,7 @@ def test_institution(test_db: Session):
         subscription_tier="free",
         max_users=10,
         max_documents=100,
-        max_questions_per_month=1000
+        max_questions_per_month=1000,
     )
     test_db.add(institution)
     test_db.commit()
@@ -38,7 +38,7 @@ def test_user(test_db: Session, test_institution: Institution):
         last_name="User",
         institution_id=test_institution.id,
         status=UserStatus.ACTIVE.value,
-        is_superuser=False
+        is_superuser=False,
     )
     test_db.add(user)
     test_db.commit()
@@ -48,98 +48,98 @@ def test_user(test_db: Session, test_institution: Institution):
 
 class TestPasswordHashing:
     """Test password hashing and verification"""
-    
+
     def test_hash_password(self):
         """Test password hashing"""
         password = "testpassword123"
         hashed = AuthService.get_password_hash(password)
-        
+
         assert hashed != password
         assert len(hashed) > 0
-    
+
     def test_verify_password_correct(self):
         """Test password verification with correct password"""
         password = "testpassword123"
         hashed = AuthService.get_password_hash(password)
-        
+
         assert AuthService.verify_password(password, hashed) is True
-    
+
     def test_verify_password_incorrect(self):
         """Test password verification with incorrect password"""
         password = "testpassword123"
         wrong_password = "wrongpassword"
         hashed = AuthService.get_password_hash(password)
-        
+
         assert AuthService.verify_password(wrong_password, hashed) is False
-    
+
     def test_hash_different_passwords_different_hashes(self):
         """Test that different passwords produce different hashes"""
         password1 = "password1"
         password2 = "password2"
-        
+
         hash1 = AuthService.get_password_hash(password1)
         hash2 = AuthService.get_password_hash(password2)
-        
+
         assert hash1 != hash2
 
 
 class TestTokenCreation:
     """Test JWT token creation"""
-    
+
     def test_create_access_token(self):
         """Test access token creation"""
         data = {"sub": "123", "email": "test@example.com"}
         token = AuthService.create_access_token(data)
-        
+
         assert token is not None
         assert len(token) > 0
-    
+
     def test_create_refresh_token(self):
         """Test refresh token creation"""
         data = {"sub": "123", "email": "test@example.com"}
         token = AuthService.create_refresh_token(data)
-        
+
         assert token is not None
         assert len(token) > 0
-    
+
     def test_create_token_with_custom_expiration(self):
         """Test token creation with custom expiration"""
         data = {"sub": "123"}
         expires_delta = timedelta(minutes=15)
         token = AuthService.create_access_token(data, expires_delta)
-        
+
         payload = AuthService.decode_token(token)
         assert payload is not None
         assert "exp" in payload
-    
+
     def test_decode_valid_token(self):
         """Test decoding valid token"""
         data = {"sub": "123", "email": "test@example.com"}
         token = AuthService.create_access_token(data)
-        
+
         payload = AuthService.decode_token(token)
-        
+
         assert payload is not None
         assert payload["sub"] == "123"
         assert payload["email"] == "test@example.com"
         assert "exp" in payload
         assert "iat" in payload
         assert "jti" in payload
-    
+
     def test_decode_invalid_token(self):
         """Test decoding invalid token"""
         invalid_token = "invalid.token.here"
         payload = AuthService.decode_token(invalid_token)
-        
+
         assert payload is None
-    
+
     def test_refresh_token_has_type_field(self):
         """Test that refresh token has type field"""
         data = {"sub": "123"}
         token = AuthService.create_refresh_token(data)
-        
+
         payload = AuthService.decode_token(token)
-        
+
         assert payload is not None
         assert payload.get("type") == "refresh"
 
@@ -150,10 +150,7 @@ class TestUserTokens:
     def test_create_tokens_for_user(self, test_db: Session, test_user: User):
         """Test creating tokens for a user"""
         tokens = AuthService.create_tokens_for_user(
-            test_user,
-            test_db,
-            user_agent="Test Browser",
-            ip_address="127.0.0.1"
+            test_user, test_db, user_agent="Test Browser", ip_address="127.0.0.1"
         )
 
         assert "access_token" in tokens
@@ -172,17 +169,16 @@ class TestUserTokens:
 
     def test_create_tokens_creates_session(self, test_db: Session, test_user: User):
         """Test that creating tokens creates a session record"""
-        tokens = AuthService.create_tokens_for_user(
-            test_user,
-            test_db,
-            user_agent="Test Browser",
-            ip_address="127.0.0.1"
+        AuthService.create_tokens_for_user(
+            test_user, test_db, user_agent="Test Browser", ip_address="127.0.0.1"
         )
 
         # Check session was created
-        session = test_db.query(UserSession).filter(
-            UserSession.user_id == test_user.id
-        ).first()
+        session = (
+            test_db.query(UserSession)
+            .filter(UserSession.user_id == test_user.id)
+            .first()
+        )
 
         assert session is not None
         assert session.user_agent == "Test Browser"
@@ -253,8 +249,8 @@ class TestTokenRevocation:
     def test_revoke_all_user_sessions(self, test_db: Session, test_user: User):
         """Test revoking all sessions for a user"""
         # Create multiple sessions
-        tokens1 = AuthService.create_tokens_for_user(test_user, test_db)
-        tokens2 = AuthService.create_tokens_for_user(test_user, test_db)
+        AuthService.create_tokens_for_user(test_user, test_db)
+        AuthService.create_tokens_for_user(test_user, test_db)
 
         # Revoke all sessions
         count = AuthService.revoke_all_user_sessions(test_user.id, test_db)
@@ -262,10 +258,11 @@ class TestTokenRevocation:
         assert count == 2
 
         # Check all sessions are revoked
-        sessions = test_db.query(UserSession).filter(
-            UserSession.user_id == test_user.id,
-            UserSession.is_active == True
-        ).all()
+        sessions = (
+            test_db.query(UserSession)
+            .filter(UserSession.user_id == test_user.id, UserSession.is_active)
+            .all()
+        )
 
         assert len(sessions) == 0
 
@@ -276,4 +273,3 @@ class TestTokenRevocation:
         token_jti = access_payload["jti"]
 
         assert AuthService.is_token_revoked(token_jti, test_db) is False
-

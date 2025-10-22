@@ -8,80 +8,85 @@ import httpx
 import json
 import asyncio
 import time
-from typing import List, Dict, Any, Optional
-from pydantic import BaseModel
+from typing import List, Dict, Any
 import logging
-from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+
 class ClaudeService:
     """Service for interacting with Claude API with full production features"""
-    
+
     def __init__(self):
         self.api_key = os.getenv("CLAUDE_API_KEY")
         self.base_url = "https://api.anthropic.com/v1/messages"
         # Using Claude Sonnet 4 (latest stable model as of 2025)
         # Previous models (claude-3-*) are being deprecated
         self.model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
-        
+
         # Rate limiting configuration
         self.max_requests_per_minute = int(os.getenv("CLAUDE_MAX_RPM", "50"))
         self.max_tokens_per_request = int(os.getenv("CLAUDE_MAX_TOKENS", "4000"))
-        
+
         # Retry configuration
         self.max_retries = int(os.getenv("CLAUDE_MAX_RETRIES", "3"))
         self.retry_delay = float(os.getenv("CLAUDE_RETRY_DELAY", "1.0"))
-        
+
         # Cost tracking
         self.cost_per_input_token = 0.003 / 1000  # $3 per million input tokens
         self.cost_per_output_token = 0.015 / 1000  # $15 per million output tokens
-        
+
         # Demo mode fallback
-        self.demo_mode = not self.api_key or os.getenv("CLAUDE_DEMO_MODE", "false").lower() == "true"
-        
+        self.demo_mode = (
+            not self.api_key or os.getenv("CLAUDE_DEMO_MODE", "false").lower() == "true"
+        )
+
         # Rate limiting tracking
         self.request_timestamps = []
         self.total_cost = 0.0
         self.total_input_tokens = 0
         self.total_output_tokens = 0
-        
+
         if self.demo_mode:
             logger.warning("Claude API running in DEMO MODE - using mock responses")
         else:
             logger.info(f"Claude API initialized with model: {self.model}")
-    
+
     def _check_rate_limit(self) -> bool:
         """Check if we're within rate limits"""
         now = time.time()
         # Remove timestamps older than 1 minute
-        self.request_timestamps = [ts for ts in self.request_timestamps if now - ts < 60]
-        
+        self.request_timestamps = [
+            ts for ts in self.request_timestamps if now - ts < 60
+        ]
+
         if len(self.request_timestamps) >= self.max_requests_per_minute:
             return False
         return True
-    
+
     def _add_request_timestamp(self):
         """Add current timestamp to rate limit tracking"""
         self.request_timestamps.append(time.time())
-    
+
     def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
         """Calculate cost for API call"""
         input_cost = input_tokens * self.cost_per_input_token
         output_cost = output_tokens * self.cost_per_output_token
         total_cost = input_cost + output_cost
-        
+
         # Update totals
         self.total_input_tokens += input_tokens
         self.total_output_tokens += output_tokens
         self.total_cost += total_cost
-        
+
         return total_cost
-    
-    async def _make_api_request_with_retry(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def _make_api_request_with_retry(
+        self, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Make API request with retry logic"""
         last_exception = None
-        
+
         for attempt in range(self.max_retries):
             try:
                 # Check rate limit
@@ -89,54 +94,64 @@ class ClaudeService:
                     wait_time = 60 - (time.time() - min(self.request_timestamps))
                     logger.warning(f"Rate limit reached, waiting {wait_time:.1f}s")
                     await asyncio.sleep(wait_time)
-                
+
                 self._add_request_timestamp()
-                
+
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(
                         self.base_url,
                         headers={
                             "Content-Type": "application/json",
                             "x-api-key": self.api_key,
-                            "anthropic-version": "2023-06-01"
+                            "anthropic-version": "2023-06-01",
                         },
-                        json=payload
+                        json=payload,
                     )
-                    
+
                     if response.status_code == 200:
                         result = response.json()
-                        
+
                         # Track usage and cost
                         usage = result.get("usage", {})
                         input_tokens = usage.get("input_tokens", 0)
                         output_tokens = usage.get("output_tokens", 0)
                         cost = self._calculate_cost(input_tokens, output_tokens)
-                        
-                        logger.info(f"Claude API call successful - Cost: ${cost:.4f}, Tokens: {input_tokens}+{output_tokens}")
+
+                        logger.info(
+                            f"Claude API call successful - Cost: ${cost:.4f}, Tokens: {input_tokens}+{output_tokens}"
+                        )
                         return result
-                    
+
                     elif response.status_code == 429:  # Rate limited
-                        retry_after = int(response.headers.get("retry-after", self.retry_delay))
+                        retry_after = int(
+                            response.headers.get("retry-after", self.retry_delay)
+                        )
                         logger.warning(f"Rate limited by API, waiting {retry_after}s")
                         await asyncio.sleep(retry_after)
                         continue
-                    
+
                     else:
-                        error_msg = f"Claude API error {response.status_code}: {response.text}"
+                        error_msg = (
+                            f"Claude API error {response.status_code}: {response.text}"
+                        )
                         logger.error(error_msg)
                         raise Exception(error_msg)
-                        
+
             except Exception as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    wait_time = self.retry_delay * (2 ** attempt)  # Exponential backoff
-                    logger.warning(f"Claude API attempt {attempt + 1} failed: {e}, retrying in {wait_time}s")
+                    wait_time = self.retry_delay * (2**attempt)  # Exponential backoff
+                    logger.warning(
+                        f"Claude API attempt {attempt + 1} failed: {e}, retrying in {wait_time}s"
+                    )
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error(f"Claude API failed after {self.max_retries} attempts: {e}")
-        
+                    logger.error(
+                        f"Claude API failed after {self.max_retries} attempts: {e}"
+                    )
+
         raise last_exception or Exception("Claude API request failed")
-    
+
     def get_usage_stats(self) -> Dict[str, Any]:
         """Get current usage statistics"""
         return {
@@ -144,63 +159,64 @@ class ClaudeService:
             "total_input_tokens": self.total_input_tokens,
             "total_output_tokens": self.total_output_tokens,
             "requests_last_minute": len(self.request_timestamps),
-            "demo_mode": self.demo_mode
+            "demo_mode": self.demo_mode,
         }
-        
+
     async def generate_questions(
-        self, 
-        topic: str, 
+        self,
+        topic: str,
         difficulty: str = "medium",
         question_count: int = 5,
         question_types: List[str] = None,
-        language: str = "de"
+        language: str = "de",
     ) -> List[Dict[str, Any]]:
         """
         Generate exam questions using Claude API with full production features
-        
+
         Args:
             topic: The subject/topic for the questions
             difficulty: easy, medium, or hard
             question_count: Number of questions to generate
             question_types: Types of questions (multiple_choice, open_ended, etc.)
             language: Language for questions (de, en)
-            
+
         Returns:
             List of generated questions
         """
-        
+
         # Use demo mode if API key not available or explicitly enabled
         if self.demo_mode:
             logger.info("Using demo mode for question generation")
-            return self._generate_demo_questions(topic, difficulty, question_count, language)
-        
+            return self._generate_demo_questions(
+                topic, difficulty, question_count, language
+            )
+
         try:
-            prompt = self._build_prompt(topic, difficulty, question_count, question_types, language)
-            
+            prompt = self._build_prompt(
+                topic, difficulty, question_count, question_types, language
+            )
+
             payload = {
                 "model": self.model,
                 "max_tokens": min(self.max_tokens_per_request, 4000),
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
+                "messages": [{"role": "user", "content": prompt}],
             }
-            
+
             # Use new retry logic
             result = await self._make_api_request_with_retry(payload)
             content = result["content"][0]["text"]
             return self._parse_claude_response(content, topic, difficulty)
-                    
+
         except Exception as e:
             logger.error(f"Claude API failed, falling back to demo mode: {str(e)}")
-            return self._generate_demo_questions(topic, difficulty, question_count, language)
-    
+            return self._generate_demo_questions(
+                topic, difficulty, question_count, language
+            )
+
     async def generate_exam_async(self, exam_request: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate exam questions asynchronously for RAG integration
-        
+
         Args:
             exam_request: Dictionary with exam parameters
                 - topic: str
@@ -209,7 +225,7 @@ class ClaudeService:
                 - question_types: List[str]
                 - context: str (optional)
                 - language: str
-                
+
         Returns:
             Dictionary with generated questions
         """
@@ -220,30 +236,30 @@ class ClaudeService:
             question_types = exam_request.get("question_types", ["multiple_choice"])
             context = exam_request.get("context", "")
             language = exam_request.get("language", "de")
-            
+
             # Build enhanced prompt with context
             if context:
                 enhanced_topic = f"{topic}\n\nKontext:\n{context}"
             else:
                 enhanced_topic = topic
-            
+
             # Generate questions using existing method
             questions = await self.generate_questions(
                 topic=enhanced_topic,
                 difficulty=difficulty,
                 question_count=question_count,
                 question_types=question_types,
-                language=language
+                language=language,
             )
-            
+
             return {
                 "questions": questions,
                 "topic": topic,
                 "difficulty": difficulty,
                 "question_count": len(questions),
-                "context_used": bool(context)
+                "context_used": bool(context),
             }
-            
+
         except Exception as e:
             logger.error(f"Exam generation failed: {str(e)}")
             # Return fallback structure
@@ -252,32 +268,32 @@ class ClaudeService:
                     exam_request.get("topic", "Fallback"),
                     exam_request.get("difficulty", "medium"),
                     exam_request.get("question_count", 1),
-                    exam_request.get("language", "de")
+                    exam_request.get("language", "de"),
                 ),
                 "topic": exam_request.get("topic", "Fallback"),
                 "difficulty": exam_request.get("difficulty", "medium"),
                 "question_count": exam_request.get("question_count", 1),
                 "context_used": False,
-                "error": str(e)
+                "error": str(e),
             }
-    
+
     def _build_prompt(
-        self, 
-        topic: str, 
-        difficulty: str, 
-        question_count: int, 
+        self,
+        topic: str,
+        difficulty: str,
+        question_count: int,
         question_types: List[str],
-        language: str
+        language: str,
     ) -> str:
         """Build the prompt for Claude API"""
-        
+
         lang_instruction = "auf Deutsch" if language == "de" else "in English"
         difficulty_map = {
             "easy": "einfach" if language == "de" else "easy",
-            "medium": "mittel" if language == "de" else "medium", 
-            "hard": "schwer" if language == "de" else "hard"
+            "medium": "mittel" if language == "de" else "medium",
+            "hard": "schwer" if language == "de" else "hard",
         }
-        
+
         prompt = f"""
 Erstelle {question_count} Prüfungsfragen zum Thema "{topic}" {lang_instruction}.
 
@@ -322,14 +338,16 @@ Format als JSON:
 Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
 """
         return prompt
-    
-    def _parse_claude_response(self, content: str, topic: str, difficulty: str) -> List[Dict[str, Any]]:
+
+    def _parse_claude_response(
+        self, content: str, topic: str, difficulty: str
+    ) -> List[Dict[str, Any]]:
         """Parse Claude's JSON response"""
         try:
             # Try to extract JSON from the response
-            start_idx = content.find('{')
-            end_idx = content.rfind('}') + 1
-            
+            start_idx = content.find("{")
+            end_idx = content.rfind("}") + 1
+
             if start_idx != -1 and end_idx != -1:
                 json_str = content[start_idx:end_idx]
                 data = json.loads(json_str)
@@ -337,116 +355,128 @@ Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
             else:
                 logger.error("No valid JSON found in Claude response")
                 return self._generate_demo_questions(topic, difficulty, 3, "de")
-                
+
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse Claude response as JSON: {e}")
             return self._generate_demo_questions(topic, difficulty, 3, "de")
-    
+
     def _generate_demo_questions(
-        self, 
-        topic: str, 
-        difficulty: str, 
-        question_count: int,
-        language: str = "de"
+        self, topic: str, difficulty: str, question_count: int, language: str = "de"
     ) -> List[Dict[str, Any]]:
         """Generate demo questions when Claude API is not available"""
-        
+
         demo_questions = []
-        
+
         # Multiple Choice Question
-        demo_questions.append({
-            "id": "demo_q1",
-            "type": "multiple_choice",
-            "question": f"Was ist ein wichtiger Aspekt von {topic}?",
-            "options": [
-                "Option A: Grundlegendes Verständnis",
-                "Option B: Praktische Anwendung", 
-                "Option C: Theoretische Fundierung",
-                "Option D: Alle oben genannten"
-            ],
-            "correct_answer": "Option D: Alle oben genannten",
-            "explanation": f"Bei {topic} sind alle genannten Aspekte wichtig: Grundlegendes Verständnis bildet die Basis, praktische Anwendung zeigt die Relevanz, und theoretische Fundierung sorgt für tieferes Verständnis. Eine ganzheitliche Betrachtung ist daher am sinnvollsten.",
-            "difficulty": difficulty,
-            "topic": topic
-        })
-        
+        demo_questions.append(
+            {
+                "id": "demo_q1",
+                "type": "multiple_choice",
+                "question": f"Was ist ein wichtiger Aspekt von {topic}?",
+                "options": [
+                    "Option A: Grundlegendes Verständnis",
+                    "Option B: Praktische Anwendung",
+                    "Option C: Theoretische Fundierung",
+                    "Option D: Alle oben genannten",
+                ],
+                "correct_answer": "Option D: Alle oben genannten",
+                "explanation": f"Bei {topic} sind alle genannten Aspekte wichtig: Grundlegendes Verständnis bildet die Basis, praktische Anwendung zeigt die Relevanz, und theoretische Fundierung sorgt für tieferes Verständnis. Eine ganzheitliche Betrachtung ist daher am sinnvollsten.",
+                "difficulty": difficulty,
+                "topic": topic,
+            }
+        )
+
         # Open Ended Question
-        demo_questions.append({
-            "id": "demo_q2",
-            "type": "open_ended",
-            "question": f"Erklären Sie die praktische Bedeutung von {topic} in der realen Welt. Geben Sie konkrete Beispiele.",
-            "options": None,
-            "correct_answer": None,
-            "explanation": f"Eine vollständige Antwort zu {topic} sollte folgende Elemente enthalten: 1) Praktische Anwendungsbereiche mit konkreten Beispielen, 2) Relevanz für verschiedene Branchen oder Lebensbereiche, 3) Vorteile und mögliche Herausforderungen. Bewertungskriterien: Fachliches Verständnis (40%), Konkrete Beispiele (30%), Strukturierte Darstellung (30%).",
-            "difficulty": difficulty,
-            "topic": topic
-        })
-        
+        demo_questions.append(
+            {
+                "id": "demo_q2",
+                "type": "open_ended",
+                "question": f"Erklären Sie die praktische Bedeutung von {topic} in der realen Welt. Geben Sie konkrete Beispiele.",
+                "options": None,
+                "correct_answer": None,
+                "explanation": f"Eine vollständige Antwort zu {topic} sollte folgende Elemente enthalten: 1) Praktische Anwendungsbereiche mit konkreten Beispielen, 2) Relevanz für verschiedene Branchen oder Lebensbereiche, 3) Vorteile und mögliche Herausforderungen. Bewertungskriterien: Fachliches Verständnis (40%), Konkrete Beispiele (30%), Strukturierte Darstellung (30%).",
+                "difficulty": difficulty,
+                "topic": topic,
+            }
+        )
+
         # Additional questions based on count
         if question_count > 2:
-            demo_questions.append({
-                "id": "demo_q3",
-                "type": "multiple_choice",
-                "question": f"Welche Herausforderung ist typisch beim Erlernen von {topic}?",
-                "options": [
-                    "Option A: Komplexität der Konzepte",
-                    "Option B: Mangel an Praxisbezug",
-                    "Option C: Schnelle Entwicklung des Fachgebiets",
-                    "Option D: Alle genannten Punkte"
-                ],
-                "correct_answer": "Option D: Alle genannten Punkte",
-                "explanation": "Beim Erlernen komplexer Themen treten oft mehrere Herausforderungen gleichzeitig auf.",
-                "difficulty": difficulty,
-                "topic": topic
-            })
-        
+            demo_questions.append(
+                {
+                    "id": "demo_q3",
+                    "type": "multiple_choice",
+                    "question": f"Welche Herausforderung ist typisch beim Erlernen von {topic}?",
+                    "options": [
+                        "Option A: Komplexität der Konzepte",
+                        "Option B: Mangel an Praxisbezug",
+                        "Option C: Schnelle Entwicklung des Fachgebiets",
+                        "Option D: Alle genannten Punkte",
+                    ],
+                    "correct_answer": "Option D: Alle genannten Punkte",
+                    "explanation": "Beim Erlernen komplexer Themen treten oft mehrere Herausforderungen gleichzeitig auf.",
+                    "difficulty": difficulty,
+                    "topic": topic,
+                }
+            )
+
         return demo_questions[:question_count]
-    
-    def _parse_claude_response(self, content: str, topic: str, difficulty: str) -> List[Dict[str, Any]]:
+
+    def _parse_claude_response(
+        self, content: str, topic: str, difficulty: str
+    ) -> List[Dict[str, Any]]:
         """Parse Claude API response into structured questions"""
         try:
             # Try to parse JSON response
             import re
-            
+
             # Extract JSON from response if wrapped in text
-            json_match = re.search(r'\[.*\]', content, re.DOTALL)
+            json_match = re.search(r"\[.*\]", content, re.DOTALL)
             if json_match:
                 questions_json = json_match.group()
                 questions = json.loads(questions_json)
                 return questions
-            
+
             # Fallback: Parse structured text response
             questions = []
-            lines = content.split('\n')
+            lines = content.split("\n")
             current_question = {}
-            
+
             for line in lines:
                 line = line.strip()
-                if line.startswith('Q:') or line.startswith('Question:'):
+                if line.startswith("Q:") or line.startswith("Question:"):
                     if current_question:
                         questions.append(current_question)
                     current_question = {
-                        'id': len(questions) + 1,
-                        'question': line.replace('Q:', '').replace('Question:', '').strip(),
-                        'type': 'open_ended',
-                        'difficulty': difficulty,
-                        'topic': topic
+                        "id": len(questions) + 1,
+                        "question": line.replace("Q:", "")
+                        .replace("Question:", "")
+                        .strip(),
+                        "type": "open_ended",
+                        "difficulty": difficulty,
+                        "topic": topic,
                     }
-                elif line.startswith('A:') or line.startswith('Answer:'):
+                elif line.startswith("A:") or line.startswith("Answer:"):
                     if current_question:
-                        current_question['correct_answer'] = line.replace('A:', '').replace('Answer:', '').strip()
-                elif line.startswith('Options:') or line.startswith('Choices:'):
-                    current_question['type'] = 'multiple_choice'
-                    current_question['options'] = []
-                elif line.startswith(('a)', 'b)', 'c)', 'd)', 'A)', 'B)', 'C)', 'D)')):
-                    if 'options' in current_question:
-                        current_question['options'].append(line)
-            
+                        current_question["correct_answer"] = (
+                            line.replace("A:", "").replace("Answer:", "").strip()
+                        )
+                elif line.startswith("Options:") or line.startswith("Choices:"):
+                    current_question["type"] = "multiple_choice"
+                    current_question["options"] = []
+                elif line.startswith(("a)", "b)", "c)", "d)", "A)", "B)", "C)", "D)")):
+                    if "options" in current_question:
+                        current_question["options"].append(line)
+
             if current_question:
                 questions.append(current_question)
-            
-            return questions if questions else self._generate_demo_questions(topic, difficulty, 1, 'de')
-            
+
+            return (
+                questions
+                if questions
+                else self._generate_demo_questions(topic, difficulty, 1, "de")
+            )
+
         except Exception as e:
             logger.error(f"Failed to parse Claude response: {e}")
-            return self._generate_demo_questions(topic, difficulty, 1, 'de')
+            return self._generate_demo_questions(topic, difficulty, 1, "de")

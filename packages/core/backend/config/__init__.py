@@ -10,7 +10,7 @@ from .features import (
     get_tier_features,
     has_feature,
     get_quota,
-    is_unlimited
+    is_unlimited,
 )
 
 __all__ = [

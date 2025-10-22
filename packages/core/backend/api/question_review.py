@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from database import get_db
-from models.question_review import QuestionReview, ReviewComment, ReviewHistory, ReviewStatus
+from models.question_review import (
+    QuestionReview,
+    ReviewComment,
+    ReviewHistory,
+    ReviewStatus,
+)
 from models.auth import User
 from utils.auth_utils import get_current_active_user, require_permission
 import logging
@@ -23,6 +28,7 @@ router = APIRouter(prefix="/api/v1/questions", tags=["Question Review"])
 # Pydantic Models
 class QuestionReviewCreate(BaseModel):
     """Request Model für neue Question Review"""
+
     question_text: str = Field(..., min_length=10, max_length=5000)
     question_type: str = Field(..., pattern="^(multiple_choice|open_ended|true_false)$")
     options: Optional[List[str]] = None
@@ -42,6 +48,7 @@ class QuestionReviewCreate(BaseModel):
 
 class QuestionReviewUpdate(BaseModel):
     """Request Model für Question Update"""
+
     question_text: Optional[str] = Field(None, min_length=10, max_length=5000)
     options: Optional[List[str]] = None
     correct_answer: Optional[str] = None
@@ -53,6 +60,7 @@ class QuestionReviewUpdate(BaseModel):
 
 class ReviewActionRequest(BaseModel):
     """Request Model für Review Actions (Approve/Reject)"""
+
     reviewer_id: str = Field(..., min_length=1, max_length=100)
     comment: Optional[str] = Field(None, max_length=2000)
     reason: Optional[str] = Field(None, max_length=500)
@@ -60,14 +68,18 @@ class ReviewActionRequest(BaseModel):
 
 class CommentCreate(BaseModel):
     """Request Model für neuen Comment"""
+
     comment_text: str = Field(..., min_length=1, max_length=2000)
-    comment_type: str = Field(default="general", pattern="^(general|suggestion|issue|approval_note)$")
+    comment_type: str = Field(
+        default="general", pattern="^(general|suggestion|issue|approval_note)$"
+    )
     author: str = Field(..., min_length=1, max_length=100)
     author_role: Optional[str] = Field(None, max_length=50)
 
 
 class QuestionReviewResponse(BaseModel):
     """Response Model für Question Review"""
+
     id: int
     question_text: str
     question_type: str
@@ -89,13 +101,14 @@ class QuestionReviewResponse(BaseModel):
     exam_id: Optional[str]
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class CommentResponse(BaseModel):
     """Response Model für Comment"""
+
     id: int
     question_id: int
     comment_text: str
@@ -104,13 +117,14 @@ class CommentResponse(BaseModel):
     author_role: Optional[str]
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class HistoryResponse(BaseModel):
     """Response Model für History Entry"""
+
     id: int
     question_id: int
     action: str
@@ -120,19 +134,21 @@ class HistoryResponse(BaseModel):
     changed_by: str
     change_reason: Optional[str]
     changed_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class QuestionReviewDetailResponse(QuestionReviewResponse):
     """Detailed Response mit Comments und History"""
+
     comments: List[CommentResponse] = []
     history: List[HistoryResponse] = []
 
 
 class ReviewQueueResponse(BaseModel):
     """Response Model für Review Queue"""
+
     total: int
     pending: int
     approved: int
@@ -144,14 +160,18 @@ class ReviewQueueResponse(BaseModel):
 # API Endpoints
 @router.get("/review", response_model=ReviewQueueResponse)
 async def get_review_queue(
-    status: Optional[str] = Query(None, pattern="^(pending|approved|rejected|edited|in_review)$"),
+    status: Optional[str] = Query(
+        None, pattern="^(pending|approved|rejected|edited|in_review)$"
+    ),
     difficulty: Optional[str] = Query(None, pattern="^(easy|medium|hard)$"),
-    question_type: Optional[str] = Query(None, pattern="^(multiple_choice|open_ended|true_false)$"),
+    question_type: Optional[str] = Query(
+        None, pattern="^(multiple_choice|open_ended|true_false)$"
+    ),
     exam_id: Optional[str] = None,
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Hole Review Queue mit Filtern
@@ -168,7 +188,7 @@ async def get_review_queue(
     try:
         # Base Query
         query = db.query(QuestionReview)
-        
+
         # Apply Filters
         if status:
             query = query.filter(QuestionReview.review_status == status)
@@ -178,36 +198,59 @@ async def get_review_queue(
             query = query.filter(QuestionReview.question_type == question_type)
         if exam_id:
             query = query.filter(QuestionReview.exam_id == exam_id)
-        
+
         # Get Statistics
         total = query.count()
-        pending = db.query(QuestionReview).filter(QuestionReview.review_status == ReviewStatus.PENDING.value).count()
-        approved = db.query(QuestionReview).filter(QuestionReview.review_status == ReviewStatus.APPROVED.value).count()
-        rejected = db.query(QuestionReview).filter(QuestionReview.review_status == ReviewStatus.REJECTED.value).count()
-        in_review = db.query(QuestionReview).filter(QuestionReview.review_status == ReviewStatus.IN_REVIEW.value).count()
-        
+        pending = (
+            db.query(QuestionReview)
+            .filter(QuestionReview.review_status == ReviewStatus.PENDING.value)
+            .count()
+        )
+        approved = (
+            db.query(QuestionReview)
+            .filter(QuestionReview.review_status == ReviewStatus.APPROVED.value)
+            .count()
+        )
+        rejected = (
+            db.query(QuestionReview)
+            .filter(QuestionReview.review_status == ReviewStatus.REJECTED.value)
+            .count()
+        )
+        in_review = (
+            db.query(QuestionReview)
+            .filter(QuestionReview.review_status == ReviewStatus.IN_REVIEW.value)
+            .count()
+        )
+
         # Get Questions with Pagination
-        questions = query.order_by(QuestionReview.created_at.desc()).limit(limit).offset(offset).all()
-        
+        questions = (
+            query.order_by(QuestionReview.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
         return ReviewQueueResponse(
             total=total,
             pending=pending,
             approved=approved,
             rejected=rejected,
             in_review=in_review,
-            questions=questions
+            questions=questions,
         )
-        
+
     except Exception as e:
         logger.error(f"Error fetching review queue: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch review queue: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch review queue: {str(e)}"
+        )
 
 
 @router.get("/{question_id}/review", response_model=QuestionReviewDetailResponse)
 async def get_question_review(
     question_id: int,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Hole detaillierte Question Review mit Comments und History
@@ -215,25 +258,31 @@ async def get_question_review(
     **Required:** Authenticated user
     """
     try:
-        question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
-        
+        question = (
+            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        )
+
         if not question:
-            raise HTTPException(status_code=404, detail=f"Question {question_id} not found")
-        
+            raise HTTPException(
+                status_code=404, detail=f"Question {question_id} not found"
+            )
+
         return question
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching question review {question_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch question review: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch question review: {str(e)}"
+        )
 
 
 @router.post("/review", response_model=QuestionReviewResponse, status_code=201)
 async def create_question_review(
     request: QuestionReviewCreate,
     current_user: User = Depends(require_permission("create_questions")),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Erstelle neue Question Review
@@ -243,6 +292,7 @@ async def create_question_review(
     try:
         # Check question generation limit for institution
         from utils.tenant_utils import SubscriptionLimits
+
         SubscriptionLimits.check_question_limit(current_user.institution, db)
 
         # Create Question Review
@@ -264,38 +314,47 @@ async def create_question_review(
             exam_id=request.exam_id,
             review_status=ReviewStatus.PENDING.value,
             institution_id=current_user.institution_id,  # Multi-tenancy
-            created_by=current_user.id  # Track creator
+            created_by=current_user.id,  # Track creator
         )
-        
+
         db.add(question)
         db.commit()
         db.refresh(question)
-        
+
         # Create History Entry
         history = ReviewHistory(
             question_id=question.id,
             action="created",
             new_status=ReviewStatus.PENDING.value,
             changed_by="system",
-            change_reason="Question created"
+            change_reason="Question created",
         )
         db.add(history)
         db.commit()
 
         # Audit log: Question created
         from services.audit_service import AuditService
+
         AuditService.log_question_action(
-            db, AuditService.ACTION_CREATE_QUESTION, current_user.id, question.id,
-            additional_data={"topic": question.topic, "difficulty": question.difficulty}
+            db,
+            AuditService.ACTION_CREATE_QUESTION,
+            current_user.id,
+            question.id,
+            additional_data={
+                "topic": question.topic,
+                "difficulty": question.difficulty,
+            },
         )
 
         logger.info(f"Created question review {question.id}")
         return question
-        
+
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating question review: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create question review: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create question review: {str(e)}"
+        )
 
 
 @router.put("/{question_id}/edit", response_model=QuestionReviewResponse)
@@ -303,7 +362,7 @@ async def edit_question(
     question_id: int,
     request: QuestionReviewUpdate,
     current_user: User = Depends(require_permission("edit_questions")),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Bearbeite Question (Inline Editing)
@@ -311,51 +370,91 @@ async def edit_question(
     **Required Permission:** `edit_questions` (Dozent, Assistant, Admin)
     """
     try:
-        question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
-        
+        question = (
+            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        )
+
         if not question:
-            raise HTTPException(status_code=404, detail=f"Question {question_id} not found")
-        
+            raise HTTPException(
+                status_code=404, detail=f"Question {question_id} not found"
+            )
+
         # Track changes
         changed_fields = {}
         old_status = question.review_status
-        
+
         # Update fields
-        if request.question_text is not None and request.question_text != question.question_text:
-            changed_fields["question_text"] = {"old": question.question_text, "new": request.question_text}
+        if (
+            request.question_text is not None
+            and request.question_text != question.question_text
+        ):
+            changed_fields["question_text"] = {
+                "old": question.question_text,
+                "new": request.question_text,
+            }
             question.question_text = request.question_text
-        
+
         if request.options is not None and request.options != question.options:
-            changed_fields["options"] = {"old": question.options, "new": request.options}
+            changed_fields["options"] = {
+                "old": question.options,
+                "new": request.options,
+            }
             question.options = request.options
-        
-        if request.correct_answer is not None and request.correct_answer != question.correct_answer:
-            changed_fields["correct_answer"] = {"old": question.correct_answer, "new": request.correct_answer}
+
+        if (
+            request.correct_answer is not None
+            and request.correct_answer != question.correct_answer
+        ):
+            changed_fields["correct_answer"] = {
+                "old": question.correct_answer,
+                "new": request.correct_answer,
+            }
             question.correct_answer = request.correct_answer
-        
-        if request.explanation is not None and request.explanation != question.explanation:
-            changed_fields["explanation"] = {"old": question.explanation, "new": request.explanation}
+
+        if (
+            request.explanation is not None
+            and request.explanation != question.explanation
+        ):
+            changed_fields["explanation"] = {
+                "old": question.explanation,
+                "new": request.explanation,
+            }
             question.explanation = request.explanation
-        
+
         if request.difficulty is not None and request.difficulty != question.difficulty:
-            changed_fields["difficulty"] = {"old": question.difficulty, "new": request.difficulty}
+            changed_fields["difficulty"] = {
+                "old": question.difficulty,
+                "new": request.difficulty,
+            }
             question.difficulty = request.difficulty
-        
-        if request.bloom_level is not None and request.bloom_level != question.bloom_level:
-            changed_fields["bloom_level"] = {"old": question.bloom_level, "new": request.bloom_level}
+
+        if (
+            request.bloom_level is not None
+            and request.bloom_level != question.bloom_level
+        ):
+            changed_fields["bloom_level"] = {
+                "old": question.bloom_level,
+                "new": request.bloom_level,
+            }
             question.bloom_level = request.bloom_level
-        
-        if request.estimated_time_minutes is not None and request.estimated_time_minutes != question.estimated_time_minutes:
-            changed_fields["estimated_time_minutes"] = {"old": question.estimated_time_minutes, "new": request.estimated_time_minutes}
+
+        if (
+            request.estimated_time_minutes is not None
+            and request.estimated_time_minutes != question.estimated_time_minutes
+        ):
+            changed_fields["estimated_time_minutes"] = {
+                "old": question.estimated_time_minutes,
+                "new": request.estimated_time_minutes,
+            }
             question.estimated_time_minutes = request.estimated_time_minutes
-        
+
         # Set status to EDITED if changes were made
         if changed_fields:
             question.review_status = ReviewStatus.EDITED.value
-        
+
         db.commit()
         db.refresh(question)
-        
+
         # Create History Entry
         if changed_fields:
             history = ReviewHistory(
@@ -365,7 +464,7 @@ async def edit_question(
                 new_status=question.review_status,
                 changed_fields=changed_fields,
                 changed_by=current_user.email,
-                change_reason="Question edited"
+                change_reason="Question edited",
             )
             db.add(history)
             db.commit()
@@ -378,7 +477,9 @@ async def edit_question(
     except Exception as e:
         db.rollback()
         logger.error(f"Error editing question {question_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to edit question: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to edit question: {str(e)}"
+        )
 
 
 @router.post("/{question_id}/approve", response_model=QuestionReviewResponse)
@@ -386,7 +487,7 @@ async def approve_question(
     question_id: int,
     request: ReviewActionRequest,
     current_user: User = Depends(require_permission("approve_questions")),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Genehmige Question
@@ -394,10 +495,14 @@ async def approve_question(
     **Required Permission:** `approve_questions` (Dozent, Admin)
     """
     try:
-        question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        question = (
+            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        )
 
         if not question:
-            raise HTTPException(status_code=404, detail=f"Question {question_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Question {question_id} not found"
+            )
 
         old_status = question.review_status
 
@@ -416,7 +521,7 @@ async def approve_question(
             old_status=old_status,
             new_status=ReviewStatus.APPROVED.value,
             changed_by=current_user.email,
-            change_reason=request.reason or "Question approved"
+            change_reason=request.reason or "Question approved",
         )
         db.add(history)
 
@@ -427,7 +532,7 @@ async def approve_question(
                 comment_text=request.comment,
                 comment_type="approval_note",
                 author=current_user.email,
-                author_role="reviewer"
+                author_role="reviewer",
             )
             db.add(comment)
 
@@ -435,9 +540,13 @@ async def approve_question(
 
         # Audit log: Question approved
         from services.audit_service import AuditService
+
         AuditService.log_question_action(
-            db, AuditService.ACTION_APPROVE_QUESTION, current_user.id, question_id,
-            additional_data={"reason": request.reason}
+            db,
+            AuditService.ACTION_APPROVE_QUESTION,
+            current_user.id,
+            question_id,
+            additional_data={"reason": request.reason},
         )
 
         logger.info(f"Approved question {question_id} by {current_user.email}")
@@ -448,7 +557,9 @@ async def approve_question(
     except Exception as e:
         db.rollback()
         logger.error(f"Error approving question {question_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to approve question: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to approve question: {str(e)}"
+        )
 
 
 @router.post("/{question_id}/reject", response_model=QuestionReviewResponse)
@@ -456,7 +567,7 @@ async def reject_question(
     question_id: int,
     request: ReviewActionRequest,
     current_user: User = Depends(require_permission("approve_questions")),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Lehne Question ab
@@ -464,10 +575,14 @@ async def reject_question(
     **Required Permission:** `approve_questions` (Dozent, Admin)
     """
     try:
-        question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        question = (
+            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        )
 
         if not question:
-            raise HTTPException(status_code=404, detail=f"Question {question_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Question {question_id} not found"
+            )
 
         old_status = question.review_status
 
@@ -486,7 +601,7 @@ async def reject_question(
             old_status=old_status,
             new_status=ReviewStatus.REJECTED.value,
             changed_by=current_user.email,
-            change_reason=request.reason or "Question rejected"
+            change_reason=request.reason or "Question rejected",
         )
         db.add(history)
 
@@ -497,7 +612,7 @@ async def reject_question(
                 comment_text=request.comment,
                 comment_type="issue",
                 author=current_user.email,
-                author_role="reviewer"
+                author_role="reviewer",
             )
             db.add(comment)
 
@@ -505,9 +620,13 @@ async def reject_question(
 
         # Audit log: Question rejected
         from services.audit_service import AuditService
+
         AuditService.log_question_action(
-            db, AuditService.ACTION_REJECT_QUESTION, current_user.id, question_id,
-            additional_data={"reason": request.reason}
+            db,
+            AuditService.ACTION_REJECT_QUESTION,
+            current_user.id,
+            question_id,
+            additional_data={"reason": request.reason},
         )
 
         logger.info(f"Rejected question {question_id} by {current_user.email}")
@@ -518,14 +637,16 @@ async def reject_question(
     except Exception as e:
         db.rollback()
         logger.error(f"Error rejecting question {question_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to reject question: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to reject question: {str(e)}"
+        )
 
 
 @router.get("/{question_id}/comments", response_model=List[CommentResponse])
 async def get_comments(
     question_id: int,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Hole alle Comments für eine Question
@@ -534,15 +655,22 @@ async def get_comments(
     """
     try:
         # Check if question exists
-        question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        question = (
+            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        )
 
         if not question:
-            raise HTTPException(status_code=404, detail=f"Question {question_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Question {question_id} not found"
+            )
 
         # Get Comments
-        comments = db.query(ReviewComment).filter(
-            ReviewComment.question_id == question_id
-        ).order_by(ReviewComment.created_at.desc()).all()
+        comments = (
+            db.query(ReviewComment)
+            .filter(ReviewComment.question_id == question_id)
+            .order_by(ReviewComment.created_at.desc())
+            .all()
+        )
 
         return comments
 
@@ -550,7 +678,9 @@ async def get_comments(
         raise
     except Exception as e:
         logger.error(f"Error fetching comments for question {question_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch comments: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch comments: {str(e)}"
+        )
 
 
 @router.post("/{question_id}/comments", response_model=CommentResponse, status_code=201)
@@ -558,7 +688,7 @@ async def add_comment(
     question_id: int,
     request: CommentCreate,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Füge Comment zu Question hinzu
@@ -567,10 +697,14 @@ async def add_comment(
     """
     try:
         # Check if question exists
-        question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        question = (
+            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        )
 
         if not question:
-            raise HTTPException(status_code=404, detail=f"Question {question_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Question {question_id} not found"
+            )
 
         # Create Comment
         comment = ReviewComment(
@@ -578,7 +712,7 @@ async def add_comment(
             comment_text=request.comment_text,
             comment_type=request.comment_type,
             author=request.author,
-            author_role=request.author_role
+            author_role=request.author_role,
         )
 
         db.add(comment)
@@ -597,24 +731,28 @@ async def add_comment(
 
 
 @router.get("/{question_id}/history", response_model=List[HistoryResponse])
-async def get_question_history(
-    question_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_question_history(question_id: int, db: Session = Depends(get_db)):
     """
     Hole History für Question
     """
     try:
         # Check if question exists
-        question = db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        question = (
+            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        )
 
         if not question:
-            raise HTTPException(status_code=404, detail=f"Question {question_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Question {question_id} not found"
+            )
 
         # Get History
-        history = db.query(ReviewHistory).filter(
-            ReviewHistory.question_id == question_id
-        ).order_by(ReviewHistory.changed_at.desc()).all()
+        history = (
+            db.query(ReviewHistory)
+            .filter(ReviewHistory.question_id == question_id)
+            .order_by(ReviewHistory.changed_at.desc())
+            .all()
+        )
 
         return history
 
@@ -622,5 +760,6 @@ async def get_question_history(
         raise
     except Exception as e:
         logger.error(f"Error fetching history for question {question_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
-
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch history: {str(e)}"
+        )

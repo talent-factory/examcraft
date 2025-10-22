@@ -1,6 +1,9 @@
 """
 Beispiele für Feature-Gate-Nutzung in ExamCraft AI
 Zeigt verschiedene Patterns für Feature-Gating und Quota-Checks
+
+HINWEIS: Diese Datei ist nur ein Beispiel und wird nicht im Production-Code verwendet.
+Die Imports get_current_user und get_db sind absichtlich nicht definiert (# noqa: F821).
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,7 +15,7 @@ from backend.middleware.feature_gate import (
     require_feature,
     require_quota,
     check_feature_access,
-    get_user_tier
+    get_user_tier,
 )
 
 # Beispiel Router
@@ -24,7 +27,7 @@ router = APIRouter(prefix="/api/v1/examples", tags=["examples"])
 @require_feature(Feature.DOCUMENT_CHATBOT)
 async def chatbot_query(
     query: str,
-    user: User = Depends(get_current_user)  # type: ignore
+    user: User = Depends(get_current_user),  # type: ignore  # noqa: F821
 ):
     """
     ChatBot-Endpoint - nur für Professional+ Tier
@@ -40,7 +43,7 @@ async def chatbot_query(
 # BEISPIEL 2: Feature-Gate manuell prüfen
 @router.get("/analytics/dashboard")
 async def analytics_dashboard(
-    user: User = Depends(get_current_user)  # type: ignore
+    user: User = Depends(get_current_user),  # type: ignore  # noqa: F821
 ):
     """
     Analytics Dashboard - zeigt unterschiedliche Daten je nach Tier
@@ -48,10 +51,7 @@ async def analytics_dashboard(
     tier = get_user_tier(user)
 
     # Basic Analytics für alle
-    basic_data = {
-        "documents_count": 10,
-        "questions_generated": 50
-    }
+    basic_data = {"documents_count": 10, "questions_generated": 50}
 
     # Advanced Analytics nur für Professional+
     if check_feature_access(user, Feature.ANALYTICS_DASHBOARD):
@@ -59,7 +59,7 @@ async def analytics_dashboard(
             **basic_data,
             "conversion_rate": 0.85,
             "user_engagement": 0.72,
-            "trending_topics": ["AI", "Python", "FastAPI"]
+            "trending_topics": ["AI", "Python", "FastAPI"],
         }
         return {"tier": tier.value, "data": advanced_data}
 
@@ -71,8 +71,8 @@ async def analytics_dashboard(
 @require_quota("max_documents")
 async def upload_document(
     file: bytes,
-    user: User = Depends(get_current_user),  # type: ignore
-    db: Session = Depends(get_db)  # type: ignore
+    user: User = Depends(get_current_user),  # type: ignore  # noqa: F821
+    db: Session = Depends(get_db),  # type: ignore  # noqa: F821
 ):
     """
     Document Upload - mit automatischem Quota-Check
@@ -88,7 +88,7 @@ async def upload_document(
 # BEISPIEL 4: Feature-basiertes Routing
 @router.get("/features/available")
 async def get_available_features(
-    user: User = Depends(get_current_user)  # type: ignore
+    user: User = Depends(get_current_user),  # type: ignore  # noqa: F821
 ):
     """
     Zeigt alle verfügbaren Features für den aktuellen User
@@ -102,14 +102,14 @@ async def get_available_features(
     return {
         "tier": tier.value,
         "features": [f.value for f in features],
-        "quotas": quotas
+        "quotas": quotas,
     }
 
 
 # BEISPIEL 5: Upgrade-Prompt bei Feature-Gate
 @router.post("/premium-feature")
 async def premium_feature(
-    user: User = Depends(get_current_user)  # type: ignore
+    user: User = Depends(get_current_user),  # type: ignore  # noqa: F821
 ):
     """
     Zeigt Upgrade-Prompt wenn Feature nicht verfügbar
@@ -132,8 +132,8 @@ async def premium_feature(
                 "current_tier": tier.value,
                 "recommended_tier": recommended_tier,
                 "upgrade_url": f"/pricing?upgrade_to={recommended_tier}",
-                "message": f"Upgrade auf '{recommended_tier}' um dieses Feature freizuschalten"
-            }
+                "message": f"Upgrade auf '{recommended_tier}' um dieses Feature freizuschalten",
+            },
         )
 
     # Feature ist verfügbar - Implementierung
@@ -145,8 +145,8 @@ async def premium_feature(
 @require_feature(Feature.BATCH_PROCESSING)
 async def batch_generation(
     count: int,
-    user: User = Depends(get_current_user),  # type: ignore
-    db: Session = Depends(get_db)  # type: ignore
+    user: User = Depends(get_current_user),  # type: ignore  # noqa: F821
+    db: Session = Depends(get_db),  # type: ignore  # noqa: F821
 ):
     """
     Batch-Generierung - Feature-Gate + manueller Quota-Check
@@ -160,7 +160,7 @@ async def batch_generation(
     # Implementierung...
     return {
         "message": f"{count} questions generated",
-        "tier": get_user_tier(user).value
+        "tier": get_user_tier(user).value,
     }
 
 

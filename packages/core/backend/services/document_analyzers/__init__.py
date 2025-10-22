@@ -4,4 +4,3 @@ Erweiterte Analyse-Tools für Dokumente
 """
 
 __all__ = []
-
