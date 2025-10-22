@@ -38,6 +38,18 @@ async def lifespan(app: FastAPI):
     from database import create_tables, SessionLocal
     create_tables()
 
+    # Startup: Seed default roles
+    try:
+        from utils.seed_roles import seed_default_roles
+        db = SessionLocal()
+        try:
+            created, updated = seed_default_roles(db)
+            print(f"✅ Roles seeded: {created} created, {updated} updated")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error seeding roles: {str(e)}")
+
     # Startup: Load API routers (Core Package)
     # Premium features (vector_search, chat, prompts) are available in Premium package
     from api import documents, rag_exams, question_review, auth, admin, gdpr
