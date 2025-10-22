@@ -264,6 +264,7 @@ class OAuthService:
         if not default_institution:
             default_institution = Institution(
                 name="Default Institution",
+                slug="default-institution",  # URL-friendly identifier
                 domain="default.examcraft.ai",
                 is_active=True
             )
