@@ -28,12 +28,9 @@ export const OAuthCallback: React.FC = () => {
 
       try {
         console.log('[OAuthCallback] Processing OAuth callback...');
-        
-        // Get authorization code from URL
-        const code = searchParams.get('code');
-        const state = searchParams.get('state');
-        const error = searchParams.get('error');
 
+        // Check for error from OAuth provider
+        const error = searchParams.get('error');
         if (error) {
           console.error('[OAuthCallback] OAuth error:', error);
           setError(`OAuth error: ${error}`);
@@ -41,8 +38,25 @@ export const OAuthCallback: React.FC = () => {
           return;
         }
 
+        // Check if backend already exchanged tokens (new flow)
+        const accessToken = searchParams.get('access_token');
+        const refreshToken = searchParams.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          console.log('[OAuthCallback] Tokens received from backend, storing...');
+          localStorage.setItem('examcraft_access_token', accessToken);
+          localStorage.setItem('examcraft_refresh_token', refreshToken);
+          console.log('[OAuthCallback] Redirecting to dashboard...');
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+
+        // Fallback: Old flow with code exchange (for compatibility)
+        const code = searchParams.get('code');
+        const state = searchParams.get('state');
+
         if (!code) {
-          console.error('[OAuthCallback] No authorization code received');
+          console.error('[OAuthCallback] No authorization code or tokens received');
           setError('No authorization code received');
           setIsProcessing(false);
           return;
@@ -55,9 +69,9 @@ export const OAuthCallback: React.FC = () => {
 
         // Exchange code for tokens
         const response = await AuthService.handleOAuthCallback(provider, code, state || '');
-        const { access_token: accessToken, refresh_token: refreshToken } = response;
+        const { access_token: newAccessToken, refresh_token: newRefreshToken } = response;
 
-        if (!accessToken || !refreshToken) {
+        if (!newAccessToken || !newRefreshToken) {
           console.error('[OAuthCallback] Missing tokens!');
           setError('Missing authentication tokens');
           setIsProcessing(false);
@@ -65,12 +79,10 @@ export const OAuthCallback: React.FC = () => {
         }
 
         console.log('[OAuthCallback] Storing tokens in localStorage...');
-        // Store tokens in localStorage
-        localStorage.setItem('examcraft_access_token', accessToken);
-        localStorage.setItem('examcraft_refresh_token', refreshToken);
+        localStorage.setItem('examcraft_access_token', newAccessToken);
+        localStorage.setItem('examcraft_refresh_token', newRefreshToken);
 
         console.log('[OAuthCallback] Redirecting to dashboard...');
-        // Redirect to dashboard - AuthContext will fetch user profile automatically
         navigate('/dashboard', { replace: true });
       } catch (err) {
         console.error('[OAuthCallback] Error:', err);
