@@ -242,10 +242,10 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     }
   };
 
-  const processedDocuments = documents.filter(doc => doc.status === DocumentStatus.PROCESSED);
-  const canCreateRAGExam = selectedDocuments.length > 0 && 
+  const processedDocuments = documents?.filter(doc => doc.status === DocumentStatus.PROCESSED) || [];
+  const canCreateRAGExam = selectedDocuments.length > 0 &&
     selectedDocuments.every(id => {
-      const doc = documents.find(d => d.id === id);
+      const doc = documents?.find(d => d.id === id);
       return doc?.status === DocumentStatus.PROCESSED && doc?.has_vectors;
     });
 

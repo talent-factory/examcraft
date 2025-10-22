@@ -66,13 +66,8 @@ describe('DocumentLibrary', () => {
 
   describe('Rendering', () => {
     it('renders loading state initially', async () => {
-      mockDocumentService.getAvailableDocuments.mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve({
-          total_documents: 0,
-          processed_documents: 0,
-          documents_with_vectors: 0,
-          documents: []
-        }), 100))
+      mockDocumentService.getDocuments.mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve([]), 100))
       );
 
       render(
@@ -85,12 +80,7 @@ describe('DocumentLibrary', () => {
     });
 
     it('renders document library with documents', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 3,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: mockDocuments
-      });
+      mockDocumentService.getDocuments.mockResolvedValue(mockDocuments);
 
       render(
         <TestWrapper>
@@ -115,12 +105,7 @@ describe('DocumentLibrary', () => {
     });
 
     it('renders empty state when no documents', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 0,
-        processed_documents: 0,
-        documents_with_vectors: 0,
-        documents: []
-      });
+      mockDocumentService.getDocuments.mockResolvedValue([]);
 
       render(
         <TestWrapper>
@@ -137,7 +122,7 @@ describe('DocumentLibrary', () => {
 
     it('renders error state when loading fails', async () => {
       const errorMessage = 'Failed to load documents';
-      mockDocumentService.getAvailableDocuments.mockRejectedValue(new Error(errorMessage));
+      mockDocumentService.getDocuments.mockRejectedValue(new Error(errorMessage));
 
       render(
         <TestWrapper>
@@ -153,12 +138,7 @@ describe('DocumentLibrary', () => {
 
   describe('Document Selection', () => {
     beforeEach(async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 3,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: mockDocuments
-      });
+      mockDocumentService.getDocuments.mockResolvedValue(mockDocuments);
     });
 
     it('allows selecting documents', async () => {
@@ -231,12 +211,7 @@ describe('DocumentLibrary', () => {
 
   describe('Document Actions', () => {
     beforeEach(async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 1,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: [mockDocuments[0]]
-      });
+      mockDocumentService.getDocuments.mockResolvedValue([mockDocuments[0]]);
     });
 
     it('opens context menu on more button click', async () => {
@@ -370,12 +345,7 @@ describe('DocumentLibrary', () => {
 
   describe('Status Display', () => {
     it('displays correct status chips', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 3,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: mockDocuments
-      });
+      mockDocumentService.getDocuments.mockResolvedValue(mockDocuments);
 
       render(
         <TestWrapper>
@@ -391,12 +361,7 @@ describe('DocumentLibrary', () => {
     });
 
     it('shows processing progress for processing documents', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 1,
-        processed_documents: 0,
-        documents_with_vectors: 0,
-        documents: [mockDocuments[1]] // Processing document
-      });
+      mockDocumentService.getDocuments.mockResolvedValue([mockDocuments[1]]);
 
       render(
         <TestWrapper>
@@ -413,12 +378,7 @@ describe('DocumentLibrary', () => {
 
   describe('File Icons', () => {
     it('displays correct file icons for different mime types', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 3,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: mockDocuments
-      });
+      mockDocumentService.getDocuments.mockResolvedValue(mockDocuments);
 
       render(
         <TestWrapper>
@@ -437,12 +397,7 @@ describe('DocumentLibrary', () => {
     });
 
     it('shows vector icon for documents with vectors', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 1,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: [mockDocuments[0]]
-      });
+      mockDocumentService.getDocuments.mockResolvedValue([mockDocuments[0]]);
 
       render(
         <TestWrapper>
@@ -458,12 +413,7 @@ describe('DocumentLibrary', () => {
 
   describe('Refresh Functionality', () => {
     it('refreshes documents when refreshTrigger changes', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 1,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: [mockDocuments[0]]
-      });
+      mockDocumentService.getDocuments.mockResolvedValue([mockDocuments[0]]);
 
       const { rerender } = render(
         <TestWrapper>
@@ -472,7 +422,7 @@ describe('DocumentLibrary', () => {
       );
 
       await waitFor(() => {
-        expect(mockDocumentService.getAvailableDocuments).toHaveBeenCalledTimes(1);
+        expect(mockDocumentService.getDocuments).toHaveBeenCalledTimes(1);
       });
 
       // Change refresh trigger
@@ -483,7 +433,7 @@ describe('DocumentLibrary', () => {
       );
 
       await waitFor(() => {
-        expect(mockDocumentService.getAvailableDocuments).toHaveBeenCalledTimes(2);
+        expect(mockDocumentService.getDocuments).toHaveBeenCalledTimes(2);
       });
     });
   });
@@ -491,7 +441,7 @@ describe('DocumentLibrary', () => {
   describe('Error Handling', () => {
     it('displays error message when document loading fails', async () => {
       const errorMessage = 'Network error';
-      mockDocumentService.getAvailableDocuments.mockRejectedValue(new Error(errorMessage));
+      mockDocumentService.getDocuments.mockRejectedValue(new Error(errorMessage));
 
       render(
         <TestWrapper>
@@ -505,12 +455,7 @@ describe('DocumentLibrary', () => {
     });
 
     it('displays error message when delete fails', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 1,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: [mockDocuments[0]]
-      });
+      mockDocumentService.getDocuments.mockResolvedValue([mockDocuments[0]]);
 
       const errorMessage = 'Delete failed';
       mockDocumentService.deleteDocument.mockRejectedValue(new Error(errorMessage));
@@ -543,12 +488,7 @@ describe('DocumentLibrary', () => {
     });
 
     it('displays error message when download fails', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 1,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: [mockDocuments[0]]
-      });
+      mockDocumentService.getDocuments.mockResolvedValue([mockDocuments[0]]);
 
       const errorMessage = 'Download failed';
       mockDocumentService.downloadDocument.mockRejectedValue(new Error(errorMessage));
@@ -579,12 +519,7 @@ describe('DocumentLibrary', () => {
 
   describe('Accessibility', () => {
     it('has proper ARIA labels and roles', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 1,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: [mockDocuments[0]]
-      });
+      mockDocumentService.getDocuments.mockResolvedValue([mockDocuments[0]]);
 
       render(
         <TestWrapper>
@@ -598,12 +533,7 @@ describe('DocumentLibrary', () => {
     });
 
     it('supports keyboard navigation', async () => {
-      mockDocumentService.getAvailableDocuments.mockResolvedValue({
-        total_documents: 1,
-        processed_documents: 1,
-        documents_with_vectors: 1,
-        documents: [mockDocuments[0]]
-      });
+      mockDocumentService.getDocuments.mockResolvedValue([mockDocuments[0]]);
 
       render(
         <TestWrapper>
