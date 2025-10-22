@@ -41,7 +41,24 @@ export const NavigationBar: React.FC = () => {
                 className="flex items-center space-x-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-full p-1 hover:bg-gray-100 transition-colors"
                 aria-label="User menu"
               >
-                <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-medium">
+                {/* Avatar Image or Initials */}
+                {user?.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={`${user.first_name} ${user.last_name}`}
+                    className="w-8 h-8 rounded-full object-cover"
+                    onError={(e) => {
+                      // Fallback to initials if image fails to load
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-medium"
+                  style={{ display: user?.avatar_url ? 'none' : 'flex' }}
+                >
                   {user?.first_name?.[0]}{user?.last_name?.[0]}
                 </div>
                 <span className="text-gray-700 font-medium">
