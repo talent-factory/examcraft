@@ -47,10 +47,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.13
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.11'
 
       - name: Install Backend Dependencies
         working-directory: packages/core/backend
@@ -152,11 +152,11 @@ jobs:
             echo "Premium package not accessible, skipping tests"
           fi
 
-      - name: Set up Python 3.13
+      - name: Set up Python 3.11
         if: steps.check_premium.outputs.exists == 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.11'
 
       - name: Install Premium Backend Dependencies
         if: steps.check_premium.outputs.exists == 'true'
