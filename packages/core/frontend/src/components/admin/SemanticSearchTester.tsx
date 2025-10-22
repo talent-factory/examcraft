@@ -220,14 +220,16 @@ export const SemanticSearchTester: React.FC = () => {
                           <Chip label={`v${result.version}`} size="small" />
                         </Box>
                       </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
-                        <TrendingUp sx={{ mr: 0.5, fontSize: 16 }} />
-                        <Chip
-                          label={`${(result.similarity_score * 100).toFixed(1)}%`}
-                          color={getSimilarityColor(result.similarity_score)}
-                          size="small"
-                        />
-                      </Box>
+                      {result.similarity_score !== undefined && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
+                          <TrendingUp sx={{ mr: 0.5, fontSize: 16 }} />
+                          <Chip
+                            label={`${(result.similarity_score * 100).toFixed(1)}%`}
+                            color={getSimilarityColor(result.similarity_score)}
+                            size="small"
+                          />
+                        </Box>
+                      )}
                     </Box>
 
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
