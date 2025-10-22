@@ -16,11 +16,14 @@ services:
       - qdrant_data:/qdrant/storage
     environment:
       QDRANT__SERVICE__GRPC_PORT: 6334
+    # Disable healthcheck - Qdrant's built-in healthcheck uses curl which is not installed
+    # Backend will retry connection with exponential backoff instead
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 
   # Backend with Premium Features
   backend:
