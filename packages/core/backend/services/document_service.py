@@ -431,7 +431,7 @@ class DocumentService:
         self, document_id: int, db: Session
     ) -> Optional[List[Dict[str, Any]]]:
         """
-        Hole verarbeitete Chunks eines Dokuments
+        Hole verarbeitete Chunks eines Dokuments aus dem Vector Store
 
         Args:
             document_id: ID des Dokuments
@@ -445,26 +445,53 @@ class DocumentService:
             return None
 
         try:
-            # Verarbeite Dokument erneut um Chunks zu erhalten
-            # In einer späteren Version könnten Chunks in der DB gespeichert werden
-            processed_doc = await self.docling_service.process_document(
-                document_id=document.id,
-                file_path=document.file_path,
-                filename=document.original_filename,
-                mime_type=document.mime_type,
-            )
+            # Hole Chunks aus Vector Store (Qdrant/ChromaDB)
+            vector_service = get_vector_service()
 
-            # Konvertiere Chunks zu Dictionary Format
-            chunks_data = []
-            for chunk in processed_doc.chunks:
-                chunks_data.append(
-                    {
-                        "chunk_index": chunk.chunk_index,
-                        "content": chunk.content,
-                        "page_number": chunk.page_number,
-                        "metadata": chunk.metadata,
-                    }
+            # Check if vector service has get_document_chunks method
+            if not hasattr(vector_service, 'get_document_chunks'):
+                logger.warning("Vector service does not support get_document_chunks, falling back to re-processing")
+                # Fallback: Verarbeite Dokument erneut um Chunks zu erhalten
+                processed_doc = await self.docling_service.process_document(
+                    document_id=document.id,
+                    file_path=document.file_path,
+                    filename=document.original_filename,
+                    mime_type=document.mime_type,
                 )
+
+                # Konvertiere Chunks zu Dictionary Format
+                chunks_data = []
+                for chunk in processed_doc.chunks:
+                    chunks_data.append(
+                        {
+                            "chunk_index": chunk.chunk_index,
+                            "content": chunk.content,
+                            "page_number": chunk.page_number,
+                            "metadata": chunk.metadata,
+                        }
+                    )
+                return chunks_data
+
+            # Hole Chunks aus Vector Store
+            search_results = await vector_service.get_document_chunks(document_id)
+
+            if not search_results:
+                logger.warning(f"No chunks found in vector store for document {document_id}")
+                return []
+
+            # Sortiere nach chunk_index
+            search_results.sort(key=lambda x: x.chunk_index if hasattr(x, 'chunk_index') else 0)
+
+            # Konvertiere SearchResult zu Dictionary Format
+            chunks_data = []
+            for result in search_results:
+                chunk_data = {
+                    "chunk_index": result.chunk_index if hasattr(result, 'chunk_index') else 0,
+                    "content": result.content,
+                    "page_number": result.metadata.get("page_number") if hasattr(result, 'metadata') and result.metadata else None,
+                    "metadata": result.metadata if hasattr(result, 'metadata') else {},
+                }
+                chunks_data.append(chunk_data)
 
             return chunks_data
 
