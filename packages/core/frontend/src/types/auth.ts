@@ -72,6 +72,7 @@ export interface User {
   status: UserStatus;
   is_superuser: boolean;
   oauth_provider?: string;  // OAuth provider (google, microsoft, etc.)
+  avatar_url?: string;  // Profile picture URL (from OAuth or uploaded)
   last_login?: string;
   created_at: string;
   updated_at?: string;
@@ -174,6 +175,7 @@ export interface UserResponse {
   status: UserStatus;
   is_superuser: boolean;
   oauth_provider?: string;  // OAuth provider (google, microsoft, etc.)
+  avatar_url?: string;  // Profile picture URL (from OAuth or uploaded)
   last_login?: string;
   created_at: string;
 }
