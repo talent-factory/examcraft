@@ -247,6 +247,60 @@ class AdminService {
 
     return response.json();
   }
+
+  /**
+   * Update institution
+   */
+  async updateInstitution(
+    institutionId: number,
+    data: {
+      name?: string;
+      domain?: string;
+      subscription_tier?: string;
+      is_active?: boolean;
+    }
+  ): Promise<Institution> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/admin/institutions/${institutionId}`,
+      {
+        method: 'PATCH',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to update institution');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Create institution
+   */
+  async createInstitution(data: {
+    name: string;
+    domain: string;
+    subscription_tier?: string;
+  }): Promise<Institution> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/admin/institutions`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to create institution');
+    }
+
+    return response.json();
+  }
 }
 
 export default new AdminService();
