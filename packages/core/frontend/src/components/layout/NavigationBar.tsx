@@ -18,6 +18,12 @@ export const NavigationBar: React.FC = () => {
     navigate('/login');
   };
 
+  // Get proxied avatar URL to avoid Google rate limiting (429 errors)
+  const getAvatarUrl = (userId: number): string => {
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+    return `${API_BASE_URL}/api/auth/avatar/${userId}`;
+  };
+
   return (
     <nav className="bg-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -42,9 +48,9 @@ export const NavigationBar: React.FC = () => {
                 aria-label="User menu"
               >
                 {/* Avatar Image or Initials */}
-                {user?.avatar_url ? (
+                {user?.id ? (
                   <img
-                    src={user.avatar_url}
+                    src={getAvatarUrl(user.id)}
                     alt={`${user.first_name} ${user.last_name}`}
                     className="w-8 h-8 rounded-full object-cover"
                     onError={(e) => {
@@ -57,7 +63,7 @@ export const NavigationBar: React.FC = () => {
                 ) : null}
                 <div
                   className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-medium"
-                  style={{ display: user?.avatar_url ? 'none' : 'flex' }}
+                  style={{ display: user?.id ? 'none' : 'flex' }}
                 >
                   {user?.first_name?.[0]}{user?.last_name?.[0]}
                 </div>
