@@ -5,6 +5,7 @@ Login, Logout, Register, Profile, Password Reset
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
@@ -14,6 +15,7 @@ import os
 from database import get_db
 from models.auth import User, Role, Institution, UserStatus, UserRole
 from services.auth_service import AuthService
+from services.avatar_service import AvatarService
 from utils.auth_utils import get_current_user, get_current_active_user
 
 logger = logging.getLogger(__name__)
@@ -733,3 +735,73 @@ async def oauth_callback(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"OAuth authentication failed: {str(e)}",
         )
+
+
+# ============================================================================
+# Avatar Proxy Endpoint
+# ============================================================================
+
+
+@router.get("/avatar/{user_id}")
+async def get_user_avatar(
+    user_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Avatar Proxy Endpoint
+
+    Proxies OAuth avatar URLs (e.g., Google) to avoid rate limiting (429 errors).
+    Caches avatar images in Redis for 24 hours.
+
+    **Why this endpoint?**
+    - Google's CDN rate limits direct avatar URL requests
+    - This endpoint downloads the image once and caches it
+    - Frontend uses this endpoint instead of the original OAuth URL
+
+    **Example:**
+    - Original: `https://lh3.googleusercontent.com/a-/ALV-UjUtfwF7...` (429 error)
+    - Proxied: `http://localhost:8000/api/auth/avatar/1` (cached, no rate limit)
+    """
+    # Get user from database
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    if not user.avatar_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User has no avatar"
+        )
+
+    # Download and cache avatar
+    avatar_service = AvatarService()
+    avatar_bytes = avatar_service.get_avatar(user_id, user.avatar_url)
+
+    if not avatar_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to download avatar from OAuth provider"
+        )
+
+    # Return image with appropriate content type
+    # Detect content type from first bytes (magic numbers)
+    content_type = "image/jpeg"  # Default
+    if avatar_bytes[:4] == b'\x89PNG':
+        content_type = "image/png"
+    elif avatar_bytes[:3] == b'GIF':
+        content_type = "image/gif"
+    elif avatar_bytes[:4] == b'RIFF' and avatar_bytes[8:12] == b'WEBP':
+        content_type = "image/webp"
+
+    return Response(
+        content=avatar_bytes,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "public, max-age=86400",  # 24 hours
+            "X-Avatar-Source": "cached" if avatar_bytes else "downloaded"
+        }
+    )
