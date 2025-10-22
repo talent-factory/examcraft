@@ -1,30 +1,39 @@
-name: examcraft
+name: examcraft-core
 
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: examcraft_postgres
     environment:
-      POSTGRES_DB: examcraft
       POSTGRES_USER: examcraft
-      POSTGRES_PASSWORD: examcraft_dev
+      POSTGRES_PASSWORD: examcraft_dev_password
+      POSTGRES_DB: examcraft
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U examcraft"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - examcraft_network
 
-  # Redis Cache
+  # Redis Cache & Session Store
   redis:
     image: redis:7-alpine
     container_name: examcraft_redis
     ports:
-      - "6380:6379"  # Changed to 6380 to avoid conflict with other Redis instances
+      - "6380:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - examcraft_network
 
@@ -33,72 +42,87 @@ services:
     image: qdrant/qdrant:latest
     container_name: examcraft_qdrant
     ports:
-      - "6333:6333"  # HTTP API
-      - "6334:6334"  # gRPC API (optional)
+      - "6333:6333"
+      - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
       - QDRANT__LOG_LEVEL=INFO
-    networks:
-      - examcraft_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/"]
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
+    networks:
+      - examcraft_network
 
-  # FastAPI Backend
+  # Core Backend (Open Source)
   backend:
     build:
       context: .
-      dockerfile: backend/Dockerfile
-      args:
-        BUILD_TIMESTAMP: ${BUILD_TIMESTAMP:-unknown}
+      dockerfile: ./packages/core/backend/Dockerfile
     container_name: examcraft_backend
     environment:
-      - DATABASE_URL=postgresql://examcraft:examcraft_dev@postgres:5432/examcraft
-      - REDIS_URL=redis://redis:6379
-      - QDRANT_URL=http://qdrant:6333
-      - VECTOR_SERVICE_TYPE=qdrant
-      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - ENVIRONMENT=development
-      - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-unknown}
-      - DOCUMENT_PROCESSOR_TYPE=${DOCUMENT_PROCESSOR_TYPE:-docling}
-      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      # Database
+      DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft
+
+      # Redis
+      REDIS_URL: redis://redis:6380/0
+
+      # Qdrant
+      QDRANT_URL: http://qdrant:6333
+      VECTOR_SERVICE_TYPE: qdrant
+
+      # JWT
+      JWT_SECRET_KEY: dev_secret_key_change_in_production
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+
+      # CORS
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8000
+
+      # Feature Flags (Free Tier)
+      DEFAULT_SUBSCRIPTION_TIER: free
+
+      # Claude API (Optional for Core)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      # Environment
+      ENVIRONMENT: development
+      DEBUG: "true"
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "8000:8000"
     volumes:
-      - ./backend:/app
-      - ./pyproject.toml:/app/pyproject.toml:ro
-      - /app/__pycache__
+      - ./packages/core/backend:/app
+      - backend_storage:/app/storage
     depends_on:
-      - postgres
-      - redis
-      - qdrant
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - examcraft_network
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # React Frontend
+  # Core Frontend (Open Source)
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./packages/core/frontend/Dockerfile
     container_name: examcraft_frontend
     environment:
-      - REACT_APP_API_URL=http://localhost:${BACKEND_PORT:-8000}
-      - REACT_APP_ENVIRONMENT=development
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_ENVIRONMENT: development
+      REACT_APP_ENABLE_PREMIUM_FEATURES: "false"
+      REACT_APP_ENABLE_ENTERPRISE_FEATURES: "false"
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "3000:3000"
     volumes:
-      - ./frontend:/app
+      - ./packages/core/frontend:/app
       - /app/node_modules
     depends_on:
       - backend
@@ -108,8 +132,13 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
   qdrant_data:
+    driver: local
+  backend_storage:
+    driver: local
 
 networks:
   examcraft_network:
