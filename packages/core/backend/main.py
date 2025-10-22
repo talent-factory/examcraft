@@ -54,6 +54,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Error seeding roles: {str(e)}")
 
+    # Startup: Seed RBAC data (Features, Tiers, Quotas)
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["python", "scripts/seed_rbac_data.py"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if result.returncode == 0:
+            print("✅ RBAC data seeded successfully")
+        else:
+            print(f"⚠️  RBAC seed warning: {result.stderr}")
+    except Exception as e:
+        print(f"❌ Error seeding RBAC data: {str(e)}")
+
     # Startup: Load API routers (Core Package)
     # Premium features (vector_search, chat, prompts) are available in Premium package
     from api import documents, rag_exams, question_review, auth, admin, gdpr
