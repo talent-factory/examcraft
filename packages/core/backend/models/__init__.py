@@ -7,7 +7,10 @@ Premium features (Chat, Prompts) are available in the Premium package.
 
 from models.document import Document
 from models.question_review import QuestionReview, ReviewComment, ReviewHistory, ReviewStatus
-from models.auth import User, Role, Institution, UserSession, AuditLog, UserRole, UserStatus
+from models.auth import (
+    User, Role, Institution, UserSession, AuditLog, UserRole, UserStatus,
+    OAuthAccount, OAuthProvider
+)
 from models.rbac import (
     Feature, RoleFeature, RBACRole,
     SubscriptionTier, TierQuota, TierFeature,
@@ -27,6 +30,8 @@ __all__ = [
     "AuditLog",
     "UserRole",
     "UserStatus",
+    "OAuthAccount",
+    "OAuthProvider",
     # RBAC Models
     "Feature",
     "RoleFeature",
