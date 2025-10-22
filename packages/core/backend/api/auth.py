@@ -110,6 +110,7 @@ class UserProfileResponse(BaseModel):
     institution_id: Optional[int]
     institution_name: Optional[str]
     oauth_provider: Optional[str] = None  # OAuth provider (google, microsoft, etc.)
+    avatar_url: Optional[str] = None  # Profile picture URL (from OAuth or uploaded)
     roles: list[RoleResponse]
     created_at: str
 
@@ -401,6 +402,7 @@ async def get_current_user_profile(
         if current_user.institution
         else None,
         oauth_provider=current_user.oauth_provider,
+        avatar_url=current_user.avatar_url,
         roles=role_responses,
         created_at=current_user.created_at.isoformat(),
     )
@@ -474,6 +476,7 @@ async def update_current_user_profile(
         if current_user.institution
         else None,
         oauth_provider=current_user.oauth_provider,
+        avatar_url=current_user.avatar_url,
         roles=role_responses,
         created_at=current_user.created_at.isoformat(),
     )
