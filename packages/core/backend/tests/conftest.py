@@ -158,3 +158,23 @@ def mock_upload_file():
     )
 
     return upload_file
+
+
+@pytest.fixture(scope="function")
+def test_institution(test_db):
+    """Erstelle Test-Institution für Subscription Limit Tests"""
+    from models.auth import Institution
+
+    institution = Institution(
+        id=1,
+        name="Test University",
+        subscription_tier="professional",
+        max_users=10,
+        max_documents=100,
+        max_questions_per_month=1000,
+    )
+    test_db.add(institution)
+    test_db.commit()
+    test_db.refresh(institution)
+
+    return institution
