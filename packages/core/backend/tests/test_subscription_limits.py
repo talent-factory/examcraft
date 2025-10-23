@@ -309,22 +309,3 @@ class TestSubscriptionLimits:
             pytest.fail("check_question_limit raised HTTPException when under quota")
 
 
-# ==================== Fixtures ====================
-
-
-@pytest.fixture
-def test_institution(db: Session) -> Institution:
-    """Create a test institution with default quotas"""
-    institution = Institution(
-        name="Test University",
-        slug="test-university",
-        subscription_tier="professional",
-        max_users=10,
-        max_documents=50,
-        max_questions_per_month=200,
-    )
-    test_db.add(institution)
-    test_db.commit()
-    test_db.refresh(institution)
-    return institution
-
