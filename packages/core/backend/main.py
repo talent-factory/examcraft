@@ -15,6 +15,10 @@ from middleware.rate_limit import RateLimitMiddleware
 # Load environment variables
 load_dotenv()
 
+# Initialize Sentry (must be done before FastAPI app creation)
+from config.sentry import init_sentry
+init_sentry()
+
 # Lazy-loaded services (to reduce memory at startup)
 _claude_service = None
 
@@ -72,7 +76,7 @@ async def lifespan(app: FastAPI):
 
     # Startup: Load API routers (Core Package)
     # Premium features (vector_search, chat, prompts) are available in Premium package
-    from api import documents, rag_exams, question_review, auth, admin, gdpr
+    from api import documents, rag_exams, question_review, auth, admin, gdpr, sentry_test
     from api.v1 import rbac as rbac_api
 
     app.include_router(auth.router)
@@ -82,6 +86,10 @@ async def lifespan(app: FastAPI):
     app.include_router(rag_exams.router)
     app.include_router(rbac_api.router)
     app.include_router(question_review.router)
+
+    # Sentry Test Router (only in development)
+    if os.getenv("ENVIRONMENT", "development") == "development":
+        app.include_router(sentry_test.router)
 
     # Startup: Reset any documents stuck in PROCESSING status
     # (happens when backend restarts during document processing)
@@ -147,6 +155,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Sentry Context Middleware (must be added before other middlewares)
+from middleware.sentry_context import SentryContextMiddleware
+app.add_middleware(SentryContextMiddleware)
 
 # Rate Limiting middleware
 rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
