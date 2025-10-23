@@ -171,6 +171,7 @@ def test_institution(test_db):
     institution = Institution(
         id=1,
         name="Test University",
+        slug="test-university",  # Required field
         subscription_tier="professional",
         max_users=10,
         max_documents=100,
