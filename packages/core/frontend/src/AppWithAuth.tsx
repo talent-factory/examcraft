@@ -24,6 +24,7 @@ import { Review } from './pages/Review';
 import { Admin } from './pages/Admin';
 import { UserRole } from './types/auth';
 import App from './App';
+import { AppErrorBoundary } from './components/ErrorBoundary';
 
 // Create a QueryClient instance for TanStack Query
 const queryClient = new QueryClient({
@@ -38,10 +39,11 @@ const queryClient = new QueryClient({
 
 export const AppWithAuth: React.FC = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
             {/* Public Routes - Only accessible when NOT authenticated */}
             <Route
               path="/login"
@@ -199,6 +201,7 @@ export const AppWithAuth: React.FC = () => {
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
+    </AppErrorBoundary>
   );
 };
 
