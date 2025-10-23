@@ -28,7 +28,7 @@ authlib==1.3.0                      # OAuth2 Client Library
 itsdangerous==2.1.2                 # Secure Token Generation for OAuth State
 
 # Error Tracking & Monitoring
-sentry-sdk[fastapi]==2.18.0         # Sentry SDK with FastAPI Integration
+sentry-sdk[fastapi]==2.42.1         # Sentry SDK with FastAPI Integration
 
 # CORS (built into FastAPI)
 # No additional package needed
