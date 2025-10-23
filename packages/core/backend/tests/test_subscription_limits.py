@@ -116,7 +116,7 @@ class TestSubscriptionLimits:
         for i in range(5):
             inactive_user = User(
                 email=f"inactive{i}@test.com",
-                username=f"inactive{i}",
+                first_name="Inactive", last_name=f"{i}",
                 password_hash="dummy",
                 institution_id=test_institution.id,
                 status=UserStatus.INACTIVE.value,
@@ -149,7 +149,7 @@ class TestSubscriptionLimits:
                 mime_type="application/pdf",
                 status=DocumentStatus.PROCESSED.value,
                 institution_id=test_institution.id,
-                uploaded_by=1,
+                user_id=1,
             )
             test_db.add(doc)
         test_db.commit()
@@ -177,7 +177,7 @@ class TestSubscriptionLimits:
                 mime_type="application/pdf",
                 status=DocumentStatus.PROCESSED.value,
                 institution_id=test_institution.id,
-                uploaded_by=1,
+                user_id=1,
             )
             test_db.add(doc)
         test_db.commit()
@@ -207,7 +207,7 @@ class TestSubscriptionLimits:
                 mime_type="application/pdf",
                 status=DocumentStatus.PROCESSED.value,
                 institution_id=test_institution.id,
-                uploaded_by=1,
+                user_id=1,
             )
             test_db.add(doc)
         test_db.commit()
@@ -234,7 +234,7 @@ class TestSubscriptionLimits:
                 question_text=f"Question {i}?",
                 question_type="multiple_choice",
                 difficulty="medium",
-                bloom_level="understand",
+                bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
                 created_by=1,
@@ -263,7 +263,7 @@ class TestSubscriptionLimits:
                 question_text=f"Question {i}?",
                 question_type="multiple_choice",
                 difficulty="medium",
-                bloom_level="understand",
+                bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
                 created_by=1,
@@ -294,7 +294,7 @@ class TestSubscriptionLimits:
                 question_text=f"Question {i}?",
                 question_type="multiple_choice",
                 difficulty="medium",
-                bloom_level="understand",
+                bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
                 created_by=1,
