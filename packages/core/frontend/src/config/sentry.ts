@@ -1,6 +1,6 @@
 /**
  * Sentry Configuration for ExamCraft Frontend
- * 
+ *
  * Initializes Sentry for error tracking and performance monitoring.
  * Only enabled in staging and production environments.
  */
@@ -30,14 +30,7 @@ export function initSentry() {
     // Integrations
     integrations: [
       // Browser Tracing for Performance Monitoring
-      Sentry.browserTracingIntegration({
-        // Trace all navigation and interactions
-        tracePropagationTargets: [
-          "localhost",
-          /^https:\/\/.*\.render\.com/,
-          /^https:\/\/examcraft\.*/,
-        ],
-      }),
+      Sentry.browserTracingIntegration(),
 
       // Session Replay for debugging (captures user interactions)
       Sentry.replayIntegration({
@@ -101,4 +94,3 @@ export function initSentry() {
 
   console.log("[Sentry] Initialized for", environment, "with version", version);
 }
-

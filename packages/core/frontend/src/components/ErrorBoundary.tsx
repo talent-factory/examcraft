@@ -1,6 +1,6 @@
 /**
  * Error Boundary Component with Sentry Integration
- * 
+ *
  * Catches React errors and displays a user-friendly fallback UI.
  * Automatically reports errors to Sentry.
  */
@@ -10,7 +10,7 @@ import * as Sentry from '@sentry/react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
 interface ErrorFallbackProps {
-  error: Error;
+  error: Error | unknown;
   resetError: () => void;
 }
 
@@ -19,6 +19,9 @@ interface ErrorFallbackProps {
  */
 function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   const isDevelopment = process.env.REACT_APP_ENVIRONMENT === 'development';
+
+  // Type guard to safely access error properties
+  const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -44,7 +47,7 @@ function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
           {isDevelopment && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded">
               <p className="text-sm font-mono text-red-800 break-words">
-                {error.message}
+                {errorMessage}
               </p>
             </div>
           )}
@@ -81,7 +84,7 @@ function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
 
 /**
  * Error Boundary Component
- * 
+ *
  * Wraps the application and catches React errors.
  * Integrates with Sentry for automatic error reporting.
  */
@@ -121,4 +124,3 @@ export const ErrorTestButton: React.FC = () => {
     </button>
   );
 };
-
