@@ -287,7 +287,7 @@ class AuthService:
             logger.warning(f"User not found or inactive: {session.user_id}")
             return None
 
-        # Create new access token
+        # Create new access token and refresh token (Token Rotation)
         token_data = {
             "sub": str(user.id),
             "email": user.email,
@@ -301,14 +301,26 @@ class AuthService:
         if not access_payload:
             raise ValueError("Failed to decode new access token")
 
-        # Update session with new access token JTI
+        # Create new refresh token (Token Rotation for security)
+        new_refresh_token = AuthService.create_refresh_token(token_data)
+        refresh_payload = AuthService.decode_token(new_refresh_token)
+
+        if not refresh_payload:
+            raise ValueError("Failed to decode new refresh token")
+
+        # Update session with new token JTIs
         session.token_jti = access_payload["jti"]
+        session.refresh_token_jti = refresh_payload["jti"]
         session.last_activity_at = datetime.now(timezone.utc)
         db.commit()
 
-        logger.info(f"Refreshed access token for user {user.email} (ID: {user.id})")
+        logger.info(f"Refreshed tokens for user {user.email} (ID: {user.id})")
 
-        return {"access_token": access_token, "token_type": "bearer"}
+        return {
+            "access_token": access_token,
+            "refresh_token": new_refresh_token,
+            "token_type": "bearer",
+        }
 
     @staticmethod
     def revoke_token(token_jti: str, db: Session, ttl_seconds: int = 1800) -> bool:
