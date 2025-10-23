@@ -14,17 +14,21 @@ ExamCraft AI nutzt [Sentry.io](https://sentry.io) für:
 
 ### 1. Sentry DSNs erhalten
 
-Die DSNs (Data Source Names) sind bereits in den `.env` Dateien konfiguriert:
+Die DSNs (Data Source Names) müssen in den `.env` Dateien konfiguriert werden.
 
-**Backend DSN:**
+**So finden Sie Ihre DSNs:**
+
+1. Gehen Sie zu https://talent-factory.sentry.io/
+2. Klicken Sie auf "Projects" → Ihr Projekt (z.B. "examcraft-frontend")
+3. Klicken Sie auf "Settings" (⚙️) → "Client Keys (DSN)"
+4. Kopieren Sie den DSN (Format: `https://xxxxx@xxxxx.ingest.de.sentry.io/xxxxx`)
+
+**Beispiel DSN-Format:**
 ```
-https://3defbb903cfb9fc06437cdf23c812385@o4509606849019904.ingest.de.sentry.io/4510238621106256
+https://YOUR_KEY_HERE@o1234567890123456.ingest.de.sentry.io/1234567890123456
 ```
 
-**Frontend DSN:**
-```
-https://acc8ca397422d4f7be7c6e2271f304ef@o4509606849019904.ingest.de.sentry.io/4510238613831760
-```
+⚠️ **WICHTIG:** Committen Sie niemals echte DSNs in Git! Verwenden Sie `.env` (ist in `.gitignore`).
 
 ### 2. Sentry aktivieren
 
@@ -115,7 +119,7 @@ Das Frontend hat einen Test-Button (nur in development):
 
 **Backend (.env):**
 ```bash
-SENTRY_DSN=https://...@o4509606849019904.ingest.de.sentry.io/...
+SENTRY_DSN=https://YOUR_BACKEND_KEY@oXXXXXXXXXXXXXXXX.ingest.de.sentry.io/XXXXXXXXXXXXXXXXX
 ENABLE_SENTRY=false              # true für Production
 ENVIRONMENT=development          # development, staging, production
 APP_VERSION=1.0.0-dev           # Für Release Tracking
@@ -123,7 +127,7 @@ APP_VERSION=1.0.0-dev           # Für Release Tracking
 
 **Frontend (.env):**
 ```bash
-REACT_APP_SENTRY_DSN=https://...@o4509606849019904.ingest.de.sentry.io/...
+REACT_APP_SENTRY_DSN=https://YOUR_FRONTEND_KEY@oXXXXXXXXXXXXXXXX.ingest.de.sentry.io/XXXXXXXXXXXXXXXXX
 REACT_APP_ENABLE_SENTRY=false   # true für Production
 REACT_APP_ENVIRONMENT=development
 REACT_APP_VERSION=1.0.0-dev
@@ -337,4 +341,3 @@ tracesSampleRate: 1.0  # Für Testing
 2. Alert-Rules konfigurieren
 3. Team-Mitglieder zu Sentry hinzufügen
 4. Regelmäßig Sentry Dashboard prüfen
-
