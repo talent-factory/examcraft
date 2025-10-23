@@ -242,7 +242,8 @@ def test_create_database_session(db):
 
     session = UserSession(
         user_id=user.id,
-        session_token="test_session_token",
+        token_jti="test_token_jti_123",  # Fixed: use token_jti instead of session_token
+        refresh_token_jti="test_refresh_jti_123",
         ip_address="192.168.1.1",
         user_agent="Mozilla/5.0",
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
@@ -262,7 +263,8 @@ def test_revoke_database_session(db):
 
     session = UserSession(
         user_id=user.id,
-        session_token="test_session_token",
+        token_jti="test_token_jti_456",  # Fixed: use token_jti instead of session_token
+        refresh_token_jti="test_refresh_jti_456",
         ip_address="192.168.1.1",
         user_agent="Mozilla/5.0",
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
@@ -286,7 +288,8 @@ def test_query_active_sessions(db):
     # Create active session
     active_session = UserSession(
         user_id=user.id,
-        session_token="active_token",
+        token_jti="active_token_jti_789",  # Fixed: use token_jti
+        refresh_token_jti="active_refresh_jti_789",
         ip_address="192.168.1.1",
         user_agent="Mozilla/5.0",
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
@@ -296,7 +299,8 @@ def test_query_active_sessions(db):
     # Create revoked session
     revoked_session = UserSession(
         user_id=user.id,
-        session_token="revoked_token",
+        token_jti="revoked_token_jti_101",  # Fixed: use token_jti
+        refresh_token_jti="revoked_refresh_jti_101",
         ip_address="192.168.1.2",
         user_agent="Mozilla/5.0",
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
@@ -316,7 +320,7 @@ def test_query_active_sessions(db):
     )
 
     assert len(active_sessions) == 1
-    assert active_sessions[0].session_token == "active_token"
+    assert active_sessions[0].token_jti == "active_token_jti_789"  # Fixed: use token_jti
 
 
 def test_query_expired_sessions(db):
@@ -326,7 +330,8 @@ def test_query_expired_sessions(db):
     # Create expired session
     expired_session = UserSession(
         user_id=user.id,
-        session_token="expired_token",
+        token_jti="expired_token_jti_202",  # Fixed: use token_jti
+        refresh_token_jti="expired_refresh_jti_202",
         ip_address="192.168.1.1",
         user_agent="Mozilla/5.0",
         expires_at=datetime.now(timezone.utc) - timedelta(hours=1),  # Already expired
@@ -336,7 +341,8 @@ def test_query_expired_sessions(db):
     # Create valid session
     valid_session = UserSession(
         user_id=user.id,
-        session_token="valid_token",
+        token_jti="valid_token_jti_303",  # Fixed: use token_jti
+        refresh_token_jti="valid_refresh_jti_303",
         ip_address="192.168.1.2",
         user_agent="Mozilla/5.0",
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
@@ -356,4 +362,4 @@ def test_query_expired_sessions(db):
     )
 
     assert len(expired_sessions) == 1
-    assert expired_sessions[0].session_token == "expired_token"
+    assert expired_sessions[0].token_jti == "expired_token_jti_202"  # Fixed: use token_jti
