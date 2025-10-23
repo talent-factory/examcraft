@@ -19,11 +19,11 @@ class TestSubscriptionLimits:
 
     # ==================== User Limit Tests ====================
 
-    def test_check_user_limit_unlimited(self, db: Session, test_institution: Institution):
+    def test_check_user_limit_unlimited(self, test_db: Session, test_institution: Institution):
         """Test that unlimited user quota (-1) allows any number of users"""
         # Arrange: Set unlimited quota
         test_institution.max_users = -1
-        db.commit()
+        test_db.commit()
 
         # Create 100 active users (way over any normal limit)
         for i in range(100):
@@ -34,20 +34,20 @@ class TestSubscriptionLimits:
                 institution_id=test_institution.id,
                 status=UserStatus.ACTIVE.value,
             )
-            db.add(user)
-        db.commit()
+            test_db.add(user)
+        test_db.commit()
 
         # Act & Assert: Should not raise exception
         try:
-            SubscriptionLimits.check_user_limit(test_institution, db)
+            SubscriptionLimits.check_user_limit(test_institution, test_db)
         except HTTPException:
             pytest.fail("check_user_limit raised HTTPException for unlimited quota")
 
-    def test_check_user_limit_exceeded(self, db: Session, test_institution: Institution):
+    def test_check_user_limit_exceeded(self, test_db: Session, test_institution: Institution):
         """Test that user limit is enforced when quota is set"""
         # Arrange: Set limit to 3 users
         test_institution.max_users = 3
-        db.commit()
+        test_db.commit()
 
         # Create 3 active users (at limit)
         for i in range(3):
@@ -58,22 +58,22 @@ class TestSubscriptionLimits:
                 institution_id=test_institution.id,
                 status=UserStatus.ACTIVE.value,
             )
-            db.add(user)
-        db.commit()
+            test_db.add(user)
+        test_db.commit()
 
         # Act & Assert: Should raise exception
         with pytest.raises(HTTPException) as exc_info:
-            SubscriptionLimits.check_user_limit(test_institution, db)
+            SubscriptionLimits.check_user_limit(test_institution, test_db)
 
         assert exc_info.value.status_code == 403
         assert "User limit reached" in exc_info.value.detail
         assert "3 users" in exc_info.value.detail
 
-    def test_check_user_limit_not_exceeded(self, db: Session, test_institution: Institution):
+    def test_check_user_limit_not_exceeded(self, test_db: Session, test_institution: Institution):
         """Test that user limit allows creation when under quota"""
         # Arrange: Set limit to 5 users
         test_institution.max_users = 5
-        db.commit()
+        test_db.commit()
 
         # Create 2 active users (under limit)
         for i in range(2):
@@ -84,12 +84,12 @@ class TestSubscriptionLimits:
                 institution_id=test_institution.id,
                 status=UserStatus.ACTIVE.value,
             )
-            db.add(user)
-        db.commit()
+            test_db.add(user)
+        test_db.commit()
 
         # Act & Assert: Should not raise exception
         try:
-            SubscriptionLimits.check_user_limit(test_institution, db)
+            SubscriptionLimits.check_user_limit(test_institution, test_db)
         except HTTPException:
             pytest.fail("check_user_limit raised HTTPException when under quota")
 
@@ -99,7 +99,7 @@ class TestSubscriptionLimits:
         """Test that inactive users don't count towards quota"""
         # Arrange: Set limit to 2 users
         test_institution.max_users = 2
-        db.commit()
+        test_db.commit()
 
         # Create 1 active user
         active_user = User(
@@ -109,7 +109,7 @@ class TestSubscriptionLimits:
             institution_id=test_institution.id,
             status=UserStatus.ACTIVE.value,
         )
-        db.add(active_user)
+        test_db.add(active_user)
 
         # Create 5 inactive users
         for i in range(5):
@@ -120,12 +120,12 @@ class TestSubscriptionLimits:
                 institution_id=test_institution.id,
                 status=UserStatus.INACTIVE.value,
             )
-            db.add(inactive_user)
-        db.commit()
+            test_db.add(inactive_user)
+        test_db.commit()
 
         # Act & Assert: Should not raise exception (only 1 active user)
         try:
-            SubscriptionLimits.check_user_limit(test_institution, db)
+            SubscriptionLimits.check_user_limit(test_institution, test_db)
         except HTTPException:
             pytest.fail("check_user_limit counted inactive users towards quota")
 
@@ -137,7 +137,7 @@ class TestSubscriptionLimits:
         """Test that unlimited document quota (-1) allows any number of documents"""
         # Arrange: Set unlimited quota
         test_institution.max_documents = -1
-        db.commit()
+        test_db.commit()
 
         # Create 100 documents (way over any normal limit)
         for i in range(100):
@@ -150,12 +150,12 @@ class TestSubscriptionLimits:
                 institution_id=test_institution.id,
                 uploaded_by=1,
             )
-            db.add(doc)
-        db.commit()
+            test_db.add(doc)
+        test_db.commit()
 
         # Act & Assert: Should not raise exception
         try:
-            SubscriptionLimits.check_document_limit(test_institution, db)
+            SubscriptionLimits.check_document_limit(test_institution, test_db)
         except HTTPException:
             pytest.fail("check_document_limit raised HTTPException for unlimited quota")
 
@@ -165,7 +165,7 @@ class TestSubscriptionLimits:
         """Test that document limit is enforced when quota is set"""
         # Arrange: Set limit to 5 documents
         test_institution.max_documents = 5
-        db.commit()
+        test_db.commit()
 
         # Create 5 documents (at limit)
         for i in range(5):
@@ -178,12 +178,12 @@ class TestSubscriptionLimits:
                 institution_id=test_institution.id,
                 uploaded_by=1,
             )
-            db.add(doc)
-        db.commit()
+            test_db.add(doc)
+        test_db.commit()
 
         # Act & Assert: Should raise exception
         with pytest.raises(HTTPException) as exc_info:
-            SubscriptionLimits.check_document_limit(test_institution, db)
+            SubscriptionLimits.check_document_limit(test_institution, test_db)
 
         assert exc_info.value.status_code == 403
         assert "Document limit reached" in exc_info.value.detail
@@ -195,7 +195,7 @@ class TestSubscriptionLimits:
         """Test that document limit allows upload when under quota"""
         # Arrange: Set limit to 10 documents
         test_institution.max_documents = 10
-        db.commit()
+        test_db.commit()
 
         # Create 3 documents (under limit)
         for i in range(3):
@@ -208,12 +208,12 @@ class TestSubscriptionLimits:
                 institution_id=test_institution.id,
                 uploaded_by=1,
             )
-            db.add(doc)
-        db.commit()
+            test_db.add(doc)
+        test_db.commit()
 
         # Act & Assert: Should not raise exception
         try:
-            SubscriptionLimits.check_document_limit(test_institution, db)
+            SubscriptionLimits.check_document_limit(test_institution, test_db)
         except HTTPException:
             pytest.fail("check_document_limit raised HTTPException when under quota")
 
@@ -225,7 +225,7 @@ class TestSubscriptionLimits:
         """Test that unlimited question quota (-1) allows any number of questions"""
         # Arrange: Set unlimited quota
         test_institution.max_questions_per_month = -1
-        db.commit()
+        test_db.commit()
 
         # Create 1000 questions this month (way over any normal limit)
         for i in range(1000):
@@ -239,12 +239,12 @@ class TestSubscriptionLimits:
                 created_by=1,
                 created_at=datetime.now(timezone.utc),
             )
-            db.add(question)
-        db.commit()
+            test_db.add(question)
+        test_db.commit()
 
         # Act & Assert: Should not raise exception
         try:
-            SubscriptionLimits.check_question_limit(test_institution, db)
+            SubscriptionLimits.check_question_limit(test_institution, test_db)
         except HTTPException:
             pytest.fail("check_question_limit raised HTTPException for unlimited quota")
 
@@ -254,7 +254,7 @@ class TestSubscriptionLimits:
         """Test that question limit is enforced when quota is set"""
         # Arrange: Set limit to 20 questions/month
         test_institution.max_questions_per_month = 20
-        db.commit()
+        test_db.commit()
 
         # Create 20 questions this month (at limit)
         for i in range(20):
@@ -268,12 +268,12 @@ class TestSubscriptionLimits:
                 created_by=1,
                 created_at=datetime.now(timezone.utc),
             )
-            db.add(question)
-        db.commit()
+            test_db.add(question)
+        test_db.commit()
 
         # Act & Assert: Should raise exception
         with pytest.raises(HTTPException) as exc_info:
-            SubscriptionLimits.check_question_limit(test_institution, db)
+            SubscriptionLimits.check_question_limit(test_institution, test_db)
 
         assert exc_info.value.status_code == 403
         assert "Monthly question limit reached" in exc_info.value.detail
@@ -285,7 +285,7 @@ class TestSubscriptionLimits:
         """Test that question limit allows generation when under quota"""
         # Arrange: Set limit to 100 questions/month
         test_institution.max_questions_per_month = 100
-        db.commit()
+        test_db.commit()
 
         # Create 30 questions this month (under limit)
         for i in range(30):
@@ -299,12 +299,12 @@ class TestSubscriptionLimits:
                 created_by=1,
                 created_at=datetime.now(timezone.utc),
             )
-            db.add(question)
-        db.commit()
+            test_db.add(question)
+        test_db.commit()
 
         # Act & Assert: Should not raise exception
         try:
-            SubscriptionLimits.check_question_limit(test_institution, db)
+            SubscriptionLimits.check_question_limit(test_institution, test_db)
         except HTTPException:
             pytest.fail("check_question_limit raised HTTPException when under quota")
 
@@ -323,8 +323,8 @@ def test_institution(db: Session) -> Institution:
         max_documents=50,
         max_questions_per_month=200,
     )
-    db.add(institution)
-    db.commit()
-    db.refresh(institution)
+    test_db.add(institution)
+    test_db.commit()
+    test_db.refresh(institution)
     return institution
 
