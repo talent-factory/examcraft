@@ -149,7 +149,7 @@ class TestSubscriptionLimits:
                 mime_type="application/pdf",
                 status=DocumentStatus.PROCESSED, original_filename=f"doc{i}.pdf",
                 institution_id=test_institution.id,
-                user_id=1,
+                user_id=None,
             )
             test_db.add(doc)
         test_db.commit()
@@ -177,7 +177,7 @@ class TestSubscriptionLimits:
                 mime_type="application/pdf",
                 status=DocumentStatus.PROCESSED, original_filename=f"doc{i}.pdf",
                 institution_id=test_institution.id,
-                user_id=1,
+                user_id=None,
             )
             test_db.add(doc)
         test_db.commit()
@@ -207,7 +207,7 @@ class TestSubscriptionLimits:
                 mime_type="application/pdf",
                 status=DocumentStatus.PROCESSED, original_filename=f"doc{i}.pdf",
                 institution_id=test_institution.id,
-                user_id=1,
+                user_id=None,
             )
             test_db.add(doc)
         test_db.commit()
@@ -237,7 +237,7 @@ class TestSubscriptionLimits:
                 bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
-                created_by=1,
+                created_by=None,
                 created_at=datetime.now(timezone.utc),
             )
             test_db.add(question)
@@ -266,7 +266,7 @@ class TestSubscriptionLimits:
                 bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
-                created_by=1,
+                created_by=None,
                 created_at=datetime.now(timezone.utc),
             )
             test_db.add(question)
@@ -297,7 +297,7 @@ class TestSubscriptionLimits:
                 bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
-                created_by=1,
+                created_by=None,
                 created_at=datetime.now(timezone.utc),
             )
             test_db.add(question)
