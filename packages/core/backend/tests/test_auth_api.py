@@ -75,6 +75,18 @@ def test_client(db):
         finally:
             pass
 
+    # Register routers manually (normally done in lifespan event)
+    from api import documents, rag_exams, question_review, auth, admin, gdpr
+    from api.v1 import rbac as rbac_api
+
+    app.include_router(auth.router)
+    app.include_router(admin.router)
+    app.include_router(gdpr.router)
+    app.include_router(documents.router)
+    app.include_router(rag_exams.router)
+    app.include_router(rbac_api.router)
+    app.include_router(question_review.router)
+
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)
     yield client
