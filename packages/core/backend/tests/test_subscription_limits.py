@@ -94,7 +94,7 @@ class TestSubscriptionLimits:
             pytest.fail("check_user_limit raised HTTPException when under quota")
 
     def test_check_user_limit_ignores_inactive_users(
-        self, db: Session, test_institution: Institution
+        self, test_db: Session, test_institution: Institution
     ):
         """Test that inactive users don't count towards quota"""
         # Arrange: Set limit to 2 users
@@ -132,7 +132,7 @@ class TestSubscriptionLimits:
     # ==================== Document Limit Tests ====================
 
     def test_check_document_limit_unlimited(
-        self, db: Session, test_institution: Institution
+        self, test_db: Session, test_institution: Institution
     ):
         """Test that unlimited document quota (-1) allows any number of documents"""
         # Arrange: Set unlimited quota
@@ -160,7 +160,7 @@ class TestSubscriptionLimits:
             pytest.fail("check_document_limit raised HTTPException for unlimited quota")
 
     def test_check_document_limit_exceeded(
-        self, db: Session, test_institution: Institution
+        self, test_db: Session, test_institution: Institution
     ):
         """Test that document limit is enforced when quota is set"""
         # Arrange: Set limit to 5 documents
@@ -190,7 +190,7 @@ class TestSubscriptionLimits:
         assert "5 documents" in exc_info.value.detail
 
     def test_check_document_limit_not_exceeded(
-        self, db: Session, test_institution: Institution
+        self, test_db: Session, test_institution: Institution
     ):
         """Test that document limit allows upload when under quota"""
         # Arrange: Set limit to 10 documents
@@ -220,7 +220,7 @@ class TestSubscriptionLimits:
     # ==================== Question Limit Tests ====================
 
     def test_check_question_limit_unlimited(
-        self, db: Session, test_institution: Institution
+        self, test_db: Session, test_institution: Institution
     ):
         """Test that unlimited question quota (-1) allows any number of questions"""
         # Arrange: Set unlimited quota
@@ -249,7 +249,7 @@ class TestSubscriptionLimits:
             pytest.fail("check_question_limit raised HTTPException for unlimited quota")
 
     def test_check_question_limit_exceeded(
-        self, db: Session, test_institution: Institution
+        self, test_db: Session, test_institution: Institution
     ):
         """Test that question limit is enforced when quota is set"""
         # Arrange: Set limit to 20 questions/month
@@ -280,7 +280,7 @@ class TestSubscriptionLimits:
         assert "20 questions" in exc_info.value.detail
 
     def test_check_question_limit_not_exceeded(
-        self, db: Session, test_institution: Institution
+        self, test_db: Session, test_institution: Institution
     ):
         """Test that question limit allows generation when under quota"""
         # Arrange: Set limit to 100 questions/month
