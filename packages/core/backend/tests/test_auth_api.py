@@ -158,7 +158,7 @@ def test_register_duplicate_email(test_client, test_user):
     assert "already registered" in response.json()["detail"].lower()
 
 
-def test_register_invalid_email(client):
+def test_register_invalid_email(test_client):
     """Test registration with invalid email fails"""
     response = test_client.post(
         "/api/auth/register",
@@ -204,7 +204,7 @@ def test_login_wrong_password(test_client, test_user):
     assert "incorrect" in response.json()["detail"].lower()
 
 
-def test_login_nonexistent_user(client):
+def test_login_nonexistent_user(test_client):
     """Test login with non-existent user fails"""
     response = test_client.post(
         "/api/auth/login",
@@ -255,7 +255,7 @@ def test_refresh_token_success(test_client, test_user):
     assert "refresh_token" in data
 
 
-def test_refresh_token_invalid(client):
+def test_refresh_token_invalid(test_client):
     """Test refresh with invalid token fails"""
     response = test_client.post(
         "/api/auth/refresh", json={"refresh_token": "invalid.token.here"}
@@ -286,7 +286,7 @@ def test_logout_success(test_client, test_user):
     assert response.status_code == 204
 
 
-def test_logout_without_token(client):
+def test_logout_without_token(test_client):
     """Test logout without token fails"""
     response = test_client.post("/api/auth/logout")
 
@@ -375,7 +375,7 @@ def test_change_password_wrong_current(test_client, test_user):
     assert "incorrect" in response.json()["detail"].lower()
 
 
-def test_change_password_without_auth(client):
+def test_change_password_without_auth(test_client):
     """Test password change without authentication fails"""
     response = test_client.post(
         "/api/auth/change-password",
