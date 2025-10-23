@@ -29,8 +29,9 @@ class TestSubscriptionLimits:
         for i in range(100):
             user = User(
                 email=f"user{i}@test.com",
-                username=f"user{i}",
-                hashed_password="dummy",
+                first_name=f"User",
+                last_name=f"{i}",
+                password_hash="dummy",
                 institution_id=test_institution.id,
                 status=UserStatus.ACTIVE.value,
             )
@@ -53,8 +54,8 @@ class TestSubscriptionLimits:
         for i in range(3):
             user = User(
                 email=f"user{i}@test.com",
-                username=f"user{i}",
-                hashed_password="dummy",
+                first_name="User", last_name=f"{i}",
+                password_hash="dummy",
                 institution_id=test_institution.id,
                 status=UserStatus.ACTIVE.value,
             )
@@ -79,8 +80,8 @@ class TestSubscriptionLimits:
         for i in range(2):
             user = User(
                 email=f"user{i}@test.com",
-                username=f"user{i}",
-                hashed_password="dummy",
+                first_name="User", last_name=f"{i}",
+                password_hash="dummy",
                 institution_id=test_institution.id,
                 status=UserStatus.ACTIVE.value,
             )
@@ -104,8 +105,8 @@ class TestSubscriptionLimits:
         # Create 1 active user
         active_user = User(
             email="active@test.com",
-            username="active",
-            hashed_password="dummy",
+            first_name="Active", last_name="User",
+            password_hash="dummy",
             institution_id=test_institution.id,
             status=UserStatus.ACTIVE.value,
         )
@@ -116,7 +117,7 @@ class TestSubscriptionLimits:
             inactive_user = User(
                 email=f"inactive{i}@test.com",
                 username=f"inactive{i}",
-                hashed_password="dummy",
+                password_hash="dummy",
                 institution_id=test_institution.id,
                 status=UserStatus.INACTIVE.value,
             )
@@ -146,7 +147,7 @@ class TestSubscriptionLimits:
                 file_path=f"/uploads/doc{i}.pdf",
                 file_size=1024,
                 mime_type="application/pdf",
-                status=DocumentStatus.READY.value,
+                status=DocumentStatus.PROCESSED.value,
                 institution_id=test_institution.id,
                 uploaded_by=1,
             )
@@ -174,7 +175,7 @@ class TestSubscriptionLimits:
                 file_path=f"/uploads/doc{i}.pdf",
                 file_size=1024,
                 mime_type="application/pdf",
-                status=DocumentStatus.READY.value,
+                status=DocumentStatus.PROCESSED.value,
                 institution_id=test_institution.id,
                 uploaded_by=1,
             )
@@ -204,7 +205,7 @@ class TestSubscriptionLimits:
                 file_path=f"/uploads/doc{i}.pdf",
                 file_size=1024,
                 mime_type="application/pdf",
-                status=DocumentStatus.READY.value,
+                status=DocumentStatus.PROCESSED.value,
                 institution_id=test_institution.id,
                 uploaded_by=1,
             )
@@ -234,7 +235,7 @@ class TestSubscriptionLimits:
                 question_type="multiple_choice",
                 difficulty="medium",
                 bloom_level="understand",
-                status=ReviewStatus.PENDING.value,
+                review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
                 created_by=1,
                 created_at=datetime.now(timezone.utc),
@@ -263,7 +264,7 @@ class TestSubscriptionLimits:
                 question_type="multiple_choice",
                 difficulty="medium",
                 bloom_level="understand",
-                status=ReviewStatus.PENDING.value,
+                review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
                 created_by=1,
                 created_at=datetime.now(timezone.utc),
@@ -294,7 +295,7 @@ class TestSubscriptionLimits:
                 question_type="multiple_choice",
                 difficulty="medium",
                 bloom_level="understand",
-                status=ReviewStatus.PENDING.value,
+                review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
                 created_by=1,
                 created_at=datetime.now(timezone.utc),
