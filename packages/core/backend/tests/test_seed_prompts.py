@@ -99,8 +99,3 @@ class TestSeedPrompts:
         """Test that seed_prompts returns accurate created/skipped counts"""
         # This test is skipped - requires Premium package Prompt model
         pass
-
-    # Cleanup
-    session.close()
-    Base.metadata.drop_all(bind=engine)
-
