@@ -1,5 +1,8 @@
 """
 API Integration Tests für Vector Search Endpoints
+
+SKIPPED: These endpoints do not exist in Core package.
+Vector Search API endpoints are available in Premium package only.
 """
 
 import pytest
@@ -8,6 +11,11 @@ from fastapi.testclient import TestClient
 
 from main import app
 from services.qdrant_vector_service import SearchResult  # Use Qdrant types
+
+# Skip all tests in this file - Vector Search API endpoints are Premium-only
+pytestmark = pytest.mark.skip(
+    reason="Vector Search API endpoints do not exist in Core package. Available in Premium package only."
+)
 
 
 class TestVectorSearchAPI:
