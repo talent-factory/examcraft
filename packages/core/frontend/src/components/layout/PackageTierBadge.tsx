@@ -188,3 +188,4 @@ export const PackageTierBadge: React.FC = () => {
   );
 };
 
+export default PackageTierBadge;
