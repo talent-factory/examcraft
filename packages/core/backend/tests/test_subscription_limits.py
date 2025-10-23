@@ -147,7 +147,7 @@ class TestSubscriptionLimits:
                 file_path=f"/uploads/doc{i}.pdf",
                 file_size=1024,
                 mime_type="application/pdf",
-                status=DocumentStatus.PROCESSED.value,
+                status=DocumentStatus.PROCESSED, original_filename=f"doc{i}.pdf",
                 institution_id=test_institution.id,
                 user_id=1,
             )
@@ -175,7 +175,7 @@ class TestSubscriptionLimits:
                 file_path=f"/uploads/doc{i}.pdf",
                 file_size=1024,
                 mime_type="application/pdf",
-                status=DocumentStatus.PROCESSED.value,
+                status=DocumentStatus.PROCESSED, original_filename=f"doc{i}.pdf",
                 institution_id=test_institution.id,
                 user_id=1,
             )
@@ -205,7 +205,7 @@ class TestSubscriptionLimits:
                 file_path=f"/uploads/doc{i}.pdf",
                 file_size=1024,
                 mime_type="application/pdf",
-                status=DocumentStatus.PROCESSED.value,
+                status=DocumentStatus.PROCESSED, original_filename=f"doc{i}.pdf",
                 institution_id=test_institution.id,
                 user_id=1,
             )
@@ -233,7 +233,7 @@ class TestSubscriptionLimits:
             question = QuestionReview(
                 question_text=f"Question {i}?",
                 question_type="multiple_choice",
-                difficulty="medium",
+                difficulty="medium", topic="Test Topic",
                 bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
@@ -262,7 +262,7 @@ class TestSubscriptionLimits:
             question = QuestionReview(
                 question_text=f"Question {i}?",
                 question_type="multiple_choice",
-                difficulty="medium",
+                difficulty="medium", topic="Test Topic",
                 bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
@@ -293,7 +293,7 @@ class TestSubscriptionLimits:
             question = QuestionReview(
                 question_text=f"Question {i}?",
                 question_type="multiple_choice",
-                difficulty="medium",
+                difficulty="medium", topic="Test Topic",
                 bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
