@@ -214,25 +214,27 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           : f
       ));
 
-      // Start processing (asynchron im Backend)
-      const processingResult = await DocumentService.processDocument(uploadResult.document_id, true);
+      // Start processing (asynchron im Backend) - NICHT WARTEN!
+      await DocumentService.processDocument(uploadResult.document_id, true);
 
       // Check if cancelled
       if (abortController.signal.aborted) {
         throw new Error('Processing cancelled');
       }
 
-      // Warte auf Verarbeitung (polling) - 30 Minuten für große Dokumente
-      await waitForDocumentProcessing(uploadResult.document_id, fileId, abortController);
-
-      // Update with processing result
+      // ✅ SOFORT als "completed" markieren - Processing läuft im Hintergrund!
+      // User kann sofort weiterarbeiten, während das Dokument verarbeitet wird
       setUploadFiles(prev => prev.map(f =>
         f.id === fileId
           ? {
               ...f,
               status: 'completed',
               progress: 100,
-              processingResult,
+              processingResult: {
+                message: 'Document uploaded and processing started in background',
+                document_id: uploadResult.document_id,
+                status: 'processing'
+              },
               abortController: undefined
             }
           : f
