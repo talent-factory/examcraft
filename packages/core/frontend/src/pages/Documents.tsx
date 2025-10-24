@@ -3,15 +3,25 @@
  * Document management and upload
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import DocumentUpload from '../components/DocumentUpload';
 import DocumentLibrary from '../components/DocumentLibrary';
 
 export const Documents: React.FC = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const libraryRef = useRef<HTMLDivElement>(null);
 
   const handleDocumentUploaded = () => {
+    // Refresh document library
     setRefreshTrigger(prev => prev + 1);
+
+    // Scroll to document library after upload
+    setTimeout(() => {
+      libraryRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }, 500); // Small delay to ensure refresh completes
   };
 
   return (
@@ -35,7 +45,7 @@ export const Documents: React.FC = () => {
       </div>
 
       {/* Library Section */}
-      <div className="card p-6">
+      <div className="card p-6" ref={libraryRef}>
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
           Meine Dokumente
         </h2>
