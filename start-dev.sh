@@ -151,6 +151,18 @@ echo ""
 echo -e "${BLUE}🐳 Starting Docker containers...${NC}"
 docker compose ${COMPOSE_FILES[@]} up -d
 
+# Wait for backend to be ready
+echo ""
+echo -e "${BLUE}⏳ Waiting for backend to be ready...${NC}"
+sleep 5
+
+# Seed development data (only in development)
+if [[ "$TIER" != "Core (Open Source)" ]]; then
+    echo ""
+    echo -e "${BLUE}🌱 Seeding development data...${NC}"
+    docker compose ${COMPOSE_FILES[@]} exec -T backend python scripts/seed_dev_data.py 2>/dev/null || echo -e "${YELLOW}⚠️  Seeding skipped (backend not ready or already seeded)${NC}"
+fi
+
 echo ""
 echo -e "${GREEN}✅ ExamCraft AI ${TIER} is starting!${NC}"
 echo ""

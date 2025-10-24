@@ -254,30 +254,40 @@ class OAuthService:
             return existing_user
 
         # Create new user from OAuth
-        # Get or create default institution
-        default_institution = (
+        # Try to find institution by email domain (Auto-Assignment)
+        email_domain = user_info["email"].split("@")[1]
+        institution = (
             self.db.query(Institution)
-            .filter(Institution.name == "Default Institution")
+            .filter(Institution.domain == email_domain)
             .first()
         )
 
-        if not default_institution:
-            default_institution = Institution(
-                name="Default Institution",
-                slug="default-institution",  # URL-friendly identifier
-                domain="default.examcraft.ai",
-                is_active=True,
+        # If no domain match, use default institution
+        if not institution:
+            institution = (
+                self.db.query(Institution)
+                .filter(Institution.name == "Default Institution")
+                .first()
             )
-            self.db.add(default_institution)
-            self.db.commit()
-            self.db.refresh(default_institution)
+
+            if not institution:
+                institution = Institution(
+                    name="Default Institution",
+                    slug="default-institution",
+                    domain="default.examcraft.ai",
+                    subscription_tier="free",
+                    is_active=True,
+                )
+                self.db.add(institution)
+                self.db.commit()
+                self.db.refresh(institution)
 
         # Create new user
         new_user = User(
             email=user_info["email"],
             first_name=user_info.get("first_name", "Unknown"),
             last_name=user_info.get("last_name", "User"),
-            institution_id=default_institution.id,
+            institution_id=institution.id,
             status="active",
             is_email_verified=user_info.get("email_verified", False),
             avatar_url=user_info.get("picture"),

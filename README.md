@@ -197,6 +197,30 @@ git submodule update --init --recursive packages/enterprise
 
 **Hinweis:** Features werden über User-Rollen und Institution-Settings gesteuert, nicht über die Package-Auswahl. Die Packages stellen nur die Code-Basis bereit.
 
+### 🌱 Development Login
+
+Das `start-dev.sh` Script erstellt automatisch Test-Daten für die Entwicklung:
+
+**Talent Factory Institution (Professional Tier):**
+- Domain: `talent-factory.ch` (Auto-Assignment für alle `@talent-factory.ch` E-Mails)
+- Subscription: Professional (Unlimited Documents, 1000 Questions/Month)
+
+**Admin User:**
+- Email: `admin@talent-factory.ch`
+- Password: `admin123` (nur Development!)
+- Rollen: Admin, Dozent, Assistant
+- Superuser: Ja
+
+**Auto-Assignment:**
+- Jeder User mit `@talent-factory.ch` E-Mail wird automatisch der Talent Factory Institution zugeordnet
+- Funktioniert für OAuth (Google, Microsoft) und normale Registrierung
+
+**Manuelles Seeding:**
+```bash
+# Falls automatisches Seeding fehlschlägt
+./seed-dev-data.sh
+```
+
 ### 📚 Weitere Informationen
 
 Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für:
