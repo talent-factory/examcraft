@@ -84,6 +84,25 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     loadDocuments();
   }, [refreshTrigger]);
 
+  // Auto-refresh for documents with status "processing"
+  useEffect(() => {
+    const hasProcessingDocs = documents.some(doc => doc.status === DocumentStatus.PROCESSING);
+
+    if (!hasProcessingDocs) {
+      return; // No processing documents, no need to refresh
+    }
+
+    // Refresh every 5 seconds while there are processing documents
+    const intervalId = setInterval(() => {
+      loadDocuments();
+    }, 5000);
+
+    // Cleanup: Stop interval when component unmounts or no more processing docs
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [documents]); // Re-run when documents change
+
   const loadDocuments = async () => {
     try {
       setLoading(true);
@@ -229,17 +248,6 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       await loadDocuments();
 
       setError(null);
-
-      // Optional: Starte Auto-Refresh für 5 Minuten (alle 5 Sekunden)
-      // um den Processing-Status live zu aktualisieren
-      const refreshInterval = setInterval(async () => {
-        await loadDocuments();
-      }, 5000); // Alle 5 Sekunden
-
-      // Stoppe Auto-Refresh nach 5 Minuten
-      setTimeout(() => {
-        clearInterval(refreshInterval);
-      }, 300000); // 5 Minuten
 
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Verarbeiten des Dokuments');
