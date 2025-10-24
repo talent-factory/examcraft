@@ -222,16 +222,25 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       setProcessingDocumentId(document.id);
       handleMenuClose();
 
-      // Start processing
+      // Start processing (asynchron im Backend) - NICHT WARTEN!
       await DocumentService.processDocument(document.id, true);
 
-      // Wait for processing to complete with polling (30 minutes timeout)
-      await waitForDocumentProcessing(document.id);
-
-      // Reload documents to show updated status
+      // ✅ SOFORT Dokumente neu laden - Processing läuft im Hintergrund!
       await loadDocuments();
 
       setError(null);
+
+      // Optional: Starte Auto-Refresh für 5 Minuten (alle 5 Sekunden)
+      // um den Processing-Status live zu aktualisieren
+      const refreshInterval = setInterval(async () => {
+        await loadDocuments();
+      }, 5000); // Alle 5 Sekunden
+
+      // Stoppe Auto-Refresh nach 5 Minuten
+      setTimeout(() => {
+        clearInterval(refreshInterval);
+      }, 300000); // 5 Minuten
+
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Verarbeiten des Dokuments');
     } finally {
