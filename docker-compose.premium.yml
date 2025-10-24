@@ -69,13 +69,9 @@ services:
 
       # Override Core Components with Premium Components
       - ./packages/premium/frontend/src/components/RAGExamCreator.tsx:/app/src/components/RAGExamCreator.tsx
-      - ./packages/premium/frontend/src/components/DocumentChat/DocumentChatPage.tsx:/app/src/components/DocumentChat/DocumentChatPage.tsx
 
-      # Override Core Services with Premium Services
       - ./packages/premium/frontend/src/services/RAGService.ts:/app/src/services/RAGService.ts
 
-      # Override Core Types with Premium Types
-      - ./packages/premium/frontend/src/types/document.ts:/app/src/types/document.ts
     environment:
       REACT_APP_ENABLE_PREMIUM_FEATURES: "true"
       REACT_APP_ENABLE_RAG: "true"
