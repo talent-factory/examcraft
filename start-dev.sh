@@ -149,7 +149,15 @@ docker compose ${COMPOSE_FILES[@]} rm -f -s -v 2>/dev/null || true
 # Start Docker containers
 echo ""
 echo -e "${BLUE}🐳 Starting Docker containers...${NC}"
-docker compose ${COMPOSE_FILES[@]} up -d
+
+# For Premium/Enterprise: Rebuild frontend to ensure volume mounts work
+if [[ "$TIER" != "Core (Open Source)" ]]; then
+    echo -e "${YELLOW}🔨 Rebuilding frontend container (Premium/Enterprise component overrides)...${NC}"
+    docker compose ${COMPOSE_FILES[@]} up -d --build frontend
+    docker compose ${COMPOSE_FILES[@]} up -d
+else
+    docker compose ${COMPOSE_FILES[@]} up -d
+fi
 
 # Wait for backend to be ready
 echo ""
