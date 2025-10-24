@@ -1,0 +1,87 @@
+name: examcraft-premium
+
+# Premium Features Extension
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.premium.yml up
+
+services:
+  # Qdrant Vector Database (Premium Feature)
+  # Note: We migrated from ChromaDB to Qdrant for better performance and scalability
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: examcraft-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    # Disable healthcheck - Qdrant's built-in healthcheck uses curl which is not installed
+    # Backend will retry connection with exponential backoff instead
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Backend with Premium Features
+  backend:
+    volumes:
+      # Mount Premium Package
+      - ./packages/premium/backend:/app/premium
+      # Override Core VectorService with Premium VectorService
+      - ./packages/premium/backend/services/vector_service_factory.py:/app/services/vector_service_factory.py
+      - ./packages/premium/backend/services/qdrant_vector_service.py:/app/services/qdrant_vector_service.py
+    environment:
+      # Premium Feature Flags
+      ENABLE_PREMIUM_FEATURES: "true"
+      DEFAULT_SUBSCRIPTION_TIER: professional
+      
+      # Vector Database (Qdrant only - ChromaDB removed after migration)
+      VECTOR_SERVICE_TYPE: qdrant
+      QDRANT_URL: http://qdrant:6333
+      
+      # RAG Configuration
+      ENABLE_RAG_GENERATION: "true"
+      RAG_CHUNK_SIZE: 1000
+      RAG_CHUNK_OVERLAP: 200
+      
+      # Prompt Management
+      ENABLE_PROMPT_MANAGEMENT: "true"
+      PROMPT_VECTOR_COLLECTION: prompts
+      
+      # ChatBot
+      ENABLE_DOCUMENT_CHATBOT: "true"
+      CHATBOT_MAX_HISTORY: 10
+      
+      # Claude API (Required for Premium)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    depends_on:
+      qdrant:
+        condition: service_healthy
+
+  # Frontend with Premium Features
+  frontend:
+    volumes:
+      # Mount Premium Package (for reference)
+      - ./packages/premium/frontend:/app/premium
+
+      # Override Core Components with Premium Components
+      - ./packages/premium/frontend/src/components/RAGExamCreator.tsx:/app/src/components/RAGExamCreator.tsx
+      - ./packages/premium/frontend/src/components/prompts:/app/src/components/prompts
+      - ./packages/premium/frontend/src/api/promptsApi.ts:/app/src/api/promptsApi.ts
+      - ./packages/premium/frontend/src/components/DocumentChat/DocumentChatPage.tsx:/app/src/components/DocumentChat/DocumentChatPage.tsx
+      - ./packages/premium/frontend/src/components/DocumentChat:/app/src/components/DocumentChat
+
+      - ./packages/premium/frontend/src/services/RAGService.ts:/app/src/services/RAGService.ts
+
+    environment:
+      REACT_APP_ENABLE_PREMIUM_FEATURES: "true"
+      REACT_APP_ENABLE_RAG: "true"
+      REACT_APP_ENABLE_CHATBOT: "true"
+      REACT_APP_ENABLE_PROMPT_MANAGEMENT: "true"
+
+volumes:
+  qdrant_data:
+    driver: local
