@@ -157,6 +157,7 @@ async def register(
     # Get or create institution
     institution = None
     if request.institution_slug:
+        # Explicit institution slug provided
         institution = (
             db.query(Institution)
             .filter(Institution.slug == request.institution_slug)
@@ -167,18 +168,27 @@ async def register(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Institution not found"
             )
     else:
-        # Create personal institution for user
-        institution = Institution(
-            name=f"{request.first_name} {request.last_name}",
-            slug=f"{request.email.split('@')[0]}-personal",
-            domain=request.email.split("@")[1],
-            subscription_tier="free",
-            max_users=1,
-            max_documents=10,
-            max_questions_per_month=50,
+        # Try to find institution by email domain (Auto-Assignment)
+        email_domain = request.email.split("@")[1]
+        institution = (
+            db.query(Institution)
+            .filter(Institution.domain == email_domain)
+            .first()
         )
-        db.add(institution)
-        db.flush()  # Get institution.id
+
+        # If no domain match, create personal institution
+        if not institution:
+            institution = Institution(
+                name=f"{request.first_name} {request.last_name}",
+                slug=f"{request.email.split('@')[0]}-personal",
+                domain=None,  # No domain for personal institutions
+                subscription_tier="free",
+                max_users=1,
+                max_documents=10,
+                max_questions_per_month=50,
+            )
+            db.add(institution)
+            db.flush()  # Get institution.id
 
     # Create user
     user = User(
