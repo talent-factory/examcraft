@@ -54,7 +54,6 @@ def seed_talent_factory_institution(db):
         name="Talent Factory",
         slug="talent-factory",
         domain="talent-factory.ch",  # Auto-assign users with @talent-factory.ch
-        description="ExamCraft AI Development & Testing Institution",
         subscription_tier="professional",  # Premium tier
         max_users=-1,  # Unlimited
         max_documents=-1,  # Unlimited
