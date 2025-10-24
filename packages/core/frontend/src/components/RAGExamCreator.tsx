@@ -1,15 +1,16 @@
 /**
  * RAG Exam Creator Component
  * Creates exams using RAG (Retrieval-Augmented Generation)
- * 
- * Note: This is a placeholder component for the Core package.
- * Full implementation is available in the Premium package.
+ *
+ * This component dynamically loads the Premium implementation if available,
+ * otherwise shows an upgrade prompt.
  */
 
-import React from 'react';
-import { Box, Typography, Alert, Button } from '@mui/material';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
+import { Box, Typography, Alert, Button, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { InfoOutlined } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RAGExamCreatorProps {
   selectedDocuments?: number[];
@@ -17,11 +18,94 @@ interface RAGExamCreatorProps {
   onBack?: () => void;
 }
 
-const RAGExamCreator: React.FC<RAGExamCreatorProps> = ({
-  onBack,
-}) => {
-  const navigate = useNavigate();
+// Try to lazy load Premium component
+let PremiumRAGExamCreator: React.ComponentType<RAGExamCreatorProps> | null = null;
 
+try {
+  // Attempt to load Premium component from mounted volume
+  PremiumRAGExamCreator = lazy(() =>
+    import('/app/premium/src/components/RAGExamCreator.tsx')
+      .catch(() => {
+        console.log('Premium RAGExamCreator not available - using Core placeholder');
+        return { default: () => null };
+      })
+  );
+} catch (error) {
+  console.log('Premium package not mounted');
+}
+
+const RAGExamCreator: React.FC<RAGExamCreatorProps> = (props) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [hasPremiumAccess, setHasPremiumAccess] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkPremiumAccess();
+  }, [user]);
+
+  const checkPremiumAccess = async () => {
+    try {
+      // Check if user has Premium/Professional/Enterprise tier
+      if (!user?.institution_id) {
+        setHasPremiumAccess(false);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch user's tier from backend
+      const token = localStorage.getItem('examcraft_access_token');
+      if (!token) {
+        setHasPremiumAccess(false);
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/v1/rbac/tiers/my`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Allow access for starter, professional, and enterprise tiers
+        const premiumTiers = ['starter', 'professional', 'enterprise'];
+        setHasPremiumAccess(premiumTiers.includes(data.tier?.toLowerCase()));
+      } else {
+        setHasPremiumAccess(false);
+      }
+    } catch (error) {
+      console.error('Error checking premium access:', error);
+      setHasPremiumAccess(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // If user has premium access and Premium component is available, use it
+  if (hasPremiumAccess && PremiumRAGExamCreator) {
+    return (
+      <Suspense fallback={
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+          <CircularProgress />
+        </Box>
+      }>
+        <PremiumRAGExamCreator {...props} />
+      </Suspense>
+    );
+  }
+
+  // Otherwise show upgrade prompt
   return (
     <Box
       sx={{
@@ -55,7 +139,7 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = ({
         <Button
           variant="contained"
           color="primary"
-          onClick={() => onBack ? onBack() : navigate('/exams')}
+          onClick={() => props.onBack ? props.onBack() : navigate('/exams')}
         >
           Back
         </Button>

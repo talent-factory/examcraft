@@ -1,4 +1,4 @@
-version: '3.8'
+name: examcraft-enterprise
 
 # Enterprise Features Extension
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.premium.yml -f docker-compose.enterprise.yml up
