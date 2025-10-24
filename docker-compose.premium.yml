@@ -69,6 +69,7 @@ services:
 
       # Override Core Components with Premium Components
       - ./packages/premium/frontend/src/components/RAGExamCreator.tsx:/app/src/components/RAGExamCreator.tsx
+      - ./packages/premium/frontend/src/components/prompts:/app/src/components/prompts
 
       - ./packages/premium/frontend/src/services/RAGService.ts:/app/src/services/RAGService.ts
 

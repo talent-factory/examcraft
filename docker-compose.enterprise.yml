@@ -52,6 +52,12 @@ services:
     volumes:
       # Mount Enterprise Package
       - ./packages/enterprise/frontend:/app/enterprise
+      # Mount Premium Package (inherited from docker-compose.premium.yml)
+      - ./packages/premium/frontend:/app/premium
+      # Override Core Components with Premium Components (inherited from docker-compose.premium.yml)
+      - ./packages/premium/frontend/src/components/RAGExamCreator.tsx:/app/src/components/RAGExamCreator.tsx
+      - ./packages/premium/frontend/src/components/prompts:/app/src/components/prompts
+      - ./packages/premium/frontend/src/services/RAGService.ts:/app/src/services/RAGService.ts
     environment:
       REACT_APP_ENABLE_ENTERPRISE_FEATURES: "true"
       REACT_APP_ENABLE_SSO: "true"
