@@ -1,74 +1,177 @@
 #!/bin/bash
 
-# ExamCraft AI - Development Startup Script
-echo "🚀 Starting ExamCraft AI Development Environment..."
+# ExamCraft AI - Development Environment
+# Intelligente Erkennung: Core / Premium / Enterprise
 
-# Check if Docker is running
-if ! docker info > /dev/null 2>&1; then
-    echo "❌ Docker is not running. Please start Docker first."
-    exit 1
+set -e
+
+# Farben für Output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Funktion: Prüfe ob Package existiert
+package_exists() {
+    [ -d "packages/$1" ] && [ -f "packages/$1/.git" ]
+}
+
+# Funktion: Prüfe ob Submodule initialisiert ist
+submodule_initialized() {
+    [ -d "packages/$1" ] && [ "$(ls -A packages/$1)" ]
+}
+
+# Erkenne verfügbare Packages
+AVAILABLE_PACKAGES=("core")
+COMPOSE_FILES=("-f docker-compose.yml")
+
+if package_exists "premium" || submodule_initialized "premium"; then
+    AVAILABLE_PACKAGES+=("premium")
+    COMPOSE_FILES+=("-f docker-compose.premium.yml")
 fi
 
-# Create .env file if it doesn't exist
+if package_exists "enterprise" || submodule_initialized "enterprise"; then
+    AVAILABLE_PACKAGES+=("enterprise")
+    COMPOSE_FILES+=("-f docker-compose.enterprise.yml")
+fi
+
+# Bestimme Tier basierend auf verfügbaren Packages
+if [[ " ${AVAILABLE_PACKAGES[@]} " =~ " enterprise " ]]; then
+    TIER="Enterprise"
+    TIER_EMOJI="🏢"
+    TIER_COLOR=$BLUE
+elif [[ " ${AVAILABLE_PACKAGES[@]} " =~ " premium " ]]; then
+    TIER="Premium"
+    TIER_EMOJI="🌟"
+    TIER_COLOR=$GREEN
+else
+    TIER="Core (Open Source)"
+    TIER_EMOJI="🚀"
+    TIER_COLOR=$YELLOW
+fi
+
+# Header
+echo -e "${TIER_COLOR}${TIER_EMOJI} Starting ExamCraft AI - ${TIER} Edition${NC}"
+echo "=============================================="
+echo ""
+echo -e "${BLUE}📦 Packages:${NC} ${AVAILABLE_PACKAGES[*]}"
+echo ""
+
+# Feature-Liste basierend auf Tier
+if [[ "$TIER" == "Enterprise" ]]; then
+    echo -e "${GREEN}✅ All Features Enabled:${NC}"
+    echo "   - Document Upload & Processing"
+    echo "   - RAG Question Generation"
+    echo "   - Document ChatBot"
+    echo "   - Advanced Prompt Management"
+    echo "   - Semantic Search (Qdrant)"
+    echo "   - SSO/SAML Integration"
+    echo "   - OAuth (Google, Microsoft)"
+    echo "   - Custom Branding"
+    echo "   - API Access Management"
+    echo "   - Advanced Analytics"
+elif [[ "$TIER" == "Premium" ]]; then
+    echo -e "${GREEN}✅ Premium Features:${NC}"
+    echo "   - Document Upload & Processing"
+    echo "   - RAG Question Generation"
+    echo "   - Document ChatBot"
+    echo "   - Advanced Prompt Management"
+    echo "   - Semantic Search (Qdrant)"
+    echo ""
+    echo -e "${YELLOW}❌ Enterprise Features (Disabled):${NC}"
+    echo "   - SSO/SAML Integration"
+    echo "   - Custom Branding"
+    echo "   - API Access Management"
+else
+    echo -e "${GREEN}✅ Core Features:${NC}"
+    echo "   - Document Upload (max 5)"
+    echo "   - Basic Question Generation (20/month)"
+    echo "   - Document Library"
+    echo "   - Question Review"
+    echo ""
+    echo -e "${YELLOW}❌ Premium/Enterprise Features (Disabled):${NC}"
+    echo "   - RAG Generation"
+    echo "   - Document ChatBot"
+    echo "   - Advanced Prompt Management"
+    echo "   - SSO/SAML"
+fi
+
+echo ""
+
+# Check if .env exists
 if [ ! -f .env ]; then
-    echo "📝 Creating .env file from template..."
-    cp .env.example .env
-    echo "⚠️  Please edit .env file and add your Claude API key!"
+    echo -e "${YELLOW}⚠️  Warning: .env file not found${NC}"
+    echo "Creating .env from .env.example..."
+    if [ -f .env.example ]; then
+        cp .env.example .env
+        echo -e "${GREEN}✅ .env created. Please configure your environment variables.${NC}"
+    else
+        echo -e "${RED}❌ .env.example not found. Please create .env manually.${NC}"
+    fi
 fi
 
-# Build and start services
-echo "🔨 Building and starting services..."
-docker-compose up --build -d
-
-# Wait for services to be ready
-echo "⏳ Waiting for services to start..."
-sleep 10
-
-# Check service health
-echo "🔍 Checking service health..."
-
-# Check backend
-if curl -f http://localhost:8000/health > /dev/null 2>&1; then
-    echo "✅ Backend is running at http://localhost:8000"
-    echo "📚 API Documentation: http://localhost:8000/docs"
-else
-    echo "❌ Backend health check failed"
+# Check for required API keys (Premium/Enterprise)
+if [[ "$TIER" != "Core (Open Source)" ]]; then
+    if [ -z "$ANTHROPIC_API_KEY" ]; then
+        echo ""
+        echo -e "${YELLOW}⚠️  Warning: ANTHROPIC_API_KEY not set${NC}"
+        echo "Premium/Enterprise features require Claude API access."
+        echo "Please set ANTHROPIC_API_KEY in .env file."
+        echo ""
+        read -p "Continue anyway? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
 fi
 
-# Check frontend
-if curl -f http://localhost:3000 > /dev/null 2>&1; then
-    echo "✅ Frontend is running at http://localhost:3000"
-else
-    echo "⏳ Frontend is still starting up..."
+# Initialize Git Submodules (falls noch nicht geschehen)
+if [[ "$TIER" != "Core (Open Source)" ]]; then
+    echo ""
+    echo -e "${BLUE}📦 Initializing Git Submodules...${NC}"
+
+    if [[ " ${AVAILABLE_PACKAGES[@]} " =~ " premium " ]] && ! submodule_initialized "premium"; then
+        git submodule update --init --recursive packages/premium
+    fi
+
+    if [[ " ${AVAILABLE_PACKAGES[@]} " =~ " enterprise " ]] && ! submodule_initialized "enterprise"; then
+        git submodule update --init --recursive packages/enterprise
+    fi
 fi
 
-# Check database
-if docker exec examcraft_postgres pg_isready -U examcraft > /dev/null 2>&1; then
-    echo "✅ PostgreSQL database is ready"
-else
-    echo "❌ Database connection failed"
-fi
+# Docker Cleanup (falls Container crashed sind)
+echo ""
+echo -e "${BLUE}🧹 Cleaning up crashed containers...${NC}"
+docker compose ${COMPOSE_FILES[@]} rm -f -s -v 2>/dev/null || true
 
-# Check Redis
-if docker exec examcraft_redis redis-cli ping > /dev/null 2>&1; then
-    echo "✅ Redis cache is ready"
-else
-    echo "❌ Redis connection failed"
+# Start Docker containers
+echo ""
+echo -e "${BLUE}🐳 Starting Docker containers...${NC}"
+docker compose ${COMPOSE_FILES[@]} up -d
+
+echo ""
+echo -e "${GREEN}✅ ExamCraft AI ${TIER} is starting!${NC}"
+echo ""
+echo -e "${BLUE}📍 Access Points:${NC}"
+echo "   - Frontend: http://localhost:3000"
+echo "   - Backend API: http://localhost:8000"
+echo "   - API Docs: http://localhost:8000/docs"
+echo "   - PostgreSQL: localhost:5432"
+echo "   - Redis: localhost:6380 (external) / 6379 (internal)"
+
+if [[ "$TIER" != "Core (Open Source)" ]]; then
+    echo "   - Qdrant: http://localhost:6333"
 fi
 
 echo ""
-echo "🎉 ExamCraft AI Development Environment is ready!"
+echo -e "${BLUE}📊 View logs:${NC}"
+echo "   docker compose ${COMPOSE_FILES[@]} logs -f"
 echo ""
-echo "📱 Frontend: http://localhost:3000"
-echo "🔧 Backend API: http://localhost:8000"
-echo "📚 API Docs: http://localhost:8000/docs"
-echo "🗄️  Database: localhost:5432 (examcraft/examcraft_dev)"
-echo "🔴 Redis: localhost:6379"
+echo -e "${BLUE}🛑 Stop services:${NC}"
+echo "   docker compose ${COMPOSE_FILES[@]} down"
 echo ""
-echo "📋 Useful commands:"
-echo "  docker-compose logs -f          # View all logs"
-echo "  docker-compose logs -f backend  # View backend logs"
-echo "  docker-compose logs -f frontend # View frontend logs"
-echo "  docker-compose down             # Stop all services"
-echo "  docker-compose restart          # Restart all services"
+echo -e "${BLUE}💡 Tip:${NC} Features are controlled by user roles and institution settings."
+echo "   Login and configure your subscription tier in the admin panel."
 echo ""

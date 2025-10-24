@@ -132,11 +132,10 @@ ExamCraft/
 │       └── frontend/               # Enterprise Frontend Components
 │           └── src/components/     # SSO Config, Branding, API Management
 ├── docker-compose.yml              # Core Services (PostgreSQL, Redis, Core)
-├── docker-compose.premium.yml      # Premium Extension (ChromaDB, Qdrant)
+├── docker-compose.premium.yml      # Premium Extension (Qdrant)
 ├── docker-compose.enterprise.yml   # Enterprise Extension
-├── start-dev.sh                    # Start Core Only
-├── start-dev-premium.sh            # Start Core + Premium
-├── start-dev-enterprise.sh         # Start All Packages
+├── start-dev.sh                    # 🚀 Smart Start Script (Auto-detects Tier)
+├── stop-dev.sh                     # 🛑 Stop All Services
 ├── MONOREPO_SETUP.md               # Detailed Monorepo Setup Guide
 └── .gitmodules                     # Git Submodules Configuration
 ```
@@ -152,7 +151,7 @@ ExamCraft/
 
 ### 🐳 Installation
 
-#### Option 1: Core Only (Open Source - Free Tier)
+Das neue `start-dev.sh` Script erkennt automatisch, welche Packages verfügbar sind und startet die entsprechenden Services:
 
 ```bash
 # Repository klonen
@@ -161,50 +160,42 @@ cd examcraft
 
 # Umgebung konfigurieren
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your configuration (ANTHROPIC_API_KEY für Premium/Enterprise)
 
-# Core Services starten
+# Services starten (erkennt automatisch Core/Premium/Enterprise)
 ./start-dev.sh
+
+# Services stoppen
+./stop-dev.sh
 ```
+
+**Das Script erkennt automatisch:**
+- ✅ **Core Only**: Wenn nur `packages/core` vorhanden ist
+- ✅ **Premium**: Wenn `packages/premium` Submodule initialisiert ist
+- ✅ **Enterprise**: Wenn `packages/enterprise` Submodule initialisiert ist
 
 **Access Points:**
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
+- PostgreSQL: localhost:5432
+- Redis: localhost:6380 (external) / 6379 (internal)
+- Qdrant: http://localhost:6333 (Premium/Enterprise)
 
-#### Option 2: Core + Premium (Starter/Professional Tier)
-
-```bash
-# Repository mit Submodules klonen (requires access)
-git clone --recurse-submodules git@github.com:talent-factory/examcraft.git
-cd examcraft
-
-# Umgebung konfigurieren
-cp .env.example .env
-# Set ANTHROPIC_API_KEY in .env
-
-# Core + Premium Services starten
-./start-dev-premium.sh
-```
-
-**Additional Access Points:**
-- ChromaDB: http://localhost:8001
-- Qdrant: http://localhost:6333
-
-#### Option 3: All Features (Enterprise Tier)
+#### Premium/Enterprise Features aktivieren
 
 ```bash
-# Repository mit allen Submodules klonen (requires access)
-git clone --recurse-submodules git@github.com:talent-factory/examcraft.git
-cd examcraft
+# Premium Submodule initialisieren (requires access)
+git submodule update --init --recursive packages/premium
 
-# Umgebung konfigurieren
-cp .env.example .env
-# Set ANTHROPIC_API_KEY, API_KEY_ENCRYPTION_KEY, OAuth credentials in .env
+# Enterprise Submodule initialisieren (requires access, optional)
+git submodule update --init --recursive packages/enterprise
 
-# All Services starten
-./start-dev-enterprise.sh
+# Services starten (erkennt automatisch verfügbare Packages)
+./start-dev.sh
 ```
+
+**Hinweis:** Features werden über User-Rollen und Institution-Settings gesteuert, nicht über die Package-Auswahl. Die Packages stellen nur die Code-Basis bereit.
 
 ### 📚 Weitere Informationen
 
