@@ -246,14 +246,21 @@ async def delete_document(
         Bestätigung der Löschung
     """
     try:
-        # Check if document exists and user owns it
+        # Check if document exists and user owns it (or is superuser)
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        if document.user_id and document.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Access denied")
+        # Only allow deletion if:
+        # 1. User is superuser (can delete any document)
+        # 2. User owns the document
+        # 3. User is admin in the same institution
+        if not current_user.is_superuser:
+            if document.user_id and document.user_id != current_user.id:
+                # Check if user is admin in same institution
+                if not (current_user.has_role("admin") and document.institution_id == current_user.institution_id):
+                    raise HTTPException(status_code=403, detail="Access denied")
 
         # Store filename for audit log
         filename = document.filename
