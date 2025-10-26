@@ -111,6 +111,15 @@ if [ ! -f .env ]; then
     fi
 fi
 
+# Validate environment variables
+echo ""
+echo -e "${BLUE}🔍 Validating environment variables...${NC}"
+if [ -f scripts/validate-env.sh ]; then
+    bash scripts/validate-env.sh || exit 1
+else
+    echo -e "${YELLOW}⚠️  Warning: scripts/validate-env.sh not found, skipping validation${NC}"
+fi
+
 # Check for required API keys (Premium/Enterprise)
 if [[ "$TIER" != "Core (Open Source)" ]]; then
     if [ -z "$ANTHROPIC_API_KEY" ]; then
@@ -144,7 +153,7 @@ fi
 # Docker Cleanup (falls Container crashed sind)
 echo ""
 echo -e "${BLUE}🧹 Cleaning up crashed containers...${NC}"
-docker compose ${COMPOSE_FILES[@]} rm -f -s -v 2>/dev/null || true
+docker compose --env-file .env ${COMPOSE_FILES[@]} rm -f -s -v 2>/dev/null || true
 
 # Start Docker containers
 echo ""
@@ -153,10 +162,10 @@ echo -e "${BLUE}🐳 Starting Docker containers...${NC}"
 # For Premium/Enterprise: Rebuild frontend to ensure volume mounts work
 if [[ "$TIER" != "Core (Open Source)" ]]; then
     echo -e "${YELLOW}🔨 Rebuilding frontend container (Premium/Enterprise component overrides)...${NC}"
-    docker compose ${COMPOSE_FILES[@]} up -d --build frontend
-    docker compose ${COMPOSE_FILES[@]} up -d
+    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d --build frontend
+    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d
 else
-    docker compose ${COMPOSE_FILES[@]} up -d
+    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d
 fi
 
 # Wait for backend to be ready
@@ -168,7 +177,7 @@ sleep 5
 if [[ "$TIER" != "Core (Open Source)" ]]; then
     echo ""
     echo -e "${BLUE}🌱 Seeding development data...${NC}"
-    docker compose ${COMPOSE_FILES[@]} exec -T backend python scripts/seed_dev_data.py 2>/dev/null || echo -e "${YELLOW}⚠️  Seeding skipped (backend not ready or already seeded)${NC}"
+    docker compose --env-file .env ${COMPOSE_FILES[@]} exec -T backend python scripts/seed_dev_data.py 2>/dev/null || echo -e "${YELLOW}⚠️  Seeding skipped (backend not ready or already seeded)${NC}"
 fi
 
 echo ""
@@ -187,10 +196,10 @@ fi
 
 echo ""
 echo -e "${BLUE}📊 View logs:${NC}"
-echo "   docker compose ${COMPOSE_FILES[@]} logs -f"
+echo "   docker compose --env-file .env ${COMPOSE_FILES[@]} logs -f"
 echo ""
 echo -e "${BLUE}🛑 Stop services:${NC}"
-echo "   docker compose ${COMPOSE_FILES[@]} down"
+echo "   docker compose --env-file .env ${COMPOSE_FILES[@]} down"
 echo ""
 echo -e "${BLUE}💡 Tip:${NC} Features are controlled by user roles and institution settings."
 echo "   Login and configure your subscription tier in the admin panel."

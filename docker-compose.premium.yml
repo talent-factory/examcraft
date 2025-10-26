@@ -55,8 +55,12 @@ services:
       ENABLE_DOCUMENT_CHATBOT: "true"
       CHATBOT_MAX_HISTORY: 10
       
-      # Claude API (Required for Premium)
+      
+      # Claude API (supports both CLAUDE_API_KEY and ANTHROPIC_API_KEY)
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      CLAUDE_MODEL: ${CLAUDE_MODEL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     depends_on:
       qdrant:
         condition: service_healthy
