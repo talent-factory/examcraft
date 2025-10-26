@@ -71,8 +71,8 @@ services:
       - ./packages/premium/frontend/src/components/RAGExamCreator.tsx:/app/src/components/RAGExamCreator.tsx
       - ./packages/premium/frontend/src/components/prompts:/app/src/components/prompts
       - ./packages/premium/frontend/src/api/promptsApi.ts:/app/src/api/promptsApi.ts
-      - ./packages/premium/frontend/src/components/DocumentChat/DocumentChatPage.tsx:/app/src/components/DocumentChat/DocumentChatPage.tsx
       - ./packages/premium/frontend/src/components/DocumentChat:/app/src/components/DocumentChat
+      - ./packages/premium/frontend/src/services/ChatService.ts:/app/src/services/ChatService.ts
 
       - ./packages/premium/frontend/src/services/RAGService.ts:/app/src/services/RAGService.ts
 

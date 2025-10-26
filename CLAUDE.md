@@ -151,20 +151,20 @@ Integration
 ### Produktive Befehle
 
 ```bash
-# Development Stack starten (Core Only)
+# Development Stack starten (automatische Tier-Erkennung)
 ./start-dev.sh
 
-# Development Stack mit Premium Features
-./start-dev-premium.sh
-
-# Development Stack mit allen Features (Enterprise)
-./start-dev-enterprise.sh
+# Environment-Variablen validieren
+bash scripts/validate-env.sh
 
 # Spezifische Services (Core + Premium)
-docker compose -f docker-compose.yml -f docker-compose.premium.yml up -d
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.premium.yml up -d
 
 # Logs überwachen
-docker compose -f docker-compose.yml -f docker-compose.premium.yml logs -f backend
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.premium.yml logs -f backend
+
+# Services stoppen
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.premium.yml down
 
 # Tests ausführen (Backend)
 cd packages/core/backend
@@ -178,6 +178,26 @@ npm test
 ruff check packages/core/backend/ utils/
 ruff format packages/core/backend/ utils/
 ```
+
+### ⚠️ WICHTIG: Docker Compose Environment Variables
+
+**IMMER `--env-file .env` verwenden!**
+
+Docker Compose lädt die `.env` Datei NICHT automatisch für alle Variablen.
+Um sicherzustellen, dass alle Umgebungsvariablen (insbesondere `CLAUDE_API_KEY`,
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) korrekt geladen werden, muss bei jedem
+`docker compose` Befehl `--env-file .env` angegeben werden.
+
+**Beispiele:**
+```bash
+# ✅ RICHTIG:
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.premium.yml up -d
+
+# ❌ FALSCH (Variablen werden nicht geladen):
+docker compose -f docker-compose.yml -f docker-compose.premium.yml up -d
+```
+
+**Das `start-dev.sh` Skript verwendet automatisch `--env-file .env`.**
 
 ### Code-Standards
 
