@@ -9,8 +9,12 @@ from pydantic import BaseModel
 from typing import List, Optional
 from contextlib import asynccontextmanager
 import os
+import logging
 from dotenv import load_dotenv
 from middleware.rate_limit import RateLimitMiddleware
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -90,6 +94,15 @@ async def lifespan(app: FastAPI):
     # Sentry Test Router (only in development)
     if os.getenv("ENVIRONMENT", "development") == "development":
         app.include_router(sentry_test.router)
+
+    # Premium Features: Chat API (only if Premium features enabled)
+    if os.getenv("ENABLE_PREMIUM_FEATURES", "false").lower() == "true":
+        try:
+            from premium.api.v1 import chat as chat_api
+            app.include_router(chat_api.router)
+            logger.info("✅ Premium Chat API loaded successfully")
+        except ImportError as e:
+            logger.warning(f"⚠️ Premium Chat API not available: {e}")
 
     # Startup: Reset any documents stuck in PROCESSING status
     # (happens when backend restarts during document processing)
