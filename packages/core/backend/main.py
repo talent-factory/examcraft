@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Initialize Sentry (must be done before FastAPI app creation)
-from config.sentry import init_sentry
+from config.sentry import init_sentry  # noqa: E402
+
 init_sentry()
 
 # Lazy-loaded services (to reduce memory at startup)
@@ -65,11 +66,12 @@ async def lifespan(app: FastAPI):
     # Startup: Seed RBAC data (Features, Tiers, Quotas)
     try:
         import subprocess
+
         result = subprocess.run(
             ["python", "scripts/seed_rbac_data.py"],
             capture_output=True,
             text=True,
-            check=False
+            check=False,
         )
         if result.returncode == 0:
             print("✅ RBAC data seeded successfully")
@@ -80,7 +82,15 @@ async def lifespan(app: FastAPI):
 
     # Startup: Load API routers (Core Package)
     # Premium features (vector_search, chat, prompts) are available in Premium package
-    from api import documents, rag_exams, question_review, auth, admin, gdpr, sentry_test
+    from api import (
+        documents,
+        rag_exams,
+        question_review,
+        auth,
+        admin,
+        gdpr,
+        sentry_test,
+    )
     from api.v1 import rbac as rbac_api
 
     app.include_router(auth.router)
@@ -99,10 +109,16 @@ async def lifespan(app: FastAPI):
     if os.getenv("ENABLE_PREMIUM_FEATURES", "false").lower() == "true":
         try:
             from premium.api.v1 import chat as chat_api
+
             app.include_router(chat_api.router)
+            print("✅ Premium Chat API loaded successfully")
             logger.info("✅ Premium Chat API loaded successfully")
         except ImportError as e:
+            print(f"⚠️ Premium Chat API not available: {e}")
             logger.warning(f"⚠️ Premium Chat API not available: {e}")
+        except Exception as e:
+            print(f"❌ Error loading Premium Chat API: {e}")
+            logger.error(f"❌ Error loading Premium Chat API: {e}")
 
     # Startup: Reset any documents stuck in PROCESSING status
     # (happens when backend restarts during document processing)
@@ -170,7 +186,8 @@ app.add_middleware(
 )
 
 # Sentry Context Middleware (must be added before other middlewares)
-from middleware.sentry_context import SentryContextMiddleware
+from middleware.sentry_context import SentryContextMiddleware  # noqa: E402
+
 app.add_middleware(SentryContextMiddleware)
 
 # Rate Limiting middleware
