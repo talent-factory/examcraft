@@ -45,6 +45,17 @@ def create_tables():
     # Import all models to register them with Base
     # This must be done before create_all() is called
 
+    # Import Core models first
+    try:
+        from models.auth import User, Role, Institution, Session, AuditLog
+        from models.document import Document, DocumentStatus
+        from models.question_review import QuestionReview, ReviewStatus
+        print("✅ Core models imported (Auth + Documents + Question Review)")
+    except Exception as e:
+        print(f"⚠️  Core models import error: {e}")
+        import traceback
+        traceback.print_exc()
+
     # Import Premium models (if available)
     try:
         import os
