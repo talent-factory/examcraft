@@ -80,6 +80,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Error seeding RBAC data: {str(e)}")
 
+    # Startup: Seed default prompts (Premium feature)
+    try:
+        from utils.seed_prompts import seed_prompts
+
+        seed_prompts()
+    except ImportError:
+        print("⚠️  Premium package not available, skipping prompt seeding")
+    except Exception as e:
+        print(f"❌ Error seeding prompts: {str(e)}")
+
     # Startup: Load API routers (Core Package)
     # Premium features (vector_search, chat, prompts) are available in Premium package
     from api import (
