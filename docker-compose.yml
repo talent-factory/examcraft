@@ -3,8 +3,8 @@ name: examcraft-core
 services:
   # PostgreSQL Database
   postgres:
+    container_name: examcraft-postgres
     image: postgres:16-alpine
-    container_name: examcraft_postgres
     environment:
       POSTGRES_USER: examcraft
       POSTGRES_PASSWORD: examcraft_dev_password
@@ -23,8 +23,8 @@ services:
 
   # Redis Cache & Session Store
   redis:
+    container_name: examcraft-redis
     image: redis:7-alpine
-    container_name: examcraft_redis
     ports:
       - "6380:6379"
     volumes:
@@ -40,7 +40,6 @@ services:
   # Qdrant Vector Database
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: examcraft_qdrant
     ports:
       - "6333:6333"
       - "6334:6334"
@@ -64,7 +63,6 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/backend/Dockerfile
-    container_name: examcraft_backend
     environment:
       # Database
       DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft
@@ -127,7 +125,6 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/frontend/Dockerfile
-    container_name: examcraft_frontend
     environment:
       REACT_APP_API_URL: http://localhost:8000
       REACT_APP_ENVIRONMENT: development
