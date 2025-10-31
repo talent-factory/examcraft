@@ -10,6 +10,7 @@ from typing import List, Optional
 from contextlib import asynccontextmanager
 import os
 import logging
+import importlib.util
 from dotenv import load_dotenv
 from middleware.rate_limit import RateLimitMiddleware
 
@@ -92,16 +93,62 @@ async def lifespan(app: FastAPI):
 
     # Startup: Load API routers (Core Package)
     # Premium features (vector_search, chat, prompts) are available in Premium package
-    from api import (
-        documents,
-        rag_exams,
-        question_review,
-        auth,
-        admin,
-        gdpr,
-        sentry_test,
+    # Import from core.api explicitly to avoid conflicts with premium.api
+    import sys
+    import importlib
+
+    # Get the core backend path
+    core_api_path = os.path.join(os.path.dirname(__file__), 'api')
+
+    # Import core API modules directly
+    spec_documents = importlib.util.spec_from_file_location(
+        "core_api_documents", os.path.join(core_api_path, 'documents.py')
     )
-    from api.v1 import rbac as rbac_api
+    documents = importlib.util.module_from_spec(spec_documents)
+    spec_documents.loader.exec_module(documents)
+
+    spec_rag = importlib.util.spec_from_file_location(
+        "core_api_rag_exams", os.path.join(core_api_path, 'rag_exams.py')
+    )
+    rag_exams = importlib.util.module_from_spec(spec_rag)
+    spec_rag.loader.exec_module(rag_exams)
+
+    spec_qr = importlib.util.spec_from_file_location(
+        "core_api_question_review", os.path.join(core_api_path, 'question_review.py')
+    )
+    question_review = importlib.util.module_from_spec(spec_qr)
+    spec_qr.loader.exec_module(question_review)
+
+    spec_auth = importlib.util.spec_from_file_location(
+        "core_api_auth", os.path.join(core_api_path, 'auth.py')
+    )
+    auth = importlib.util.module_from_spec(spec_auth)
+    spec_auth.loader.exec_module(auth)
+
+    spec_admin = importlib.util.spec_from_file_location(
+        "core_api_admin", os.path.join(core_api_path, 'admin.py')
+    )
+    admin = importlib.util.module_from_spec(spec_admin)
+    spec_admin.loader.exec_module(admin)
+
+    spec_gdpr = importlib.util.spec_from_file_location(
+        "core_api_gdpr", os.path.join(core_api_path, 'gdpr.py')
+    )
+    gdpr = importlib.util.module_from_spec(spec_gdpr)
+    spec_gdpr.loader.exec_module(gdpr)
+
+    spec_sentry = importlib.util.spec_from_file_location(
+        "core_api_sentry_test", os.path.join(core_api_path, 'sentry_test.py')
+    )
+    sentry_test = importlib.util.module_from_spec(spec_sentry)
+    spec_sentry.loader.exec_module(sentry_test)
+
+    # Import RBAC API
+    spec_rbac = importlib.util.spec_from_file_location(
+        "core_api_v1_rbac", os.path.join(core_api_path, 'v1', 'rbac.py')
+    )
+    rbac_api = importlib.util.module_from_spec(spec_rbac)
+    spec_rbac.loader.exec_module(rbac_api)
 
     app.include_router(auth.router)
     app.include_router(admin.router)
