@@ -153,19 +153,26 @@ fi
 # Docker Cleanup (falls Container crashed sind)
 echo ""
 echo -e "${BLUE}🧹 Cleaning up crashed containers...${NC}"
-docker compose --env-file .env ${COMPOSE_FILES[@]} rm -f -s -v 2>/dev/null || true
+docker compose --env-file .env ${COMPOSE_FILES[@]} down 2>/dev/null || true
 
 # Start Docker containers
 echo ""
 echo -e "${BLUE}🐳 Starting Docker containers...${NC}"
 
+# Pre-pull images to avoid Docker Compose pull issues
+echo -e "${BLUE}🐳 Pre-pulling Docker images...${NC}"
+docker pull redis:7-alpine 2>/dev/null || true
+docker pull postgres:16-alpine 2>/dev/null || true
+docker pull qdrant/qdrant:latest 2>/dev/null || true
+echo ""
+
 # For Premium/Enterprise: Rebuild frontend to ensure volume mounts work
 if [[ "$TIER" != "Core (Open Source)" ]]; then
     echo -e "${YELLOW}🔨 Rebuilding frontend container (Premium/Enterprise component overrides)...${NC}"
-    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d --build frontend
-    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d
+    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d --build --pull=never frontend
+    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d --pull=never
 else
-    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d
+    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d --pull=never
 fi
 
 # Wait for backend to be ready
