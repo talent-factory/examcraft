@@ -47,7 +47,7 @@ def create_tables():
 
     # Import Core models first
     try:
-        from models.auth import User, Role, Institution, Session, AuditLog
+        from models.auth import User, Role, Institution, UserSession, AuditLog
         from models.document import Document, DocumentStatus
         from models.question_review import QuestionReview, ReviewStatus
         print("✅ Core models imported (Auth + Documents + Question Review)")

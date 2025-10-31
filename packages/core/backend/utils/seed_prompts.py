@@ -18,29 +18,30 @@ if os.path.exists(premium_path) and premium_path not in sys.path:
     sys.path.insert(0, premium_path)
 
 from sqlalchemy.orm import Session
-from database import SessionLocal
-import importlib.util
-
-
-def load_prompt_model():
-    """Dynamically load Prompt model from premium package"""
-    prompt_model_path = '/app/premium/models/prompt.py'
-    if not os.path.exists(prompt_model_path):
-        # Fallback for local development
-        prompt_model_path = os.path.join(
-            os.path.dirname(__file__), '..', '..', '..', 'premium', 'backend', 'models', 'prompt.py'
-        )
-    
-    spec = importlib.util.spec_from_file_location("prompt_models", prompt_model_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.Prompt
+from database import SessionLocal, Base
 
 
 def seed_prompts():
     """Load initial prompts into the database"""
     db = SessionLocal()
-    Prompt = load_prompt_model()
+
+    # Get Prompt model from SQLAlchemy registry (already imported in database.py)
+    # This avoids double-registration issues
+    try:
+        # Try to get Prompt from the registry
+        Prompt = None
+        for mapper in Base.registry.mappers:
+            if mapper.class_.__name__ == 'Prompt':
+                Prompt = mapper.class_
+                break
+
+        if Prompt is None:
+            # If not found in registry, try direct import
+            from premium.models.prompt import Prompt
+    except Exception as e:
+        print(f"❌ Could not get Prompt model: {e}")
+        db.close()
+        return
 
     prompts_to_seed = [
         {
