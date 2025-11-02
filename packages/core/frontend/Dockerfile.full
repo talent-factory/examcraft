@@ -1,0 +1,23 @@
+# ExamCraft AI - Frontend Dockerfile (Full Deployment)
+# Sets up Core frontend with support for Premium/Enterprise packages via runtime merge
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy Core package.json and install dependencies first (for better caching)
+COPY packages/core/frontend/package*.json ./
+RUN npm install
+
+# Copy Core frontend source
+COPY packages/core/frontend/ ./
+
+# Copy entrypoint script for package merging
+COPY packages/core/frontend/entrypoint-full.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Expose port 3000
+EXPOSE 3000
+
+# Use entrypoint script to merge packages at runtime
+ENTRYPOINT ["/entrypoint.sh"]
