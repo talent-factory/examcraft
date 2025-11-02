@@ -25,3 +25,13 @@ dev = [
 members = [
     "packages/core/backend",
 ]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "1.1.0"
+tag_format = "v$version"
+# Allow emojis at the beginning of commit messages
+# Pattern: [emoji] type(scope): description
+message_template = "{{change_type}}{{scope}}: {{message}}"
+# Custom regex pattern to allow optional emoji prefix
+pattern = "^(\\S+ )?(build|bump|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\\(\\S+\\))?!?: ([^\\n\\r]+)((\\n\\n.*)|(\\s*))?$"
