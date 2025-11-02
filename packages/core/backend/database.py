@@ -45,9 +45,25 @@ def create_tables():
     # Import all models to register them with Base
     # This must be done before create_all() is called
 
-    # Import Core models first
+    # Import Core models first (CRITICAL: Must be imported before Premium models!)
     try:
-        print("✅ Core models imported (Auth + Documents + Question Review)")
+        from models.auth import User, Role, Institution, Session, AuditLog  # noqa: F401
+        from models.document import Document, DocumentStatus  # noqa: F401
+        from models.question_review import (  # noqa: F401
+            QuestionReview,
+            ReviewStatus,
+            ReviewComment,
+        )
+        from models.rbac import (  # noqa: F401
+            RBACRole,
+            SubscriptionTier,
+            Feature,
+            RoleFeature,
+            TierFeature,
+            TierQuota,
+        )
+
+        print("✅ Core models imported (Auth + Documents + Question Review + RBAC)")
     except Exception as e:
         print(f"⚠️  Core models import error: {e}")
         import traceback
