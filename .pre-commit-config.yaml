@@ -4,7 +4,7 @@
 repos:
   # Python Code Quality (Ruff replaces black + isort + flake8)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.9
+    rev: v0.14.3
     hooks:
       - id: ruff
         name: Ruff Linter
@@ -18,7 +18,7 @@ repos:
 
   # YAML Validation
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: check-yaml
         args: ['--unsafe']
@@ -33,7 +33,7 @@ repos:
 
   # Commit Message Linting
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v3.12.0
+    rev: v4.9.1
     hooks:
       - id: commitizen
         stages: [commit-msg]
@@ -41,7 +41,7 @@ repos:
 
   # Security Scanning
   - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.4.0
+    rev: v1.5.0
     hooks:
       - id: detect-secrets
         args: [--baseline, .secrets.baseline]
