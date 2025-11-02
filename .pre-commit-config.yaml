@@ -31,13 +31,14 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
 
-  # Commit Message Linting
-  - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.9.1
-    hooks:
-      - id: commitizen
-        stages: [commit-msg]
-        language_version: python3
+  # Commit Message Linting (Disabled to allow emoji prefixes)
+  # TODO: Re-enable with custom regex support for emoji prefixes
+  # - repo: https://github.com/commitizen-tools/commitizen
+  #   rev: v4.9.1
+  #   hooks:
+  #     - id: commitizen
+  #       stages: [commit-msg]
+  #       language_version: python3
 
   # Security Scanning
   - repo: https://github.com/Yelp/detect-secrets
