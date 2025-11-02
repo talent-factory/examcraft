@@ -68,7 +68,7 @@ ExamCraft/
 Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API
 Integration
 
-### Aktueller Projektstatus (Stand: 22.10.2025)
+### Aktueller Projektstatus (Stand: 01.11.2025)
 
 **CORE FEATURES ABGESCHLOSSEN:**
 
@@ -89,8 +89,23 @@ Integration
 - **RBAC & Subscription Tiers** - Unlimited Quotas (-1) Support
 - **Avatar Proxy** - Redis Caching für Google OAuth Avatars
 - **Institution Management** - Admin UI für Institution Creation
+- **Deployment Simplification** (NEW) - 2-Tier Architecture (Core/Full)
 
-**RECENT BUG FIXES (22.10.2025):**
+**RECENT CHANGES (01.11.2025):**
+
+**🎯 Deployment-Vereinfachung:**
+- ✅ 2-Tier-Architektur: Core (OpenSource) + Full (Premium+Enterprise)
+- ✅ docker-compose.yml: Core deployment ohne Qdrant
+- ✅ docker-compose.full.yml: Full deployment mit allen Features
+- ✅ start-dev.sh: Auto-Detection mit --core/--full flags
+- ✅ Backend: DEPLOYMENT_MODE detection, intelligentes Premium API loading
+- ✅ Frontend: Runtime Component Loading (ersetzt Volume Mounts)
+- ✅ DEPLOYMENT.md: Umfassender Deployment Guide
+- ✅ Entfernt: docker-compose.premium.yml, docker-compose.enterprise.yml
+- ✅ Entfernt: Alle Feature-Flags (ENABLE_PREMIUM_FEATURES, etc.)
+- ✅ Feature-Kontrolle: **100% RBAC-gesteuert**
+
+**BUG FIXES (22.10.2025):**
 
 - ✅ Unlimited Quotas (-1) korrekt behandelt (Professional/Enterprise Tier)
 - ✅ PackageTierBadge zeigt korrektes Tier (localStorage Key Fix)
@@ -99,9 +114,9 @@ Integration
 - ✅ Seed Prompts implementiert (5 Default Prompts)
 - ✅ Premium Component Override via Docker Volumes
 
-**TEST COVERAGE (NEW):**
+**TEST COVERAGE:**
 
-- ✅ 52 neue Tests für alle Bug Fixes
+- ✅ 52 Tests für Bug Fixes
 - ✅ Backend: test_subscription_limits.py (12 Tests)
 - ✅ Backend: test_avatar_proxy.py (10 Tests)
 - ✅ Backend: test_seed_prompts.py (15 Tests)
@@ -146,25 +161,60 @@ Integration
 - **PackageTierBadge** mit dynamischer Tier-Erkennung
 - **Premium Component Override** via Docker Volume Mounts
 
+## Deployment-Architektur (Neu: 2-Tier System)
+
+ExamCraft AI verwendet eine vereinfachte 2-Tier-Deployment-Architektur:
+
+### Deployment-Modi
+
+**Core (OpenSource)**
+- Community Edition mit begrenzten Features
+- Docker Compose: `docker-compose.yml`
+- Keine Qdrant Vector Database
+- RBAC: Free Tier (5 Dokumente, 20 Fragen/Monat)
+- Zielgruppe: OpenSource-Community
+
+**Full (Premium + Enterprise)**
+- Komplette Version mit allen Features
+- Docker Compose: `docker-compose.full.yml`
+- Qdrant Vector Database inklusive
+- RBAC: Alle Tiers verfügbar (Free, Starter, Professional, Enterprise)
+- Zielgruppe: Private Development & Production
+
+### Feature-Kontrolle via RBAC
+
+**WICHTIG:** Alle Features werden ausschließlich über RBAC gesteuert!
+- ❌ Keine Environment-Feature-Flags mehr
+- ✅ Subscription Tiers steuern Feature-Zugriff
+- ✅ User Roles steuern Berechtigungen
+- ✅ DEPLOYMENT_MODE steuert nur, welche Services verfügbar sind
+
 ## Entwicklungsumgebung
 
 ### Produktive Befehle
 
 ```bash
-# Development Stack starten (automatische Tier-Erkennung)
+# Development Stack starten (Auto-Detection: Core oder Full)
 ./start-dev.sh
+
+# Force Core-Modus (OpenSource Testing)
+./start-dev.sh --core
+
+# Force Full-Modus (Premium + Enterprise)
+./start-dev.sh --full
 
 # Environment-Variablen validieren
 bash scripts/validate-env.sh
 
-# Spezifische Services (Core + Premium)
-docker compose --env-file .env -f docker-compose.yml -f docker-compose.premium.yml up -d
+# Logs überwachen (Core)
+docker compose --env-file .env -f docker-compose.yml logs -f backend
 
-# Logs überwachen
-docker compose --env-file .env -f docker-compose.yml -f docker-compose.premium.yml logs -f backend
+# Logs überwachen (Full)
+docker compose --env-file .env -f docker-compose.full.yml logs -f backend
 
-# Services stoppen
-docker compose --env-file .env -f docker-compose.yml -f docker-compose.premium.yml down
+# Services stoppen (Auto-detect durch start-dev.sh)
+docker compose --env-file .env -f docker-compose.yml down
+docker compose --env-file .env -f docker-compose.full.yml down
 
 # Tests ausführen (Backend)
 cd packages/core/backend
@@ -184,20 +234,19 @@ ruff format packages/core/backend/ utils/
 **IMMER `--env-file .env` verwenden!**
 
 Docker Compose lädt die `.env` Datei NICHT automatisch für alle Variablen.
-Um sicherzustellen, dass alle Umgebungsvariablen (insbesondere `CLAUDE_API_KEY`,
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) korrekt geladen werden, muss bei jedem
-`docker compose` Befehl `--env-file .env` angegeben werden.
+Das `start-dev.sh` Skript verwendet automatisch `--env-file .env`.
 
 **Beispiele:**
 ```bash
-# ✅ RICHTIG:
-docker compose --env-file .env -f docker-compose.yml -f docker-compose.premium.yml up -d
+# ✅ RICHTIG (via Script):
+./start-dev.sh --full
+
+# ✅ RICHTIG (manuell):
+docker compose --env-file .env -f docker-compose.full.yml up -d
 
 # ❌ FALSCH (Variablen werden nicht geladen):
-docker compose -f docker-compose.yml -f docker-compose.premium.yml up -d
+docker compose -f docker-compose.full.yml up -d
 ```
-
-**Das `start-dev.sh` Skript verwendet automatisch `--env-file .env`.**
 
 ### Code-Standards
 
