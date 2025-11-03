@@ -85,8 +85,14 @@ def seed_default_roles(db: Session):
         {
             "name": UserRole.VIEWER.value,
             "display_name": "Viewer",
-            "description": "View-only access to questions and exams",
-            "permissions": ["view_questions", "view_exams"],
+            "description": "View-only access to questions and exams, can upload and manage documents",
+            "permissions": [
+                "view_questions",
+                "view_exams",
+                "documents:read",
+                "create_documents",
+                "delete_documents",
+            ],
             "is_system_role": True,
         },
     ]
