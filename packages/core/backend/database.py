@@ -47,7 +47,7 @@ def create_tables():
 
     # Import Core models first (CRITICAL: Must be imported before Premium models!)
     try:
-        from models.auth import User, Role, Institution, Session, AuditLog  # noqa: F401
+        from models.auth import User, Role, Institution, UserSession, AuditLog  # noqa: F401
         from models.document import Document, DocumentStatus  # noqa: F401
         from models.question_review import (  # noqa: F401
             QuestionReview,
