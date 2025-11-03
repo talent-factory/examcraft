@@ -140,25 +140,28 @@ All feature access is controlled by the RBAC (Role-Based Access Control) system:
 
 ### Frontend Component Loading
 
-The frontend uses **runtime component loading** to dynamically load Premium/Enterprise features:
+The frontend uses **Docker volume mounts** to merge Premium/Enterprise packages into the Core structure:
 
-```typescript
-import { loadRAGExamCreator } from './utils/componentLoader';
+**Development (docker-compose.full.yml):**
+```yaml
+frontend:
+  volumes:
+    # Core Frontend Source
+    - ./packages/core/frontend/src:/app/src
 
-// Load Premium component
-const RAGExamCreator = loadRAGExamCreator();
+    # Premium Frontend (mounted into Core structure)
+    - ./packages/premium/frontend/src:/app/src/premium
 
-// Use in your component
-<RAGExamCreator onComplete={handleComplete} />
+    # Enterprise Frontend (mounted into Core structure)
+    - ./packages/enterprise/frontend/src:/app/src/enterprise
 ```
 
-**Available Component Loaders:**
-- `loadRAGExamCreator()` - RAG Exam Creator (Premium)
-- `loadDocumentChat()` - Document Chat (Premium)
-- `loadPromptManagement()` - Prompt Management (Premium)
-- `loadPromptTemplateSelector()` - Prompt Template Selector (Premium)
-- `loadCustomBranding()` - Custom Branding (Enterprise)
-- `loadSSOConfiguration()` - SSO Configuration (Enterprise)
+**How it works:**
+1. Core frontend is mounted at `/app/src`
+2. Premium components are mounted at `/app/src/premium`
+3. Enterprise components are mounted at `/app/src/enterprise`
+4. All relative imports work correctly
+5. Hot-reload works seamlessly for all packages
 
 ## Production Deployment (Render.com)
 
@@ -227,8 +230,9 @@ docker compose --env-file .env -f docker-compose.full.yml up -d
    - ❌ `REACT_APP_ENABLE_ENTERPRISE_FEATURES` → ✅ `REACT_APP_DEPLOYMENT_MODE=full`
 
 3. **Docker Volumes:**
-   - Component override volumes removed
-   - Frontend uses runtime component loading instead
+   - Frontend now uses direct volume mounts for Premium/Enterprise packages
+   - Simpler than previous approach, preserves directory structure
+   - Hot-reload works correctly for all packages
 
 ## Development Workflow
 
