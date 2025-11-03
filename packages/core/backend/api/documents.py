@@ -24,6 +24,7 @@ from models.document import Document, DocumentStatus
 from models.auth import User
 from database import get_db
 from utils.auth_utils import get_current_active_user, require_permission
+from tasks.document_tasks import process_document as celery_process_document
 import logging
 
 logger = logging.getLogger(__name__)
@@ -71,7 +72,7 @@ async def upload_document(
     db: Session = Depends(get_db),
 ):
     """
-    Upload ein neues Dokument
+    Upload ein neues Dokument (Asynchrone Verarbeitung mit Celery)
 
     **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
 
@@ -79,6 +80,8 @@ async def upload_document(
 
     Returns:
         UploadResponse mit Document ID und Status
+
+    **Note:** Document wird asynchron verarbeitet. Status kann via GET /documents/{id} abgerufen werden.
     """
     try:
         # Check document limit for institution
@@ -86,14 +89,26 @@ async def upload_document(
 
         SubscriptionLimits.check_document_limit(current_user.institution, db)
 
+        # Save document file and create DB entry
         document = await document_service.upload_document(
             file=file, user_id=current_user.id, db=db
         )
 
         # Set institution_id for multi-tenancy
         document.institution_id = current_user.institution_id
+        document.status = DocumentStatus.QUEUED  # Set to QUEUED for async processing
         db.commit()
         db.refresh(document)
+
+        # Dispatch async processing task to Celery
+        task = celery_process_document.apply_async(
+            args=[str(document.id), str(current_user.id)],
+            countdown=0,  # Start immediately
+        )
+
+        # Store task ID for tracking
+        document.task_id = task.id
+        db.commit()
 
         # Audit log: Document created
         from services.audit_service import AuditService
@@ -104,19 +119,20 @@ async def upload_document(
             current_user.id,
             document.id,
             request=http_request,
-            additional_data={"filename": document.filename},
+            additional_data={"filename": document.filename, "task_id": task.id},
         )
 
         return UploadResponse(
             document_id=document.id,
             filename=document.filename,
             status=document.status.value,
-            message="Document uploaded successfully",
+            message="Document queued for processing. Check status via GET /documents/{id}",
         )
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Upload failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
@@ -228,6 +244,74 @@ async def get_document(
         raise HTTPException(status_code=500, detail=f"Failed to get document: {str(e)}")
 
 
+@router.get("/{document_id}/status")
+async def get_document_status(
+    document_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the processing status of a document (for async processing)
+
+    **Required:** Authenticated user
+
+    - **document_id**: ID of the document
+
+    Returns:
+        Document status, task ID, and processing info
+    """
+    try:
+        document = document_service.get_document_by_id(document_id, db)
+
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Tenant-aware access control
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+
+        tenant_context = get_tenant_context(current_user)
+        TenantFilter.verify_tenant_access(document, tenant_context)
+
+        # Get Celery task status if task_id exists
+        task_status = None
+        if document.task_id:
+            try:
+                from celery_app import celery_app
+
+                task = celery_app.AsyncResult(document.task_id)
+                task_status = {
+                    "task_id": document.task_id,
+                    "state": task.state,
+                    "result": task.result if task.successful() else None,
+                    "error": str(task.info) if task.failed() else None,
+                }
+            except Exception as e:
+                logger.warning(f"Failed to get Celery task status: {str(e)}")
+
+        return {
+            "document_id": document.id,
+            "filename": document.filename,
+            "status": document.status.value,
+            "task_status": task_status,
+            "error_message": document.error_message,
+            "processing_info": document.processing_info,
+            "created_at": document.created_at.isoformat()
+            if document.created_at
+            else None,
+            "processed_at": document.processed_at.isoformat()
+            if document.processed_at
+            else None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get document status: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get document status: {str(e)}"
+        )
+
+
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: int,
@@ -259,7 +343,10 @@ async def delete_document(
         if not current_user.is_superuser:
             if document.user_id and document.user_id != current_user.id:
                 # Check if user is admin in same institution
-                if not (current_user.has_role("admin") and document.institution_id == current_user.institution_id):
+                if not (
+                    current_user.has_role("admin")
+                    and document.institution_id == current_user.institution_id
+                ):
                     raise HTTPException(status_code=403, detail="Access denied")
 
         # Store filename for audit log
@@ -297,52 +384,6 @@ async def delete_document(
         raise HTTPException(
             status_code=500, detail=f"Failed to delete document: {str(e)}"
         )
-
-
-@router.get("/{document_id}/status")
-async def get_document_status(
-    document_id: int,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Hole Processing-Status eines Dokuments
-
-    **Required:** Authenticated user
-
-    - **document_id**: ID des Dokuments
-
-    Returns:
-        Aktueller Processing-Status
-    """
-    try:
-        document = document_service.get_document_by_id(document_id, db)
-
-        if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
-
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
-
-        return {
-            "document_id": document_id,
-            "status": document.status.value,
-            "created_at": document.created_at.isoformat()
-            if document.created_at
-            else None,
-            "processed_at": document.processed_at.isoformat()
-            if document.processed_at
-            else None,
-            "metadata": document.doc_metadata,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
 
 
 @router.post("/{document_id}/process")
