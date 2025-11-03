@@ -45,6 +45,27 @@ services:
     networks:
       - examcraft_network
 
+  # RabbitMQ Message Queue
+  rabbitmq:
+    container_name: examcraft-rabbitmq
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-examcraft}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-secure_password_here}
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"      # AMQP Port
+      - "15672:15672"    # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - examcraft_network
+
   # Core Backend (Open Source)
   backend:
     build:
@@ -59,6 +80,10 @@ services:
 
       # Redis (internal port 6379, external port 6380)
       REDIS_URL: redis://redis:6379/0
+
+      # Celery Configuration
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-examcraft}:${RABBITMQ_PASSWORD:-secure_password_here}@rabbitmq:5672/
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
 
       # JWT
       JWT_SECRET_KEY: dev_secret_key_change_in_production
@@ -102,9 +127,54 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - examcraft_network
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker for Async Document Processing
+  celery_worker:
+    build:
+      context: .
+      dockerfile: ./packages/core/backend/Dockerfile
+    container_name: examcraft-celery-worker
+    command: celery -A celery_app worker --loglevel=info --concurrency=3 --queues=document_processing,rag_embedding,question_generation
+    environment:
+      # Deployment Mode
+      DEPLOYMENT_MODE: core
+
+      # Database
+      DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft
+
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+
+      # Celery Configuration
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-examcraft}:${RABBITMQ_PASSWORD:-secure_password_here}@rabbitmq:5672/
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+
+      # AI APIs
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-3-5-sonnet-20241022}
+
+      # Environment
+      ENVIRONMENT: development
+      DEBUG: "false"
+    volumes:
+      - ./packages/core/backend:/app
+      - backend_storage:/app/storage
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - examcraft_network
 
   # Core Frontend (Open Source)
   frontend:
@@ -138,6 +208,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  rabbitmq_data:
     driver: local
   backend_storage:
     driver: local

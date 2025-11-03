@@ -24,6 +24,14 @@ from config.sentry import init_sentry  # noqa: E402
 
 init_sentry()
 
+# Initialize Celery App (for async task processing)
+try:
+    from celery_app import celery_app  # noqa: F401
+
+    logger.info("✅ Celery app initialized for async document processing")
+except Exception as e:
+    logger.warning(f"⚠️  Celery initialization warning: {str(e)}")
+
 # Lazy-loaded services (to reduce memory at startup)
 _claude_service = None
 
