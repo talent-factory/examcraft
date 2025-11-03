@@ -45,6 +45,14 @@ async def lifespan(app: FastAPI):
     Lifespan event handler for startup and shutdown events.
     Replaces deprecated @app.on_event("startup") and @app.on_event("shutdown")
     """
+    # Detect deployment mode
+    deployment_mode = os.getenv("DEPLOYMENT_MODE", "core")
+    is_full_deployment = deployment_mode == "full"
+
+    print("\n" + "=" * 60)
+    print(f"🚀 ExamCraft AI - Starting ({deployment_mode.upper()} mode)")
+    print("=" * 60 + "\n")
+
     # Startup: Initialize database tables
     from database import create_tables, SessionLocal
 
@@ -80,28 +88,77 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Error seeding RBAC data: {str(e)}")
 
-    # Startup: Seed default prompts (Premium feature)
-    try:
-        from utils.seed_prompts import seed_prompts
+    # Startup: Seed default prompts (Premium/Enterprise feature)
+    if is_full_deployment:
+        try:
+            from utils.seed_prompts import seed_prompts
 
-        seed_prompts()
-    except ImportError:
-        print("⚠️  Premium package not available, skipping prompt seeding")
-    except Exception as e:
-        print(f"❌ Error seeding prompts: {str(e)}")
+            seed_prompts()
+            print("✅ Premium prompts seeded")
+        except ImportError:
+            print("⚠️  Premium package not available, skipping prompt seeding")
+        except Exception as e:
+            print(f"❌ Error seeding prompts: {str(e)}")
+    else:
+        print("ℹ️  Running in Core mode - Premium features disabled")
 
     # Startup: Load API routers (Core Package)
     # Premium features (vector_search, chat, prompts) are available in Premium package
-    from api import (
-        documents,
-        rag_exams,
-        question_review,
-        auth,
-        admin,
-        gdpr,
-        sentry_test,
+    # Import from core.api explicitly to avoid conflicts with premium.api
+    import importlib
+
+    # Get the core backend path
+    core_api_path = os.path.join(os.path.dirname(__file__), "api")
+
+    # Import core API modules directly
+    spec_documents = importlib.util.spec_from_file_location(
+        "core_api_documents", os.path.join(core_api_path, "documents.py")
     )
-    from api.v1 import rbac as rbac_api
+    documents = importlib.util.module_from_spec(spec_documents)
+    spec_documents.loader.exec_module(documents)
+
+    spec_rag = importlib.util.spec_from_file_location(
+        "core_api_rag_exams", os.path.join(core_api_path, "rag_exams.py")
+    )
+    rag_exams = importlib.util.module_from_spec(spec_rag)
+    spec_rag.loader.exec_module(rag_exams)
+
+    spec_qr = importlib.util.spec_from_file_location(
+        "core_api_question_review", os.path.join(core_api_path, "question_review.py")
+    )
+    question_review = importlib.util.module_from_spec(spec_qr)
+    spec_qr.loader.exec_module(question_review)
+
+    spec_auth = importlib.util.spec_from_file_location(
+        "core_api_auth", os.path.join(core_api_path, "auth.py")
+    )
+    auth = importlib.util.module_from_spec(spec_auth)
+    spec_auth.loader.exec_module(auth)
+
+    spec_admin = importlib.util.spec_from_file_location(
+        "core_api_admin", os.path.join(core_api_path, "admin.py")
+    )
+    admin = importlib.util.module_from_spec(spec_admin)
+    spec_admin.loader.exec_module(admin)
+
+    spec_gdpr = importlib.util.spec_from_file_location(
+        "core_api_gdpr", os.path.join(core_api_path, "gdpr.py")
+    )
+    gdpr = importlib.util.module_from_spec(spec_gdpr)
+    spec_gdpr.loader.exec_module(gdpr)
+
+    spec_sentry = importlib.util.spec_from_file_location(
+        "core_api_sentry_test", os.path.join(core_api_path, "sentry_test.py")
+    )
+    sentry_test = importlib.util.module_from_spec(spec_sentry)
+    spec_sentry.loader.exec_module(sentry_test)
+
+    # Import RBAC API
+    spec_rbac = importlib.util.spec_from_file_location(
+        "core_api_v1_rbac", os.path.join(core_api_path, "v1", "rbac.py")
+    )
+    rbac_api = importlib.util.module_from_spec(spec_rbac)
+    spec_rbac.loader.exec_module(rbac_api)
 
     app.include_router(auth.router)
     app.include_router(admin.router)
@@ -115,20 +172,46 @@ async def lifespan(app: FastAPI):
     if os.getenv("ENVIRONMENT", "development") == "development":
         app.include_router(sentry_test.router)
 
-    # Premium Features: Chat API (only if Premium features enabled)
-    if os.getenv("ENABLE_PREMIUM_FEATURES", "false").lower() == "true":
+    # Premium/Enterprise Features: Load additional APIs in Full deployment
+    if is_full_deployment:
+        print("\n🌟 Loading Premium/Enterprise Features...")
+
+        # Premium: Chat API
         try:
             from premium.api.v1 import chat as chat_api
 
             app.include_router(chat_api.router)
-            print("✅ Premium Chat API loaded successfully")
-            logger.info("✅ Premium Chat API loaded successfully")
+            print("✅ Premium Chat API loaded")
         except ImportError as e:
-            print(f"⚠️ Premium Chat API not available: {e}")
-            logger.warning(f"⚠️ Premium Chat API not available: {e}")
+            print(f"⚠️  Premium Chat API not available: {e}")
         except Exception as e:
             print(f"❌ Error loading Premium Chat API: {e}")
-            logger.error(f"❌ Error loading Premium Chat API: {e}")
+
+        # Premium: Prompts API
+        try:
+            from premium.api.v1 import prompts as prompts_api
+
+            app.include_router(prompts_api.router)
+            print("✅ Premium Prompts API loaded")
+        except ImportError as e:
+            print(f"⚠️  Premium Prompts API not available: {e}")
+        except Exception as e:
+            print(f"❌ Error loading Premium Prompts API: {e}")
+
+        # Premium: Vector Search API
+        try:
+            from premium.api.v1 import vector_search as vector_search_api
+
+            app.include_router(vector_search_api.router)
+            print("✅ Premium Vector Search API loaded")
+        except ImportError as e:
+            print(f"⚠️  Premium Vector Search API not available: {e}")
+        except Exception as e:
+            print(f"❌ Error loading Premium Vector Search API: {e}")
+
+        print("")
+    else:
+        print("ℹ️  Core mode - Premium/Enterprise APIs not loaded")
 
     # Startup: Reset any documents stuck in PROCESSING status
     # (happens when backend restarts during document processing)

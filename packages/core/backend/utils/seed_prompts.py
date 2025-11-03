@@ -5,47 +5,40 @@ Simplified version that works in Docker container.
 
 import sys
 import os
-from datetime import datetime
 
 # Add app path for imports (Docker: /app)
-app_path = '/app'
+app_path = "/app"
 if os.path.exists(app_path) and app_path not in sys.path:
     sys.path.insert(0, app_path)
 
 # Add premium path for imports
-premium_path = '/app/premium'
+premium_path = "/app/premium"
 if os.path.exists(premium_path) and premium_path not in sys.path:
     sys.path.insert(0, premium_path)
 
-from sqlalchemy.orm import Session
-from database import SessionLocal
-import importlib.util
-
-
-def load_prompt_model():
-    """Dynamically load Prompt model from premium package"""
-    prompt_model_path = '/app/premium/models/prompt.py'
-    if not os.path.exists(prompt_model_path):
-        # Fallback for local development
-        prompt_model_path = os.path.join(
-            os.path.dirname(__file__), '..', '..', '..', 'premium', 'backend', 'models', 'prompt.py'
-        )
-    
-    spec = importlib.util.spec_from_file_location("prompt_models", prompt_model_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.Prompt
+from database import SessionLocal  # noqa: E402
 
 
 def seed_prompts():
     """Load initial prompts into the database"""
     db = SessionLocal()
-    Prompt = load_prompt_model()
+
+    # Import Prompt model (already registered in database.py)
+    try:
+        from premium.models.prompt import Prompt
+    except ImportError as e:
+        print(f"❌ Premium package not available: {e}")
+        db.close()
+        return
+    except Exception as e:
+        print(f"❌ Could not import Prompt model: {e}")
+        db.close()
+        return
 
     prompts_to_seed = [
         {
             "name": "system_prompt_question_generation_bloom",
-            "content": """You are an expert in educational assessment and exam question generation. 
+            "content": """You are an expert in educational assessment and exam question generation.
 Your task is to create high-quality exam questions based on Bloom's Taxonomy.
 
 Current Bloom Level: {bloom_level}
@@ -201,9 +194,7 @@ Format your response as structured JSON with the following fields:
 
     for prompt_data in prompts_to_seed:
         # Check if already exists
-        existing = (
-            db.query(Prompt).filter(Prompt.name == prompt_data["name"]).first()
-        )
+        existing = db.query(Prompt).filter(Prompt.name == prompt_data["name"]).first()
         if existing:
             print(f"⏭️  Prompt '{prompt_data['name']}' already exists, skipping...")
             skipped_count += 1
@@ -213,16 +204,17 @@ Format your response as structured JSON with the following fields:
         prompt = Prompt(**prompt_data)
         db.add(prompt)
         db.flush()
-        
+
         print(f"✅ Created prompt: {prompt.name} (v{prompt.version})")
         created_count += 1
 
     db.commit()
     db.close()
 
-    print(f"\n🎉 Seed completed: {created_count} prompts created, {skipped_count} skipped")
+    print(
+        f"\n🎉 Seed completed: {created_count} prompts created, {skipped_count} skipped"
+    )
 
 
 if __name__ == "__main__":
     seed_prompts()
-

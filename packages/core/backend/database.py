@@ -45,10 +45,43 @@ def create_tables():
     # Import all models to register them with Base
     # This must be done before create_all() is called
 
+    # Import Core models first (CRITICAL: Must be imported before Premium models!)
+    try:
+        from models.auth import (  # noqa: F401
+            User,
+            Role,
+            Institution,
+            UserSession,
+            AuditLog,
+            OAuthAccount,
+        )
+        from models.document import Document, DocumentStatus  # noqa: F401
+        from models.question_review import (  # noqa: F401
+            QuestionReview,
+            ReviewStatus,
+            ReviewComment,
+        )
+        from models.rbac import (  # noqa: F401
+            RBACRole,
+            SubscriptionTier,
+            Feature,
+            RoleFeature,
+            TierFeature,
+            TierQuota,
+        )
+
+        print("✅ Core models imported (Auth + Documents + Question Review + RBAC)")
+    except Exception as e:
+        print(f"⚠️  Core models import error: {e}")
+        import traceback
+
+        traceback.print_exc()
+
     # Import Premium models (if available)
+    # NOTE: We import Premium models using standard imports (not importlib.util)
+    # to avoid double-registration issues with SQLAlchemy
     try:
         import os
-        import importlib.util
 
         # Check if premium package is mounted (Docker: /app/premium)
         premium_models_path = "/app/premium/models"
@@ -59,21 +92,14 @@ def create_tables():
             )
 
         if os.path.exists(premium_models_path):
-            # Import prompt models directly
-            prompt_spec = importlib.util.spec_from_file_location(
-                "premium_prompt_models", os.path.join(premium_models_path, "prompt.py")
-            )
-            prompt_module = importlib.util.module_from_spec(prompt_spec)
-            prompt_spec.loader.exec_module(prompt_module)
+            # Import Premium models using standard imports to avoid double-registration
+            try:
+                from premium.models.prompt import Prompt  # noqa: F401
+                from premium.models.chat_db import ChatSession  # noqa: F401
 
-            # Import chat database models directly (chat_db.py contains SQLAlchemy models)
-            chat_spec = importlib.util.spec_from_file_location(
-                "premium_chat_models", os.path.join(premium_models_path, "chat_db.py")
-            )
-            chat_module = importlib.util.module_from_spec(chat_spec)
-            chat_spec.loader.exec_module(chat_module)
-
-            print("✅ Premium models imported (Prompt Knowledge Base + ChatBot)")
+                print("✅ Premium models imported (Prompt Knowledge Base + ChatBot)")
+            except ImportError as ie:
+                print(f"⚠️  Premium models import failed: {ie}")
         else:
             print("⚠️  Premium package not found - skipping premium models")
     except Exception as e:

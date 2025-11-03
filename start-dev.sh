@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # ExamCraft AI - Development Environment
-# Intelligente Erkennung: Core / Premium / Enterprise
+# Simplified 2-Tier Deployment: Core (OpenSource) or Full (Premium + Enterprise)
+# All feature access controlled via RBAC
 
 set -e
 
@@ -12,89 +13,94 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Funktion: Prüfe ob Package existiert
-package_exists() {
-    [ -d "packages/$1" ] && [ -f "packages/$1/.git" ]
-}
+# Parse command-line arguments
+FORCE_MODE=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --core)
+      FORCE_MODE="core"
+      shift
+      ;;
+    --full)
+      FORCE_MODE="full"
+      shift
+      ;;
+    *)
+      echo -e "${RED}Unknown option: $1${NC}"
+      echo "Usage: $0 [--core|--full]"
+      exit 1
+      ;;
+  esac
+done
 
 # Funktion: Prüfe ob Submodule initialisiert ist
 submodule_initialized() {
     [ -d "packages/$1" ] && [ "$(ls -A packages/$1)" ]
 }
 
-# Erkenne verfügbare Packages
-AVAILABLE_PACKAGES=("core")
-COMPOSE_FILES=("-f docker-compose.yml")
-
-if package_exists "premium" || submodule_initialized "premium"; then
-    AVAILABLE_PACKAGES+=("premium")
-    COMPOSE_FILES+=("-f docker-compose.premium.yml")
+# Auto-detect deployment mode (unless forced)
+if [ -n "$FORCE_MODE" ]; then
+    DEPLOYMENT_MODE="$FORCE_MODE"
+    echo -e "${YELLOW}🔧 Forced deployment mode: ${DEPLOYMENT_MODE}${NC}"
+else
+    if submodule_initialized "premium" || submodule_initialized "enterprise"; then
+        DEPLOYMENT_MODE="full"
+        echo -e "${GREEN}✅ Auto-detected: Full deployment (Premium + Enterprise available)${NC}"
+    else
+        DEPLOYMENT_MODE="core"
+        echo -e "${BLUE}ℹ️  Auto-detected: Core deployment (OpenSource)${NC}"
+    fi
 fi
 
-if package_exists "enterprise" || submodule_initialized "enterprise"; then
-    AVAILABLE_PACKAGES+=("enterprise")
-    COMPOSE_FILES+=("-f docker-compose.enterprise.yml")
-fi
-
-# Bestimme Tier basierend auf verfügbaren Packages
-if [[ " ${AVAILABLE_PACKAGES[@]} " =~ " enterprise " ]]; then
-    TIER="Enterprise"
-    TIER_EMOJI="🏢"
-    TIER_COLOR=$BLUE
-elif [[ " ${AVAILABLE_PACKAGES[@]} " =~ " premium " ]]; then
-    TIER="Premium"
+# Set deployment variables
+if [ "$DEPLOYMENT_MODE" = "full" ]; then
+    COMPOSE_FILE="docker-compose.full.yml"
+    TIER="Full (Premium + Enterprise)"
     TIER_EMOJI="🌟"
     TIER_COLOR=$GREEN
 else
-    TIER="Core (Open Source)"
+    COMPOSE_FILE="docker-compose.yml"
+    TIER="Core (OpenSource)"
     TIER_EMOJI="🚀"
-    TIER_COLOR=$YELLOW
+    TIER_COLOR=$BLUE
 fi
 
 # Header
-echo -e "${TIER_COLOR}${TIER_EMOJI} Starting ExamCraft AI - ${TIER} Edition${NC}"
-echo "=============================================="
 echo ""
-echo -e "${BLUE}📦 Packages:${NC} ${AVAILABLE_PACKAGES[*]}"
+echo -e "${TIER_COLOR}╔════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${TIER_COLOR}║  ${TIER_EMOJI} ExamCraft AI - ${TIER} Edition  ${TIER_EMOJI} ║${NC}"
+echo -e "${TIER_COLOR}╚════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "${BLUE}📦 Deployment Mode:${NC} ${DEPLOYMENT_MODE}"
+echo -e "${BLUE}📄 Compose File:${NC} ${COMPOSE_FILE}"
 echo ""
 
-# Feature-Liste basierend auf Tier
-if [[ "$TIER" == "Enterprise" ]]; then
-    echo -e "${GREEN}✅ All Features Enabled:${NC}"
+# Feature-Info basierend auf Deployment-Mode
+if [ "$DEPLOYMENT_MODE" = "full" ]; then
+    echo -e "${GREEN}✅ Available Features (Access via RBAC):${NC}"
     echo "   - Document Upload & Processing"
-    echo "   - RAG Question Generation"
+    echo "   - RAG Question Generation (Qdrant)"
     echo "   - Document ChatBot"
     echo "   - Advanced Prompt Management"
-    echo "   - Semantic Search (Qdrant)"
-    echo "   - SSO/SAML Integration"
+    echo "   - Semantic Search & Vector Storage"
     echo "   - OAuth (Google, Microsoft)"
-    echo "   - Custom Branding"
-    echo "   - API Access Management"
-    echo "   - Advanced Analytics"
-elif [[ "$TIER" == "Premium" ]]; then
-    echo -e "${GREEN}✅ Premium Features:${NC}"
-    echo "   - Document Upload & Processing"
-    echo "   - RAG Question Generation"
-    echo "   - Document ChatBot"
-    echo "   - Advanced Prompt Management"
-    echo "   - Semantic Search (Qdrant)"
+    echo "   - SSO/SAML Integration (Enterprise)"
+    echo "   - Custom Branding (Enterprise)"
+    echo "   - API Access Management (Enterprise)"
+    echo "   - Advanced Analytics (Enterprise)"
     echo ""
-    echo -e "${YELLOW}❌ Enterprise Features (Disabled):${NC}"
-    echo "   - SSO/SAML Integration"
-    echo "   - Custom Branding"
-    echo "   - API Access Management"
+    echo -e "${BLUE}💡 Access Control:${NC} All features available, controlled by RBAC & Subscription Tiers"
 else
     echo -e "${GREEN}✅ Core Features:${NC}"
-    echo "   - Document Upload (max 5)"
-    echo "   - Basic Question Generation (20/month)"
+    echo "   - Document Upload (limited)"
+    echo "   - Basic Question Generation (limited)"
     echo "   - Document Library"
     echo "   - Question Review"
+    echo "   - OAuth (Google, Microsoft)"
     echo ""
-    echo -e "${YELLOW}❌ Premium/Enterprise Features (Disabled):${NC}"
-    echo "   - RAG Generation"
-    echo "   - Document ChatBot"
-    echo "   - Advanced Prompt Management"
-    echo "   - SSO/SAML"
+    echo -e "${YELLOW}ℹ️  Premium/Enterprise Features:${NC}"
+    echo "   Not available in Core deployment"
+    echo "   To enable: Clone premium/enterprise packages and run with --full"
 fi
 
 echo ""
@@ -108,6 +114,7 @@ if [ ! -f .env ]; then
         echo -e "${GREEN}✅ .env created. Please configure your environment variables.${NC}"
     else
         echo -e "${RED}❌ .env.example not found. Please create .env manually.${NC}"
+        exit 1
     fi
 fi
 
@@ -120,13 +127,13 @@ else
     echo -e "${YELLOW}⚠️  Warning: scripts/validate-env.sh not found, skipping validation${NC}"
 fi
 
-# Check for required API keys (Premium/Enterprise)
-if [[ "$TIER" != "Core (Open Source)" ]]; then
-    if [ -z "$ANTHROPIC_API_KEY" ]; then
+# Check for required API keys (Full mode)
+if [ "$DEPLOYMENT_MODE" = "full" ]; then
+    if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_API_KEY" ]; then
         echo ""
         echo -e "${YELLOW}⚠️  Warning: ANTHROPIC_API_KEY not set${NC}"
-        echo "Premium/Enterprise features require Claude API access."
-        echo "Please set ANTHROPIC_API_KEY in .env file."
+        echo "Full deployment requires Claude API access for Premium features."
+        echo "Please set ANTHROPIC_API_KEY or CLAUDE_API_KEY in .env file."
         echo ""
         read -p "Continue anyway? (y/N) " -n 1 -r
         echo
@@ -136,43 +143,53 @@ if [[ "$TIER" != "Core (Open Source)" ]]; then
     fi
 fi
 
-# Initialize Git Submodules (falls noch nicht geschehen)
-if [[ "$TIER" != "Core (Open Source)" ]]; then
+# Initialize Git Submodules (Full mode)
+if [ "$DEPLOYMENT_MODE" = "full" ]; then
     echo ""
     echo -e "${BLUE}📦 Initializing Git Submodules...${NC}"
 
-    if [[ " ${AVAILABLE_PACKAGES[@]} " =~ " premium " ]] && ! submodule_initialized "premium"; then
+    if ! submodule_initialized "premium"; then
+        echo "Initializing premium package..."
         git submodule update --init --recursive packages/premium
+    else
+        echo "✅ Premium package already initialized"
     fi
 
-    if [[ " ${AVAILABLE_PACKAGES[@]} " =~ " enterprise " ]] && ! submodule_initialized "enterprise"; then
+    if ! submodule_initialized "enterprise"; then
+        echo "Initializing enterprise package..."
         git submodule update --init --recursive packages/enterprise
+    else
+        echo "✅ Enterprise package already initialized"
     fi
 fi
 
-# Docker Cleanup (falls Container crashed sind)
+# Docker Cleanup
 echo ""
-echo -e "${BLUE}🧹 Cleaning up crashed containers...${NC}"
-docker compose --env-file .env ${COMPOSE_FILES[@]} down 2>/dev/null || true
+echo -e "${BLUE}🧹 Cleaning up existing containers...${NC}"
+docker compose --env-file .env -f "$COMPOSE_FILE" down 2>/dev/null || true
+
+# Pre-pull images
+echo ""
+echo -e "${BLUE}🐳 Pre-pulling Docker images...${NC}"
+docker pull redis:7-alpine 2>/dev/null || echo "  ⚠️  Redis image pull skipped"
+docker pull postgres:16-alpine 2>/dev/null || echo "  ⚠️  PostgreSQL image pull skipped"
+
+if [ "$DEPLOYMENT_MODE" = "full" ]; then
+    docker pull qdrant/qdrant:latest 2>/dev/null || echo "  ⚠️  Qdrant image pull skipped"
+fi
+
+echo ""
 
 # Start Docker containers
-echo ""
-echo -e "${BLUE}🐳 Starting Docker containers...${NC}"
-
-# Pre-pull images to avoid Docker Compose pull issues
-echo -e "${BLUE}🐳 Pre-pulling Docker images...${NC}"
-docker pull redis:7-alpine 2>/dev/null || true
-docker pull postgres:16-alpine 2>/dev/null || true
-docker pull qdrant/qdrant:latest 2>/dev/null || true
+echo -e "${BLUE}🚀 Starting Docker containers...${NC}"
 echo ""
 
-# For Premium/Enterprise: Rebuild frontend to ensure volume mounts work
-if [[ "$TIER" != "Core (Open Source)" ]]; then
-    echo -e "${YELLOW}🔨 Rebuilding frontend container (Premium/Enterprise component overrides)...${NC}"
-    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d --build --pull=never frontend
-    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d --pull=never
+if [ "$DEPLOYMENT_MODE" = "full" ]; then
+    # Full mode: Rebuild to ensure volume mounts work correctly
+    docker compose --env-file .env -f "$COMPOSE_FILE" up -d --build --pull=never
 else
-    docker compose --env-file .env ${COMPOSE_FILES[@]} up -d --pull=never
+    # Core mode: Simple startup
+    docker compose --env-file .env -f "$COMPOSE_FILE" up -d --pull=never
 fi
 
 # Wait for backend to be ready
@@ -180,15 +197,17 @@ echo ""
 echo -e "${BLUE}⏳ Waiting for backend to be ready...${NC}"
 sleep 5
 
-# Seed development data (only in development)
-if [[ "$TIER" != "Core (Open Source)" ]]; then
+# Seed development data (Full mode only)
+if [ "$DEPLOYMENT_MODE" = "full" ]; then
     echo ""
     echo -e "${BLUE}🌱 Seeding development data...${NC}"
-    docker compose --env-file .env ${COMPOSE_FILES[@]} exec -T backend python scripts/seed_dev_data.py 2>/dev/null || echo -e "${YELLOW}⚠️  Seeding skipped (backend not ready or already seeded)${NC}"
+    docker compose --env-file .env -f "$COMPOSE_FILE" exec -T backend python scripts/seed_dev_data.py 2>/dev/null || echo -e "${YELLOW}⚠️  Seeding skipped (backend not ready or already seeded)${NC}"
 fi
 
 echo ""
-echo -e "${GREEN}✅ ExamCraft AI ${TIER} is starting!${NC}"
+echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║  ✅  ExamCraft AI ${TIER} is running!  ✅  ║${NC}"
+echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${BLUE}📍 Access Points:${NC}"
 echo "   - Frontend: http://localhost:3000"
@@ -197,17 +216,26 @@ echo "   - API Docs: http://localhost:8000/docs"
 echo "   - PostgreSQL: localhost:5432"
 echo "   - Redis: localhost:6380 (external) / 6379 (internal)"
 
-if [[ "$TIER" != "Core (Open Source)" ]]; then
+if [ "$DEPLOYMENT_MODE" = "full" ]; then
     echo "   - Qdrant: http://localhost:6333"
 fi
 
 echo ""
 echo -e "${BLUE}📊 View logs:${NC}"
-echo "   docker compose --env-file .env ${COMPOSE_FILES[@]} logs -f"
+echo "   docker compose --env-file .env -f ${COMPOSE_FILE} logs -f"
 echo ""
 echo -e "${BLUE}🛑 Stop services:${NC}"
-echo "   docker compose --env-file .env ${COMPOSE_FILES[@]} down"
+echo "   docker compose --env-file .env -f ${COMPOSE_FILE} down"
 echo ""
-echo -e "${BLUE}💡 Tip:${NC} Features are controlled by user roles and institution settings."
-echo "   Login and configure your subscription tier in the admin panel."
+echo -e "${BLUE}💡 Important:${NC}"
+echo "   - Feature access is controlled by RBAC & Subscription Tiers"
+echo "   - Login and configure user roles/subscriptions in the admin panel"
+
+if [ "$DEPLOYMENT_MODE" = "core" ]; then
+    echo ""
+    echo -e "${YELLOW}ℹ️  To enable Premium/Enterprise features:${NC}"
+    echo "   1. Clone premium/enterprise packages as git submodules"
+    echo "   2. Run: ./start-dev.sh --full"
+fi
+
 echo ""
