@@ -210,8 +210,14 @@ async def register(
         viewer_role = Role(
             name=UserRole.VIEWER.value,
             display_name="Viewer",
-            description="Can view questions and exams",
-            permissions=["view_questions", "view_exams"],
+            description="Can view questions and exams, upload and manage documents",
+            permissions=[
+                "view_questions",
+                "view_exams",
+                "documents:read",
+                "create_documents",
+                "delete_documents",
+            ],
             is_system_role=True,
         )
         db.add(viewer_role)
