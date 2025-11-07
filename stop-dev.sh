@@ -1,47 +1,84 @@
 #!/bin/bash
 
 # ExamCraft AI - Stop Development Environment
-# Stoppt alle laufenden Container (Core / Premium / Enterprise)
+# Stoppt alle laufenden Container (Core oder Full)
 
 set -e
 
 # Farben für Output
 RED='\033[0;31m'
 BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${RED}🛑 Stopping ExamCraft AI Development Environment${NC}"
-echo "=============================================="
+echo "=================================================="
 echo ""
 
-# Funktion: Prüfe ob Package existiert
-package_exists() {
-    [ -d "packages/$1" ] && [ -f "packages/$1/.git" ]
-}
+# Parse command line arguments
+DEPLOYMENT_MODE="auto"
+REMOVE_VOLUMES=false
 
-# Funktion: Prüfe ob Submodule initialisiert ist
-submodule_initialized() {
-    [ -d "packages/$1" ] && [ "$(ls -A packages/$1)" ]
-}
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --core)
+            DEPLOYMENT_MODE="core"
+            shift
+            ;;
+        --full)
+            DEPLOYMENT_MODE="full"
+            shift
+            ;;
+        -v|--volumes)
+            REMOVE_VOLUMES=true
+            shift
+            ;;
+        *)
+            echo -e "${RED}❌ Unknown option: $1${NC}"
+            echo "Usage: ./stop-dev.sh [--core|--full] [-v|--volumes]"
+            exit 1
+            ;;
+    esac
+done
 
-# Erkenne verfügbare Packages
-COMPOSE_FILES=("-f docker-compose.yml")
-
-if package_exists "premium" || submodule_initialized "premium"; then
-    COMPOSE_FILES+=("-f docker-compose.premium.yml")
+# Auto-detect deployment mode
+if [ "$DEPLOYMENT_MODE" = "auto" ]; then
+    if [ -f "docker-compose.full.yml" ]; then
+        # Check if full stack is running
+        if docker compose -f docker-compose.full.yml ps 2>/dev/null | grep -q "examcraft"; then
+            DEPLOYMENT_MODE="full"
+        else
+            DEPLOYMENT_MODE="core"
+        fi
+    else
+        DEPLOYMENT_MODE="core"
+    fi
 fi
 
-if package_exists "enterprise" || submodule_initialized "enterprise"; then
-    COMPOSE_FILES+=("-f docker-compose.enterprise.yml")
-fi
-
-echo -e "${BLUE}📦 Detected compose files:${NC} ${COMPOSE_FILES[*]}"
+DEPLOYMENT_MODE_UPPER=$(echo "$DEPLOYMENT_MODE" | tr '[:lower:]' '[:upper:]')
+echo -e "${BLUE}📦 Deployment Mode:${NC} ${YELLOW}${DEPLOYMENT_MODE_UPPER}${NC}"
 echo ""
 
-# Stop containers
+# Stop containers based on deployment mode
 echo -e "${BLUE}🐳 Stopping Docker containers...${NC}"
-docker compose ${COMPOSE_FILES[@]} down
 
-echo ""
-echo -e "${RED}✅ All containers stopped!${NC}"
+if [ "$DEPLOYMENT_MODE" = "full" ]; then
+    if [ "$REMOVE_VOLUMES" = true ]; then
+        docker compose --env-file .env -f docker-compose.full.yml down -v
+        echo -e "${GREEN}✅ Full stack stopped and volumes removed!${NC}"
+    else
+        docker compose --env-file .env -f docker-compose.full.yml down
+        echo -e "${GREEN}✅ Full stack stopped!${NC}"
+    fi
+else
+    if [ "$REMOVE_VOLUMES" = true ]; then
+        docker compose --env-file .env -f docker-compose.yml down -v
+        echo -e "${GREEN}✅ Core stack stopped and volumes removed!${NC}"
+    else
+        docker compose --env-file .env -f docker-compose.yml down
+        echo -e "${GREEN}✅ Core stack stopped!${NC}"
+    fi
+fi
+
 echo ""
