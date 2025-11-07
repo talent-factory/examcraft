@@ -83,10 +83,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [chunksLoading, setChunksLoading] = useState(false);
 
   useEffect(() => {
-    // On initial load (refreshTrigger = 0), show loading spinner
-    // On subsequent refreshes (refreshTrigger > 0), load without spinner (async processing)
-    const showSpinner = refreshTrigger === 0;
-    loadDocuments(showSpinner);
+    loadDocuments(true); // Initial load with loading state
   }, [refreshTrigger]);
 
   // Auto-refresh for documents with status "processing"
@@ -110,6 +107,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
   const loadDocuments = async (showLoading: boolean = true) => {
     try {
+      // Show loading spinner only on initial load (when showLoading=true and hasLoadedOnce=false)
       if (showLoading && !hasLoadedOnce) {
         setLoading(true);
       }
@@ -121,7 +119,11 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
     } finally {
+      // Always hide loading spinner after load attempt
       if (showLoading && !hasLoadedOnce) {
+        setLoading(false);
+      } else if (!showLoading) {
+        // If showLoading=false (background refresh), ensure loading is false
         setLoading(false);
       }
     }
