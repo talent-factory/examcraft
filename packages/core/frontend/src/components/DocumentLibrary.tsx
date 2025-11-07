@@ -57,6 +57,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
   const [menuAnchor, setMenuAnchor] = useState<{ element: HTMLElement; documentId: number } | null>(null);
@@ -106,17 +107,18 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
   const loadDocuments = async (showLoading: boolean = true) => {
     try {
-      if (showLoading) {
+      if (showLoading && !hasLoadedOnce) {
         setLoading(true);
       }
       setError(null);
       const docs = await DocumentService.getDocuments();
       setDocuments(docs);
       setIsInitialLoad(false);
+      setHasLoadedOnce(true);
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
     } finally {
-      if (showLoading) {
+      if (showLoading && !hasLoadedOnce) {
         setLoading(false);
       }
     }
@@ -314,7 +316,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     });
 
   // Only show loading spinner on initial load, not on background refreshes
-  if (loading && isInitialLoad) {
+  // Use hasLoadedOnce to persist the state even if component remounts
+  if (loading && !hasLoadedOnce) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
         <CircularProgress />
