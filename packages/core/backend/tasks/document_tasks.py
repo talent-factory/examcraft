@@ -6,7 +6,7 @@ Handles document extraction, RAG embedding, and metadata extraction
 from celery import Task
 from celery_app import celery_app
 from services.docling_service import DoclingService
-from services.rag_service import RAGService
+from services.rag_service import rag_service
 from models.document import Document, DocumentStatus
 from database import SessionLocal
 from typing import Dict, Any
@@ -69,24 +69,32 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
 
         logger.info(f"Docling processing completed for {document_id}")
 
-        # 4. Create RAG embeddings (as sub-task)
-        logger.info(f"Creating RAG embeddings for {document_id}")
-        rag_service = RAGService()
-        chunks = rag_service.chunk_document(
-            content=document.content, document_id=document_id
-        )
+        # 4. Create RAG embeddings (as sub-task) - Only in Premium/Enterprise
+        embedding_task_id = None
+        try:
+            logger.info(f"Creating RAG embeddings for {document_id}")
+            # Try to use RAG service if available (Premium/Enterprise)
+            chunks = rag_service.chunk_document(
+                content=document.content, document_id=document_id
+            )
 
-        # Dispatch embedding task
-        embedding_task = create_embeddings.apply_async(
-            args=[document_id, chunks],
-            countdown=5,  # 5 seconds delay
-        )
+            # Dispatch embedding task
+            embedding_task = create_embeddings.apply_async(
+                args=[document_id, chunks],
+                countdown=5,  # 5 seconds delay
+            )
+            embedding_task_id = embedding_task.id
+            chunks_count = len(chunks)
+        except (NotImplementedError, AttributeError) as e:
+            # RAG not available in Core package
+            logger.info(f"RAG embeddings not available (Core package): {str(e)}")
+            chunks_count = 0
 
         # 5. Set status to "completed"
         document.status = DocumentStatus.COMPLETED
         document.processing_info = {
-            "chunks_created": len(chunks),
-            "embedding_task_id": embedding_task.id,
+            "chunks_created": chunks_count,
+            "embedding_task_id": embedding_task_id,
         }
         db.commit()
 
@@ -121,6 +129,9 @@ def create_embeddings(document_id: str, chunks: list) -> Dict[str, Any]:
     """
     Create RAG embeddings for document chunks.
 
+    Note: This task is only functional in Premium/Enterprise packages.
+    In Core package, it logs and returns success without creating embeddings.
+
     Args:
         document_id: UUID of the document
         chunks: List of text chunks
@@ -129,15 +140,20 @@ def create_embeddings(document_id: str, chunks: list) -> Dict[str, Any]:
         Dict with embedding status
     """
     try:
-        rag_service = RAGService()
-        rag_service.add_document_chunks(document_id=document_id, chunks=chunks)
-
-        logger.info(f"Successfully created embeddings for {document_id}")
+        # Try to use RAG service if available (Premium/Enterprise)
+        try:
+            rag_service.add_document_chunks(document_id=document_id, chunks=chunks)
+            logger.info(f"Successfully created embeddings for {document_id}")
+            chunks_embedded = len(chunks)
+        except (NotImplementedError, AttributeError) as e:
+            # RAG not available in Core package
+            logger.info(f"RAG embeddings not available (Core package): {str(e)}")
+            chunks_embedded = 0
 
         return {
             "success": True,
             "document_id": document_id,
-            "chunks_embedded": len(chunks),
+            "chunks_embedded": chunks_embedded,
         }
 
     except Exception as e:

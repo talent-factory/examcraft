@@ -69,6 +69,18 @@ class RAGServicePlaceholder:
             "RAG question generation is only available in the Premium package."
         )
 
+    def chunk_document(self, content: str, document_id: str) -> List[str]:
+        """Chunk document content - only available in Premium package"""
+        raise NotImplementedError(
+            "Document chunking is only available in the Premium package."
+        )
+
+    def add_document_chunks(self, document_id: str, chunks: List[str]) -> None:
+        """Add document chunks to vector store - only available in Premium package"""
+        raise NotImplementedError(
+            "Vector embedding is only available in the Premium package."
+        )
+
 
 # Singleton instance
 rag_service = RAGServicePlaceholder()
