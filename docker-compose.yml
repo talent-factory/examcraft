@@ -12,7 +12,7 @@ services:
   # PostgreSQL Database
   postgres:
     container_name: examcraft-postgres
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: examcraft
       POSTGRES_PASSWORD: examcraft_dev_password
@@ -32,7 +32,7 @@ services:
   # Redis Cache & Session Store
   redis:
     container_name: examcraft-redis
-    image: redis:7-alpine
+    image: redis:8-alpine
     ports:
       - "6380:6379"
     volumes:
