@@ -107,7 +107,6 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
   const loadDocuments = async (showLoading: boolean = true) => {
     try {
-      // Show loading spinner only on initial load (when showLoading=true and hasLoadedOnce=false)
       if (showLoading && !hasLoadedOnce) {
         setLoading(true);
       }
@@ -115,16 +114,14 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       const docs = await DocumentService.getDocuments();
       setDocuments(docs);
       setIsInitialLoad(false);
-      setHasLoadedOnce(true);
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
     } finally {
-      // Always hide loading spinner after load attempt
-      if (showLoading && !hasLoadedOnce) {
-        setLoading(false);
-      } else if (!showLoading) {
-        // If showLoading=false (background refresh), ensure loading is false
-        setLoading(false);
+      // ALWAYS set loading to false after load completes
+      setLoading(false);
+      // Mark that we've loaded at least once
+      if (!hasLoadedOnce) {
+        setHasLoadedOnce(true);
       }
     }
   };
