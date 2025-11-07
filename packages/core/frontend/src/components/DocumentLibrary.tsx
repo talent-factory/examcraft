@@ -56,7 +56,6 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
@@ -107,18 +106,24 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
   const loadDocuments = async (showLoading: boolean = true) => {
     try {
+      // Only show loading spinner on true initial load
       if (showLoading && !hasLoadedOnce) {
         setLoading(true);
       }
       setError(null);
       const docs = await DocumentService.getDocuments();
       setDocuments(docs);
-      setIsInitialLoad(false);
-      setHasLoadedOnce(true);
+
+      // Mark that we've loaded at least once
+      if (!hasLoadedOnce) {
+        setHasLoadedOnce(true);
+        setLoading(false);
+      }
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
-    } finally {
-      if (showLoading && !hasLoadedOnce) {
+      // Always hide loading on error
+      if (!hasLoadedOnce) {
+        setHasLoadedOnce(true);
         setLoading(false);
       }
     }
@@ -184,6 +189,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const handlePreview = async (document: Document) => {
     setPreviewDialog({ open: true, document });
     setPreviewTab(0);
+    setDocumentContent(null);
     setDocumentChunks([]);
     setCurrentPage(1);
     handleMenuClose();
