@@ -56,6 +56,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
@@ -69,6 +70,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     document: null
   });
   const [previewTab, setPreviewTab] = useState(0);
+  const [documentContent, setDocumentContent] = useState<string | null>(null);
+  const [contentLoading, setContentLoading] = useState(false);
   const [processingDocumentId, setProcessingDocumentId] = useState<number | null>(null);
 
   // Pagination state for large documents
@@ -104,23 +107,23 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
   const loadDocuments = async (showLoading: boolean = true) => {
     try {
-      if (showLoading && !hasLoadedOnce) {
+      // Show loading spinner on initial load or when explicitly requested
+      if (showLoading) {
         setLoading(true);
       }
       setError(null);
       const docs = await DocumentService.getDocuments();
       setDocuments(docs);
-
-      // Mark that we've loaded at least once
-      if (!hasLoadedOnce) {
-        setHasLoadedOnce(true);
-        setLoading(false);
-      }
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
     } finally {
-      if (showLoading && !hasLoadedOnce) {
+      // Always hide loading spinner after load attempt
+      if (showLoading) {
         setLoading(false);
+      }
+      // Mark that we've loaded at least once (only on first load)
+      if (!hasLoadedOnce) {
+        setHasLoadedOnce(true);
       }
     }
   };
@@ -185,6 +188,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const handlePreview = async (document: Document) => {
     setPreviewDialog({ open: true, document });
     setPreviewTab(0);
+    setDocumentContent(null);
     setDocumentChunks([]);
     setCurrentPage(1);
     handleMenuClose();
@@ -262,6 +266,44 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     } finally {
       setProcessingDocumentId(null);
     }
+  };
+
+  const waitForDocumentProcessing = async (
+    documentId: number,
+    maxWaitTime: number = 1800000 // 30 Minuten für große Dokumente
+  ) => {
+    const startTime = Date.now();
+    const pollInterval = 3000; // Poll alle 3 Sekunden
+    let pollCount = 0;
+
+    while (Date.now() - startTime < maxWaitTime) {
+      try {
+        const status = await DocumentService.getProcessingStatus(documentId);
+
+        // Reload document list every 5 polls (15 seconds) to show progress
+        pollCount++;
+        if (pollCount % 5 === 0) {
+          await loadDocuments();
+        }
+
+        if (status.status === 'Verarbeitet' || status.status === 'processed') {
+          return; // Verarbeitung abgeschlossen
+        }
+
+        if (status.status === 'Fehler' || status.status === 'error') {
+          throw new Error(`Document processing failed: ${status.status}`);
+        }
+
+        // Warte vor nächstem Poll
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      } catch (error) {
+        console.error('Error checking document status:', error);
+        // Weiter versuchen
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+    }
+
+    throw new Error(`Document processing timeout after ${maxWaitTime / 60000} minutes. Please try again or contact support for large documents.`);
   };
 
   const handleCreateRAGExam = () => {
