@@ -1,0 +1,394 @@
+---
+title: 'Changelog'
+description: 'Alle wichtigen Änderungen an ExamCraft AI werden hier dokumentiert'
+---
+
+## Version 1.0.0 - Production Release (Januar 2025)
+
+<Info>
+  **Aktueller Status:** ExamCraft AI ist produktionsreif und unter [examcraft.talent-factory.xyz](https://examcraft.talent-factory.xyz) verfügbar.
+</Info>
+
+### 🎉 Hauptfeatures
+
+<CardGroup cols={2}>
+  <Card title="Document ChatBot" icon="comments">
+    RAG-powered conversational interface mit NotebookLM-Style
+  </Card>
+  <Card title="IBM Docling Integration" icon="file-pdf">
+    Advanced Document Processing mit OCR und Layout-Erkennung
+  </Card>
+  <Card title="Tailwind CSS v3" icon="palette">
+    Moderne UI mit utility-first CSS framework
+  </Card>
+  <Card title="Production Deployment" icon="rocket">
+    Live auf Render.com mit CI/CD Pipeline
+  </Card>
+</CardGroup>
+
+---
+
+## TF-57: Authentication UI Modernization (20. Januar 2025)
+
+### Frontend Improvements
+
+<AccordionGroup>
+  <Accordion title="Tailwind CSS v3 Integration" icon="palette">
+    **Neue Features:**
+    - Configured CRACO for Create React App PostCSS integration
+    - Added `tailwind.config.js` für Content Scanning und Theme Configuration
+    - Configured `postcss.config.js` für Tailwind und Autoprefixer
+    - Full utility classes support across all components
+    - Production-ready build with CSS purging
+
+    **Konfigurationsdateien:**
+    - `frontend/tailwind.config.js`
+    - `frontend/postcss.config.js`
+    - `frontend/craco.config.js`
+    - `frontend/src/index.css` (mit Tailwind directives)
+  </Accordion>
+
+  <Accordion title="Authentication UI Redesign" icon="lock">
+    **Verbesserungen:**
+    - Redesigned LoginForm mit modern card-based layout
+    - Updated AuthPage mit improved visual hierarchy
+    - Reduced icon size für bessere Proportionen (20x20 → 16x16)
+    - Enhanced form inputs mit focus states und transitions
+    - Added "Welcome back" header mit descriptive subtitle
+    - Improved color scheme (gray-900 → blue-600 für branding)
+    - Consistent spacing und typography throughout auth flow
+  </Accordion>
+
+  <Accordion title="Technical Changes" icon="code">
+    **Dependencies:**
+    - Added `tailwindcss@3.3.0` (downgraded from v4 für CRA compatibility)
+    - Added `postcss@latest`
+    - Added `autoprefixer@latest`
+    - Added `@craco/craco@7.1.0` für CRA configuration override
+
+    **Component Updates:**
+    - `LoginForm.tsx` - Removed self-contained card wrapper, enhanced styling
+    - `AuthPage.tsx` - Reduced icon size, changed background color
+  </Accordion>
+</AccordionGroup>
+
+### Bug Fixes
+
+- ✅ Fixed Tailwind CSS not loading due to v4 incompatibility with CRA
+- ✅ Resolved PostCSS configuration conflicts with CRACO
+- ✅ Fixed double-card structure in authentication flow
+- ✅ Corrected icon sizing issues in AuthPage
+
+---
+
+## TF-111: Document ChatBot Feature (9. Januar 2025)
+
+### Features
+
+<Tabs>
+  <Tab title="Interactive ChatBot">
+    **Kernfunktionen:**
+    - Real-time chat mit uploaded documents
+    - Context-aware responses using Claude API
+    - Source citations mit page references
+    - Chat history persistence in PostgreSQL
+    - Export conversations as Markdown documents
+
+    **Frontend Components:**
+    - `ChatInterface.tsx` - Main chat UI
+    - `ChatSidebar.tsx` - Session management
+    - `MessageList.tsx` - Conversation display
+    - `ChatInput.tsx` - Message input mit file upload
+  </Tab>
+
+  <Tab title="Chat-to-Document Export">
+    **Export Features:**
+    - Full conversation export mit metadata
+    - Automatic title generation from chat context
+    - Integration mit document library
+    - Markdown formatting mit timestamps
+    - User attribution for library visibility
+
+    **Endpoints:**
+    - `POST /api/v1/chat/sessions/{id}/to-document` - Export to document
+    - `GET /api/v1/chat/sessions/{id}/download` - Download as Markdown
+  </Tab>
+
+  <Tab title="API Endpoints">
+    **New Endpoints:**
+    - `POST /api/v1/chat/sessions` - Create chat session
+    - `POST /api/v1/chat/message` - Send message
+    - `GET /api/v1/chat/sessions/{id}` - Get session details
+    - `POST /api/v1/chat/sessions/{id}/to-document` - Export to document
+    - `GET /api/v1/chat/sessions/{id}/download` - Download as Markdown
+
+    **Services:**
+    - `backend/services/chatbot_service.py` - PydanticAI-based chat logic
+    - `backend/services/chat_export_service.py` - Conversation export
+    - `backend/services/document_service.py` - Chat-export handling
+  </Tab>
+</Tabs>
+
+### Testing
+
+- ✅ **28/28 tests passing** (100% pass rate)
+- PostgreSQL-based integration tests mit transaction isolation
+- `backend/tests/test_chat_api.py` - Chat API tests (3 tests)
+- `backend/tests/test_document_model.py` - Document model tests (6 tests)
+- `backend/tests/test_document_service.py` - Service tests (2 tests)
+
+### Bug Fixes
+
+- ✅ Fixed Markdown rendering in chat responses
+- ✅ Fixed PydanticAI message history handling
+- ✅ Fixed export button functionality (download & save)
+- ✅ Fixed missing documents in library after export
+- ✅ Fixed incomplete chat history in document preview
+- ✅ Fixed SQLAlchemy deprecation warnings
+- ✅ Removed obsolete test dependencies
+
+---
+
+## TF-110: IBM Docling Integration (6. Januar 2025)
+
+### Features
+
+<AccordionGroup>
+  <Accordion title="IBM Docling Processor" icon="file-pdf">
+    **Advanced Features:**
+    - Advanced PDF-Layout-Erkennung
+    - Tabellen-Extraktion mit Strukturerhaltung
+    - Multi-Format-Support (PDF, DOCX, PPTX, XLSX, Images)
+    - OCR für gescannte Dokumente
+    - Semantic Chunking basierend auf Dokumentstruktur
+    - Erweiterte Metadaten-Extraktion (Sektionen, Tabellen, Bilder)
+
+    **Neue Module:**
+    - `backend/services/document_processors/docling_processor.py`
+    - `backend/services/document_processors/legacy_processor.py`
+    - `backend/services/document_processors/processor_factory.py`
+  </Accordion>
+
+  <Accordion title="Legacy Processor Fallback" icon="rotate-right">
+    **Fallback Implementation:**
+    - PyPDF für PDF-Verarbeitung
+    - python-docx für DOCX-Verarbeitung
+    - Markdown-Support
+    - Automatischer Fallback wenn Docling nicht verfügbar
+
+    **Environment Configuration:**
+    - `DOCUMENT_PROCESSOR_TYPE` - Select processor (docling, legacy, auto)
+    - Auto-Detection mit intelligent fallback
+    - Backwards Compatible API
+  </Accordion>
+</AccordionGroup>
+
+### Dependencies
+
+**Added:**
+- `docling==2.23.0`
+- `docling-core==2.48.4`
+- `docling-ibm-models==3.9.1`
+
+**Updated:**
+- `python-docx==1.1.2` (required by Docling)
+- `numpy>=1.24.3` (flexible version für Docling compatibility)
+
+### Testing
+
+- `backend/tests/test_docling_processor.py` - Unit tests for Docling
+- `backend/tests/test_legacy_processor.py` - Unit tests for Legacy
+- `backend/tests/test_processor_factory.py` - Integration tests
+- `backend/tests/test_processor_performance.py` - Performance benchmarks
+
+---
+
+## TF-108: Production Deployment (5. Januar 2025)
+
+### Deployment Infrastructure
+
+<Tabs>
+  <Tab title="Render.com Architecture">
+    **Multi-Service Setup:**
+    - Backend API: [api.examcraft.talent-factory.xyz](https://api.examcraft.talent-factory.xyz)
+    - Frontend: [examcraft.talent-factory.xyz](https://examcraft.talent-factory.xyz)
+    - Qdrant Vector Database
+    - PostgreSQL Database
+    - Redis Cache
+  </Tab>
+
+  <Tab title="Environment Management">
+    **Tools:**
+    - Environment sync tool (`scripts/sync_env_to_render.py`)
+    - Production environment template (`.env.production`)
+    - Comprehensive documentation (`docs/deployment/ENVIRONMENT-VARIABLES.md`)
+  </Tab>
+
+  <Tab title="Health Checks">
+    **Monitoring:**
+    - Health check script (`scripts/check_deployment.py`)
+    - Automated testing of all endpoints
+    - Service status monitoring
+  </Tab>
+</Tabs>
+
+### CI/CD Pipeline
+
+**GitLab CI/CD:**
+- Automated testing on push
+- Pre-commit hooks for code quality
+- Deployment validation
+
+### Bug Fixes
+
+- ✅ Database connection issues (missing password in DATABASE_URL)
+- ✅ Health endpoint bugs (SQLAlchemy text() wrapper, async issues)
+- ✅ Build timeout (removed sentence-transformers)
+- ✅ Import errors (numpy always imported)
+
+---
+
+## Version 0.9.0 - Qdrant Migration (20. Dezember 2024)
+
+### Vector Database Upgrade
+
+<Card title="Migrated from ChromaDB to Qdrant" icon="database">
+  **Improvements:**
+  - Better performance and scalability
+  - Production-ready vector search
+  - Improved embedding management
+  - Qdrant client integration
+  - Vector search endpoints
+  - Document reindexing functionality
+</Card>
+
+### Changes
+
+- ❌ Removed ChromaDB dependencies
+- ✅ Updated vector search implementation
+- ✅ Optimized embedding storage
+
+---
+
+## Version 0.8.0 - Core Features (15. Dezember 2024)
+
+### Major Features
+
+<CardGroup cols={2}>
+  <Card title="Document Processing" icon="file">
+    - PDF processing mit PyPDF
+    - DOCX processing mit python-docx
+    - Markdown support
+    - Text chunking mit overlap
+  </Card>
+  <Card title="RAG System" icon="brain">
+    - ChromaDB vector storage
+    - Semantic search
+    - Context retrieval für question generation
+  </Card>
+  <Card title="Question Generation" icon="wand-magic-sparkles">
+    - Claude API integration via PydanticAI
+    - Bloom Taxonomy support
+    - Structured answer generation
+    - Quality levels (A/B/C)
+  </Card>
+  <Card title="Modern Frontend" icon="browser">
+    - React 18 + TypeScript
+    - TanStack Query für API state
+    - Tailwind CSS + shadcn/ui
+    - Responsive design
+  </Card>
+</CardGroup>
+
+### Backend
+
+- FastAPI REST API
+- PostgreSQL database
+- Redis caching
+- SQLAlchemy ORM
+
+---
+
+## Version 0.1.0 - Initial Setup (1. November 2024)
+
+### Project Structure
+
+- Backend (FastAPI)
+- Frontend (React)
+- Database (PostgreSQL)
+- Docker Compose setup
+
+### Basic Features
+
+- Document upload
+- Basic text extraction
+- Simple question generation
+
+---
+
+## Roadmap
+
+### Planned Features
+
+<AccordionGroup>
+  <Accordion title="Document Analysis (TF-110 Continuation)" icon="magnifying-glass">
+    - [ ] Table Extractor Analyzer
+    - [ ] Layout Analyzer
+    - [ ] Metadata Enricher
+    - [ ] Custom Chunking Strategies
+    - [ ] Batch Processing
+    - [ ] Document Caching
+  </Accordion>
+
+  <Accordion title="User Management" icon="users">
+    - [ ] Enhanced Authentication & Authorization
+    - [ ] Role-based access control (RBAC)
+    - [ ] User profiles and settings
+    - [ ] Team collaboration features
+  </Accordion>
+
+  <Accordion title="Question Management" icon="question">
+    - [ ] Question Review Interface (TF-60)
+    - [ ] Question Bank Management
+    - [ ] Tagging and categorization
+    - [ ] Advanced search and filtering
+  </Accordion>
+
+  <Accordion title="Exam Composition" icon="file-lines">
+    - [ ] Exam Composition & Export (TF-56)
+    - [ ] PDF export
+    - [ ] Moodle XML export
+    - [ ] Canvas JSON export
+    - [ ] Custom templates
+  </Accordion>
+
+  <Accordion title="Analytics & Insights" icon="chart-line">
+    - [ ] Question performance analytics
+    - [ ] Usage statistics
+    - [ ] Quality metrics
+    - [ ] Student feedback integration
+  </Accordion>
+</AccordionGroup>
+
+### Future Enhancements
+
+- [ ] Multi-language Support
+- [ ] Mobile App (PWA)
+- [ ] LMS Integration (Moodle, Canvas)
+- [ ] Adaptive Learning Paths
+- [ ] Collaborative Review Workflow
+
+---
+
+## Contributors
+
+<Card title="Talent Factory Team" icon="users">
+  - **Daniel Senften** (@dsenften) - Lead Developer
+  - **Talent Factory Team** - Product Development
+</Card>
+
+---
+
+## License
+
+**MIT License** - See LICENSE file for details

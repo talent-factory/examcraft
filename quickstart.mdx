@@ -1,0 +1,372 @@
+---
+title: 'Quickstart'
+description: 'Starten Sie mit ExamCraft AI in unter 5 Minuten'
+---
+
+## Systemanforderungen
+
+Bevor Sie beginnen, stellen Sie sicher, dass Sie folgendes installiert haben:
+
+<CardGroup cols={2}>
+  <Card title="Docker & Docker Compose" icon="docker">
+    Version 20.10 oder höher
+  </Card>
+  <Card title="Git" icon="git">
+    Für Repository-Management
+  </Card>
+  <Card title="Claude API Key" icon="key">
+    Optional für Premium/Enterprise Features
+  </Card>
+  <Card title="Browser" icon="browser">
+    Chrome, Firefox, Safari oder Edge (aktuelle Version)
+  </Card>
+</CardGroup>
+
+## Installation
+
+<Steps>
+  <Step title="Repository klonen">
+    Klonen Sie das ExamCraft AI Repository von GitHub:
+
+    ```bash
+    git clone https://github.com/talent-factory/examcraft.git
+    cd examcraft
+    ```
+  </Step>
+
+  <Step title="Environment-Variablen konfigurieren">
+    Kopieren Sie die Beispiel-Konfiguration und passen Sie sie an:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Öffnen Sie `.env` und konfigurieren Sie mindestens:
+
+    ```bash
+    # Datenbank-Konfiguration
+    POSTGRES_USER=examcraft
+    POSTGRES_PASSWORD=your-secure-password
+    POSTGRES_DB=examcraft
+
+    # Redis-Konfiguration
+    REDIS_PASSWORD=your-redis-password
+
+    # Claude API (optional für Core)
+    ANTHROPIC_API_KEY=your-claude-api-key
+
+    # JWT Secret
+    JWT_SECRET_KEY=your-jwt-secret-key
+    ```
+
+    <Warning>
+      Ändern Sie alle Passwörter und Secrets vor dem produktiven Einsatz!
+    </Warning>
+  </Step>
+
+  <Step title="Services starten">
+    Das `start-dev.sh` Script erkennt automatisch, welche Packages verfügbar sind:
+
+    ```bash
+    chmod +x start-dev.sh
+    ./start-dev.sh
+    ```
+
+    Das Script startet automatisch:
+    - PostgreSQL Datenbank
+    - Redis Cache
+    - Backend API (FastAPI)
+    - Frontend (React)
+    - Qdrant Vector Database (wenn Premium/Enterprise verfügbar)
+
+    <Info>
+      Der erste Start kann 2-3 Minuten dauern, während Docker die Images herunterlädt.
+    </Info>
+  </Step>
+
+  <Step title="Zugriff auf die Anwendung">
+    Nach erfolgreichem Start erreichen Sie ExamCraft AI unter:
+
+    - **Frontend**: http://localhost:3000
+    - **Backend API**: http://localhost:8000
+    - **API Dokumentation**: http://localhost:8000/docs
+
+    <Check>
+      Wenn Sie die Login-Seite sehen, war die Installation erfolgreich!
+    </Check>
+  </Step>
+</Steps>
+
+## Erste Anmeldung
+
+### Development Login
+
+Für die Entwicklung werden automatisch Test-Accounts erstellt:
+
+<Tabs>
+  <Tab title="Admin Account">
+    ```
+    Email: admin@talent-factory.ch
+    Password: admin123
+    Rolle: Admin, Dozent, Assistant
+    ```
+
+    <Warning>
+      Dieser Account ist nur für Development! Ändern Sie das Passwort in der Produktion.
+    </Warning>
+  </Tab>
+
+  <Tab title="Neue Registrierung">
+    1. Klicken Sie auf "Registrieren"
+    2. Geben Sie Ihre Daten ein
+    3. Verwenden Sie `@talent-factory.ch` für automatische Zuordnung zur Development Institution
+    4. Bestätigen Sie Ihre E-Mail (Development: automatisch bestätigt)
+  </Tab>
+
+  <Tab title="OAuth Login">
+    Sie können sich auch mit Google oder Microsoft OAuth anmelden:
+
+    1. Klicken Sie auf "Mit Google anmelden"
+    2. Wählen Sie Ihren Account
+    3. Bei erster Anmeldung wird automatisch ein Account erstellt
+
+    <Info>
+      OAuth-Accounts mit `@talent-factory.ch` werden automatisch der Development Institution zugeordnet.
+    </Info>
+  </Tab>
+</Tabs>
+
+## Deployment-Modi
+
+ExamCraft AI unterstützt verschiedene Deployment-Modi je nach verfügbaren Packages:
+
+<Tabs>
+  <Tab title="Core (Open Source)">
+    **Community Edition** mit grundlegenden Features
+
+    ```bash
+    ./start-dev.sh --core
+    ```
+
+    **Verfügbare Features:**
+    - ✅ Dokumenten-Upload (5 Dokumente)
+    - ✅ Basis-Fragenerstellung (20 Fragen/Monat)
+    - ✅ Question Review
+    - ✅ User Management
+    - ✅ RBAC System
+
+    **Nicht verfügbar:**
+    - ❌ RAG Generation
+    - ❌ ChatBot
+    - ❌ Vector Database
+  </Tab>
+
+  <Tab title="Full (Premium + Enterprise)">
+    **Komplette Version** mit allen Features
+
+    ```bash
+    ./start-dev.sh --full
+    ```
+
+    **Zusätzliche Features:**
+    - ✅ RAG-basierte Fragenerstellung
+    - ✅ Dokument ChatBot
+    - ✅ Qdrant Vector Database
+    - ✅ Advanced Prompt Management
+    - ✅ Semantic Search
+    - ✅ Alle Subscription Tiers
+  </Tab>
+
+  <Tab title="Auto-Detection">
+    **Automatische Erkennung** (empfohlen)
+
+    ```bash
+    ./start-dev.sh
+    ```
+
+    Das Script erkennt automatisch:
+    - Core Package (immer vorhanden)
+    - Premium Package (falls initialisiert)
+    - Enterprise Package (falls initialisiert)
+
+    Und startet die entsprechenden Services.
+  </Tab>
+</Tabs>
+
+## Überprüfung der Installation
+
+Verwenden Sie diese Checks, um sicherzustellen, dass alles korrekt funktioniert:
+
+<AccordionGroup>
+  <Accordion title="Services überprüfen" icon="list-check">
+    ```bash
+    docker ps
+    ```
+
+    Sie sollten folgende Container sehen:
+    - `examcraft-backend`
+    - `examcraft-frontend`
+    - `examcraft-postgres`
+    - `examcraft-redis`
+    - `examcraft-qdrant` (bei Full Deployment)
+  </Accordion>
+
+  <Accordion title="Logs überwachen" icon="scroll">
+    **Backend Logs:**
+    ```bash
+    docker compose logs -f backend
+    ```
+
+    **Frontend Logs:**
+    ```bash
+    docker compose logs -f frontend
+    ```
+
+    **Alle Logs:**
+    ```bash
+    docker compose logs -f
+    ```
+  </Accordion>
+
+  <Accordion title="Health Check" icon="heart-pulse">
+    Überprüfen Sie den Health Status:
+
+    ```bash
+    curl http://localhost:8000/health
+    ```
+
+    Erwartete Antwort:
+    ```json
+    {
+      "status": "healthy",
+      "database": "connected",
+      "redis": "connected",
+      "qdrant": "connected"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="API Dokumentation" icon="book-open">
+    Öffnen Sie die interaktive API-Dokumentation:
+
+    http://localhost:8000/docs
+
+    Sie sollten alle verfügbaren Endpoints sehen können.
+  </Accordion>
+</AccordionGroup>
+
+## Nächste Schritte
+
+<CardGroup cols={2}>
+  <Card
+    title="Erste Prüfung erstellen"
+    icon="graduation-cap"
+    href="/guides/first-exam"
+  >
+    Folgen Sie unserem Schritt-für-Schritt Guide
+  </Card>
+  <Card
+    title="RAG Workflow"
+    icon="brain"
+    href="/guides/rag-workflow"
+  >
+    Lernen Sie, wie Sie Fragen aus Dokumenten generieren
+  </Card>
+  <Card
+    title="Benutzeroberfläche erkunden"
+    icon="compass"
+    href="/essentials/overview"
+  >
+    Machen Sie sich mit der UI vertraut
+  </Card>
+  <Card
+    title="Subscription Tiers"
+    icon="layer-group"
+    href="/essentials/subscription-tiers"
+  >
+    Verstehen Sie die verschiedenen Tiers
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Services starten nicht" icon="triangle-exclamation">
+    **Problem**: Docker Compose schlägt fehl
+
+    **Lösungen:**
+    1. Überprüfen Sie, ob Docker läuft: `docker ps`
+    2. Prüfen Sie die Logs: `docker compose logs`
+    3. Ports bereits belegt? Ändern Sie Ports in `.env`
+    4. Environment-Variablen korrekt? Prüfen Sie `.env`
+  </Accordion>
+
+  <Accordion title="Frontend lädt nicht" icon="triangle-exclamation">
+    **Problem**: Weißer Bildschirm oder Fehler im Browser
+
+    **Lösungen:**
+    1. Überprüfen Sie Frontend Logs: `docker compose logs frontend`
+    2. Browser-Cache leeren: Strg+Shift+R
+    3. Warten Sie 30-60 Sekunden nach dem Start
+    4. Überprüfen Sie ob Backend läuft: `curl http://localhost:8000/health`
+  </Accordion>
+
+  <Accordion title="Datenbank-Connection Fehler" icon="triangle-exclamation">
+    **Problem**: Backend kann nicht mit Datenbank verbinden
+
+    **Lösungen:**
+    1. Überprüfen Sie PostgreSQL Container: `docker ps | grep postgres`
+    2. Prüfen Sie Credentials in `.env`
+    3. Warten Sie 10-15 Sekunden nach dem Start
+    4. Logs prüfen: `docker compose logs postgres`
+  </Accordion>
+
+  <Accordion title="'start-dev.sh' Permission Denied" icon="triangle-exclamation">
+    **Problem**: Script kann nicht ausgeführt werden
+
+    **Lösung:**
+    ```bash
+    chmod +x start-dev.sh
+    ./start-dev.sh
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Services stoppen
+
+Wenn Sie die Entwicklung beenden möchten:
+
+```bash
+./stop-dev.sh
+```
+
+Oder manuell:
+
+```bash
+docker compose down
+```
+
+<Warning>
+  Daten bleiben in Docker Volumes erhalten. Zum kompletten Reset verwenden Sie:
+  ```bash
+  docker compose down -v
+  ```
+</Warning>
+
+## Produktions-Deployment
+
+Für Produktions-Deployment siehe:
+
+<Card
+  title="Deployment Guide"
+  icon="rocket"
+  href="/deployment"
+>
+  Detaillierte Anleitung für Render.com und andere Plattformen
+</Card>
+
+---
+
+<Check>
+  **Bereit für den nächsten Schritt?** Erstellen Sie [Ihre erste Prüfung](/guides/first-exam) oder erkunden Sie [alle Features](/essentials/overview).
+</Check>

@@ -1,0 +1,449 @@
+---
+title: 'API Introduction'
+description: 'RESTful API für ExamCraft AI - Integrieren Sie KI-gestützte Fragenerstellung in Ihre Anwendungen'
+---
+
+## Übersicht
+
+Die ExamCraft AI API ermöglicht es Ihnen, KI-gestützte Fragenerstellung und Dokumentenverarbeitung in Ihre eigenen Anwendungen zu integrieren.
+
+<Info>
+  **API Access:** Enterprise Tier erforderlich. Kontaktieren Sie [sales@examcraft.ai](mailto:sales@examcraft.ai) für API-Zugriff.
+</Info>
+
+## Base URL
+
+<CodeGroup>
+
+```bash Production
+https://api.examcraft.talent-factory.xyz/api/v1
+```
+
+```bash Development
+http://localhost:8000/api/v1
+```
+
+</CodeGroup>
+
+## Authentication
+
+ExamCraft AI verwendet JWT (JSON Web Tokens) für die Authentifizierung.
+
+### Login und Token erhalten
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://api.examcraft.talent-factory.xyz/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "your@email.com",
+    "password": "your-password"
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.examcraft.talent-factory.xyz/api/auth/login",
+    json={
+        "email": "your@email.com",
+        "password": "your-password"
+    }
+)
+
+token = response.json()["access_token"]
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.examcraft.talent-factory.xyz/api/auth/login',
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: 'your@email.com',
+      password: 'your-password'
+    })
+  }
+);
+
+const { access_token } = await response.json();
+```
+
+</CodeGroup>
+
+### Token verwenden
+
+Fügen Sie den Token in den Authorization Header Ihrer Requests ein:
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET https://api.examcraft.talent-factory.xyz/api/v1/documents \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+```python Python
+headers = {
+    "Authorization": f"Bearer {token}"
+}
+
+response = requests.get(
+    "https://api.examcraft.talent-factory.xyz/api/v1/documents",
+    headers=headers
+)
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.examcraft.talent-factory.xyz/api/v1/documents',
+  {
+    headers: {
+      'Authorization': `Bearer ${access_token}`
+    }
+  }
+);
+```
+
+</CodeGroup>
+
+## Rate Limiting
+
+<Warning>
+  Die API ist rate-limited, um Missbrauch zu verhindern.
+</Warning>
+
+**Limits:**
+- Free Tier: 10 requests/minute
+- Starter: 60 requests/minute
+- Professional: 300 requests/minute
+- Enterprise: 1000 requests/minute
+
+**Headers:**
+```
+X-RateLimit-Limit: 300
+X-RateLimit-Remaining: 299
+X-RateLimit-Reset: 1640995200
+```
+
+Wenn Sie das Limit überschreiten, erhalten Sie einen `429 Too Many Requests` Response.
+
+## Error Handling
+
+Die API verwendet standard HTTP Status Codes:
+
+| Code | Bedeutung |
+|------|-----------|
+| 200 | Success - Request erfolgreich |
+| 201 | Created - Ressource erstellt |
+| 400 | Bad Request - Ungültige Parameter |
+| 401 | Unauthorized - Authentifizierung fehlgeschlagen |
+| 403 | Forbidden - Keine Berechtigung |
+| 404 | Not Found - Ressource nicht gefunden |
+| 429 | Too Many Requests - Rate Limit überschritten |
+| 500 | Internal Server Error - Serverfehler |
+
+### Error Response Format
+
+```json
+{
+  "error": {
+    "code": "INVALID_PARAMETER",
+    "message": "The 'difficulty' parameter must be one of: easy, medium, hard",
+    "details": {
+      "parameter": "difficulty",
+      "provided": "very_hard",
+      "allowed": ["easy", "medium", "hard"]
+    }
+  }
+}
+```
+
+## Pagination
+
+Endpoints, die Listen zurückgeben, verwenden cursor-based pagination:
+
+**Request:**
+```bash
+GET /api/v1/documents?limit=20&cursor=eyJpZCI6MTIzfQ==
+```
+
+**Response:**
+```json
+{
+  "data": [...],
+  "pagination": {
+    "next_cursor": "eyJpZCI6MTQzfQ==",
+    "has_more": true,
+    "total": 156
+  }
+}
+```
+
+**Parameters:**
+- `limit` - Anzahl Ergebnisse pro Seite (default: 20, max: 100)
+- `cursor` - Cursor für nächste Seite (von vorheriger Response)
+
+## Core Endpoints
+
+<CardGroup cols={2}>
+  <Card
+    title="Documents"
+    icon="file"
+    href="/api-reference/endpoints/documents"
+  >
+    Upload, verwalten und durchsuchen Sie Dokumente
+  </Card>
+  <Card
+    title="Questions"
+    icon="question"
+    href="/api-reference/endpoints/questions"
+  >
+    Generieren und verwalten Sie Prüfungsfragen
+  </Card>
+  <Card
+    title="Exams"
+    icon="graduation-cap"
+    href="/api-reference/endpoints/exams"
+  >
+    Erstellen und exportieren Sie komplette Prüfungen
+  </Card>
+  <Card
+    title="Chat"
+    icon="comments"
+    href="/api-reference/endpoints/chat"
+  >
+    Interaktive Gespräche mit Ihren Dokumenten
+  </Card>
+</CardGroup>
+
+## Quick Start Examples
+
+### Dokument hochladen
+
+<CodeGroup>
+
+```python Python
+import requests
+
+# Upload document
+with open("textbook.pdf", "rb") as f:
+    response = requests.post(
+        "https://api.examcraft.talent-factory.xyz/api/v1/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": f}
+    )
+
+document_id = response.json()["id"]
+print(f"Document uploaded: {document_id}")
+```
+
+```javascript JavaScript
+// Upload document
+const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+
+const response = await fetch(
+  'https://api.examcraft.talent-factory.xyz/api/v1/documents',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${access_token}`
+    },
+    body: formData
+  }
+);
+
+const { id } = await response.json();
+console.log(`Document uploaded: ${id}`);
+```
+
+```bash cURL
+curl -X POST https://api.examcraft.talent-factory.xyz/api/v1/documents \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -F "file=@textbook.pdf"
+```
+
+</CodeGroup>
+
+### Fragen generieren (RAG)
+
+<CodeGroup>
+
+```python Python
+# Generate questions from document
+response = requests.post(
+    "https://api.examcraft.talent-factory.xyz/api/v1/questions/generate-rag",
+    headers={"Authorization": f"Bearer {token}"},
+    json={
+        "document_ids": [document_id],
+        "topic": "Sorting Algorithms",
+        "difficulty": "medium",
+        "num_questions": 5,
+        "question_types": ["multiple_choice", "open_ended"]
+    }
+)
+
+questions = response.json()["questions"]
+print(f"Generated {len(questions)} questions")
+```
+
+```javascript JavaScript
+// Generate questions from document
+const response = await fetch(
+  'https://api.examcraft.talent-factory.xyz/api/v1/questions/generate-rag',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${access_token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      document_ids: [documentId],
+      topic: 'Sorting Algorithms',
+      difficulty: 'medium',
+      num_questions: 5,
+      question_types: ['multiple_choice', 'open_ended']
+    })
+  }
+);
+
+const { questions } = await response.json();
+console.log(`Generated ${questions.length} questions`);
+```
+
+```bash cURL
+curl -X POST https://api.examcraft.talent-factory.xyz/api/v1/questions/generate-rag \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_ids": [123],
+    "topic": "Sorting Algorithms",
+    "difficulty": "medium",
+    "num_questions": 5,
+    "question_types": ["multiple_choice", "open_ended"]
+  }'
+```
+
+</CodeGroup>
+
+### Chat mit Dokument
+
+<CodeGroup>
+
+```python Python
+# Create chat session
+response = requests.post(
+    "https://api.examcraft.talent-factory.xyz/api/v1/chat/sessions",
+    headers={"Authorization": f"Bearer {token}"},
+    json={"document_id": document_id}
+)
+
+session_id = response.json()["id"]
+
+# Send message
+response = requests.post(
+    "https://api.examcraft.talent-factory.xyz/api/v1/chat/message",
+    headers={"Authorization": f"Bearer {token}"},
+    json={
+        "session_id": session_id,
+        "message": "Explain the Heapsort algorithm"
+    }
+)
+
+answer = response.json()["response"]
+print(answer)
+```
+
+```javascript JavaScript
+// Create chat session
+let response = await fetch(
+  'https://api.examcraft.talent-factory.xyz/api/v1/chat/sessions',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${access_token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ document_id: documentId })
+  }
+);
+
+const { id: sessionId } = await response.json();
+
+// Send message
+response = await fetch(
+  'https://api.examcraft.talent-factory.xyz/api/v1/chat/message',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${access_token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      session_id: sessionId,
+      message: 'Explain the Heapsort algorithm'
+    })
+  }
+);
+
+const { response: answer } = await response.json();
+console.log(answer);
+```
+
+</CodeGroup>
+
+## SDK Libraries (Coming Soon)
+
+Wir arbeiten an offiziellen SDKs für verschiedene Sprachen:
+
+<CardGroup cols={3}>
+  <Card title="Python SDK" icon="python">
+    Coming in Q2 2025
+  </Card>
+  <Card title="JavaScript/TypeScript SDK" icon="js">
+    Coming in Q2 2025
+  </Card>
+  <Card title="Java SDK" icon="java">
+    Coming in Q3 2025
+  </Card>
+</CardGroup>
+
+## Interactive API Docs
+
+Für eine vollständige interaktive API-Dokumentation besuchen Sie:
+
+<Card
+  title="Swagger UI"
+  icon="book-open"
+  href="https://api.examcraft.talent-factory.xyz/docs"
+>
+  Interaktive API-Dokumentation mit Try-It-Out Funktionalität
+</Card>
+
+## Support
+
+<CardGroup cols={2}>
+  <Card
+    title="API Status"
+    icon="signal"
+    href="https://status.examcraft.ai"
+  >
+    Prüfen Sie den aktuellen API Status
+  </Card>
+  <Card
+    title="API Support"
+    icon="headset"
+    href="mailto:api-support@examcraft.ai"
+  >
+    Kontaktieren Sie unser API Support Team
+  </Card>
+</CardGroup>
+
+---
+
+<Info>
+  **Enterprise Tier erforderlich** für vollen API-Zugriff. Kontaktieren Sie [sales@examcraft.ai](mailto:sales@examcraft.ai) für weitere Informationen.
+</Info>

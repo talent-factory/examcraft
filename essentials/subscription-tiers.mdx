@@ -1,0 +1,376 @@
+---
+title: 'Subscription Tiers'
+description: 'Detaillierte Übersicht aller Features und Limits pro Tier'
+---
+
+## Übersicht
+
+ExamCraft AI bietet flexible Subscription-Modelle für verschiedene Nutzungsszenarien - von Einzelpersonen bis zu großen Institutionen.
+
+<CardGroup cols={2}>
+  <Card title="Free Tier" icon="gift">
+    Perfekt für Einsteiger und Hobby-Projekte
+  </Card>
+  <Card title="Starter" icon="rocket">
+    Ideal für kleine Lehrteams
+  </Card>
+  <Card title="Professional" icon="briefcase">
+    Für Departments und größere Teams
+  </Card>
+  <Card title="Enterprise" icon="building">
+    Universitäten und Institutionen
+  </Card>
+</CardGroup>
+
+## Feature-Vergleich
+
+### Basis-Features
+
+| Feature | Free | Starter | Professional | Enterprise |
+|---------|------|---------|--------------|------------|
+| **Max. Dokumente** | 5 | 50 | Unbegrenzt | Unbegrenzt |
+| **Fragen pro Monat** | 20 | 200 | 1,000 | Unbegrenzt |
+| **Benutzer** | 1 | 3 | 10 | Unbegrenzt |
+| **Dokumenten-Upload** | ✅ | ✅ | ✅ | ✅ |
+| **Basic Question Generation** | ✅ | ✅ | ✅ | ✅ |
+| **Question Review** | ✅ | ✅ | ✅ | ✅ |
+| **RBAC System** | ✅ | ✅ | ✅ | ✅ |
+
+### Premium Features
+
+| Feature | Free | Starter | Professional | Enterprise |
+|---------|------|---------|--------------|------------|
+| **RAG-basierte Generation** | ❌ | ✅ | ✅ | ✅ |
+| **Dokument ChatBot** | ❌ | ❌ | ✅ | ✅ |
+| **Advanced Prompt Management** | ❌ | ❌ | ✅ | ✅ |
+| **Semantic Search** | ❌ | ❌ | ✅ | ✅ |
+| **Analytics Dashboard** | ❌ | ❌ | ✅ | ✅ |
+| **Vector Database (Qdrant)** | ❌ | ✅ | ✅ | ✅ |
+
+### Enterprise Features
+
+| Feature | Free | Starter | Professional | Enterprise |
+|---------|------|---------|--------------|------------|
+| **SSO/SAML Integration** | ❌ | ❌ | ❌ | ✅ |
+| **Custom Branding** | ❌ | ❌ | ❌ | ✅ |
+| **API Access** | ❌ | ❌ | ❌ | ✅ |
+| **Advanced Analytics** | ❌ | ❌ | ❌ | ✅ |
+| **Priority Support (24/7)** | ❌ | ❌ | ❌ | ✅ |
+| **Dedicated Account Manager** | ❌ | ❌ | ❌ | ✅ |
+| **SLA Guarantee** | ❌ | ❌ | ❌ | ✅ |
+| **On-Premise Deployment** | ❌ | ❌ | ❌ | ✅ |
+
+## Detaillierte Tier-Beschreibungen
+
+<Tabs>
+  <Tab title="Free Tier">
+    ### 🎁 Free - Community Edition
+
+    **Preis:** Kostenlos
+
+    **Ideal für:**
+    - Einzelpersonen, die ExamCraft AI testen möchten
+    - Hobby-Projekte
+    - Kleinere Kurse
+    - OpenSource-Enthusiasten
+
+    **Limits:**
+    - 5 Dokumente
+    - 20 Fragen pro Monat
+    - 1 Benutzer
+
+    **Verfügbare Features:**
+    - ✅ Dokumenten-Upload (PDF, Word, Markdown, Text)
+    - ✅ Basis-Fragenerstellung (themenbasiert)
+    - ✅ Question Review Workflow
+    - ✅ User Authentication
+    - ✅ RBAC System
+    - ✅ Community Support (GitHub, Discord)
+
+    **Nicht verfügbar:**
+    - ❌ RAG-Generation aus Dokumenten
+    - ❌ Dokument ChatBot
+    - ❌ Vector Database
+    - ❌ Advanced Features
+
+    <Info>
+      Der Free Tier ist perfekt, um ExamCraft AI kennenzulernen und erste Erfahrungen zu sammeln.
+    </Info>
+  </Tab>
+
+  <Tab title="Starter">
+    ### 🚀 Starter - Small Teams
+
+    **Preis:** €19/Monat
+
+    **Ideal für:**
+    - Kleine Lehrteams (2-3 Personen)
+    - Dozenten mit mehreren Kursen
+    - Freelance Educators
+    - Kleinere Bildungseinrichtungen
+
+    **Limits:**
+    - 50 Dokumente
+    - 200 Fragen pro Monat
+    - 3 Benutzer
+
+    **Zusätzlich zu Free:**
+    - ✅ RAG-basierte Fragenerstellung
+    - ✅ Vector Database (Qdrant)
+    - ✅ Semantic Search in Dokumenten
+    - ✅ 10x mehr Dokumente
+    - ✅ 10x mehr Fragen
+    - ✅ Team-Kollaboration (3 User)
+    - ✅ Email Support
+
+    **Use Cases:**
+    - RAG-Fragen aus Lehrbüchern generieren
+    - Dokumenten-basierte Prüfungen erstellen
+    - Team-Kollaboration bei Prüfungserstellung
+
+    <Check>
+      **Upgrade-Empfehlung:** Wenn Sie regelmäßig Prüfungen erstellen und RAG-Features nutzen möchten.
+    </Check>
+  </Tab>
+
+  <Tab title="Professional">
+    ### 💼 Professional - Departments
+
+    **Preis:** €49/Monat
+
+    **Ideal für:**
+    - Departments und Fachbereiche
+    - Größere Lehrteams (5-10 Personen)
+    - Bildungseinrichtungen mit mehreren Kursen
+    - Content-Ersteller und Verlage
+
+    **Limits:**
+    - Unbegrenzte Dokumente
+    - 1,000 Fragen pro Monat
+    - 10 Benutzer
+
+    **Zusätzlich zu Starter:**
+    - ✅ **Dokument ChatBot** - NotebookLM-Style Konversationen
+    - ✅ **Advanced Prompt Management** - Versionierung, Templates
+    - ✅ **Analytics Dashboard** - Usage Metrics, Performance Tracking
+    - ✅ **Unbegrenzte Dokumente**
+    - ✅ **5x mehr Fragen** als Starter
+    - ✅ **Priority Email Support**
+
+    **Use Cases:**
+    - Interaktive Gespräche mit Kursmaterialien
+    - Custom Prompts für spezielle Fragetypen
+    - Usage Analytics für Department
+    - Große Dokumentenbibliothek verwalten
+
+    <Check>
+      **Upgrade-Empfehlung:** Wenn Sie ChatBot, Analytics und unbegrenzte Dokumente benötigen.
+    </Check>
+  </Tab>
+
+  <Tab title="Enterprise">
+    ### 🏢 Enterprise - Institutions
+
+    **Preis:** €149/Monat
+
+    **Ideal für:**
+    - Universitäten und Hochschulen
+    - Große Bildungseinrichtungen
+    - E-Learning Plattformen
+    - Verlage mit API-Bedarf
+
+    **Limits:**
+    - Unbegrenzte Dokumente
+    - **Unbegrenzte Fragen** ⭐
+    - **Unbegrenzte Benutzer** ⭐
+
+    **Zusätzlich zu Professional:**
+    - ✅ **SSO/SAML Integration** - Single Sign-On
+    - ✅ **Custom Branding** - White-Label Lösung
+    - ✅ **API Access** - REST API für Integrationen
+    - ✅ **Advanced Analytics** - BI Export, Custom Reports
+    - ✅ **Audit Logs** - Compliance & Security
+    - ✅ **Priority Support (24/7)**
+    - ✅ **Dedicated Account Manager**
+    - ✅ **SLA Guarantee (99.9% Uptime)**
+    - ✅ **On-Premise Deployment Option**
+
+    **Use Cases:**
+    - University-wide Deployment
+    - LMS Integration via API
+    - Custom Branding für Institution
+    - Compliance-kritische Umgebungen
+
+    <Check>
+      **Upgrade-Empfehlung:** Für große Institutionen mit SSO, API oder On-Premise Anforderungen.
+    </Check>
+  </Tab>
+</Tabs>
+
+## Self-Hosted Enterprise Edition
+
+Für Institutionen mit speziellen Compliance- oder Datenschutz-Anforderungen:
+
+### 🏛️ On-Premise Deployment
+
+**Setup Fee:** €999 (einmalig)
+**License:** €99/Monat pro 10 Benutzer
+**Support:** €299/Jahr
+
+**Features:**
+- ✅ Vollständige On-Premise Installation
+- ✅ Volle Datenkontrolle
+- ✅ SSO/LDAP Integration
+- ✅ Custom Branding
+- ✅ API Access
+- ✅ Dedizierter Support
+- ✅ SLA Guarantee
+
+**Ideal für:**
+- Universitäten mit Datenschutz-Anforderungen
+- Institutionen in regulierten Branchen
+- Organisationen mit Air-Gap Anforderungen
+
+<Card
+  title="Self-Hosted anfragen"
+  icon="envelope"
+  href="mailto:sales@examcraft.ai?subject=Self-Hosted Enterprise Edition"
+>
+  Kontaktieren Sie unser Sales Team für ein individuelles Angebot
+</Card>
+
+## Quota-Verwaltung
+
+### Wie funktionieren Quotas?
+
+<AccordionGroup>
+  <Accordion title="Dokumente" icon="file">
+    **Max. Dokumente:**
+    - Anzahl gleichzeitig gespeicherter Dokumente
+    - Gelöschte Dokumente zählen nicht zur Quota
+    - Quota gilt pro Institution
+
+    **Was passiert bei Erreichen?**
+    - Upload neuer Dokumente wird blockiert
+    - Bestehende Dokumente bleiben verfügbar
+    - Löschen Sie alte Dokumente oder upgraden Sie
+  </Accordion>
+
+  <Accordion title="Fragen pro Monat" icon="question">
+    **Fragen-Quota:**
+    - Anzahl generierter Fragen pro Kalendermonat
+    - Reset am 1. jeden Monats
+    - Quota gilt pro Institution
+
+    **Was passiert bei Erreichen?**
+    - Fragengenerierung wird blockiert
+    - Bestehende Fragen bleiben verfügbar
+    - Warten Sie bis zum Monatsende oder upgraden Sie
+
+    **Unbegrenzte Quota (-1):**
+    - Professional: 1,000 Fragen/Monat
+    - Enterprise: **Unbegrenzt** (kein Limit!)
+  </Accordion>
+
+  <Accordion title="Benutzer" icon="users">
+    **Max. Benutzer:**
+    - Anzahl Accounts pro Institution
+    - Aktive + Inaktive Benutzer zählen
+    - Quota gilt pro Institution
+
+    **Was passiert bei Erreichen?**
+    - Neue Registrierungen werden blockiert
+    - Bestehende Benutzer können weiter arbeiten
+    - Deaktivieren Sie inaktive User oder upgraden Sie
+
+    **Unbegrenzte Benutzer:**
+    - Nur im Enterprise Tier verfügbar
+  </Accordion>
+</AccordionGroup>
+
+## Upgrade-Prozess
+
+So upgraden Sie Ihr Subscription Tier:
+
+<Steps>
+  <Step title="Neues Tier auswählen">
+    Gehen Sie zu **Profil → Subscription** und wählen Sie das gewünschte Tier
+  </Step>
+  <Step title="Payment abschließen">
+    Geben Sie Ihre Zahlungsinformationen ein (Stripe)
+  </Step>
+  <Step title="Sofortige Aktivierung">
+    Neue Features sind sofort verfügbar - kein Neustart erforderlich
+  </Step>
+  <Step title="Anteilige Abrechnung">
+    Bei Upgrade wird die Differenz anteilig berechnet
+  </Step>
+</Steps>
+
+<Info>
+  Bei Downgrade bleibt das höhere Tier bis zum Monatsende aktiv.
+</Info>
+
+## Häufige Fragen
+
+<AccordionGroup>
+  <Accordion title="Kann ich jederzeit upgraden/downgraden?" icon="arrows-up-down">
+    **Ja!** Sie können jederzeit Ihr Tier wechseln:
+    - **Upgrade:** Sofort aktiv, anteilige Berechnung
+    - **Downgrade:** Aktiv ab nächstem Abrechnungszeitraum
+  </Accordion>
+
+  <Accordion title="Was passiert mit meinen Daten bei Downgrade?" icon="database">
+    Ihre Daten bleiben erhalten, aber:
+    - Überschüssige Dokumente werden schreibgeschützt
+    - Neue Features werden deaktiviert
+    - Historische Daten bleiben verfügbar
+  </Accordion>
+
+  <Accordion title="Gibt es einen Educational Discount?" icon="graduation-cap">
+    **Ja!** Bildungseinrichtungen erhalten:
+    - 20% Rabatt auf Professional
+    - 30% Rabatt auf Enterprise
+    - Kontaktieren Sie sales@examcraft.ai mit Nachweis
+  </Accordion>
+
+  <Accordion title="Kann ich vor dem Upgrade testen?" icon="flask">
+    **Ja!** Wir bieten:
+    - 14-Tage Trial für Professional
+    - 30-Tage Trial für Enterprise
+    - Keine Kreditkarte erforderlich für Trial
+  </Accordion>
+</AccordionGroup>
+
+## Nächste Schritte
+
+<CardGroup cols={2}>
+  <Card
+    title="RBAC System"
+    icon="shield-halved"
+    href="/essentials/rbac"
+  >
+    Verstehen Sie Rollen und Berechtigungen
+  </Card>
+  <Card
+    title="Erste Prüfung erstellen"
+    icon="graduation-cap"
+    href="/guides/first-exam"
+  >
+    Legen Sie los mit ExamCraft AI
+  </Card>
+  <Card
+    title="Features erkunden"
+    icon="compass"
+    href="/features/document-upload"
+  >
+    Detaillierte Feature-Dokumentation
+  </Card>
+  <Card
+    title="Upgrade anfragen"
+    icon="rocket"
+    href="mailto:sales@examcraft.ai"
+  >
+    Kontaktieren Sie unser Sales Team
+  </Card>
+</CardGroup>
