@@ -1,0 +1,622 @@
+---
+title: 'Fragenerstellung'
+description: 'KI-gestützte Generierung von Prüfungsfragen mit Claude AI und Bloom\'s Taxonomy'
+---
+
+## Übersicht
+
+ExamCraft AI nutzt Claude 3.5 Sonnet für die automatische Generierung von pädagogisch wertvollen Prüfungsfragen. Das System unterstützt verschiedene Fragetypen und richtet sich automatisch nach Bloom's Taxonomy aus.
+
+<CardGroup cols={2}>
+  <Card title="Claude 3.5 Sonnet" icon="brain">
+    State-of-the-art Language Model von Anthropic
+  </Card>
+  <Card title="Bloom's Taxonomy" icon="layer-group">
+    Automatische kognitive Level-Zuordnung
+  </Card>
+  <Card title="Multiple Question Types" icon="list">
+    Multiple Choice, Open-Ended, Code Questions
+  </Card>
+  <Card title="Quality Calibration" icon="gauge">
+    Automatische Schwierigkeitsgrad-Einschätzung
+  </Card>
+</CardGroup>
+
+## Fragetypen
+
+### Multiple Choice
+
+<Tabs>
+  <Tab title="Format">
+    **Struktur:**
+    - 1 Fragentext
+    - 4 Antwortoptionen (A, B, C, D)
+    - 1 korrekte Antwort
+    - 3 Distraktoren (plausible falsche Antworten)
+    - Erklärung/Begründung
+
+    **Beispiel:**
+    ```
+    Was ist die Zeitkomplexität von Heapsort im Worst Case?
+
+    A) O(n)
+    B) O(n log n) ✓
+    C) O(n²)
+    D) O(log n)
+
+    Erklärung: Heapsort hat eine garantierte Worst-Case-Komplexität
+    von O(n log n), da das Heapify für jedes Element O(log n) Zeit
+    benötigt und über n Elemente iteriert wird.
+    ```
+  </Tab>
+
+  <Tab title="Use Cases">
+    **Ideal für:**
+    - Faktenwissen (Bloom Level 1-2)
+    - Konzeptverständnis
+    - Schnelle Bewertung
+    - Automatisierte Auswertung
+
+    **Nicht ideal für:**
+    - Kreative Aufgaben
+    - Lange Antworten
+    - Prozessbeschreibungen
+  </Tab>
+
+  <Tab title="Best Practices">
+    **Gute Fragen:**
+    - ✅ Klare, eindeutige Fragestellung
+    - ✅ Plausible Distraktoren
+    - ✅ Eindeutig korrekte Antwort
+    - ✅ Keine Hinweise auf richtige Antwort
+
+    **Vermeiden:**
+    - ❌ "Alle oben genannten"
+    - ❌ "Keine der oben genannten"
+    - ❌ Doppelte Verneinungen
+    - ❌ Zu offensichtliche Distraktoren
+  </Tab>
+
+  <Tab title="Bloom Levels">
+    **Level 1-2 (Remember, Understand):**
+    ```
+    Was bedeutet der Begriff "Polymorphismus"?
+    ```
+
+    **Level 3-4 (Apply, Analyze):**
+    ```
+    Welche der folgenden Code-Implementierungen verwendet
+    Polymorphismus korrekt?
+    ```
+
+    **Level 5 (Evaluate):**
+    ```
+    Welche Implementierung bietet die beste Performance
+    für diesen Use Case?
+    ```
+  </Tab>
+</Tabs>
+
+### Offene Fragen
+
+<Tabs>
+  <Tab title="Format">
+    **Struktur:**
+    - Fragentext (oft mit Kontext)
+    - Erwartete Antwortlänge (kurz/mittel/lang)
+    - Musterlösung
+    - Bewertungskriterien
+    - Punkteverteilung
+
+    **Beispiel:**
+    ```
+    Erklären Sie den Unterschied zwischen Heapsort und Quicksort
+    in Bezug auf Stabilität und Speicherkomplexität. Diskutieren
+    Sie die Vor- und Nachteile beider Algorithmen.
+
+    Erwartete Länge: 200-300 Wörter
+
+    Musterlösung:
+    Heapsort ist nicht stabil, da beim Heapify gleiche Elemente
+    ihre relative Reihenfolge verlieren können. Quicksort ist
+    ebenfalls in der Standard-Implementierung nicht stabil...
+
+    Bewertungskriterien:
+    - Stabilität korrekt erklärt (3 Punkte)
+    - Speicherkomplexität analysiert (3 Punkte)
+    - Vor-/Nachteile genannt (4 Punkte)
+    ```
+  </Tab>
+
+  <Tab title="Use Cases">
+    **Ideal für:**
+    - Tiefes Verständnis (Bloom Level 3-6)
+    - Analyse und Evaluation
+    - Kreative Antworten
+    - Prozesserklärungen
+
+    **Vorteile:**
+    - Prüft echtes Verständnis
+    - Keine Ratewahrscheinlichkeit
+    - Kreativität möglich
+
+    **Nachteile:**
+    - Manuelle Bewertung nötig
+    - Zeitaufwändig zu korrigieren
+    - Subjektive Bewertung möglich
+  </Tab>
+
+  <Tab title="Bloom Levels">
+    **Level 3 (Apply):**
+    ```
+    Wenden Sie den Dijkstra-Algorithmus auf den gegebenen
+    Graphen an und zeigen Sie alle Schritte.
+    ```
+
+    **Level 4 (Analyze):**
+    ```
+    Analysieren Sie die Performance-Unterschiede zwischen
+    ArrayList und LinkedList für verschiedene Operationen.
+    ```
+
+    **Level 5 (Evaluate):**
+    ```
+    Bewerten Sie die Eignung von NoSQL-Datenbanken für
+    E-Commerce-Anwendungen und rechtfertigen Sie Ihre Wahl.
+    ```
+
+    **Level 6 (Create):**
+    ```
+    Entwerfen Sie ein Caching-System für eine verteilte
+    Anwendung und begründen Sie Ihre Designentscheidungen.
+    ```
+  </Tab>
+</Tabs>
+
+### Code-Fragen
+
+<Tabs>
+  <Tab title="Format">
+    **Struktur:**
+    - Aufgabenbeschreibung
+    - Input/Output Beispiele
+    - Constraints
+    - Template-Code (optional)
+    - Musterlösung
+    - Test Cases
+
+    **Beispiel:**
+    ```python
+    Implementieren Sie eine Funktion, die einen Heap aus einem
+    unsorted Array erstellt (Build-Heap Operation).
+
+    Input: [4, 10, 3, 5, 1]
+    Output: [10, 5, 3, 4, 1]  # Max-Heap
+
+    Constraints:
+    - Time: O(n)
+    - Space: O(1) in-place
+
+    def build_heap(arr):
+        # Ihre Lösung hier
+        pass
+
+    Test Cases:
+    assert build_heap([4, 10, 3, 5, 1]) == [10, 5, 3, 4, 1]
+    assert build_heap([1, 2, 3]) == [3, 2, 1]
+    ```
+  </Tab>
+
+  <Tab title="Unterstützte Sprachen">
+    - Python
+    - JavaScript/TypeScript
+    - Java
+    - C/C++
+    - C#
+    - Go
+    - Rust
+    - SQL
+
+    **Syntax Highlighting** automatisch aktiviert
+  </Tab>
+
+  <Tab title="Use Cases">
+    **Ideal für:**
+    - Programmier-Kurse
+    - Algorithmen und Datenstrukturen
+    - Praktische Implementierung
+    - Bloom Level 3-6 (Apply bis Create)
+
+    **Best Practices:**
+    - ✅ Klare Aufgabenbeschreibung
+    - ✅ Input/Output Beispiele
+    - ✅ Test Cases angeben
+    - ✅ Constraints spezifizieren
+    - ✅ Template-Code für Struktur
+  </Tab>
+</Tabs>
+
+## Bloom's Taxonomy Integration
+
+ExamCraft AI ordnet jede Frage automatisch einem Bloom-Level zu:
+
+<AccordionGroup>
+  <Accordion title="Level 1: Remember" icon="brain">
+    **Kognitive Fähigkeit:** Wissen abrufen
+
+    **Verben:**
+    - Nennen, Aufzählen, Identifizieren
+    - Definieren, Beschreiben, Erkennen
+
+    **Beispielfrage:**
+    ```
+    Definieren Sie den Begriff "Binary Search Tree".
+    ```
+
+    **Fragetypen:**
+    - Multiple Choice (einfach)
+    - Kurze offene Fragen
+  </Accordion>
+
+  <Accordion title="Level 2: Understand" icon="lightbulb">
+    **Kognitive Fähigkeit:** Konzepte verstehen
+
+    **Verben:**
+    - Erklären, Zusammenfassen, Interpretieren
+    - Klassifizieren, Vergleichen, Paraphrasieren
+
+    **Beispielfrage:**
+    ```
+    Erklären Sie, wie ein Binary Search Tree die Suchzeit
+    im Vergleich zu einem unsorted Array verbessert.
+    ```
+
+    **Fragetypen:**
+    - Multiple Choice (mittel)
+    - Offene Fragen (kurz)
+  </Accordion>
+
+  <Accordion title="Level 3: Apply" icon="wrench">
+    **Kognitive Fähigkeit:** Wissen anwenden
+
+    **Verben:**
+    - Verwenden, Implementieren, Ausführen
+    - Lösen, Demonstrieren, Anwenden
+
+    **Beispielfrage:**
+    ```
+    Implementieren Sie eine Funktion zum Einfügen eines
+    Elements in einen Binary Search Tree.
+    ```
+
+    **Fragetypen:**
+    - Code-Fragen
+    - Offene Fragen (mittel)
+    - Multiple Choice (komplex)
+  </Accordion>
+
+  <Accordion title="Level 4: Analyze" icon="magnifying-glass">
+    **Kognitive Fähigkeit:** Strukturen analysieren
+
+    **Verben:**
+    - Unterscheiden, Organisieren, Vergleichen
+    - Dekonstruieren, Attributieren, Gliedern
+
+    **Beispielfrage:**
+    ```
+    Analysieren Sie die Vor- und Nachteile von AVL-Trees
+    im Vergleich zu Red-Black-Trees für verschiedene
+    Use Cases.
+    ```
+
+    **Fragetypen:**
+    - Offene Fragen (lang)
+    - Code-Analyse-Aufgaben
+  </Accordion>
+
+  <Accordion title="Level 5: Evaluate" icon="balance-scale">
+    **Kognitive Fähigkeit:** Bewerten und beurteilen
+
+    **Verben:**
+    - Beurteilen, Kritisieren, Rechtfertigen
+    - Evaluieren, Testen, Detektieren
+
+    **Beispielfrage:**
+    ```
+    Bewerten Sie die Eignung verschiedener
+    Sortieralgorithmen für ein Echtzeit-System mit
+    begrenztem Speicher. Rechtfertigen Sie Ihre Wahl.
+    ```
+
+    **Fragetypen:**
+    - Offene Fragen (lang)
+    - Case Study Fragen
+  </Accordion>
+
+  <Accordion title="Level 6: Create" icon="lightbulb">
+    **Kognitive Fähigkeit:** Neues erschaffen
+
+    **Verben:**
+    - Entwerfen, Konstruieren, Planen
+    - Entwickeln, Formulieren, Produzieren
+
+    **Beispielfrage:**
+    ```
+    Entwerfen Sie eine neue Datenstruktur, die die Vorteile
+    von Hash Tables und Binary Search Trees kombiniert.
+    Beschreiben Sie die Operationen und analysieren Sie
+    die Komplexität.
+    ```
+
+    **Fragetypen:**
+    - Offene Fragen (sehr lang)
+    - Design-Aufgaben
+    - Projekt-Aufgaben
+  </Accordion>
+</AccordionGroup>
+
+## Schwierigkeitsgrade
+
+ExamCraft AI verwendet ein 5-stufiges System:
+
+<Tabs>
+  <Tab title="Sehr Einfach (1★)">
+    **Charakteristik:**
+    - Faktenwissen
+    - Bloom Level 1 (Remember)
+    - Direkter Recall
+
+    **Beispiel:**
+    ```
+    Was bedeutet die Abkürzung "SQL"?
+
+    A) Structured Query Language ✓
+    B) Simple Query Logic
+    C) Sequential Query List
+    D) System Query Library
+    ```
+
+    **Zielgruppe:**
+    - Einsteiger
+    - Erste Vorlesungen
+    - Grundlagen-Kurse
+  </Tab>
+
+  <Tab title="Einfach (2★)">
+    **Charakteristik:**
+    - Grundlegendes Verständnis
+    - Bloom Level 1-2
+    - Simple Anwendung
+
+    **Beispiel:**
+    ```
+    Welche der folgenden Operationen hat die höchste
+    Zeitkomplexität bei einer verketteten Liste?
+
+    A) Einfügen am Anfang - O(1)
+    B) Einfügen am Ende - O(n) ✓
+    C) Löschen am Anfang - O(1)
+    D) Suchen nach Wert - O(n)
+    ```
+
+    **Zielgruppe:**
+    - Anfänger
+    - Nach ersten Kapiteln
+    - Verständnisprüfung
+  </Tab>
+
+  <Tab title="Mittel (3★)">
+    **Charakteristik:**
+    - Anwendung und Analyse
+    - Bloom Level 3-4
+    - Problemlösung erforderlich
+
+    **Beispiel:**
+    ```
+    Implementieren Sie eine Funktion, die prüft, ob ein
+    Binary Tree ein gültiger Binary Search Tree ist.
+
+    def is_valid_bst(root):
+        # Ihre Lösung hier
+        pass
+    ```
+
+    **Zielgruppe:**
+    - Fortgeschrittene
+    - Hauptvorlesungen
+    - Praktische Prüfungen
+  </Tab>
+
+  <Tab title="Schwer (4★)">
+    **Charakteristik:**
+    - Evaluation und Synthese
+    - Bloom Level 5
+    - Mehrschrittige Problemlösung
+
+    **Beispiel:**
+    ```
+    Gegeben ist ein System mit folgenden Anforderungen:
+    - 1 Million Transaktionen/Sekunde
+    - ACID-Garantien erforderlich
+    - Budget: $10k/Monat
+
+    Evaluieren Sie verschiedene Datenbank-Lösungen und
+    rechtfertigen Sie Ihre Empfehlung mit konkreten
+    Performance-Metriken.
+    ```
+
+    **Zielgruppe:**
+    - Experten
+    - Master-Kurse
+    - Fortgeschrittene Projekte
+  </Tab>
+
+  <Tab title="Sehr Schwer (5★)">
+    **Charakteristik:**
+    - Kreation und Innovation
+    - Bloom Level 6
+    - Originelle Lösungen erforderlich
+
+    **Beispiel:**
+    ```
+    Entwerfen Sie ein verteiltes Consensus-Protokoll für
+    ein Blockchain-System, das:
+    - Byzantine Fault Tolerance garantiert
+    - <1s Latenz bei 10k Nodes
+    - Keine Single Point of Failure
+
+    Beschreiben Sie das Protokoll, analysieren Sie die
+    Komplexität und beweisen Sie die Korrektheit.
+    ```
+
+    **Zielgruppe:**
+    - Meister
+    - PhD-Level
+    - Research-Projekte
+  </Tab>
+</Tabs>
+
+## Generierungs-Konfiguration
+
+### Themenbasierte Generierung
+
+<Steps>
+  <Step title="Thema eingeben">
+    **Best Practices:**
+    - ✅ Spezifisch: "Python Listen - Methoden und Operationen"
+    - ❌ Zu allgemein: "Programmierung"
+
+    **Beispiele:**
+    - "Datenstrukturen - Binary Search Trees"
+    - "Algorithmen - Zeitkomplexität O-Notation"
+    - "OOP - Vererbung und Polymorphismus in Java"
+  </Step>
+
+  <Step title="Schwierigkeitsgrad wählen">
+    - **Einfach:** Bloom 1-2, 1-2 Sterne
+    - **Mittel:** Bloom 3-4, 3 Sterne
+    - **Schwer:** Bloom 5-6, 4-5 Sterne
+  </Step>
+
+  <Step title="Anzahl & Typ festlegen">
+    **Anzahl:** 1-20 Fragen
+    **Typen:** Multiple Choice, Offene Fragen, Code
+
+    **Empfehlung:**
+    - Quiz: 5-10 MC
+    - Test: 5 MC + 3 Offene
+    - Exam: 10 MC + 5 Offene + 2 Code
+  </Step>
+
+  <Step title="Sprache wählen">
+    - Deutsch
+    - English
+
+    (Weitere Sprachen in Planung)
+  </Step>
+</Steps>
+
+### Generierungs-Performance
+
+<Tabs>
+  <Tab title="Generierungszeit">
+    **Pro Frage:**
+    - Multiple Choice: ~2-3 Sekunden
+    - Offene Frage: ~3-5 Sekunden
+    - Code-Frage: ~5-7 Sekunden
+
+    **Batch-Generierung:**
+    - 5 Fragen: ~15 Sekunden
+    - 10 Fragen: ~30 Sekunden
+    - 20 Fragen: ~60 Sekunden
+  </Tab>
+
+  <Tab title="Qualitätsmetriken">
+    **Automatische Bewertung:**
+    - Clarity Score (0-1)
+    - Bloom Level Accuracy
+    - Difficulty Calibration
+    - Distractor Quality (MC)
+
+    **Fragen mit niedrigen Scores:**
+    - Werden markiert
+    - Review empfohlen
+    - Regeneration möglich
+  </Tab>
+
+  <Tab title="Token Usage">
+    **Claude API Kosten:**
+    - Input Tokens: ~500-1000/Frage
+    - Output Tokens: ~200-500/Frage
+    - Geschätzte Kosten: ~$0.02-0.05/Frage
+
+    **Enterprise Tier:**
+    - Unbegrenzte Fragen
+    - Keine zusätzlichen API-Kosten
+  </Tab>
+</Tabs>
+
+## Qualitätssicherung
+
+<CardGroup cols={2}>
+  <Card title="Automatic Checks" icon="robot">
+    - Grammatik und Rechtschreibung
+    - Bloom Level Validation
+    - Difficulty Consistency
+    - Answer Uniqueness (MC)
+  </Card>
+
+  <Card title="Human Review" icon="user">
+    - Inhaltliche Korrektheit
+    - Pädagogische Qualität
+    - Cultural Sensitivity
+    - Target Audience Fit
+  </Card>
+
+  <Card title="A/B Testing" icon="flask">
+    - Student Performance
+    - Question Discrimination
+    - Item Difficulty
+    - Time to Answer
+  </Card>
+
+  <Card title="Continuous Improvement" icon="chart-line">
+    - Feedback Loop
+    - Prompt Optimization
+    - Model Fine-tuning
+    - Quality Metrics Tracking
+  </Card>
+</CardGroup>
+
+## Nächste Schritte
+
+<CardGroup cols={2}>
+  <Card
+    title="RAG-Generation"
+    icon="brain"
+    href="/features/rag-generation"
+  >
+    Generieren Sie Fragen direkt aus Ihren Dokumenten
+  </Card>
+  <Card
+    title="Question Review"
+    icon="check"
+    href="/features/question-review"
+  >
+    Überprüfen und bearbeiten Sie generierte Fragen
+  </Card>
+  <Card
+    title="Erste Prüfung erstellen"
+    icon="graduation-cap"
+    href="/guides/first-exam"
+  >
+    Schritt-für-Schritt Guide
+  </Card>
+  <Card
+    title="Best Practices"
+    icon="star"
+    href="/guides/best-practices"
+  >
+    Tipps für hochwertige Fragen
+  </Card>
+</CardGroup>

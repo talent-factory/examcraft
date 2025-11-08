@@ -1,0 +1,331 @@
+---
+title: 'Dokument ChatBot'
+description: 'Führen Sie intelligente Gespräche mit Ihren Kursmaterialien - NotebookLM-Style'
+---
+
+## Übersicht
+
+Der Dokument ChatBot ermöglicht interaktive Konversationen mit Ihren hochgeladenen Dokumenten. Ähnlich wie NotebookLM können Sie Fragen stellen, Konzepte erkunden und Zusammenfassungen erhalten - alles basierend auf Ihren eigenen Materialien.
+
+<CardGroup cols={2}>
+  <Card title="RAG-Powered" icon="brain">
+    Semantic Search + Claude AI
+  </Card>
+  <Card title="Multi-Turn Dialogue" icon="comments">
+    Context-aware Konversationen
+  </Card>
+  <Card title="Source Citations" icon="quote">
+    Jede Antwort mit Quellenangabe
+  </Card>
+  <Card title="Chat Export" icon="download">
+    Speichern als Markdown-Dokument
+  </Card>
+</CardGroup>
+
+## Features
+
+### Interaktive Q&A
+
+**Stellen Sie Fragen in natürlicher Sprache:**
+- "Erkläre mir den Heapsort Algorithmus"
+- "Was sind die Unterschiede zwischen Quicksort und Mergesort?"
+- "Fasse Kapitel 3 zusammen"
+
+**Der Bot versteht:**
+- Follow-up Fragen
+- Kontextreferenzen ("Was meinst du damit?")
+- Vergleichsanfragen
+- Zusammenfassungen
+
+### Multi-Turn Konversationen
+
+<Steps>
+  <Step title="Kontext bleibt erhalten">
+    Frühere Nachrichten werden berücksichtigt
+  </Step>
+  <Step title="Follow-Up möglich">
+    "Erkläre das genauer" funktioniert
+  </Step>
+  <Step title="Historie verfügbar">
+    Alle Nachrichten sind scrollbar
+  </Step>
+</Steps>
+
+### Source Citations
+
+Jede Antwort enthält:
+- Relevante Textabschnitte
+- Dokument + Seitenzahl
+- Confidence Score (0-1)
+
+**Beispiel:**
+```
+🤖: "Heapsort hat eine Zeitkomplexität von O(n log n) im Worst Case..."
+
+📚 Quellen:
+• algorithms_chapter3.pdf, Seite 42 (Relevanz: 0.95)
+• data_structures.pdf, Seite 128 (Relevanz: 0.87)
+```
+
+## Verwendung
+
+### Chat-Session starten
+
+<Tabs>
+  <Tab title="Web-Interface">
+    <Steps>
+      <Step title="Tab öffnen">
+        Navigieren Sie zu "Dokument ChatBot"
+      </Step>
+      <Step title="Dokument wählen">
+        Dropdown-Menü → Dokument auswählen
+      </Step>
+      <Step title="Chat starten">
+        Erste Frage eingeben und Enter drücken
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="API">
+    ```python
+    import requests
+
+    # Create session
+    response = requests.post(
+        "https://api.examcraft.ai/api/v1/chat/sessions",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"document_id": 123}
+    )
+
+    session_id = response.json()["id"]
+    print(f"Session created: {session_id}")
+    ```
+  </Tab>
+</Tabs>
+
+### Nachricht senden
+
+<Tabs>
+  <Tab title="Web-Interface">
+    - Frage in Input-Feld eingeben
+    - Enter drücken oder Send-Button
+    - Antwort erscheint nach 2-10 Sekunden
+  </Tab>
+
+  <Tab title="API">
+    ```python
+    # Send message
+    response = requests.post(
+        "https://api.examcraft.ai/api/v1/chat/message",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "session_id": session_id,
+            "message": "Erkläre mir den Heapsort Algorithmus"
+        }
+    )
+
+    answer = response.json()
+    print(f"Bot: {answer['response']}")
+    print(f"Confidence: {answer['confidence']}")
+    print(f"Sources: {len(answer['sources'])}")
+    ```
+  </Tab>
+</Tabs>
+
+## Beispiel-Dialog
+
+```
+👤: Was ist Heapsort?
+
+🤖: Heapsort ist ein vergleichsbasierter Sortieralgorithmus, der
+auf der Heap-Datenstruktur basiert. Er arbeitet in zwei Phasen:
+1. Build-Heap: Erstellt einen Max-Heap aus dem unsorted Array
+2. Extract-Max: Entfernt wiederholt das Maximum und platziert es
+   am Ende des Arrays.
+
+Die Zeitkomplexität beträgt O(n log n) im Worst Case.
+
+📚 Quellen: algorithms.pdf, Seite 42 (Relevanz: 0.95)
+
+---
+
+👤: Wie unterscheidet sich das von Quicksort?
+
+🤖: Die Hauptunterschiede sind:
+
+**Stabilität:**
+- Heapsort: nicht stabil
+- Quicksort: nicht stabil (Standard-Implementation)
+
+**Zeitkomplexität:**
+- Heapsort: O(n log n) garantiert (Worst Case)
+- Quicksort: O(n log n) durchschnittlich, O(n²) Worst Case
+
+**Speicher:**
+- Heapsort: O(1) in-place
+- Quicksort: O(log n) für Rekursions-Stack
+
+**Praxis:**
+Quicksort ist in der Praxis oft schneller aufgrund besserer
+Cache-Locality, obwohl Heapsort garantierte Performance bietet.
+
+📚 Quellen: algorithms.pdf, Seiten 42, 38 (Relevanz: 0.91)
+```
+
+## Chat Export
+
+### Als Dokument speichern
+
+<Steps>
+  <Step title="Export-Button klicken">
+    "Als Dokument speichern" im Chat-Interface
+  </Step>
+  <Step title="Title wird generiert">
+    Automatisch aus Chat-Kontext
+  </Step>
+  <Step title="In Bibliothek verfügbar">
+    Gespeichert in Dokumentenbibliothek
+  </Step>
+</Steps>
+
+**Export-Format:**
+```markdown
+# Chat: Heapsort und Sortieralgorithmen
+
+**Datum:** 2025-01-08 14:32
+**Dokument:** algorithms_chapter3.pdf
+
+## Konversation
+
+**User:** Was ist Heapsort?
+
+**Assistant:** Heapsort ist ein vergleichsbasierter...
+[Full conversation]
+
+---
+
+**Quellen:**
+- algorithms_chapter3.pdf, Seiten 38, 42
+- data_structures.pdf, Seite 128
+```
+
+### Als Markdown herunterladen
+
+```python
+# Download chat as Markdown
+response = requests.get(
+    f"https://api.examcraft.ai/api/v1/chat/sessions/{session_id}/download",
+    headers={"Authorization": f"Bearer {token}"}
+)
+
+with open("chat_export.md", "w") as f:
+    f.write(response.text)
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Effektive Fragen" icon="question">
+    **Do:**
+    - ✅ Spezifisch: "Erkläre die Build-Heap Operation"
+    - ✅ Kontext: "Im Kontext von Heapsort..."
+    - ✅ Follow-up: "Kannst du ein Beispiel geben?"
+
+    **Don't:**
+    - ❌ Zu allgemein: "Was ist Informatik?"
+    - ❌ Außerhalb Dokument: "Was ist Python?" (wenn Dokument über Java)
+  </Accordion>
+
+  <Accordion title="Konversations-Flow" icon="route">
+    **Guter Flow:**
+    1. Start mit Überblicksfrage
+    2. Vertiefen mit Follow-ups
+    3. Beispiele anfordern
+    4. Zusammenfassung
+
+    **Beispiel:**
+    ```
+    "Was ist Heapsort?"
+    → "Wie funktioniert Build-Heap?"
+    → "Gib mir ein Beispiel mit [4,10,3,5,1]"
+    → "Fasse die Vor- und Nachteile zusammen"
+    ```
+  </Accordion>
+
+  <Accordion title="Confidence Scores beachten" icon="gauge">
+    **Hoch (>0.8):**
+    - Vertrauen Sie der Antwort
+    - Direktes Match mit Source
+
+    **Mittel (0.6-0.8):**
+    - Prüfen Sie Quellenangaben
+    - Möglicherweise Interpretation
+
+    **Niedrig (<0.6):**
+    - Mit Vorsicht verwenden
+    - Überprüfen Sie selbst im Dokument
+  </Accordion>
+</AccordionGroup>
+
+## Subscription Requirements
+
+<Tabs>
+  <Tab title="Professional Tier">
+    **€49/Monat**
+
+    - ✅ Unbegrenzte Chat-Sessions
+    - ✅ Unbegrenzte Nachrichten
+    - ✅ Chat Export
+    - ✅ Multi-Document Support (geplant)
+  </Tab>
+
+  <Tab title="Enterprise Tier">
+    **€149/Monat**
+
+    Alles aus Professional plus:
+    - ✅ API Access
+    - ✅ Custom Prompts
+    - ✅ Advanced Analytics
+    - ✅ Priority Support
+  </Tab>
+
+  <Tab title="Nicht verfügbar">
+    - ❌ Free Tier
+    - ❌ Starter Tier
+
+    **Upgrade für ChatBot-Zugriff**
+  </Tab>
+</Tabs>
+
+## Nächste Schritte
+
+<CardGroup cols={2}>
+  <Card
+    title="ChatBot Usage Guide"
+    icon="book-open"
+    href="/guides/chatbot-usage"
+  >
+    Detaillierter Guide für effektive Nutzung
+  </Card>
+  <Card
+    title="RAG Generation"
+    icon="brain"
+    href="/features/rag-generation"
+  >
+    Fragen aus Dokumenten generieren
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference/endpoints/chat"
+  >
+    Chat API Dokumentation
+  </Card>
+  <Card
+    title="Subscription Upgrade"
+    icon="rocket"
+    href="/essentials/subscription-tiers"
+  >
+    Professional Tier Vorteile
+  </Card>
+</CardGroup>
