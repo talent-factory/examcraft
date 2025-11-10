@@ -1,1 +1,1 @@
-/Users/daniel/GitRepository/dotfiles/claude/commands/commit.md
+/Users/daniel/GitRepository/dotfiles/claude/commands/develop/commit.md

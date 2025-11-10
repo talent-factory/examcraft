@@ -146,5 +146,32 @@
     "ga4": {
       "measurementId": "G-XXXXXXXXXX"
     }
-  }
+  },
+  "ignore": [
+    ".venv/**",
+    "venv/**",
+    "node_modules/**",
+    "packages/**",
+    "demo/**",
+    "scripts/**",
+    "utils/**",
+    "alembic/**",
+    "tests/**",
+    "CHANGELOG.md",
+    "PR_DESCRIPTION.md",
+    "README.md",
+    "CLAUDE.md",
+    "MINTLIFY_README.md",
+    "docs/ADMIN_PROMPT_MANAGEMENT.md",
+    "docs/FEATURES.md",
+    "docs/EXECUTIVE_SUMMARY.md",
+    "docs/MONETIZATION_STRATEGY.md",
+    "docs/INDEX.md",
+    "docs/ROADMAP.md",
+    "docs/SCREENSHOTS.md",
+    "docs/USER_GUIDE.md",
+    "docs/SCREENSHOT_CHECKLIST.md",
+    "docs/deployment/**",
+    "docs/screenshots/**"
+  ]
 }
