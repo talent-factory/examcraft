@@ -77,15 +77,21 @@ Integration
 - **React Frontend Dashboard** (TF-54) - Production-ready
 - **Document Processing Pipeline** (TF-51) - PDF/DOC/Markdown Support
 - **Question Generation Core API** (TF-52) - Claude API + PydanticAI
-- **Semantic Search & Vector Storage** (TF-55) - Qdrant Integration (migrated from ChromaDB)
+- **Semantic Search & Vector Storage** (TF-55) - Qdrant Integration
+  (migrated from ChromaDB)
 - **Claude API Integration** (TF-59) - Rate Limiting + Cost Tracking
-- **Prompt Knowledge Base** (TF-122) - Centralized Prompt Management + Seeding
-- **Prompt Template Selector UI** (TF-146) - Frontend Komponente für Prompt-Auswahl
-- **Template-Variablen-System** (TF-145) - Dynamische Prompt-Konfiguration mit Jinja2
-- **RAG Service Integration** (TF-147) - Prompt-Konfiguration in Question Generation
+- **Prompt Knowledge Base** (TF-122) - Centralized Prompt Management +
+  Seeding
+- **Prompt Template Selector UI** (TF-146) - Frontend Komponente für
+  Prompt-Auswahl
+- **Template-Variablen-System** (TF-145) - Dynamische Prompt-Konfiguration
+  mit Jinja2
+- **RAG Service Integration** (TF-147) - Prompt-Konfiguration in Question
+  Generation
 - **Question Review Interface** (TF-60) - MVP mit Review Workflow
 - **Workshop Demo Materials** (TF-58) - Vollständig abgeschlossen
-- **Authentication & User Management** (TF-57) - Backend + Frontend + Tests (100%)
+- **Authentication & User Management** (TF-57) - Backend + Frontend +
+  Tests (100%)
 - **RBAC & Subscription Tiers** - Unlimited Quotas (-1) Support
 - **Avatar Proxy** - Redis Caching für Google OAuth Avatars
 - **Institution Management** - Admin UI für Institution Creation
@@ -94,20 +100,24 @@ Integration
 **RECENT CHANGES (01.11.2025):**
 
 **🎯 Deployment-Vereinfachung:**
+
 - ✅ 2-Tier-Architektur: Core (OpenSource) + Full (Premium+Enterprise)
 - ✅ docker-compose.yml: Core deployment ohne Qdrant
 - ✅ docker-compose.full.yml: Full deployment mit allen Features
 - ✅ start-dev.sh: Auto-Detection mit --core/--full flags
-- ✅ Backend: DEPLOYMENT_MODE detection, intelligentes Premium API loading
+- ✅ Backend: DEPLOYMENT_MODE detection, intelligentes Premium API
+  loading
 - ✅ Frontend: Runtime Component Loading (ersetzt Volume Mounts)
 - ✅ DEPLOYMENT.md: Umfassender Deployment Guide
-- ✅ Entfernt: docker-compose.premium.yml, docker-compose.enterprise.yml
+- ✅ Entfernt: docker-compose.premium.yml,
+  docker-compose.enterprise.yml
 - ✅ Entfernt: Alle Feature-Flags (ENABLE_PREMIUM_FEATURES, etc.)
 - ✅ Feature-Kontrolle: **100% RBAC-gesteuert**
 
 **BUG FIXES (22.10.2025):**
 
-- ✅ Unlimited Quotas (-1) korrekt behandelt (Professional/Enterprise Tier)
+- ✅ Unlimited Quotas (-1) korrekt behandelt (Professional/Enterprise
+  Tier)
 - ✅ PackageTierBadge zeigt korrektes Tier (localStorage Key Fix)
 - ✅ Avatar URLs 429 Rate Limiting behoben (Redis Proxy)
 - ✅ Premium Models in Database Schema integriert
@@ -132,10 +142,12 @@ Integration
 
 **VOLLSTÄNDIG IMPLEMENTIERT:**
 
-- **Monorepo Architecture** - Core/Premium/Enterprise Packages mit Git Submodules
+- **Monorepo Architecture** - Core/Premium/Enterprise Packages mit Git
+  Submodules
 - **FastAPI + React 18 + TypeScript Stack**
 - **PostgreSQL + Redis Integration**
-- **Docker + Docker Compose Environment** - Multi-File Compose mit Overrides
+- **Docker + Docker Compose Environment** - Multi-File Compose mit
+  Overrides
 - **Claude API Integration** mit PydanticAI
 - **RAG System** mit Qdrant (migrated from ChromaDB)
 - **Document Processing** (PDF, DOC, Markdown)
@@ -167,23 +179,27 @@ ExamCraft AI verwendet eine vereinfachte 2-Tier-Deployment-Architektur:
 
 ### Deployment-Modi
 
-**Core (OpenSource)**
+#### Core (OpenSource)
+
 - Community Edition mit begrenzten Features
 - Docker Compose: `docker-compose.yml`
 - Keine Qdrant Vector Database
 - RBAC: Free Tier (5 Dokumente, 20 Fragen/Monat)
 - Zielgruppe: OpenSource-Community
 
-**Full (Premium + Enterprise)**
+#### Full (Premium + Enterprise)
+
 - Komplette Version mit allen Features
 - Docker Compose: `docker-compose.full.yml`
 - Qdrant Vector Database inklusive
-- RBAC: Alle Tiers verfügbar (Free, Starter, Professional, Enterprise)
+- RBAC: Alle Tiers verfügbar (Free, Starter, Professional,
+  Enterprise)
 - Zielgruppe: Private Development & Production
 
 ### Feature-Kontrolle via RBAC
 
 **WICHTIG:** Alle Features werden ausschließlich über RBAC gesteuert!
+
 - ❌ Keine Environment-Feature-Flags mehr
 - ✅ Subscription Tiers steuern Feature-Zugriff
 - ✅ User Roles steuern Berechtigungen
@@ -237,6 +253,7 @@ Docker Compose lädt die `.env` Datei NICHT automatisch für alle Variablen.
 Das `start-dev.sh` Skript verwendet automatisch `--env-file .env`.
 
 **Beispiele:**
+
 ```bash
 # ✅ RICHTIG (via Script):
 ./start-dev.sh --full

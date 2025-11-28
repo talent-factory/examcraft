@@ -17,37 +17,42 @@ open http://localhost:3000
 
 | Service | URL |
 |---------|-----|
-| **Frontend** | http://localhost:3000 |
-| **Backend API** | http://localhost:8000 |
-| **API Docs** | http://localhost:8000/docs |
-| **Qdrant Dashboard** | http://localhost:6333/dashboard |
+| **Frontend** | [http://localhost:3000](http://localhost:3000) |
+| **Backend API** | [http://localhost:8000](http://localhost:8000) |
+| **API Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| **Qdrant Dashboard** | [http://localhost:6333/dashboard](http://localhost:6333/dashboard) |
 
 ## 🧪 What to Test
 
 ### 1. **New Navigation**
+
 - ✅ Sidebar visible on left
 - ✅ Sidebar collapses on mobile
 - ✅ Role-based menu items
 - ✅ Active route highlighting
 
 ### 2. **Dashboard Page**
+
 - ✅ Hero section with greeting
 - ✅ Quick Action cards (4 columns)
 - ✅ Statistics cards
 - ✅ Recent Activity placeholder
 
 ### 3. **Feature Pages**
+
 - ✅ `/documents` - Document upload & library
 - ✅ `/questions/generate` - RAG exam creation
 - ✅ `/questions/review` - Question review
 - ✅ `/admin` - User & prompt management
 
 ### 4. **Responsive Design**
+
 - ✅ Desktop: Full sidebar
 - ✅ Tablet: Sidebar icons only
 - ✅ Mobile: Hamburger menu
 
 ### 5. **Form Components**
+
 - ✅ Input fields with validation
 - ✅ Buttons with variants
 - ✅ Select dropdowns
@@ -90,7 +95,7 @@ export BACKEND_PORT=8001
 
 ## 📊 Test Credentials
 
-```
+```text
 Email: test@example.com
 Password: Test123!@#
 ```
@@ -100,8 +105,8 @@ Password: Test123!@#
 ## ✅ Deployment Checklist
 
 - [ ] All containers running (`docker-compose ps`)
-- [ ] Frontend loads at http://localhost:3000
-- [ ] Backend API responds at http://localhost:8000/docs
+- [ ] Frontend loads at [http://localhost:3000](http://localhost:3000)
+- [ ] Backend API responds at [http://localhost:8000/docs](http://localhost:8000/docs)
 - [ ] Sidebar navigation visible
 - [ ] Dashboard page loads
 - [ ] Feature pages accessible
@@ -111,18 +116,21 @@ Password: Test123!@#
 ## 🐛 Troubleshooting
 
 **Frontend not loading?**
+
 ```bash
 docker-compose logs frontend
 docker-compose restart frontend
 ```
 
 **Backend errors?**
+
 ```bash
 docker-compose logs backend
 docker-compose restart backend
 ```
 
 **Database issues?**
+
 ```bash
 docker-compose down -v
 docker-compose up -d
@@ -143,7 +151,6 @@ See `docs/DEPLOYMENT_GUI_MODERNIZATION.md` for complete guide.
 
 ---
 
-**Branch**: `feature/tf-148-gui-modernization`  
-**Status**: ✅ Production Ready  
+**Branch**: `feature/tf-148-gui-modernization`
+**Status**: ✅ Production Ready
 **Tests**: ✅ 52/52 Passing
-
