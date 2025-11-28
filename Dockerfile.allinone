@@ -30,6 +30,9 @@ RUN apt-get update && apt-get install -y \
     g++ \
     libpq-dev \
     libmagic1 \
+    # PyMuPDF Dependencies
+    libmupdf-dev \
+    mupdf \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js 18 installieren
@@ -104,4 +107,3 @@ COPY docker/start-allinone.sh /start.sh
 RUN chmod +x /start.sh
 
 CMD ["/start.sh"]
-

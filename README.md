@@ -77,7 +77,7 @@ examcraft/
 ### ✨ Core Features (Open Source)
 
 - **📄 Multi-Format Dokumentenverarbeitung**: PDF, Word, Markdown
-- **🔬 IBM Docling Integration** - Advanced Document Processing mit automatischem Fallback
+- **🔬 PyMuPDF Integration** - Fast Document Processing (10x schneller als Docling)
 - **🤖 Basic Question Generation** mit Claude API + PydanticAI
 - **📝 Question Review Workflow** - Approve/Reject/Edit
 - **👥 User Management** - Authentication, Authorization, RBAC

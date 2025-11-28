@@ -283,7 +283,7 @@ docker compose -f docker-compose.full.yml up -d
    - Claude API Integration
 
 2. **Document Processing** (`utils/extraction.py`)
-   - PDF Text Extraction mit Docling
+   - PDF Text Extraction mit PyMuPDF (schnell und effizient)
    - Markdown/DOC Processing
    - Structured Content Chunking
 
