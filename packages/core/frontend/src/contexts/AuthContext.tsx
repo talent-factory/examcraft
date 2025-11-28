@@ -15,6 +15,7 @@ import {
   SetPasswordRequest
 } from '../types/auth';
 import AuthService from '../services/AuthService';
+import { SubscriptionTier, hasFeature as tierHasFeature, isFeatureName } from '../config/features';
 
 // ============================================================================
 // Context Creation
@@ -390,12 +391,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /**
    * Check if user has specific permission
+   * Checks BOTH role-based permissions AND subscription tier features
    */
   const hasPermission = useCallback((permission: string): boolean => {
     if (!state.user) return false;
     if (state.user.is_superuser) return true;
 
-    // Guard against undefined roles or permissions
+    // First: Check if it's a subscription tier feature
+    if (isFeatureName(permission)) {
+      const institution = state.user.institution;
+      if (institution && institution.subscription_tier) {
+        const tier = institution.subscription_tier as SubscriptionTier;
+        if (tierHasFeature(tier, permission)) {
+          return true;
+        }
+      }
+    }
+
+    // Second: Check role-based permissions
     if (!state.user.roles || !Array.isArray(state.user.roles)) return false;
 
     return state.user.roles.some(role => {
