@@ -3,10 +3,10 @@ Celery Tasks for Asynchronous Document Processing
 Handles document extraction, RAG embedding, and metadata extraction
 """
 
+import asyncio
 from celery import Task
 from celery_app import celery_app
-from services.docling_service import DoclingService
-from services.rag_service import rag_service
+from services.document_service import document_service
 from models.document import Document, DocumentStatus
 from database import SessionLocal
 from typing import Dict, Any
@@ -24,6 +24,16 @@ class DocumentProcessingTask(Task):
     retry_jitter = True
 
 
+def run_async(coro):
+    """Helper to run async code in sync context"""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
+
+
 @celery_app.task(
     bind=True,
     base=DocumentProcessingTask,
@@ -32,88 +42,56 @@ class DocumentProcessingTask(Task):
 )
 def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
     """
-    Asynchronous document processing with Docling and RAG embedding.
+    Asynchronous document processing with Docling and Vector embedding.
 
     Args:
-        document_id: UUID of the document
-        user_id: UUID of the user
+        document_id: ID of the document
+        user_id: ID of the user
 
     Returns:
         Dict with processing status and metadata
     """
     db = SessionLocal()
+    document = None
 
     try:
         # 1. Load document from DB
-        document = db.query(Document).filter(Document.id == document_id).first()
+        document = db.query(Document).filter(Document.id == int(document_id)).first()
         if not document:
             raise ValueError(f"Document {document_id} not found")
 
-        # Set status to "processing"
-        document.status = DocumentStatus.PROCESSING
-        db.commit()
+        logger.info(f"Starting document processing for {document.filename}")
 
-        logger.info(f"Starting Docling processing for {document.filename}")
-
-        # 2. Docling Processing
-        docling_service = DoclingService()
-        processing_result = docling_service.process_document(
-            file_path=document.file_path, filename=document.filename
+        # 2. Process document with vectors using document_service
+        # This handles: Docling processing + Vector embedding creation
+        result = run_async(
+            document_service.process_document_with_vectors(int(document_id), db)
         )
 
-        # 3. Save metadata
-        document.title = processing_result.get("title", document.filename)
-        document.metadata = processing_result.get("metadata", {})
-        document.content = processing_result.get("content", "")
-        document.page_count = processing_result.get("page_count", 0)
+        if result is None:
+            raise ValueError(f"Document processing failed for {document_id}")
 
-        logger.info(f"Docling processing completed for {document_id}")
-
-        # 4. Create RAG embeddings (as sub-task) - Only in Premium/Enterprise
-        embedding_task_id = None
-        try:
-            logger.info(f"Creating RAG embeddings for {document_id}")
-            # Try to use RAG service if available (Premium/Enterprise)
-            chunks = rag_service.chunk_document(
-                content=document.content, document_id=document_id
-            )
-
-            # Dispatch embedding task
-            embedding_task = create_embeddings.apply_async(
-                args=[document_id, chunks],
-                countdown=5,  # 5 seconds delay
-            )
-            embedding_task_id = embedding_task.id
-            chunks_count = len(chunks)
-        except (NotImplementedError, AttributeError) as e:
-            # RAG not available in Core package
-            logger.info(f"RAG embeddings not available (Core package): {str(e)}")
-            chunks_count = 0
-
-        # 5. Set status to "completed"
-        document.status = DocumentStatus.COMPLETED
-        document.processing_info = {
-            "chunks_created": chunks_count,
-            "embedding_task_id": embedding_task_id,
-        }
-        db.commit()
+        # Refresh document to get updated values
+        db.refresh(document)
 
         logger.info(f"Successfully processed document {document_id}")
 
         return {
             "success": True,
             "document_id": document_id,
-            "title": document.title,
-            "chunks": len(chunks),
-            "embedding_task_id": embedding_task.id,
+            "title": document.original_filename,
+            "status": document.status.value,
+            "has_vectors": document.has_vectors,
+            "docling_processing": result.get("docling_processing", {}),
+            "vector_embeddings": result.get("vector_embeddings", {}),
         }
 
     except Exception as e:
         logger.error(f"Error processing document {document_id}: {str(e)}")
 
-        # Set status to "failed"
+        # Set status to "error"
         if document:
-            document.status = DocumentStatus.FAILED
+            document.status = DocumentStatus.ERROR
             document.error_message = str(e)
             db.commit()
 
@@ -124,38 +102,5 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
         db.close()
 
 
-@celery_app.task(name="tasks.rag_tasks.create_embeddings", priority=3)
-def create_embeddings(document_id: str, chunks: list) -> Dict[str, Any]:
-    """
-    Create RAG embeddings for document chunks.
-
-    Note: This task is only functional in Premium/Enterprise packages.
-    In Core package, it logs and returns success without creating embeddings.
-
-    Args:
-        document_id: UUID of the document
-        chunks: List of text chunks
-
-    Returns:
-        Dict with embedding status
-    """
-    try:
-        # Try to use RAG service if available (Premium/Enterprise)
-        try:
-            rag_service.add_document_chunks(document_id=document_id, chunks=chunks)
-            logger.info(f"Successfully created embeddings for {document_id}")
-            chunks_embedded = len(chunks)
-        except (NotImplementedError, AttributeError) as e:
-            # RAG not available in Core package
-            logger.info(f"RAG embeddings not available (Core package): {str(e)}")
-            chunks_embedded = 0
-
-        return {
-            "success": True,
-            "document_id": document_id,
-            "chunks_embedded": chunks_embedded,
-        }
-
-    except Exception as e:
-        logger.error(f"Error creating embeddings for {document_id}: {str(e)}")
-        raise
+# Note: create_embeddings task removed - vector embedding is now handled
+# directly in document_service.process_document_with_vectors()
