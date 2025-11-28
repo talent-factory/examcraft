@@ -50,12 +50,14 @@ interface DocumentLibraryProps {
   refreshTrigger?: number;
 }
 
-const DocumentLibrary: React.FC<DocumentLibraryProps> = ({ 
-  onCreateRAGExam, 
-  refreshTrigger 
+const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
+  onCreateRAGExam,
+  refreshTrigger
 }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
   const [menuAnchor, setMenuAnchor] = useState<{ element: HTMLElement; documentId: number } | null>(null);
@@ -81,7 +83,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [chunksLoading, setChunksLoading] = useState(false);
 
   useEffect(() => {
-    loadDocuments();
+    loadDocuments(true); // Initial load with loading state
   }, [refreshTrigger]);
 
   // Auto-refresh for documents with status "processing"
@@ -94,7 +96,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
     // Refresh every 5 seconds while there are processing documents
     const intervalId = setInterval(() => {
-      loadDocuments();
+      loadDocuments(false); // Background refresh without loading state
     }, 5000);
 
     // Cleanup: Stop interval when component unmounts or no more processing docs
@@ -103,16 +105,24 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     };
   }, [documents]); // Re-run when documents change
 
-  const loadDocuments = async () => {
+  const loadDocuments = async (showLoading: boolean = true) => {
     try {
-      setLoading(true);
+      if (showLoading && !hasLoadedOnce) {
+        setLoading(true);
+      }
       setError(null);
       const docs = await DocumentService.getDocuments();
       setDocuments(docs);
+      setIsInitialLoad(false);
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
     } finally {
+      // ALWAYS set loading to false after load completes
       setLoading(false);
+      // Mark that we've loaded at least once
+      if (!hasLoadedOnce) {
+        setHasLoadedOnce(true);
+      }
     }
   };
 
@@ -158,7 +168,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   };
 
   const handleDocumentSelect = (documentId: number) => {
-    setSelectedDocuments(prev => 
+    setSelectedDocuments(prev =>
       prev.includes(documentId)
         ? prev.filter(id => id !== documentId)
         : [...prev, documentId]
@@ -216,7 +226,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
   const confirmDelete = async () => {
     if (!deleteDialog.document) return;
-    
+
     try {
       await DocumentService.deleteDocument(deleteDialog.document.id);
       setDocuments(prev => prev.filter(doc => doc.id !== deleteDialog.document!.id));
@@ -307,7 +317,9 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       return doc?.status === DocumentStatus.PROCESSED && doc?.has_vectors;
     });
 
-  if (loading) {
+  // Only show loading spinner on initial load, not on background refreshes
+  // Use hasLoadedOnce to persist the state even if component remounts
+  if (loading && !hasLoadedOnce) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
         <CircularProgress />
@@ -322,7 +334,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         <Typography variant="h6">
           Dokumentenbibliothek ({documents.length} Dokumente)
         </Typography>
-        
+
         {selectedDocuments.length > 0 && (
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <Typography variant="body2" color="text.secondary">
@@ -419,8 +431,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         <Grid container spacing={2}>
           {documents.map((document) => (
             <Grid item xs={12} sm={6} md={4} key={document.id}>
-              <Card 
-                sx={{ 
+              <Card
+                sx={{
                   height: '100%',
                   cursor: 'pointer',
                   border: selectedDocuments.includes(document.id) ? 2 : 1,

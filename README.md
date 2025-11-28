@@ -52,6 +52,7 @@ examcraft/
 - **[🚀 Deployment Guide](docs/RENDER_DEPLOYMENT.md)** - Production Deployment auf Render.com
 - **[📖 API Dokumentation](http://localhost:8000/docs)** - Interaktive API-Docs (lokal)
 - **[🔧 Development Setup](#-quick-start)** - Lokale Entwicklungsumgebung (siehe unten)
+- **[⚙️ Async Document Processing](docs/ASYNC_DOCUMENT_PROCESSING.md)** - RabbitMQ & Celery Setup, Monitoring & Troubleshooting
 
 ### 💎 Subscription Tiers
 
@@ -76,7 +77,7 @@ examcraft/
 ### ✨ Core Features (Open Source)
 
 - **📄 Multi-Format Dokumentenverarbeitung**: PDF, Word, Markdown
-- **🔬 IBM Docling Integration** - Advanced Document Processing mit automatischem Fallback
+- **🔬 PyMuPDF Integration** - Fast Document Processing (10x schneller als Docling)
 - **🤖 Basic Question Generation** mit Claude API + PydanticAI
 - **📝 Question Review Workflow** - Approve/Reject/Edit
 - **👥 User Management** - Authentication, Authorization, RBAC
@@ -207,7 +208,7 @@ Das `start-dev.sh` Script erstellt automatisch Test-Daten für die Entwicklung:
 
 **Admin User:**
 - Email: `admin@talent-factory.ch`
-- Password: `admin123` (nur Development!)
+- Password: `admin123` (nur Development!)  # pragma: allowlist secret
 - Rollen: Admin, Dozent, Assistant
 - Superuser: Ja
 

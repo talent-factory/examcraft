@@ -7,11 +7,14 @@ ARG BUILD_TIMESTAMP
 ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 
 # Install system dependencies
+# Note: PyMuPDF (fitz) requires mupdf libraries for PDF processing
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
     python3-dev \
     libmagic1 \
+    libmupdf-dev \
+    mupdf \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and pyproject.toml first for better caching

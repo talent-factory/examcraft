@@ -15,6 +15,7 @@ import {
   SetPasswordRequest
 } from '../types/auth';
 import AuthService from '../services/AuthService';
+import { SubscriptionTier, hasFeature as tierHasFeature, isFeatureName } from '../config/features';
 
 // ============================================================================
 // Context Creation
@@ -70,7 +71,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Always fetch fresh profile instead of relying on cached user
           try {
             console.log('[AuthContext] Verifying token with getProfile...');
-            const profile = await AuthService.getProfile(accessToken);
+
+            // Add timeout to prevent spinner from hanging
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+            );
+
+            const profile = await Promise.race([
+              AuthService.getProfile(accessToken),
+              timeoutPromise
+            ]) as any;
+
             console.log('[AuthContext] Token valid! Setting authenticated state for:', profile.email);
 
             // Update localStorage with fresh user data
@@ -89,8 +100,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Token expired, try to refresh
             try {
               console.log('[AuthContext] Attempting token refresh...');
-              const tokens = await AuthService.refreshToken({ refresh_token: refreshToken });
-              const profile = await AuthService.getProfile(tokens.access_token);
+
+              // Add timeout for refresh as well
+              const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Token refresh timeout')), 5000)
+              );
+
+              const tokens = await Promise.race([
+                AuthService.refreshToken({ refresh_token: refreshToken }),
+                timeoutPromise
+              ]) as any;
+
+              const profileTimeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+              );
+
+              const profile = await Promise.race([
+                AuthService.getProfile(tokens.access_token),
+                profileTimeoutPromise
+              ]) as any;
 
               localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
               localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
@@ -183,14 +211,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = useCallback(async (data: RegisterRequest) => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
-      
+
       const tokens = await AuthService.register(data);
       const user = await AuthService.getProfile(tokens.access_token);
-      
+
       localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
       localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
-      
+
       setState({
         user,
         accessToken: tokens.access_token,
@@ -246,14 +274,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!state.refreshToken) {
         throw new Error('No refresh token available');
       }
-      
+
       const tokens = await AuthService.refreshToken({ refresh_token: state.refreshToken });
       const user = await AuthService.getProfile(tokens.access_token);
-      
+
       localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
       localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
-      
+
       setState(prev => ({
         ...prev,
         user,
@@ -275,13 +303,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!state.accessToken) {
         throw new Error('Not authenticated');
       }
-      
+
       setState(prev => ({ ...prev, isLoading: true, error: null }));
-      
+
       const user = await AuthService.updateProfile(state.accessToken, data);
-      
+
       localStorage.setItem(USER_KEY, JSON.stringify(user));
-      
+
       setState(prev => ({
         ...prev,
         user,
@@ -363,12 +391,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /**
    * Check if user has specific permission
+   * Checks BOTH role-based permissions AND subscription tier features
    */
   const hasPermission = useCallback((permission: string): boolean => {
     if (!state.user) return false;
     if (state.user.is_superuser) return true;
 
-    // Guard against undefined roles or permissions
+    // First: Check if it's a subscription tier feature
+    if (isFeatureName(permission)) {
+      const institution = state.user.institution;
+      if (institution && institution.subscription_tier) {
+        const tier = institution.subscription_tier as SubscriptionTier;
+        if (tierHasFeature(tier, permission)) {
+          return true;
+        }
+      }
+    }
+
+    // Second: Check role-based permissions
     if (!state.user.roles || !Array.isArray(state.user.roles)) return false;
 
     return state.user.roles.some(role => {
@@ -418,4 +458,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

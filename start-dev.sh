@@ -127,6 +127,13 @@ else
     echo -e "${YELLOW}⚠️  Warning: scripts/validate-env.sh not found, skipping validation${NC}"
 fi
 
+# Load .env file to check variables
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
 # Check for required API keys (Full mode)
 if [ "$DEPLOYMENT_MODE" = "full" ]; then
     if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_API_KEY" ]; then
@@ -160,6 +167,15 @@ if [ "$DEPLOYMENT_MODE" = "full" ]; then
         git submodule update --init --recursive packages/enterprise
     else
         echo "✅ Enterprise package already initialized"
+    fi
+
+    # Setup Premium component symlinks for CRA imports
+    echo ""
+    echo -e "${BLUE}🔗 Setting up Premium component symlinks...${NC}"
+    if [ -f scripts/setup-premium-symlinks.sh ]; then
+        bash scripts/setup-premium-symlinks.sh
+    else
+        echo -e "${YELLOW}⚠️  Warning: scripts/setup-premium-symlinks.sh not found${NC}"
     fi
 fi
 

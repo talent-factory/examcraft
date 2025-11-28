@@ -2,20 +2,37 @@
  * Document Chat Page Component
  * Allows users to chat with documents using RAG
  *
- * Note: This is a placeholder component for the Core package.
- * The Premium implementation is mounted via Docker volume in docker-compose.premium.yml
+ * Note: This component dynamically loads the Premium implementation
+ * if the user has the required subscription tier.
+ * Otherwise shows upgrade prompt.
  */
 
-import React from 'react';
-import { Box, Typography, Alert, Button } from '@mui/material';
+import React, { lazy, Suspense } from 'react';
+import { Box, Typography, Alert, Button, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { InfoOutlined } from '@mui/icons-material';
+import { useAuth } from '../../contexts/AuthContext';
+import { isFullDeployment } from '../../utils/deploymentMode';
 
-export const DocumentChatPage: React.FC = () => {
+// Lazy load Premium DocumentChat component
+// Note: In Full deployment, this stub is replaced via symlink with the real Premium component
+const PremiumDocumentChatPage = lazy(() =>
+  import('../../premium/components/DocumentChat/DocumentChatPage')
+    .then(module => ({ default: module.DocumentChatPage }))
+    .catch(() => {
+      // Premium package not available - will show upgrade prompt
+      console.warn('Failed to load Premium DocumentChat component - showing upgrade prompt');
+      return { default: UpgradePrompt };
+    })
+);
+
+/**
+ * Upgrade Prompt Component
+ * Shown when user doesn't have access to Document Chat feature
+ */
+const UpgradePrompt: React.FC = () => {
   const navigate = useNavigate();
 
-  // This is the Core (Free) version - always shows upgrade prompt
-  // The Premium version is mounted via Docker volume in docker-compose.premium.yml
   return (
     <Box
       sx={{
@@ -66,3 +83,48 @@ export const DocumentChatPage: React.FC = () => {
   );
 };
 
+/**
+ * Loading Fallback Component
+ */
+const LoadingFallback: React.FC = () => (
+  <Box
+    sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh',
+    }}
+  >
+    <CircularProgress />
+    <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
+      Loading Document Chat...
+    </Typography>
+  </Box>
+);
+
+/**
+ * Main Document Chat Page Component
+ * Dynamically loads Premium version based on user permissions
+ */
+export const DocumentChatPage: React.FC = () => {
+  const { hasPermission } = useAuth();
+
+  // Check if user has document_chatbot feature (Professional/Enterprise tier)
+  const hasDocumentChatAccess = hasPermission('document_chatbot');
+
+  // Check if Full deployment (Premium/Enterprise packages available)
+  const isFullMode = isFullDeployment();
+
+  // If user has access AND Full deployment mode, load Premium component
+  if (hasDocumentChatAccess && isFullMode) {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <PremiumDocumentChatPage />
+      </Suspense>
+    );
+  }
+
+  // Otherwise show upgrade prompt
+  return <UpgradePrompt />;
+};

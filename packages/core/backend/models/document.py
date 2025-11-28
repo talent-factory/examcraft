@@ -25,8 +25,12 @@ from database import Base
 
 
 class DocumentStatus(enum.Enum):
+    QUEUED = "queued"  # Waiting in Celery queue
+    PROCESSING = "processing"  # Currently being processed
+    COMPLETED = "completed"  # Successfully processed
+    FAILED = "failed"  # Processing failed
+    # Legacy statuses (for backward compatibility)
     UPLOADED = "uploaded"
-    PROCESSING = "processing"
     PROCESSED = "processed"
     ERROR = "error"
 
@@ -68,6 +72,13 @@ class Document(Base):
 
     # Flag ob Vektoren erstellt wurden
     has_vectors = Column(Boolean, default=False, nullable=True)
+
+    # Celery Task Tracking
+    task_id = Column(
+        String(100), nullable=True, index=True
+    )  # Celery task ID for async processing
+    error_message = Column(Text, nullable=True)  # Error message if processing failed
+    processing_info = Column(JSON, nullable=True)  # Additional processing metadata
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
