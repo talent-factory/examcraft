@@ -7,12 +7,15 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
+# Note: PyMuPDF (fitz) requires mupdf libraries for PDF processing
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libpq-dev \
     python3-dev \
     libmagic1 \
+    libmupdf-dev \
+    mupdf \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -45,4 +48,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Run the application
 # Note: Render.com will override this with the startCommand from render.yaml
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
-
