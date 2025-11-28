@@ -25,17 +25,18 @@ fi
 # Create premium stub directory structure if it doesn't exist
 mkdir -p "$CORE_FRONTEND_SRC/premium/components/DocumentChat"
 
-# Remove existing symlink if it exists (to allow re-linking)
-if [ -L "$CORE_FRONTEND_SRC/premium/components/DocumentChat/DocumentChatPage.tsx" ]; then
-    rm "$CORE_FRONTEND_SRC/premium/components/DocumentChat/DocumentChatPage.tsx"
-    echo "  ↻ Removed existing symlink"
+# Remove existing file or symlink if it exists (to allow re-linking)
+TARGET_FILE="$CORE_FRONTEND_SRC/premium/components/DocumentChat/DocumentChatPage.tsx"
+if [ -e "$TARGET_FILE" ] || [ -L "$TARGET_FILE" ]; then
+    rm -f "$TARGET_FILE"
+    echo "  ↻ Removed existing file/symlink"
 fi
 
 # Create symlink to Premium DocumentChat component
 if [ -f "$PREMIUM_FRONTEND_SRC/components/DocumentChat/DocumentChatPage.tsx" ]; then
     # Use relative path for symlink
     cd "$CORE_FRONTEND_SRC/premium/components/DocumentChat"
-    ln -s "../../../../../../premium/frontend/src/components/DocumentChat/DocumentChatPage.tsx" "DocumentChatPage.tsx"
+    ln -sf "../../../../../../premium/frontend/src/components/DocumentChat/DocumentChatPage.tsx" "DocumentChatPage.tsx"
     cd - > /dev/null
     echo -e "${GREEN}  ✅ Linked Premium DocumentChatPage${NC}"
 else

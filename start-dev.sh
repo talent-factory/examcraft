@@ -127,6 +127,13 @@ else
     echo -e "${YELLOW}⚠️  Warning: scripts/validate-env.sh not found, skipping validation${NC}"
 fi
 
+# Load .env file to check variables
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
 # Check for required API keys (Full mode)
 if [ "$DEPLOYMENT_MODE" = "full" ]; then
     if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_API_KEY" ]; then
