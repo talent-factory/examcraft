@@ -15,11 +15,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { isFullDeployment } from '../../utils/deploymentMode';
 
 // Lazy load Premium DocumentChat component
+// Note: In Full deployment, this stub is replaced via symlink with the real Premium component
 const PremiumDocumentChatPage = lazy(() =>
-  import('../../../premium/components/DocumentChat/DocumentChatPage')
+  import('../../premium/components/DocumentChat/DocumentChatPage')
     .then(module => ({ default: module.DocumentChatPage }))
     .catch(() => {
       // Premium package not available - will show upgrade prompt
+      console.warn('Failed to load Premium DocumentChat component - showing upgrade prompt');
       return { default: UpgradePrompt };
     })
 );

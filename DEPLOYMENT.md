@@ -31,6 +31,7 @@ docker compose --env-file .env -f docker-compose.yml up -d
 ### Full Deployment (Premium + Enterprise)
 
 **Features:**
+
 - All Core features (unlimited)
 - RAG Question Generation (Qdrant)
 - Document ChatBot
@@ -44,11 +45,13 @@ docker compose --env-file .env -f docker-compose.yml up -d
 **Access Control:** All features available, controlled by RBAC & Subscription Tiers
 
 **Docker Compose:**
+
 ```bash
 docker compose --env-file .env -f docker-compose.full.yml up -d
 ```
 
 **Or use the startup script:**
+
 ```bash
 ./start-dev.sh --full
 ```

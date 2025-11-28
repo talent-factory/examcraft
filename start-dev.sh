@@ -161,6 +161,15 @@ if [ "$DEPLOYMENT_MODE" = "full" ]; then
     else
         echo "✅ Enterprise package already initialized"
     fi
+
+    # Setup Premium component symlinks for CRA imports
+    echo ""
+    echo -e "${BLUE}🔗 Setting up Premium component symlinks...${NC}"
+    if [ -f scripts/setup-premium-symlinks.sh ]; then
+        bash scripts/setup-premium-symlinks.sh
+    else
+        echo -e "${YELLOW}⚠️  Warning: scripts/setup-premium-symlinks.sh not found${NC}"
+    fi
 fi
 
 # Docker Cleanup
