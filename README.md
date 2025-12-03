@@ -19,7 +19,7 @@ ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwen
 
 ### 📦 Package-Struktur
 
-```
+```text
 examcraft/
 ├── packages/
 │   ├── core/          # ✅ Open Source (MIT) - Free Tier
@@ -28,7 +28,7 @@ examcraft/
 ├── docker-compose.yml              # Core Services
 ├── docker-compose.premium.yml      # Premium Extension
 ├── docker-compose.enterprise.yml   # Enterprise Extension
-└── MONOREPO_SETUP.md              # Detailed Setup Guide
+└── MONOREPO_SETUP.md               # Detailed Setup Guide
 ```
 
 **Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für detaillierte Informationen zur Monorepo-Struktur.**
@@ -171,11 +171,13 @@ cp .env.example .env
 ```
 
 **Das Script erkennt automatisch:**
+
 - ✅ **Core Only**: Wenn nur `packages/core` vorhanden ist
 - ✅ **Premium**: Wenn `packages/premium` Submodule initialisiert ist
 - ✅ **Enterprise**: Wenn `packages/enterprise` Submodule initialisiert ist
 
 **Access Points:**
+
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
@@ -203,20 +205,24 @@ git submodule update --init --recursive packages/enterprise
 Das `start-dev.sh` Script erstellt automatisch Test-Daten für die Entwicklung:
 
 **Talent Factory Institution (Professional Tier):**
+
 - Domain: `talent-factory.ch` (Auto-Assignment für alle `@talent-factory.ch` E-Mails)
 - Subscription: Professional (Unlimited Documents, 1000 Questions/Month)
 
 **Admin User:**
+
 - Email: `admin@talent-factory.ch`
 - Password: `admin123` (nur Development!)  # pragma: allowlist secret
 - Rollen: Admin, Dozent, Assistant
 - Superuser: Ja
 
 **Auto-Assignment:**
+
 - Jeder User mit `@talent-factory.ch` E-Mail wird automatisch der Talent Factory Institution zugeordnet
 - Funktioniert für OAuth (Google, Microsoft) und normale Registrierung
 
 **Manuelles Seeding:**
+
 ```bash
 # Falls automatisches Seeding fehlschlägt
 ./seed-dev-data.sh
@@ -225,12 +231,11 @@ Das `start-dev.sh` Script erstellt automatisch Test-Daten für die Entwicklung:
 ### 📚 Weitere Informationen
 
 Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für:
+
 - Detaillierte Setup-Anleitung
 - Submodule-Verwaltung
 - Docker Compose Befehle
 - Troubleshooting
-
-
 
 ## 🛠️ Entwicklung
 
