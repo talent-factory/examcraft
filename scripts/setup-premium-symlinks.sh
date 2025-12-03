@@ -43,13 +43,24 @@ else
     echo -e "${YELLOW}  ⚠️  Premium DocumentChatPage not found, keeping stub${NC}"
 fi
 
+# Create symlink to Premium RAGExamCreator component
+if [ -f "$PREMIUM_FRONTEND_SRC/components/RAGExamCreator.tsx" ]; then
+    # Remove existing file or symlink if it exists
+    TARGET_FILE="$CORE_FRONTEND_SRC/premium/components/RAGExamCreator.tsx"
+    if [ -e "$TARGET_FILE" ] || [ -L "$TARGET_FILE" ]; then
+        rm -f "$TARGET_FILE"
+        echo "  ↻ Removed existing RAGExamCreator file/symlink"
+    fi
+
+    # Create symlink using relative path
+    cd "$CORE_FRONTEND_SRC/premium/components"
+    ln -sf "../../../../../premium/frontend/src/components/RAGExamCreator.tsx" "RAGExamCreator.tsx"
+    cd - > /dev/null
+    echo -e "${GREEN}  ✅ Linked Premium RAGExamCreator${NC}"
+else
+    echo -e "${YELLOW}  ⚠️  Premium RAGExamCreator not found, keeping stub${NC}"
+fi
+
 # TODO: Add more Premium component symlinks here as needed
-# Example:
-# if [ -f "$PREMIUM_FRONTEND_SRC/components/RAGExamCreator.tsx" ]; then
-#     mkdir -p "$CORE_FRONTEND_SRC/premium/components"
-#     ln -sf "../../../$PREMIUM_FRONTEND_SRC/components/RAGExamCreator.tsx" \
-#            "$CORE_FRONTEND_SRC/premium/components/RAGExamCreator.tsx"
-#     echo -e "${GREEN}  ✅ Linked Premium RAGExamCreator${NC}"
-# fi
 
 echo -e "${GREEN}✅ Premium symlinks setup complete${NC}"

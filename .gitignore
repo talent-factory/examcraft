@@ -49,6 +49,10 @@ docker/volumes/
 backend/storage/uploads/
 storage/uploads/
 
+# Premium component symlinks (created by scripts/setup-premium-symlinks.sh)
+packages/core/frontend/src/premium/
+packages/core/frontend/src/enterprise/
+
 # Vector database files (generated data)
 backend/mock_vector_db/
 mock_vector_db/
