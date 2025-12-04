@@ -22,7 +22,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U examcraft"]
+      test: [ "CMD-SHELL", "pg_isready -U examcraft" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,13 +32,13 @@ services:
   # Redis Cache & Session Store
   redis:
     container_name: examcraft-redis
-    image: redis:8-alpine
+    image: redis:7-alpine
     ports:
       - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -48,14 +48,14 @@ services:
   # RabbitMQ Message Queue
   rabbitmq:
     container_name: examcraft-rabbitmq
-    image: rabbitmq:4.2-management-alpine
+    image: rabbitmq:management
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-examcraft}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-secure_password_here}
       RABBITMQ_DEFAULT_VHOST: /
     ports:
-      - "5672:5672"      # AMQP Port
-      - "15672:15672"    # Management UI
+      - "5672:5672" # AMQP Port
+      - "15672:15672" # Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
