@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "add_celery_task_tracking"
-down_revision = "b9585b1a8163"
+down_revision = "013"
 branch_labels = None
 depends_on = None
 
