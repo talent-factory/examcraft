@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
 import { paymentService } from '../services/paymentService';
 
+// This would strictly come from specific environment configuration or API in real app
+// For foundation, we use a placeholder that matches the plan
+const STARTER_PRICE_ID = 'price_placeholder_starter';
+
 export const BillingPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handleSubscribe = async (plan: string) => {
+    const handleSubscribe = async (priceId: string) => {
         setLoading(true);
         setError(null);
         try {
-            const session = await paymentService.createCheckoutSession(plan);
+            const session = await paymentService.createCheckoutSession(priceId);
             // Redirect to Stripe Checkout
             window.location.href = session.url;
         } catch (err: any) {
             console.error('Subscription error:', err);
-            const errorMessage = err.response?.data?.detail || 'Failed to start subscription process. Please try again.';
-            setError(errorMessage);
+            setError('Failed to start subscription process. Please try again.');
             setLoading(false);
         }
     };
@@ -30,7 +33,6 @@ export const BillingPage: React.FC = () => {
                     Choose the plan that fits your needs.
                 </p>
             </div>
-
 
             {error && (
                 <div className="mt-8 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
@@ -74,9 +76,9 @@ export const BillingPage: React.FC = () => {
                             For serious exam creators.
                         </p>
                         <button
-                            onClick={() => handleSubscribe('starter')}
+                            onClick={() => handleSubscribe(STARTER_PRICE_ID)}
                             disabled={loading}
-                            className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700"
                         >
                             {loading ? 'Processing...' : 'Subscribe'}
                         </button>
@@ -92,14 +94,13 @@ export const BillingPage: React.FC = () => {
                             <span className="text-base font-medium text-gray-500">/mo</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
-                            Unlimited power for professional exam creation.
+                            Unlimited power.
                         </p>
                         <button
-                            onClick={() => handleSubscribe('professional')}
-                            disabled={loading}
-                            className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            disabled
+                            className="mt-8 block w-full bg-gray-50 border border-gray-200 rounded-md py-2 text-sm font-semibold text-gray-400 text-center"
                         >
-                            {loading ? 'Processing...' : 'Subscribe'}
+                            Contact Sales
                         </button>
                     </div>
                 </div>

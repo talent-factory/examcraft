@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-const ACCESS_TOKEN_KEY = 'examcraft_access_token';
 
 export interface CheckoutSession {
     session_id: string;
@@ -9,18 +8,12 @@ export interface CheckoutSession {
 }
 
 export const paymentService = {
-    createCheckoutSession: async (plan: string): Promise<CheckoutSession> => {
-        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-
-        const response = await axios.post<CheckoutSession>(
-            `${API_URL}/api/v1/billing/create-checkout-session`,
-            { plan },
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            }
-        );
+    createCheckoutSession: async (priceId: string): Promise<CheckoutSession> => {
+        const response = await axios.post(`${API_URL}/api/v1/billing/create-checkout-session`, {
+            price_id: priceId,
+            success_url: `${window.location.origin}/billing/success`,
+            cancel_url: `${window.location.origin}/billing`,
+        });
         return response.data;
     },
 };
