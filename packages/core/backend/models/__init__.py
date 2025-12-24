@@ -33,6 +33,11 @@ from models.rbac import (
     Organization,
     ResourceUsage,
     PermissionAuditLog,
+    PermissionAuditLog,
+)
+from models.subscription import (
+    Subscription,
+    SubscriptionStatus,
 )
 
 __all__ = [
@@ -60,4 +65,6 @@ __all__ = [
     "Organization",
     "ResourceUsage",
     "PermissionAuditLog",
+    "Subscription",
+    "SubscriptionStatus",
 ]
