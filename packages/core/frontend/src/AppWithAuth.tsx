@@ -22,6 +22,7 @@ import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
 import { Review } from './pages/Review';
 import { Admin } from './pages/Admin';
+import { BillingPage } from './pages/BillingPage';
 import { UserRole } from './types/auth';
 import App from './App';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
@@ -168,6 +169,17 @@ export const AppWithAuth: React.FC = () => {
                         <PromptLibrary />
                       </AppLayout>
                     </RoleGuard>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/billing"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <BillingPage />
+                    </AppLayout>
                   </ProtectedRoute>
                 }
               />

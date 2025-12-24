@@ -10,6 +10,10 @@ psycopg2-binary==2.9.7
 # Redis
 redis==5.0.1
 
+# Payment
+stripe>=7.0.0
+
+
 # Message Queue & Task Processing
 celery[redis]==5.4.0                    # Celery Task Queue with Redis Backend
 kombu==5.4.0                            # Messaging Library for Celery
