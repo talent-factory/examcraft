@@ -4,7 +4,7 @@ Sentry Test Endpoints
 Endpoints to test Sentry integration (only available in development).
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os
 import sentry_sdk
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/sentry-test", tags=["Sentry Test"])
 
 class SentryTestResponse(BaseModel):
     """Response model for Sentry test endpoints"""
+
     message: str
     sentry_enabled: bool
     environment: str
@@ -24,14 +25,14 @@ class SentryTestResponse(BaseModel):
 async def sentry_status():
     """
     Check if Sentry is enabled and configured.
-    
+
     Returns:
         SentryTestResponse: Sentry configuration status
     """
     environment = os.getenv("ENVIRONMENT", "development")
     enable_sentry = os.getenv("ENABLE_SENTRY", "false").lower() == "true"
     dsn = os.getenv("SENTRY_DSN")
-    
+
     return SentryTestResponse(
         message="Sentry configuration status",
         sentry_enabled=enable_sentry and dsn is not None,
@@ -43,21 +44,21 @@ async def sentry_status():
 async def trigger_error():
     """
     Trigger a test error to verify Sentry error tracking.
-    
+
     Only available in development environment.
-    
+
     Raises:
         HTTPException: If not in development environment
         Exception: Test exception to be captured by Sentry
     """
     environment = os.getenv("ENVIRONMENT", "development")
-    
+
     if environment != "development":
         raise HTTPException(
             status_code=403,
-            detail="Sentry test endpoints are only available in development"
+            detail="Sentry test endpoints are only available in development",
         )
-    
+
     # Trigger a test error
     try:
         raise Exception("🧪 Sentry Test Error: This is a test error triggered manually")
@@ -72,7 +73,7 @@ async def trigger_error():
             tags={
                 "test": "true",
                 "feature": "sentry_integration",
-            }
+            },
         )
         raise
 
@@ -81,23 +82,23 @@ async def trigger_error():
 async def trigger_message():
     """
     Send a test message to Sentry.
-    
+
     Only available in development environment.
-    
+
     Returns:
         SentryTestResponse: Success message
-        
+
     Raises:
         HTTPException: If not in development environment
     """
     environment = os.getenv("ENVIRONMENT", "development")
-    
+
     if environment != "development":
         raise HTTPException(
             status_code=403,
-            detail="Sentry test endpoints are only available in development"
+            detail="Sentry test endpoints are only available in development",
         )
-    
+
     # Send a test message
     capture_message_with_context(
         message="🧪 Sentry Test Message: This is a test message sent manually",
@@ -109,9 +110,9 @@ async def trigger_message():
         tags={
             "test": "true",
             "feature": "sentry_integration",
-        }
+        },
     )
-    
+
     return SentryTestResponse(
         message="Test message sent to Sentry successfully",
         sentry_enabled=True,
@@ -123,36 +124,36 @@ async def trigger_message():
 async def trigger_performance():
     """
     Trigger a performance transaction to test Sentry performance monitoring.
-    
+
     Only available in development environment.
-    
+
     Returns:
         SentryTestResponse: Success message
-        
+
     Raises:
         HTTPException: If not in development environment
     """
     environment = os.getenv("ENVIRONMENT", "development")
-    
+
     if environment != "development":
         raise HTTPException(
             status_code=403,
-            detail="Sentry test endpoints are only available in development"
+            detail="Sentry test endpoints are only available in development",
         )
-    
+
     # Create a performance transaction
     with sentry_sdk.start_transaction(op="test", name="sentry_performance_test"):
         # Simulate some work
         import time
+
         with sentry_sdk.start_span(op="db", description="Simulated DB Query"):
             time.sleep(0.1)
-        
+
         with sentry_sdk.start_span(op="http", description="Simulated API Call"):
             time.sleep(0.2)
-    
+
     return SentryTestResponse(
         message="Performance transaction sent to Sentry successfully",
         sentry_enabled=True,
         environment=environment,
     )
-

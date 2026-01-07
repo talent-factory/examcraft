@@ -12,14 +12,16 @@ TODO: Rewrite tests for the actual /api/auth/avatar/{user_id} endpoint
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
 import requests
 
 from main import app
 from services.redis_service import RedisService
 
 # Skip all tests in this file - endpoint does not exist
-pytestmark = pytest.mark.skip(reason="Avatar proxy endpoint /api/v1/auth/avatar-proxy does not exist. Actual endpoint is /api/auth/avatar/{user_id}")
+pytestmark = pytest.mark.skip(
+    reason="Avatar proxy endpoint /api/v1/auth/avatar-proxy does not exist. Actual endpoint is /api/auth/avatar/{user_id}"
+)
 
 
 class TestAvatarProxy:
@@ -251,4 +253,3 @@ def mock_redis(monkeypatch):
 def client():
     """Create test client"""
     return TestClient(app)
-

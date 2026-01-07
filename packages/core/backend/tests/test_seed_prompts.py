@@ -11,7 +11,6 @@ TODO: Re-enable when Premium package is integrated into test environment
 """
 
 import pytest
-from sqlalchemy.orm import Session
 import sys
 import os
 
@@ -19,7 +18,9 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 # Skip all tests in this file - Premium package not available in Core tests
-pytestmark = pytest.mark.skip(reason="Premium package models not available in Core test environment")
+pytestmark = pytest.mark.skip(
+    reason="Premium package models not available in Core test environment"
+)
 
 
 class TestSeedPrompts:
