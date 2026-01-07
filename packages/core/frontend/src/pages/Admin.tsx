@@ -4,13 +4,12 @@
  */
 
 import React, { useState } from 'react';
-import { PromptManagement } from '../components/admin/PromptManagement';
 import { UserManagementPage } from '../components/admin/UserManagementPage';
 import { InstitutionManagementPage } from '../components/admin/InstitutionManagementPage';
 import RoleManagementPage from '../components/admin/RoleManagementPage';
 
 export const Admin: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'prompts' | 'users' | 'institutions' | 'roles'>('prompts');
+  const [activeTab, setActiveTab] = useState<'users' | 'institutions' | 'roles'>('users');
 
   return (
     <div className="space-y-6">
@@ -28,57 +27,37 @@ export const Admin: React.FC = () => {
       <div className="flex gap-4 border-b border-gray-200">
         <button
           type="button"
-          onClick={() => setActiveTab('prompts')}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-            activeTab === 'prompts'
-              ? 'border-primary-600 text-primary-600'
-              : 'border-transparent text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Prompt-Verwaltung
-        </button>
-        <button
-          type="button"
           onClick={() => setActiveTab('users')}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-            activeTab === 'users'
-              ? 'border-primary-600 text-primary-600'
-              : 'border-transparent text-gray-600 hover:text-gray-900'
-          }`}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'users'
+            ? 'border-primary-600 text-primary-600'
+            : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
         >
           Benutzer-Verwaltung
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('institutions')}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-            activeTab === 'institutions'
-              ? 'border-primary-600 text-primary-600'
-              : 'border-transparent text-gray-600 hover:text-gray-900'
-          }`}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'institutions'
+            ? 'border-primary-600 text-primary-600'
+            : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
         >
           Institutions
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('roles')}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-            activeTab === 'roles'
-              ? 'border-primary-600 text-primary-600'
-              : 'border-transparent text-gray-600 hover:text-gray-900'
-          }`}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'roles'
+            ? 'border-primary-600 text-primary-600'
+            : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
         >
           Rollen & Berechtigungen
         </button>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'prompts' && (
-        <div className="card p-6">
-          <PromptManagement />
-        </div>
-      )}
-
       {activeTab === 'users' && (
         <div className="card p-6">
           <UserManagementPage />
