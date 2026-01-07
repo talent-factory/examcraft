@@ -110,6 +110,27 @@ async def lifespan(app: FastAPI):
     else:
         print("ℹ️  Running in Core mode - Premium features disabled")
 
+    # Premium/Enterprise Features: Replace Core placeholders BEFORE loading routers
+    if is_full_deployment:
+        print("\n🌟 Loading Premium/Enterprise Features...")
+
+        # Premium: RAG Service (replace Core placeholder with Premium implementation)
+        # IMPORTANT: This must happen BEFORE loading API routers that use rag_service
+        try:
+            from premium.services.rag_service import RAGService
+            import services.rag_service as core_rag_module
+
+            # Replace Core RAG service singleton with Premium implementation
+            core_rag_module.rag_service = RAGService()
+            print("✅ Premium RAG Service loaded")
+            logger.info("✅ Premium RAG Service loaded and replaced Core placeholder")
+        except ImportError as e:
+            print(f"⚠️  Premium RAG Service not available: {e}")
+            logger.warning(f"Premium RAG Service not available: {e}")
+        except Exception as e:
+            print(f"❌ Error loading Premium RAG Service: {e}")
+            logger.error(f"Error loading Premium RAG Service: {e}", exc_info=True)
+
     # Startup: Load API routers (Core Package)
     # Premium features (vector_search, chat, prompts) are available in Premium package
     # Import from core.api explicitly to avoid conflicts with premium.api
@@ -180,10 +201,8 @@ async def lifespan(app: FastAPI):
     if os.getenv("ENVIRONMENT", "development") == "development":
         app.include_router(sentry_test.router)
 
-    # Premium/Enterprise Features: Load additional APIs in Full deployment
+    # Premium/Enterprise Features: Load additional Premium APIs
     if is_full_deployment:
-        print("\n🌟 Loading Premium/Enterprise Features...")
-
         # Premium: Chat API
         try:
             from premium.api.v1 import chat as chat_api
