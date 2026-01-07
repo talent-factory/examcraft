@@ -7,7 +7,15 @@ Full RAG functionality is available in the Premium package.
 
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-from uuid import UUID
+from dataclasses import dataclass
+
+
+@dataclass
+class PromptConfig:
+    """Konfiguration für einen Prompt (Placeholder)"""
+
+    prompt_id: str
+    variables: Optional[Dict[str, Any]] = None
 
 
 class RAGQuestion(BaseModel):
@@ -24,7 +32,7 @@ class RAGQuestion(BaseModel):
 class RAGContext(BaseModel):
     """Context used for RAG generation"""
 
-    document_id: UUID
+    document_id: int
     chunk_text: str
     relevance_score: float
 
@@ -32,10 +40,16 @@ class RAGContext(BaseModel):
 class RAGExamRequest(BaseModel):
     """Request for RAG-based exam generation"""
 
-    document_ids: List[UUID]
-    num_questions: int = Field(default=10, ge=1, le=50)
-    difficulty: str = "mixed"
-    question_types: List[str] = ["multiple_choice", "open_ended"]
+    topic: str
+    document_ids: Optional[List[int]] = None
+    question_count: int = Field(default=5, ge=1, le=20)
+    question_types: Optional[List[str]] = Field(
+        default=["multiple_choice", "open_ended"]
+    )
+    difficulty: str = "medium"
+    language: str = "de"
+    context_chunks_per_question: int = Field(default=3, ge=1, le=10)
+    prompt_config: Optional[Dict[str, PromptConfig]] = None
 
 
 class RAGExamResponse(BaseModel):

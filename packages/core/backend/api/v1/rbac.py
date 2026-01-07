@@ -298,9 +298,7 @@ async def get_current_tier(db: Session = Depends(get_db)):
     if not tier:
         # Fallback to free tier if default not found
         tier = (
-            db.query(SubscriptionTier)
-            .filter(SubscriptionTier.name == "free")
-            .first()
+            db.query(SubscriptionTier).filter(SubscriptionTier.name == "free").first()
         )
 
     if not tier:
@@ -314,8 +312,7 @@ async def get_current_tier(db: Session = Depends(get_db)):
 
 @router.get("/tiers/my", response_model=SubscriptionTierResponse)
 async def get_my_tier(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)
 ):
     """
     Gibt den Subscription Tier der Institution des eingeloggten Users zurück.
@@ -327,12 +324,15 @@ async def get_my_tier(
     from models.auth import Institution
 
     # Get user's institution
-    institution = db.query(Institution).filter(Institution.id == current_user.institution_id).first()
+    institution = (
+        db.query(Institution)
+        .filter(Institution.id == current_user.institution_id)
+        .first()
+    )
 
     if not institution:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User's institution not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User's institution not found"
         )
 
     # Get subscription tier
@@ -345,9 +345,7 @@ async def get_my_tier(
     if not tier:
         # Fallback to free tier if institution tier not found
         tier = (
-            db.query(SubscriptionTier)
-            .filter(SubscriptionTier.name == "free")
-            .first()
+            db.query(SubscriptionTier).filter(SubscriptionTier.name == "free").first()
         )
 
     if not tier:

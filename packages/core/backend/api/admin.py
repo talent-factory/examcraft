@@ -668,6 +668,7 @@ async def list_institutions(
 
 class UpdateInstitutionRequest(BaseModel):
     """Request model for updating institution"""
+
     name: Optional[str] = None
     domain: Optional[str] = None
     subscription_tier: Optional[str] = None
@@ -715,7 +716,7 @@ async def update_institution(
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid subscription tier. Must be one of: {', '.join([t.value for t in SubscriptionTier])}"
+                detail=f"Invalid subscription tier. Must be one of: {', '.join([t.value for t in SubscriptionTier])}",
             )
 
         institution.subscription_tier = tier.value
@@ -745,6 +746,7 @@ async def update_institution(
 
 class CreateInstitutionRequest(BaseModel):
     """Request model for creating institution"""
+
     name: str
     domain: str
     subscription_tier: str = "free"
@@ -771,13 +773,19 @@ async def create_institution(
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid subscription tier. Must be one of: {', '.join([t.value for t in SubscriptionTier])}"
+            detail=f"Invalid subscription tier. Must be one of: {', '.join([t.value for t in SubscriptionTier])}",
         )
 
     # Check if domain already exists
-    existing = db.query(Institution).filter(Institution.domain == institution_data.domain).first()
+    existing = (
+        db.query(Institution)
+        .filter(Institution.domain == institution_data.domain)
+        .first()
+    )
     if existing:
-        raise HTTPException(status_code=400, detail="Institution with this domain already exists")
+        raise HTTPException(
+            status_code=400, detail="Institution with this domain already exists"
+        )
 
     # Get quotas for tier
     quotas = TIER_QUOTAS[tier]

@@ -109,7 +109,8 @@ export const PackageTierBadge: React.FC = () => {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/v1/rbac/tiers/my`, {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/v1/rbac/tiers/my`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

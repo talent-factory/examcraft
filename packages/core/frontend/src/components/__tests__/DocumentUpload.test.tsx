@@ -5,6 +5,8 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import DocumentUpload from '../DocumentUpload';
 import { DocumentService } from '../../services/DocumentService';
 
+import { useDropzone } from 'react-dropzone';
+
 // Mock DocumentService
 jest.mock('../../services/DocumentService');
 const mockDocumentService = DocumentService as jest.Mocked<typeof DocumentService>;
@@ -13,8 +15,6 @@ const mockDocumentService = DocumentService as jest.Mocked<typeof DocumentServic
 jest.mock('react-dropzone', () => ({
   useDropzone: jest.fn()
 }));
-
-import { useDropzone } from 'react-dropzone';
 const mockUseDropzone = useDropzone as jest.MockedFunction<typeof useDropzone>;
 
 // Mock theme
@@ -50,10 +50,10 @@ const createMockFile = (name: string, size: number, type: string): File => {
 describe.skip('DocumentUpload', () => {
   const mockGetRootProps = jest.fn();
   const mockGetInputProps = jest.fn();
-  
+
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     mockUseDropzone.mockReturnValue({
       getRootProps: mockGetRootProps,
       getInputProps: mockGetInputProps,
@@ -108,7 +108,7 @@ describe.skip('DocumentUpload', () => {
     it('renders with custom props', () => {
       render(
         <TestWrapper>
-          <DocumentUpload 
+          <DocumentUpload
             maxFiles={5}
             acceptedFileTypes={['.pdf', '.txt']}
           />
@@ -250,7 +250,7 @@ describe.skip('DocumentUpload', () => {
 
     it('shows upload progress', async () => {
       mockDocumentService.uploadDocument.mockImplementation(
-        () => new Promise(resolve => 
+        () => new Promise(resolve =>
           setTimeout(() => resolve({
             document_id: 1,
             filename: 'test.pdf',
@@ -505,7 +505,7 @@ describe.skip('DocumentUpload', () => {
   describe('Callbacks', () => {
     it('calls onUploadComplete callback', async () => {
       const mockOnUploadComplete = jest.fn();
-      
+
       mockDocumentService.uploadDocument.mockResolvedValue({
         document_id: 1,
         filename: 'test.pdf',
@@ -539,7 +539,7 @@ describe.skip('DocumentUpload', () => {
     it('calls onUploadError callback', async () => {
       const mockOnUploadError = jest.fn();
       const errorMessage = 'Upload failed';
-      
+
       mockDocumentService.uploadDocument.mockRejectedValue(new Error(errorMessage));
 
       const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
@@ -571,7 +571,7 @@ describe.skip('DocumentUpload', () => {
       });
 
       mockDocumentService.processDocument.mockImplementation(
-        () => new Promise(resolve => 
+        () => new Promise(resolve =>
           setTimeout(() => resolve({
             message: 'Processing successful',
             document_id: 1

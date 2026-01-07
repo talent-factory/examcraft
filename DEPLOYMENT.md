@@ -264,6 +264,13 @@ git submodule update --init --recursive
 ./start-dev.sh
 ```
 
+**Note:** The `start-dev.sh` script automatically runs `scripts/setup-premium-symlinks.sh` to create symlinks for Premium/Enterprise components. This enables:
+- Native Node.js development (without Docker)
+- IDE autocomplete for Premium components
+- Local testing with `npm start`
+
+If developing inside Docker containers, symlinks are not needed as volume mounts handle component loading.
+
 ## Troubleshooting
 
 ### Seed Scripts Not Running
@@ -277,12 +284,32 @@ git submodule update --init --recursive
 
 ### Premium Components Not Loading
 
-**Problem:** "Feature Not Available" message shown
+**Problem:** "RAG Exam Creator - Premium Feature" or "Feature Not Available" message shown despite Full deployment
 
 **Solution:**
+
+**For Docker Development:**
 1. Check `REACT_APP_DEPLOYMENT_MODE=full` in frontend environment
-2. Verify `packages/premium/frontend/src` is mounted at `/app/src/premium`
-3. Clear browser cache and rebuild: `docker compose up -d --build frontend`
+2. Verify `packages/premium/frontend/src` is mounted at `/app/src/premium` in `docker-compose.full.yml`
+3. Rebuild frontend container: `docker compose -f docker-compose.full.yml up -d --build frontend`
+4. Clear browser cache (Cmd+Shift+R / Ctrl+Shift+R)
+
+**For Native Development (npm start):**
+1. Ensure symlinks are created: `bash scripts/setup-premium-symlinks.sh`
+2. Verify symlinks exist:
+   ```bash
+   ls -la packages/core/frontend/src/premium/components/
+   # Should show symlinks to Premium components
+   ```
+3. Check `REACT_APP_DEPLOYMENT_MODE=full` in `.env`
+4. Restart dev server: `npm start` (in packages/core/frontend)
+
+**Common Issue - Missing RAGExamCreator Symlink:**
+If only DocumentChat works but RAG Exam Creator shows upgrade prompt:
+```bash
+# Run symlink setup (fixed in TF-177)
+bash scripts/setup-premium-symlinks.sh
+```
 
 ### Qdrant Connection Failed
 

@@ -1,14 +1,19 @@
 /**
  * Exams Page
  * Exam generation and management
+ *
+ * In Full deployment mode, uses Premium RAGExamCreator via symlink.
+ * In Core deployment mode, falls back to stub component.
  */
 
 import React from 'react';
-import RAGExamCreator from '../components/RAGExamCreator';
+// Import from premium directory - symlinked to actual Premium component in Full mode
+import RAGExamCreator from '../premium/components/RAGExamCreator';
 
 export const Exams: React.FC = () => {
   const handleExamGenerated = (exam: any) => {
     console.log('Exam generated:', exam);
+    // Do nothing - let RAGExamCreator handle the display
   };
 
   const handleBack = () => {
@@ -36,4 +41,3 @@ export const Exams: React.FC = () => {
     </div>
   );
 };
-

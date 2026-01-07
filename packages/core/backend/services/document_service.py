@@ -449,8 +449,10 @@ class DocumentService:
             vector_service = get_vector_service()
 
             # Check if vector service has get_document_chunks method
-            if not hasattr(vector_service, 'get_document_chunks'):
-                logger.warning("Vector service does not support get_document_chunks, falling back to re-processing")
+            if not hasattr(vector_service, "get_document_chunks"):
+                logger.warning(
+                    "Vector service does not support get_document_chunks, falling back to re-processing"
+                )
                 # Fallback: Verarbeite Dokument erneut um Chunks zu erhalten
                 processed_doc = await self.docling_service.process_document(
                     document_id=document.id,
@@ -476,20 +478,28 @@ class DocumentService:
             search_results = await vector_service.get_document_chunks(document_id)
 
             if not search_results:
-                logger.warning(f"No chunks found in vector store for document {document_id}")
+                logger.warning(
+                    f"No chunks found in vector store for document {document_id}"
+                )
                 return []
 
             # Sortiere nach chunk_index
-            search_results.sort(key=lambda x: x.chunk_index if hasattr(x, 'chunk_index') else 0)
+            search_results.sort(
+                key=lambda x: x.chunk_index if hasattr(x, "chunk_index") else 0
+            )
 
             # Konvertiere SearchResult zu Dictionary Format
             chunks_data = []
             for result in search_results:
                 chunk_data = {
-                    "chunk_index": result.chunk_index if hasattr(result, 'chunk_index') else 0,
+                    "chunk_index": result.chunk_index
+                    if hasattr(result, "chunk_index")
+                    else 0,
                     "content": result.content,
-                    "page_number": result.metadata.get("page_number") if hasattr(result, 'metadata') and result.metadata else None,
-                    "metadata": result.metadata if hasattr(result, 'metadata') else {},
+                    "page_number": result.metadata.get("page_number")
+                    if hasattr(result, "metadata") and result.metadata
+                    else None,
+                    "metadata": result.metadata if hasattr(result, "metadata") else {},
                 }
                 chunks_data.append(chunk_data)
 

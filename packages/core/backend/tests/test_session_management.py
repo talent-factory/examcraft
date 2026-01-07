@@ -320,7 +320,9 @@ def test_query_active_sessions(db):
     )
 
     assert len(active_sessions) == 1
-    assert active_sessions[0].token_jti == "active_token_jti_789"  # Fixed: use token_jti
+    assert (
+        active_sessions[0].token_jti == "active_token_jti_789"
+    )  # Fixed: use token_jti
 
 
 def test_query_expired_sessions(db):
@@ -362,4 +364,6 @@ def test_query_expired_sessions(db):
     )
 
     assert len(expired_sessions) == 1
-    assert expired_sessions[0].token_jti == "expired_token_jti_202"  # Fixed: use token_jti
+    assert (
+        expired_sessions[0].token_jti == "expired_token_jti_202"
+    )  # Fixed: use token_jti
