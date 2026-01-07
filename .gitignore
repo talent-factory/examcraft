@@ -58,9 +58,12 @@ backend/mock_vector_db/
 mock_vector_db/
 
 # Test coverage reports
+**/coverage/
 frontend/coverage/
 backend/htmlcov/
 backend/.coverage
+.coverage
+htmlcov/
 
 # Playwright test artifacts
 frontend/test-results/
