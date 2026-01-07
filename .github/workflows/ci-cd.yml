@@ -198,6 +198,25 @@ jobs:
         scenario: [core, premium, enterprise]
 
     steps:
+      - name: Free Disk Space
+        run: |
+          echo "=== Disk Space Before Cleanup ==="
+          df -h
+          echo ""
+          echo "=== Removing unnecessary packages ==="
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          echo ""
+          echo "=== Docker cleanup ==="
+          docker system prune -af --volumes
+          echo ""
+          echo "=== Disk Space After Cleanup ==="
+          df -h
+
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
@@ -221,15 +240,39 @@ jobs:
 
       - name: Build Docker Images - Core
         if: matrix.scenario == 'core'
-        run: docker compose -f docker-compose.yml build
+        run: |
+          echo "Building only backend and frontend images to save disk space"
+          docker compose -f docker-compose.yml build backend frontend
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
 
       - name: Build Docker Images - Premium
         if: matrix.scenario == 'premium'
-        run: docker compose -f docker-compose.yml -f docker-compose.premium.yml build
+        run: |
+          echo "Building only backend and frontend images to save disk space"
+          docker compose -f docker-compose.yml -f docker-compose.premium.yml build backend frontend
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
 
       - name: Build Docker Images - Enterprise
         if: matrix.scenario == 'enterprise'
-        run: docker compose -f docker-compose.yml -f docker-compose.premium.yml -f docker-compose.enterprise.yml build
+        run: |
+          echo "Building only backend and frontend images to save disk space"
+          docker compose -f docker-compose.yml -f docker-compose.premium.yml -f docker-compose.enterprise.yml build backend frontend
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+
+      - name: Cleanup Build Cache
+        if: always()
+        run: |
+          echo "=== Cleaning up Docker build cache ==="
+          docker builder prune -af
+          docker system prune -af --volumes
+          echo "=== Final Disk Space ==="
+          df -h
 
   # Job 4: Security Scan
   security-scan:
