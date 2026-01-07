@@ -41,7 +41,9 @@ class AvatarService:
             return cached_avatar
 
         # Download avatar from original URL
-        logger.info(f"Avatar cache miss for user {user_id}, downloading from {avatar_url[:50]}...")
+        logger.info(
+            f"Avatar cache miss for user {user_id}, downloading from {avatar_url[:50]}..."
+        )
         avatar_bytes = self._download_avatar(avatar_url)
 
         if avatar_bytes:
@@ -148,6 +150,7 @@ class AvatarService:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to invalidate avatar cache for user {user_id}: {str(e)}")
+            logger.error(
+                f"Failed to invalidate avatar cache for user {user_id}: {str(e)}"
+            )
             return False
-

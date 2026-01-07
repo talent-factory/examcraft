@@ -171,9 +171,7 @@ async def register(
         # Try to find institution by email domain (Auto-Assignment)
         email_domain = request.email.split("@")[1]
         institution = (
-            db.query(Institution)
-            .filter(Institution.domain == email_domain)
-            .first()
+            db.query(Institution).filter(Institution.domain == email_domain).first()
         )
 
         # If no domain match, create personal institution
@@ -783,14 +781,12 @@ async def get_user_avatar(
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
     if not user.avatar_url:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User has no avatar"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User has no avatar"
         )
 
     # Download and cache avatar
@@ -800,17 +796,17 @@ async def get_user_avatar(
     if not avatar_bytes:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to download avatar from OAuth provider"
+            detail="Failed to download avatar from OAuth provider",
         )
 
     # Return image with appropriate content type
     # Detect content type from first bytes (magic numbers)
     content_type = "image/jpeg"  # Default
-    if avatar_bytes[:4] == b'\x89PNG':
+    if avatar_bytes[:4] == b"\x89PNG":
         content_type = "image/png"
-    elif avatar_bytes[:3] == b'GIF':
+    elif avatar_bytes[:3] == b"GIF":
         content_type = "image/gif"
-    elif avatar_bytes[:4] == b'RIFF' and avatar_bytes[8:12] == b'WEBP':
+    elif avatar_bytes[:4] == b"RIFF" and avatar_bytes[8:12] == b"WEBP":
         content_type = "image/webp"
 
     return Response(
@@ -818,6 +814,6 @@ async def get_user_avatar(
         media_type=content_type,
         headers={
             "Cache-Control": "public, max-age=86400",  # 24 hours
-            "X-Avatar-Source": "cached" if avatar_bytes else "downloaded"
-        }
+            "X-Avatar-Source": "cached" if avatar_bytes else "downloaded",
+        },
     )
