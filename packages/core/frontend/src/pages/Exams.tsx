@@ -6,7 +6,7 @@
  * In Core deployment mode, falls back to stub component.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 // Import from premium directory - symlinked to actual Premium component in Full mode
 import RAGExamCreator from '../premium/components/RAGExamCreator';
 
