@@ -15,14 +15,14 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: examcraft
-      POSTGRES_PASSWORD: examcraft_dev_password  # pragma: allowlist secret
+      POSTGRES_PASSWORD: examcraft_dev_password # pragma: allowlist secret
       POSTGRES_DB: examcraft
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U examcraft"]
+      test: [ "CMD-SHELL", "pg_isready -U examcraft" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,13 +32,13 @@ services:
   # Redis Cache & Session Store
   redis:
     container_name: examcraft-redis
-    image: redis:8-alpine
+    image: redis:7-alpine
     ports:
       - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -48,17 +48,17 @@ services:
   # RabbitMQ Message Broker (for async document processing)
   rabbitmq:
     container_name: examcraft-rabbitmq
-    image: rabbitmq:4.2-management-alpine
+    image: rabbitmq:management
     environment:
       RABBITMQ_DEFAULT_USER: examcraft
-      RABBITMQ_DEFAULT_PASS: examcraft_dev_password  # pragma: allowlist secret
+      RABBITMQ_DEFAULT_PASS: examcraft_dev_password # pragma: allowlist secret
     ports:
-      - "5672:5672"      # AMQP port
-      - "15672:15672"    # Management UI
+      - "5672:5672" # AMQP port
+      - "15672:15672" # Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -79,7 +79,7 @@ services:
       QDRANT__SERVICE__GRPC_PORT: 6334
       QDRANT__LOG_LEVEL: INFO
     healthcheck:
-      test: ["CMD-SHELL", "exit 0"]
+      test: [ "CMD-SHELL", "exit 0" ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -97,15 +97,15 @@ services:
       DEPLOYMENT_MODE: full
 
       # Database
-      DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft  # pragma: allowlist secret
+      DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft # pragma: allowlist secret
 
       # Redis (internal port 6379, external port 6380)
       REDIS_URL: redis://redis:6379/0
 
       # RabbitMQ & Celery (for async document processing)
       RABBITMQ_USER: examcraft
-      RABBITMQ_PASSWORD: examcraft_dev_password  # pragma: allowlist secret
-      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev_password@rabbitmq:5672/  # pragma: allowlist secret
+      RABBITMQ_PASSWORD: examcraft_dev_password # pragma: allowlist secret
+      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev_password@rabbitmq:5672/ # pragma: allowlist secret
       CELERY_RESULT_BACKEND: redis://redis:6379/1
 
       # Qdrant
@@ -113,7 +113,7 @@ services:
       VECTOR_SERVICE_TYPE: qdrant
 
       # JWT
-      JWT_SECRET_KEY: dev_secret_key_change_in_production  # pragma: allowlist secret
+      JWT_SECRET_KEY: dev_secret_key_change_in_production # pragma: allowlist secret
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       REFRESH_TOKEN_EXPIRE_DAYS: 7
@@ -182,15 +182,15 @@ services:
       DEPLOYMENT_MODE: full
 
       # Database
-      DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft  # pragma: allowlist secret
+      DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft # pragma: allowlist secret
 
       # Redis (internal port 6379, external port 6380)
       REDIS_URL: redis://redis:6379/0
 
       # RabbitMQ & Celery (for async document processing)
       RABBITMQ_USER: examcraft
-      RABBITMQ_PASSWORD: examcraft_dev_password  # pragma: allowlist secret
-      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev_password@rabbitmq:5672/  # pragma: allowlist secret
+      RABBITMQ_PASSWORD: examcraft_dev_password # pragma: allowlist secret
+      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev_password@rabbitmq:5672/ # pragma: allowlist secret
       CELERY_RESULT_BACKEND: redis://redis:6379/1
 
       # Qdrant
@@ -198,7 +198,7 @@ services:
       VECTOR_SERVICE_TYPE: qdrant
 
       # JWT
-      JWT_SECRET_KEY: dev_secret_key_change_in_production  # pragma: allowlist secret
+      JWT_SECRET_KEY: dev_secret_key_change_in_production # pragma: allowlist secret
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       REFRESH_TOKEN_EXPIRE_DAYS: 7
