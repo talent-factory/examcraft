@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 env:
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
@@ -47,6 +51,8 @@ jobs:
         with:
           fetch-depth: 1  # Shallow clone for faster checkout
           submodules: false  # Don't checkout submodules (Premium/Enterprise are private)
+          persist-credentials: true  # Persist credentials for subsequent git operations
+          token: ${{ github.token }}  # Use GitHub token explicitly
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
