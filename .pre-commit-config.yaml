@@ -51,6 +51,19 @@ repos:
 # Configuration
 default_stages: [pre-commit]
 fail_fast: false
+
+# Pre-Push Hook: Comprehensive Lint Check
+# Uncomment to enable automatic lint checks before push
+# - repo: local
+#   hooks:
+#     - id: pre-push-lint-check
+#       name: Pre-Push Lint Check
+#       entry: bash scripts/pre-push-lint-check.sh
+#       language: system
+#       stages: [pre-push]
+#       pass_filenames: false
+#       always_run: true
+
 exclude: |
   (?x)^(
     packages/premium/|
