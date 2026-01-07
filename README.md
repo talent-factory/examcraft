@@ -246,6 +246,52 @@ Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für:
 - **PostgreSQL**: Port 5432
 - **Redis**: Port 6379
 
+### Code-Qualität & Lint-Checks
+
+**Automatische Checks vor jedem Commit:**
+
+```bash
+# Pre-Commit-Hooks installieren (einmalig)
+make install-hooks
+
+# Jetzt laufen Checks automatisch bei jedem Commit
+git commit -m "feat: Add feature"
+```
+
+**Manuelle Lint-Checks:**
+
+```bash
+# Alle Lint-Checks ausführen
+make lint
+
+# Auto-Fix für alle Fehler
+make lint-fix
+
+# Nur Backend
+make lint-backend
+make lint-fix-backend
+
+# Nur Frontend
+make lint-frontend
+make lint-fix-frontend
+
+# Pre-Commit-Hooks manuell ausführen
+make pre-commit
+```
+
+**Vor jedem Pull Request:**
+
+```bash
+# Umfassende Lint-Checks
+make pre-push
+
+# Oder manuell:
+cd packages/core/backend && ruff check . --fix && ruff format .
+cd packages/core/frontend && npm run lint:fix
+```
+
+**Siehe [docs/LINT_CHECKS.md](docs/LINT_CHECKS.md) für detaillierte Informationen.**
+
 ### Nützliche Befehle
 
 ```bash
