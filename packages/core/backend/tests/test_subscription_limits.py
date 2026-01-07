@@ -19,7 +19,9 @@ class TestSubscriptionLimits:
 
     # ==================== User Limit Tests ====================
 
-    def test_check_user_limit_unlimited(self, test_db: Session, test_institution: Institution):
+    def test_check_user_limit_unlimited(
+        self, test_db: Session, test_institution: Institution
+    ):
         """Test that unlimited user quota (-1) allows any number of users"""
         # Arrange: Set unlimited quota
         test_institution.max_users = -1
@@ -29,7 +31,7 @@ class TestSubscriptionLimits:
         for i in range(100):
             user = User(
                 email=f"user{i}@test.com",
-                first_name=f"User",
+                first_name="User",
                 last_name=f"{i}",
                 password_hash="dummy",
                 institution_id=test_institution.id,
@@ -44,7 +46,9 @@ class TestSubscriptionLimits:
         except HTTPException:
             pytest.fail("check_user_limit raised HTTPException for unlimited quota")
 
-    def test_check_user_limit_exceeded(self, test_db: Session, test_institution: Institution):
+    def test_check_user_limit_exceeded(
+        self, test_db: Session, test_institution: Institution
+    ):
         """Test that user limit is enforced when quota is set"""
         # Arrange: Set limit to 3 users
         test_institution.max_users = 3
@@ -54,7 +58,8 @@ class TestSubscriptionLimits:
         for i in range(3):
             user = User(
                 email=f"user{i}@test.com",
-                first_name="User", last_name=f"{i}",
+                first_name="User",
+                last_name=f"{i}",
                 password_hash="dummy",
                 institution_id=test_institution.id,
                 status=UserStatus.ACTIVE.value,
@@ -70,7 +75,9 @@ class TestSubscriptionLimits:
         assert "User limit reached" in exc_info.value.detail
         assert "3 users" in exc_info.value.detail
 
-    def test_check_user_limit_not_exceeded(self, test_db: Session, test_institution: Institution):
+    def test_check_user_limit_not_exceeded(
+        self, test_db: Session, test_institution: Institution
+    ):
         """Test that user limit allows creation when under quota"""
         # Arrange: Set limit to 5 users
         test_institution.max_users = 5
@@ -80,7 +87,8 @@ class TestSubscriptionLimits:
         for i in range(2):
             user = User(
                 email=f"user{i}@test.com",
-                first_name="User", last_name=f"{i}",
+                first_name="User",
+                last_name=f"{i}",
                 password_hash="dummy",
                 institution_id=test_institution.id,
                 status=UserStatus.ACTIVE.value,
@@ -105,7 +113,8 @@ class TestSubscriptionLimits:
         # Create 1 active user
         active_user = User(
             email="active@test.com",
-            first_name="Active", last_name="User",
+            first_name="Active",
+            last_name="User",
             password_hash="dummy",
             institution_id=test_institution.id,
             status=UserStatus.ACTIVE.value,
@@ -116,7 +125,8 @@ class TestSubscriptionLimits:
         for i in range(5):
             inactive_user = User(
                 email=f"inactive{i}@test.com",
-                first_name="Inactive", last_name=f"{i}",
+                first_name="Inactive",
+                last_name=f"{i}",
                 password_hash="dummy",
                 institution_id=test_institution.id,
                 status=UserStatus.INACTIVE.value,
@@ -147,7 +157,8 @@ class TestSubscriptionLimits:
                 file_path=f"/uploads/doc{i}.pdf",
                 file_size=1024,
                 mime_type="application/pdf",
-                status=DocumentStatus.PROCESSED, original_filename=f"doc{i}.pdf",
+                status=DocumentStatus.PROCESSED,
+                original_filename=f"doc{i}.pdf",
                 institution_id=test_institution.id,
                 user_id=None,
             )
@@ -175,7 +186,8 @@ class TestSubscriptionLimits:
                 file_path=f"/uploads/doc{i}.pdf",
                 file_size=1024,
                 mime_type="application/pdf",
-                status=DocumentStatus.PROCESSED, original_filename=f"doc{i}.pdf",
+                status=DocumentStatus.PROCESSED,
+                original_filename=f"doc{i}.pdf",
                 institution_id=test_institution.id,
                 user_id=None,
             )
@@ -205,7 +217,8 @@ class TestSubscriptionLimits:
                 file_path=f"/uploads/doc{i}.pdf",
                 file_size=1024,
                 mime_type="application/pdf",
-                status=DocumentStatus.PROCESSED, original_filename=f"doc{i}.pdf",
+                status=DocumentStatus.PROCESSED,
+                original_filename=f"doc{i}.pdf",
                 institution_id=test_institution.id,
                 user_id=None,
             )
@@ -233,7 +246,8 @@ class TestSubscriptionLimits:
             question = QuestionReview(
                 question_text=f"Question {i}?",
                 question_type="multiple_choice",
-                difficulty="medium", topic="Test Topic",
+                difficulty="medium",
+                topic="Test Topic",
                 bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
@@ -262,7 +276,8 @@ class TestSubscriptionLimits:
             question = QuestionReview(
                 question_text=f"Question {i}?",
                 question_type="multiple_choice",
-                difficulty="medium", topic="Test Topic",
+                difficulty="medium",
+                topic="Test Topic",
                 bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
@@ -293,7 +308,8 @@ class TestSubscriptionLimits:
             question = QuestionReview(
                 question_text=f"Question {i}?",
                 question_type="multiple_choice",
-                difficulty="medium", topic="Test Topic",
+                difficulty="medium",
+                topic="Test Topic",
                 bloom_level=2,
                 review_status=ReviewStatus.PENDING.value,
                 institution_id=test_institution.id,
@@ -308,5 +324,3 @@ class TestSubscriptionLimits:
             SubscriptionLimits.check_question_limit(test_institution, test_db)
         except HTTPException:
             pytest.fail("check_question_limit raised HTTPException when under quota")
-
-

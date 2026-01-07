@@ -16,7 +16,6 @@ from database import SessionLocal
 from models.auth import User, Role, Institution, UserStatus
 from models.rbac import RBACRole, SubscriptionTier, Feature
 from services.auth_service import AuthService
-from sqlalchemy.exc import IntegrityError
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -32,9 +31,7 @@ def seed_talent_factory_institution(db):
 
     # Check if already exists
     existing = (
-        db.query(Institution)
-        .filter(Institution.slug == "talent-factory")
-        .first()
+        db.query(Institution).filter(Institution.slug == "talent-factory").first()
     )
 
     if existing:
@@ -125,7 +122,7 @@ def seed_admin_user(db, institution):
     db.refresh(admin_user)
 
     logger.info(f"   ✅ Created: {admin_user.email} (ID: {admin_user.id})")
-    logger.info(f"   🔑 Password: admin123 (DEVELOPMENT ONLY!)")
+    logger.info("   🔑 Password: admin123 (DEVELOPMENT ONLY!)")
     logger.info(f"   👑 Superuser: {admin_user.is_superuser}")
     logger.info(f"   🎭 Roles: {[r.name for r in admin_user.roles]}")
 
@@ -145,7 +142,9 @@ def seed_rbac_data_if_needed(db):
     feature_count = db.query(Feature).count()
 
     if role_count > 0 and tier_count > 0 and feature_count > 0:
-        logger.info(f"   ✅ RBAC data already seeded ({role_count} roles, {tier_count} tiers, {feature_count} features)")
+        logger.info(
+            f"   ✅ RBAC data already seeded ({role_count} roles, {tier_count} tiers, {feature_count} features)"
+        )
         return
 
     logger.info("   🌱 Seeding RBAC data...")
@@ -221,16 +220,16 @@ def main():
 
         # 4. Seed Admin User
         if institution:
-            admin_user = seed_admin_user(db, institution)
+            seed_admin_user(db, institution)
 
         print("\n" + "=" * 60)
         print("✅ Development Data Seeding Complete!")
         print("=" * 60)
         print("\n📋 Summary:")
-        print(f"   - Institution: Talent Factory (Professional Tier)")
-        print(f"   - Domain: talent-factory.ch (Auto-Assignment)")
-        print(f"   - Admin User: admin@talent-factory.ch")
-        print(f"   - Password: admin123 (DEVELOPMENT ONLY!)")
+        print("   - Institution: Talent Factory (Professional Tier)")
+        print("   - Domain: talent-factory.ch (Auto-Assignment)")
+        print("   - Admin User: admin@talent-factory.ch")
+        print("   - Password: admin123 (DEVELOPMENT ONLY!)")
         print("\n💡 Next Steps:")
         print("   1. Login with admin@talent-factory.ch / admin123")
         print("   2. Any user with @talent-factory.ch email will be auto-assigned")
@@ -247,4 +246,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
