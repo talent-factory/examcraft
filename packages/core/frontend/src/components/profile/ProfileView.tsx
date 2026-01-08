@@ -3,7 +3,7 @@
  * Display user profile information
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ProfileViewProps {
@@ -12,6 +12,7 @@ interface ProfileViewProps {
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
   const { user } = useAuth();
+  const [avatarError, setAvatarError] = useState(false);
 
   if (!user) {
     return (
@@ -21,6 +22,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
     );
   }
 
+  // Get proxied avatar URL to avoid Google rate limiting (429 errors)
+  const getAvatarUrl = (userId: number): string => {
+    const API_BASE_URL = process.env.REACT_APP_API_URL;
+
+    if (!API_BASE_URL) {
+      console.error('REACT_APP_API_URL is not configured. Avatar proxy will not work.');
+      return ''; // Return empty string to trigger onError fallback
+    }
+
+    return `${API_BASE_URL}/api/auth/avatar/${userId}`;
+  };
+
   return (
     <div className="bg-white shadow rounded-lg">
       {/* Header */}
@@ -28,6 +41,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
         <h2 className="text-xl font-semibold text-gray-800">Profile Information</h2>
         {onEdit && (
           <button
+            type="button"
             onClick={onEdit}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -40,14 +54,31 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
       <div className="px-6 py-6 space-y-6">
         {/* Avatar Section */}
         <div className="flex items-center space-x-4">
-          <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-            {user.first_name?.[0]}{user.last_name?.[0]}
-          </div>
+          {/* Avatar with fallback to initials */}
+          {user.id && !avatarError ? (
+            <img
+              src={getAvatarUrl(user.id)}
+              alt={`${user.first_name} ${user.last_name}`}
+              className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+              onError={() => setAvatarError(true)}
+            />
+          ) : (
+            <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold border-2 border-gray-200">
+              {user.first_name?.[0] || user.email?.[0]?.toUpperCase() || '?'}{user.last_name?.[0] || ''}
+            </div>
+          )}
           <div>
             <h3 className="text-2xl font-bold text-gray-900">
-              {user.first_name} {user.last_name}
+              {user.first_name && user.last_name
+                ? `${user.first_name} ${user.last_name}`
+                : user.email || 'Unnamed User'}
             </h3>
             <p className="text-gray-600">{user.email}</p>
+            {user.oauth_provider && (
+              <p className="text-sm text-gray-500 mt-1">
+                🔗 Connected via {user.oauth_provider.charAt(0).toUpperCase() + user.oauth_provider.slice(1)}
+              </p>
+            )}
           </div>
         </div>
 
@@ -83,8 +114,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
               Account Status
             </label>
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-              user.status === 'active' 
-                ? 'bg-green-100 text-green-800' 
+              user.status === 'active'
+                ? 'bg-green-100 text-green-800'
                 : 'bg-red-100 text-red-800'
             }`}>
               {user.status}
@@ -174,4 +205,3 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
     </div>
   );
 };
-
