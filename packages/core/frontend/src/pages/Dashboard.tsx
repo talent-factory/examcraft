@@ -16,7 +16,7 @@ export const Dashboard: React.FC = () => {
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-primary-600 to-secondary-600 rounded-lg p-8 text-white">
         <h1 className="text-4xl font-bold mb-2">
-          Willkommen, {user?.first_name}! 👋
+          Willkommen{user?.first_name ? `, ${user.first_name}` : ''}! 👋
         </h1>
         <p className="text-lg text-primary-100">
           Erstelle intelligente Prüfungsaufgaben mit KI-Unterstützung
@@ -109,4 +109,3 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 };
-
