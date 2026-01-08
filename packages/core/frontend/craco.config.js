@@ -1,4 +1,11 @@
+const path = require('path');
+
 module.exports = {
+  webpack: {
+    alias: {
+      '@core': path.resolve(__dirname, 'src'),
+    },
+  },
   style: {
     postcss: {
       mode: 'extends',
@@ -21,6 +28,9 @@ module.exports = {
       transformIgnorePatterns: [
         'node_modules/(?!(axios)/)',
       ],
+      moduleNameMapper: {
+        '^@core/(.*)$': '<rootDir>/src/$1',
+      },
     },
   },
 }
