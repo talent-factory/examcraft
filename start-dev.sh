@@ -221,9 +221,9 @@ if [ "$DEPLOYMENT_MODE" = "full" ]; then
 fi
 
 echo ""
-echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  ✅  ExamCraft AI ${TIER} is running!  ✅  ║${NC}"
-echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${GREEN}$(printf '=%.0s' {1..60})${NC}"
+echo -e "${GREEN}✅ ExamCraft AI ${TIER} is running!${NC}"
+echo -e "${GREEN}$(printf '=%.0s' {1..60})${NC}"
 echo ""
 echo -e "${BLUE}📍 Access Points:${NC}"
 echo "   - Frontend: http://localhost:3000"
