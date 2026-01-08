@@ -227,6 +227,18 @@ class OAuthService:
             oauth_account.email = user_info.get("email")
             oauth_account.name = user_info.get("name")
             oauth_account.picture = user_info.get("picture")
+
+            # Update user data from OAuth (profile might have changed)
+            user = oauth_account.user
+            if user_info.get("first_name"):
+                user.first_name = user_info.get("first_name")
+            if user_info.get("last_name"):
+                user.last_name = user_info.get("last_name")
+            if user_info.get("name"):
+                user.display_name = user_info.get("name")
+            if user_info.get("picture"):
+                user.avatar_url = user_info.get("picture")
+
             self.db.commit()
             self.db.refresh(oauth_account)
             return oauth_account.user
@@ -237,6 +249,18 @@ class OAuthService:
         )
 
         if existing_user:
+            # Update user data from OAuth
+            if user_info.get("first_name"):
+                existing_user.first_name = user_info.get("first_name")
+            if user_info.get("last_name"):
+                existing_user.last_name = user_info.get("last_name")
+            if user_info.get("name"):
+                existing_user.display_name = user_info.get("name")
+            if user_info.get("picture"):
+                existing_user.avatar_url = user_info.get("picture")
+            existing_user.oauth_provider = provider  # Mark as OAuth user
+            existing_user.is_email_verified = True  # OAuth emails are verified
+
             # Link OAuth account to existing user
             new_oauth_account = OAuthAccount(
                 user_id=existing_user.id,
@@ -251,6 +275,7 @@ class OAuthService:
             )
             self.db.add(new_oauth_account)
             self.db.commit()
+            self.db.refresh(existing_user)  # Refresh after update
             return existing_user
 
         # Create new user from OAuth
