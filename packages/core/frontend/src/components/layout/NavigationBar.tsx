@@ -65,10 +65,12 @@ export const NavigationBar: React.FC = () => {
                   className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-medium"
                   style={{ display: user?.id ? 'none' : 'flex' }}
                 >
-                  {user?.first_name?.[0]}{user?.last_name?.[0]}
+                  {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || '?'}{user?.last_name?.[0] || ''}
                 </div>
                 <span className="text-gray-700 font-medium">
-                  {user?.first_name} {user?.last_name}
+                  {user?.first_name && user?.last_name
+                    ? `${user.first_name} ${user.last_name}`
+                    : user?.email || 'User'}
                 </span>
                 <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -113,4 +115,3 @@ export const NavigationBar: React.FC = () => {
     </nav>
   );
 };
-

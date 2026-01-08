@@ -21,6 +21,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
     );
   }
 
+  // Get proxied avatar URL to avoid Google rate limiting (429 errors)
+  const getAvatarUrl = (userId: number): string => {
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+    return `${API_BASE_URL}/api/auth/avatar/${userId}`;
+  };
+
   return (
     <div className="bg-white shadow rounded-lg">
       {/* Header */}
@@ -40,14 +46,44 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
       <div className="px-6 py-6 space-y-6">
         {/* Avatar Section */}
         <div className="flex items-center space-x-4">
-          <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-            {user.first_name?.[0]}{user.last_name?.[0]}
-          </div>
+          {/* Avatar with fallback to initials */}
+          {user.id ? (
+            <>
+              <img
+                src={getAvatarUrl(user.id)}
+                alt={`${user.first_name} ${user.last_name}`}
+                className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                onError={(e) => {
+                  // Fallback to initials if image fails to load
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+              <div
+                className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold border-2 border-gray-200"
+                style={{ display: 'none' }}
+              >
+                {user.first_name?.[0] || user.email?.[0]?.toUpperCase() || '?'}{user.last_name?.[0] || ''}
+              </div>
+            </>
+          ) : (
+            <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold border-2 border-gray-200">
+              {user.first_name?.[0] || user.email?.[0]?.toUpperCase() || '?'}{user.last_name?.[0] || ''}
+            </div>
+          )}
           <div>
             <h3 className="text-2xl font-bold text-gray-900">
-              {user.first_name} {user.last_name}
+              {user.first_name && user.last_name
+                ? `${user.first_name} ${user.last_name}`
+                : user.email || 'Unnamed User'}
             </h3>
             <p className="text-gray-600">{user.email}</p>
+            {user.oauth_provider && (
+              <p className="text-sm text-gray-500 mt-1">
+                🔗 Connected via {user.oauth_provider.charAt(0).toUpperCase() + user.oauth_provider.slice(1)}
+              </p>
+            )}
           </div>
         </div>
 
@@ -83,8 +119,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
               Account Status
             </label>
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-              user.status === 'active' 
-                ? 'bg-green-100 text-green-800' 
+              user.status === 'active'
+                ? 'bg-green-100 text-green-800'
                 : 'bg-red-100 text-red-800'
             }`}>
               {user.status}
@@ -174,4 +210,3 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
     </div>
   );
 };
-
