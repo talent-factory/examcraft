@@ -3,7 +3,7 @@
  * Display user profile information
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ProfileViewProps {
@@ -12,6 +12,7 @@ interface ProfileViewProps {
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
   const { user } = useAuth();
+  const [avatarError, setAvatarError] = useState(false);
 
   if (!user) {
     return (
@@ -23,7 +24,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
 
   // Get proxied avatar URL to avoid Google rate limiting (429 errors)
   const getAvatarUrl = (userId: number): string => {
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+    const API_BASE_URL = process.env.REACT_APP_API_URL;
+
+    if (!API_BASE_URL) {
+      console.error('REACT_APP_API_URL is not configured. Avatar proxy will not work.');
+      return ''; // Return empty string to trigger onError fallback
+    }
+
     return `${API_BASE_URL}/api/auth/avatar/${userId}`;
   };
 
@@ -34,6 +41,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
         <h2 className="text-xl font-semibold text-gray-800">Profile Information</h2>
         {onEdit && (
           <button
+            type="button"
             onClick={onEdit}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -47,26 +55,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
         {/* Avatar Section */}
         <div className="flex items-center space-x-4">
           {/* Avatar with fallback to initials */}
-          {user.id ? (
-            <>
-              <img
-                src={getAvatarUrl(user.id)}
-                alt={`${user.first_name} ${user.last_name}`}
-                className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
-                onError={(e) => {
-                  // Fallback to initials if image fails to load
-                  e.currentTarget.style.display = 'none';
-                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                  if (fallback) fallback.style.display = 'flex';
-                }}
-              />
-              <div
-                className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold border-2 border-gray-200"
-                style={{ display: 'none' }}
-              >
-                {user.first_name?.[0] || user.email?.[0]?.toUpperCase() || '?'}{user.last_name?.[0] || ''}
-              </div>
-            </>
+          {user.id && !avatarError ? (
+            <img
+              src={getAvatarUrl(user.id)}
+              alt={`${user.first_name} ${user.last_name}`}
+              className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+              onError={() => setAvatarError(true)}
+            />
           ) : (
             <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold border-2 border-gray-200">
               {user.first_name?.[0] || user.email?.[0]?.toUpperCase() || '?'}{user.last_name?.[0] || ''}

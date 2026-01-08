@@ -12,6 +12,7 @@ export const NavigationBar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -20,7 +21,13 @@ export const NavigationBar: React.FC = () => {
 
   // Get proxied avatar URL to avoid Google rate limiting (429 errors)
   const getAvatarUrl = (userId: number): string => {
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+    const API_BASE_URL = process.env.REACT_APP_API_URL;
+
+    if (!API_BASE_URL) {
+      console.error('REACT_APP_API_URL is not configured. Avatar proxy will not work.');
+      return ''; // Return empty string to trigger onError fallback
+    }
+
     return `${API_BASE_URL}/api/auth/avatar/${userId}`;
   };
 
@@ -48,25 +55,18 @@ export const NavigationBar: React.FC = () => {
                 aria-label="User menu"
               >
                 {/* Avatar Image or Initials */}
-                {user?.id ? (
+                {user?.id && !avatarError ? (
                   <img
                     src={getAvatarUrl(user.id)}
                     alt={`${user.first_name} ${user.last_name}`}
                     className="w-8 h-8 rounded-full object-cover"
-                    onError={(e) => {
-                      // Fallback to initials if image fails to load
-                      e.currentTarget.style.display = 'none';
-                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                      if (fallback) fallback.style.display = 'flex';
-                    }}
+                    onError={() => setAvatarError(true)}
                   />
-                ) : null}
-                <div
-                  className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-medium"
-                  style={{ display: user?.id ? 'none' : 'flex' }}
-                >
-                  {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || '?'}{user?.last_name?.[0] || ''}
-                </div>
+                ) : (
+                  <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-medium">
+                    {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || '?'}{user?.last_name?.[0] || ''}
+                  </div>
+                )}
                 <span className="text-gray-700 font-medium">
                   {user?.first_name && user?.last_name
                     ? `${user.first_name} ${user.last_name}`
