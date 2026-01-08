@@ -23,6 +23,8 @@ import { Exams } from './pages/Exams';
 import { Review } from './pages/Review';
 import { Admin } from './pages/Admin';
 import { BillingPage } from './pages/BillingPage';
+import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
+import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { UserRole } from './types/auth';
 import App from './App';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
@@ -222,6 +224,8 @@ export const AppWithAuth: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route path="/billing/success" element={<PaymentSuccessPage />} />
+              <Route path="/billing/cancel" element={<PaymentCancelPage />} />
 
               {/* Redirect root to dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
