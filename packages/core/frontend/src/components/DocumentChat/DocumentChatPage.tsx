@@ -11,6 +11,7 @@ import { Box, Typography, Alert, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { InfoOutlined } from '@mui/icons-material';
 
+
 /**
  * Upgrade Prompt Component
  * Shown when user doesn't have access to Document Chat feature

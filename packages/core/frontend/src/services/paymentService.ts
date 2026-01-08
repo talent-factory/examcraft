@@ -9,11 +9,22 @@ export interface CheckoutSession {
 
 export const paymentService = {
     createCheckoutSession: async (priceId: string): Promise<CheckoutSession> => {
-        const response = await axios.post(`${API_URL}/api/v1/billing/create-checkout-session`, {
-            price_id: priceId,
-            success_url: `${window.location.origin}/billing/success`,
-            cancel_url: `${window.location.origin}/billing`,
-        });
+        // Get the current auth token
+        const token = localStorage.getItem('token');
+
+        const response = await axios.post<CheckoutSession>(
+            `${API_URL}/api/v1/billing/create-checkout-session`,
+            {
+                price_id: priceId,
+                success_url: `${window.location.origin}/billing/success`,
+                cancel_url: `${window.location.origin}/billing/cancel`,
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
         return response.data;
     },
 };
