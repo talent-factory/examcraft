@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from services.payment_service import PaymentService
 
-router = APIRouter(prefix="/billing", tags=["Billing"])
+router = APIRouter()
 
 class CheckoutRequest(BaseModel):
     price_id: str
