@@ -25,29 +25,49 @@ import { promptsApi, Prompt } from '../../api/promptsApi';
 interface PromptLibraryProps {
   onEditPrompt?: (promptId: string) => void;
   onCreateNew?: () => void;
+  onShowVersions?: (promptName: string) => void;
 }
 
 export const PromptLibrary: React.FC<PromptLibraryProps> = ({
   onEditPrompt,
-  onCreateNew
+  onCreateNew,
+  onShowVersions
 }) => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all'); // all, active, inactive
 
   useEffect(() => {
     loadPrompts();
-  }, [categoryFilter]);
+  }, [categoryFilter, statusFilter]);
 
   const loadPrompts = async () => {
     try {
       setLoading(true);
       setError(null);
-      const filters = categoryFilter !== 'all' ? { category: categoryFilter, is_active: true } : { is_active: true };
+
+      // Build filters
+      const filters: any = {};
+      if (categoryFilter !== 'all') {
+        filters.category = categoryFilter;
+      }
+      // Don't filter by is_active - we want to see all prompts
+      // Filter will be applied in UI
+
       const data = await promptsApi.listPrompts(filters);
-      setPrompts(data);
+
+      // Apply status filter in frontend
+      let filteredData = data;
+      if (statusFilter === 'active') {
+        filteredData = data.filter(p => p.is_active);
+      } else if (statusFilter === 'inactive') {
+        filteredData = data.filter(p => !p.is_active);
+      }
+
+      setPrompts(filteredData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Laden der Prompts');
     } finally {
@@ -65,6 +85,20 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
       await loadPrompts();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Löschen');
+    }
+  };
+
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    const action = currentStatus ? 'deaktivieren' : 'aktivieren';
+    if (!window.confirm(`Möchten Sie diesen Prompt wirklich ${action}?`)) {
+      return;
+    }
+
+    try {
+      await promptsApi.toggleActive(id, !currentStatus);
+      await loadPrompts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Fehler beim ${action}`);
     }
   };
 
@@ -119,7 +153,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
       {/* Search and Filter */}
       <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
         <Grid container spacing={2}>
-          <Grid item xs={12} md={8}>
+          <Grid item xs={12} md={6}>
             <TextField
               fullWidth
               placeholder="Prompts durchsuchen..."
@@ -130,7 +164,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
               }}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <FormControl fullWidth>
               <InputLabel>Kategorie</InputLabel>
               <Select
@@ -143,6 +177,20 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                 <MenuItem value="user_prompt">User Prompts</MenuItem>
                 <MenuItem value="few_shot_example">Few-Shot Examples</MenuItem>
                 <MenuItem value="template">Templates</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <FormControl fullWidth>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={statusFilter}
+                label="Status"
+                onChange={(e: SelectChangeEvent) => setStatusFilter(e.target.value)}
+              >
+                <MenuItem value="all">Alle</MenuItem>
+                <MenuItem value="active">Aktiv</MenuItem>
+                <MenuItem value="inactive">Inaktiv (Review)</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -231,6 +279,14 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                             variant="outlined"
                           />
                         )}
+                        {!prompt.is_active && (
+                          <Chip
+                            label="Inaktiv (Review)"
+                            size="small"
+                            color="warning"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        )}
                       </Box>
 
                       {/* Tags */}
@@ -263,18 +319,27 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                     </CardContent>
 
                     <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-                      <Button
-                        size="small"
-                        startIcon={<Edit />}
-                        onClick={() => onEditPrompt?.(prompt.id)}
-                      >
-                        Bearbeiten
-                      </Button>
+                      <Box>
+                        <Button
+                          size="small"
+                          startIcon={<Edit />}
+                          onClick={() => onEditPrompt?.(prompt.id)}
+                        >
+                          Bearbeiten
+                        </Button>
+                        <Button
+                          size="small"
+                          color={prompt.is_active ? 'warning' : 'success'}
+                          onClick={() => handleToggleActive(prompt.id, prompt.is_active)}
+                        >
+                          {prompt.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                        </Button>
+                      </Box>
                       <Box>
                         <Button
                           size="small"
                           startIcon={<History />}
-                          onClick={() => console.log('Show versions', prompt.id)}
+                          onClick={() => onShowVersions?.(prompt.name)}
                         >
                           Versionen
                         </Button>
@@ -298,4 +363,3 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
     </Container>
   );
 };
-

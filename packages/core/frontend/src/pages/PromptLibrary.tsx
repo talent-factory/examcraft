@@ -1,12 +1,24 @@
 /**
  * Prompt Library Page
  * Prompt management and library for admins and teachers
+ *
+ * Premium Version (Full Deployment): Shows PromptLibraryWithUpload (with tabs + file upload)
+ * Core Version: Shows basic PromptManagement
  */
 
 import React from 'react';
 import { PromptManagement } from '../components/admin/PromptManagement';
+import { loadPromptLibraryWithUpload } from '../utils/componentLoader';
+import { isFullDeployment } from '../utils/deploymentMode';
 
 export const PromptLibrary: React.FC = () => {
+  // Try to load Premium version with upload functionality
+  if (isFullDeployment()) {
+    const PremiumPromptLibrary = loadPromptLibraryWithUpload();
+    return <PremiumPromptLibrary />;
+  }
+
+  // Fallback: Core version without upload
   return (
     <div className="space-y-6">
       {/* Header */}

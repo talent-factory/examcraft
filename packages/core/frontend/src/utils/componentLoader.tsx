@@ -124,6 +124,15 @@ export const loadPromptTemplateSelector = () =>
   );
 
 /**
+ * Load Prompt Library with Upload (Premium Feature)
+ */
+export const loadPromptLibraryWithUpload = () =>
+  loadComponent(
+    'premium/components/prompts/PromptLibraryWithUpload',
+    'Prompt Library with Upload'
+  );
+
+/**
  * Load Custom Branding (Enterprise Feature)
  */
 export const loadCustomBranding = () =>
