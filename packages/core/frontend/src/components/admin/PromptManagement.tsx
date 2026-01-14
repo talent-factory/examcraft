@@ -68,6 +68,7 @@ export const PromptManagement: React.FC = () => {
           <PromptLibrary
             onEditPrompt={handleEditPrompt}
             onCreateNew={handleCreateNew}
+            onShowVersions={handleShowVersions}
           />
         </Box>
       )}
@@ -111,4 +112,3 @@ export const PromptManagement: React.FC = () => {
     </Box>
   );
 };
-

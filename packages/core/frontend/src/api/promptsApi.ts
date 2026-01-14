@@ -150,7 +150,7 @@ class PromptsApiService {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    const response = await this.api.patch(`/api/v1/prompts/${id}`, { is_active: isActive });
+    const response = await this.api.patch(`/api/v1/prompts/${id}/active`, { is_active: isActive });
     return response.data;
   }
 }

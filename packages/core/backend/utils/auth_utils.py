@@ -178,28 +178,8 @@ def require_permission(required_permission: str):
     async def permission_checker(
         current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
     ) -> User:
-        # DEBUG: Log permission check details
-        import json
-
-        print("\n=== PERMISSION CHECK DEBUG ===")
-        print(f"User: {current_user.email} (ID: {current_user.id})")
-        print(f"Required permission: {required_permission}")
-        print(f"is_superuser: {current_user.is_superuser}")
-        print(f"Number of roles: {len(current_user.roles)}")
-        for role in current_user.roles:
-            print(f"  Role: {role.name}")
-            print(f"    Permissions type: {type(role.permissions)}")
-            print(f"    Permissions value: {repr(role.permissions)[:100]}")
-            if isinstance(role.permissions, str):
-                try:
-                    perms = json.loads(role.permissions)
-                    print(f"    Parsed permissions: {perms}")
-                except Exception as e:
-                    print(f"    ERROR parsing: {e}")
-
+        # Check permission
         has_perm = current_user.has_permission(required_permission)
-        print(f"has_permission result: {has_perm}")
-        print("=== END DEBUG ===\n")
 
         if not has_perm:
             # Audit log: Permission denied
