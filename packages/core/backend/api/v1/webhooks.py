@@ -46,46 +46,69 @@ async def handle_checkout_session_completed(session: dict, db: Session):
     Handle successful checkout
     Create/Update subscription and link to Institution
     """
-    # client_reference_id should contain Institution ID
-    institution_id = session.get("client_reference_id")
+    # Get institution_id from metadata (set during checkout session creation)
+    metadata = session.get("metadata", {})
+    institution_id = metadata.get("institution_id")
+
     if not institution_id:
-        print("Error: No client_reference_id in session")
+        print("Error: No institution_id in session metadata")
         return
 
     # functionality depends on subscription_mode (payment vs subscription)
     if session.get("mode") == "subscription":
         subscription_id = session.get("subscription")
         customer_id = session.get("customer")
-        
-        # Determine plan based on metadata or price
-        # In this simple version, we trust the checkout session resulted in a subscription
-        
+
         # Update Institution
-        institution = db.query(Institution).filter(Institution.id == institution_id).first()
-        if institution:
+        institution = db.query(Institution).filter(Institution.id == int(institution_id)).first()
+        if not institution:
+            print(f"Error: Institution {institution_id} not found")
+            return
+
+        # Fetch actual subscription details from Stripe
+        stripe_sub = stripe.Subscription.retrieve(subscription_id)
+        price_id = stripe_sub["items"]["data"][0]["price"]["id"]
+
+        # Check if subscription already exists
+        existing_sub = db.query(Subscription).filter(
+            Subscription.stripe_subscription_id == subscription_id
+        ).first()
+
+        if existing_sub:
+            # Update existing subscription
+            existing_sub.status = SubscriptionStatus(stripe_sub["status"])
+            existing_sub.stripe_price_id = price_id
+            existing_sub.current_period_start = datetime.fromtimestamp(stripe_sub["current_period_start"])
+            existing_sub.current_period_end = datetime.fromtimestamp(stripe_sub["current_period_end"])
+            print(f"Updated existing subscription {subscription_id}")
+        else:
             # Create local Subscription record
             new_sub = Subscription(
                 institution_id=institution.id,
                 stripe_subscription_id=subscription_id,
                 stripe_customer_id=customer_id,
-                stripe_price_id=session.get("amount_total"), # Warning: This is amount, not price ID. Need to fetch sub details or line items.
-                status=SubscriptionStatus.ACTIVE
+                stripe_price_id=price_id,
+                status=SubscriptionStatus(stripe_sub["status"]),
+                current_period_start=datetime.fromtimestamp(stripe_sub["current_period_start"]),
+                current_period_end=datetime.fromtimestamp(stripe_sub["current_period_end"])
             )
-            # Fetch actual subscription details to get dates
-            stripe_sub = stripe.Subscription.retrieve(subscription_id)
-            new_sub.stripe_price_id = stripe_sub["items"]["data"][0]["price"]["id"]
-            new_sub.status = SubscriptionStatus(stripe_sub["status"])
-            new_sub.current_period_end = datetime.fromtimestamp(stripe_sub["current_period_end"])
-            
             db.add(new_sub)
-            
-            # Upgrade Institution Tier
-            # Logic to map Price ID to Tier needed. For now assuming "starter" if purchase happened.
-            # Ideally metadata contains tier info.
-            # Or use settings map.
-            institution.subscription_tier = "starter" # Placeholder logic
-            
-            db.commit()
+            print(f"Created new subscription {subscription_id}")
+
+        # Map Price ID to Subscription Tier
+        # TODO: Make this configurable via environment variables or database
+        tier_mapping = {
+            # Add your actual Stripe Price IDs here after creating products
+            # "price_1abc...": "starter",
+            # "price_1xyz...": "professional",
+        }
+
+        # For now, default to starter if we can't map the price
+        new_tier = tier_mapping.get(price_id, "starter")
+        institution.subscription_tier = new_tier
+        print(f"Updated institution {institution_id} to tier: {new_tier}")
+
+        db.commit()
 
 
 async def handle_subscription_updated(subscription: dict, db: Session):
