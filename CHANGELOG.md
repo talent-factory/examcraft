@@ -302,8 +302,8 @@ features
 
 #### RAG System
 
-- ChromaDB vector storage (later migrated to Qdrant)
-- Semantic search
+- Qdrant vector storage
+- Semantic search with OpenAI embeddings
 - Context retrieval for question generation
 
 #### Question Generation

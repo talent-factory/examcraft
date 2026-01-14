@@ -305,8 +305,8 @@ docker compose -f docker-compose.full.yml up -d
    - Structured Content Chunking
 
 3. **RAG System** (`utils/rag.py`)
-   - ChromaDB Vector Storage
-   - Semantic Search mit sentence-transformers
+   - Qdrant Vector Storage
+   - Semantic Search mit OpenAI Embeddings
    - Context Retrieval für Question Generation
 
 4. **Frontend UI** (`frontend/`)

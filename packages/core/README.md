@@ -86,7 +86,7 @@ Benötigen Sie mehr Features? Schauen Sie sich unsere Premium- und Enterprise-Ed
 
 ### 🌟 Premium Features (€19-49/Monat)
 
-- **RAG Generation**: Semantische Suche mit ChromaDB
+- **RAG Generation**: Semantische Suche mit Qdrant (Premium)
 - **Document ChatBot**: NotebookLM-Style Chatbot
 - **Prompt Management**: Erweiterte Prompt-Verwaltung
 - **Analytics Dashboard**: Nutzungsstatistiken
@@ -172,4 +172,3 @@ Entwickelt von [Talent Factory](https://talent-factory.ch) mit ❤️
 ---
 
 **⭐ Wenn Ihnen ExamCraft AI gefällt, geben Sie uns einen Star auf GitHub!**
-

@@ -1,1 +1,0 @@
-../../../../../../premium/frontend/src/components/DocumentChat/DocumentChatPage.tsx

@@ -15,7 +15,7 @@ class VectorServicePlaceholder:
     Placeholder Vector Service for Core Package
 
     Raises NotImplementedError for all vector operations.
-    Premium package provides full ChromaDB/Qdrant integration.
+    Premium package provides full Qdrant integration.
     """
 
     def __init__(self):

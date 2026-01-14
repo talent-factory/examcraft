@@ -65,5 +65,5 @@ pypdf==3.17.1                       # PDF Processing Fallback
 # qdrant-client==1.7.3              # Qdrant Vector Database Client (Premium)
 # openai==1.59.5                    # OpenAI API for Embeddings (Premium)
 # sentence-transformers==2.7.0      # Sentence Embeddings (Premium)
-# chromadb==0.4.15                  # ChromaDB (Premium)
+
 numpy==1.26.4                       # Numerische Operations (für Embeddings, Docling compatible)

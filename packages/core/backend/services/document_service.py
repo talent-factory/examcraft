@@ -445,7 +445,7 @@ class DocumentService:
             return None
 
         try:
-            # Hole Chunks aus Vector Store (Qdrant/ChromaDB)
+            # Hole Chunks aus Vector Store (Qdrant)
             vector_service = get_vector_service()
 
             # Check if vector service has get_document_chunks method

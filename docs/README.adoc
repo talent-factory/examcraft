@@ -39,7 +39,7 @@ ExamCraft AI transforms the way educators create exam questions by using artific
 
 [cols="1,2"]
 |===
-|**Technology Stack** | React + TypeScript + FastAPI + PostgreSQL + ChromaDB
+|**Technology Stack** | React + TypeScript + FastAPI + PostgreSQL + Qdrant
 |**AI Integration** | Claude API for question generation
 |**Deployment** | Docker Compose for development, scalable for production
 |**Documentation** | AsciiDoc with PlantUML diagrams
