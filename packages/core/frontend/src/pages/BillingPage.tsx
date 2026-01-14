@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { paymentService } from '../services/paymentService';
-
-// This would strictly come from specific environment configuration or API in real app
-// For foundation, we use a placeholder that matches the plan
-const STARTER_PRICE_ID = 'price_placeholder_starter';
+import { STRIPE_PRICES, getStripeConfigStatus } from '../config/stripe.config';
 
 export const BillingPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const stripeConfigStatus = getStripeConfigStatus();
 
     const handleSubscribe = async (priceId: string) => {
         setLoading(true);
@@ -18,7 +16,8 @@ export const BillingPage: React.FC = () => {
             window.location.href = session.url;
         } catch (err: any) {
             console.error('Subscription error:', err);
-            setError('Failed to start subscription process. Please try again.');
+            const errorMessage = err.response?.data?.detail || 'Failed to start subscription process. Please try again.';
+            setError(errorMessage);
             setLoading(false);
         }
     };
@@ -33,6 +32,13 @@ export const BillingPage: React.FC = () => {
                     Choose the plan that fits your needs.
                 </p>
             </div>
+
+            {!stripeConfigStatus.configured && (
+                <div className="mt-8 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative" role="alert">
+                    <strong className="font-bold">Configuration Required: </strong>
+                    <span className="block sm:inline">{stripeConfigStatus.message}</span>
+                </div>
+            )}
 
             {error && (
                 <div className="mt-8 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
@@ -76,9 +82,9 @@ export const BillingPage: React.FC = () => {
                             For serious exam creators.
                         </p>
                         <button
-                            onClick={() => handleSubscribe(STARTER_PRICE_ID)}
-                            disabled={loading}
-                            className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700"
+                            onClick={() => handleSubscribe(STRIPE_PRICES.starter)}
+                            disabled={loading || !stripeConfigStatus.configured}
+                            className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
                             {loading ? 'Processing...' : 'Subscribe'}
                         </button>
@@ -94,13 +100,14 @@ export const BillingPage: React.FC = () => {
                             <span className="text-base font-medium text-gray-500">/mo</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
-                            Unlimited power.
+                            Unlimited power for professional exam creation.
                         </p>
                         <button
-                            disabled
-                            className="mt-8 block w-full bg-gray-50 border border-gray-200 rounded-md py-2 text-sm font-semibold text-gray-400 text-center"
+                            onClick={() => handleSubscribe(STRIPE_PRICES.professional)}
+                            disabled={loading || !stripeConfigStatus.configured}
+                            className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
-                            Contact Sales
+                            {loading ? 'Processing...' : 'Subscribe'}
                         </button>
                     </div>
                 </div>

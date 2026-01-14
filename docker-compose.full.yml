@@ -156,6 +156,9 @@ services:
       SUBSCRIBEFLOW_API_KEY: ${SUBSCRIBEFLOW_API_KEY:-}
       SUBSCRIBEFLOW_BASE_URL: ${SUBSCRIBEFLOW_BASE_URL:-https://api.subscribeflow.net}
 
+      # Stripe Payment Integration
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       # Environment
       ENVIRONMENT: development
 
@@ -260,6 +263,9 @@ services:
       SUBSCRIBEFLOW_API_KEY: ${SUBSCRIBEFLOW_API_KEY:-}
       SUBSCRIBEFLOW_BASE_URL: ${SUBSCRIBEFLOW_BASE_URL:-https://api.subscribeflow.net}
 
+      # Stripe Payment Integration
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       # Environment
       ENVIRONMENT: development
 
