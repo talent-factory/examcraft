@@ -18,6 +18,16 @@ module.exports = {
       },
     },
   },
+  webpack: {
+    configure: (webpackConfig) => {
+      // Exclude test files and setup files from production build
+      webpackConfig.module.rules.push({
+        test: /\.(test|spec)\.(ts|tsx|js|jsx)$|setupTests\.(ts|tsx|js|jsx)$/,
+        loader: 'ignore-loader',
+      });
+      return webpackConfig;
+    },
+  },
   jest: {
     configure: {
       transformIgnorePatterns: [

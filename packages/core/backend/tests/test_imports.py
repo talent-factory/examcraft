@@ -143,8 +143,8 @@ class TestNumpyAvailability:
         from services.vector_service import VectorService
         import numpy as np
 
-        # Erstelle Service-Instanz
-        VectorService(persist_directory="./test_chroma", collection_name="test")
+        # Erstelle Service-Instanz (Placeholder in Core)
+        VectorService()
 
         # Prüfe, dass numpy verfügbar ist
         assert np is not None
@@ -164,14 +164,14 @@ class TestOptionalDependencies:
             # Wenn nicht verfügbar, ist das OK
             pass
 
-    def test_chromadb_optional(self):
-        """ChromaDB ist optional"""
+    def test_qdrant_client_optional(self):
+        """Qdrant Client ist optional (nur in Premium)"""
         try:
-            import chromadb
+            from qdrant_client import QdrantClient
 
-            assert chromadb is not None
+            assert QdrantClient is not None
         except ImportError:
-            # Wenn nicht verfügbar, ist das OK
+            # Wenn nicht verfügbar, ist das OK (Core Package)
             pass
 
 

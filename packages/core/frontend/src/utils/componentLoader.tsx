@@ -125,12 +125,18 @@ export const loadPromptTemplateSelector = () =>
 
 /**
  * Load Prompt Library with Upload (Premium Feature)
+ * Falls back to Core PromptLibrary if Premium not available
  */
-export const loadPromptLibraryWithUpload = () =>
-  loadComponent(
+export const loadPromptLibraryWithUpload = () => {
+  // Import Core PromptLibrary as fallback
+  const CorePromptLibrary = require('../pages/PromptLibrary').PromptLibrary;
+
+  return loadComponent(
     'premium/components/prompts/PromptLibraryWithUpload',
-    'Prompt Library with Upload'
+    'Prompt Library with Upload',
+    CorePromptLibrary
   );
+};
 
 /**
  * Load Custom Branding (Enterprise Feature)

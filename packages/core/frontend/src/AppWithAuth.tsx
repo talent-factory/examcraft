@@ -22,10 +22,13 @@ import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
 import { Review } from './pages/Review';
 import { Admin } from './pages/Admin';
-import { PromptLibrary } from './pages/PromptLibrary';
 import { UserRole } from './types/auth';
 import App from './App';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
+import { loadPromptLibraryWithUpload } from './utils/componentLoader';
+
+// Load Premium PromptLibrary with Upload (falls back to Core version)
+const PromptLibrary = loadPromptLibraryWithUpload();
 
 // Create a QueryClient instance for TanStack Query
 const queryClient = new QueryClient({
