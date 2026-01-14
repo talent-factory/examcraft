@@ -73,3 +73,6 @@ frontend/.playwright/
 # MCP configuration with API keys
 .mcp.json
 backend/mock_vector_db/mock_vectors.json
+
+# Git worktrees
+.worktrees/
