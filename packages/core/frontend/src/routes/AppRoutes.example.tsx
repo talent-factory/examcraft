@@ -1,7 +1,7 @@
 /**
  * App Routes Configuration Example
  * Example of how to use route guards with React Router
- * 
+ *
  * USAGE:
  * 1. Rename this file to AppRoutes.tsx
  * 2. Import in App.tsx: import { AppRoutes } from './routes/AppRoutes';
@@ -14,7 +14,7 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { ProtectedRoute, RoleGuard, PermissionGuard, GuestRoute, UnauthorizedPage } from '../components/guards';
 import { AppLayout } from '../components/layout';
 import { AuthPage, OAuthCallback } from '../components/auth';
-import { UserRole, OAuthProvider } from '../types/auth';
+import { UserRole } from '../types/auth';
 
 // Placeholder components - replace with actual components
 const DashboardPage = () => <div className="p-6"><h1 className="text-2xl font-bold">Dashboard</h1></div>;
@@ -200,4 +200,3 @@ export const AppRoutes: React.FC = () => {
     </AuthProvider>
   );
 };
-

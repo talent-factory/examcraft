@@ -7,12 +7,10 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import {
   AuthState,
   AuthContextType,
-  User,
   UserRole,
   RegisterRequest,
   UpdateProfileRequest,
   ChangePasswordRequest,
-  SetPasswordRequest
 } from '../types/auth';
 import AuthService from '../services/AuthService';
 import { SubscriptionTier, hasFeature as tierHasFeature, isFeatureName } from '../config/features';

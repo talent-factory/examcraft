@@ -9,7 +9,6 @@ import {
   Layers as CoreIcon,
   Star as PremiumIcon,
   Business as EnterpriseIcon,
-  Info as InfoIcon
 } from '@mui/icons-material';
 
 interface PackageTierInfo {

@@ -16,7 +16,7 @@ import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { UserManagementPage } from './components/admin/UserManagementPage';
 import RoleManagementPage from './components/admin/RoleManagementPage';
-import { DocumentChatPage } from './components/DocumentChat/DocumentChatPage';
+import { DocumentChatPage } from './premium/components/DocumentChat/DocumentChatPage';
 import { Dashboard } from './pages/Dashboard';
 import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
