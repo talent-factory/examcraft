@@ -31,6 +31,8 @@ class ClaudeService:
         # Retry configuration
         self.max_retries = int(os.getenv("CLAUDE_MAX_RETRIES", "3"))
         self.retry_delay = float(os.getenv("CLAUDE_RETRY_DELAY", "1.0"))
+        # Timeout for API requests (default 120s for large prompts with context)
+        self.request_timeout = float(os.getenv("CLAUDE_REQUEST_TIMEOUT", "120.0"))
 
         # Cost tracking
         self.cost_per_input_token = 0.003 / 1000  # $3 per million input tokens
@@ -59,7 +61,7 @@ class ClaudeService:
                 else "INVALID_KEY"
             )
             logger.info(
-                f"Claude API initialized with model: {self.model}, API key: {key_preview}"
+                f"Claude API initialized: model={self.model}, timeout={self.request_timeout}s, key={key_preview}"
             )
 
     def _check_rate_limit(self) -> bool:
@@ -107,7 +109,7 @@ class ClaudeService:
 
                 self._add_request_timestamp()
 
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                async with httpx.AsyncClient(timeout=self.request_timeout) as client:
                     response = await client.post(
                         self.base_url,
                         headers={
