@@ -9,7 +9,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
-from services.rag_service import rag_service, RAGExamRequest
+
+# IMPORTANT: Import module reference instead of direct import to allow
+# runtime replacement of rag_service singleton by Premium package in main.py
+import services.rag_service as rag_service_module
+from services.rag_service import RAGExamRequest
 from services.document_service import document_service
 from models.auth import User
 from utils.auth_utils import get_current_active_user, require_permission
@@ -174,6 +178,11 @@ async def generate_rag_exam(
                 prompt_config_dict[question_type] = RAGPromptConfig(
                     prompt_id=config.prompt_id, variables=config.variables
                 )
+                logger.info(
+                    f"📋 API received prompt_config for '{question_type}': prompt_id={config.prompt_id}, variables={list(config.variables.keys()) if config.variables else []}"
+                )
+        else:
+            logger.info("📋 API received NO prompt_config - will use default templates")
 
         # Erstelle RAG Request
         rag_request = RAGExamRequest(
@@ -188,7 +197,9 @@ async def generate_rag_exam(
         )
 
         # Generiere RAG Exam
-        rag_response = await rag_service.generate_rag_exam(rag_request)
+        rag_response = await rag_service_module.rag_service.generate_rag_exam(
+            rag_request
+        )
 
         # Konvertiere zu Response Model
         questions_response = []
@@ -265,7 +276,7 @@ async def retrieve_context(
 
         # Hole Kontext (mit angepasstem min_similarity für Mock Embeddings)
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
-        context = await rag_service.retrieve_context(
+        context = await rag_service_module.rag_service.retrieve_context(
             query=request.query,
             document_ids=request.document_ids,
             max_chunks=request.max_chunks,
@@ -432,7 +443,7 @@ async def rag_service_health():
         # Teste Claude Service (vereinfacht)
         claude_available = True
         try:
-            claude_service = rag_service.claude_service
+            claude_service = rag_service_module.rag_service.claude_service
             # Einfacher Test ob Service initialisiert ist
             claude_available = claude_service is not None
         except Exception:
@@ -453,7 +464,9 @@ async def rag_service_health():
                 },
                 "rag_templates": {
                     "status": "loaded",
-                    "template_count": len(rag_service.question_templates),
+                    "template_count": len(
+                        rag_service_module.rag_service.question_templates
+                    ),
                 },
             },
             "supported_features": [
