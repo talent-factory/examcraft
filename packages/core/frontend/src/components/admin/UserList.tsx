@@ -21,18 +21,18 @@ export const UserList: React.FC<UserListProps> = ({
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Pagination state
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  
+
   // Filter state
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  
+
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -46,6 +46,7 @@ export const UserList: React.FC<UserListProps> = ({
 
   useEffect(() => {
     loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedSearch, roleFilter, statusFilter]);
 
   const loadUsers = async () => {
@@ -63,7 +64,7 @@ export const UserList: React.FC<UserListProps> = ({
       if (statusFilter) params.status = statusFilter;
 
       const response = await AdminService.listUsers(params);
-      
+
       setUsers(response.users);
       setTotal(response.total);
       setTotalPages(response.total_pages);
@@ -76,10 +77,10 @@ export const UserList: React.FC<UserListProps> = ({
 
   const handleStatusToggle = async (userId: number, currentStatus: string) => {
     try {
-      const newStatus = currentStatus === UserStatus.ACTIVE 
-        ? UserStatus.INACTIVE 
+      const newStatus = currentStatus === UserStatus.ACTIVE
+        ? UserStatus.INACTIVE
         : UserStatus.ACTIVE;
-      
+
       await AdminService.updateUserStatus(userId, newStatus);
       await loadUsers();
       if (onRefresh) onRefresh();
@@ -143,10 +144,11 @@ export const UserList: React.FC<UserListProps> = ({
 
           {/* Role Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="role-filter" className="block text-sm font-medium text-gray-700 mb-1">
               Role
             </label>
             <select
+              id="role-filter"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -161,10 +163,11 @@ export const UserList: React.FC<UserListProps> = ({
 
           {/* Status Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
               Status
             </label>
             <select
+              id="status-filter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -334,4 +337,3 @@ export const UserList: React.FC<UserListProps> = ({
     </div>
   );
 };
-

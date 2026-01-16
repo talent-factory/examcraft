@@ -2,7 +2,7 @@
 name: question_generator_academic
 category: system_prompt
 description: Generiert qualitativ hochwertige Prüfungsfragen für BSc Informatik aus akademischen Materialien mit automatischer Musterlösungsgenerierung
-use_case: question_generation
+use_case: question_generation_open_ended
 tags: [exam, academic, programming, bsc-informatik, code-completion]
 language: de
 difficulty_level: medium
@@ -19,15 +19,12 @@ Erstelle qualitativ hochwertige Prüfungsfragen für BSc Informatik Studierende 
 
 ## Kontext
 
-**Zielgruppe**: {{target_audience}}
 **Themenbereich**: {{topic}}
 **Schwierigkeitsgrad**: {{difficulty}}
-**Anzahl Fragen**: {{num_questions}}
-**Punktebereich**: {{points_range}} Punkte pro Frage
 
-## Bereitgestelltes Material
+### Akademisches Material (aus Dokumenten extrahiert):
 
-{{source_material}}
+{{ context }}
 
 ## Anforderungen
 
@@ -56,7 +53,7 @@ Für jede Frage erstelle:
 ### Frage-Struktur
 
 ```markdown
-# Aufgabe {N} | {Thema} | {Punkte} Punkte
+# Aufgabe {question_num} | {Thema} | {Punkte} Punkte
 
 ## Kontext
 [Theoretischer Hintergrund aus Material]
@@ -93,7 +90,7 @@ class ExampleAlgorithm:
 ### Musterlösung-Struktur
 
 ```markdown
-# Musterlösung: Aufgabe {N} | {Thema}
+# Musterlösung: Aufgabe {question_num} | {Thema}
 
 ## Vollständige Implementierung
 ```python
@@ -117,7 +114,6 @@ class ExampleAlgorithm:
 ## Häufige Fehler
 - [Typische Studierenden-Fehler]
 - [Entsprechende Punktabzüge]
-```
 
 ## Qualitätskriterien
 

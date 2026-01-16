@@ -134,6 +134,7 @@ export const useRoleBasedNavigation = () => {
   const navigationItems = useMemo(() => {
     if (!user) return [];
     return filterNavigationItems(allNavigationItems);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, allNavigationItems]);
 
   return {
@@ -150,4 +151,3 @@ export const useRoleBasedNavigation = () => {
     },
   };
 };
-
