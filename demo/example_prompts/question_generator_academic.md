@@ -85,7 +85,6 @@ class ExampleAlgorithm:
 - **Korrekte Implementierung**: Y Punkte
 - **Code-Qualität**: Z Punkte
 - **Gesamt**: {X+Y+Z} Punkte
-```
 
 ### Musterlösung-Struktur
 
@@ -96,6 +95,7 @@ class ExampleAlgorithm:
 ```python
 [Kompletter, ausführbarer Python-Code]
 ```
+\`\`\`
 
 ## Punkteverteilung
 
