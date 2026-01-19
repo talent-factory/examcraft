@@ -57,7 +57,6 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
   onComment,
   loading = false,
 }) => {
-  const [expanded, setExpanded] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<ReviewComment[]>([]);
@@ -117,21 +116,21 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
   };
 
   const formatQuestionType = (type: string): string => {
-    return type.split('_').map(word => 
+    return type.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
 
   return (
-    <Card 
-      sx={{ 
-        mb: 2, 
+    <Card
+      sx={{
+        mb: 2,
         border: question.review_status === ReviewStatus.PENDING ? '2px solid #1976d2' : undefined,
         opacity: loading ? 0.6 : 1,
       }}
     >
       {loading && <LinearProgress />}
-      
+
       <CardContent>
         {/* Header with Status and Metadata */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
@@ -143,8 +142,8 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               {question.question_text}
             </Typography>
           </Box>
-          <Chip 
-            label={question.review_status.toUpperCase()} 
+          <Chip
+            label={question.review_status.toUpperCase()}
             color={getStatusColor(question.review_status)}
             size="small"
           />
@@ -158,16 +157,16 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             </Typography>
             <List dense>
               {question.options.map((option, index) => (
-                <ListItem 
+                <ListItem
                   key={index}
-                  sx={{ 
+                  sx={{
                     py: 0.5,
                     bgcolor: option === question.correct_answer ? 'success.light' : undefined,
                     borderRadius: 1,
                     mb: 0.5,
                   }}
                 >
-                  <ListItemText 
+                  <ListItemText
                     primary={option}
                     primaryTypographyProps={{
                       fontWeight: option === question.correct_answer ? 'bold' : 'normal',
@@ -211,7 +210,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
         {/* Quality Indicators */}
         <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
           <Tooltip title="Difficulty Level">
-            <Chip 
+            <Chip
               icon={<Grade />}
               label={question.difficulty.toUpperCase()}
               color={getDifficultyColor(question.difficulty)}
@@ -221,7 +220,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
           </Tooltip>
 
           <Tooltip title="AI Confidence Score">
-            <Chip 
+            <Chip
               icon={<Psychology />}
               label={`${(question.confidence_score * 100).toFixed(0)}% Confidence`}
               size="small"
@@ -232,7 +231,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
 
           {question.bloom_level && (
             <Tooltip title="Bloom's Taxonomy Level">
-              <Chip 
+              <Chip
                 icon={<Lightbulb />}
                 label={getBloomLevelLabel(question.bloom_level)}
                 size="small"
@@ -243,7 +242,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
 
           {question.estimated_time_minutes && (
             <Tooltip title="Estimated Time">
-              <Chip 
+              <Chip
                 icon={<Timer />}
                 label={`${question.estimated_time_minutes} min`}
                 size="small"
@@ -254,7 +253,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
 
           {question.quality_tier && (
             <Tooltip title="Quality Tier">
-              <Chip 
+              <Chip
                 label={`Tier ${question.quality_tier}`}
                 size="small"
                 variant="outlined"
@@ -264,7 +263,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
           )}
 
           <Tooltip title="Topic">
-            <Chip 
+            <Chip
               label={question.topic}
               size="small"
               variant="outlined"
@@ -413,4 +412,3 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
 };
 
 export default QuestionReviewCard;
-

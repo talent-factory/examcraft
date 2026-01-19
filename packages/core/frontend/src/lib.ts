@@ -19,6 +19,7 @@ export * from './types';
 export { default as AuthService } from './services/AuthService';
 export { default as AdminService } from './services/AdminService';
 export { default as RBACService } from './services/RBACService';
+// Note: RAGService and ChatService are Premium features, not exported from Core
 // Note: DocumentService, ExamService, ReviewService use named exports
 export * from './services/DocumentService';
 export * from './services/ExamService';
@@ -46,12 +47,22 @@ export { default as DocumentLibrary } from './components/DocumentLibrary';
 export { default as QuestionEditor } from './components/QuestionEditor';
 export { default as ReviewQueue } from './components/ReviewQueue';
 export { default as PackageTierBadge } from './components/layout/PackageTierBadge';
+export { default as MarkdownRenderer } from './components/MarkdownRenderer';
+export { default as ExamDisplay } from './components/ExamDisplay';
+export { default as QuestionReviewCard } from './components/QuestionReviewCard';
 
 // ============================================================================
 // Contexts
 // ============================================================================
 
 export { AuthProvider, useAuth } from './contexts/AuthContext';
+
+// ============================================================================
+// Hooks
+// ============================================================================
+
+export { default as useDebounce } from './hooks/useDebounce';
+export { useRoleBasedNavigation } from './hooks/useRoleBasedNavigation';
 
 // ============================================================================
 // Utils

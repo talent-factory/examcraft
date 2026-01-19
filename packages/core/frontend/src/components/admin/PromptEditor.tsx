@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -60,13 +60,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     is_active: false
   });
 
-  useEffect(() => {
-    if (promptId) {
-      loadPrompt();
-    }
-  }, [promptId]);
-
-  const loadPrompt = async () => {
+  const loadPrompt = useCallback(async () => {
     if (!promptId) return;
 
     try {
@@ -79,7 +73,13 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [promptId]);
+
+  useEffect(() => {
+    if (promptId) {
+      loadPrompt();
+    }
+  }, [promptId, loadPrompt]);
 
   const handleSave = async () => {
     if (!formData.name || !formData.content || !formData.category) {

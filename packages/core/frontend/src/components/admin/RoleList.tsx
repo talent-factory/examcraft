@@ -22,7 +22,7 @@ import {
   Add as AddIcon,
   Lock as LockIcon
 } from '@mui/icons-material';
-import { Role, FEATURE_CATEGORIES } from '../../types/rbac';
+import { Role } from '../../types/rbac';
 import RBACService from '../../services/RBACService';
 
 interface RoleListProps {
@@ -215,4 +215,3 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
 };
 
 export default RoleList;
-

@@ -3,7 +3,7 @@
  * Modal dialog for editing user details
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AdminService, { UserDetailResponse, UpdateUserRequest } from '../../services/AdminService';
 
 interface UserEditDialogProps {
@@ -23,20 +23,14 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
     email: '',
   });
 
-  useEffect(() => {
-    if (isOpen && userId) {
-      loadUser();
-    }
-  }, [isOpen, userId]);
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     if (!userId) return;
 
     try {
@@ -54,11 +48,17 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    if (isOpen && userId) {
+      loadUser();
+    }
+  }, [isOpen, userId, loadUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!userId) return;
 
     try {
@@ -66,7 +66,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
       setError(null);
 
       const updateData: UpdateUserRequest = {};
-      
+
       if (formData.first_name !== user?.first_name) {
         updateData.first_name = formData.first_name;
       }
@@ -232,4 +232,3 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
     </div>
   );
 };
-

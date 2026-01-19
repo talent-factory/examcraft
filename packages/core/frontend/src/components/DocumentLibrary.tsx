@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -56,7 +56,6 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
@@ -70,8 +69,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     document: null
   });
   const [previewTab, setPreviewTab] = useState(0);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [documentContent, setDocumentContent] = useState<string | null>(null);
-  const [contentLoading, setContentLoading] = useState(false);
   const [processingDocumentId, setProcessingDocumentId] = useState<number | null>(null);
 
   // Pagination state for large documents
@@ -82,9 +81,31 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [chunksPageSize] = useState(10); // Chunks pro Seite
   const [chunksLoading, setChunksLoading] = useState(false);
 
+  // Define loadDocuments before useEffect hooks that use it
+  const loadDocuments = useCallback(async (showLoading: boolean = true) => {
+    try {
+      if (showLoading && !hasLoadedOnce) {
+        setLoading(true);
+      }
+      setError(null);
+      const docs = await DocumentService.getDocuments();
+      setDocuments(docs);
+    } catch (err) {
+      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
+    } finally {
+      // ALWAYS set loading to false after load completes
+      setLoading(false);
+      // Mark that we've loaded at least once
+      if (!hasLoadedOnce) {
+        setHasLoadedOnce(true);
+      }
+    }
+  }, [hasLoadedOnce]);
+
+  // Initial load and refresh trigger
   useEffect(() => {
     loadDocuments(true); // Initial load with loading state
-  }, [refreshTrigger]);
+  }, [refreshTrigger, loadDocuments]);
 
   // Auto-refresh for documents with status "processing"
   useEffect(() => {
@@ -103,28 +124,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [documents]); // Re-run when documents change
-
-  const loadDocuments = async (showLoading: boolean = true) => {
-    try {
-      if (showLoading && !hasLoadedOnce) {
-        setLoading(true);
-      }
-      setError(null);
-      const docs = await DocumentService.getDocuments();
-      setDocuments(docs);
-      setIsInitialLoad(false);
-    } catch (err) {
-      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
-    } finally {
-      // ALWAYS set loading to false after load completes
-      setLoading(false);
-      // Mark that we've loaded at least once
-      if (!hasLoadedOnce) {
-        setHasLoadedOnce(true);
-      }
-    }
-  };
+  }, [documents, loadDocuments]); // Re-run when documents change
 
   const getFileIcon = (mimeType: string) => {
     if (mimeType.includes('pdf')) return <PictureAsPdf color="error" />;
@@ -266,6 +266,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const waitForDocumentProcessing = async (
     documentId: number,
     maxWaitTime: number = 1800000 // 30 Minuten für große Dokumente
