@@ -54,104 +54,184 @@ const FeatureUnavailable: React.FC<{ featureName: string }> = ({ featureName }) 
 
 /**
  * Generic component loader with error handling
+ * DEPRECATED: Use specific loader functions instead (loadRAGExamCreator, loadDocumentChat, etc.)
+ * This function is kept for backward compatibility but should not be used for new code.
  */
 export const loadComponent = <P extends object>(
   componentPath: string,
   componentName: string,
   FallbackComponent?: ComponentType<P>
 ): ComponentType<P> => {
-  // Check deployment mode
-  if (!isFullDeployment()) {
-    return (FallbackComponent || (() => <FeatureUnavailable featureName={componentName} />)) as ComponentType<P>;
-  }
-
-  // Lazy load the component
-  const LazyComponent = lazy(() =>
-    import(`../${componentPath}`)
-      .then((module) => ({ default: module.default || module }))
-      .catch((error) => {
-        console.error(`Failed to load ${componentName}:`, error);
-        // Return fallback or unavailable component
-        if (FallbackComponent) {
-          return { default: FallbackComponent };
-        }
-        return { default: () => <FeatureUnavailable featureName={componentName} /> };
-      })
-  );
-
-  // Wrap in Suspense
-  return ((props: P) => (
-    <Suspense fallback={<LoadingFallback componentName={componentName} />}>
-      <LazyComponent {...props} />
-    </Suspense>
-  )) as ComponentType<P>;
+  console.warn(`loadComponent is deprecated. Use specific loader functions instead.`);
+  return (FallbackComponent || (() => <FeatureUnavailable featureName={componentName} />)) as ComponentType<P>;
 };
 
 /**
  * Load RAG Exam Creator (Premium Feature)
+ * Uses @examcraft/premium package in workspace
  */
-export const loadRAGExamCreator = () =>
-  loadComponent(
-    'premium/components/RAGExamCreator',
-    'RAG Exam Creator'
+export const loadRAGExamCreator = () => {
+  if (!isFullDeployment()) {
+    return () => <FeatureUnavailable featureName="RAG Exam Creator" />;
+  }
+
+  const LazyComponent = lazy(() =>
+    import('@examcraft/premium')
+      .then((module) => ({ default: module.RAGExamCreator }))
+      .catch((error) => {
+        console.error('Failed to load RAG Exam Creator:', error);
+        return { default: () => <FeatureUnavailable featureName="RAG Exam Creator" /> };
+      })
   );
+
+  return (props: any) => (
+    <Suspense fallback={<LoadingFallback componentName="RAG Exam Creator" />}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
+};
 
 /**
  * Load Document Chat (Premium Feature)
  */
-export const loadDocumentChat = () =>
-  loadComponent(
-    'premium/components/DocumentChat/DocumentChat',
-    'Document Chat'
+export const loadDocumentChat = () => {
+  if (!isFullDeployment()) {
+    return () => <FeatureUnavailable featureName="Document Chat" />;
+  }
+
+  const LazyComponent = lazy(() =>
+    import('@examcraft/premium')
+      .then((module) => ({ default: module.DocumentChatPage }))
+      .catch((error) => {
+        console.error('Failed to load Document Chat:', error);
+        return { default: () => <FeatureUnavailable featureName="Document Chat" /> };
+      })
   );
+
+  return (props: any) => (
+    <Suspense fallback={<LoadingFallback componentName="Document Chat" />}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
+};
 
 /**
  * Load Prompt Management (Premium Feature)
  */
-export const loadPromptManagement = () =>
-  loadComponent(
-    'premium/components/prompts/PromptManagement',
-    'Prompt Management'
+export const loadPromptManagement = () => {
+  if (!isFullDeployment()) {
+    return () => <FeatureUnavailable featureName="Prompt Management" />;
+  }
+
+  const LazyComponent = lazy(() =>
+    import('@examcraft/premium')
+      .then((module) => ({ default: module.PromptLibraryWithUpload }))
+      .catch((error) => {
+        console.error('Failed to load Prompt Management:', error);
+        return { default: () => <FeatureUnavailable featureName="Prompt Management" /> };
+      })
   );
+
+  return (props: any) => (
+    <Suspense fallback={<LoadingFallback componentName="Prompt Management" />}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
+};
 
 /**
  * Load Prompt Template Selector (Premium Feature)
  */
-export const loadPromptTemplateSelector = () =>
-  loadComponent(
-    'premium/components/prompts/PromptTemplateSelector',
-    'Prompt Template Selector'
+export const loadPromptTemplateSelector = () => {
+  if (!isFullDeployment()) {
+    return () => <FeatureUnavailable featureName="Prompt Template Selector" />;
+  }
+
+  const LazyComponent = lazy(() =>
+    import('@examcraft/premium')
+      .then((module) => ({ default: module.PromptTemplateSelector }))
+      .catch((error) => {
+        console.error('Failed to load Prompt Template Selector:', error);
+        return { default: () => <FeatureUnavailable featureName="Prompt Template Selector" /> };
+      })
   );
+
+  return (props: any) => (
+    <Suspense fallback={<LoadingFallback componentName="Prompt Template Selector" />}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
+};
 
 /**
  * Load Prompt Library with Upload (Premium Feature)
  * Falls back to Core PromptLibrary if Premium not available
  */
 export const loadPromptLibraryWithUpload = () => {
-  // Import Core PromptLibrary as fallback
-  const CorePromptLibrary = require('../pages/PromptLibrary').PromptLibrary;
+  if (!isFullDeployment()) {
+    return () => <FeatureUnavailable featureName="Prompt Library with Upload" />;
+  }
 
-  return loadComponent(
-    'premium/components/prompts/PromptLibraryWithUpload',
-    'Prompt Library with Upload',
-    CorePromptLibrary
+  const LazyComponent = lazy(() =>
+    import('@examcraft/premium')
+      .then((module) => ({ default: module.PromptLibraryWithUpload }))
+      .catch((error) => {
+        console.error('Failed to load Prompt Library with Upload:', error);
+        return { default: () => <FeatureUnavailable featureName="Prompt Library with Upload" /> };
+      })
+  );
+
+  return (props: any) => (
+    <Suspense fallback={<LoadingFallback componentName="Prompt Library with Upload" />}>
+      <LazyComponent {...props} />
+    </Suspense>
   );
 };
 
 /**
  * Load Custom Branding (Enterprise Feature)
  */
-export const loadCustomBranding = () =>
-  loadComponent(
-    'enterprise/components/CustomBranding',
-    'Custom Branding'
+export const loadCustomBranding = () => {
+  if (!isFullDeployment()) {
+    return () => <FeatureUnavailable featureName="Custom Branding" />;
+  }
+
+  const LazyComponent = lazy(() =>
+    import('@examcraft/enterprise')
+      .then((module) => ({ default: module.CustomBranding }))
+      .catch((error) => {
+        console.error('Failed to load Custom Branding:', error);
+        return { default: () => <FeatureUnavailable featureName="Custom Branding" /> };
+      })
   );
+
+  return (props: any) => (
+    <Suspense fallback={<LoadingFallback componentName="Custom Branding" />}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
+};
 
 /**
  * Load SSO Configuration (Enterprise Feature)
  */
-export const loadSSOConfiguration = () =>
-  loadComponent(
-    'enterprise/components/SSOConfiguration',
-    'SSO Configuration'
+export const loadSSOConfiguration = () => {
+  if (!isFullDeployment()) {
+    return () => <FeatureUnavailable featureName="SSO Configuration" />;
+  }
+
+  const LazyComponent = lazy(() =>
+    import('@examcraft/enterprise')
+      .then((module) => ({ default: module.SSOConfiguration }))
+      .catch((error) => {
+        console.error('Failed to load SSO Configuration:', error);
+        return { default: () => <FeatureUnavailable featureName="SSO Configuration" /> };
+      })
   );
+
+  return (props: any) => (
+    <Suspense fallback={<LoadingFallback componentName="SSO Configuration" />}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
+};

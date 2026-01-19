@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -37,11 +37,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [previewVersion, setPreviewVersion] = useState<Prompt | null>(null);
 
-  useEffect(() => {
-    loadVersions();
-  }, [promptName]);
-
-  const loadVersions = async () => {
+  const loadVersions = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -52,7 +48,11 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [promptName]);
+
+  useEffect(() => {
+    loadVersions();
+  }, [loadVersions]);
 
   const handleActivate = async (version: Prompt) => {
     try {
@@ -249,4 +249,3 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
     </Container>
   );
 };
-

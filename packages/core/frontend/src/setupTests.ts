@@ -5,18 +5,14 @@
 import '@testing-library/jest-dom';
 
 // Mock IntersectionObserver
-// eslint-disable-next-line @typescript-eslint/no-useless-constructor
 global.IntersectionObserver = class IntersectionObserver {
-  constructor() {}
   disconnect() {}
   observe() {}
   unobserve() {}
 };
 
 // Mock ResizeObserver
-// eslint-disable-next-line @typescript-eslint/no-useless-constructor
 global.ResizeObserver = class ResizeObserver {
-  constructor() {}
   disconnect() {}
   observe() {}
   unobserve() {}

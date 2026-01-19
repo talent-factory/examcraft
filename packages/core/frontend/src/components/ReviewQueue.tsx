@@ -3,7 +3,7 @@
  * Main component for question review workflow
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -15,14 +15,12 @@ import {
   MenuItem,
   TextField,
   Button,
-  Chip,
   Stack,
   Alert,
   CircularProgress,
   Pagination,
   Card,
   CardContent,
-  Divider,
   IconButton,
   Tooltip,
   Dialog,
@@ -33,11 +31,6 @@ import {
 import {
   FilterList,
   Refresh,
-  CheckCircle,
-  Cancel,
-  Edit,
-  Comment as CommentIcon,
-  Search,
 } from '@mui/icons-material';
 import { ReviewService } from '../services/ReviewService';
 import {
@@ -55,7 +48,7 @@ const ReviewQueue: React.FC = () => {
   const [questions, setQuestions] = useState<QuestionReview[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Statistics
   const [stats, setStats] = useState({
     total: 0,
@@ -94,10 +87,10 @@ const ReviewQueue: React.FC = () => {
   const [actionReason, setActionReason] = useState('');
 
   // Load questions
-  const loadQuestions = async () => {
+  const loadQuestions = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await ReviewService.getReviewQueue(filters);
       setQuestions(response.questions);
@@ -113,11 +106,11 @@ const ReviewQueue: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
     loadQuestions();
-  }, [filters]);
+  }, [loadQuestions]);
 
   const handleFilterChange = (field: keyof ReviewFilters, value: any) => {
     setFilters(prev => ({ ...prev, [field]: value, offset: 0 }));
@@ -431,9 +424,9 @@ const ReviewQueue: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setActionDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={executeAction} 
-            variant="contained" 
+          <Button
+            onClick={executeAction}
+            variant="contained"
             color={actionType === 'approve' ? 'success' : 'error'}
             disabled={loading}
           >
@@ -446,4 +439,3 @@ const ReviewQueue: React.FC = () => {
 };
 
 export default ReviewQueue;
-
