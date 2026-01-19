@@ -230,8 +230,8 @@ npm run test:e2e
 
 - **GitHub Issues**: For bugs and feature requests
 - **GitHub Discussions**: For questions and community support
-- **Documentation**: Check `/docs` folder and API documentation at
-  `/docs` endpoint
+- **Documentation**: Visit [docs.examcraft.ch](https://docs.examcraft.ch) for
+  comprehensive documentation
 - **Code Review**: Request reviews from maintainers in PRs
 
 ## Recognition

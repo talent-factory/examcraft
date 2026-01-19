@@ -14,17 +14,12 @@ ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwen
 
 ## 📚 Dokumentation
 
-### 📊 Für Stakeholder & Kunden
+Besuchen Sie unsere **[📖 Vollständige Dokumentation](https://docs.examcraft.ch)** für:
 
-- **[📊 Executive Summary](docs/EXECUTIVE_SUMMARY.md)** - Business-Übersicht, Marktchancen, Finanzprognosen
-- **[🎯 Feature-Übersicht](docs/FEATURES.md)** - Vollständige Feature-Liste mit Use Cases und Benefits
-- **[📅 Release Timeline](docs/RELEASE_TIMELINE.md)** - Detaillierte Roadmap mit quartalsweisen Releases
-- **[🗺️ Product Roadmap](docs/ROADMAP.md)** - Langfristige Vision und Feature-Vergleichsmatrix
-
-### 👥 Für Benutzer
-
-- **[📚 Benutzerhandbuch](docs/USER_GUIDE.md)** - Vollständige Anleitung für Dozenten und Lehrkräfte
-- **[🎛️ Admin Guide: Prompt Management](docs/ADMIN_PROMPT_MANAGEMENT.md)** - Verwaltung der AI-Prompts
+- 📚 **Benutzerhandbuch** - Anleitung für Dozenten und Lehrkräfte
+- 🎛️ **Admin Guide** - Prompt Management und System-Administration
+- 🔌 **API Referenz** - Vollständige API-Dokumentation
+- 🚀 **Deployment Guides** - Cloud und Self-Hosted Deployment
 
 ### 🔧 Für Entwickler
 
@@ -201,29 +196,29 @@ Diese Version enthält eine funktionsfähige Demo für Workshop-Zwecke:
 
 ## 🎯 Roadmap
 
-### Phase 1: Workshop Demo ✅
+> Für die detaillierte Roadmap siehe unsere [Dokumentation](https://docs.examcraft.ch).
 
-- [x] Grundlegende Projektstruktur
-- [x] Docker-Umgebung Setup
-- [x] FastAPI Backend mit Demo-Endpoints
-- [x] React Frontend mit Material-UI
-- [x] Prüfungserstellung und -anzeige
+### ✅ Verfügbar (v1.0)
 
-### Phase 2: Core Features
+- Document Upload & Processing (PDF, Word, Markdown)
+- KI-basierte Fragenerstellung mit Claude API
+- RAG-System mit Qdrant Vector Database
+- Interaktiver Document ChatBot
+- Prompt Knowledge Base Management
+- Benutzerauthentifizierung mit OAuth (Google, Microsoft)
+- Role-Based Access Control (RBAC)
 
-- [ ] Claude API Integration
-- [ ] Benutzerauthentifizierung
-- [ ] Prüfungsverwaltung (CRUD)
-- [ ] Erweiterte Fragetypen
-- [ ] Export-Funktionen (PDF, Word)
+### 🔜 In Entwicklung
 
-### Phase 3: Erweiterte Features
+- Export-Funktionen (PDF, Moodle XML, JSON)
+- Question Review Workflow
+- Team Collaboration Features
 
-- [ ] Fragenkatalog-Verwaltung
-- [ ] Statistiken und Analytics
-- [ ] Benutzerrollen und Permissions
-- [ ] Integration mit LMS-Systemen
-- [ ] Mobile App
+### 🔮 Geplant
+
+- LMS-Integrationen (Moodle, Canvas)
+- Analytics Dashboard
+- Self-Hosted Enterprise Edition
 
 ## 🤝 Contributing
 
