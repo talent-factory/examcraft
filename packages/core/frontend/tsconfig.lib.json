@@ -20,6 +20,7 @@
     "src/index.tsx",
     "src/App.tsx",
     "src/AppWithAuth.tsx",
-    "src/react-app-env.d.ts"
+    "src/react-app-env.d.ts",
+    "src/pages/**"
   ]
 }

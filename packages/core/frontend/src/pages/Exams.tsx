@@ -2,13 +2,15 @@
  * Exams Page
  * Exam generation and management
  *
- * In Full deployment mode, uses Premium RAGExamCreator via symlink.
+ * In Full deployment mode, uses Premium RAGExamCreator via dynamic import.
  * In Core deployment mode, falls back to stub component.
  */
 
 import React from 'react';
-// Import from premium directory - symlinked to actual Premium component in Full mode
-import RAGExamCreator from '../premium/components/RAGExamCreator';
+import { loadRAGExamCreator } from '../utils/componentLoader';
+
+// Dynamically load RAGExamCreator from Premium package
+const RAGExamCreator = loadRAGExamCreator();
 
 export const Exams: React.FC = () => {
   const handleExamGenerated = (exam: any) => {
