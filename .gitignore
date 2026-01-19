@@ -76,3 +76,4 @@ backend/mock_vector_db/mock_vectors.json
 
 # Git worktrees
 .worktrees/
+*.tsbuildinfo
