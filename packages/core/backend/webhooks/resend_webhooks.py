@@ -119,15 +119,33 @@ async def resend_webhook(
     - Verifies Svix signature to ensure webhook authenticity
     - Stores all events for audit trail
     - Updates suppression list for bounces/complaints
+    - Fails closed in production if RESEND_WEBHOOK_SECRET is not set
     """
     # Get webhook secret
     webhook_secret = os.getenv("RESEND_WEBHOOK_SECRET")
 
+    # Check if we're in development mode
+    is_development = os.getenv("ENVIRONMENT", "production").lower() in [
+        "development",
+        "dev",
+        "local",
+    ]
+
     # Get raw payload
     payload = await request.body()
 
-    # Verify signature (skip in development if secret not set)
-    if webhook_secret:
+    # Verify signature (fail closed in production)
+    if not webhook_secret:
+        if is_development:
+            logger.warning(
+                "RESEND_WEBHOOK_SECRET not set - skipping signature verification (DEVELOPMENT MODE ONLY)"
+            )
+        else:
+            logger.error(
+                "RESEND_WEBHOOK_SECRET not set in production - rejecting webhook"
+            )
+            raise HTTPException(status_code=500, detail="Webhook secret not configured")
+    else:
         if not svix_signature:
             logger.warning("Missing Svix-Signature header")
             raise HTTPException(status_code=401, detail="Missing signature")
@@ -136,10 +154,6 @@ async def resend_webhook(
         if not verify_resend_signature(payload, signature_string, webhook_secret):
             logger.warning("Invalid webhook signature")
             raise HTTPException(status_code=401, detail="Invalid signature")
-    else:
-        logger.warning(
-            "RESEND_WEBHOOK_SECRET not set - skipping signature verification"
-        )
 
     # Parse event data
     try:

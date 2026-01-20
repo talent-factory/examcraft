@@ -82,9 +82,9 @@ class TestWebhookSignatureVerification:
 class TestWebhookEndpoint:
     """Tests für Webhook Endpoint"""
 
-    def test_webhook_without_secret_logs_warning(self, client):
+    def test_webhook_without_secret_development_mode(self, client):
         """Webhook processes without secret in development mode"""
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.dict("os.environ", {"ENVIRONMENT": "development"}, clear=True):
             response = client.post(
                 "/webhooks/resend",
                 json={
@@ -99,6 +99,24 @@ class TestWebhookEndpoint:
 
             assert response.status_code == 200
             assert response.json() == {"status": "ok"}
+
+    def test_webhook_without_secret_production_mode_rejected(self, client):
+        """Webhook without secret is rejected in production mode"""
+        with patch.dict("os.environ", {"ENVIRONMENT": "production"}, clear=True):
+            response = client.post(
+                "/webhooks/resend",
+                json={
+                    "type": "email.delivered",
+                    "data": {
+                        "email_id": "email_123",
+                        "to": ["user@example.com"],
+                        "created_at": "2025-01-01T12:00:00Z",
+                    },
+                },
+            )
+
+            assert response.status_code == 500
+            assert "Webhook secret not configured" in response.json()["detail"]
 
     def test_webhook_with_invalid_signature_rejected(self, client):
         """Webhook with invalid signature is rejected when secret is set"""
