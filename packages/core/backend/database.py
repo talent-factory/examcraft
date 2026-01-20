@@ -69,8 +69,14 @@ def create_tables():
             TierFeature,
             TierQuota,
         )
+        from models.email_event import (  # noqa: F401
+            EmailEvent,
+            EmailSuppressionList,
+        )
 
-        print("✅ Core models imported (Auth + Documents + Question Review + RBAC)")
+        print(
+            "✅ Core models imported (Auth + Documents + Question Review + RBAC + Email)"
+        )
     except Exception as e:
         print(f"⚠️  Core models import error: {e}")
         import traceback
