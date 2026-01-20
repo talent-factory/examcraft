@@ -197,6 +197,17 @@ async def lifespan(app: FastAPI):
     app.include_router(rbac_api.router)
     app.include_router(question_review.router)
 
+    # Email Webhooks (Resend)
+    try:
+        from webhooks import resend_router
+
+        app.include_router(resend_router)
+        print("✅ Email webhooks loaded (Resend)")
+    except ImportError as e:
+        print(f"⚠️  Email webhooks not available: {e}")
+    except Exception as e:
+        print(f"❌ Error loading email webhooks: {e}")
+
     # Sentry Test Router (only in development)
     if os.getenv("ENVIRONMENT", "development") == "development":
         app.include_router(sentry_test.router)
