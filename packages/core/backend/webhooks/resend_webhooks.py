@@ -193,7 +193,7 @@ async def handle_email_sent(db: Session, data: dict, svix_id: Optional[str]) -> 
         event_type=EmailEventType.SENT,
         recipient_email=_extract_recipient(data),
         event_timestamp=_parse_timestamp(data.get("created_at")),
-        metadata={
+        event_metadata={
             "svix_id": svix_id,
             "subject": data.get("subject"),
             "from": data.get("from"),
@@ -216,7 +216,7 @@ async def handle_email_delivered(
         event_type=EmailEventType.DELIVERED,
         recipient_email=_extract_recipient(data),
         event_timestamp=_parse_timestamp(data.get("created_at")),
-        metadata={
+        event_metadata={
             "svix_id": svix_id,
             **data,
         },
@@ -245,7 +245,7 @@ async def handle_email_bounced(db: Session, data: dict, svix_id: Optional[str]) 
         event_type=EmailEventType.BOUNCED,
         recipient_email=recipient,
         event_timestamp=_parse_timestamp(data.get("created_at")),
-        metadata={
+        event_metadata={
             "svix_id": svix_id,
             "bounce_type": bounce_type,
             "bounce_subtype": bounce_subtype,
@@ -280,7 +280,7 @@ async def handle_email_opened(db: Session, data: dict, svix_id: Optional[str]) -
         event_type=EmailEventType.OPENED,
         recipient_email=_extract_recipient(data),
         event_timestamp=_parse_timestamp(data.get("created_at")),
-        metadata={
+        event_metadata={
             "svix_id": svix_id,
             "user_agent": data.get("user_agent"),
             "ip_address": data.get("ip_address"),
@@ -301,7 +301,7 @@ async def handle_email_clicked(db: Session, data: dict, svix_id: Optional[str]) 
         event_type=EmailEventType.CLICKED,
         recipient_email=_extract_recipient(data),
         event_timestamp=_parse_timestamp(data.get("created_at")),
-        metadata={
+        event_metadata={
             "svix_id": svix_id,
             "link_url": data.get("link"),
             "user_agent": data.get("user_agent"),
@@ -332,7 +332,7 @@ async def handle_email_spam_complaint(
         event_type=EmailEventType.SPAM_COMPLAINT,
         recipient_email=recipient,
         event_timestamp=_parse_timestamp(data.get("created_at")),
-        metadata={
+        event_metadata={
             "svix_id": svix_id,
             **data,
         },

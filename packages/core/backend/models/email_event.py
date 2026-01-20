@@ -73,8 +73,9 @@ class EmailEvent(Base):
     event_timestamp = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    # Additional metadata (provider-specific data, link URLs, etc.)
-    metadata = Column(JSON, nullable=True)
+    # Additional event metadata (provider-specific data, link URLs, etc.)
+    # Renamed from 'metadata' to avoid SQLAlchemy reserved attribute conflict
+    event_metadata = Column(JSON, nullable=True)
 
     # Indexes for common queries
     __table_args__ = (
