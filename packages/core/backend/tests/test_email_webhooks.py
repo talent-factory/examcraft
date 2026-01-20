@@ -239,7 +239,7 @@ class TestEmailEventHandlers:
         )
         assert event is not None
         assert event.event_type == EmailEventType.OPENED
-        assert event.metadata.get("user_agent") == "Mozilla/5.0"
+        assert event.event_metadata.get("user_agent") == "Mozilla/5.0"
 
     @pytest.mark.asyncio
     async def test_handle_email_clicked(self, test_db):
@@ -263,7 +263,9 @@ class TestEmailEventHandlers:
         )
         assert event is not None
         assert event.event_type == EmailEventType.CLICKED
-        assert event.metadata.get("link_url") == "https://examcraft.ai/verify/token"
+        assert (
+            event.event_metadata.get("link_url") == "https://examcraft.ai/verify/token"
+        )
 
     @pytest.mark.asyncio
     async def test_handle_email_spam_complaint(self, test_db):
