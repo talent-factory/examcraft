@@ -26,7 +26,7 @@ export const BillingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-                    Pricing Plans
+                    Subscription Plans
                 </h2>
                 <p className="mt-4 text-xl text-gray-600">
                     Choose the plan that fits your needs.
@@ -52,7 +52,7 @@ export const BillingPage: React.FC = () => {
                     <div className="p-6">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Free</h2>
                         <p className="mt-4">
-                            <span className="text-4xl font-extrabold text-gray-900">€0</span>
+                            <span className="text-4xl font-extrabold text-gray-900">CHF 0</span>
                             <span className="text-base font-medium text-gray-500">/mo</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
@@ -75,7 +75,7 @@ export const BillingPage: React.FC = () => {
                     <div className="p-6">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Starter</h2>
                         <p className="mt-4">
-                            <span className="text-4xl font-extrabold text-gray-900">€19</span>
+                            <span className="text-4xl font-extrabold text-gray-900">CHF 19</span>
                             <span className="text-base font-medium text-gray-500">/mo</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
@@ -96,7 +96,7 @@ export const BillingPage: React.FC = () => {
                     <div className="p-6">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Professional</h2>
                         <p className="mt-4">
-                            <span className="text-4xl font-extrabold text-gray-900">€149</span>
+                            <span className="text-4xl font-extrabold text-gray-900">CHF 149</span>
                             <span className="text-base font-medium text-gray-500">/mo</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">

@@ -26,6 +26,7 @@ import { Admin } from './pages/Admin';
 import { BillingPage } from './pages/BillingPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
+import { SubscriptionManagementPage } from './pages/SubscriptionManagementPage';
 import { UserRole } from './types/auth';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
@@ -186,6 +187,17 @@ export const AppWithAuth: React.FC = () => {
                   <ProtectedRoute>
                     <AppLayout>
                       <BillingPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/subscription"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <SubscriptionManagementPage />
                     </AppLayout>
                   </ProtectedRoute>
                 }

@@ -24,10 +24,10 @@ export interface StripePriceConfig {
  * 3. Update the values below
  */
 export const STRIPE_PRICES: StripePriceConfig = {
-  // Starter Plan - €19/month
+  // Starter Plan - CHF 19/month
   starter: process.env.REACT_APP_STRIPE_PRICE_STARTER || 'price_placeholder_starter',
 
-  // Professional Plan - €149/month
+  // Professional Plan - CHF 149/month
   professional: process.env.REACT_APP_STRIPE_PRICE_PROFESSIONAL || 'price_placeholder_professional',
 };
 
