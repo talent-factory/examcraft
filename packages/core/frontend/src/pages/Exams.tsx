@@ -2,24 +2,22 @@
  * Exams Page
  * Exam generation and management
  *
- * In Full deployment mode, uses Premium RAGExamCreator via dynamic import.
- * In Core deployment mode, falls back to stub component.
+ * TEMPORARY: Uses BasicExamCreator until TF-200 (NPM Workspace Migration) is merged.
+ * After TF-200 merge, this will use Premium RAGExamCreator via @examcraft/premium package.
  */
 
 import React from 'react';
-import { loadRAGExamCreator } from '../utils/componentLoader';
-
-// Dynamically load RAGExamCreator from Premium package
-const RAGExamCreator = loadRAGExamCreator();
+import { BasicExamCreator } from '../components/exam/BasicExamCreator';
 
 export const Exams: React.FC = () => {
   const handleExamGenerated = (exam: any) => {
     console.log('Exam generated:', exam);
-    // Do nothing - let RAGExamCreator handle the display
+    // TODO: Navigate to exam review page
   };
 
   const handleBack = () => {
     console.log('Back to exams');
+    // TODO: Navigate back
   };
 
   return (
@@ -34,8 +32,8 @@ export const Exams: React.FC = () => {
         </p>
       </div>
 
-      {/* RAG Exam Creator */}
-      <RAGExamCreator
+      {/* Basic Exam Creator (Temporary until TF-200 merge) */}
+      <BasicExamCreator
         selectedDocuments={[]}
         onExamGenerated={handleExamGenerated}
         onBack={handleBack}
