@@ -109,6 +109,7 @@ class UserProfileResponse(BaseModel):
     last_name: str
     status: str
     is_superuser: bool
+    is_email_verified: bool  # Email verification status
     institution_id: Optional[int]
     institution_name: Optional[str]
     oauth_provider: Optional[str] = None  # OAuth provider (google, microsoft, etc.)
@@ -174,28 +175,38 @@ async def register(
             db.query(Institution).filter(Institution.domain == email_domain).first()
         )
 
-        # If no domain match, create personal institution
+        # If no domain match, create or find personal institution
         if not institution:
-            institution = Institution(
-                name=f"{request.first_name} {request.last_name}",
-                slug=f"{request.email.split('@')[0]}-personal",
-                domain=None,  # No domain for personal institutions
-                subscription_tier="free",
-                max_users=1,
-                max_documents=10,
-                max_questions_per_month=50,
-            )
-            db.add(institution)
-            db.flush()  # Get institution.id
+            personal_slug = f"{request.email.split('@')[0]}-personal"
 
-    # Create user
+            # Check if personal institution already exists
+            institution = (
+                db.query(Institution).filter(Institution.slug == personal_slug).first()
+            )
+
+            # Create new personal institution if it doesn't exist
+            if not institution:
+                institution = Institution(
+                    name=f"{request.first_name} {request.last_name}",
+                    slug=personal_slug,
+                    domain=None,  # No domain for personal institutions
+                    subscription_tier="free",
+                    max_users=1,
+                    max_documents=10,
+                    max_questions_per_month=50,
+                )
+                db.add(institution)
+                db.flush()  # Get institution.id
+
+    # Create user (email not verified yet)
     user = User(
         email=request.email,
         password_hash=AuthService.get_password_hash(request.password),
         first_name=request.first_name,
         last_name=request.last_name,
         institution_id=institution.id,
-        status=UserStatus.ACTIVE.value,
+        status=UserStatus.PENDING.value,  # Pending until email verified
+        is_email_verified=False,
         is_superuser=False,
     )
     db.add(user)
@@ -222,6 +233,23 @@ async def register(
         db.flush()
 
     user.roles.append(viewer_role)
+
+    # Generate verification token
+    from services.email_service import EmailService
+    from models.auth import EmailVerificationToken
+    from datetime import datetime, timedelta, timezone
+
+    verification_token = EmailService.generate_verification_token()
+    token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
+
+    # Store verification token
+    email_token = EmailVerificationToken(
+        user_id=user.id,
+        token=verification_token,
+        expires_at=token_expires,
+        is_used=False,
+    )
+    db.add(email_token)
     db.commit()
     db.refresh(user)
 
@@ -230,7 +258,19 @@ async def register(
 
     AuditService.log_register(db, user.id, user.email, request=http_request)
 
-    # Create tokens
+    # Send verification email (async via background task)
+    try:
+        EmailService.send_verification_email(
+            email=user.email,
+            first_name=user.first_name,
+            verification_token=verification_token,
+        )
+        logger.info(f"Verification email sent to {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
+        # Don't fail registration if email fails
+
+    # Create tokens (user can login but features limited until verified)
     tokens = AuthService.create_tokens_for_user(
         user,
         db,
@@ -238,7 +278,9 @@ async def register(
         ip_address=http_request.client.host if http_request.client else None,
     )
 
-    logger.info(f"New user registered: {user.email} (ID: {user.id})")
+    logger.info(
+        f"New user registered: {user.email} (ID: {user.id}) - Verification email sent"
+    )
 
     return tokens
 
@@ -413,6 +455,7 @@ async def get_current_user_profile(
         last_name=current_user.last_name,
         status=current_user.status,
         is_superuser=current_user.is_superuser,
+        is_email_verified=current_user.is_email_verified,
         institution_id=current_user.institution_id,
         institution_name=current_user.institution.name
         if current_user.institution
@@ -487,6 +530,7 @@ async def update_current_user_profile(
         last_name=current_user.last_name,
         status=current_user.status,
         is_superuser=current_user.is_superuser,
+        is_email_verified=current_user.is_email_verified,
         institution_id=current_user.institution_id,
         institution_name=current_user.institution.name
         if current_user.institution
@@ -631,6 +675,158 @@ async def confirm_password_reset(
     )
 
     return None
+
+
+@router.post("/verify-email", status_code=status.HTTP_200_OK)
+async def verify_email(token: str, db: Session = Depends(get_db)):
+    """
+    Verify user email with token
+
+    - Validates verification token
+    - Marks email as verified
+    - Activates user account
+    - Sends welcome email
+    """
+    from models.auth import EmailVerificationToken
+    from services.email_service import EmailService
+    from datetime import datetime, timezone
+
+    # Find token
+    email_token = (
+        db.query(EmailVerificationToken)
+        .filter(EmailVerificationToken.token == token)
+        .first()
+    )
+
+    if not email_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification token",
+        )
+
+    # Check if already used
+    if email_token.is_used:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification token already used",
+        )
+
+    # Check if expired
+    if email_token.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification token expired. Please request a new one.",
+        )
+
+    # Get user
+    user = db.query(User).filter(User.id == email_token.user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Mark email as verified
+    user.is_email_verified = True
+    user.status = UserStatus.ACTIVE.value
+
+    # Mark token as used
+    email_token.is_used = True
+    email_token.used_at = datetime.now(timezone.utc)
+
+    db.commit()
+
+    # Send welcome email
+    try:
+        EmailService.send_welcome_email(email=user.email, first_name=user.first_name)
+        logger.info(f"Welcome email sent to {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send welcome email to {user.email}: {str(e)}")
+        # Don't fail verification if welcome email fails
+
+    logger.info(f"Email verified for user: {user.email} (ID: {user.id})")
+
+    return {
+        "success": True,
+        "message": "Email verified successfully",
+        "user": {
+            "email": user.email,
+            "first_name": user.first_name,
+            "is_email_verified": user.is_email_verified,
+        },
+    }
+
+
+@router.post("/resend-verification", status_code=status.HTTP_200_OK)
+async def resend_verification_email(email: EmailStr, db: Session = Depends(get_db)):
+    """
+    Resend verification email
+
+    - Generates new verification token
+    - Sends new verification email
+    """
+    from models.auth import EmailVerificationToken
+    from services.email_service import EmailService
+    from datetime import datetime, timedelta, timezone
+
+    # Find user
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        # Don't reveal if email exists
+        return {
+            "success": True,
+            "message": "If the email exists, a verification email has been sent",
+        }
+
+    # Check if already verified
+    if user.is_email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already verified",
+        )
+
+    # Invalidate old tokens
+    old_tokens = (
+        db.query(EmailVerificationToken)
+        .filter(
+            EmailVerificationToken.user_id == user.id,
+            ~EmailVerificationToken.is_used,
+        )
+        .all()
+    )
+    for old_token in old_tokens:
+        old_token.is_used = True
+        old_token.used_at = datetime.now(timezone.utc)
+
+    # Generate new token
+    verification_token = EmailService.generate_verification_token()
+    token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
+
+    # Store new token
+    email_token = EmailVerificationToken(
+        user_id=user.id,
+        token=verification_token,
+        expires_at=token_expires,
+        is_used=False,
+    )
+    db.add(email_token)
+    db.commit()
+
+    # Send verification email
+    try:
+        EmailService.send_verification_email(
+            email=user.email,
+            first_name=user.first_name,
+            verification_token=verification_token,
+        )
+        logger.info(f"Verification email resent to {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to resend verification email to {user.email}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email",
+        )
+
+    return {"success": True, "message": "Verification email sent"}
 
 
 # ============================================================================

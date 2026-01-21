@@ -334,6 +334,67 @@ docker-compose logs -f backend
 docker-compose logs -f frontend
 ```
 
+### 🔧 Troubleshooting
+
+#### Frontend Build Errors nach Git Pull/Branch Switch
+
+**Problem:** `Module not found: Error: Can't resolve '@examcraft/premium'` oder ähnliche Webpack-Fehler
+
+**Ursache:** Webpack cached alte Versionen von Dateien nach Branch-Wechsel oder Git Pull
+
+**Lösung:**
+
+```bash
+# Option 1: Cache-Clearing Script (empfohlen)
+./scripts/clean-frontend-cache.sh
+
+# Option 2: Alle Caches löschen + Neuinstallation
+./scripts/clean-frontend-cache.sh --all --reinstall
+
+# Option 3: Manuell (Core Frontend)
+cd packages/core/frontend
+rm -rf node_modules/.cache build/
+bun install  # oder: npm install
+```
+
+#### Bun vs NPM
+
+ExamCraft AI unterstützt sowohl **Bun** (empfohlen) als auch **npm**:
+
+```bash
+# Bun installieren (10-100x schneller!)
+curl -fsSL https://bun.sh/install | bash
+
+# Dependencies installieren
+bun install  # oder: npm install
+
+# Scripts ausführen
+bun run build:core  # oder: npm run build:core
+```
+
+**Vorteile von Bun:**
+- ⚡ 10-100x schnellere Installation
+- 🚀 Schnellere Script-Ausführung
+- 📦 Besseres Monorepo-Handling
+- ✅ Drop-in Replacement für npm
+
+#### Docker Container Probleme
+
+```bash
+# Alle Container stoppen und neu starten
+docker-compose down
+docker-compose up -d --build
+
+# Volumes löschen (ACHTUNG: Löscht Datenbank!)
+docker-compose down -v
+docker-compose up -d
+
+# Logs für Debugging
+docker-compose logs -f backend
+```
+
+**Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für weitere Troubleshooting-Tipps.**
+
 ### API Endpoints
 
 - `GET /` - Health Check

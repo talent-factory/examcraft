@@ -14,6 +14,8 @@ import { OAuthCallback } from './components/auth/OAuthCallback';
 import { PasswordResetRequest } from './components/auth/PasswordResetRequest';
 import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
+import RegistrationSuccessPage from './pages/RegistrationSuccessPage';
 import { UserManagementPage } from './components/admin/UserManagementPage';
 import RoleManagementPage from './components/admin/RoleManagementPage';
 import { Dashboard } from './pages/Dashboard';
@@ -71,6 +73,8 @@ export const AppWithAuth: React.FC = () => {
               <Route path="/auth/callback" element={<OAuthCallback />} />
               <Route path="/auth/reset-password" element={<PasswordResetRequest />} />
               <Route path="/auth/reset-password/confirm" element={<PasswordResetConfirm />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/registration-success" element={<RegistrationSuccessPage />} />
 
               {/* Protected Routes - Require authentication */}
               <Route
