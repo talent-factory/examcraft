@@ -8,7 +8,7 @@ from fastapi.security import HTTPBearer
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List
 import logging
 import os
 
@@ -1012,4 +1012,67 @@ async def get_user_avatar(
             "Cache-Control": "public, max-age=86400",  # 24 hours
             "X-Avatar-Source": "cached" if avatar_bytes else "downloaded",
         },
+    )
+
+
+# ============================================================================
+# Feature Access Endpoints (RBAC Integration)
+# ============================================================================
+
+
+class UserFeaturesResponse(BaseModel):
+    """User features and subscription tier response"""
+
+    subscription_tier: str
+    features: List[str]
+    quotas: dict
+
+
+@router.get("/features", response_model=UserFeaturesResponse)
+async def get_user_features(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get current user's features and subscription tier
+
+    Returns:
+    - subscription_tier: User's institution subscription tier
+    - features: List of enabled features for this tier
+    - quotas: Current quota limits and usage
+
+    Used by frontend to determine which components to load and display
+    """
+    from config.features import TIER_FEATURES, SubscriptionTier
+
+    # Get user's institution
+    institution = current_user.institution
+
+    # Get subscription tier
+    try:
+        tier = SubscriptionTier(institution.subscription_tier)
+    except ValueError:
+        # Fallback to FREE if invalid tier
+        logger.warning(
+            f"Invalid subscription tier '{institution.subscription_tier}' for institution {institution.id}, defaulting to FREE"
+        )
+        tier = SubscriptionTier.FREE
+
+    # Get features for this tier
+    features = TIER_FEATURES.get(tier, [])
+    feature_names = [f.value for f in features]
+
+    # Build quota response with current usage
+    quotas = {
+        "max_documents": institution.max_documents,
+        "max_questions_per_month": institution.max_questions_per_month,
+        "max_users": institution.max_users,
+        # TODO: Add current usage counts when usage tracking is implemented
+        # "documents_used": 0,
+        # "questions_used_this_month": 0,
+        # "users_count": 0,
+    }
+
+    return UserFeaturesResponse(
+        subscription_tier=tier.value, features=feature_names, quotas=quotas
     )
