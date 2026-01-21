@@ -1,0 +1,39 @@
+feat(TF-187): Implement complete email verification system with Resend
+
+Backend Implementation:
+- Add EmailVerificationToken model with 24h expiration
+- Add email_service.py with Resend API integration
+- Implement send_verification_email() and send_welcome_email()
+- Add /api/auth/verify-email endpoint for token validation
+- Add /api/auth/resend-verification endpoint
+- Update registration flow to create PENDING users
+- Add is_email_verified field to UserProfileResponse
+- Fix duplicate personal institution slug handling
+- Database migration: 014_add_email_verification_tokens.py
+
+Frontend Implementation:
+- Add VerifyEmailPage with auto-redirect after 2s
+- Add RegistrationSuccessPage with resend button
+- Add EmailVerificationBanner for unverified users
+- Add ResendVerificationButton reusable component
+- Update User and UserResponse interfaces with is_email_verified
+- Fix React 18 Strict Mode double verification with useRef
+- Update RegisterForm to navigate to success page
+- Integrate verification banner in Dashboard
+
+Configuration:
+- Add Resend environment variables to docker-compose.full.yml
+- Update .env.example with Resend configuration
+- Add FRONTEND_URL for verification link generation
+
+Bug Fixes:
+- Prevent duplicate personal institution creation
+- Fix double API calls in React 18 Strict Mode
+- Clear success/error states properly in VerifyEmailPage
+- Add is_email_verified to /api/auth/me response
+
+Testing:
+- Email verification flow tested end-to-end
+- Resend verification email tested
+- Auto-redirect after verification tested
+- Verification banner visibility tested

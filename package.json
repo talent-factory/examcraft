@@ -2,27 +2,26 @@
   "name": "examcraft-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "ExamCraft AI - NPM Workspace Monorepo",
+  "description": "ExamCraft AI - Bun Workspace Monorepo",
   "workspaces": [
-    "packages/core/frontend",
-    "packages/premium/frontend",
-    "packages/enterprise/frontend"
+    "packages/core/frontend"
   ],
   "scripts": {
-    "install:all": "npm install",
-    "build:core": "npm run build --workspace=@examcraft/core",
-    "build:premium": "npm run build --workspace=@examcraft/premium",
-    "build:enterprise": "npm run build --workspace=@examcraft/enterprise",
-    "build:all": "npm run build:core && npm run build:premium && npm run build:enterprise",
-    "test:core": "npm test --workspace=@examcraft/core",
-    "test:premium": "npm test --workspace=@examcraft/premium",
-    "test:enterprise": "npm test --workspace=@examcraft/enterprise",
-    "test:all": "npm test --workspaces",
-    "dev:core": "npm run dev --workspace=@examcraft/core",
-    "dev:premium": "npm run dev --workspace=@examcraft/premium",
-    "dev:enterprise": "npm run dev --workspace=@examcraft/enterprise",
-    "lint": "npm run lint --workspaces",
-    "clean": "npm run clean --workspaces && rm -rf node_modules"
+    "install:all": "bun install",
+    "build:core": "bun run build --filter=@examcraft/core",
+    "build:premium": "bun run build --filter=@examcraft/premium",
+    "build:enterprise": "bun run build --filter=@examcraft/enterprise",
+    "build:all": "bun run build:core && bun run build:premium && bun run build:enterprise",
+    "test:core": "bun test --filter=@examcraft/core",
+    "test:premium": "bun test --filter=@examcraft/premium",
+    "test:enterprise": "bun test --filter=@examcraft/enterprise",
+    "test:all": "bun test",
+    "dev:core": "bun run dev --filter=@examcraft/core",
+    "dev:premium": "bun run dev --filter=@examcraft/premium",
+    "dev:enterprise": "bun run dev --filter=@examcraft/enterprise",
+    "lint": "bun run lint",
+    "clean": "bun run clean && rm -rf node_modules",
+    "clean:cache": "bash scripts/clean-frontend-cache.sh"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -33,6 +32,6 @@
   },
   "engines": {
     "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "bun": ">=1.0.0"
   }
 }
