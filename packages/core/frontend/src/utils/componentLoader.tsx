@@ -5,8 +5,8 @@
  * Replaces static imports and volume mounts for cleaner deployment.
  */
 
-import React, { ComponentType } from 'react';
-import { Box, Typography } from '@mui/material';
+import React, { lazy, Suspense, ComponentType } from 'react';
+import { Box, Typography, CircularProgress } from '@mui/material';
 
 /**
  * Feature unavailable component
@@ -32,6 +32,26 @@ const FeatureUnavailable: React.FC<{ featureName: string }> = ({ featureName }) 
 );
 
 /**
+ * Loading fallback component
+ */
+const LoadingFallback: React.FC<{ componentName?: string }> = ({ componentName }) => (
+  <Box
+    display="flex"
+    flexDirection="column"
+    justifyContent="center"
+    alignItems="center"
+    minHeight="200px"
+  >
+    <CircularProgress />
+    {componentName && (
+      <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
+        Loading {componentName}...
+      </Typography>
+    )}
+  </Box>
+);
+
+/**
  * Generic component loader with error handling
  * DEPRECATED: Use specific loader functions instead (loadRAGExamCreator, loadDocumentChat, etc.)
  * This function is kept for backward compatibility but should not be used for new code.
@@ -49,10 +69,24 @@ export const loadComponent = <P extends object>(
 
 /**
  * Load RAG Exam Creator (Premium Feature)
- * TEMPORARY: Returns unavailable until TF-200 (NPM Workspace Migration) is merged
+ * Uses @examcraft/premium package via Webpack alias
  */
 export const loadRAGExamCreator = () => {
-  return () => <FeatureUnavailable featureName="RAG Exam Creator" />;
+  const LazyComponent = lazy(() =>
+    // @examcraft/premium resolves to ../../premium/frontend/src via craco.config.js
+    import(/* webpackChunkName: "premium-rag-exam-creator" */ '@examcraft/premium')
+      .then((module) => ({ default: module.RAGExamCreator || module.default }))
+      .catch((error) => {
+        console.error('Failed to load RAG Exam Creator:', error);
+        return { default: () => <FeatureUnavailable featureName="RAG Exam Creator" /> };
+      })
+  );
+
+  return (props: any) => (
+    <Suspense fallback={<LoadingFallback componentName="RAG Exam Creator" />}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
 };
 
 /**
