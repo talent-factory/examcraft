@@ -4,7 +4,9 @@
   "private": true,
   "description": "ExamCraft AI - Bun Workspace Monorepo",
   "workspaces": [
-    "packages/core/frontend"
+    "packages/core/frontend",
+    "packages/premium/frontend",
+    "packages/enterprise/frontend"
   ],
   "scripts": {
     "install:all": "bun install",

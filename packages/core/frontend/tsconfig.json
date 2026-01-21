@@ -22,7 +22,11 @@
     "baseUrl": ".",
     "paths": {
       "@examcraft/core": ["./src/lib"],
-      "@examcraft/core/*": ["./src/*"]
+      "@examcraft/core/*": ["./src/*"],
+      "@examcraft/premium": ["../../premium/frontend/src"],
+      "@examcraft/premium/*": ["../../premium/frontend/src/*"],
+      "@examcraft/enterprise": ["../../enterprise/frontend/src"],
+      "@examcraft/enterprise/*": ["../../enterprise/frontend/src/*"]
     }
   },
   "include": [
