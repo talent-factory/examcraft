@@ -34,12 +34,21 @@ module.exports = {
       // Add workspace packages to module resolution
       // NOTE: @examcraft/core points to lib (library entry), not src/ directory
       // This prevents conflicts with index.tsx (React app entry point)
-      // In Docker, Premium/Enterprise packages are mounted at /workspace/packages/
+      // Docker: Premium/Enterprise mounted at /premium and /enterprise (see docker-compose.full.yml)
+      // Render.com: Use relative paths from monorepo root
+      const isProd = process.env.NODE_ENV === 'production';
+      const premiumPath = isProd
+        ? path.resolve(__dirname, '../../premium/frontend/src')
+        : path.resolve('/premium/frontend/src');
+      const enterprisePath = isProd
+        ? path.resolve(__dirname, '../../enterprise/frontend/src')
+        : path.resolve('/enterprise/frontend/src');
+
       webpackConfig.resolve.alias = {
         ...webpackConfig.resolve.alias,
         '@examcraft/core': path.resolve(__dirname, 'src/lib'),
-        '@examcraft/premium': path.resolve('/workspace/packages/premium/frontend/src'),
-        '@examcraft/enterprise': path.resolve('/workspace/packages/enterprise/frontend/src'),
+        '@examcraft/premium': premiumPath,
+        '@examcraft/enterprise': enterprisePath,
       };
 
       // Configure module resolution to prefer .tsx over .ts for entry points
@@ -56,11 +65,12 @@ module.exports = {
         );
         if (tsRule) {
           // Extend include to cover workspace packages for Babel transpilation
-          // In Docker, Premium/Enterprise packages are mounted at /workspace/packages/
+          // Docker: Premium/Enterprise mounted at /premium and /enterprise
+          // Render.com: Use relative paths from monorepo root
           tsRule.include = [
             tsRule.include,
-            path.resolve('/workspace/packages/premium/frontend/src'),
-            path.resolve('/workspace/packages/enterprise/frontend/src'),
+            premiumPath,
+            enterprisePath,
           ].filter(Boolean);
 
           // Disable TypeScript checking for workspace packages

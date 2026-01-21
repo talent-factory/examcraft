@@ -289,20 +289,20 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # Workspace root package files
-      - ./package.json:/workspace/package.json
-      - ./package-lock.json:/workspace/package-lock.json
+      # Core Frontend Source (working directory is /app)
+      - ./packages/core/frontend/src:/app/src
+      - ./packages/core/frontend/public:/app/public
+      - ./packages/core/frontend/.env.local:/app/.env.local
 
-      # Core Frontend Source
-      - ./packages/core/frontend/src:/workspace/packages/core/frontend/src
-      - ./packages/core/frontend/public:/workspace/packages/core/frontend/public
-      - ./packages/core/frontend/.env.local:/workspace/packages/core/frontend/.env.local
+      # Premium Frontend (mounted relative to /app for Webpack alias resolution)
+      # Webpack alias: path.resolve(__dirname, '../../premium/frontend/src')
+      # __dirname = /app, so ../../premium/frontend/src = /premium/frontend/src
+      - ./packages/premium/frontend/src:/premium/frontend/src
 
-      # Premium Frontend (mounted into workspace structure)
-      - ./packages/premium/frontend/src:/workspace/packages/premium/frontend/src
-
-      # Enterprise Frontend (mounted into workspace structure)
-      - ./packages/enterprise/frontend/src:/workspace/packages/enterprise/frontend/src
+      # Enterprise Frontend (mounted relative to /app for Webpack alias resolution)
+      # Webpack alias: path.resolve(__dirname, '../../enterprise/frontend/src')
+      # __dirname = /app, so ../../enterprise/frontend/src = /enterprise/frontend/src
+      - ./packages/enterprise/frontend/src:/enterprise/frontend/src
 
       # Don't override node_modules
       - /app/node_modules
