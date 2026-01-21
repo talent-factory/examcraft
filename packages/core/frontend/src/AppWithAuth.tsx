@@ -16,19 +16,20 @@ import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { UserManagementPage } from './components/admin/UserManagementPage';
 import RoleManagementPage from './components/admin/RoleManagementPage';
-import { DocumentChatPage } from './premium/components/DocumentChat/DocumentChatPage';
 import { Dashboard } from './pages/Dashboard';
 import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
 import { Review } from './pages/Review';
 import { Admin } from './pages/Admin';
 import { UserRole } from './types/auth';
-import App from './App';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
-import { loadPromptLibraryWithUpload } from './utils/componentLoader';
+import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
 // Load Premium PromptLibrary with Upload (falls back to Core version)
 const PromptLibrary = loadPromptLibraryWithUpload();
+
+// Load Premium Document Chat (falls back to unavailable message)
+const DocumentChatPage = loadDocumentChat();
 
 // Create a QueryClient instance for TanStack Query
 const queryClient = new QueryClient({

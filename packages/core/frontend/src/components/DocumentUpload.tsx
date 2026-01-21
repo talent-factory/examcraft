@@ -14,24 +14,17 @@ import {
   ListItemSecondaryAction,
   IconButton,
   Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Grid,
   Paper
 } from '@mui/material';
 import {
   CloudUpload,
   Description,
-  CheckCircle,
-  Error as ErrorIcon,
   Delete,
   Refresh,
   Schedule,
   PictureAsPdf,
   TextSnippet,
-  Code,
   Cancel
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
@@ -172,8 +165,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     const file = uploadFiles.find(f => f.id === fileId);
     if (!file) return;
 
-    setUploadFiles(prev => prev.map(f => 
-      f.id === fileId 
+    setUploadFiles(prev => prev.map(f =>
+      f.id === fileId
         ? { ...f, status: 'pending', progress: 0, error: undefined }
         : f
     ));
@@ -265,82 +258,83 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     }
   };
 
-  const waitForDocumentProcessing = async (
-    documentId: number,
-    fileId: string,
-    abortController: AbortController,
-    maxWaitTime: number = 1800000 // 30 Minuten für große Dokumente (300+ Seiten)
-  ) => {
-    /**
-     * Warte auf Dokumentenverarbeitung durch Polling des Status
-     * maxWaitTime: Maximale Wartezeit in ms (default: 30 Minuten)
-     */
-    const startTime = Date.now();
-    const pollInterval = 3000; // Poll alle 3 Sekunden
-    const warningThreshold = maxWaitTime * 0.8; // Warnung bei 80% der Zeit
+  // Commented out - not currently used but may be needed for future features
+  // const waitForDocumentProcessing = async (
+  //   documentId: number,
+  //   fileId: string,
+  //   abortController: AbortController,
+  //   maxWaitTime: number = 1800000 // 30 Minuten für große Dokumente (300+ Seiten)
+  // ) => {
+  //   /**
+  //    * Warte auf Dokumentenverarbeitung durch Polling des Status
+  //    * maxWaitTime: Maximale Wartezeit in ms (default: 30 Minuten)
+  //    */
+  //   const startTime = Date.now();
+  //   const pollInterval = 3000; // Poll alle 3 Sekunden
+  //   const warningThreshold = maxWaitTime * 0.8; // Warnung bei 80% der Zeit
 
-    while (Date.now() - startTime < maxWaitTime) {
-      // Check if cancelled
-      if (abortController.signal.aborted) {
-        throw new Error('Processing cancelled by user');
-      }
+  //   while (Date.now() - startTime < maxWaitTime) {
+  //     // Check if cancelled
+  //     if (abortController.signal.aborted) {
+  //       throw new Error('Processing cancelled by user');
+  //     }
 
-      try {
-        const status = await DocumentService.getProcessingStatus(documentId);
-        const elapsedTime = Date.now() - startTime;
-        const estimatedTimeRemaining = Math.max(0, maxWaitTime - elapsedTime);
+  //     try {
+  //       const status = await DocumentService.getProcessingStatus(documentId);
+  //       const elapsedTime = Date.now() - startTime;
+  //       const estimatedTimeRemaining = Math.max(0, maxWaitTime - elapsedTime);
 
-        // Calculate progress (50% → 95%)
-        const processingProgress = Math.min(95, 50 + (elapsedTime / maxWaitTime) * 45);
+  //       // Calculate progress (50% → 95%)
+  //       const processingProgress = Math.min(95, 50 + (elapsedTime / maxWaitTime) * 45);
 
-        // Update progress with estimated time
-        setUploadFiles(prev => prev.map(f =>
-          f.id === fileId
-            ? {
-                ...f,
-                progress: processingProgress,
-                estimatedTimeRemaining: estimatedTimeRemaining
-              }
-            : f
-        ));
+  //       // Update progress with estimated time
+  //       setUploadFiles(prev => prev.map(f =>
+  //         f.id === fileId
+  //           ? {
+  //               ...f,
+  //               progress: processingProgress,
+  //               estimatedTimeRemaining: estimatedTimeRemaining
+  //             }
+  //           : f
+  //       ));
 
-        // Show warning if approaching timeout
-        if (elapsedTime > warningThreshold && elapsedTime < warningThreshold + pollInterval) {
-          console.warn(`Document processing taking longer than expected. ${Math.round(estimatedTimeRemaining / 1000)}s remaining.`);
-        }
+  //       // Show warning if approaching timeout
+  //       if (elapsedTime > warningThreshold && elapsedTime < warningThreshold + pollInterval) {
+  //         console.warn(`Document processing taking longer than expected. ${Math.round(estimatedTimeRemaining / 1000)}s remaining.`);
+  //       }
 
-        if (status.status === 'Verarbeitet' || status.status === 'processed') {
-          return; // Verarbeitung abgeschlossen
-        }
+  //       if (status.status === 'Verarbeitet' || status.status === 'processed') {
+  //         return; // Verarbeitung abgeschlossen
+  //       }
 
-        if (status.status === 'Fehler' || status.status === 'error') {
-          throw new Error(`Document processing failed: ${status.status}`);
-        }
+  //       if (status.status === 'Fehler' || status.status === 'error') {
+  //         throw new Error(`Document processing failed: ${status.status}`);
+  //       }
 
-        // Warte vor nächstem Poll
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
-      } catch (error) {
-        // Check if cancelled
-        if (abortController.signal.aborted) {
-          throw new Error('Processing cancelled by user');
-        }
+  //       // Warte vor nächstem Poll
+  //       await new Promise(resolve => setTimeout(resolve, pollInterval));
+  //     } catch (error) {
+  //       // Check if cancelled
+  //       if (abortController.signal.aborted) {
+  //         throw new Error('Processing cancelled by user');
+  //       }
 
-        console.error('Error checking document status:', error);
-        // Weiter versuchen
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
-      }
-    }
+  //       console.error('Error checking document status:', error);
+  //       // Weiter versuchen
+  //       await new Promise(resolve => setTimeout(resolve, pollInterval));
+  //     }
+  //   }
 
-    throw new Error(`Document processing timeout after ${maxWaitTime / 60000} minutes. Please try again or contact support for large documents.`);
-  };
+  //   throw new Error(`Document processing timeout after ${maxWaitTime / 60000} minutes. Please try again or contact support for large documents.`);
+  // };
 
   const startUpload = async () => {
     if (uploadFiles.length === 0) return;
 
     setIsUploading(true);
-    
+
     const pendingFiles = uploadFiles.filter(f => f.status === 'pending' || f.status === 'error');
-    
+
     // Upload files sequentially to avoid overwhelming the server
     for (const uploadFile of pendingFiles) {
       await uploadSingleFile(uploadFile.file, uploadFile.id);
@@ -441,9 +435,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                           {formatFileSize(uploadFile.file.size)}
                         </Typography>
                         {uploadFile.progress > 0 && uploadFile.status !== 'completed' && (
-                          <LinearProgress 
-                            variant="determinate" 
-                            value={uploadFile.progress} 
+                          <LinearProgress
+                            variant="determinate"
+                            value={uploadFile.progress}
                             sx={{ mt: 1 }}
                           />
                         )}
@@ -499,8 +493,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
       {/* Results Summary */}
       {showResults && totalCount > 0 && (
-        <Alert 
-          severity={errorCount > 0 ? 'warning' : 'success'} 
+        <Alert
+          severity={errorCount > 0 ? 'warning' : 'success'}
           sx={{ mt: 2 }}
           onClose={() => setShowResults(false)}
         >
@@ -519,7 +513,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         <Alert severity="info" sx={{ mt: 2 }}>
           <Typography variant="body2">
             <Schedule sx={{ verticalAlign: 'middle', mr: 1 }} />
-            Dokumente werden verarbeitet und für RAG-Prüfungen vorbereitet. 
+            Dokumente werden verarbeitet und für RAG-Prüfungen vorbereitet.
             Dies kann je nach Dateigröße einige Minuten dauern.
           </Typography>
         </Alert>

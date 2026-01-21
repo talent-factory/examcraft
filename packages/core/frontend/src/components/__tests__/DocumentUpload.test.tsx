@@ -133,8 +133,6 @@ describe.skip('DocumentUpload', () => {
         createMockFile('test2.txt', 512, 'text/plain')
       ];
 
-      // Mock the onDrop callback
-      const mockOnDrop = jest.fn();
       mockUseDropzone.mockReturnValue({
         getRootProps: mockGetRootProps,
         getInputProps: mockGetInputProps,

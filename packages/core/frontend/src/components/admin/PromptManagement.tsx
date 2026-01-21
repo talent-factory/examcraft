@@ -5,7 +5,7 @@ import { PromptVersionHistory } from './PromptVersionHistory';
 import { PromptUsageChart } from './PromptUsageChart';
 import { SemanticSearchTester } from './SemanticSearchTester';
 import { Box, Paper, Tabs, Tab } from '@mui/material';
-import { LibraryBooks, Edit, History, BarChart, Search } from '@mui/icons-material';
+import { LibraryBooks, Search } from '@mui/icons-material';
 
 type ViewMode = 'library' | 'editor' | 'versions' | 'analytics' | 'search';
 
@@ -37,11 +37,6 @@ export const PromptManagement: React.FC = () => {
   const handleShowVersions = (promptName: string) => {
     setSelectedPromptName(promptName);
     setViewMode('versions');
-  };
-
-  const handleShowAnalytics = (promptId: string) => {
-    setSelectedPromptId(promptId);
-    setViewMode('analytics');
   };
 
   const handleBackToLibrary = () => {

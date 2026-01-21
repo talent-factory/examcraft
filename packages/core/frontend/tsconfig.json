@@ -18,7 +18,12 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@examcraft/core": ["./src/lib"],
+      "@examcraft/core/*": ["./src/*"]
+    }
   },
   "include": [
     "src"
@@ -27,6 +32,10 @@
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/__tests__/**",
-    "src/setupTests.ts"
+    "src/setupTests.ts",
+    "src/premium/**",
+    "src/enterprise/**",
+    "../../premium/**",
+    "../../enterprise/**"
   ]
 }

@@ -60,8 +60,9 @@ services:
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 40s
     networks:
       - examcraft_network
 
@@ -274,17 +275,20 @@ services:
     ports:
       - "3000:3000"
     volumes:
+      # Workspace root package files
+      - ./package.json:/workspace/package.json
+      - ./package-lock.json:/workspace/package-lock.json
+
       # Core Frontend Source
-      - ./packages/core/frontend/src:/app/src
+      - ./packages/core/frontend/src:/workspace/packages/core/frontend/src
+      - ./packages/core/frontend/public:/workspace/packages/core/frontend/public
+      - ./packages/core/frontend/.env.local:/workspace/packages/core/frontend/.env.local
 
-      # Premium Frontend (mounted into Core structure)
-      - ./packages/premium/frontend/src:/app/src/premium
+      # Premium Frontend (mounted into workspace structure)
+      - ./packages/premium/frontend/src:/workspace/packages/premium/frontend/src
 
-      # Enterprise Frontend (mounted into Core structure)
-      - ./packages/enterprise/frontend/src:/app/src/enterprise
-
-      # Public assets
-      - ./packages/core/frontend/public:/app/public
+      # Enterprise Frontend (mounted into workspace structure)
+      - ./packages/enterprise/frontend/src:/workspace/packages/enterprise/frontend/src
 
       # Don't override node_modules
       - /app/node_modules

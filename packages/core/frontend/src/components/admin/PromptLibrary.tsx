@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -19,7 +19,7 @@ import {
   MenuItem,
   SelectChangeEvent
 } from '@mui/material';
-import { Add, Search, Edit, Delete, History, TrendingUp } from '@mui/icons-material';
+import { Add, Search, Edit, Delete, History } from '@mui/icons-material';
 import { promptsApi, Prompt } from '../../api/promptsApi';
 
 interface PromptLibraryProps {
@@ -40,11 +40,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all'); // all, active, inactive
 
-  useEffect(() => {
-    loadPrompts();
-  }, [categoryFilter, statusFilter]);
-
-  const loadPrompts = async () => {
+  const loadPrompts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -73,7 +69,11 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [categoryFilter, statusFilter]);
+
+  useEffect(() => {
+    loadPrompts();
+  }, [loadPrompts]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Möchten Sie diesen Prompt wirklich löschen?')) {

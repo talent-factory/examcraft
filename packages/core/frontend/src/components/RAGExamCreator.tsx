@@ -9,11 +9,10 @@
  * in docker-compose.premium.yml, which replaces this entire file.
  */
 
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, Alert, Button, CircularProgress } from '@mui/material';
+import React from 'react';
+import { Box, Typography, Alert, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { InfoOutlined } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
 
 interface RAGExamCreatorProps {
   selectedDocuments?: number[];
@@ -77,4 +76,3 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = (props) => {
 };
 
 export default RAGExamCreator;
-
