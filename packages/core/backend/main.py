@@ -214,18 +214,7 @@ async def lifespan(app: FastAPI):
 
     # Premium/Enterprise Features: Load additional Premium APIs
     if is_full_deployment:
-        # Premium: Chat API
-        try:
-            from premium.api.v1 import chat as chat_api
-
-            app.include_router(chat_api.router)
-            print("✅ Premium Chat API loaded")
-        except ImportError as e:
-            print(f"⚠️  Premium Chat API not available: {e}")
-        except Exception as e:
-            print(f"❌ Error loading Premium Chat API: {e}")
-
-        # Premium: Prompts API
+        # Premium: Prompts API (only this one is fully implemented)
         try:
             from premium.api.v1 import prompts as prompts_api
 
@@ -236,16 +225,8 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"❌ Error loading Premium Prompts API: {e}")
 
-        # Premium: Vector Search API
-        try:
-            from premium.api.v1 import vector_search as vector_search_api
-
-            app.include_router(vector_search_api.router)
-            print("✅ Premium Vector Search API loaded")
-        except ImportError as e:
-            print(f"⚠️  Premium Vector Search API not available: {e}")
-        except Exception as e:
-            print(f"❌ Error loading Premium Vector Search API: {e}")
+        # NOTE: Chat API and Vector Search API are not yet fully implemented
+        # They will be added in future releases when the models are properly integrated
 
         print("")
     else:
