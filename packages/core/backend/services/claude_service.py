@@ -289,7 +289,23 @@ class ClaudeService:
 
                 result = await self._make_api_request_with_retry(payload)
                 content = result["content"][0]["text"]
-                questions = self._parse_claude_response(content, topic, difficulty)
+
+                # Custom prompts können Markdown oder JSON zurückgeben
+                # Versuche JSON zu parsen, aber akzeptiere auch Markdown
+                try:
+                    questions = self._parse_claude_response(content, topic, difficulty)
+                except Exception as e:
+                    logger.warning(
+                        f"Could not parse as JSON, returning raw Markdown: {e}"
+                    )
+                    # Wenn JSON-Parsing fehlschlägt, gib Markdown als einzelne "Frage" zurück
+                    questions = [
+                        {
+                            "question": content,
+                            "type": "markdown",
+                            "raw_output": True,
+                        }
+                    ]
 
                 return {
                     "questions": questions,
@@ -467,11 +483,13 @@ Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
                 except json.JSONDecodeError:
                     logger.debug("Code block JSON parsing failed")
 
-            # No valid JSON found
-            logger.error(
+            # No valid JSON found - könnte Markdown sein (bei Custom Prompts normal)
+            logger.warning(
                 f"No valid JSON found in Claude response. Content preview: {content[:200]}..."
             )
-            return self._generate_demo_questions(topic, difficulty, 3, "de")
+            # Raise exception statt Demo-Fragen zurückzugeben
+            # Der Caller kann entscheiden, ob Markdown akzeptiert wird
+            raise ValueError("No valid JSON found in Claude response")
 
         except Exception as e:
             logger.error(f"Failed to parse Claude response: {type(e).__name__}: {e}")
