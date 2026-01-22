@@ -491,6 +491,9 @@ Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
             # Der Caller kann entscheiden, ob Markdown akzeptiert wird
             raise ValueError("No valid JSON found in Claude response")
 
+        except ValueError:
+            # ValueError wird nach oben propagiert (für Custom Prompt Handler)
+            raise
         except Exception as e:
             logger.error(f"Failed to parse Claude response: {type(e).__name__}: {e}")
             logger.error(f"Response content preview: {content[:300]}...")
