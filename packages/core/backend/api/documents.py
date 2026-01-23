@@ -13,10 +13,11 @@ from fastapi import (
     Request,
     BackgroundTasks,
 )
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import os
 
 from services.document_service import DocumentService
 from services.vector_service_factory import vector_service
@@ -242,6 +243,56 @@ async def get_document(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get document: {str(e)}")
+
+
+@router.get("/{document_id}/download")
+async def download_document(
+    document_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Download original document file
+
+    **Required:** Authenticated user
+
+    - **document_id**: ID of the document to download
+
+    Returns:
+        File download with original filename
+    """
+    try:
+        document = document_service.get_document_by_id(document_id, db)
+
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Tenant-aware access control
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+
+        tenant_context = get_tenant_context(current_user)
+        TenantFilter.verify_tenant_access(document, tenant_context)
+
+        # Check if file exists
+        if not os.path.exists(document.file_path):
+            raise HTTPException(
+                status_code=404, detail="Document file not found on disk"
+            )
+
+        # Return file with original filename
+        return FileResponse(
+            path=document.file_path,
+            filename=document.original_filename,
+            media_type=document.mime_type,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to download document {document_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to download document: {str(e)}"
+        )
 
 
 @router.get("/{document_id}/status")
