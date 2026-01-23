@@ -2,6 +2,7 @@
 
 # ExamCraft AI - Seed Development Data
 # Führt seed_dev_data.py im Backend-Container aus
+# Verwendet 2-Tier-Architektur: Core oder Full
 
 set -e
 
@@ -16,19 +17,23 @@ echo ""
 echo -e "${BLUE}🌱 Seeding Development Data...${NC}"
 echo ""
 
-# Erkenne verfügbare Compose Files
-COMPOSE_FILES=("-f docker-compose.yml")
+# Auto-detect deployment mode (same logic as start-dev.sh)
+submodule_initialized() {
+    [ -d "packages/$1" ] && [ "$(ls -A packages/$1 2>/dev/null)" ]
+}
 
-if [ -d "packages/premium" ] && [ "$(ls -A packages/premium)" ]; then
-    COMPOSE_FILES+=("-f docker-compose.premium.yml")
+if submodule_initialized "premium" || submodule_initialized "enterprise"; then
+    COMPOSE_FILE="docker-compose.full.yml"
+    echo -e "${GREEN}✅ Detected: Full deployment${NC}"
+else
+    COMPOSE_FILE="docker-compose.yml"
+    echo -e "${BLUE}ℹ️  Detected: Core deployment${NC}"
 fi
 
-if [ -d "packages/enterprise" ] && [ "$(ls -A packages/enterprise)" ]; then
-    COMPOSE_FILES+=("-f docker-compose.enterprise.yml")
-fi
+echo ""
 
 # Führe Seed-Script im Backend-Container aus
-docker compose ${COMPOSE_FILES[@]} exec backend python scripts/seed_dev_data.py
+docker compose --env-file .env -f "$COMPOSE_FILE" exec backend python scripts/seed_dev_data.py
 
 echo ""
 echo -e "${GREEN}✅ Development data seeded successfully!${NC}"
@@ -39,4 +44,3 @@ echo "   Password: admin123"
 echo ""
 echo -e "${BLUE}💡 Tip:${NC} Any user with @talent-factory.ch email will be auto-assigned to Talent Factory institution"
 echo ""
-
