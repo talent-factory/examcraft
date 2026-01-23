@@ -752,22 +752,47 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
                 {previewTab === 1 && (
                   <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Typography variant="h6">
-                        Dokumentinhalt ({totalChunks} Chunks)
-                      </Typography>
-                      {totalPages > 1 && (
-                        <Typography variant="body2" color="text.secondary">
-                          Seite {currentPage} von {totalPages}
+                    {/* Check if document has full_content in metadata (e.g., chat export) */}
+                    {previewDialog.document.metadata?.full_content ? (
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          Dokumentinhalt
                         </Typography>
-                      )}
-                    </Box>
-
-                    {chunksLoading ? (
-                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                        <CircularProgress />
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 3,
+                            bgcolor: 'grey.50',
+                            maxHeight: 600,
+                            overflow: 'auto',
+                            fontFamily: 'monospace',
+                            fontSize: '0.875rem',
+                            lineHeight: 1.6,
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word'
+                          }}
+                        >
+                          {previewDialog.document.metadata.full_content}
+                        </Paper>
                       </Box>
-                    ) : documentChunks.length > 0 ? (
+                    ) : (
+                      <>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="h6">
+                            Dokumentinhalt ({totalChunks} Chunks)
+                          </Typography>
+                          {totalPages > 1 && (
+                            <Typography variant="body2" color="text.secondary">
+                              Seite {currentPage} von {totalPages}
+                            </Typography>
+                          )}
+                        </Box>
+
+                        {chunksLoading ? (
+                          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                            <CircularProgress />
+                          </Box>
+                        ) : documentChunks.length > 0 ? (
                       <Box>
                         {/* Chunks Display */}
                         <Box sx={{ mb: 3 }}>
@@ -858,6 +883,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                           : 'Kein Inhalt verfügbar.'
                         }
                       </Alert>
+                    )}
+                      </>
                     )}
                   </Box>
                 )}
