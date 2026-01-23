@@ -533,3 +533,41 @@ class OAuthAccount(Base):
 
     def __repr__(self):
         return f"<OAuthAccount(id={self.id}, provider='{self.provider}', user_id={self.user_id})>"
+
+
+class EmailVerificationToken(Base):
+    """
+    Email Verification Tokens
+    Stores tokens for email verification with expiration
+    """
+
+    __tablename__ = "email_verification_tokens"
+
+    # Primary Key
+    id = Column(Integer, primary_key=True, index=True)
+
+    # User Reference
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+
+    # Token
+    token = Column(String(255), unique=True, nullable=False, index=True)
+
+    # Expiration
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    # Status
+    is_used = Column(Boolean, default=False, nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Timestamps
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    user = relationship("User", backref="verification_tokens")
+
+    def __repr__(self):
+        return f"<EmailVerificationToken(id={self.id}, user_id={self.user_id}, is_used={self.is_used})>"

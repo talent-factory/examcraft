@@ -195,7 +195,7 @@ jobs:
 
     strategy:
       matrix:
-        scenario: [core, premium, enterprise]
+        scenario: [core, full]
 
     steps:
       - name: Free Disk Space
@@ -230,13 +230,9 @@ jobs:
         if: matrix.scenario == 'core'
         run: docker compose -f docker-compose.yml config
 
-      - name: Validate Docker Compose - Premium
-        if: matrix.scenario == 'premium'
-        run: docker compose -f docker-compose.yml -f docker-compose.premium.yml config
-
-      - name: Validate Docker Compose - Enterprise
-        if: matrix.scenario == 'enterprise'
-        run: docker compose -f docker-compose.yml -f docker-compose.premium.yml -f docker-compose.enterprise.yml config
+      - name: Validate Docker Compose - Full
+        if: matrix.scenario == 'full'
+        run: docker compose -f docker-compose.full.yml config
 
       - name: Build Docker Images - Core
         if: matrix.scenario == 'core'
@@ -247,20 +243,11 @@ jobs:
           DOCKER_BUILDKIT: 1
           COMPOSE_DOCKER_CLI_BUILD: 1
 
-      - name: Build Docker Images - Premium
-        if: matrix.scenario == 'premium'
+      - name: Build Docker Images - Full
+        if: matrix.scenario == 'full'
         run: |
           echo "Building only backend and frontend images to save disk space"
-          docker compose -f docker-compose.yml -f docker-compose.premium.yml build backend frontend
-        env:
-          DOCKER_BUILDKIT: 1
-          COMPOSE_DOCKER_CLI_BUILD: 1
-
-      - name: Build Docker Images - Enterprise
-        if: matrix.scenario == 'enterprise'
-        run: |
-          echo "Building only backend and frontend images to save disk space"
-          docker compose -f docker-compose.yml -f docker-compose.premium.yml -f docker-compose.enterprise.yml build backend frontend
+          docker compose -f docker-compose.full.yml build backend frontend
         env:
           DOCKER_BUILDKIT: 1
           COMPOSE_DOCKER_CLI_BUILD: 1

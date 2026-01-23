@@ -34,6 +34,12 @@ from models.rbac import (
     ResourceUsage,
     PermissionAuditLog,
 )
+from models.email_event import (
+    EmailEvent,
+    EmailSuppressionList,
+    EmailEventType,
+    EmailType,
+)
 
 __all__ = [
     "Document",
@@ -60,4 +66,9 @@ __all__ = [
     "Organization",
     "ResourceUsage",
     "PermissionAuditLog",
+    # Email Event Models
+    "EmailEvent",
+    "EmailSuppressionList",
+    "EmailEventType",
+    "EmailType",
 ]

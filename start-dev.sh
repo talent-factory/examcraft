@@ -177,6 +177,17 @@ if [ "$DEPLOYMENT_MODE" = "full" ]; then
     else
         echo -e "${YELLOW}⚠️  Warning: scripts/setup-premium-symlinks.sh not found${NC}"
     fi
+
+    # Install NPM/Bun dependencies
+    echo ""
+    echo -e "${BLUE}📦 Installing frontend dependencies...${NC}"
+    if command -v bun &> /dev/null; then
+        echo "  Using Bun (fast!)..."
+        bun install
+    else
+        echo "  Using npm (consider installing Bun for 10-100x faster installs)..."
+        npm install
+    fi
 fi
 
 # Docker Cleanup

@@ -38,12 +38,21 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         '& h1': { fontSize: '2rem' },
         '& h2': { fontSize: '1.5rem' },
         '& h3': { fontSize: '1.25rem' },
-        '& ul, & ol': {
+        '& ul': {
           pl: 3,
-          my: 1
+          my: 1,
+          listStyleType: 'disc',
+          listStylePosition: 'outside'
+        },
+        '& ol': {
+          pl: 3,
+          my: 1,
+          listStyleType: 'decimal',
+          listStylePosition: 'outside'
         },
         '& li': {
-          mb: 0.5
+          mb: 0.5,
+          display: 'list-item'
         },
         '& blockquote': {
           borderLeft: '4px solid',
