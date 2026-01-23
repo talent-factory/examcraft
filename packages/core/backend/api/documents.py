@@ -13,7 +13,7 @@ from fastapi import (
     Request,
     BackgroundTasks,
 )
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -260,6 +260,8 @@ async def download_document(
 
     Returns:
         File download with original filename
+
+    **Note:** Supports both physical files and virtual files (e.g., chat exports)
     """
     try:
         document = document_service.get_document_by_id(document_id, db)
@@ -273,18 +275,40 @@ async def download_document(
         tenant_context = get_tenant_context(current_user)
         TenantFilter.verify_tenant_access(document, tenant_context)
 
-        # Check if file exists
-        if not os.path.exists(document.file_path):
-            raise HTTPException(
-                status_code=404, detail="Document file not found on disk"
-            )
+        # Check if this is a chat export (virtual file)
+        if (
+            document.doc_metadata
+            and document.doc_metadata.get("source") == "chat_export"
+        ):
+            # Chat exports don't have physical files - content is in metadata
+            content = document.doc_metadata.get("full_content", "")
+            if not content:
+                raise HTTPException(
+                    status_code=404, detail="Document content not available"
+                )
 
-        # Return file with original filename
-        return FileResponse(
-            path=document.file_path,
-            filename=document.original_filename,
-            media_type=document.mime_type,
-        )
+            # Return content as downloadable file
+            headers = {
+                "Content-Disposition": f'attachment; filename="{document.original_filename}"'
+            }
+            return Response(
+                content=content.encode("utf-8"),
+                media_type=document.mime_type,
+                headers=headers,
+            )
+        else:
+            # Normal documents - check if file exists on disk
+            if not os.path.exists(document.file_path):
+                raise HTTPException(
+                    status_code=404, detail="Document file not found on disk"
+                )
+
+            # Return file with original filename
+            return FileResponse(
+                path=document.file_path,
+                filename=document.original_filename,
+                media_type=document.mime_type,
+            )
 
     except HTTPException:
         raise
