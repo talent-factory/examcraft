@@ -239,7 +239,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
   const handleDownload = async (document: Document) => {
     try {
-      await DocumentService.downloadDocument(document.id, document.filename);
+      // Use original_filename for user-friendly download name
+      await DocumentService.downloadDocument(document.id, document.original_filename);
       handleMenuClose();
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Download');
