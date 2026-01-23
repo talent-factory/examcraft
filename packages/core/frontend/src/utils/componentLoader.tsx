@@ -122,7 +122,7 @@ export const loadRAGExamCreator = () => {
  *
  * Checks:
  * 1. Deployment Mode: Must be Full deployment
- * 2. RBAC: User must have 'document_chatbot' feature (checked in component)
+ * 2. RBAC: User must have 'document_chatbot' feature (Professional tier)
  */
 export const loadDocumentChat = () => {
   if (!isFullDeployment()) {
@@ -130,11 +130,17 @@ export const loadDocumentChat = () => {
     return () => <FeatureUnavailable featureName="Document Chat" />;
   }
 
-  // TODO: Implement lazy loading when DocumentChat component is ready
-  // const LazyComponent = lazy(() =>
-  //   import('@examcraft/premium').then(module => ({ default: module.DocumentChat }))
-  // );
-  return () => <FeatureUnavailable featureName="Document Chat" />;
+  const LazyComponent = lazy(() =>
+    import('@examcraft/premium').then(module => ({ default: module.DocumentChatPage }))
+  );
+
+  return withFeatureGate(
+    LazyComponent,
+    'document_chatbot',
+    'professional',
+    'Document Chat',
+    'Chat with your documents using AI-powered conversations'
+  );
 };
 
 /**
@@ -142,7 +148,7 @@ export const loadDocumentChat = () => {
  *
  * Checks:
  * 1. Deployment Mode: Must be Full deployment
- * 2. RBAC: User must have 'advanced_prompt_management' feature (checked in component)
+ * 2. RBAC: User must have 'advanced_prompt_management' feature (Professional tier)
  */
 export const loadPromptManagement = () => {
   if (!isFullDeployment()) {
@@ -150,8 +156,17 @@ export const loadPromptManagement = () => {
     return () => <FeatureUnavailable featureName="Prompt Management" />;
   }
 
-  // TODO: Implement lazy loading when PromptManagement component is ready
-  return () => <FeatureUnavailable featureName="Prompt Management" />;
+  const LazyComponent = lazy(() =>
+    import('@examcraft/premium').then(module => ({ default: module.PromptLibraryWithUpload }))
+  );
+
+  return withFeatureGate(
+    LazyComponent,
+    'advanced_prompt_management',
+    'professional',
+    'Prompt Management',
+    'Manage and customize your prompt templates with advanced features'
+  );
 };
 
 /**
