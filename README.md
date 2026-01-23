@@ -25,9 +25,8 @@ examcraft/
 │   ├── core/          # ✅ Open Source (MIT) - Free Tier
 │   ├── premium/       # 🔒 Closed Source - Starter/Professional Tier
 │   └── enterprise/    # 🔒 Closed Source - Enterprise Tier
-├── docker-compose.yml              # Core Services
-├── docker-compose.premium.yml      # Premium Extension
-├── docker-compose.enterprise.yml   # Enterprise Extension
+├── docker-compose.yml              # Core Services (OpenSource)
+├── docker-compose.full.yml         # Full Services (Premium + Enterprise)
 └── MONOREPO_SETUP.md               # Detailed Setup Guide
 ```
 
@@ -152,10 +151,9 @@ ExamCraft/
 │       │   └── services/           # SSO, OAuth, Branding Services
 │       └── frontend/               # Enterprise Frontend Components
 │           └── src/components/     # SSO Config, Branding, API Management
-├── docker-compose.yml              # Core Services (PostgreSQL, Redis, Core)
-├── docker-compose.premium.yml      # Premium Extension (Qdrant)
-├── docker-compose.enterprise.yml   # Enterprise Extension
-├── start-dev.sh                    # 🚀 Smart Start Script (Auto-detects Tier)
+├── docker-compose.yml              # Core Services (PostgreSQL, Redis, RabbitMQ)
+├── docker-compose.full.yml         # Full Services (Core + Premium + Enterprise + Qdrant)
+├── start-dev.sh                    # 🚀 Smart Start Script (Auto-detects --core/--full)
 ├── stop-dev.sh                     # 🛑 Stop All Services
 ├── MONOREPO_SETUP.md               # Detailed Monorepo Setup Guide
 └── .gitmodules                     # Git Submodules Configuration
