@@ -98,7 +98,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
                 current_period_end=datetime.fromtimestamp(stripe_sub["current_period_end"])
             )
             db.add(new_sub)
-            logger.error(f"Created new subscription {subscription_id}")
+            logger.info(f"Created new subscription {subscription_id}")
 
         # Map Price ID to Subscription Tier
         # TODO: Make this configurable via environment variables or database
@@ -111,7 +111,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         # For now, default to starter if we can't map the price
         new_tier = tier_mapping.get(price_id, "starter")
         institution.subscription_tier = new_tier
-        logger.error(f"Updated institution {institution_id} to tier: {new_tier}")
+        logger.info(f"Updated institution {institution_id} to tier: {new_tier}")
 
         db.commit()
 
