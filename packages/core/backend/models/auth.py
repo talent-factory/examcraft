@@ -124,6 +124,9 @@ class Institution(Base):
     users = relationship(
         "User", back_populates="institution", cascade="all, delete-orphan"
     )
+    subscriptions = relationship(
+        "Subscription", back_populates="institution", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Institution(id={self.id}, name='{self.name}', slug='{self.slug}')>"

@@ -188,6 +188,20 @@ async def lifespan(app: FastAPI):
     )
     rbac_api = importlib.util.module_from_spec(spec_rbac)
     spec_rbac.loader.exec_module(rbac_api)
+    
+    # Import Billing API
+    spec_billing = importlib.util.spec_from_file_location(
+        "core_api_v1_billing", os.path.join(core_api_path, "v1", "billing.py")
+    )
+    billing_api = importlib.util.module_from_spec(spec_billing)
+    spec_billing.loader.exec_module(billing_api)
+
+    # Import Webhooks API
+    spec_webhooks = importlib.util.spec_from_file_location(
+        "core_api_v1_webhooks", os.path.join(core_api_path, "v1", "webhooks.py")
+    )
+    webhooks_api = importlib.util.module_from_spec(spec_webhooks)
+    spec_webhooks.loader.exec_module(webhooks_api)
 
     app.include_router(auth.router)
     app.include_router(admin.router)
@@ -196,6 +210,8 @@ async def lifespan(app: FastAPI):
     app.include_router(rag_exams.router)
     app.include_router(rbac_api.router)
     app.include_router(question_review.router)
+    app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["billing"])
+    app.include_router(webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"])
 
     # Email Webhooks (Resend)
     try:

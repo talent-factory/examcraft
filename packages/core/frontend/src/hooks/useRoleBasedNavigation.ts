@@ -100,6 +100,11 @@ export const useRoleBasedNavigation = () => {
       ],
     },
     {
+      label: 'Pricing',
+      path: '/billing',
+      icon: '💳',
+    },
+    {
       label: 'Profile',
       path: '/profile',
       icon: '👤',

@@ -23,6 +23,9 @@ import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
 import { Review } from './pages/Review';
 import { Admin } from './pages/Admin';
+import { BillingPage } from './pages/BillingPage';
+import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
+import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { UserRole } from './types/auth';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
@@ -178,6 +181,17 @@ export const AppWithAuth: React.FC = () => {
               />
 
               <Route
+                path="/billing"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <BillingPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/admin"
                 element={
                   <ProtectedRoute>
@@ -215,6 +229,8 @@ export const AppWithAuth: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route path="/billing/success" element={<PaymentSuccessPage />} />
+              <Route path="/billing/cancel" element={<PaymentCancelPage />} />
 
               {/* Redirect root to dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
