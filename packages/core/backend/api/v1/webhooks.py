@@ -2,15 +2,26 @@ import stripe
 from fastapi import APIRouter, Request, Header, HTTPException, Depends
 from sqlalchemy.orm import Session
 import os
+import logging
 from database import get_db
 from models.subscription import Subscription, SubscriptionStatus
-from models.auth import Institution, User
+from models.auth import Institution
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+# Stripe API Key setzen (notwendig für stripe.Subscription.retrieve() etc.)
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 router = APIRouter()
 
+
 @router.post("/stripe")
-async def stripe_webhook(request: Request, stripe_signature: str = Header(None), db: Session = Depends(get_db)):
+async def stripe_webhook(
+    request: Request,
+    stripe_signature: str = Header(None),
+    db: Session = Depends(get_db),
+):
     """
     Handle Stripe Webhooks
     Syncs Stripe events with local database
@@ -20,13 +31,11 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None),
     endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
 
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, endpoint_secret
-        )
-    except ValueError as e:
+        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+    except ValueError:
         # Invalid payload
         raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError as e:
+    except stripe.error.SignatureVerificationError:
         # Invalid signature
         raise HTTPException(status_code=400, detail="Invalid signature")
 
@@ -51,7 +60,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
     institution_id = metadata.get("institution_id")
 
     if not institution_id:
-        print("Error: No institution_id in session metadata")
+        logger.error("No institution_id in session metadata")
         return
 
     # functionality depends on subscription_mode (payment vs subscription)
@@ -60,9 +69,11 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         customer_id = session.get("customer")
 
         # Update Institution
-        institution = db.query(Institution).filter(Institution.id == int(institution_id)).first()
+        institution = (
+            db.query(Institution).filter(Institution.id == int(institution_id)).first()
+        )
         if not institution:
-            print(f"Error: Institution {institution_id} not found")
+            logger.error(f"Institution {institution_id} not found")
             return
 
         # Fetch actual subscription details from Stripe
@@ -70,17 +81,23 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         price_id = stripe_sub["items"]["data"][0]["price"]["id"]
 
         # Check if subscription already exists
-        existing_sub = db.query(Subscription).filter(
-            Subscription.stripe_subscription_id == subscription_id
-        ).first()
+        existing_sub = (
+            db.query(Subscription)
+            .filter(Subscription.stripe_subscription_id == subscription_id)
+            .first()
+        )
 
         if existing_sub:
             # Update existing subscription
             existing_sub.status = SubscriptionStatus(stripe_sub["status"])
             existing_sub.stripe_price_id = price_id
-            existing_sub.current_period_start = datetime.fromtimestamp(stripe_sub["current_period_start"])
-            existing_sub.current_period_end = datetime.fromtimestamp(stripe_sub["current_period_end"])
-            print(f"Updated existing subscription {subscription_id}")
+            existing_sub.current_period_start = datetime.fromtimestamp(
+                stripe_sub["current_period_start"]
+            )
+            existing_sub.current_period_end = datetime.fromtimestamp(
+                stripe_sub["current_period_end"]
+            )
+            logger.info(f"Updated existing subscription {subscription_id}")
         else:
             # Create local Subscription record
             new_sub = Subscription(
@@ -89,11 +106,15 @@ async def handle_checkout_session_completed(session: dict, db: Session):
                 stripe_customer_id=customer_id,
                 stripe_price_id=price_id,
                 status=SubscriptionStatus(stripe_sub["status"]),
-                current_period_start=datetime.fromtimestamp(stripe_sub["current_period_start"]),
-                current_period_end=datetime.fromtimestamp(stripe_sub["current_period_end"])
+                current_period_start=datetime.fromtimestamp(
+                    stripe_sub["current_period_start"]
+                ),
+                current_period_end=datetime.fromtimestamp(
+                    stripe_sub["current_period_end"]
+                ),
             )
             db.add(new_sub)
-            print(f"Created new subscription {subscription_id}")
+            logger.info(f"Created new subscription {subscription_id}")
 
         # Map Price ID to Subscription Tier
         # TODO: Make this configurable via environment variables or database
@@ -106,7 +127,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         # For now, default to starter if we can't map the price
         new_tier = tier_mapping.get(price_id, "starter")
         institution.subscription_tier = new_tier
-        print(f"Updated institution {institution_id} to tier: {new_tier}")
+        logger.info(f"Updated institution {institution_id} to tier: {new_tier}")
 
         db.commit()
 
@@ -114,34 +135,47 @@ async def handle_checkout_session_completed(session: dict, db: Session):
 async def handle_subscription_updated(subscription: dict, db: Session):
     """Sync subscription status updates"""
     sub_id = subscription["id"]
-    local_sub = db.query(Subscription).filter(Subscription.stripe_subscription_id == sub_id).first()
-    
+    local_sub = (
+        db.query(Subscription)
+        .filter(Subscription.stripe_subscription_id == sub_id)
+        .first()
+    )
+
     if local_sub:
         local_sub.status = SubscriptionStatus(subscription["status"])
-        local_sub.current_period_end = datetime.fromtimestamp(subscription["current_period_end"])
+        local_sub.current_period_end = datetime.fromtimestamp(
+            subscription["current_period_end"]
+        )
         local_sub.cancel_at_period_end = subscription["cancel_at_period_end"]
-        
+
         # Sync Institution Status
-        if local_sub.status != SubscriptionStatus.ACTIVE and local_sub.status != SubscriptionStatus.TRIALING:
+        if (
+            local_sub.status != SubscriptionStatus.ACTIVE
+            and local_sub.status != SubscriptionStatus.TRIALING
+        ):
             # Downgrade or suspend?
             # For now, just keep status synced. Gating logic can check subscription status.
             pass
-            
+
         db.commit()
 
 
 async def handle_subscription_deleted(subscription: dict, db: Session):
     """Handle subscription cancellation"""
     sub_id = subscription["id"]
-    local_sub = db.query(Subscription).filter(Subscription.stripe_subscription_id == sub_id).first()
-    
+    local_sub = (
+        db.query(Subscription)
+        .filter(Subscription.stripe_subscription_id == sub_id)
+        .first()
+    )
+
     if local_sub:
         local_sub.status = SubscriptionStatus.CANCELED
         local_sub.ended_at = datetime.now()
-        
+
         # Downgrade Institution
         institution = local_sub.institution
         if institution:
             institution.subscription_tier = "free"
-            
+
         db.commit()
