@@ -33,7 +33,6 @@ from models.rbac import (
     Organization,
     ResourceUsage,
     PermissionAuditLog,
-    PermissionAuditLog,
 )
 from models.subscription import (
     Subscription,

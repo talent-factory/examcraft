@@ -7,9 +7,7 @@ from sqlalchemy import pool
 from alembic import context
 
 # Import database models for autogenerate support
-# Import database models for autogenerate support
 from database import Base
-import models  # Register all models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
