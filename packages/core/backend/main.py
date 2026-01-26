@@ -213,23 +213,23 @@ async def lifespan(app: FastAPI):
     app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["billing"])
     app.include_router(webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"])
 
+    # Email Webhooks (Resend)
+    try:
+        from webhooks import resend_router
+
+        app.include_router(resend_router)
+        print("✅ Email webhooks loaded (Resend)")
+    except ImportError as e:
+        print(f"⚠️  Email webhooks not available: {e}")
+    except Exception as e:
+        print(f"❌ Error loading email webhooks: {e}")
+
     # Sentry Test Router (only in development)
     if os.getenv("ENVIRONMENT", "development") == "development":
         app.include_router(sentry_test.router)
 
     # Premium/Enterprise Features: Load additional Premium APIs
     if is_full_deployment:
-        # Premium: Chat API
-        try:
-            from premium.api.v1 import chat as chat_api
-
-            app.include_router(chat_api.router)
-            print("✅ Premium Chat API loaded")
-        except ImportError as e:
-            print(f"⚠️  Premium Chat API not available: {e}")
-        except Exception as e:
-            print(f"❌ Error loading Premium Chat API: {e}")
-
         # Premium: Prompts API
         try:
             from premium.api.v1 import prompts as prompts_api
@@ -241,16 +241,16 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"❌ Error loading Premium Prompts API: {e}")
 
-        # Premium: Vector Search API
+        # Premium: Chat API (Document ChatBot)
         try:
-            from premium.api.v1 import vector_search as vector_search_api
+            from premium.api.v1 import chat as chat_api
 
-            app.include_router(vector_search_api.router)
-            print("✅ Premium Vector Search API loaded")
+            app.include_router(chat_api.router)
+            print("✅ Premium Chat API loaded")
         except ImportError as e:
-            print(f"⚠️  Premium Vector Search API not available: {e}")
+            print(f"⚠️  Premium Chat API not available: {e}")
         except Exception as e:
-            print(f"❌ Error loading Premium Vector Search API: {e}")
+            print(f"❌ Error loading Premium Chat API: {e}")
 
         print("")
     else:

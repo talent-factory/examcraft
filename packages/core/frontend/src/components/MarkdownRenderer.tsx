@@ -4,7 +4,6 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Box } from '@mui/material';
-import type { SyntaxHighlighterProps } from 'react-syntax-highlighter';
 
 interface MarkdownRendererProps {
   content: string;
@@ -13,23 +12,23 @@ interface MarkdownRendererProps {
 
 /**
  * Wiederverwendbare Markdown-Rendering-Komponente mit Syntax-Highlighting
- * 
+ *
  * Features:
  * - GitHub Flavored Markdown (GFM)
  * - Syntax-Highlighting für Code-Blöcke
  * - Responsive Design
  * - Konsistentes Styling
  */
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ 
-  content, 
-  variant = 'default' 
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
+  content,
+  variant = 'default'
 }) => {
   return (
     <Box
       sx={{
-        '& p': { 
-          mt: variant === 'compact' ? 0 : 1, 
-          mb: variant === 'compact' ? 1 : 2 
+        '& p': {
+          mt: variant === 'compact' ? 0 : 1,
+          mb: variant === 'compact' ? 1 : 2
         },
         '& h1, & h2, & h3, & h4, & h5, & h6': {
           mt: 2,
@@ -39,12 +38,21 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         '& h1': { fontSize: '2rem' },
         '& h2': { fontSize: '1.5rem' },
         '& h3': { fontSize: '1.25rem' },
-        '& ul, & ol': {
+        '& ul': {
           pl: 3,
-          my: 1
+          my: 1,
+          listStyleType: 'disc',
+          listStylePosition: 'outside'
+        },
+        '& ol': {
+          pl: 3,
+          my: 1,
+          listStyleType: 'decimal',
+          listStylePosition: 'outside'
         },
         '& li': {
-          mb: 0.5
+          mb: 0.5,
+          display: 'list-item'
         },
         '& blockquote': {
           borderLeft: '4px solid',
@@ -151,4 +159,3 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 };
 
 export default MarkdownRenderer;
-

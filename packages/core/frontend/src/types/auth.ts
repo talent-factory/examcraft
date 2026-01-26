@@ -71,6 +71,7 @@ export interface User {
   roles: Role[];
   status: UserStatus;
   is_superuser: boolean;
+  is_email_verified: boolean;  // Email verification status
   oauth_provider?: string;  // OAuth provider (google, microsoft, etc.)
   avatar_url?: string;  // Profile picture URL (from OAuth or uploaded)
   last_login?: string;
@@ -174,6 +175,7 @@ export interface UserResponse {
   roles: Role[];
   status: UserStatus;
   is_superuser: boolean;
+  is_email_verified: boolean;  // Email verification status
   oauth_provider?: string;  // OAuth provider (google, microsoft, etc.)
   avatar_url?: string;  // Profile picture URL (from OAuth or uploaded)
   last_login?: string;
@@ -303,4 +305,3 @@ export interface RoleCheck {
   role: UserRole;
   granted: boolean;
 }
-

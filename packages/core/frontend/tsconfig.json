@@ -4,7 +4,7 @@
     "lib": [
       "dom",
       "dom.iterable",
-      "es6"
+      "es2017"
     ],
     "allowJs": true,
     "skipLibCheck": true,
@@ -18,7 +18,16 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@examcraft/core": ["./src/lib"],
+      "@examcraft/core/*": ["./src/*"],
+      "@examcraft/premium": ["../../premium/frontend/src"],
+      "@examcraft/premium/*": ["../../premium/frontend/src/*"],
+      "@examcraft/enterprise": ["../../enterprise/frontend/src"],
+      "@examcraft/enterprise/*": ["../../enterprise/frontend/src/*"]
+    }
   },
   "include": [
     "src"
@@ -27,6 +36,10 @@
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/__tests__/**",
-    "src/setupTests.ts"
+    "src/setupTests.ts",
+    "src/premium/**",
+    "src/enterprise/**",
+    "../../premium/**",
+    "../../enterprise/**"
   ]
 }

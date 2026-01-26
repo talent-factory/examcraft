@@ -1,7 +1,62 @@
 {
-  "name": "examcraft-frontend",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@examcraft/core",
+  "version": "1.0.0",
+  "description": "ExamCraft AI - Core Package (OpenSource)",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./types": {
+      "import": "./dist/types/index.esm.js",
+      "require": "./dist/types/index.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./types/*": {
+      "import": "./dist/types/*.esm.js",
+      "require": "./dist/types/*.js",
+      "types": "./dist/types/*.d.ts"
+    },
+    "./services": {
+      "import": "./dist/services/index.esm.js",
+      "require": "./dist/services/index.js",
+      "types": "./dist/services/index.d.ts"
+    },
+    "./services/*": {
+      "import": "./dist/services/*.esm.js",
+      "require": "./dist/services/*.js",
+      "types": "./dist/services/*.d.ts"
+    },
+    "./components": {
+      "import": "./dist/components/index.esm.js",
+      "require": "./dist/components/index.js",
+      "types": "./dist/components/index.d.ts"
+    },
+    "./components/*": {
+      "import": "./dist/components/*.esm.js",
+      "require": "./dist/components/*.js",
+      "types": "./dist/components/*.d.ts"
+    },
+    "./contexts": {
+      "import": "./dist/contexts/index.esm.js",
+      "require": "./dist/contexts/index.js",
+      "types": "./dist/contexts/index.d.ts"
+    },
+    "./utils": {
+      "import": "./dist/utils/index.esm.js",
+      "require": "./dist/utils/index.js",
+      "types": "./dist/utils/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
@@ -17,9 +72,6 @@
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^14.5.1",
     "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.68",
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
     "@types/react-dropzone": "^4.2.2",
     "@types/react-syntax-highlighter": "^15.5.13",
     "axios": "^1.6.2",
@@ -37,8 +89,10 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+    "dev": "craco start",
     "start": "craco start",
     "build": "craco build",
+    "build:lib": "tsc --project tsconfig.lib.json",
     "test": "craco test",
     "test:unit": "craco test --watchAll=false",
     "test:e2e": "playwright test",
@@ -48,6 +102,7 @@
     "test:all": "npm run test:unit && npm run test:e2e",
     "lint": "eslint src --ext .ts,.tsx,.js,.jsx",
     "lint:fix": "eslint src --ext .ts,.tsx,.js,.jsx --fix",
+    "clean": "rm -rf dist",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -72,10 +127,36 @@
   "devDependencies": {
     "@craco/craco": "^7.1.0",
     "@playwright/test": "^1.56.1",
+    "@types/node": "^25.0.9",
+    "@types/react": "^18.3.27",
+    "@types/react-dom": "^18.3.7",
     "autoprefixer": "^10.4.21",
     "ignore-loader": "^0.1.2",
     "playwright": "^1.56.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.3.0"
-  }
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/talent-factory/examcraft.git",
+    "directory": "packages/core/frontend"
+  },
+  "keywords": [
+    "examcraft",
+    "ai",
+    "education",
+    "exam-generation",
+    "openbook-exams",
+    "claude-ai"
+  ],
+  "author": "Talent Factory",
+  "license": "MIT"
 }

@@ -12,9 +12,7 @@ import {
   FormControl,
   TextField,
   Chip,
-  Divider,
   Alert,
-  Grid,
   Accordion,
   AccordionSummary,
   AccordionDetails
@@ -25,7 +23,6 @@ import {
   CheckCircle,
   Cancel,
   Lightbulb,
-  Download,
   Print,
   Refresh
 } from '@mui/icons-material';
@@ -45,7 +42,6 @@ interface UserAnswer {
 const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [showResults, setShowResults] = useState(false);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   const handleAnswerChange = (questionId: string, answer: string) => {
     setUserAnswers(prev => {
@@ -74,7 +70,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
       return isCorrectAnswer(question, userAnswer) ? count + 1 : count;
     }, 0);
     const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
-    
+
     return { correct, total, percentage };
   };
 
@@ -86,10 +82,10 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
       <Card key={question.id} sx={{ mb: 3, border: showResults ? (isCorrect ? '2px solid green' : '2px solid red') : 'none' }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-            <Chip 
-              label={`Frage ${index + 1}`} 
-              color="primary" 
-              size="small" 
+            <Chip
+              label={`Frage ${index + 1}`}
+              color="primary"
+              size="small"
               sx={{ mr: 2, mt: 0.5 }}
             />
             <Box sx={{ flex: 1 }}>
@@ -205,7 +201,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
         </Box>
 
         {showResults && score && (
-          <Alert 
+          <Alert
             severity={score.percentage >= 70 ? 'success' : score.percentage >= 50 ? 'warning' : 'error'}
             sx={{ mb: 2 }}
           >
@@ -243,7 +239,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
               </Button>
             </>
           )}
-          
+
           <Button
             variant="outlined"
             onClick={onNewExam}

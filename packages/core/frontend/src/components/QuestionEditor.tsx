@@ -23,7 +23,6 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   Alert,
-  Chip,
   Stack,
 } from '@mui/material';
 import {
@@ -137,7 +136,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
     try {
       // Only send changed fields
       const updates: QuestionReviewUpdateRequest = {};
-      
+
       if (formData.question_text !== question.question_text) {
         updates.question_text = formData.question_text;
       }
@@ -178,8 +177,8 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
   };
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={handleCancel}
       maxWidth="md"
       fullWidth
@@ -217,9 +216,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
               </Typography>
               <List dense>
                 {options.map((option, index) => (
-                  <ListItem 
+                  <ListItem
                     key={index}
-                    sx={{ 
+                    sx={{
                       bgcolor: option === formData.correct_answer ? 'success.light' : 'background.paper',
                       borderRadius: 1,
                       mb: 1,
@@ -239,7 +238,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
                   </ListItem>
                 ))}
               </List>
-              
+
               <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
                 <TextField
                   size="small"
@@ -392,4 +391,3 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
 };
 
 export default QuestionEditor;
-

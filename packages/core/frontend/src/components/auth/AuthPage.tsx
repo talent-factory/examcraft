@@ -19,7 +19,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultTab = 'login' }) => {
   const [view, setView] = useState<AuthView>(defaultTab);
   const navigate = useNavigate();
 
-  const handleSuccess = () => {
+  const handleLoginSuccess = () => {
     navigate('/dashboard');
   };
 
@@ -62,7 +62,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultTab = 'login' }) => {
           {/* Content */}
           {view === 'login' && (
             <LoginForm
-              onSuccess={handleSuccess}
+              onSuccess={handleLoginSuccess}
               onSwitchToRegister={() => setView('register')}
               onForgotPassword={() => setView('reset-password')}
             />
@@ -70,7 +70,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultTab = 'login' }) => {
 
           {view === 'register' && (
             <RegisterForm
-              onSuccess={handleSuccess}
+              onSuccess={handleLoginSuccess}
               onSwitchToLogin={() => setView('login')}
             />
           )}
@@ -100,4 +100,3 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultTab = 'login' }) => {
     </div>
   );
 };
-

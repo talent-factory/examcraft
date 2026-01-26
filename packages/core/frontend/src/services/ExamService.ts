@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ExamRequest, ExamResponse, ApiResponse } from '../types/exam';
+import { ExamRequest, ExamResponse } from '../types/exam';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -37,7 +37,7 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     console.error('Response error:', error);
-    
+
     if (error.response) {
       // Server responded with error status
       const message = error.response.data?.detail || error.response.data?.message || 'Server error';

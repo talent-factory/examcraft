@@ -22,7 +22,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U examcraft" ]
+      test: ["CMD-SHELL", "pg_isready -U examcraft"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -38,7 +38,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -48,7 +48,7 @@ services:
   # RabbitMQ Message Broker (for async document processing)
   rabbitmq:
     container_name: examcraft-rabbitmq
-    image: rabbitmq:3-management-alpine
+    image: rabbitmq:4-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: examcraft
       RABBITMQ_DEFAULT_PASS: examcraft_dev_password # pragma: allowlist secret
@@ -58,10 +58,11 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 40s
     networks:
       - examcraft_network
 
@@ -79,7 +80,7 @@ services:
       QDRANT__SERVICE__GRPC_PORT: 6334
       QDRANT__LOG_LEVEL: INFO
     healthcheck:
-      test: [ "CMD-SHELL", "exit 0" ]
+      test: ["CMD-SHELL", "exit 0"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -139,6 +140,12 @@ services:
       # Stripe Payment Integration
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Resend Email Configuration
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@examcraft.ai}
+      RESEND_FROM_NAME: ${RESEND_FROM_NAME:-ExamCraft AI}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
 
       # Environment
       ENVIRONMENT: development
@@ -228,6 +235,12 @@ services:
       # Stripe Payment Integration
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Resend Email Configuration
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@examcraft.ai}
+      RESEND_FROM_NAME: ${RESEND_FROM_NAME:-ExamCraft AI}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
 
       # Environment
       ENVIRONMENT: development
@@ -286,17 +299,20 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # Core Frontend Source
+      # Core Frontend Source (working directory is /app)
       - ./packages/core/frontend/src:/app/src
-
-      # Premium Frontend (mounted into Core structure)
-      - ./packages/premium/frontend/src:/app/src/premium
-
-      # Enterprise Frontend (mounted into Core structure)
-      - ./packages/enterprise/frontend/src:/app/src/enterprise
-
-      # Public assets
       - ./packages/core/frontend/public:/app/public
+      - ./packages/core/frontend/.env.local:/app/.env.local
+
+      # Premium Frontend (mounted relative to /app for Webpack alias resolution)
+      # Webpack alias: path.resolve(__dirname, '../../premium/frontend/src')
+      # __dirname = /app, so ../../premium/frontend/src = /premium/frontend/src
+      - ./packages/premium/frontend/src:/premium/frontend/src
+
+      # Enterprise Frontend (mounted relative to /app for Webpack alias resolution)
+      # Webpack alias: path.resolve(__dirname, '../../enterprise/frontend/src')
+      # __dirname = /app, so ../../enterprise/frontend/src = /enterprise/frontend/src
+      - ./packages/enterprise/frontend/src:/enterprise/frontend/src
 
       # Don't override node_modules
       - /app/node_modules

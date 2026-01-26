@@ -22,7 +22,6 @@ import {
   Paper
 } from '@mui/material';
 import {
-  CheckCircle as CheckIcon,
   Cancel as CancelIcon,
   AllInclusive as InfinityIcon
 } from '@mui/icons-material';
@@ -224,4 +223,3 @@ const SubscriptionTierOverview: React.FC = () => {
 };
 
 export default SubscriptionTierOverview;
-

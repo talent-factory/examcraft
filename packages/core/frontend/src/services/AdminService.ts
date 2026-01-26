@@ -3,7 +3,7 @@
  * API calls for admin user management
  */
 
-import { User, Role, Institution, UserStatus } from '../types/auth';
+import { Role, Institution, UserStatus } from '../types/auth';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -81,7 +81,7 @@ class AdminService {
    */
   async listUsers(params: ListUsersParams = {}): Promise<UserListResponse> {
     const queryParams = new URLSearchParams();
-    
+
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.page_size) queryParams.append('page_size', params.page_size.toString());
     if (params.search) queryParams.append('search', params.search);
@@ -303,5 +303,5 @@ class AdminService {
   }
 }
 
-export default new AdminService();
-
+const adminService = new AdminService();
+export default adminService;

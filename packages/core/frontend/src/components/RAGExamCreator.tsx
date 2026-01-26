@@ -6,14 +6,13 @@
  * an upgrade prompt for Free tier users.
  *
  * Note: The actual Premium implementation is mounted via Docker volume
- * in docker-compose.premium.yml, which replaces this entire file.
+ * in docker-compose.full.yml, which provides the full feature set.
  */
 
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, Alert, Button, CircularProgress } from '@mui/material';
+import React from 'react';
+import { Box, Typography, Alert, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { InfoOutlined } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
 
 interface RAGExamCreatorProps {
   selectedDocuments?: number[];
@@ -25,7 +24,7 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = (props) => {
   const navigate = useNavigate();
 
   // This is the Core (Free) version - always shows upgrade prompt
-  // The Premium version is mounted via Docker volume in docker-compose.premium.yml
+  // The Premium version is mounted via Docker volume in docker-compose.full.yml
   return (
     <Box
       sx={{
@@ -77,4 +76,3 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = (props) => {
 };
 
 export default RAGExamCreator;
-
