@@ -21,7 +21,6 @@
 #  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 #  OR OTHER DEALINGS IN THE SOFTWARE.
 
-import os
 import pathlib
 import logging
 import argparse
@@ -50,18 +49,18 @@ def setup_logging(log_level=logging.INFO):
 def extract_text_with_pypdf(pdf_path, logger=None):
     """
     Extrahiert Text aus einer PDF-Datei mit pypdf als Fallback.
-    
+
     Args:
         pdf_path (str): Pfad zur PDF-Datei
         logger: Logger-Instanz für Ausgaben
-        
+
     Returns:
         str: Extrahierter Text im Markdown-Format
     """
     try:
         reader = PdfReader(pdf_path)
         text_content = []
-        
+
         # Metadaten extrahieren
         metadata = reader.metadata
         if metadata:
@@ -76,15 +75,15 @@ def extract_text_with_pypdf(pdf_path, logger=None):
                 text_content.append(f"**Erstellt mit:** {metadata.creator}\n")
             text_content.append(f"**Anzahl Seiten:** {len(reader.pages)}\n")
             text_content.append("\n---\n\n")
-        
+
         if logger:
             logger.info(f"Extrahiere Text aus {len(reader.pages)} Seiten")
-        
+
         for page_num, page in enumerate(reader.pages, 1):
             text = page.extract_text()
             if text.strip():
                 text_content.append(f"## Seite {page_num}\n\n{text}\n")
-        
+
         return "\n".join(text_content)
     except Exception as e:
         raise Exception(f"Fehler beim Extrahieren mit pypdf: {str(e)}")
@@ -100,9 +99,9 @@ else:
 
 def process_pdf_files(input_dir="demo", output_dir=None, force_pypdf=False, logger=None):
     """
-    Verarbeitet alle PDF-Dateien im angegebenen Verzeichnis und 
+    Verarbeitet alle PDF-Dateien im angegebenen Verzeichnis und
     speichert sie als Markdown-Dateien.
-    
+
     Args:
         input_dir (str): Pfad zum Verzeichnis mit den PDF-Dateien
         output_dir (str): Pfad zum Ausgabeverzeichnis (Standard: gleiches wie input_dir)
@@ -111,11 +110,11 @@ def process_pdf_files(input_dir="demo", output_dir=None, force_pypdf=False, logg
     """
     input_path = pathlib.Path(input_dir)
     output_path = pathlib.Path(output_dir) if output_dir else input_path
-    
+
     if logger:
         logger.info(f"Starte PDF-Verarbeitung in: {input_path}")
         logger.info(f"Ausgabeverzeichnis: {output_path}")
-    
+
     if not input_path.exists():
         error_msg = f"Eingabeverzeichnis {input_dir} existiert nicht!"
         if logger:
@@ -123,13 +122,13 @@ def process_pdf_files(input_dir="demo", output_dir=None, force_pypdf=False, logg
         else:
             print(error_msg)
         return False
-    
+
     # Ausgabeverzeichnis erstellen falls es nicht existiert
     output_path.mkdir(parents=True, exist_ok=True)
-    
+
     # Alle PDF-Dateien im Verzeichnis finden
     pdf_files = list(input_path.glob("*.pdf"))
-    
+
     if not pdf_files:
         error_msg = f"Keine PDF-Dateien im Verzeichnis {input_dir} gefunden!"
         if logger:
@@ -137,27 +136,27 @@ def process_pdf_files(input_dir="demo", output_dir=None, force_pypdf=False, logg
         else:
             print(error_msg)
         return False
-    
+
     use_docling = DOCLING_AVAILABLE and converter and not force_pypdf
     method = "docling" if use_docling else "pypdf"
-    
+
     if logger:
         logger.info(f"Gefundene PDF-Dateien: {len(pdf_files)}")
         logger.info(f"Verwendete Methode: {method}")
     else:
         print(f"Gefundene PDF-Dateien: {len(pdf_files)}")
         print(f"Verwendete Methode: {method}")
-    
+
     success_count = 0
     error_count = 0
-    
+
     for i, pdf_file in enumerate(pdf_files, 1):
         try:
             if logger:
                 logger.info(f"[{i}/{len(pdf_files)}] Verarbeite: {pdf_file.name}")
             else:
                 print(f"\n[{i}/{len(pdf_files)}] Verarbeite: {pdf_file.name}")
-            
+
             # PDF konvertieren - versuche zuerst docling, dann pypdf
             if use_docling:
                 try:
@@ -174,23 +173,23 @@ def process_pdf_files(input_dir="demo", output_dir=None, force_pypdf=False, logg
                     markdown_output = extract_text_with_pypdf(str(pdf_file), logger)
             else:
                 markdown_output = extract_text_with_pypdf(str(pdf_file), logger)
-            
+
             # Markdown-Dateiname erstellen (PDF-Endung durch .md ersetzen)
             md_filename = pdf_file.stem + ".md"
             md_filepath = output_path / md_filename
-            
+
             # Markdown-Datei speichern
             with open(md_filepath, 'w', encoding='utf-8') as f:
                 f.write(markdown_output)
-            
+
             success_msg = f"✓ Gespeichert als: {md_filepath}"
             if logger:
                 logger.info(success_msg)
             else:
                 print(success_msg)
-            
+
             success_count += 1
-            
+
         except Exception as e:
             error_msg = f"✗ Fehler beim Verarbeiten von {pdf_file.name}: {str(e)}"
             if logger:
@@ -198,14 +197,14 @@ def process_pdf_files(input_dir="demo", output_dir=None, force_pypdf=False, logg
             else:
                 print(error_msg)
             error_count += 1
-    
+
     # Zusammenfassung
     summary = f"Verarbeitung abgeschlossen: {success_count} erfolgreich, {error_count} Fehler"
     if logger:
         logger.info(summary)
     else:
         print(f"\n{summary}")
-    
+
     return error_count == 0
 
 def main():
@@ -221,53 +220,53 @@ Beispiele:
   python extraction.py --verbose               # Detaillierte Ausgabe
         """
     )
-    
+
     parser.add_argument(
         "-i", "--input-dir",
         default="demo",
         help="Eingabeverzeichnis mit PDF-Dateien (Standard: demo)"
     )
-    
+
     parser.add_argument(
         "-o", "--output-dir",
         help="Ausgabeverzeichnis für Markdown-Dateien (Standard: gleiches wie Eingabe)"
     )
-    
+
     parser.add_argument(
         "--force-pypdf",
         action="store_true",
         help="Erzwingt die Verwendung von pypdf statt docling"
     )
-    
+
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Aktiviert detaillierte Logging-Ausgabe"
     )
-    
+
     parser.add_argument(
         "--log-file",
         help="Pfad zur Log-Datei (Standard: automatisch generiert)"
     )
-    
+
     args = parser.parse_args()
-    
+
     # Logging konfigurieren
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logger = setup_logging(log_level)
-    
+
     if args.log_file:
         # Zusätzlichen FileHandler für spezifische Log-Datei hinzufügen
         file_handler = logging.FileHandler(args.log_file)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         logger.addHandler(file_handler)
-    
+
     logger.info("=== PDF-zu-Markdown Extraktion gestartet ===")
     logger.info(f"Docling verfügbar: {DOCLING_AVAILABLE}")
     logger.info(f"Eingabeverzeichnis: {args.input_dir}")
     logger.info(f"Ausgabeverzeichnis: {args.output_dir or args.input_dir}")
     logger.info(f"Erzwinge pypdf: {args.force_pypdf}")
-    
+
     try:
         success = process_pdf_files(
             input_dir=args.input_dir,
@@ -275,23 +274,22 @@ Beispiele:
             force_pypdf=args.force_pypdf,
             logger=logger
         )
-        
+
         if success:
             logger.info("=== Alle Dateien erfolgreich verarbeitet ===")
             exit_code = 0
         else:
             logger.error("=== Verarbeitung mit Fehlern abgeschlossen ===")
             exit_code = 1
-            
+
     except KeyboardInterrupt:
         logger.info("Verarbeitung durch Benutzer abgebrochen")
         exit_code = 130
     except Exception as e:
         logger.error(f"Unerwarteter Fehler: {str(e)}")
         exit_code = 1
-    
+
     return exit_code
 
 if __name__ == "__main__":
     exit(main())
-
