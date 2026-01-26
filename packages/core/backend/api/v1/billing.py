@@ -1,12 +1,18 @@
+import stripe
+import os
+import logging
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from datetime import datetime
 from services.payment_service import PaymentService
 from utils.auth_utils import get_current_active_user
-from models.auth import User
+from models.auth import User, Institution
 from models.subscription import Subscription, SubscriptionStatus
 from database import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
 
@@ -289,3 +295,148 @@ async def create_checkout_session(
         return session
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/sync-subscription")
+async def sync_subscription_from_stripe(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync subscription from Stripe to local database.
+
+    This endpoint is useful when webhooks fail or for local development.
+    It searches for active subscriptions in Stripe by customer email
+    and syncs them to the local database.
+    """
+    payment_service = PaymentService()
+
+    if not payment_service.is_available():
+        raise HTTPException(
+            status_code=503,
+            detail="Payment service is not configured"
+        )
+
+    if not current_user.institution_id:
+        raise HTTPException(
+            status_code=400,
+            detail="User must be associated with an institution"
+        )
+
+    # Get institution
+    institution = db.query(Institution).filter(
+        Institution.id == current_user.institution_id
+    ).first()
+
+    if not institution:
+        raise HTTPException(status_code=404, detail="Institution not found")
+
+    try:
+        # Initialize Stripe API key
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+        if not stripe.api_key:
+            raise HTTPException(status_code=503, detail="Stripe API key not configured")
+
+        # Search for Stripe customer by email
+        customers = stripe.Customer.list(email=current_user.email, limit=1)
+
+        if not customers.data:
+            return {
+                "status": "no_customer",
+                "message": "No Stripe customer found for this email",
+                "synced": False
+            }
+
+        customer = customers.data[0]
+        customer_id = customer.id
+
+        # Get active subscriptions for this customer
+        subscriptions = stripe.Subscription.list(
+            customer=customer_id,
+            status="active",
+            limit=1
+        )
+
+        if not subscriptions.data:
+            # Check for trialing subscriptions
+            subscriptions = stripe.Subscription.list(
+                customer=customer_id,
+                status="trialing",
+                limit=1
+            )
+
+        if not subscriptions.data:
+            return {
+                "status": "no_subscription",
+                "message": "No active subscription found in Stripe",
+                "synced": False
+            }
+
+        stripe_sub = subscriptions.data[0]
+        price_id = stripe_sub.items.data[0].price.id if stripe_sub.items.data else None
+
+        # Check if subscription already exists in DB
+        existing_sub = db.query(Subscription).filter(
+            Subscription.stripe_subscription_id == stripe_sub.id
+        ).first()
+
+        if existing_sub:
+            # Update existing
+            existing_sub.status = SubscriptionStatus(stripe_sub.status)
+            existing_sub.stripe_price_id = price_id
+            existing_sub.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start)
+            existing_sub.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end)
+            existing_sub.cancel_at_period_end = stripe_sub.cancel_at_period_end
+            logger.info(f"Updated subscription {stripe_sub.id}")
+        else:
+            # Create new subscription record
+            new_sub = Subscription(
+                institution_id=institution.id,
+                stripe_subscription_id=stripe_sub.id,
+                stripe_customer_id=customer_id,
+                stripe_price_id=price_id,
+                status=SubscriptionStatus(stripe_sub.status),
+                current_period_start=datetime.fromtimestamp(stripe_sub.current_period_start),
+                current_period_end=datetime.fromtimestamp(stripe_sub.current_period_end),
+                cancel_at_period_end=stripe_sub.cancel_at_period_end
+            )
+            db.add(new_sub)
+            logger.info(f"Created subscription {stripe_sub.id}")
+
+        # Map price ID to tier
+        tier = _get_tier_from_price_id(price_id) if price_id else "starter"
+
+        # Also check environment variables for price mapping
+        env_starter_price = os.getenv("REACT_APP_STRIPE_PRICE_STARTER", "")
+        env_professional_price = os.getenv("REACT_APP_STRIPE_PRICE_PROFESSIONAL", "")
+
+        if price_id == env_starter_price:
+            tier = "starter"
+        elif price_id == env_professional_price:
+            tier = "professional"
+
+        # Update institution tier
+        old_tier = institution.subscription_tier
+        institution.subscription_tier = tier
+
+        db.commit()
+
+        logger.info(f"Synced subscription for institution {institution.id}: {old_tier} -> {tier}")
+
+        return {
+            "status": "success",
+            "message": f"Subscription synced successfully",
+            "synced": True,
+            "subscription_id": stripe_sub.id,
+            "tier": tier,
+            "old_tier": old_tier,
+            "price_id": price_id
+        }
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error during sync: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error syncing subscription: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
