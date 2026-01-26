@@ -2,11 +2,16 @@ import stripe
 from fastapi import APIRouter, Request, Header, HTTPException, Depends
 from sqlalchemy.orm import Session
 import os
+import logging
 from database import get_db
 from models.subscription import Subscription, SubscriptionStatus
 from models.auth import Institution, User
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
+
+# Stripe API Key setzen (notwendig für stripe.Subscription.retrieve() etc.)
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 router = APIRouter()
 
 @router.post("/stripe")
@@ -51,7 +56,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
     institution_id = metadata.get("institution_id")
 
     if not institution_id:
-        print("Error: No institution_id in session metadata")
+        logging.error("Error: No institution_id in session metadata")
         return
 
     # functionality depends on subscription_mode (payment vs subscription)
@@ -62,7 +67,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         # Update Institution
         institution = db.query(Institution).filter(Institution.id == int(institution_id)).first()
         if not institution:
-            print(f"Error: Institution {institution_id} not found")
+            Loggin.error(f"Error: Institution {institution_id} not found")
             return
 
         # Fetch actual subscription details from Stripe
@@ -80,7 +85,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
             existing_sub.stripe_price_id = price_id
             existing_sub.current_period_start = datetime.fromtimestamp(stripe_sub["current_period_start"])
             existing_sub.current_period_end = datetime.fromtimestamp(stripe_sub["current_period_end"])
-            print(f"Updated existing subscription {subscription_id}")
+            logging.error(f"Updated existing subscription {subscription_id}")
         else:
             # Create local Subscription record
             new_sub = Subscription(
@@ -93,7 +98,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
                 current_period_end=datetime.fromtimestamp(stripe_sub["current_period_end"])
             )
             db.add(new_sub)
-            print(f"Created new subscription {subscription_id}")
+            logging.error(f"Created new subscription {subscription_id}")
 
         # Map Price ID to Subscription Tier
         # TODO: Make this configurable via environment variables or database
@@ -106,7 +111,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         # For now, default to starter if we can't map the price
         new_tier = tier_mapping.get(price_id, "starter")
         institution.subscription_tier = new_tier
-        print(f"Updated institution {institution_id} to tier: {new_tier}")
+        logging.error(f"Updated institution {institution_id} to tier: {new_tier}")
 
         db.commit()
 
