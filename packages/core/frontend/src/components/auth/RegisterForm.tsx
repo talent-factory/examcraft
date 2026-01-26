@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { RegisterRequest } from '../../types/auth';
 
@@ -16,6 +17,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   onSuccess,
   onSwitchToLogin,
 }) => {
+  const navigate = useNavigate();
   const { register, error, isLoading, clearError } = useAuth();
   const [formData, setFormData] = useState<RegisterRequest>({
     email: '',
@@ -69,7 +71,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
 
     try {
       await register(formData);
-      onSuccess?.();
+      // Navigate to registration success page with email
+      navigate('/registration-success', { state: { email: formData.email } });
     } catch (err) {
       // Error is handled by AuthContext
       console.error('Registration failed:', err);
@@ -264,4 +267,3 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
     </div>
   );
 };
-

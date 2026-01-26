@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -56,7 +56,6 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
@@ -70,8 +69,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     document: null
   });
   const [previewTab, setPreviewTab] = useState(0);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [documentContent, setDocumentContent] = useState<string | null>(null);
-  const [contentLoading, setContentLoading] = useState(false);
   const [processingDocumentId, setProcessingDocumentId] = useState<number | null>(null);
 
   // Pagination state for large documents
@@ -82,9 +81,31 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [chunksPageSize] = useState(10); // Chunks pro Seite
   const [chunksLoading, setChunksLoading] = useState(false);
 
+  // Define loadDocuments before useEffect hooks that use it
+  const loadDocuments = useCallback(async (showLoading: boolean = true) => {
+    try {
+      if (showLoading && !hasLoadedOnce) {
+        setLoading(true);
+      }
+      setError(null);
+      const docs = await DocumentService.getDocuments();
+      setDocuments(docs);
+    } catch (err) {
+      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
+    } finally {
+      // ALWAYS set loading to false after load completes
+      setLoading(false);
+      // Mark that we've loaded at least once
+      if (!hasLoadedOnce) {
+        setHasLoadedOnce(true);
+      }
+    }
+  }, [hasLoadedOnce]);
+
+  // Initial load and refresh trigger
   useEffect(() => {
     loadDocuments(true); // Initial load with loading state
-  }, [refreshTrigger]);
+  }, [refreshTrigger, loadDocuments]);
 
   // Auto-refresh for documents with status "processing"
   useEffect(() => {
@@ -103,28 +124,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [documents]); // Re-run when documents change
-
-  const loadDocuments = async (showLoading: boolean = true) => {
-    try {
-      if (showLoading && !hasLoadedOnce) {
-        setLoading(true);
-      }
-      setError(null);
-      const docs = await DocumentService.getDocuments();
-      setDocuments(docs);
-      setIsInitialLoad(false);
-    } catch (err) {
-      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
-    } finally {
-      // ALWAYS set loading to false after load completes
-      setLoading(false);
-      // Mark that we've loaded at least once
-      if (!hasLoadedOnce) {
-        setHasLoadedOnce(true);
-      }
-    }
-  };
+  }, [documents, loadDocuments]); // Re-run when documents change
 
   const getFileIcon = (mimeType: string) => {
     if (mimeType.includes('pdf')) return <PictureAsPdf color="error" />;
@@ -239,7 +239,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
   const handleDownload = async (document: Document) => {
     try {
-      await DocumentService.downloadDocument(document.id, document.filename);
+      // Use original_filename for user-friendly download name
+      await DocumentService.downloadDocument(document.id, document.original_filename);
       handleMenuClose();
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Download');
@@ -266,6 +267,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const waitForDocumentProcessing = async (
     documentId: number,
     maxWaitTime: number = 1800000 // 30 Minuten für große Dokumente
@@ -751,22 +753,47 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
                 {previewTab === 1 && (
                   <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Typography variant="h6">
-                        Dokumentinhalt ({totalChunks} Chunks)
-                      </Typography>
-                      {totalPages > 1 && (
-                        <Typography variant="body2" color="text.secondary">
-                          Seite {currentPage} von {totalPages}
+                    {/* Check if document has full_content in metadata (e.g., chat export) */}
+                    {previewDialog.document.metadata?.full_content ? (
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          Dokumentinhalt
                         </Typography>
-                      )}
-                    </Box>
-
-                    {chunksLoading ? (
-                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                        <CircularProgress />
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 3,
+                            bgcolor: 'grey.50',
+                            maxHeight: 600,
+                            overflow: 'auto',
+                            fontFamily: 'monospace',
+                            fontSize: '0.875rem',
+                            lineHeight: 1.6,
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word'
+                          }}
+                        >
+                          {previewDialog.document.metadata.full_content}
+                        </Paper>
                       </Box>
-                    ) : documentChunks.length > 0 ? (
+                    ) : (
+                      <>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="h6">
+                            Dokumentinhalt ({totalChunks} Chunks)
+                          </Typography>
+                          {totalPages > 1 && (
+                            <Typography variant="body2" color="text.secondary">
+                              Seite {currentPage} von {totalPages}
+                            </Typography>
+                          )}
+                        </Box>
+
+                        {chunksLoading ? (
+                          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                            <CircularProgress />
+                          </Box>
+                        ) : documentChunks.length > 0 ? (
                       <Box>
                         {/* Chunks Display */}
                         <Box sx={{ mb: 3 }}>
@@ -857,6 +884,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                           : 'Kein Inhalt verfügbar.'
                         }
                       </Alert>
+                    )}
+                      </>
                     )}
                   </Box>
                 )}

@@ -6,7 +6,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { OAuthProvider } from '../../types/auth';
-import AuthService from '../../services/AuthService';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -250,4 +249,3 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     </div>
   );
 };
-

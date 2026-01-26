@@ -48,7 +48,7 @@ services:
   # RabbitMQ Message Queue
   rabbitmq:
     container_name: examcraft-rabbitmq
-    image: rabbitmq:management
+    image: rabbitmq:4-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-examcraft}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-secure_password_here}

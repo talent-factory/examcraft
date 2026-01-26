@@ -25,9 +25,8 @@ examcraft/
 │   ├── core/          # ✅ Open Source (MIT) - Free Tier
 │   ├── premium/       # 🔒 Closed Source - Starter/Professional Tier
 │   └── enterprise/    # 🔒 Closed Source - Enterprise Tier
-├── docker-compose.yml              # Core Services
-├── docker-compose.premium.yml      # Premium Extension
-├── docker-compose.enterprise.yml   # Enterprise Extension
+├── docker-compose.yml              # Core Services (OpenSource)
+├── docker-compose.full.yml         # Full Services (Premium + Enterprise)
 └── MONOREPO_SETUP.md               # Detailed Setup Guide
 ```
 
@@ -35,24 +34,44 @@ examcraft/
 
 ## 📚 Dokumentation
 
-### 📊 Für Stakeholder & Kunden
+### 📖 User Documentation
 
-- **[📊 Executive Summary](docs/EXECUTIVE_SUMMARY.md)** - Business-Übersicht, Marktchancen, Finanzprognosen
-- **[🎯 Feature-Übersicht](docs/FEATURES.md)** - Vollständige Feature-Liste mit Use Cases und Benefits
-- **[📅 Release Timeline](docs/RELEASE_TIMELINE.md)** - Detaillierte Roadmap mit quartalsweisen Releases
-- **[🗺️ Product Roadmap](docs/ROADMAP.md)** - Langfristige Vision und Feature-Vergleichsmatrix
+- **[📚 User Guide](https://docs.examcraft.ch/guides/user-guide)** - Comprehensive guide for educators
+- **[🎛️ Admin Guide](https://docs.examcraft.ch/guides/admin-guide)** - Prompt management and administration
+- **[🚀 Quick Start](https://docs.examcraft.ch/quickstart)** - Get started in 5 minutes
 
-### 👥 Für Benutzer
+### 🔧 Developer Documentation
 
-- **[📚 Benutzerhandbuch](docs/USER_GUIDE.md)** - Vollständige Anleitung für Dozenten und Lehrkräfte
-- **[🎛️ Admin Guide: Prompt Management](docs/ADMIN_PROMPT_MANAGEMENT.md)** - Verwaltung der AI-Prompts
+- **[🚀 Deployment Guide](docs/RENDER_DEPLOYMENT.md)** - Production deployment on Render.com
+- **[📖 API Documentation](http://localhost:8000/docs)** - Interactive API docs (local)
+- **[🔧 Development Setup](#-quick-start)** - Local development environment (see below)
+- **[⚙️ Async Document Processing](docs/ASYNC_DOCUMENT_PROCESSING.md)** - RabbitMQ & Celery setup
 
-### 🔧 Für Entwickler
+### 🗺️ Public Roadmap
 
-- **[🚀 Deployment Guide](docs/RENDER_DEPLOYMENT.md)** - Production Deployment auf Render.com
-- **[📖 API Dokumentation](http://localhost:8000/docs)** - Interaktive API-Docs (lokal)
-- **[🔧 Development Setup](#-quick-start)** - Lokale Entwicklungsumgebung (siehe unten)
-- **[⚙️ Async Document Processing](docs/ASYNC_DOCUMENT_PROCESSING.md)** - RabbitMQ & Celery Setup, Monitoring & Troubleshooting
+**Current Status:** Production-ready v1.0 with core features available
+
+#### ✅ Released (v1.0)
+- 📄 Multi-format document processing (PDF, Word, Markdown)
+- 🤖 AI-powered question generation with Claude API
+- 🔍 RAG-based semantic search (Premium)
+- 💬 Interactive document chatbot (Premium)
+- 👥 User management with RBAC
+- 📝 Question review workflow
+
+#### 🚧 In Progress (Q1 2026)
+- 📊 Advanced analytics dashboard
+- 🔄 Exam composition & export
+- 🌐 Multi-language support
+- 📱 Mobile-responsive UI improvements
+
+#### 🔮 Planned (Q2-Q3 2026)
+- 🔗 LMS integrations (Moodle, Canvas)
+- 🎨 Custom branding (Enterprise)
+- 🔐 SSO/SAML integration (Enterprise)
+- 📈 Performance optimizations
+
+**Want to influence our roadmap?** [Open a feature request](https://github.com/talent-factory/examcraft/issues/new?template=feature_request.md)
 
 ### 💎 Subscription Tiers
 
@@ -132,10 +151,9 @@ ExamCraft/
 │       │   └── services/           # SSO, OAuth, Branding Services
 │       └── frontend/               # Enterprise Frontend Components
 │           └── src/components/     # SSO Config, Branding, API Management
-├── docker-compose.yml              # Core Services (PostgreSQL, Redis, Core)
-├── docker-compose.premium.yml      # Premium Extension (Qdrant)
-├── docker-compose.enterprise.yml   # Enterprise Extension
-├── start-dev.sh                    # 🚀 Smart Start Script (Auto-detects Tier)
+├── docker-compose.yml              # Core Services (PostgreSQL, Redis, RabbitMQ)
+├── docker-compose.full.yml         # Full Services (Core + Premium + Enterprise + Qdrant)
+├── start-dev.sh                    # 🚀 Smart Start Script (Auto-detects --core/--full)
 ├── stop-dev.sh                     # 🛑 Stop All Services
 ├── MONOREPO_SETUP.md               # Detailed Monorepo Setup Guide
 └── .gitmodules                     # Git Submodules Configuration
@@ -313,6 +331,67 @@ docker-compose logs -f backend
 # Frontend Logs
 docker-compose logs -f frontend
 ```
+
+### 🔧 Troubleshooting
+
+#### Frontend Build Errors nach Git Pull/Branch Switch
+
+**Problem:** `Module not found: Error: Can't resolve '@examcraft/premium'` oder ähnliche Webpack-Fehler
+
+**Ursache:** Webpack cached alte Versionen von Dateien nach Branch-Wechsel oder Git Pull
+
+**Lösung:**
+
+```bash
+# Option 1: Cache-Clearing Script (empfohlen)
+./scripts/clean-frontend-cache.sh
+
+# Option 2: Alle Caches löschen + Neuinstallation
+./scripts/clean-frontend-cache.sh --all --reinstall
+
+# Option 3: Manuell (Core Frontend)
+cd packages/core/frontend
+rm -rf node_modules/.cache build/
+bun install  # oder: npm install
+```
+
+#### Bun vs NPM
+
+ExamCraft AI unterstützt sowohl **Bun** (empfohlen) als auch **npm**:
+
+```bash
+# Bun installieren (10-100x schneller!)
+curl -fsSL https://bun.sh/install | bash
+
+# Dependencies installieren
+bun install  # oder: npm install
+
+# Scripts ausführen
+bun run build:core  # oder: npm run build:core
+```
+
+**Vorteile von Bun:**
+- ⚡ 10-100x schnellere Installation
+- 🚀 Schnellere Script-Ausführung
+- 📦 Besseres Monorepo-Handling
+- ✅ Drop-in Replacement für npm
+
+#### Docker Container Probleme
+
+```bash
+# Alle Container stoppen und neu starten
+docker-compose down
+docker-compose up -d --build
+
+# Volumes löschen (ACHTUNG: Löscht Datenbank!)
+docker-compose down -v
+docker-compose up -d
+
+# Logs für Debugging
+docker-compose logs -f backend
+```
+
+**Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für weitere Troubleshooting-Tipps.**
 
 ### API Endpoints
 

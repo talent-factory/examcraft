@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -22,8 +22,15 @@ import {
 } from '@mui/material';
 import { Save, Cancel, Preview, Code, History } from '@mui/icons-material';
 import { promptsApi, Prompt } from '../../api/promptsApi';
-import { PromptCategory } from '../../types/prompt';
+import { PromptCategory, QuestionType } from '../../types/prompt';
 import MarkdownRenderer from '../MarkdownRenderer';
+
+// Question Type Labels für UI
+const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
+  [QuestionType.MULTIPLE_CHOICE]: 'Multiple Choice',
+  [QuestionType.OPEN_ENDED]: 'Offene Frage',
+  [QuestionType.TRUE_FALSE]: 'Wahr/Falsch'
+};
 
 interface PromptEditorProps {
   promptId?: string;
@@ -53,13 +60,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     is_active: false
   });
 
-  useEffect(() => {
-    if (promptId) {
-      loadPrompt();
-    }
-  }, [promptId]);
-
-  const loadPrompt = async () => {
+  const loadPrompt = useCallback(async () => {
     if (!promptId) return;
 
     try {
@@ -72,11 +73,17 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [promptId]);
+
+  useEffect(() => {
+    if (promptId) {
+      loadPrompt();
+    }
+  }, [promptId, loadPrompt]);
 
   const handleSave = async () => {
-    if (!formData.name || !formData.content || !formData.category || !formData.use_case) {
-      setError('Name, Content, Category und Use Case sind Pflichtfelder');
+    if (!formData.name || !formData.content || !formData.category) {
+      setError('Name, Content und Category sind Pflichtfelder');
       return;
     }
 
@@ -287,15 +294,28 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
               </Select>
             </FormControl>
 
-            {/* Use Case */}
-            <TextField
-              fullWidth
-              label="Use Case"
-              value={formData.use_case}
-              onChange={(e) => setFormData({ ...formData, use_case: e.target.value })}
-              placeholder="z.B. question_generation"
-              sx={{ mb: 3 }}
-            />
+            {/* Use Case - Fragetyp Dropdown */}
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <InputLabel id="use-case-label">Use Case (Fragetyp)</InputLabel>
+              <Select
+                labelId="use-case-label"
+                id="use-case-select"
+                value={formData.use_case || ''}
+                label="Use Case (Fragetyp)"
+                onChange={(e: SelectChangeEvent) =>
+                  setFormData({ ...formData, use_case: e.target.value })
+                }
+              >
+                <MenuItem value="">
+                  <em>Kein spezifischer Fragetyp</em>
+                </MenuItem>
+                {Object.entries(QUESTION_TYPE_LABELS).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
             {/* Tags */}
             <Box sx={{ mb: 3 }}>
@@ -365,4 +385,3 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     </Container>
   );
 };
-

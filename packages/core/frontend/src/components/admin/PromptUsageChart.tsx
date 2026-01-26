@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -21,11 +21,7 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadUsageLogs();
-  }, [promptId]);
-
-  const loadUsageLogs = async () => {
+  const loadUsageLogs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -36,7 +32,11 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [promptId]);
+
+  useEffect(() => {
+    loadUsageLogs();
+  }, [loadUsageLogs]);
 
   if (loading) {
     return (
@@ -225,4 +225,3 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
     </Box>
   );
 };
-

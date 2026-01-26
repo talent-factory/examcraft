@@ -8,7 +8,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
-import { Prompt, PromptCategory } from '../types/prompt';
+import { Prompt } from '../types/prompt';
 
 // Check if Premium package is available
 const DEPLOYMENT_MODE = process.env.REACT_APP_DEPLOYMENT_MODE || 'core';

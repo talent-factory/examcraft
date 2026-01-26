@@ -9,7 +9,6 @@ import {
   Layers as CoreIcon,
   Star as PremiumIcon,
   Business as EnterpriseIcon,
-  Info as InfoIcon
 } from '@mui/icons-material';
 
 interface PackageTierInfo {
@@ -157,11 +156,14 @@ export const PackageTierBadge: React.FC = () => {
       </Box>
       <Box sx={{ fontSize: '0.875rem' }}>
         <strong>Features:</strong>
-        <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
+        <Box
+          component="ul"
+          sx={{ margin: '4px 0', paddingLeft: '20px' }}
+        >
           {tierInfo.features.map((feature, index) => (
             <li key={index}>{feature}</li>
           ))}
-        </ul>
+        </Box>
       </Box>
     </Box>
   );

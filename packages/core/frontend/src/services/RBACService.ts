@@ -319,5 +319,5 @@ class RBACService {
   }
 }
 
-export default new RBACService();
-
+const rbacService = new RBACService();
+export default rbacService;

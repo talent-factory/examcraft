@@ -14,9 +14,10 @@ import { OAuthCallback } from './components/auth/OAuthCallback';
 import { PasswordResetRequest } from './components/auth/PasswordResetRequest';
 import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
+import RegistrationSuccessPage from './pages/RegistrationSuccessPage';
 import { UserManagementPage } from './components/admin/UserManagementPage';
 import RoleManagementPage from './components/admin/RoleManagementPage';
-import { DocumentChatPage } from './components/DocumentChat/DocumentChatPage';
 import { Dashboard } from './pages/Dashboard';
 import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
@@ -26,12 +27,14 @@ import { BillingPage } from './pages/BillingPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { UserRole } from './types/auth';
-import App from './App';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
-import { loadPromptLibraryWithUpload } from './utils/componentLoader';
+import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
 // Load Premium PromptLibrary with Upload (falls back to Core version)
 const PromptLibrary = loadPromptLibraryWithUpload();
+
+// Load Premium Document Chat (falls back to unavailable message)
+const DocumentChatPage = loadDocumentChat();
 
 // Create a QueryClient instance for TanStack Query
 const queryClient = new QueryClient({
@@ -73,6 +76,8 @@ export const AppWithAuth: React.FC = () => {
               <Route path="/auth/callback" element={<OAuthCallback />} />
               <Route path="/auth/reset-password" element={<PasswordResetRequest />} />
               <Route path="/auth/reset-password/confirm" element={<PasswordResetConfirm />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/registration-success" element={<RegistrationSuccessPage />} />
 
               {/* Protected Routes - Require authentication */}
               <Route

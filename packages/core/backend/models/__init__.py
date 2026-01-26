@@ -39,6 +39,12 @@ from models.subscription import (
     Subscription,
     SubscriptionStatus,
 )
+from models.email_event import (
+    EmailEvent,
+    EmailSuppressionList,
+    EmailEventType,
+    EmailType,
+)
 
 __all__ = [
     "Document",
@@ -67,4 +73,9 @@ __all__ = [
     "PermissionAuditLog",
     "Subscription",
     "SubscriptionStatus",
+    # Email Event Models
+    "EmailEvent",
+    "EmailSuppressionList",
+    "EmailEventType",
+    "EmailType",
 ]

@@ -7,12 +7,16 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { QuickActionCard } from '../components/cards/QuickActionCard';
 import { StatsCard } from '../components/cards/StatsCard';
+import EmailVerificationBanner from '../components/auth/EmailVerificationBanner';
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
 
   return (
     <div className="space-y-8">
+      {/* Email Verification Banner */}
+      <EmailVerificationBanner />
+
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-primary-600 to-secondary-600 rounded-lg p-8 text-white">
         <h1 className="text-4xl font-bold mb-2">

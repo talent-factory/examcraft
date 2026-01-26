@@ -3,7 +3,7 @@
  * Modal dialog for managing user roles
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AdminService, { UserDetailResponse } from '../../services/AdminService';
 import { Role } from '../../types/auth';
 
@@ -27,24 +27,18 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
-  useEffect(() => {
-    if (isOpen && userId) {
-      loadData();
-    }
-  }, [isOpen, userId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!userId) return;
 
     try {
       setLoading(true);
       setError(null);
-      
+
       const [userData, rolesData] = await Promise.all([
         AdminService.getUser(userId),
         AdminService.listRoles(),
       ]);
-      
+
       setUser(userData);
       setAllRoles(rolesData);
     } catch (err) {
@@ -52,7 +46,13 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    if (isOpen && userId) {
+      loadData();
+    }
+  }, [isOpen, userId, loadData]);
 
   const handleAssignRole = async (roleId: number) => {
     if (!userId) return;
@@ -84,10 +84,6 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
     } finally {
       setProcessing(false);
     }
-  };
-
-  const hasRole = (roleId: number): boolean => {
-    return user?.roles.some(r => r.id === roleId) || false;
   };
 
   const getAvailableRoles = (): Role[] => {
@@ -263,4 +259,3 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
     </div>
   );
 };
-

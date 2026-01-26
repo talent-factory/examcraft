@@ -3,7 +3,7 @@
  * Modal dialog for editing institution details and subscription tier
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AdminService from '../../services/AdminService';
 import { Institution } from '../../types/auth';
 
@@ -46,13 +46,7 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
     is_active: true,
   });
 
-  useEffect(() => {
-    if (isOpen && institutionId) {
-      loadInstitution();
-    }
-  }, [isOpen, institutionId]);
-
-  const loadInstitution = async () => {
+  const loadInstitution = useCallback(async () => {
     if (!institutionId) return;
 
     try {
@@ -60,7 +54,7 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
       setError(null);
       const institutions = await AdminService.listInstitutions();
       const inst = institutions.find((i) => i.id === institutionId);
-      
+
       if (inst) {
         setInstitution(inst);
         setFormData({
@@ -77,7 +71,13 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [institutionId]);
+
+  useEffect(() => {
+    if (isOpen && institutionId) {
+      loadInstitution();
+    }
+  }, [isOpen, institutionId, loadInstitution]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -269,4 +269,3 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
     </div>
   );
 };
-
