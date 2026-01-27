@@ -1,8 +1,5 @@
 const path = require('path');
 
-// Check deployment mode - in Core mode, we don't bundle Premium/Enterprise
-const isFullDeployment = process.env.REACT_APP_DEPLOYMENT_MODE === 'full';
-
 module.exports = {
   typescript: {
     enableTypeChecking: false, // Disable TypeScript type checking in webpack
@@ -54,30 +51,6 @@ module.exports = {
         '@examcraft/enterprise': enterprisePath,
       };
 
-      // Only include Premium/Enterprise in Full deployment mode
-      if (isFullDeployment) {
-        // IMPORTANT: Premium/Enterprise packages use relative imports that assume
-        // they are overlaid on Core's src directory. We need to handle this by:
-        // 1. Resolving @examcraft/premium and @examcraft/enterprise to their src dirs
-        // 2. Adding a fallback so relative imports from Premium/Enterprise can find Core components
-        webpackConfig.resolve.alias['@examcraft/premium'] = path.resolve(__dirname, '../../premium/frontend/src');
-        webpackConfig.resolve.alias['@examcraft/enterprise'] = path.resolve(__dirname, '../../enterprise/frontend/src');
-
-        // Add modules resolution fallback for Premium/Enterprise relative imports
-        // This allows Premium/Enterprise to use relative paths like '../../../components/admin'
-        // which will fall back to the Core src directory
-        webpackConfig.resolve.modules = [
-          ...(webpackConfig.resolve.modules || []),
-          path.resolve(__dirname, 'src'),
-          'node_modules',
-        ];
-      } else {
-        // In Core mode, Premium/Enterprise imports should resolve to empty stubs
-        // This prevents webpack from bundling them
-        webpackConfig.resolve.alias['@examcraft/premium'] = path.resolve(__dirname, 'src/stubs/premium.ts');
-        webpackConfig.resolve.alias['@examcraft/enterprise'] = path.resolve(__dirname, 'src/stubs/enterprise.ts');
-      }
-
       // Configure module resolution to prefer .tsx over .ts for entry points
       // This ensures CRA uses index.tsx (React app) instead of index.ts (library exports)
       webpackConfig.resolve.extensions = [
@@ -100,11 +73,10 @@ module.exports = {
             enterprisePath,
           ].filter(Boolean);
 
-            // Disable TypeScript checking for workspace packages
-            // TypeScript will only check Core files, Webpack will transpile Premium/Enterprise
-            if (tsRule.options && tsRule.options.compilerOptions) {
-              tsRule.options.compilerOptions.skipLibCheck = true;
-            }
+          // Disable TypeScript checking for workspace packages
+          // TypeScript will only check Core files, Webpack will transpile Premium/Enterprise
+          if (tsRule.options && tsRule.options.compilerOptions) {
+            tsRule.options.compilerOptions.skipLibCheck = true;
           }
         }
       }
