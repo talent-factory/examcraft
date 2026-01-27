@@ -191,6 +191,8 @@ async def register(
                     slug=personal_slug,
                     domain=None,  # No domain for personal institutions
                     subscription_tier="free",
+                    subscription_type="self_service",  # Stripe Billing
+                    institution_type="personal",  # Single-user institution
                     max_users=1,
                     max_documents=10,
                     max_questions_per_month=50,
