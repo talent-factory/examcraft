@@ -210,9 +210,9 @@ async def lifespan(app: FastAPI):
     app.include_router(rag_exams.router)
     app.include_router(rbac_api.router)
     app.include_router(question_review.router)
-    app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["billing"])
+    app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["Billing"])
     app.include_router(
-        webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"]
+        webhooks_api.router, prefix="/api/v1/webhooks", tags=["Webhooks"]
     )
 
     # Email Webhooks (Resend)

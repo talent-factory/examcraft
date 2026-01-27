@@ -14,15 +14,18 @@ from database import get_db
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/billing", tags=["Billing"])
+router = APIRouter()
+
 
 class CheckoutRequest(BaseModel):
     price_id: str
     success_url: str
     cancel_url: str
 
+
 class PortalRequest(BaseModel):
     return_url: str
+
 
 class SubscriptionResponse(BaseModel):
     id: str
@@ -34,6 +37,7 @@ class SubscriptionResponse(BaseModel):
     canceled_at: Optional[str]
     plan: Optional[dict]
     default_payment_method: Optional[dict]
+
 
 class InvoiceResponse(BaseModel):
     id: str
@@ -47,6 +51,7 @@ class InvoiceResponse(BaseModel):
     paid_at: Optional[str]
     invoice_pdf: Optional[str]
     hosted_invoice_url: Optional[str]
+
 
 class PaymentMethodResponse(BaseModel):
     id: str
@@ -66,11 +71,13 @@ def _get_tier_from_price_id(price_id: str) -> str:
 
 @router.get("/subscription")
 async def get_subscription(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)
 ):
     """
     Get current subscription details for the user's institution
+
+    IMPORTANT: The tier is read from institution.subscription_tier (Single Source of Truth)
+    This is updated by the Stripe webhook handler when subscriptions change.
     """
     payment_service = PaymentService()
 
@@ -88,13 +95,16 @@ async def get_subscription(
             "default_payment_method": None,
         }
 
-    # Get subscription from database
-    subscription = db.query(Subscription).filter(
-        Subscription.institution_id == current_user.institution_id,
-        Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING, SubscriptionStatus.PAST_DUE])
-    ).first()
-
-    if not subscription:
+    # Get institution to read subscription_tier (Single Source of Truth)
+    institution = (
+        db.query(Institution)
+        .filter(Institution.id == current_user.institution_id)
+        .first()
+    )
+    if not institution:
+        logger.error(
+            f"Institution {current_user.institution_id} not found for user {current_user.id}"
+        )
         return {
             "id": None,
             "status": "free",
@@ -107,29 +117,75 @@ async def get_subscription(
             "default_payment_method": None,
         }
 
-    # If Stripe is available, get live data
+    # Get subscription from database (LATEST one)
+    subscription = (
+        db.query(Subscription)
+        .filter(
+            Subscription.institution_id == current_user.institution_id,
+            Subscription.status.in_(
+                [
+                    SubscriptionStatus.ACTIVE,
+                    SubscriptionStatus.TRIALING,
+                    SubscriptionStatus.PAST_DUE,
+                ]
+            ),
+        )
+        .order_by(Subscription.created_at.desc())  # Get most recent subscription
+        .first()
+    )
+
+    if not subscription:
+        # No active subscription - return institution tier
+        # Status should match tier: if tier is not "free", status should be "active"
+        tier = institution.subscription_tier or "free"
+        status = "active" if tier != "free" else "free"
+
+        return {
+            "id": None,
+            "status": status,
+            "tier": tier,
+            "current_period_start": None,
+            "current_period_end": None,
+            "cancel_at_period_end": False,
+            "canceled_at": None,
+            "plan": None,
+            "default_payment_method": None,
+        }
+
+    # IMPORTANT: Use database data as primary source (already synced via webhooks)
+    # Only fetch from Stripe for payment method details if needed
+    payment_method = None
     if payment_service.is_available() and subscription.stripe_subscription_id:
         try:
-            stripe_data = await payment_service.get_subscription(subscription.stripe_subscription_id)
-            stripe_data["tier"] = _get_tier_from_price_id(stripe_data.get("plan", {}).get("id", ""))
-            return stripe_data
+            stripe_data = await payment_service.get_subscription(
+                subscription.stripe_subscription_id
+            )
+            payment_method = stripe_data.get("default_payment_method")
         except Exception as e:
-            # Fall back to database data if Stripe fails
+            # Continue with database data if Stripe fails
+            logger.warning(f"Failed to fetch Stripe payment method: {e}")
             pass
 
+    # Return database data with institution tier (primary source of truth)
     return {
         "id": subscription.stripe_subscription_id,
         "status": subscription.status.value,
-        "tier": _get_tier_from_price_id(subscription.stripe_price_id),
-        "current_period_start": subscription.current_period_start.isoformat() if subscription.current_period_start else None,
-        "current_period_end": subscription.current_period_end.isoformat() if subscription.current_period_end else None,
+        "tier": institution.subscription_tier or "free",  # Single Source of Truth
+        "current_period_start": subscription.current_period_start.isoformat()
+        if subscription.current_period_start
+        else None,
+        "current_period_end": subscription.current_period_end.isoformat()
+        if subscription.current_period_end
+        else None,
         "cancel_at_period_end": subscription.cancel_at_period_end,
-        "canceled_at": subscription.canceled_at.isoformat() if subscription.canceled_at else None,
+        "canceled_at": subscription.canceled_at.isoformat()
+        if subscription.canceled_at
+        else None,
         "plan": {
             "id": subscription.stripe_price_id,
             "currency": "CHF",
         },
-        "default_payment_method": None,
+        "default_payment_method": payment_method,  # From Stripe if available
     }
 
 
@@ -137,7 +193,7 @@ async def get_subscription(
 async def get_invoices(
     limit: int = Query(default=10, le=100),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get billing history (invoices) for the user's institution
@@ -145,27 +201,25 @@ async def get_invoices(
     payment_service = PaymentService()
 
     if not payment_service.is_available():
-        raise HTTPException(
-            status_code=503,
-            detail="Payment service is not configured"
-        )
+        raise HTTPException(status_code=503, detail="Payment service is not configured")
 
     # Check if user has an institution
     if not current_user.institution_id:
         return []
 
     # Get subscription to find customer ID
-    subscription = db.query(Subscription).filter(
-        Subscription.institution_id == current_user.institution_id
-    ).first()
+    subscription = (
+        db.query(Subscription)
+        .filter(Subscription.institution_id == current_user.institution_id)
+        .first()
+    )
 
     if not subscription or not subscription.stripe_customer_id:
         return []
 
     try:
         invoices = await payment_service.get_invoices(
-            subscription.stripe_customer_id,
-            limit=limit
+            subscription.stripe_customer_id, limit=limit
         )
         return invoices
     except Exception as e:
@@ -174,8 +228,7 @@ async def get_invoices(
 
 @router.get("/payment-methods", response_model=List[PaymentMethodResponse])
 async def get_payment_methods(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)
 ):
     """
     Get payment methods for the user's institution
@@ -183,19 +236,18 @@ async def get_payment_methods(
     payment_service = PaymentService()
 
     if not payment_service.is_available():
-        raise HTTPException(
-            status_code=503,
-            detail="Payment service is not configured"
-        )
+        raise HTTPException(status_code=503, detail="Payment service is not configured")
 
     # Check if user has an institution
     if not current_user.institution_id:
         return []
 
     # Get subscription to find customer ID
-    subscription = db.query(Subscription).filter(
-        Subscription.institution_id == current_user.institution_id
-    ).first()
+    subscription = (
+        db.query(Subscription)
+        .filter(Subscription.institution_id == current_user.institution_id)
+        .first()
+    )
 
     if not subscription or not subscription.stripe_customer_id:
         return []
@@ -213,7 +265,7 @@ async def get_payment_methods(
 async def create_customer_portal(
     request: PortalRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Create a Stripe Customer Portal session for managing subscription and payment methods
@@ -221,33 +273,30 @@ async def create_customer_portal(
     payment_service = PaymentService()
 
     if not payment_service.is_available():
-        raise HTTPException(
-            status_code=503,
-            detail="Payment service is not configured"
-        )
+        raise HTTPException(status_code=503, detail="Payment service is not configured")
 
     # Check if user has an institution
     if not current_user.institution_id:
         raise HTTPException(
-            status_code=400,
-            detail="User must be associated with an institution"
+            status_code=400, detail="User must be associated with an institution"
         )
 
     # Get subscription to find customer ID
-    subscription = db.query(Subscription).filter(
-        Subscription.institution_id == current_user.institution_id
-    ).first()
+    subscription = (
+        db.query(Subscription)
+        .filter(Subscription.institution_id == current_user.institution_id)
+        .first()
+    )
 
     if not subscription or not subscription.stripe_customer_id:
         raise HTTPException(
-            status_code=404,
-            detail="No subscription found for this institution"
+            status_code=404, detail="No subscription found for this institution"
         )
 
     try:
         session = await payment_service.create_customer_portal_session(
             stripe_customer_id=subscription.stripe_customer_id,
-            return_url=request.return_url
+            return_url=request.return_url,
         )
         return session
     except Exception as e:
@@ -258,7 +307,7 @@ async def create_customer_portal(
 async def create_checkout_session(
     request: CheckoutRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Create a Stripe Checkout Session for the current user's institution
@@ -270,14 +319,14 @@ async def create_checkout_session(
     if not payment_service.is_available():
         raise HTTPException(
             status_code=503,
-            detail="Payment service is not configured (missing STRIPE_SECRET_KEY)"
+            detail="Payment service is not configured (missing STRIPE_SECRET_KEY)",
         )
 
     # Check if user has an institution
     if not current_user.institution_id:
         raise HTTPException(
             status_code=400,
-            detail="User must be associated with an institution to subscribe"
+            detail="User must be associated with an institution to subscribe",
         )
 
     try:
@@ -289,8 +338,8 @@ async def create_checkout_session(
             metadata={
                 "institution_id": str(current_user.institution_id),
                 "user_id": str(current_user.id),
-                "user_email": current_user.email
-            }
+                "user_email": current_user.email,
+            },
         )
         return session
     except Exception as e:
@@ -299,8 +348,7 @@ async def create_checkout_session(
 
 @router.post("/sync-subscription")
 async def sync_subscription_from_stripe(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)
 ):
     """
     Sync subscription from Stripe to local database.
@@ -312,21 +360,19 @@ async def sync_subscription_from_stripe(
     payment_service = PaymentService()
 
     if not payment_service.is_available():
-        raise HTTPException(
-            status_code=503,
-            detail="Payment service is not configured"
-        )
+        raise HTTPException(status_code=503, detail="Payment service is not configured")
 
     if not current_user.institution_id:
         raise HTTPException(
-            status_code=400,
-            detail="User must be associated with an institution"
+            status_code=400, detail="User must be associated with an institution"
         )
 
     # Get institution
-    institution = db.query(Institution).filter(
-        Institution.id == current_user.institution_id
-    ).first()
+    institution = (
+        db.query(Institution)
+        .filter(Institution.id == current_user.institution_id)
+        .first()
+    )
 
     if not institution:
         raise HTTPException(status_code=404, detail="Institution not found")
@@ -345,7 +391,7 @@ async def sync_subscription_from_stripe(
             return {
                 "status": "no_customer",
                 "message": "No Stripe customer found for this email",
-                "synced": False
+                "synced": False,
             }
 
         customer = customers.data[0]
@@ -353,40 +399,42 @@ async def sync_subscription_from_stripe(
 
         # Get active subscriptions for this customer
         subscriptions = stripe.Subscription.list(
-            customer=customer_id,
-            status="active",
-            limit=1
+            customer=customer_id, status="active", limit=1
         )
 
         if not subscriptions.data:
             # Check for trialing subscriptions
             subscriptions = stripe.Subscription.list(
-                customer=customer_id,
-                status="trialing",
-                limit=1
+                customer=customer_id, status="trialing", limit=1
             )
 
         if not subscriptions.data:
             return {
                 "status": "no_subscription",
                 "message": "No active subscription found in Stripe",
-                "synced": False
+                "synced": False,
             }
 
         stripe_sub = subscriptions.data[0]
         price_id = stripe_sub.items.data[0].price.id if stripe_sub.items.data else None
 
         # Check if subscription already exists in DB
-        existing_sub = db.query(Subscription).filter(
-            Subscription.stripe_subscription_id == stripe_sub.id
-        ).first()
+        existing_sub = (
+            db.query(Subscription)
+            .filter(Subscription.stripe_subscription_id == stripe_sub.id)
+            .first()
+        )
 
         if existing_sub:
             # Update existing
             existing_sub.status = SubscriptionStatus(stripe_sub.status)
             existing_sub.stripe_price_id = price_id
-            existing_sub.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start)
-            existing_sub.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end)
+            existing_sub.current_period_start = datetime.fromtimestamp(
+                stripe_sub.current_period_start
+            )
+            existing_sub.current_period_end = datetime.fromtimestamp(
+                stripe_sub.current_period_end
+            )
             existing_sub.cancel_at_period_end = stripe_sub.cancel_at_period_end
             logger.info(f"Updated subscription {stripe_sub.id}")
         else:
@@ -397,9 +445,13 @@ async def sync_subscription_from_stripe(
                 stripe_customer_id=customer_id,
                 stripe_price_id=price_id,
                 status=SubscriptionStatus(stripe_sub.status),
-                current_period_start=datetime.fromtimestamp(stripe_sub.current_period_start),
-                current_period_end=datetime.fromtimestamp(stripe_sub.current_period_end),
-                cancel_at_period_end=stripe_sub.cancel_at_period_end
+                current_period_start=datetime.fromtimestamp(
+                    stripe_sub.current_period_start
+                ),
+                current_period_end=datetime.fromtimestamp(
+                    stripe_sub.current_period_end
+                ),
+                cancel_at_period_end=stripe_sub.cancel_at_period_end,
             )
             db.add(new_sub)
             logger.info(f"Created subscription {stripe_sub.id}")
@@ -422,16 +474,18 @@ async def sync_subscription_from_stripe(
 
         db.commit()
 
-        logger.info(f"Synced subscription for institution {institution.id}: {old_tier} -> {tier}")
+        logger.info(
+            f"Synced subscription for institution {institution.id}: {old_tier} -> {tier}"
+        )
 
         return {
             "status": "success",
-            "message": f"Subscription synced successfully",
+            "message": "Subscription synced successfully",
             "synced": True,
             "subscription_id": stripe_sub.id,
             "tier": tier,
             "old_tier": old_tier,
-            "price_id": price_id
+            "price_id": price_id,
         }
 
     except stripe.error.StripeError as e:
