@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     paymentService,
     SubscriptionDetails,
@@ -41,6 +41,7 @@ const formatCurrency = (amount: number, currency: string): string => {
 
 export const SubscriptionManagementPage: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -50,7 +51,7 @@ export const SubscriptionManagementPage: React.FC = () => {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [location.key]); // Reload when location changes (e.g., after redirect from payment success)
 
     const loadData = async () => {
         try {
@@ -123,9 +124,12 @@ export const SubscriptionManagementPage: React.FC = () => {
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${tierConfig.color}`}>
                             {tierConfig.name}
                         </span>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusConfig.color}`}>
-                            {statusConfig.label}
-                        </span>
+                        {/* Only show status badge if there's an active subscription */}
+                        {subscription?.id && subscription?.status !== 'free' && (
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusConfig.color}`}>
+                                {statusConfig.label}
+                            </span>
+                        )}
                     </div>
                 </div>
 
