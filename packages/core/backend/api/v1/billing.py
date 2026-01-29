@@ -152,19 +152,28 @@ async def get_subscription(
             "default_payment_method": None,
         }
 
-    # IMPORTANT: Use database data as primary source (already synced via webhooks)
-    # Only fetch from Stripe for payment method details if needed
+    # Fetch subscription details from Stripe (includes price the user actually pays)
     payment_method = None
+    plan_details = {
+        "id": subscription.stripe_price_id,
+        "currency": "CHF",
+        "amount": 0,
+        "interval": "month",
+    }
+
     if payment_service.is_available() and subscription.stripe_subscription_id:
         try:
             stripe_data = await payment_service.get_subscription(
                 subscription.stripe_subscription_id
             )
             payment_method = stripe_data.get("default_payment_method")
+
+            # Get price details from the Stripe subscription (what the user actually pays)
+            if stripe_data.get("plan"):
+                plan_details = stripe_data["plan"]
         except Exception as e:
             # Continue with database data if Stripe fails
-            logger.warning(f"Failed to fetch Stripe payment method: {e}")
-            pass
+            logger.warning(f"Failed to fetch Stripe subscription details: {e}")
 
     # Return database data with institution tier (primary source of truth)
     return {
@@ -181,11 +190,8 @@ async def get_subscription(
         "canceled_at": subscription.canceled_at.isoformat()
         if subscription.canceled_at
         else None,
-        "plan": {
-            "id": subscription.stripe_price_id,
-            "currency": "CHF",
-        },
-        "default_payment_method": payment_method,  # From Stripe if available
+        "plan": plan_details,
+        "default_payment_method": payment_method,
     }
 
 
