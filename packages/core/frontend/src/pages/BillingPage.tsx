@@ -1,11 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { paymentService } from '../services/paymentService';
 import { STRIPE_PRICES, getStripeConfigStatus } from '../config/stripe.config';
 
 export const BillingPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [currentTier, setCurrentTier] = useState<string>('free');
     const stripeConfigStatus = getStripeConfigStatus();
+
+    useEffect(() => {
+        const loadCurrentTier = async () => {
+            try {
+                const subscription = await paymentService.getSubscription();
+                setCurrentTier(subscription.tier || 'free');
+            } catch (err) {
+                console.error('Failed to load subscription:', err);
+            }
+        };
+        loadCurrentTier();
+    }, []);
 
     const handleSubscribe = async (priceId: string) => {
         setLoading(true);
@@ -62,7 +75,7 @@ export const BillingPage: React.FC = () => {
                             disabled
                             className="mt-8 block w-full bg-gray-100 border border-transparent rounded-md py-2 text-sm font-semibold text-gray-400 text-center cursor-not-allowed"
                         >
-                            Current Plan
+                            {currentTier === 'free' ? 'Current Plan' : 'Free Plan'}
                         </button>
                     </div>
                 </div>
@@ -83,10 +96,14 @@ export const BillingPage: React.FC = () => {
                         </p>
                         <button
                             onClick={() => handleSubscribe(STRIPE_PRICES.starter)}
-                            disabled={loading || !stripeConfigStatus.configured}
-                            className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            disabled={loading || !stripeConfigStatus.configured || currentTier === 'starter'}
+                            className={`mt-8 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-center ${
+                                currentTier === 'starter'
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
+                            }`}
                         >
-                            {loading ? 'Processing...' : 'Subscribe'}
+                            {currentTier === 'starter' ? 'Current Plan' : loading ? 'Processing...' : 'Subscribe'}
                         </button>
                     </div>
                 </div>
@@ -104,10 +121,14 @@ export const BillingPage: React.FC = () => {
                         </p>
                         <button
                             onClick={() => handleSubscribe(STRIPE_PRICES.professional)}
-                            disabled={loading || !stripeConfigStatus.configured}
-                            className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            disabled={loading || !stripeConfigStatus.configured || currentTier === 'professional'}
+                            className={`mt-8 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-center ${
+                                currentTier === 'professional'
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
+                            }`}
                         >
-                            {loading ? 'Processing...' : 'Subscribe'}
+                            {currentTier === 'professional' ? 'Current Plan' : loading ? 'Processing...' : 'Subscribe'}
                         </button>
                     </div>
                 </div>
