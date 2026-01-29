@@ -96,7 +96,7 @@ export const BillingPage: React.FC = () => {
                     <div className="p-6">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Professional</h2>
                         <p className="mt-4">
-                            <span className="text-4xl font-extrabold text-gray-900">CHF 149</span>
+                            <span className="text-4xl font-extrabold text-gray-900">CHF 49</span>
                             <span className="text-base font-medium text-gray-500">/mo</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
