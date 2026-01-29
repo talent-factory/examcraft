@@ -100,20 +100,32 @@ async def handle_checkout_session_completed(session: dict, db: Session):
     print("✅ INSTITUTION_ID FOUND, CONTINUING...")
 
     # functionality depends on subscription_mode (payment vs subscription)
-    if session.get("mode") == "subscription":
+    session_mode = session.get("mode")
+    print(f"🔍 SESSION MODE: {session_mode}")
+    logger.info(f"🔍 Session mode: {session_mode}")
+
+    if session_mode == "subscription":
         subscription_id = session.get("subscription")
         customer_id = session.get("customer")
+        print(f"🔍 SUBSCRIPTION_ID: {subscription_id}, CUSTOMER_ID: {customer_id}")
+        logger.info(f"🔍 Subscription ID: {subscription_id}, Customer ID: {customer_id}")
 
         # Update Institution
         institution = (
             db.query(Institution).filter(Institution.id == int(institution_id)).first()
         )
         if not institution:
+            print(f"❌ INSTITUTION {institution_id} NOT FOUND")
             logger.error(f"Error: Institution {institution_id} not found")
             return
 
+        print(f"✅ INSTITUTION FOUND: {institution.name}")
+        logger.info(f"✅ Institution found: {institution.name} (ID: {institution.id})")
+
         # Fetch actual subscription details from Stripe
+        print(f"🔍 FETCHING STRIPE SUBSCRIPTION: {subscription_id}")
         stripe_sub = stripe.Subscription.retrieve(subscription_id)
+        print(f"✅ STRIPE SUBSCRIPTION FETCHED")
         price_id = stripe_sub["items"]["data"][0]["price"]["id"]
 
         # Debug: Log subscription object to see available fields
@@ -221,11 +233,17 @@ async def handle_checkout_session_completed(session: dict, db: Session):
                 )
 
         institution.subscription_tier = new_tier
+        print(f"✅ UPDATING INSTITUTION TIER TO: {new_tier}")
         logger.info(
             f"✅ Updated institution {institution_id} to tier: {new_tier} (price_id: {price_id})"
         )
 
         db.commit()
+        print("✅ DATABASE COMMIT SUCCESSFUL")
+        logger.info("✅ Database commit successful")
+    else:
+        print(f"⚠️ SESSION MODE IS NOT 'subscription': {session_mode}")
+        logger.warning(f"Session mode is not 'subscription': {session_mode}")
 
 
 async def handle_subscription_created(subscription: dict, db: Session):
