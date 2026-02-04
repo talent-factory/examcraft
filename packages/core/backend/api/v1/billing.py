@@ -69,6 +69,21 @@ def _get_tier_from_price_id(price_id: str) -> str:
     return price_to_tier.get(price_id, "free")
 
 
+def _is_billing_owner(user: User, subscription: Subscription) -> bool:
+    """
+    Check if the user is the billing owner of the subscription.
+    Only the billing owner can view invoices, payment methods, and manage the subscription.
+    """
+    if not subscription or not subscription.billing_owner_id:
+        # No billing owner set - allow for backwards compatibility
+        # but log a warning
+        logger.warning(
+            f"Subscription {subscription.id if subscription else 'N/A'} has no billing_owner_id set"
+        )
+        return True  # Allow access for legacy subscriptions
+    return user.id == subscription.billing_owner_id
+
+
 @router.get("/subscription")
 async def get_subscription(
     current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)
@@ -93,6 +108,7 @@ async def get_subscription(
             "canceled_at": None,
             "plan": None,
             "default_payment_method": None,
+            "is_billing_owner": False,
         }
 
     # Get institution to read subscription_tier (Single Source of Truth)
@@ -115,6 +131,7 @@ async def get_subscription(
             "canceled_at": None,
             "plan": None,
             "default_payment_method": None,
+            "is_billing_owner": False,
         }
 
     # Get subscription from database (LATEST one)
@@ -150,6 +167,7 @@ async def get_subscription(
             "canceled_at": None,
             "plan": None,
             "default_payment_method": None,
+            "is_billing_owner": False,  # No subscription, so no billing owner
         }
 
     # Fetch subscription details from Stripe (includes price the user actually pays)
@@ -192,6 +210,7 @@ async def get_subscription(
         else None,
         "plan": plan_details,
         "default_payment_method": payment_method,
+        "is_billing_owner": _is_billing_owner(current_user, subscription),
     }
 
 
@@ -202,7 +221,8 @@ async def get_invoices(
     db: Session = Depends(get_db),
 ):
     """
-    Get billing history (invoices) for the user's institution
+    Get billing history (invoices) for the user's institution.
+    Only the billing owner can view invoices.
     """
     payment_service = PaymentService()
 
@@ -222,6 +242,13 @@ async def get_invoices(
 
     if not subscription or not subscription.stripe_customer_id:
         return []
+
+    # Check if user is the billing owner
+    if not _is_billing_owner(current_user, subscription):
+        logger.info(
+            f"User {current_user.id} denied access to invoices - not billing owner"
+        )
+        return []  # Return empty list instead of error for non-billing owners
 
     try:
         invoices = await payment_service.get_invoices(
@@ -237,7 +264,8 @@ async def get_payment_methods(
     current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)
 ):
     """
-    Get payment methods for the user's institution
+    Get payment methods for the user's institution.
+    Only the billing owner can view payment methods.
     """
     payment_service = PaymentService()
 
@@ -257,6 +285,13 @@ async def get_payment_methods(
 
     if not subscription or not subscription.stripe_customer_id:
         return []
+
+    # Check if user is the billing owner
+    if not _is_billing_owner(current_user, subscription):
+        logger.info(
+            f"User {current_user.id} denied access to payment methods - not billing owner"
+        )
+        return []  # Return empty list instead of error for non-billing owners
 
     try:
         payment_methods = await payment_service.get_payment_methods(
@@ -274,7 +309,8 @@ async def create_customer_portal(
     db: Session = Depends(get_db),
 ):
     """
-    Create a Stripe Customer Portal session for managing subscription and payment methods
+    Create a Stripe Customer Portal session for managing subscription and payment methods.
+    Only the billing owner can access the customer portal.
     """
     payment_service = PaymentService()
 
@@ -297,6 +333,16 @@ async def create_customer_portal(
     if not subscription or not subscription.stripe_customer_id:
         raise HTTPException(
             status_code=404, detail="No subscription found for this institution"
+        )
+
+    # Check if user is the billing owner
+    if not _is_billing_owner(current_user, subscription):
+        logger.warning(
+            f"User {current_user.id} denied access to customer portal - not billing owner"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Only the billing owner can manage subscription settings"
         )
 
     try:

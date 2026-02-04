@@ -175,13 +175,16 @@ export const SubscriptionManagementPage: React.FC = () => {
                         </button>
                     ) : (
                         <>
-                            <button
-                                onClick={handleManageSubscription}
-                                disabled={portalLoading}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-                            >
-                                {portalLoading ? 'Loading...' : 'Manage Subscription'}
-                            </button>
+                            {/* Only billing owner can manage subscription */}
+                            {subscription?.is_billing_owner && (
+                                <button
+                                    onClick={handleManageSubscription}
+                                    disabled={portalLoading}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                                >
+                                    {portalLoading ? 'Loading...' : 'Manage Subscription'}
+                                </button>
+                            )}
                             <button
                                 onClick={handleUpgrade}
                                 className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
@@ -193,119 +196,123 @@ export const SubscriptionManagementPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Payment Methods */}
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-gray-900">Payment Methods</h2>
-                    {subscription?.id && subscription.status !== 'free' && (
-                        <button
-                            onClick={handleManageSubscription}
-                            disabled={portalLoading}
-                            className="text-sm text-blue-600 hover:text-blue-800"
-                        >
-                            Update Payment Method
-                        </button>
+            {/* Payment Methods - Only visible to billing owner */}
+            {subscription?.is_billing_owner && (
+                <div className="bg-white shadow rounded-lg p-6 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-semibold text-gray-900">Payment Methods</h2>
+                        {subscription?.id && subscription.status !== 'free' && (
+                            <button
+                                onClick={handleManageSubscription}
+                                disabled={portalLoading}
+                                className="text-sm text-blue-600 hover:text-blue-800"
+                            >
+                                Update Payment Method
+                            </button>
+                        )}
+                    </div>
+
+                    {paymentMethods.length > 0 ? (
+                        <div className="space-y-3">
+                            {paymentMethods.map((pm) => (
+                                <div key={pm.id} className="flex items-center p-3 border rounded-md">
+                                    <div className="flex-shrink-0 mr-3">
+                                        <span className="text-2xl">
+                                            {pm.card?.brand === 'visa' && '💳'}
+                                            {pm.card?.brand === 'mastercard' && '💳'}
+                                            {pm.card?.brand === 'amex' && '💳'}
+                                            {!pm.card?.brand && '💳'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-gray-900">
+                                            {pm.card?.brand?.toUpperCase() || 'Card'} ending in {pm.card?.last4 || '****'}
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            Expires {pm.card?.exp_month}/{pm.card?.exp_year}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-gray-500">No payment methods on file.</p>
                     )}
                 </div>
+            )}
 
-                {paymentMethods.length > 0 ? (
-                    <div className="space-y-3">
-                        {paymentMethods.map((pm) => (
-                            <div key={pm.id} className="flex items-center p-3 border rounded-md">
-                                <div className="flex-shrink-0 mr-3">
-                                    <span className="text-2xl">
-                                        {pm.card?.brand === 'visa' && '💳'}
-                                        {pm.card?.brand === 'mastercard' && '💳'}
-                                        {pm.card?.brand === 'amex' && '💳'}
-                                        {!pm.card?.brand && '💳'}
-                                    </span>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-900">
-                                        {pm.card?.brand?.toUpperCase() || 'Card'} ending in {pm.card?.last4 || '****'}
-                                    </p>
-                                    <p className="text-sm text-gray-500">
-                                        Expires {pm.card?.exp_month}/{pm.card?.exp_year}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-gray-500">No payment methods on file.</p>
-                )}
-            </div>
+            {/* Billing History - Only visible to billing owner */}
+            {subscription?.is_billing_owner && (
+                <div className="bg-white shadow rounded-lg p-6">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4">Billing History</h2>
 
-            {/* Billing History */}
-            <div className="bg-white shadow rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Billing History</h2>
-
-                {invoices.length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Invoice
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Date
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Amount
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Status
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Download
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {invoices.map((invoice) => (
-                                    <tr key={invoice.id}>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {invoice.number || invoice.id.slice(0, 8)}
-                                        </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {formatDate(invoice.created)}
-                                        </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {formatCurrency(invoice.amount_paid || invoice.amount_due, invoice.currency)}
-                                        </td>
-                                        <td className="px-4 py-4 whitespace-nowrap">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                invoice.status === 'paid'
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : invoice.status === 'open'
-                                                    ? 'bg-yellow-100 text-yellow-800'
-                                                    : 'bg-gray-100 text-gray-800'
-                                            }`}>
-                                                {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                            {invoice.invoice_pdf && (
-                                                <a
-                                                    href={invoice.invoice_pdf}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                >
-                                                    PDF
-                                                </a>
-                                            )}
-                                        </td>
+                    {invoices.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Invoice
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Date
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Amount
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Status
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Download
+                                        </th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : (
-                    <p className="text-gray-500">No invoices yet.</p>
-                )}
-            </div>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {invoices.map((invoice) => (
+                                        <tr key={invoice.id}>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {invoice.number || invoice.id.slice(0, 8)}
+                                            </td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {formatDate(invoice.created)}
+                                            </td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {formatCurrency(invoice.amount_paid || invoice.amount_due, invoice.currency)}
+                                            </td>
+                                            <td className="px-4 py-4 whitespace-nowrap">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                    invoice.status === 'paid'
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : invoice.status === 'open'
+                                                        ? 'bg-yellow-100 text-yellow-800'
+                                                        : 'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                    {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                                {invoice.invoice_pdf && (
+                                                    <a
+                                                        href={invoice.invoice_pdf}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        PDF
+                                                    </a>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <p className="text-gray-500">No invoices yet.</p>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

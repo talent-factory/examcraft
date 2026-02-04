@@ -23,6 +23,7 @@ export interface SubscriptionDetails {
         interval?: string;
     } | null;
     default_payment_method: PaymentMethod | null;
+    is_billing_owner: boolean;
 }
 
 export interface Invoice {

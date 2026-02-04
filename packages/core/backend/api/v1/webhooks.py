@@ -83,14 +83,17 @@ async def handle_checkout_session_completed(session: dict, db: Session):
     logger.info("🔍 handle_checkout_session_completed() called")
     logger.info(f"🔍 Session object: {session}")
 
-    # Get institution_id from metadata (set during checkout session creation)
+    # Get institution_id and user_id from metadata (set during checkout session creation)
     metadata = session.get("metadata", {})
     institution_id = metadata.get("institution_id")
+    user_id = metadata.get("user_id")  # Billing owner
 
     print(f"🔍 METADATA: {metadata}")
     print(f"🔍 INSTITUTION_ID: {institution_id}")
+    print(f"🔍 USER_ID (billing owner): {user_id}")
     logger.info(f"🔍 Metadata: {metadata}")
     logger.info(f"🔍 Institution ID: {institution_id}")
+    logger.info(f"🔍 User ID (billing owner): {user_id}")
 
     if not institution_id:
         print("❌ NO INSTITUTION_ID - ABORTING")
@@ -147,6 +150,9 @@ async def handle_checkout_session_completed(session: dict, db: Session):
             # Update existing subscription
             existing_sub.status = SubscriptionStatus(stripe_sub["status"])
             existing_sub.stripe_price_id = price_id
+            # Set billing owner if not already set
+            if not existing_sub.billing_owner_id and user_id:
+                existing_sub.billing_owner_id = int(user_id)
             if "current_period_start" in stripe_sub:
                 existing_sub.current_period_start = datetime.fromtimestamp(
                     stripe_sub["current_period_start"]
@@ -173,6 +179,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
 
             new_sub = Subscription(
                 institution_id=institution.id,
+                billing_owner_id=int(user_id) if user_id else None,
                 stripe_subscription_id=subscription_id,
                 stripe_customer_id=customer_id,
                 stripe_price_id=price_id,
