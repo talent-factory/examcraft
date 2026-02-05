@@ -743,6 +743,26 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
         logger.error(f"Failed to send welcome email to {user.email}: {str(e)}")
         # Don't fail verification if welcome email fails
 
+    # Subscribe to SubscribeFlow newsletter
+    try:
+        from services.subscribeflow_service import subscribeflow_service
+
+        result = await subscribeflow_service.subscribe_user(
+            email=user.email,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            user_id=str(user.id),
+            source="email_verification",
+        )
+        logger.info(
+            f"SubscribeFlow subscription for {user.email}: {result}"
+        )
+    except Exception as e:
+        logger.error(
+            f"SubscribeFlow subscription failed for {user.email}: {str(e)}"
+        )
+        # Don't fail verification if newsletter subscription fails
+
     logger.info(f"Email verified for user: {user.email} (ID: {user.id})")
 
     return {

@@ -22,6 +22,9 @@ amqp==5.2.0                             # AMQP Protocol Implementation
 # HTTP client for Claude API
 httpx==0.27.2
 
+# SubscribeFlow SDK (Newsletter Subscription)
+subscribeflow @ git+https://github.com/talent-factory/subscribe-flow.git#subdirectory=sdk/python
+
 # Environment and configuration
 python-dotenv==1.0.0
 pydantic==2.10.3

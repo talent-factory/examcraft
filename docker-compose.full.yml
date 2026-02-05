@@ -150,6 +150,9 @@ services:
       RESEND_FROM_NAME: ${RESEND_FROM_NAME:-ExamCraft AI}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      # SubscribeFlow Newsletter Integration
+      SUBSCRIBEFLOW_API_KEY: ${SUBSCRIBEFLOW_API_KEY:-}
+      SUBSCRIBEFLOW_BASE_URL: ${SUBSCRIBEFLOW_BASE_URL:-https://api.subscribeflow.net}
 
       # Environment
       ENVIRONMENT: development
@@ -249,6 +252,9 @@ services:
       RESEND_FROM_NAME: ${RESEND_FROM_NAME:-ExamCraft AI}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      # SubscribeFlow Newsletter Integration
+      SUBSCRIBEFLOW_API_KEY: ${SUBSCRIBEFLOW_API_KEY:-}
+      SUBSCRIBEFLOW_BASE_URL: ${SUBSCRIBEFLOW_BASE_URL:-https://api.subscribeflow.net}
 
       # Environment
       ENVIRONMENT: development
