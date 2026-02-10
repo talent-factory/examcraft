@@ -45,7 +45,6 @@ primary_region = "fra"  # Frankfurt
 [checks]
   [checks.health]
     port = 15672
-    type = "http"
+    type = "tcp"
     interval = "30s"
     timeout = "10s"
-    path = "/api/health/checks/alarms"
