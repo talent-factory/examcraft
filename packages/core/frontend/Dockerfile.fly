@@ -12,16 +12,28 @@ WORKDIR /app
 
 # Build arguments for environment configuration
 ARG REACT_APP_API_URL
+ARG REACT_APP_DEPLOYMENT_MODE=full
 ENV REACT_APP_API_URL=${REACT_APP_API_URL}
+ENV REACT_APP_DEPLOYMENT_MODE=${REACT_APP_DEPLOYMENT_MODE}
+
+# Create packages structure matching monorepo layout
+# craco.config.js expects ../../premium/frontend/src relative to core/frontend
+WORKDIR /app/packages/core/frontend
 
 # Copy package files
 COPY packages/core/frontend/package*.json ./
 
 # Install all dependencies (including devDependencies for build)
-RUN npm ci
+# Using npm install instead of npm ci due to lockfile sync issues
+RUN npm install --legacy-peer-deps
 
-# Copy source code
+# Copy core source code
 COPY packages/core/frontend/ ./
+
+# Copy premium package to correct location for webpack alias
+# craco.config.js: path.resolve(__dirname, '../../premium/frontend/src')
+COPY packages/premium/frontend/src/ /app/packages/premium/frontend/src/
+COPY packages/enterprise/frontend/src/ /app/packages/enterprise/frontend/src/
 
 # Build for production
 RUN npm run build
@@ -32,10 +44,10 @@ RUN npm run build
 FROM nginx:alpine AS runtime
 
 # Copy built assets from builder
-COPY --from=builder /app/build /usr/share/nginx/html
+COPY --from=builder /app/packages/core/frontend/build /usr/share/nginx/html
 
 # Copy custom nginx configuration
-COPY packages/core/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/packages/core/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Create non-root user for security
 RUN addgroup -g 1000 -S appgroup && \
