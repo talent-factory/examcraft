@@ -1,0 +1,51 @@
+# =============================================================================
+# ExamCraft AI RabbitMQ - Fly.io Configuration
+# Message Broker for Celery with Persistent Storage
+# =============================================================================
+
+app = "examcraft-rabbitmq"
+primary_region = "fra"  # Frankfurt
+
+[build]
+  image = "rabbitmq:4-management-alpine"
+
+[env]
+  RABBITMQ_DEFAULT_USER = "examcraft"
+  # RABBITMQ_DEFAULT_PASS wird als Secret gesetzt
+
+[http_service]
+  internal_port = 15672  # Management UI
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1  # RabbitMQ muss immer laufen für Celery
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 50
+    soft_limit = 40
+
+# AMQP Port für Celery Worker
+[[services]]
+  protocol = "tcp"
+  internal_port = 5672
+
+  [[services.ports]]
+    port = 5672
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "rabbitmq_data"
+  destination = "/var/lib/rabbitmq"
+
+[checks]
+  [checks.health]
+    port = 15672
+    type = "http"
+    interval = "30s"
+    timeout = "10s"
+    path = "/api/health/checks/alarms"

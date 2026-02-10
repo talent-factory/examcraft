@@ -166,7 +166,158 @@ frontend:
 4. All relative imports work correctly
 5. Hot-reload works seamlessly for all packages
 
-## Production Deployment (Render.com)
+## Production Deployment (Fly.io) - Recommended
+
+ExamCraft AI is deployed on [Fly.io](https://fly.io) for production. This enables
+self-hosting all services including Qdrant Vector Database without external
+cloud dependencies.
+
+### Architecture
+
+| Service | Fly.io Solution | Estimated Cost |
+|---------|-----------------|----------------|
+| PostgreSQL | Fly Postgres (Managed) | ~$7/Mo |
+| Redis | Fly Upstash Redis | ~$0-5/Mo |
+| RabbitMQ | Fly Machine + Volume | ~$3/Mo |
+| Qdrant | Fly Machine + Volume | ~$7/Mo |
+| Backend | Fly Machine (Auto-Scale) | ~$3/Mo |
+| Celery Worker | Fly Machine | ~$3/Mo |
+| Frontend | Fly Machine (Nginx) | ~$2/Mo |
+
+**Total Estimated Cost:** ~$25-30/month
+
+### Configuration Files
+
+```
+ExamCraft/
+├── fly.toml              # Backend (API Server)
+├── fly.frontend.toml     # Frontend (Nginx)
+├── fly.qdrant.toml       # Qdrant Vector Database
+├── fly.rabbitmq.toml     # RabbitMQ Message Broker
+├── fly.celery.toml       # Celery Worker
+└── packages/core/
+    ├── backend/
+    │   ├── Dockerfile.fly
+    │   └── docker-entrypoint.sh
+    └── frontend/
+        └── Dockerfile.fly
+```
+
+### Deployment Steps
+
+#### 1. Install Fly CLI
+
+```bash
+# macOS
+brew install flyctl
+
+# or via curl
+curl -L https://fly.io/install.sh | sh
+```
+
+#### 2. Create Fly.io Apps
+
+```bash
+# Login to Fly.io
+fly auth login
+
+# Create apps (Frankfurt region)
+fly apps create examcraft-api --org personal
+fly apps create examcraft-web --org personal
+fly apps create examcraft-qdrant --org personal
+fly apps create examcraft-rabbitmq --org personal
+fly apps create examcraft-celery --org personal
+```
+
+#### 3. Provision Databases
+
+```bash
+# PostgreSQL (Managed)
+fly postgres create --name examcraft-db --region fra
+
+# Attach to backend
+fly postgres attach examcraft-db --app examcraft-api
+
+# Redis (Upstash)
+fly redis create --name examcraft-redis --region fra
+```
+
+#### 4. Create Persistent Volumes
+
+```bash
+# Qdrant volume (1GB)
+fly volumes create qdrant_data --size 1 --region fra --app examcraft-qdrant
+
+# RabbitMQ volume (1GB)
+fly volumes create rabbitmq_data --size 1 --region fra --app examcraft-rabbitmq
+```
+
+#### 5. Set Secrets
+
+```bash
+# Backend secrets (replace with real values)
+fly secrets set \
+  JWT_SECRET_KEY="<your-jwt-secret>" \
+  ANTHROPIC_API_KEY="<your-anthropic-key>" \
+  GOOGLE_CLIENT_ID="<your-google-id>" \
+  GOOGLE_CLIENT_SECRET="<your-google-secret>" \
+  --app examcraft-api
+
+# RabbitMQ password
+fly secrets set RABBITMQ_DEFAULT_PASS="<your-rabbitmq-password>" --app examcraft-rabbitmq
+
+# Celery broker URL (use actual password from above)
+fly secrets set CELERY_BROKER_URL="amqp://examcraft:<password>@examcraft-rabbitmq.internal:5672" --app examcraft-celery
+```
+
+#### 6. Deploy Services
+
+```bash
+# Deploy in order (dependencies first)
+fly deploy -c fly.qdrant.toml
+fly deploy -c fly.rabbitmq.toml
+fly deploy -c fly.toml           # Backend
+fly deploy -c fly.celery.toml
+fly deploy -c fly.frontend.toml
+```
+
+### Private Networking
+
+All services communicate via Fly's private network using `.internal` domains:
+
+- `examcraft-db.internal` - PostgreSQL
+- `examcraft-redis.internal` - Redis
+- `examcraft-qdrant.internal:6333` - Qdrant
+- `examcraft-rabbitmq.internal:5672` - RabbitMQ
+
+### Monitoring
+
+```bash
+# View logs
+fly logs --app examcraft-api
+
+# Check status
+fly status --app examcraft-api
+
+# SSH into container
+fly ssh console --app examcraft-api
+```
+
+### Custom Domain
+
+```bash
+# Add custom domain
+fly certs create examcraft.ai --app examcraft-web
+
+# Verify DNS
+fly certs show examcraft.ai --app examcraft-web
+```
+
+---
+
+## Production Deployment (Render.com) - Legacy
+
+> **Note:** Render.com deployment is deprecated. Use Fly.io for new deployments.
 
 ### Recommended Setup
 

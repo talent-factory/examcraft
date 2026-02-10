@@ -1,0 +1,57 @@
+# ============================================================================
+# ExamCraft AI Frontend - Fly.io Production Dockerfile
+# Multi-stage build for optimized static site
+# ============================================================================
+
+# =========================
+# Stage 1: Build Stage
+# =========================
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Build arguments for environment configuration
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=${REACT_APP_API_URL}
+
+# Copy package files
+COPY packages/core/frontend/package*.json ./
+
+# Install all dependencies (including devDependencies for build)
+RUN npm ci
+
+# Copy source code
+COPY packages/core/frontend/ ./
+
+# Build for production
+RUN npm run build
+
+# =========================
+# Stage 2: Production Stage (Nginx)
+# =========================
+FROM nginx:alpine AS runtime
+
+# Copy built assets from builder
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Copy custom nginx configuration
+COPY packages/core/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Create non-root user for security
+RUN addgroup -g 1000 -S appgroup && \
+    adduser -u 1000 -S appuser -G appgroup && \
+    chown -R appuser:appgroup /usr/share/nginx/html && \
+    chown -R appuser:appgroup /var/cache/nginx && \
+    chown -R appuser:appgroup /var/log/nginx && \
+    touch /var/run/nginx.pid && \
+    chown -R appuser:appgroup /var/run/nginx.pid
+
+# Expose port
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
