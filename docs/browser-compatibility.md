@@ -54,4 +54,3 @@ Verwende **Data-URLs** statt Blob-URLs für Downloads mit benutzerdefinierten Da
 ### References
 - MDN: [HTMLAnchorElement.download](https://developer.mozilla.org/en-US/docs/Web/API/HTMLAnchorElement/download)
 - MDN: [FileReader.readAsDataURL()](https://developer.mozilla.org/en-US/docs/Web/API/FileReader/readAsDataURL)
-

@@ -104,4 +104,3 @@ describe('Button Component', () => {
     expect(screen.getByText('Loading')).toBeInTheDocument();
   });
 });
-

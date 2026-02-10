@@ -11,4 +11,3 @@ docker-compose build --build-arg BUILD_TIMESTAMP="$BUILD_TIMESTAMP" backend
 
 echo "✅ Build complete!"
 echo "📅 Build Timestamp: $BUILD_TIMESTAMP"
-

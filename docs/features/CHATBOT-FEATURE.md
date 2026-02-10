@@ -185,7 +185,7 @@ GET /api/v1/chat/sessions/{session_id}/download
 ```markdown
 # Chat: Session Title
 
-**Erstellt am:** 2025-01-09 14:30:00  
+**Erstellt am:** 2025-01-09 14:30:00
 **Dokumente:** Example.pdf, Tutorial.docx
 
 ---
@@ -216,11 +216,11 @@ Certainly! ...
 ```python
 class Document(Base):
     __tablename__ = "documents"
-    
+
     # ... existing fields ...
-    
+
     doc_metadata = Column(JSONB, nullable=True)
-    
+
     @property
     def title(self) -> str:
         """

@@ -126,4 +126,3 @@ export const TIER_COLORS: Record<string, string> = {
   tier_professional: '#4CAF50',
   tier_enterprise: '#FF9800'
 };
-

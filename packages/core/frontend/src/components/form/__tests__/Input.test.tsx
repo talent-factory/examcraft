@@ -78,4 +78,3 @@ describe('Input Component', () => {
     expect(wrapper).toHaveClass('w-full');
   });
 });
-

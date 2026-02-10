@@ -37,7 +37,7 @@ export class ReviewService {
    */
   static async getReviewQueue(filters?: ReviewFilters): Promise<ReviewQueueResponse> {
     const params = new URLSearchParams();
-    
+
     if (filters?.status) params.append('status', filters.status);
     if (filters?.difficulty) params.append('difficulty', filters.difficulty);
     if (filters?.question_type) params.append('question_type', filters.question_type);
@@ -259,7 +259,7 @@ export class ReviewService {
     }
 
     const data: ReviewQueueResponse = await response.json();
-    
+
     return {
       total: data.total,
       pending: data.pending,
@@ -280,7 +280,7 @@ export class ReviewService {
     const promises = questionIds.map(id =>
       this.approveQuestion(id, { reviewer_id: reviewerId })
     );
-    
+
     return Promise.all(promises);
   }
 
@@ -295,8 +295,7 @@ export class ReviewService {
     const promises = questionIds.map(id =>
       this.rejectQuestion(id, { reviewer_id: reviewerId, reason })
     );
-    
+
     return Promise.all(promises);
   }
 }
-

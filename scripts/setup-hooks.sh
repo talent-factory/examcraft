@@ -45,4 +45,3 @@ echo "  - Hooks will run automatically on 'git commit'"
 echo "  - To run manually: pre-commit run --all-files"
 echo "  - To skip hooks: git commit --no-verify"
 echo ""
-

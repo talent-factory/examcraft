@@ -61,7 +61,7 @@ npm run test:unit
 
 **Location**: `backend/tests/integration/`
 
-**Scope**: 
+**Scope**:
 - API Endpoints mit echter Datenbank
 - Service-zu-Service Kommunikation
 - Claude API Integration (mit Mocks)
@@ -294,7 +294,6 @@ test('flaky test', async ({ page }) => {
 
 ## Kontakt
 
-**Team**: Talent Factory  
-**Projekt**: ExamCraft AI (TF-148)  
+**Team**: Talent Factory
+**Projekt**: ExamCraft AI (TF-148)
 **Linear**: https://linear.app/talent-factory/project/examcraft-ai-6eebcff0
-

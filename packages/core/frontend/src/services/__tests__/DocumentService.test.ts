@@ -67,7 +67,7 @@ describe('DocumentService', () => {
   describe('uploadDocument', () => {
     it('uploads document successfully', async () => {
       const mockFile = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
-      
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockUploadResponse
@@ -89,7 +89,7 @@ describe('DocumentService', () => {
 
     it('handles upload errors', async () => {
       const mockFile = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
-      
+
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
@@ -103,7 +103,7 @@ describe('DocumentService', () => {
 
     it('handles network errors', async () => {
       const mockFile = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
-      
+
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       await expect(DocumentService.uploadDocument(mockFile))
@@ -163,7 +163,7 @@ describe('DocumentService', () => {
   describe('getDocuments', () => {
     it('retrieves documents successfully', async () => {
       const mockDocuments = [mockDocument];
-      
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ documents: mockDocuments })
@@ -216,7 +216,7 @@ describe('DocumentService', () => {
         documents_with_vectors: 1,
         documents: [mockDocument]
       };
-      
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse
@@ -368,7 +368,7 @@ describe('DocumentService', () => {
           metadata: { page: 1 }
         }
       ];
-      
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockChunks
@@ -393,7 +393,7 @@ describe('DocumentService', () => {
   describe('reindexDocument', () => {
     it('reindexes document successfully', async () => {
       const mockResponse = { message: 'Reindexing started' };
-      
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse
@@ -418,7 +418,7 @@ describe('DocumentService', () => {
   describe('getProcessingStatus', () => {
     it('retrieves processing status successfully', async () => {
       const mockStatus = { status: 'processing', progress: 50 };
-      
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockStatus
@@ -619,8 +619,8 @@ describe('DocumentService', () => {
     });
 
     it('handles network timeouts', async () => {
-      mockFetch.mockImplementation(() => 
-        new Promise((_, reject) => 
+      mockFetch.mockImplementation(() =>
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Network timeout')), 100)
         )
       );

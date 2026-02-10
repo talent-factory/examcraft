@@ -231,4 +231,3 @@ For issues or questions:
 - Check logs: `docker-compose logs -f`
 - Review documentation: `docs/WORKTREE_SETUP.md`
 - Check Linear ticket: TF-148
-

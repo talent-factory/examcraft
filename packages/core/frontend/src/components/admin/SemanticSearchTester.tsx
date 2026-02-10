@@ -271,4 +271,3 @@ export const SemanticSearchTester: React.FC = () => {
     </Box>
   );
 };
-
