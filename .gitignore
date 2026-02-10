@@ -26,6 +26,7 @@ yarn-error.log*
 
 # IDE files
 .vscode/
+.grepai/
 .idea/
 *.swp
 *.swo
