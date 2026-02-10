@@ -313,6 +313,63 @@ fly certs create examcraft.ai --app examcraft-web
 fly certs show examcraft.ai --app examcraft-web
 ```
 
+### GitHub Actions CI/CD
+
+ExamCraft uses GitHub Actions for automated deployment on PR merge to main.
+
+#### Required Secrets
+
+Configure these secrets in your GitHub repository (Settings → Secrets and variables → Actions):
+
+| Secret | Description | How to Get |
+|--------|-------------|------------|
+| `FLY_API_TOKEN` | Fly.io API token for deployment | `fly tokens create deploy -x 999999h` |
+| `SUBMODULE_TOKEN` | GitHub PAT for Premium submodules | GitHub Settings → Developer settings → PATs |
+
+#### Create Fly.io Deploy Token
+
+```bash
+# Create a long-lived deployment token
+fly tokens create deploy -x 999999h
+
+# Copy the token and add it as FLY_API_TOKEN in GitHub Secrets
+```
+
+#### Workflow Overview
+
+**Automatic Deployment (on push to main):**
+1. CI/CD pipeline runs tests
+2. `deploy.yml` deploys Backend then Frontend
+3. Health checks verify deployment success
+4. Summary shows deployment status
+
+**Manual Deployment:**
+1. Go to Actions → "Deploy to Fly.io"
+2. Click "Run workflow"
+3. Select services to deploy
+4. Infrastructure services (Qdrant, RabbitMQ, Celery) only via manual trigger
+
+#### Makefile Commands
+
+```bash
+# Deploy Backend + Frontend
+make deploy
+
+# Deploy all services (including infrastructure)
+make deploy-all
+
+# Deploy individual services
+make deploy-backend
+make deploy-frontend
+make deploy-qdrant
+make deploy-rabbitmq
+make deploy-celery
+
+# Monitor deployments
+make deploy-status
+make deploy-logs
+```
+
 ### OAuth Configuration (Google)
 
 When deploying to Fly.io, Google OAuth requires specific configuration:

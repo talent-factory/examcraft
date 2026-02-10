@@ -2,6 +2,7 @@
 # Praktische Shortcuts für häufige Entwicklungsaufgaben
 
 .PHONY: help lint lint-fix test test-backend test-frontend pre-commit install-hooks
+.PHONY: deploy deploy-backend deploy-frontend deploy-all deploy-status deploy-logs
 
 # Default target
 help:
@@ -26,6 +27,17 @@ help:
 	@echo "  make dev           - Start development environment"
 	@echo "  make dev-core      - Start Core deployment"
 	@echo "  make dev-full      - Start Full deployment"
+	@echo ""
+	@echo "Fly.io Deployment:"
+	@echo "  make deploy        - Deploy Backend + Frontend to Fly.io"
+	@echo "  make deploy-all    - Deploy ALL services (Backend, Frontend, Qdrant, RabbitMQ, Celery)"
+	@echo "  make deploy-backend  - Deploy Backend only"
+	@echo "  make deploy-frontend - Deploy Frontend only"
+	@echo "  make deploy-qdrant   - Deploy Qdrant vector database"
+	@echo "  make deploy-rabbitmq - Deploy RabbitMQ message broker"
+	@echo "  make deploy-celery   - Deploy Celery worker"
+	@echo "  make deploy-status   - Show status of all Fly.io apps"
+	@echo "  make deploy-logs     - Show logs from Backend app"
 	@echo ""
 
 # Lint Commands
@@ -117,3 +129,76 @@ setup: install install-hooks
 	@echo "  2. Run 'make dev' to start development environment"
 	@echo "  3. Run 'make lint' before committing"
 	@echo ""
+
+# =============================================================================
+# Fly.io Deployment Commands
+# =============================================================================
+
+# Deploy Backend + Frontend (most common)
+deploy: deploy-backend deploy-frontend
+	@echo "✅ Core services deployed!"
+
+# Deploy all services
+deploy-all: deploy-backend deploy-frontend deploy-qdrant deploy-rabbitmq deploy-celery
+	@echo "✅ All services deployed!"
+
+# Individual service deployments
+deploy-backend:
+	@echo "🚀 Deploying Backend to Fly.io..."
+	fly deploy --config fly.toml
+
+deploy-frontend:
+	@echo "🚀 Deploying Frontend to Fly.io..."
+	fly deploy --config fly.frontend.toml
+
+deploy-qdrant:
+	@echo "🚀 Deploying Qdrant to Fly.io..."
+	fly deploy --config fly.qdrant.toml
+
+deploy-rabbitmq:
+	@echo "🚀 Deploying RabbitMQ to Fly.io..."
+	fly deploy --config fly.rabbitmq.toml
+
+deploy-celery:
+	@echo "🚀 Deploying Celery Worker to Fly.io..."
+	fly deploy --config fly.celery.toml
+
+# Status and monitoring
+deploy-status:
+	@echo "📊 Fly.io App Status"
+	@echo ""
+	@echo "=== Backend (examcraft-api) ==="
+	@fly status -a examcraft-api 2>/dev/null || echo "  Not deployed"
+	@echo ""
+	@echo "=== Frontend (examcraft-web) ==="
+	@fly status -a examcraft-web 2>/dev/null || echo "  Not deployed"
+	@echo ""
+	@echo "=== Database (examcraft-db) ==="
+	@fly status -a examcraft-db 2>/dev/null || echo "  Not deployed"
+	@echo ""
+	@echo "=== Qdrant (examcraft-qdrant) ==="
+	@fly status -a examcraft-qdrant 2>/dev/null || echo "  Not deployed"
+	@echo ""
+	@echo "=== RabbitMQ (examcraft-rabbitmq) ==="
+	@fly status -a examcraft-rabbitmq 2>/dev/null || echo "  Not deployed"
+	@echo ""
+	@echo "=== Celery (examcraft-celery) ==="
+	@fly status -a examcraft-celery 2>/dev/null || echo "  Not deployed"
+
+deploy-logs:
+	@echo "📜 Backend Logs (examcraft-api)"
+	fly logs -a examcraft-api
+
+deploy-logs-frontend:
+	@echo "📜 Frontend Logs (examcraft-web)"
+	fly logs -a examcraft-web
+
+# Database access helper
+db-proxy:
+	@echo "🔌 Starting database proxy on localhost:5432..."
+	@echo "   Connect with: psql -h localhost -p 5432 -U flypgadmin -d examcraft_api"
+	fly proxy 5432 -a examcraft-db
+
+db-connect:
+	@echo "🔌 Connecting to database..."
+	fly postgres connect -a examcraft-db
