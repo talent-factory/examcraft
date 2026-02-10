@@ -1,0 +1,43 @@
+# =============================================================================
+# ExamCraft AI Qdrant - Fly.io Configuration
+# Self-hosted Vector Database with Persistent Storage
+# =============================================================================
+
+app = "examcraft-qdrant"
+primary_region = "fra"  # Frankfurt
+
+[build]
+  image = "qdrant/qdrant:latest"
+
+[env]
+  QDRANT__SERVICE__HTTP_PORT = "6333"
+  QDRANT__SERVICE__GRPC_PORT = "6334"
+
+[http_service]
+  internal_port = 6333
+  force_https = true
+  auto_stop_machines = "suspend"  # Suspend statt stop für schnelleren Start
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 100
+    soft_limit = 80
+
+[[vm]]
+  memory = "1gb"  # Qdrant benötigt mehr RAM für Vector Operations
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "qdrant_data"
+  destination = "/qdrant/storage"
+
+[checks]
+  [checks.health]
+    port = 6333
+    type = "http"
+    interval = "30s"
+    timeout = "10s"
+    path = "/healthz"
