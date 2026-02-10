@@ -82,25 +82,22 @@ jobs:
           JWT_SECRET_KEY: test_secret_key_for_ci
           JWT_ALGORITHM: HS256
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: packages/core/frontend/package-lock.json
+          bun-version: latest
 
       - name: Install Frontend Dependencies
-        working-directory: packages/core/frontend
-        run: npm ci
+        run: bun install
 
       - name: Lint Frontend
         working-directory: packages/core/frontend
-        run: npm run lint || echo "Linting completed with warnings"
+        run: bun run lint || echo "Linting completed with warnings"
         continue-on-error: true
 
       - name: Run Frontend Tests
         working-directory: packages/core/frontend
-        run: npm test -- --coverage --watchAll=false
+        run: bun run test --coverage --watchAll=false
 
       - name: Upload Coverage Reports
         uses: codecov/codecov-action@v4
