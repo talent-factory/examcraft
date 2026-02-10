@@ -416,43 +416,6 @@ fly secrets set \
 
 ---
 
-## Production Deployment (Render.com) - Legacy
-
-> **Note:** Render.com deployment is deprecated. Use Fly.io for new deployments.
-
-### Recommended Setup
-
-**Deployment Mode:** Always use `full` for production
-
-**Environment Variables:**
-```yaml
-# render.yaml
-services:
-  - type: web
-    name: examcraft-backend
-    env: docker
-    dockerfilePath: ./packages/core/backend/Dockerfile
-    envVars:
-      - key: DEPLOYMENT_MODE
-        value: full
-      - key: DEFAULT_SUBSCRIPTION_TIER
-        value: professional
-      - key: DATABASE_URL
-        fromDatabase:
-          name: examcraft-db
-          property: connectionString
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: QDRANT_URL
-        value: http://qdrant:6333
-```
-
-**Why Full Deployment for Production:**
-- All features available
-- Access controlled via RBAC
-- Users can upgrade subscriptions without redeployment
-- Admins can assign different tiers to different institutions
-
 ## Migration from Old Setup
 
 If you're migrating from the old 3-file Docker Compose setup:

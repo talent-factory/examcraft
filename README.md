@@ -42,7 +42,7 @@ examcraft/
 
 ### 🔧 Developer Documentation
 
-- **[🚀 Deployment Guide](docs/RENDER_DEPLOYMENT.md)** - Production deployment on Render.com
+- **[🚀 Deployment Guide](DEPLOYMENT.md)** - Production deployment on Fly.io
 - **[📖 API Documentation](http://localhost:8000/docs)** - Interactive API docs (local)
 - **[🔧 Development Setup](#-quick-start)** - Local development environment (see below)
 - **[⚙️ Async Document Processing](docs/ASYNC_DOCUMENT_PROCESSING.md)** - RabbitMQ & Celery setup
