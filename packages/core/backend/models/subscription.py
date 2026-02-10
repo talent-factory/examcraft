@@ -20,6 +20,7 @@ from database import Base
 
 class SubscriptionStatus(str, enum.Enum):
     """Stripe Subscription Status"""
+
     ACTIVE = "active"
     PAST_DUE = "past_due"
     CANCELED = "canceled"
@@ -35,26 +36,31 @@ class Subscription(Base):
     Subscription Model
     Stores Stripe subscription details for an Institution.
     """
+
     __tablename__ = "subscriptions"
 
     id = Column(Integer, primary_key=True, index=True)
-    
+
     # Institution Association (One Subscription per Institution usually, but can support history)
     institution_id = Column(
-        Integer, 
-        ForeignKey("institutions.id", ondelete="CASCADE"), 
-        nullable=False, 
-        index=True
+        Integer,
+        ForeignKey("institutions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # Stripe Identifiers
-    stripe_subscription_id = Column(String(255), unique=True, nullable=False, index=True)
+    stripe_subscription_id = Column(
+        String(255), unique=True, nullable=False, index=True
+    )
     stripe_customer_id = Column(String(255), nullable=False, index=True)
     stripe_price_id = Column(String(255), nullable=False)
-    
+
     # Status
-    status = Column(Enum(SubscriptionStatus), default=SubscriptionStatus.INCOMPLETE, nullable=False)
-    
+    status = Column(
+        Enum(SubscriptionStatus), default=SubscriptionStatus.INCOMPLETE, nullable=False
+    )
+
     # Period
     current_period_start = Column(DateTime(timezone=True), nullable=True)
     current_period_end = Column(DateTime(timezone=True), nullable=True)
@@ -63,7 +69,9 @@ class Subscription(Base):
     ended_at = Column(DateTime(timezone=True), nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
