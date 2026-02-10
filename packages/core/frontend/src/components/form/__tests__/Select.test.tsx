@@ -94,4 +94,3 @@ describe('Select Component', () => {
     expect(wrapper).toHaveClass('w-full');
   });
 });
-

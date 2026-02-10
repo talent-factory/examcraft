@@ -212,4 +212,3 @@ export interface ReviewErrorResponse {
   detail: string;
   status_code: number;
 }
-

@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react';
 
 /**
  * Custom hook for debouncing values
- * 
+ *
  * @param value - The value to debounce
  * @param delay - Delay in milliseconds (default: 500ms)
  * @returns Debounced value
- * 
+ *
  * @example
  * const [searchTerm, setSearchTerm] = useState('');
  * const debouncedSearchTerm = useDebounce(searchTerm, 300);
- * 
+ *
  * useEffect(() => {
  *   // API call with debouncedSearchTerm
  * }, [debouncedSearchTerm]);
@@ -34,4 +34,3 @@ export function useDebounce<T>(value: T, delay: number = 500): T {
 }
 
 export default useDebounce;
-

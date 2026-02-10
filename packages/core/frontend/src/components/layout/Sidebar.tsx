@@ -97,4 +97,3 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
     </aside>
   );
 };
-

@@ -169,4 +169,3 @@ if [ "$SHOW_LOGS" = true ]; then
   echo -e "${BLUE}📋 Showing logs (Ctrl+C to exit)...${NC}"
   docker-compose logs -f
 fi
-

@@ -35,7 +35,7 @@ describe('DashboardLayout Component', () => {
         <div>Test Content</div>
       </DashboardLayout>
     );
-    
+
     expect(screen.getByTestId('navigation-bar')).toBeInTheDocument();
   });
 
@@ -45,7 +45,7 @@ describe('DashboardLayout Component', () => {
         <div>Test Content</div>
       </DashboardLayout>
     );
-    
+
     expect(screen.getByTestId('sidebar')).toBeInTheDocument();
   });
 
@@ -55,7 +55,7 @@ describe('DashboardLayout Component', () => {
         <div>Test Content</div>
       </DashboardLayout>
     );
-    
+
     expect(screen.getByText('Test Content')).toBeInTheDocument();
   });
 
@@ -65,11 +65,11 @@ describe('DashboardLayout Component', () => {
         <div>Test Content</div>
       </DashboardLayout>
     );
-    
+
     // Check for main element
     const main = container.querySelector('main');
     expect(main).toBeInTheDocument();
-    
+
     // Check for min-h-screen class
     const wrapper = container.querySelector('.min-h-screen');
     expect(wrapper).toBeInTheDocument();
@@ -81,9 +81,8 @@ describe('DashboardLayout Component', () => {
         <div>Test Content</div>
       </DashboardLayout>
     );
-    
+
     const main = container.querySelector('main');
     expect(main).toHaveClass('ml-sidebar');
   });
 });
-

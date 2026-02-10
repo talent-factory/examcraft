@@ -1,6 +1,6 @@
 /**
  * TypeScript Types for Prompt Management
- * 
+ *
  * Defines interfaces for Prompt Library, Template Selection,
  * and Prompt Configuration in Question Generation.
  */
@@ -249,4 +249,3 @@ export function isPromptCompatible(prompt: Prompt, questionType: QuestionType): 
   const expectedUseCase = getUseCaseForQuestionType(questionType);
   return prompt.use_case === expectedUseCase && prompt.is_active;
 }
-

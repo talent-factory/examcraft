@@ -78,4 +78,3 @@ export const Admin: React.FC = () => {
     </div>
   );
 };
-

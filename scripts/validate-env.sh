@@ -136,4 +136,3 @@ fi
 
 echo "All required environment variables are configured correctly!"
 echo ""
-

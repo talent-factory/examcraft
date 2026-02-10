@@ -38,4 +38,3 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     </div>
   );
 };
-

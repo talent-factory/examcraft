@@ -15,4 +15,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Qdrant startet automatisch mit dem Entrypoint des Base Images
 # Keine CMD nötig, da das Base Image bereits konfiguriert ist
-

@@ -22,11 +22,11 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = () => {
           Die Frontend-Komponente wird gerade finalisiert.
         </Typography>
       </Alert>
-      
+
       <Typography variant="body1" color="text.secondary">
         Verfügbare API Endpoints:
       </Typography>
-      
+
       <Box component="ul" sx={{ mt: 1 }}>
         <li>POST /api/v1/documents/upload - Dokument hochladen</li>
         <li>GET /api/v1/documents/ - Alle Dokumente auflisten</li>
@@ -34,7 +34,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = () => {
         <li>GET /api/v1/documents/{`{id}`}/chunks - Text-Chunks abrufen</li>
         <li>GET /api/v1/documents/health - Service Status</li>
       </Box>
-      
+
       <Alert severity="success" sx={{ mt: 3 }}>
         <Typography variant="body2">
           ✅ Backend vollständig implementiert<br/>

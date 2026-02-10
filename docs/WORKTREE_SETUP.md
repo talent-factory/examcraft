@@ -188,4 +188,3 @@ docker-compose up -d
 - [Git Worktrees Dokumentation](https://git-scm.com/docs/git-worktree)
 - [Docker Compose Dokumentation](https://docs.docker.com/compose/)
 - [ExamCraft AI README](../README.md)
-

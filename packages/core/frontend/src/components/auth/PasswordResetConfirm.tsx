@@ -175,4 +175,3 @@ export const PasswordResetConfirm: React.FC = () => {
     </div>
   );
 };
-

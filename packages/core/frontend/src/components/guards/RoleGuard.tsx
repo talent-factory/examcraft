@@ -66,4 +66,3 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
   console.log('[RoleGuard] Access granted');
   return <>{children}</>;
 };
-

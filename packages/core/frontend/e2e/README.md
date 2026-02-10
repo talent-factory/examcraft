@@ -229,4 +229,3 @@ Bei Fragen zu den Tests:
 - **Team**: Talent Factory
 - **Projekt**: ExamCraft AI (TF-148)
 - **Dokumentation**: `docs/browser-compatibility.md`
-

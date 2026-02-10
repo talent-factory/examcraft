@@ -140,7 +140,7 @@ const mockRAGExam = {
 describe('Frontend Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Default service mocks
     mockDocumentService.getAvailableDocuments.mockResolvedValue({
       total_documents: 1,
@@ -523,7 +523,7 @@ describe('Frontend Integration Tests', () => {
       );
 
       const topicInput = screen.getByLabelText('Prüfungsthema');
-      
+
       // Should be focusable
       topicInput.focus();
       expect(document.activeElement).toBe(topicInput);

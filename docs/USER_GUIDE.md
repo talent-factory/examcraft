@@ -2,8 +2,8 @@
 
 > **Vollständige Anleitung zur Nutzung von ExamCraft AI für die automatische Generierung von Prüfungsaufgaben**
 
-**Version**: 1.0.0  
-**Stand**: Oktober 2025  
+**Version**: 1.0.0
+**Stand**: Oktober 2025
 **Zielgruppe**: Dozenten, Lehrkräfte, Bildungseinrichtungen
 
 ---
@@ -774,6 +774,6 @@ A:
 
 ---
 
-**Letzte Aktualisierung**: Oktober 2025  
-**Version**: 1.0.0  
+**Letzte Aktualisierung**: Oktober 2025
+**Version**: 1.0.0
 **Lizenz**: MIT License
