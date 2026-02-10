@@ -6,12 +6,25 @@ This document describes how to configure GitHub Secrets for ExamCraft AI CI/CD P
 
 GitHub Secrets are encrypted environment variables that are used in GitHub Actions workflows. They are essential for:
 - Accessing private repositories (Submodules)
-- API authentication (Claude API, Render.com)
-- Deployment automation
+- API authentication (Claude API)
+- Deployment automation (Fly.io)
 
 ## Required Secrets
 
-### 1. SUBMODULE_TOKEN
+### 1. FLY_API_TOKEN
+
+**Purpose**: Authenticate with Fly.io for automated deployments
+
+**How to Create**:
+1. Install Fly CLI: `brew install flyctl` or `curl -L https://fly.io/install.sh | sh`
+2. Login: `fly auth login`
+3. Create deploy token: `fly tokens create org`
+4. Copy the token
+5. Add to repository secrets as `FLY_API_TOKEN`
+
+**Usage**: Used in CI/CD workflows to deploy Backend and Frontend to Fly.io
+
+### 2. SUBMODULE_TOKEN
 
 **Purpose**: Access private Git submodules (Premium & Enterprise packages)
 
@@ -27,7 +40,7 @@ GitHub Secrets are encrypted environment variables that are used in GitHub Actio
 
 **Usage**: Used in CI/CD workflows to checkout private submodules
 
-### 2. ANTHROPIC_API_KEY
+### 3. ANTHROPIC_API_KEY
 
 **Purpose**: Claude API authentication for Premium feature tests
 
@@ -39,32 +52,6 @@ GitHub Secrets are encrypted environment variables that are used in GitHub Actio
 5. Add to repository secrets as `ANTHROPIC_API_KEY`
 
 **Usage**: Used in Premium package tests and question generation
-
-### 3. RENDER_STAGING_DEPLOY_HOOK
-
-**Purpose**: Trigger deployments to Staging environment
-
-**How to Create**:
-1. Go to [Render Dashboard](https://dashboard.render.com)
-2. Select your Staging service
-3. Go to Settings → Deploy Hook
-4. Copy the webhook URL
-5. Add to repository secrets as `RENDER_STAGING_DEPLOY_HOOK`
-
-**Usage**: Automatic deployment on `develop` branch push
-
-### 4. RENDER_PRODUCTION_DEPLOY_HOOK
-
-**Purpose**: Trigger deployments to Production environment
-
-**How to Create**:
-1. Go to [Render Dashboard](https://dashboard.render.com)
-2. Select your Production service
-3. Go to Settings → Deploy Hook
-4. Copy the webhook URL
-5. Add to repository secrets as `RENDER_PRODUCTION_DEPLOY_HOOK`
-
-**Usage**: Automatic deployment on `main` branch push
 
 ## How to Add Secrets to Repository
 
@@ -104,7 +91,7 @@ gh secret delete SECRET_NAME
 
 3. **Monitor Usage**
    - Check GitHub Actions logs for secret usage
-   - Review Render.com deployment history
+   - Review Fly.io deployment history: `fly releases -a examcraft-api`
 
 4. **Never Commit Secrets**
    - Use `.env.example` for template
@@ -130,7 +117,12 @@ To verify secrets are configured correctly:
    git submodule update --init --recursive
    ```
 
-3. **Test API Keys**
+3. **Test Fly.io Token**
+   ```bash
+   FLY_API_TOKEN=<your-token> fly status -a examcraft-api
+   ```
+
+4. **Test API Keys**
    ```bash
    # Backend
    cd packages/core/backend
@@ -149,18 +141,24 @@ To verify secrets are configured correctly:
 
 - Verify API key is correct and not expired
 - Check API key has necessary permissions
-- Ensure key is for correct service (Anthropic, Render, etc.)
+- Ensure key is for correct service (Anthropic, Fly.io)
 
 ### Deployment not triggering
 
-- Verify webhook URL is correct
-- Check branch name matches trigger condition
+- Verify `FLY_API_TOKEN` is set correctly
+- Check branch name matches trigger condition (main)
 - Review GitHub Actions logs for errors
+- Test manually: `make deploy`
+
+### Fly.io authentication failed
+
+- Create a new token: `fly tokens create org`
+- Update the secret in GitHub
+- Verify token has access to the org: `fly orgs list`
 
 ## Related Documentation
 
 - [GitHub Secrets Documentation](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
 - [GitHub CLI Documentation](https://cli.github.com/manual)
-- [Render.com Deploy Hooks](https://render.com/docs/deploy-hooks)
+- [Fly.io Tokens Documentation](https://fly.io/docs/flyctl/tokens-create/)
 - [Anthropic API Documentation](https://docs.anthropic.com)
-

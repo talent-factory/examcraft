@@ -26,7 +26,7 @@
 
 | Dokument | Beschreibung | Zielgruppe |
 |----------|--------------|------------|
-| **[🚀 Deployment Guide](RENDER_DEPLOYMENT.md)** | Production Deployment auf Render.com | DevOps, Entwickler |
+| **[🚀 Deployment Guide](../DEPLOYMENT.md)** | Production Deployment auf Fly.io | DevOps, Entwickler |
 | **[🔄 Qdrant Migration](QDRANT_MIGRATION.md)** | Migration zu Qdrant Cloud | Backend-Entwickler |
 | **[📖 API Dokumentation](http://localhost:8000/docs)** | Interaktive API-Docs (lokal) | Backend-Entwickler |
 
@@ -95,8 +95,8 @@
 
 **Dokumente:**
 
-- **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)** - Deployment Guide
-  - Render.com Setup
+- **[../DEPLOYMENT.md](../DEPLOYMENT.md)** - Deployment Guide
+  - Fly.io Setup
   - Environment Variables
   - Database Configuration
   - CI/CD Pipeline
@@ -156,7 +156,7 @@
 - [x] Monetization Strategy (Moved to Premium Package)
 - [x] Product Roadmap (Moved to Premium Package)
 - [x] Release Timeline (Moved to Premium Package)
-- [x] Deployment Guide (RENDER_DEPLOYMENT.md)
+- [x] Deployment Guide (../DEPLOYMENT.md)
 - [x] Qdrant Migration (QDRANT_MIGRATION.md)
 
 ### 🔄 In Arbeit
@@ -214,7 +214,7 @@
 
 **Deployment:**
 
-- [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)
+- [../DEPLOYMENT.md](../DEPLOYMENT.md)
 - [README.md - Docker Installation](../README.md#docker-installation)
 
 **Prompt Management:**
@@ -236,7 +236,7 @@
 **Administrator:**
 
 1. [Mintlify Docs - Admin Guide](https://docs.examcraft.ch/guides/admin-guide) - Prompt Management
-2. [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) - Deployment
+2. [../DEPLOYMENT.md](../DEPLOYMENT.md) - Deployment
 3. [QDRANT_MIGRATION.md](QDRANT_MIGRATION.md) - Vector DB Setup
 
 **Manager/Investor:**
@@ -246,7 +246,7 @@
 **Entwickler:**
 
 1. [API Docs](http://localhost:8000/docs) - API Reference
-2. [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) - Deployment
+2. [../DEPLOYMENT.md](../DEPLOYMENT.md) - Deployment
 3. [README.md](../README.md) - Development Setup
 
 ---

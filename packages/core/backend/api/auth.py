@@ -862,7 +862,11 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
     oauth_service = OAuthService(db)
 
     # Generate callback URL
+    # Handle X-Forwarded-Proto for reverse proxies (Fly.io, Render, etc.)
     base_url = str(request.base_url).rstrip("/")
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    if forwarded_proto == "https" and base_url.startswith("http://"):
+        base_url = base_url.replace("http://", "https://", 1)
     redirect_uri = f"{base_url}/api/auth/oauth/{provider}/callback"
 
     try:
@@ -899,7 +903,11 @@ async def oauth_callback(
     oauth_service = OAuthService(db)
 
     # Generate callback URL (must match authorization request)
+    # Handle X-Forwarded-Proto for reverse proxies (Fly.io, Render, etc.)
     base_url = str(request.base_url).rstrip("/")
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    if forwarded_proto == "https" and base_url.startswith("http://"):
+        base_url = base_url.replace("http://", "https://", 1)
     redirect_uri = f"{base_url}/api/auth/oauth/{provider}/callback"
 
     try:

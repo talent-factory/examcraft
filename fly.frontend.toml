@@ -1,0 +1,39 @@
+# =============================================================================
+# ExamCraft AI Frontend - Fly.io Configuration
+# =============================================================================
+
+app = "examcraft-web"
+primary_region = "fra"  # Frankfurt
+
+[build]
+  dockerfile = "packages/core/frontend/Dockerfile.fly"
+  [build.args]
+    REACT_APP_API_URL = "https://api.examcraft.ch"
+
+[env]
+  PORT = "80"
+
+[http_service]
+  internal_port = 80
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[checks]
+  [checks.health]
+    port = 80
+    type = "http"
+    interval = "15s"
+    timeout = "5s"
+    path = "/"

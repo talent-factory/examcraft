@@ -166,40 +166,255 @@ frontend:
 4. All relative imports work correctly
 5. Hot-reload works seamlessly for all packages
 
-## Production Deployment (Render.com)
+## Production Deployment (Fly.io) - Recommended
 
-### Recommended Setup
+ExamCraft AI is deployed on [Fly.io](https://fly.io) for production. This enables
+self-hosting all services including Qdrant Vector Database without external
+cloud dependencies.
 
-**Deployment Mode:** Always use `full` for production
+### Architecture
 
-**Environment Variables:**
-```yaml
-# render.yaml
-services:
-  - type: web
-    name: examcraft-backend
-    env: docker
-    dockerfilePath: ./packages/core/backend/Dockerfile
-    envVars:
-      - key: DEPLOYMENT_MODE
-        value: full
-      - key: DEFAULT_SUBSCRIPTION_TIER
-        value: professional
-      - key: DATABASE_URL
-        fromDatabase:
-          name: examcraft-db
-          property: connectionString
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: QDRANT_URL
-        value: http://qdrant:6333
+| Service | Fly.io Solution | Estimated Cost |
+|---------|-----------------|----------------|
+| PostgreSQL | Fly Postgres (Managed) | ~$7/Mo |
+| Redis | Fly Upstash Redis | ~$0-5/Mo |
+| RabbitMQ | Fly Machine + Volume | ~$3/Mo |
+| Qdrant | Fly Machine + Volume | ~$7/Mo |
+| Backend | Fly Machine (Auto-Scale) | ~$3/Mo |
+| Celery Worker | Fly Machine | ~$3/Mo |
+| Frontend | Fly Machine (Nginx) | ~$2/Mo |
+
+**Total Estimated Cost:** ~$25-30/month
+
+### Configuration Files
+
+```
+ExamCraft/
+├── fly.toml              # Backend (API Server)
+├── fly.frontend.toml     # Frontend (Nginx)
+├── fly.qdrant.toml       # Qdrant Vector Database
+├── fly.rabbitmq.toml     # RabbitMQ Message Broker
+├── fly.celery.toml       # Celery Worker
+└── packages/core/
+    ├── backend/
+    │   ├── Dockerfile.fly
+    │   └── docker-entrypoint.sh
+    └── frontend/
+        └── Dockerfile.fly
 ```
 
-**Why Full Deployment for Production:**
-- All features available
-- Access controlled via RBAC
-- Users can upgrade subscriptions without redeployment
-- Admins can assign different tiers to different institutions
+### Deployment Steps
+
+#### 1. Install Fly CLI
+
+```bash
+# macOS
+brew install flyctl
+
+# or via curl
+curl -L https://fly.io/install.sh | sh
+```
+
+#### 2. Create Fly.io Apps
+
+```bash
+# Login to Fly.io
+fly auth login
+
+# Create apps (Frankfurt region)
+fly apps create examcraft-api --org personal
+fly apps create examcraft-web --org personal
+fly apps create examcraft-qdrant --org personal
+fly apps create examcraft-rabbitmq --org personal
+fly apps create examcraft-celery --org personal
+```
+
+#### 3. Provision Databases
+
+```bash
+# PostgreSQL (Managed)
+fly postgres create --name examcraft-db --region fra
+
+# Attach to backend
+fly postgres attach examcraft-db --app examcraft-api
+
+# Redis (Upstash)
+fly redis create --name examcraft-redis --region fra
+```
+
+#### 4. Create Persistent Volumes
+
+```bash
+# Qdrant volume (1GB)
+fly volumes create qdrant_data --size 1 --region fra --app examcraft-qdrant
+
+# RabbitMQ volume (1GB)
+fly volumes create rabbitmq_data --size 1 --region fra --app examcraft-rabbitmq
+```
+
+#### 5. Set Secrets
+
+```bash
+# Backend secrets (replace with real values)
+fly secrets set \
+  JWT_SECRET_KEY="<your-jwt-secret>" \
+  ANTHROPIC_API_KEY="<your-anthropic-key>" \
+  GOOGLE_CLIENT_ID="<your-google-id>" \
+  GOOGLE_CLIENT_SECRET="<your-google-secret>" \
+  --app examcraft-api
+
+# RabbitMQ password
+fly secrets set RABBITMQ_DEFAULT_PASS="<your-rabbitmq-password>" --app examcraft-rabbitmq
+
+# Celery broker URL (use actual password from above)
+fly secrets set CELERY_BROKER_URL="amqp://examcraft:<password>@examcraft-rabbitmq.internal:5672" --app examcraft-celery
+```
+
+#### 6. Deploy Services
+
+```bash
+# Deploy in order (dependencies first)
+fly deploy -c fly.qdrant.toml
+fly deploy -c fly.rabbitmq.toml
+fly deploy -c fly.toml           # Backend
+fly deploy -c fly.celery.toml
+fly deploy -c fly.frontend.toml
+```
+
+### Private Networking
+
+All services communicate via Fly's private network using `.internal` domains:
+
+- `examcraft-db.internal` - PostgreSQL
+- `examcraft-redis.internal` - Redis
+- `examcraft-qdrant.internal:6333` - Qdrant
+- `examcraft-rabbitmq.internal:5672` - RabbitMQ
+
+### Monitoring
+
+```bash
+# View logs
+fly logs --app examcraft-api
+
+# Check status
+fly status --app examcraft-api
+
+# SSH into container
+fly ssh console --app examcraft-api
+```
+
+### Custom Domain
+
+```bash
+# Add custom domain
+fly certs create examcraft.ai --app examcraft-web
+
+# Verify DNS
+fly certs show examcraft.ai --app examcraft-web
+```
+
+### GitHub Actions CI/CD
+
+ExamCraft uses GitHub Actions for automated deployment on PR merge to main.
+
+#### Required Secrets
+
+Configure these secrets in your GitHub repository (Settings → Secrets and variables → Actions):
+
+| Secret | Description | How to Get |
+|--------|-------------|------------|
+| `FLY_API_TOKEN` | Fly.io API token for deployment | `fly tokens create deploy -x 999999h` |
+| `SUBMODULE_TOKEN` | GitHub PAT for Premium submodules | GitHub Settings → Developer settings → PATs |
+
+#### Create Fly.io Deploy Token
+
+```bash
+# Create a long-lived deployment token
+fly tokens create deploy -x 999999h
+
+# Copy the token and add it as FLY_API_TOKEN in GitHub Secrets
+```
+
+#### Workflow Overview
+
+**Automatic Deployment (on push to main):**
+1. CI/CD pipeline runs tests
+2. `deploy.yml` deploys Backend then Frontend
+3. Health checks verify deployment success
+4. Summary shows deployment status
+
+**Manual Deployment:**
+1. Go to Actions → "Deploy to Fly.io"
+2. Click "Run workflow"
+3. Select services to deploy
+4. Infrastructure services (Qdrant, RabbitMQ, Celery) only via manual trigger
+
+#### Makefile Commands
+
+```bash
+# Deploy Backend + Frontend
+make deploy
+
+# Deploy all services (including infrastructure)
+make deploy-all
+
+# Deploy individual services
+make deploy-backend
+make deploy-frontend
+make deploy-qdrant
+make deploy-rabbitmq
+make deploy-celery
+
+# Monitor deployments
+make deploy-status
+make deploy-logs
+```
+
+### OAuth Configuration (Google)
+
+When deploying to Fly.io, Google OAuth requires specific configuration:
+
+#### Google Cloud Console Settings
+
+Navigate to [Google Cloud Console](https://console.cloud.google.com/apis/credentials) and configure:
+
+**Authorized JavaScript Origins:**
+```
+https://examcraft-web.fly.dev
+http://localhost:3000
+```
+
+**Authorized Redirect URIs:**
+```
+https://examcraft-api.fly.dev/api/auth/oauth/google/callback
+http://localhost:8000/api/auth/oauth/google/callback
+```
+
+> **Important:** The redirect URI path must be `/api/auth/oauth/{provider}/callback` - this is
+> the format used by the backend OAuth endpoints.
+
+#### Required Environment Variables
+
+The backend requires these secrets for OAuth:
+
+```bash
+fly secrets set \
+  GOOGLE_CLIENT_ID="<your-google-client-id>" \
+  GOOGLE_CLIENT_SECRET="<your-google-client-secret>" \
+  CORS_ORIGINS="http://localhost:3000,http://localhost:8000,https://examcraft-web.fly.dev" \
+  FRONTEND_URL="https://examcraft-web.fly.dev" \
+  --app examcraft-api
+```
+
+#### Troubleshooting OAuth
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `redirect_uri_mismatch` | Callback URL doesn't match Google config | Verify the exact path: `/api/auth/oauth/google/callback` |
+| `Failed to fetch` | CORS not configured | Add frontend domain to `CORS_ORIGINS` |
+| HTTP vs HTTPS mismatch | Fly.io terminates SSL at proxy | Backend handles `X-Forwarded-Proto` header automatically |
+
+---
 
 ## Migration from Old Setup
 
