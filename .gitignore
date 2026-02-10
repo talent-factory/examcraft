@@ -78,3 +78,6 @@ backend/mock_vector_db/mock_vectors.json
 .worktrees/
 *.tsbuildinfo
 packages/core/frontend/.env.local
+
+# Local documentation (contains secrets)
+*.local.md
