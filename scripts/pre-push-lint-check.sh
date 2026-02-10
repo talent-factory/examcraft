@@ -39,7 +39,41 @@ fi
 
 cd ../../..
 
-# 3. Frontend: ESLint (optional, da oft Warnings)
+# 3. Frontend: package-lock.json Sync Check
+echo ""
+echo "🔗 Checking package-lock.json sync..."
+cd packages/core/frontend
+
+# Temporarily hide root package.json to avoid workspace conflicts
+if [ -f ../../../package.json ]; then
+    mv ../../../package.json ../../../package.json.tmp
+fi
+
+# Check if package-lock.json is in sync
+npm install --package-lock-only --legacy-peer-deps 2>/dev/null
+LOCK_CHANGES=$(git diff --name-only package-lock.json 2>/dev/null || true)
+
+# Restore root package.json
+if [ -f ../../../package.json.tmp ]; then
+    mv ../../../package.json.tmp ../../../package.json
+fi
+
+if [ -z "$LOCK_CHANGES" ]; then
+    echo -e "${GREEN}✅ package-lock.json: IN SYNC${NC}"
+else
+    echo -e "${RED}❌ package-lock.json: OUT OF SYNC${NC}"
+    echo -e "${YELLOW}💡 Fix: Run the following commands:${NC}"
+    echo -e "${YELLOW}   mv package.json package.json.bak${NC}"
+    echo -e "${YELLOW}   cd packages/core/frontend && npm install --legacy-peer-deps${NC}"
+    echo -e "${YELLOW}   cd ../../.. && mv package.json.bak package.json${NC}"
+    echo -e "${YELLOW}   git add packages/core/frontend/package-lock.json && git commit --amend --no-edit${NC}"
+    git checkout package-lock.json 2>/dev/null || true
+    ERRORS=$((ERRORS + 1))
+fi
+
+cd ../../..
+
+# 4. Frontend: ESLint (optional, da oft Warnings)
 echo ""
 echo "🎨 Checking Frontend (ESLint)..."
 cd packages/core/frontend

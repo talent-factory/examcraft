@@ -1,7 +1,7 @@
 # ExamCraft AI - Development Makefile
 # Praktische Shortcuts für häufige Entwicklungsaufgaben
 
-.PHONY: help lint lint-fix test test-backend test-frontend pre-commit install-hooks
+.PHONY: help lint lint-fix test test-backend test-frontend pre-commit install-hooks ci-check
 .PHONY: deploy deploy-backend deploy-frontend deploy-all deploy-status deploy-logs
 
 # Default target
@@ -19,9 +19,10 @@ help:
 	@echo "  make test-backend  - Run Backend tests"
 	@echo "  make test-frontend - Run Frontend tests"
 	@echo ""
-	@echo "Pre-Commit:"
+	@echo "Quality Checks:"
+	@echo "  make ci-check      - Run all CI checks locally (before push)"
 	@echo "  make pre-commit    - Run all pre-commit hooks"
-	@echo "  make install-hooks - Install pre-commit hooks"
+	@echo "  make install-hooks - Install pre-commit & pre-push hooks"
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev           - Start development environment"
@@ -80,10 +81,17 @@ pre-commit:
 	pre-commit run --all-files
 
 install-hooks:
-	@echo "📦 Installing Pre-Commit Hooks..."
+	@echo "📦 Installing Pre-Commit & Pre-Push Hooks..."
 	pre-commit install
-	@echo "✅ Pre-Commit Hooks installed!"
-	@echo "💡 Hooks will run automatically on every commit"
+	pre-commit install --hook-type pre-push
+	@echo "✅ Hooks installed!"
+	@echo "💡 Pre-commit: Runs on every commit"
+	@echo "💡 Pre-push: Runs comprehensive checks before push"
+
+# CI-Check (simulate what CI does)
+ci-check:
+	@echo "🔍 Running CI Checks locally..."
+	@bash scripts/pre-push-lint-check.sh
 
 # Development Environment
 dev:
