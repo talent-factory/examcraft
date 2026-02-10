@@ -313,6 +313,50 @@ fly certs create examcraft.ai --app examcraft-web
 fly certs show examcraft.ai --app examcraft-web
 ```
 
+### OAuth Configuration (Google)
+
+When deploying to Fly.io, Google OAuth requires specific configuration:
+
+#### Google Cloud Console Settings
+
+Navigate to [Google Cloud Console](https://console.cloud.google.com/apis/credentials) and configure:
+
+**Authorized JavaScript Origins:**
+```
+https://examcraft-web.fly.dev
+http://localhost:3000
+```
+
+**Authorized Redirect URIs:**
+```
+https://examcraft-api.fly.dev/api/auth/oauth/google/callback
+http://localhost:8000/api/auth/oauth/google/callback
+```
+
+> **Important:** The redirect URI path must be `/api/auth/oauth/{provider}/callback` - this is
+> the format used by the backend OAuth endpoints.
+
+#### Required Environment Variables
+
+The backend requires these secrets for OAuth:
+
+```bash
+fly secrets set \
+  GOOGLE_CLIENT_ID="<your-google-client-id>" \
+  GOOGLE_CLIENT_SECRET="<your-google-client-secret>" \
+  CORS_ORIGINS="http://localhost:3000,http://localhost:8000,https://examcraft-web.fly.dev" \
+  FRONTEND_URL="https://examcraft-web.fly.dev" \
+  --app examcraft-api
+```
+
+#### Troubleshooting OAuth
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `redirect_uri_mismatch` | Callback URL doesn't match Google config | Verify the exact path: `/api/auth/oauth/google/callback` |
+| `Failed to fetch` | CORS not configured | Add frontend domain to `CORS_ORIGINS` |
+| HTTP vs HTTPS mismatch | Fly.io terminates SSL at proxy | Backend handles `X-Forwarded-Proto` header automatically |
+
 ---
 
 ## Production Deployment (Render.com) - Legacy
