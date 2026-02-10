@@ -8,7 +8,7 @@ primary_region = "fra"  # Frankfurt
 [build]
   dockerfile = "packages/core/frontend/Dockerfile.fly"
   [build.args]
-    REACT_APP_API_URL = "https://examcraft-api.fly.dev"
+    REACT_APP_API_URL = "https://api.examcraft.ch"
 
 [env]
   PORT = "80"
