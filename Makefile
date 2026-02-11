@@ -2,6 +2,7 @@
 # Praktische Shortcuts für häufige Entwicklungsaufgaben
 
 .PHONY: help lint lint-fix test test-backend test-frontend pre-commit install-hooks ci-check
+.PHONY: e2e e2e-ui e2e-headed e2e-debug e2e-setup
 .PHONY: deploy deploy-backend deploy-frontend deploy-all deploy-status deploy-logs
 
 # Default target
@@ -18,6 +19,13 @@ help:
 	@echo "  make test          - Run all tests"
 	@echo "  make test-backend  - Run Backend tests"
 	@echo "  make test-frontend - Run Frontend tests"
+	@echo ""
+	@echo "E2E Testing (Playwright):"
+	@echo "  make e2e           - Run all E2E tests"
+	@echo "  make e2e-ui        - Run E2E tests with interactive UI"
+	@echo "  make e2e-headed    - Run E2E tests with visible browser"
+	@echo "  make e2e-debug     - Run E2E tests in debug mode"
+	@echo "  make e2e-setup     - Setup test data for E2E tests"
 	@echo ""
 	@echo "Quality Checks:"
 	@echo "  make ci-check      - Run all CI checks locally (before push)"
@@ -69,11 +77,33 @@ test: test-backend test-frontend
 
 test-backend:
 	@echo "🧪 Running Backend Tests..."
-	cd packages/core/backend && pytest tests/ -v
+	uv run pytest packages/core/backend/tests/ -v
 
 test-frontend:
 	@echo "🧪 Running Frontend Tests..."
 	cd packages/core/frontend && npm test -- --watchAll=false
+
+# E2E Test Commands (Playwright)
+e2e:
+	@echo "🎭 Running E2E Tests..."
+	cd packages/core/frontend && npm run test:e2e
+
+e2e-ui:
+	@echo "🎭 Running E2E Tests with UI..."
+	cd packages/core/frontend && npm run test:e2e:ui
+
+e2e-headed:
+	@echo "🎭 Running E2E Tests (Headed)..."
+	cd packages/core/frontend && npm run test:e2e:headed
+
+e2e-debug:
+	@echo "🎭 Running E2E Tests (Debug)..."
+	cd packages/core/frontend && npm run test:e2e:debug
+
+e2e-setup:
+	@echo "📦 Setting up E2E Test Data..."
+	@echo "💡 Requires: docker compose up -d postgres (or local PostgreSQL)"
+	DATABASE_URL=postgresql://examcraft:examcraft_dev@localhost:5432/examcraft uv run python packages/core/backend/scripts/setup_e2e_test_data.py  # pragma: allowlist secret
 
 # Pre-Commit Hooks
 pre-commit:
@@ -123,8 +153,8 @@ clean:
 # Install Dependencies
 install:
 	@echo "📦 Installing Dependencies..."
-	cd packages/core/backend && pip install -r requirements.txt
-	cd packages/core/frontend && npm install
+	cd packages/core/backend && uv pip install -r requirements.txt
+	cd packages/core/frontend && bun install
 	@echo "✅ Dependencies installed!"
 
 # Full Setup (for new developers)
