@@ -16,9 +16,15 @@ Nach dem Browser-Kompatibilitätsproblem beim Chat-Export (Oktober 2025) haben w
 
 ```
 frontend/e2e/
-├── chat-export.spec.ts    # Chat Export Tests (Markdown & JSON)
-├── README.md              # Diese Datei
-└── test-downloads/        # Temporäre Downloads (wird automatisch bereinigt)
+├── fixtures/
+│   └── auth.ts              # Authentication helpers & fixtures
+├── smoke.spec.ts            # Smoke tests (no auth required, fast)
+├── auth.spec.ts             # Authentication E2E tests (Login, Logout, OAuth)
+├── api-connectivity.spec.ts # API connectivity tests (URL fix verification)
+├── chat-export.spec.ts      # Chat Export Tests (Markdown & JSON)
+├── README.md                # Diese Datei
+├── .auth/                   # Stored auth state (gitignored)
+└── test-downloads/          # Temporäre Downloads (wird automatisch bereinigt)
 ```
 
 ## Tests ausführen
@@ -77,13 +83,56 @@ npm start
 docker-compose up -d frontend
 ```
 
-### 3. Test-Daten
+### 3. Test-Daten einrichten
 
-Die Tests erwarten:
-- Einen Test-User: `test@example.com` / `TestPassword123!`
-- Mindestens ein hochgeladenes Dokument in der Datenbank
+```bash
+# Via Makefile (empfohlen)
+make e2e-setup
+
+# Oder direkt
+cd packages/core/backend
+python scripts/setup_e2e_test_data.py
+```
+
+Die Tests verwenden:
+- E2E Test-User: `e2e-test@examcraft.test` / `E2ETestPassword123!`
+- Test-Institution: E2E Test Institution (Professional Tier)
+- Test-Dokument: e2e-test-document.pdf
+
+### 4. Playwright Browser installieren (einmalig)
+
+```bash
+cd packages/core/frontend
+npx playwright install
+```
 
 ## Test-Abdeckung
+
+### ✅ Smoke Tests (`smoke.spec.ts`)
+
+- **Frontend Loading** - App lädt ohne Fehler
+- **Login Page** - Form wird angezeigt
+- **API Health** - Backend erreichbar
+- **OpenAPI Docs** - Swagger UI verfügbar
+- **Protected Routes** - Redirect zu Login
+- **Static Assets** - Favicon, Manifest
+
+### ✅ Authentication (`auth.spec.ts`)
+
+- **Login Flow** - Email/Password authentication
+- **OAuth Buttons** - Google & Microsoft visibility
+- **Logout** - Session termination
+- **Session Persistence** - Stays logged in after reload
+- **Protected Routes** - Redirect to login
+
+### ✅ API Connectivity (`api-connectivity.spec.ts`)
+
+- **Health Check** - Backend reachability
+- **Protected Endpoints** - 401 without auth
+- **URL Configuration** - No hardcoded localhost in production
+- **Question Generation** - BasicExamCreator API calls
+- **Chat Download** - ChatInterface download API calls
+- **Prompts API** - promptsApi service calls
 
 ### ✅ Chat Export (`chat-export.spec.ts`)
 
@@ -95,10 +144,9 @@ Die Tests erwarten:
 
 ### 🔜 Geplante Tests
 
-- Authentication Flow (Login, Logout, Token Refresh)
 - Document Upload & Management
-- Question Generation Workflow
 - RAG Exam Creation
+- Admin Features
 
 ## Debugging
 

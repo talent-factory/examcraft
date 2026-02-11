@@ -70,6 +70,10 @@ htmlcov/
 frontend/test-results/
 frontend/playwright-report/
 frontend/.playwright/
+packages/core/frontend/test-results/
+packages/core/frontend/playwright-report/
+packages/core/frontend/e2e/.auth/
+packages/core/frontend/e2e/test-downloads/
 
 # MCP configuration with API keys
 .mcp.json
