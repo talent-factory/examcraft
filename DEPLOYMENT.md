@@ -73,7 +73,7 @@ The startup script automatically detects the deployment mode based on available 
 
 ```bash
 # Database
-DATABASE_URL=postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft  # pragma: allowlist secret
+DATABASE_URL=postgresql://examcraft:examcraft_dev@postgres:5432/examcraft  # pragma: allowlist secret
 
 # Redis
 REDIS_URL=redis://redis:6379/0

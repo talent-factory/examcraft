@@ -15,7 +15,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: examcraft
-      POSTGRES_PASSWORD: examcraft_dev_password
+      POSTGRES_PASSWORD: examcraft_dev  # pragma: allowlist secret
       POSTGRES_DB: examcraft
     ports:
       - "5432:5432"
@@ -76,7 +76,7 @@ services:
       DEPLOYMENT_MODE: core
 
       # Database
-      DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft
+      DATABASE_URL: postgresql://examcraft:examcraft_dev@postgres:5432/examcraft  # pragma: allowlist secret
 
       # Redis (internal port 6379, external port 6380)
       REDIS_URL: redis://redis:6379/0
@@ -145,7 +145,7 @@ services:
       DEPLOYMENT_MODE: core
 
       # Database
-      DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft
+      DATABASE_URL: postgresql://examcraft:examcraft_dev@postgres:5432/examcraft  # pragma: allowlist secret
 
       # Redis
       REDIS_URL: redis://redis:6379/0
