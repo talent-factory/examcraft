@@ -57,6 +57,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY packages/core/backend/ ./
 
+# Copy Premium package (for Full deployment mode)
+COPY packages/premium/backend/ ./premium/
+
 # Copy utils directory (RAG, extraction modules)
 COPY utils/ ./utils/
 

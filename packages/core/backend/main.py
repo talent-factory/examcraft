@@ -232,6 +232,20 @@ async def lifespan(app: FastAPI):
 
     # Premium/Enterprise Features: Load additional Premium APIs
     if is_full_deployment:
+        # Create premium tables if they don't exist
+        try:
+            from premium.models.chat_db import ChatSession, ChatMessage  # noqa: F401
+            from premium.models.prompt import Prompt, PromptTemplate, PromptUsageLog  # noqa: F401
+            from database import engine
+            from database import Base
+
+            Base.metadata.create_all(bind=engine)
+            print("✅ Premium database tables created/verified")
+        except ImportError as e:
+            print(f"⚠️  Premium models not available: {e}")
+        except Exception as e:
+            print(f"❌ Error creating premium tables: {e}")
+
         # Premium: Prompts API
         try:
             from premium.api.v1 import prompts as prompts_api
@@ -303,6 +317,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
+    redirect_slashes=False,  # Prevent 307 redirects to HTTP behind proxy
 )
 
 # CORS middleware - Production-ready configuration
