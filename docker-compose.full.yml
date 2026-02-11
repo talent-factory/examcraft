@@ -15,7 +15,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: examcraft
-      POSTGRES_PASSWORD: examcraft_dev_password # pragma: allowlist secret
+      POSTGRES_PASSWORD: examcraft_dev # pragma: allowlist secret
       POSTGRES_DB: examcraft
     ports:
       - "5432:5432"
@@ -51,7 +51,7 @@ services:
     image: rabbitmq:4-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: examcraft
-      RABBITMQ_DEFAULT_PASS: examcraft_dev_password # pragma: allowlist secret
+      RABBITMQ_DEFAULT_PASS: examcraft_dev # pragma: allowlist secret
     ports:
       - "5672:5672" # AMQP port
       - "15672:15672" # Management UI
@@ -98,15 +98,15 @@ services:
       DEPLOYMENT_MODE: full
 
       # Database
-      DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft # pragma: allowlist secret
+      DATABASE_URL: postgresql://examcraft:examcraft_dev@postgres:5432/examcraft # pragma: allowlist secret
 
       # Redis (internal port 6379, external port 6380)
       REDIS_URL: redis://redis:6379/0
 
       # RabbitMQ & Celery (for async document processing)
       RABBITMQ_USER: examcraft
-      RABBITMQ_PASSWORD: examcraft_dev_password # pragma: allowlist secret
-      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev_password@rabbitmq:5672/ # pragma: allowlist secret
+      RABBITMQ_PASSWORD: examcraft_dev # pragma: allowlist secret
+      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev@rabbitmq:5672/ # pragma: allowlist secret
       CELERY_RESULT_BACKEND: redis://redis:6379/1
 
       # Qdrant
@@ -197,15 +197,15 @@ services:
       DEPLOYMENT_MODE: full
 
       # Database
-      DATABASE_URL: postgresql://examcraft:examcraft_dev_password@postgres:5432/examcraft # pragma: allowlist secret
+      DATABASE_URL: postgresql://examcraft:examcraft_dev@postgres:5432/examcraft # pragma: allowlist secret
 
       # Redis (internal port 6379, external port 6380)
       REDIS_URL: redis://redis:6379/0
 
       # RabbitMQ & Celery (for async document processing)
       RABBITMQ_USER: examcraft
-      RABBITMQ_PASSWORD: examcraft_dev_password # pragma: allowlist secret
-      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev_password@rabbitmq:5672/ # pragma: allowlist secret
+      RABBITMQ_PASSWORD: examcraft_dev # pragma: allowlist secret
+      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev@rabbitmq:5672/ # pragma: allowlist secret
       CELERY_RESULT_BACKEND: redis://redis:6379/1
 
       # Qdrant
