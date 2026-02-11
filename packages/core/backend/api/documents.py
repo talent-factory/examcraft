@@ -13,13 +13,15 @@ from fastapi import (
     Request,
     BackgroundTasks,
 )
-from fastapi.responses import JSONResponse, FileResponse, Response
+from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import os
+import io
 
 from services.document_service import DocumentService
+from services.storage_service import storage_service
 from services.vector_service_factory import vector_service
 from models.document import Document, DocumentStatus
 from models.auth import User
@@ -297,18 +299,45 @@ async def download_document(
                 headers=headers,
             )
         else:
-            # Normal documents - check if file exists on disk
-            if not os.path.exists(document.file_path):
-                raise HTTPException(
-                    status_code=404, detail="Document file not found on disk"
-                )
+            # Normal documents - check storage type
+            if (
+                document.file_path.startswith("uploads/")
+                and storage_service.is_configured
+            ):
+                # S3 Storage: Download from S3 and stream to client
+                try:
+                    file_data = storage_service.download_file(document.file_path)
+                    headers = {
+                        "Content-Disposition": f'attachment; filename="{document.original_filename}"'
+                    }
+                    return StreamingResponse(
+                        io.BytesIO(file_data),
+                        media_type=document.mime_type,
+                        headers=headers,
+                    )
+                except FileNotFoundError:
+                    raise HTTPException(
+                        status_code=404, detail="Document file not found in storage"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to download from S3: {e}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Failed to download document from storage",
+                    )
+            else:
+                # Local Storage: Check if file exists on disk
+                if not os.path.exists(document.file_path):
+                    raise HTTPException(
+                        status_code=404, detail="Document file not found on disk"
+                    )
 
-            # Return file with original filename
-            return FileResponse(
-                path=document.file_path,
-                filename=document.original_filename,
-                media_type=document.mime_type,
-            )
+                # Return file with original filename
+                return FileResponse(
+                    path=document.file_path,
+                    filename=document.original_filename,
+                    media_type=document.mime_type,
+                )
 
     except HTTPException:
         raise

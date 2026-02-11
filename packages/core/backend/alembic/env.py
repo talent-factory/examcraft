@@ -25,9 +25,12 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# Premium models removed for Core package
-# from models.chat_db import ChatSession, ChatMessage
-# from models.prompt import Prompt, PromptTemplate, PromptUsageLog
+# Import premium models for Full deployment mode
+try:
+    from premium.models.chat_db import ChatSession, ChatMessage  # noqa: F401
+    from premium.models.prompt import Prompt, PromptTemplate, PromptUsageLog  # noqa: F401
+except ImportError:
+    pass  # Core mode - premium models not available
 
 target_metadata = Base.metadata
 

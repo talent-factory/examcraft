@@ -1,10 +1,12 @@
 """
 Document Service für ExamCraft AI
 Verwaltet File Upload, Validierung und Speicherung
+Supports both local filesystem and S3-compatible storage
 """
 
 import os
 import uuid
+import tempfile
 import aiofiles
 import magic
 from typing import List, Optional, Dict, Any
@@ -13,6 +15,7 @@ from sqlalchemy.orm import Session
 from models.document import Document, DocumentStatus
 from services.docling_service import DoclingService, ProcessedDocument
 from services.vector_service_factory import get_vector_service
+from services.storage_service import storage_service
 from datetime import datetime
 import logging
 
@@ -31,8 +34,14 @@ class DocumentService:
             "text/markdown": ".md",
         }
 
-        # Erstelle Upload-Verzeichnis falls nicht vorhanden
-        os.makedirs(upload_dir, exist_ok=True)
+        # Check if S3 storage is configured
+        self.use_s3 = storage_service.is_configured
+        if self.use_s3:
+            logger.info("Using S3 storage for document uploads")
+        else:
+            logger.info("Using local filesystem storage for document uploads")
+            # Erstelle Upload-Verzeichnis nur wenn lokaler Storage verwendet wird
+            os.makedirs(upload_dir, exist_ok=True)
 
         # Initialisiere Docling Service
         self.docling_service = DoclingService()
@@ -57,6 +66,9 @@ class DocumentService:
         Raises:
             HTTPException: Bei Validierungsfehlern
         """
+        file_path = None
+        object_key = None
+
         try:
             # 1. File Validation
             await self._validate_file(file)
@@ -64,20 +76,37 @@ class DocumentService:
             # 2. Generate unique filename
             file_extension = self._get_file_extension(file.filename)
             unique_filename = f"{uuid.uuid4()}{file_extension}"
-            file_path = os.path.join(self.upload_dir, unique_filename)
 
-            # 3. Save file to disk
-            await self._save_file_to_disk(file, file_path)
+            # 3. Read file content
+            content = await file.read()
+            await file.seek(0)
 
-            # 4. Detect actual MIME type
-            actual_mime_type = self._detect_mime_type(file_path)
+            # 4. Detect MIME type from content
+            actual_mime_type = self._detect_mime_type_from_bytes(content, file.filename)
+
+            if self.use_s3:
+                # S3 Storage: Upload to S3
+                object_key = f"uploads/{unique_filename}"
+                storage_service.upload_file(
+                    file_data=content,
+                    object_key=object_key,
+                    content_type=actual_mime_type,
+                )
+                # Store S3 object key as file_path
+                file_path = object_key
+                logger.info(f"File uploaded to S3: {object_key}")
+            else:
+                # Local Storage: Save to disk
+                file_path = os.path.join(self.upload_dir, unique_filename)
+                await self._save_file_to_disk(file, file_path)
+                logger.info(f"File saved locally: {file_path}")
 
             # 5. Create database entry
             document = Document(
                 filename=unique_filename,
                 original_filename=file.filename,
                 file_path=file_path,
-                file_size=file.size or 0,
+                file_size=file.size or len(content),
                 mime_type=actual_mime_type,
                 status=DocumentStatus.UPLOADED,
                 user_id=user_id,
@@ -94,8 +123,13 @@ class DocumentService:
 
         except Exception as e:
             logger.error(f"Document upload failed: {str(e)}")
-            # Cleanup file if it was created
-            if "file_path" in locals() and os.path.exists(file_path):
+            # Cleanup on failure
+            if self.use_s3 and object_key:
+                try:
+                    storage_service.delete_file(object_key)
+                except Exception:
+                    pass
+            elif file_path and os.path.exists(file_path):
                 os.remove(file_path)
             raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
@@ -170,6 +204,20 @@ class DocumentService:
                     return mime
             return "application/octet-stream"
 
+    def _detect_mime_type_from_bytes(self, content: bytes, filename: str) -> str:
+        """Erkenne MIME-Type aus Datei-Bytes"""
+        try:
+            mime_type = magic.from_buffer(content, mime=True)
+            return mime_type
+        except Exception as e:
+            logger.warning(f"Could not detect MIME type from buffer: {str(e)}")
+            # Fallback based on extension
+            extension = self._get_file_extension(filename)
+            for mime, ext in self.supported_formats.items():
+                if ext == extension:
+                    return mime
+            return "application/octet-stream"
+
     def get_document_by_id(self, document_id: int, db: Session) -> Optional[Document]:
         """Hole Dokument nach ID"""
         return db.query(Document).filter(Document.id == document_id).first()
@@ -217,9 +265,20 @@ class DocumentService:
             return False
 
         try:
-            # Delete file from disk
-            if os.path.exists(document.file_path):
+            # Delete file from storage
+            if self.use_s3 and document.file_path.startswith("uploads/"):
+                # S3 Storage: Delete from S3
+                try:
+                    storage_service.delete_file(document.file_path)
+                    logger.info(f"Deleted file from S3: {document.file_path}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to delete S3 file {document.file_path}: {e}"
+                    )
+            elif os.path.exists(document.file_path):
+                # Local Storage: Delete from disk
                 os.remove(document.file_path)
+                logger.info(f"Deleted file from disk: {document.file_path}")
 
             # Delete from database
             db.delete(document)
@@ -232,6 +291,50 @@ class DocumentService:
             logger.error(f"Failed to delete document {document_id}: {str(e)}")
             db.rollback()
             return False
+
+    def _get_local_file_path(self, document: Document) -> str:
+        """
+        Get local file path for processing. Downloads from S3 if needed.
+
+        Args:
+            document: Document model instance
+
+        Returns:
+            Local file path (either original or temp file from S3)
+        """
+        if self.use_s3 and document.file_path.startswith("uploads/"):
+            # Download from S3 to temp file
+            logger.info(f"Downloading from S3 for processing: {document.file_path}")
+            file_data = storage_service.download_file(document.file_path)
+
+            # Get file extension
+            ext = self._get_file_extension(document.original_filename)
+
+            # Create temp file with proper extension
+            temp_file = tempfile.NamedTemporaryFile(
+                suffix=ext, delete=False, prefix="examcraft_"
+            )
+            temp_file.write(file_data)
+            temp_file.close()
+
+            logger.info(f"Downloaded S3 file to temp: {temp_file.name}")
+            return temp_file.name
+        else:
+            # Local file - return as-is
+            return document.file_path
+
+    def _cleanup_temp_file(self, file_path: str, document: Document) -> None:
+        """Cleanup temp file if it was created for S3 download"""
+        if self.use_s3 and document.file_path.startswith("uploads/"):
+            # This was a temp file from S3 download
+            if os.path.exists(file_path) and file_path.startswith(
+                tempfile.gettempdir()
+            ):
+                try:
+                    os.unlink(file_path)
+                    logger.debug(f"Cleaned up temp file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp file {file_path}: {e}")
 
     async def process_document_content(
         self, document_id: int, db: Optional[Session] = None
@@ -255,6 +358,9 @@ class DocumentService:
         else:
             close_db = False
 
+        local_file_path = None
+        document = None
+
         try:
             document = self.get_document_by_id(document_id, db)
             if not document:
@@ -265,10 +371,13 @@ class DocumentService:
             document.status = DocumentStatus.PROCESSING
             db.commit()
 
+            # Get local file path (downloads from S3 if needed)
+            local_file_path = self._get_local_file_path(document)
+
             # Verarbeite Dokument mit Docling
             processed_doc = await self.docling_service.process_document(
                 document_id=document.id,
-                file_path=document.file_path,
+                file_path=local_file_path,
                 filename=document.original_filename,
                 mime_type=document.mime_type,
             )
@@ -313,6 +422,9 @@ class DocumentService:
 
             return None
         finally:
+            # Cleanup temp file if S3 was used
+            if local_file_path and document:
+                self._cleanup_temp_file(local_file_path, document)
             if close_db:
                 db.close()
 
@@ -444,6 +556,8 @@ class DocumentService:
         if not document or document.status != DocumentStatus.PROCESSED:
             return None
 
+        local_file_path = None
+
         try:
             # Hole Chunks aus Vector Store (Qdrant)
             vector_service = get_vector_service()
@@ -454,9 +568,12 @@ class DocumentService:
                     "Vector service does not support get_document_chunks, falling back to re-processing"
                 )
                 # Fallback: Verarbeite Dokument erneut um Chunks zu erhalten
+                # Get local file path (downloads from S3 if needed)
+                local_file_path = self._get_local_file_path(document)
+
                 processed_doc = await self.docling_service.process_document(
                     document_id=document.id,
-                    file_path=document.file_path,
+                    file_path=local_file_path,
                     filename=document.original_filename,
                     mime_type=document.mime_type,
                 )
@@ -507,6 +624,10 @@ class DocumentService:
 
         except Exception as e:
             logger.error(f"Failed to get document chunks for {document_id}: {str(e)}")
+        finally:
+            # Cleanup temp file if S3 was used
+            if local_file_path and document:
+                self._cleanup_temp_file(local_file_path, document)
             return None
 
     async def get_full_document_content(
@@ -525,6 +646,8 @@ class DocumentService:
         document = self.get_document_by_id(document_id, db)
         if not document:
             return None
+
+        local_file_path = None
 
         try:
             # Spezialbehandlung für Chat-Exports
@@ -551,10 +674,13 @@ class DocumentService:
                 # Dokument konnte nicht verarbeitet werden
                 return None
 
+            # Get local file path (downloads from S3 if needed)
+            local_file_path = self._get_local_file_path(document)
+
             # Verarbeite Dokument um vollständigen Inhalt zu erhalten
             processed_doc = await self.docling_service.process_document(
                 document_id=document.id,
-                file_path=document.file_path,
+                file_path=local_file_path,
                 filename=document.original_filename,
                 mime_type=document.mime_type,
             )
@@ -576,6 +702,10 @@ class DocumentService:
                 f"Failed to get full document content for {document_id}: {str(e)}"
             )
             return None
+        finally:
+            # Cleanup temp file if S3 was used
+            if local_file_path and document:
+                self._cleanup_temp_file(local_file_path, document)
 
 
 # Globale Service Instanz
