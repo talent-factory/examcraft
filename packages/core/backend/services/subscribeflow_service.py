@@ -77,6 +77,7 @@ class SubscribeFlowService:
         async with SubscribeFlowClient(
             api_key=self.api_key,
             base_url=self.base_url,
+            timeout=60.0,
         ) as client:
             # 1. Get or create the 'examcraft' tag
             tag, tag_created = await client.tags.get_or_create(

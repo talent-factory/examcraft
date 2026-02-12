@@ -59,6 +59,12 @@ celery_app.conf.task_queues = (
         routing_key="question.generate",
         durable=True,
     ),
+    Queue(
+        "notifications",
+        default_exchange,
+        routing_key="notification.send",
+        durable=True,
+    ),
 )
 
 # Task Routes
@@ -70,6 +76,10 @@ celery_app.conf.task_routes = {
     "tasks.rag_tasks.create_embeddings": {
         "queue": "rag_embedding",
         "routing_key": "rag.embed",
+    },
+    "tasks.notification_tasks.subscribe_to_newsletter": {
+        "queue": "notifications",
+        "routing_key": "notification.send",
     },
 }
 
