@@ -2,7 +2,7 @@
 
 > **Visuelle Übersicht der ExamCraft AI Benutzeroberfläche**
 
-**Version**: 1.0.0  
+**Version**: 1.0.0
 **Stand**: Oktober 2025
 
 ---
@@ -624,6 +624,6 @@ Verwende diese Checkliste, um sicherzustellen, dass alle Screenshots erstellt wu
 
 ---
 
-**Letzte Aktualisierung**: Oktober 2025  
-**Version**: 1.0.0  
+**Letzte Aktualisierung**: Oktober 2025
+**Version**: 1.0.0
 **Autor**: ExamCraft AI Team

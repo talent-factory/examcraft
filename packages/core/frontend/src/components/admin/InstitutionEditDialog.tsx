@@ -59,7 +59,7 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
         setInstitution(inst);
         setFormData({
           name: inst.name,
-          domain: inst.domain,
+          domain: inst.domain || '',
           subscription_tier: inst.subscription_tier,
           is_active: inst.is_active,
         });

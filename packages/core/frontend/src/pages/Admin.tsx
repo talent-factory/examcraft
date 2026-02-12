@@ -7,8 +7,11 @@ import React, { useState } from 'react';
 import { UserManagementPage } from '../components/admin/UserManagementPage';
 import { InstitutionManagementPage } from '../components/admin/InstitutionManagementPage';
 import RoleManagementPage from '../components/admin/RoleManagementPage';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Admin: React.FC = () => {
+  const { user } = useAuth();
+  const isSuperuser = user?.is_superuser ?? false;
   const [activeTab, setActiveTab] = useState<'users' | 'institutions' | 'roles'>('users');
 
   return (
@@ -35,26 +38,30 @@ export const Admin: React.FC = () => {
         >
           Benutzer-Verwaltung
         </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('institutions')}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'institutions'
-            ? 'border-primary-600 text-primary-600'
-            : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-        >
-          Institutions
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('roles')}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'roles'
-            ? 'border-primary-600 text-primary-600'
-            : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-        >
-          Rollen & Berechtigungen
-        </button>
+        {isSuperuser && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('institutions')}
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'institutions'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+          >
+            Institutions
+          </button>
+        )}
+        {isSuperuser && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('roles')}
+            className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === 'roles'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+          >
+            Rollen & Berechtigungen
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
@@ -78,4 +85,3 @@ export const Admin: React.FC = () => {
     </div>
   );
 };
-

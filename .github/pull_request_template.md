@@ -18,7 +18,7 @@ Please describe the tests that you ran to verify your changes.
 - [ ] Manual testing
 
 ## Test Configuration
-- **OS**: 
+- **OS**:
 - **Browser** (if applicable):
 - **Docker Version** (if applicable):
 
@@ -40,4 +40,3 @@ Add any other context about the PR here.
 
 ## Deployment Notes
 Any special deployment instructions or breaking changes?
-

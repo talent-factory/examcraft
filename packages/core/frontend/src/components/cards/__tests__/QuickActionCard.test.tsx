@@ -85,4 +85,3 @@ describe('QuickActionCard Component', () => {
     expect(screen.getByText('Öffnen →')).toBeInTheDocument();
   });
 });
-

@@ -300,4 +300,3 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
 };
 
 export default RoleEditorDialog;
-

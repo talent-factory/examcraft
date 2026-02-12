@@ -1097,7 +1097,7 @@ docker-compose logs -f backend | grep prompt
 SELECT * FROM prompts WHERE is_active = true;
 
 -- Usage Statistics
-SELECT 
+SELECT
   prompt_id,
   COUNT(*) as uses,
   AVG(latency_ms) as avg_latency,

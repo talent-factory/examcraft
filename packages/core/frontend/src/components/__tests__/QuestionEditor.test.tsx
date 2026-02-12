@@ -159,7 +159,7 @@ describe.skip('QuestionEditor', () => {
 
       const difficultySelect = screen.getByLabelText(/Difficulty/i);
       fireEvent.mouseDown(difficultySelect);
-      
+
       const hardOption = screen.getByRole('option', { name: /Hard/i });
       fireEvent.click(hardOption);
 
@@ -180,7 +180,7 @@ describe.skip('QuestionEditor', () => {
 
       const bloomSelect = screen.getByLabelText(/Bloom's Taxonomy Level/i);
       fireEvent.mouseDown(bloomSelect);
-      
+
       const level5Option = screen.getByRole('option', { name: /5 - Evaluate/i });
       fireEvent.click(level5Option);
 
@@ -244,7 +244,7 @@ describe.skip('QuestionEditor', () => {
       const deleteButtons = screen.getAllByRole('button', { name: '' }).filter(
         btn => btn.querySelector('svg[data-testid="DeleteIcon"]')
       );
-      
+
       fireEvent.click(deleteButtons[0]);
 
       expect(screen.queryByText('A tree-based structure')).not.toBeInTheDocument();
@@ -435,4 +435,3 @@ describe.skip('QuestionEditor', () => {
     });
   });
 });
-

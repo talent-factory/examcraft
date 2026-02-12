@@ -41,7 +41,7 @@ export interface Institution {
   id: number;
   name: string;
   slug: string;
-  domain: string;
+  domain: string | null;
   subscription_tier: SubscriptionTier;
   max_users: number;
   max_documents: number;

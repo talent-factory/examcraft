@@ -11,6 +11,7 @@ import { UserRole } from '../../types/auth';
 interface RoleGuardProps {
   children: React.ReactNode;
   allowedRoles: UserRole[];
+  requireSuperuser?: boolean;
   redirectTo?: string;
   fallback?: React.ReactNode;
 }
@@ -18,6 +19,7 @@ interface RoleGuardProps {
 export const RoleGuard: React.FC<RoleGuardProps> = ({
   children,
   allowedRoles,
+  requireSuperuser = false,
   redirectTo = '/unauthorized',
   fallback,
 }) => {
@@ -49,6 +51,13 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
     isSuperuser: user.is_superuser
   });
 
+  // If superuser-only, check is_superuser directly (no role bypass)
+  if (requireSuperuser && !user.is_superuser) {
+    console.log('[RoleGuard] Access denied - superuser required');
+    if (fallback) return <>{fallback}</>;
+    return <Navigate to={redirectTo} state={{ from: location }} replace />;
+  }
+
   // Check if user has any of the allowed roles
   const hasAllowedRole = user.is_superuser || user.roles?.some(role =>
     allowedRoles.includes(role.name as UserRole)
@@ -66,4 +75,3 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
   console.log('[RoleGuard] Access granted');
   return <>{children}</>;
 };
-

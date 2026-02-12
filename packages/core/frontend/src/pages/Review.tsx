@@ -24,4 +24,3 @@ export const Review: React.FC = () => {
     </div>
   );
 };
-

@@ -335,6 +335,10 @@ class User(Base):
 
     def has_permission(self, permission: str) -> bool:
         """Check if user has specific permission"""
+        # Superuser has all permissions
+        if self.is_superuser:
+            return True
+
         import json
 
         for role in self.roles:

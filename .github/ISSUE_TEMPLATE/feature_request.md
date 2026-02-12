@@ -42,4 +42,3 @@ Link to any related issues: #123
 - [ ] Criterion 1
 - [ ] Criterion 2
 - [ ] Criterion 3
-

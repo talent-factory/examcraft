@@ -37,7 +37,6 @@ REQUIRED_CORE_VARS=()
 
 # Required variables for Premium/Enterprise
 REQUIRED_PREMIUM_VARS=(
-    "CLAUDE_API_KEY"
     "ANTHROPIC_API_KEY"
     "OPENAI_API_KEY"
     "CLAUDE_MODEL"
@@ -122,7 +121,7 @@ if [[ "$TIER" != "core" ]] && [ $PREMIUM_MISSING -gt 0 ]; then
     echo "Missing $PREMIUM_MISSING required Premium/Enterprise variable(s)."
     echo "Please configure them in .env file."
     echo ""
-    echo "Hint: Make sure CLAUDE_API_KEY and ANTHROPIC_API_KEY have the same value."
+    echo "Hint: Make sure ANTHROPIC_API_KEY is set with your Anthropic API key."
     exit 1
 fi
 
@@ -136,4 +135,3 @@ fi
 
 echo "All required environment variables are configured correctly!"
 echo ""
-

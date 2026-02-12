@@ -60,7 +60,10 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
         if not document:
             raise ValueError(f"Document {document_id} not found")
 
-        logger.info(f"Starting document processing for {document.filename}")
+        logger.info(
+            f"Starting document processing for {document.filename} "
+            f"(file_path: {document.file_path}, S3: {document_service.use_s3})"
+        )
 
         # 2. Process document with vectors using document_service
         # This handles: Docling processing + Vector embedding creation

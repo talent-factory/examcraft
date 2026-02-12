@@ -153,7 +153,7 @@ export const InstitutionList: React.FC<InstitutionListProps> = ({
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{institution.domain}</div>
+                  <div className="text-sm text-gray-900">{institution.domain || '—'}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
@@ -205,4 +205,3 @@ export const InstitutionList: React.FC<InstitutionListProps> = ({
     </div>
   );
 };
-

@@ -152,7 +152,7 @@ Account deletion has a 30-day grace period to prevent accidental data loss.
 ```python
 class User(Base):
     # ... existing fields ...
-    
+
     # GDPR Compliance
     deletion_requested_at = Column(DateTime(timezone=True), nullable=True)
     scheduled_deletion_date = Column(DateTime(timezone=True), nullable=True)
@@ -203,9 +203,9 @@ const ExportDataButton = () => {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
+
       const data = await response.json();
-      
+
       // Download as JSON file
       const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -253,7 +253,7 @@ const DeleteAccountButton = () => {
         },
         body: JSON.stringify({ password }),
       });
-      
+
       if (response.ok) {
         // Logout and redirect
         localStorage.clear();
@@ -344,4 +344,3 @@ For GDPR-related questions or data requests, contact:
 - [GDPR Official Text](https://gdpr-info.eu/)
 - [Article 17 - Right to Erasure](https://gdpr-info.eu/art-17-gdpr/)
 - [Article 20 - Right to Data Portability](https://gdpr-info.eu/art-20-gdpr/)
-

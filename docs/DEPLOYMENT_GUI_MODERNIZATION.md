@@ -19,7 +19,7 @@ This guide explains how to deploy and test the GUI modernization feature (TF-148
 cp .env.example .env
 
 # Edit .env and add your API keys (optional for testing)
-# CLAUDE_API_KEY=your_key_here
+# ANTHROPIC_API_KEY=your_key_here
 # GOOGLE_CLIENT_ID=your_id_here
 # GOOGLE_CLIENT_SECRET=your_secret_here
 ```
@@ -231,4 +231,3 @@ For issues or questions:
 - Check logs: `docker-compose logs -f`
 - Review documentation: `docs/WORKTREE_SETUP.md`
 - Check Linear ticket: TF-148
-

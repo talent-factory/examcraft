@@ -49,8 +49,9 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
     setError(null);
     setSuccess(false);
 
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
     try {
-      const response = await fetch('http://localhost:8000/api/v1/questions/generate', {
+      const response = await fetch(`${apiUrl}/api/v1/questions/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

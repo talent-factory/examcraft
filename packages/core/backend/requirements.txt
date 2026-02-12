@@ -10,6 +10,9 @@ psycopg2-binary==2.9.7
 # Redis
 redis==5.0.1
 
+# S3 Storage
+boto3>=1.28.0
+
 # Payment
 stripe>=14.2.0
 
@@ -27,6 +30,10 @@ subscribeflow @ git+ssh://git@github.com/talent-factory/subscribe-flow.git#subdi
 
 # Configuration
 pyyaml>=6.0.2                       # YAML Configuration
+# Template Engine (required for Premium features)
+Jinja2>=3.1.0
+
+# Environment and configuration
 python-dotenv==1.0.0
 pydantic==2.10.3
 pydantic-settings==2.7.0
@@ -69,9 +76,9 @@ pypdf>=6.1.0                        # PDF Processing Fallback
 # docling-core==2.48.4              # Docling Core (deprecated)
 # docling-ibm-models==3.9.1         # IBM Models (deprecated)
 
-# Vector Database & Embeddings (Premium Features - moved to Premium package)
-# qdrant-client==1.7.3              # Qdrant Vector Database Client (Premium)
-# openai==1.59.5                    # OpenAI API for Embeddings (Premium)
+# Vector Database & Embeddings (Premium Features)
+qdrant-client==1.16.2             # Qdrant Vector Database Client (Premium)
+openai==1.59.5                    # OpenAI API for Embeddings (Premium)
 # sentence-transformers==2.7.0      # Sentence Embeddings (Premium)
 
 numpy==1.26.4                       # Numerische Operations (für Embeddings, Docling compatible)

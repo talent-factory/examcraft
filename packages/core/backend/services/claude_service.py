@@ -18,7 +18,7 @@ class ClaudeService:
     """Service for interacting with Claude API with full production features"""
 
     def __init__(self):
-        self.api_key = os.getenv("CLAUDE_API_KEY")
+        self.api_key = os.getenv("ANTHROPIC_API_KEY")
         self.base_url = "https://api.anthropic.com/v1/messages"
         # Using Claude Sonnet 4 (latest stable model as of 2025)
         # Previous models (claude-3-*) are being deprecated
@@ -52,7 +52,7 @@ class ClaudeService:
         if self.demo_mode:
             logger.warning("Claude API running in DEMO MODE - using mock responses")
             if not self.api_key:
-                logger.warning("CLAUDE_API_KEY environment variable is not set!")
+                logger.warning("ANTHROPIC_API_KEY environment variable is not set!")
         else:
             # Log API key status (masked for security)
             key_preview = (

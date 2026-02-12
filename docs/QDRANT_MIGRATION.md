@@ -373,6 +373,6 @@ Bei Fragen oder Problemen:
 
 ---
 
-**Status**: ✅ Migration Ready  
-**Version**: 1.0.0  
+**Status**: ✅ Migration Ready
+**Version**: 1.0.0
 **Last Updated**: 2025-09-25

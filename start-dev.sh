@@ -136,11 +136,11 @@ fi
 
 # Check for required API keys (Full mode)
 if [ "$DEPLOYMENT_MODE" = "full" ]; then
-    if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_API_KEY" ]; then
+    if [ -z "$ANTHROPIC_API_KEY" ]; then
         echo ""
         echo -e "${YELLOW}⚠️  Warning: ANTHROPIC_API_KEY not set${NC}"
         echo "Full deployment requires Claude API access for Premium features."
-        echo "Please set ANTHROPIC_API_KEY or CLAUDE_API_KEY in .env file."
+        echo "Please set ANTHROPIC_API_KEY in .env file."
         echo ""
         read -p "Continue anyway? (y/N) " -n 1 -r
         echo
