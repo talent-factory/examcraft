@@ -10,6 +10,8 @@ ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 # Note: PyMuPDF (fitz) requires mupdf libraries for PDF processing
 RUN apt-get update && apt-get install -y \
     gcc \
+    git \
+    openssh-client \
     libpq-dev \
     python3-dev \
     libmagic1 \
@@ -17,12 +19,15 @@ RUN apt-get update && apt-get install -y \
     mupdf \
     && rm -rf /var/lib/apt/lists/*
 
+# Add GitHub SSH host key to known_hosts
+RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
+
 # Copy requirements and pyproject.toml first for better caching
 COPY packages/core/backend/requirements.txt .
 COPY pyproject.toml /app/pyproject.toml
 
-# Install Python dependencies from requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (SSH mount for private git repos)
+RUN --mount=type=ssh pip install --no-cache-dir -r requirements.txt
 
 # Install additional dependencies from pyproject.toml (qdrant-client, sentence-transformers, etc.)
 RUN pip install --no-cache-dir -e .
