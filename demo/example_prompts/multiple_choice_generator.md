@@ -2,7 +2,7 @@
 name: multiple_choice_generator
 category: template
 description: Generiert Multiple-Choice-Fragen aus Textmaterial mit automatischer Distraktoren-Erstellung
-use_case: question_generation
+use_case: question_generation_multiple_choice
 tags: [exam, multiple-choice, quiz, assessment]
 language: de
 difficulty_level: easy
