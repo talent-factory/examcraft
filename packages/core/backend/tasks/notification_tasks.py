@@ -64,4 +64,6 @@ def subscribe_to_newsletter(
             f"SubscribeFlow subscription attempt failed for {email}: {exc} "
             f"(retry {subscribe_to_newsletter.request.retries}/{subscribe_to_newsletter.max_retries})"
         )
-        raise subscribe_to_newsletter.retry(exc=exc, countdown=10 * (2 ** subscribe_to_newsletter.request.retries))
+        raise subscribe_to_newsletter.retry(
+            exc=exc, countdown=10 * (2**subscribe_to_newsletter.request.retries)
+        )

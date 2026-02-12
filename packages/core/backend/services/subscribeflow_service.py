@@ -98,8 +98,7 @@ class SubscribeFlowService:
 
             action = "Created new" if subscriber_created else "Found existing"
             logger.info(
-                f"{action} SubscribeFlow subscriber: {email} "
-                f"with tag '{TAG_NAME}'"
+                f"{action} SubscribeFlow subscriber: {email} with tag '{TAG_NAME}'"
             )
 
             return {

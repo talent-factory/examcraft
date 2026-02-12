@@ -756,9 +756,7 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
         )
         logger.info(f"SubscribeFlow subscription task queued for {user.email}")
     except Exception as e:
-        logger.error(
-            f"Failed to queue SubscribeFlow task for {user.email}: {str(e)}"
-        )
+        logger.error(f"Failed to queue SubscribeFlow task for {user.email}: {str(e)}")
         # Don't fail verification if task queuing fails
 
     logger.info(f"Email verified for user: {user.email} (ID: {user.id})")
