@@ -72,7 +72,7 @@ pypdf==3.17.1                       # PDF Processing Fallback
 # docling-ibm-models==3.9.1         # IBM Models (deprecated)
 
 # Vector Database & Embeddings (Premium Features)
-qdrant-client==1.7.3              # Qdrant Vector Database Client (Premium)
+qdrant-client==1.16.2             # Qdrant Vector Database Client (Premium)
 openai==1.59.5                    # OpenAI API for Embeddings (Premium)
 # sentence-transformers==2.7.0      # Sentence Embeddings (Premium)
 
