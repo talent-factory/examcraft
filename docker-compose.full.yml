@@ -93,6 +93,8 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/backend/Dockerfile
+      ssh:
+        - default
     environment:
       # Deployment Mode
       DEPLOYMENT_MODE: full
@@ -194,6 +196,8 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/backend/Dockerfile
+      ssh:
+        - default
     container_name: examcraft-celery-worker
     environment:
       # Deployment Mode
