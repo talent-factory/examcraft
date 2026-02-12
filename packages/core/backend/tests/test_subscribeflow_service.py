@@ -12,7 +12,7 @@ from services.subscribeflow_service import SubscribeFlowService
 def service():
     """Create service instance with test config."""
     svc = SubscribeFlowService()
-    svc.api_key = "sf_test_key"
+    svc.api_key = "sf_test_key"  # pragma: allowlist secret
     svc.base_url = "http://localhost:8000"
     return svc
 
@@ -32,9 +32,7 @@ def mock_client():
     mock_subscriber = MagicMock()
     mock_subscriber.id = "subscriber-uuid-456"
     mock_subscriber.email = "test@example.com"
-    client.subscribers.get_or_create = AsyncMock(
-        return_value=(mock_subscriber, True)
-    )
+    client.subscribers.get_or_create = AsyncMock(return_value=(mock_subscriber, True))
 
     # Context manager support
     client.__aenter__ = AsyncMock(return_value=client)
@@ -125,7 +123,7 @@ async def test_subscribe_user_skips_when_not_configured():
 def test_is_available_with_key():
     """Test is_available returns True when API key is set."""
     service = SubscribeFlowService()
-    service.api_key = "sf_test_key"
+    service.api_key = "sf_test_key"  # pragma: allowlist secret
     assert service.is_available() is True
 
 
