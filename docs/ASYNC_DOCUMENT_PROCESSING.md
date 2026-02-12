@@ -154,17 +154,29 @@ http://localhost:15672 → Queues Tab
 docker exec examcraft-rabbitmq rabbitmqctl list_queues name messages consumers
 ```
 
-### 4. Task Flower Dashboard (Optional)
+### 4. Flower Monitoring Dashboard
 
+Flower ist als Docker-Service integriert und startet automatisch mit `./start-dev.sh --full`.
+
+```
+URL: http://localhost:5555
+```
+
+**Features:**
+- Aktive/abgeschlossene/fehlgeschlagene Tasks in Echtzeit
+- Worker-Status, Concurrency und Ressourcen
+- Task-Laufzeiten, Retry-History und Ergebnisse
+- Queue-Auslastung pro Worker
+- Task-Rate-Graphen und Statistiken
+
+**Fly.io Deployment:**
 ```bash
-# Flower installieren
-pip install flower
+# Flower deployen
+make deploy-flower
 
-# Flower starten
-celery -A celery_app flower
-
-# Zugriff
-http://localhost:5555
+# Secrets setzen (einmalig)
+fly secrets set CELERY_BROKER_URL="amqp://..." -a examcraft-flower
+fly secrets set FLOWER_BASIC_AUTH="admin:secure_password" -a examcraft-flower
 ```
 
 ## 🧪 Testing
@@ -328,5 +340,5 @@ docker stats examcraft-celery-worker
 1. **Frontend Multi-Upload UI** - Batch-Upload mit Progress-Anzeige
 2. **WebSocket Real-time Updates** - Live Status-Updates statt Polling
 3. **Batch Question Generation** - Fragen aus mehreren Dokumenten
-4. **Advanced Monitoring** - Flower Dashboard Integration
+4. ~~**Advanced Monitoring** - Flower Dashboard Integration~~ ✅ Implementiert
 5. **Auto-Scaling** - Dynamische Worker-Skalierung basierend auf Queue-Länge
