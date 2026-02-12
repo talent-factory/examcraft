@@ -13,7 +13,7 @@ import json
 
 from database import get_db
 from models.auth import User, Role, Institution, UserStatus
-from utils.auth_utils import require_permission
+from utils.auth_utils import get_current_superuser, require_permission
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
@@ -599,11 +599,11 @@ async def remove_role_from_user(
 
 @router.get("/roles", response_model=List[RoleResponse])
 async def list_roles(
-    current_user: User = Depends(require_permission("manage_users")),
+    current_user: User = Depends(get_current_superuser),
     db: Session = Depends(get_db),
 ):
     """
-    List all roles (Admin only)
+    List all roles (Superuser only)
 
     - Returns all available roles
     - Requires 'manage_users' permission
@@ -638,11 +638,11 @@ async def list_roles(
 
 @router.get("/institutions", response_model=List[InstitutionResponse])
 async def list_institutions(
-    current_user: User = Depends(require_permission("manage_users")),
+    current_user: User = Depends(get_current_superuser),
     db: Session = Depends(get_db),
 ):
     """
-    List all institutions (Admin only)
+    List all institutions (Superuser only)
 
     - Returns all institutions
     - Requires 'manage_users' permission
@@ -679,7 +679,7 @@ class UpdateInstitutionRequest(BaseModel):
 async def update_institution(
     institution_id: int,
     update_data: UpdateInstitutionRequest,
-    current_user: User = Depends(require_permission("manage_users")),
+    current_user: User = Depends(get_current_superuser),
     db: Session = Depends(get_db),
 ):
     """
@@ -755,11 +755,11 @@ class CreateInstitutionRequest(BaseModel):
 @router.post("/institutions", response_model=InstitutionResponse, status_code=201)
 async def create_institution(
     institution_data: CreateInstitutionRequest,
-    current_user: User = Depends(require_permission("manage_users")),
+    current_user: User = Depends(get_current_superuser),
     db: Session = Depends(get_db),
 ):
     """
-    Create new institution (Admin only)
+    Create new institution (Superuser only)
 
     - Creates new institution with specified tier
     - Automatically sets quotas based on tier
