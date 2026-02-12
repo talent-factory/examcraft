@@ -211,4 +211,3 @@ const FeaturePermissionsMatrix: React.FC = () => {
 };
 
 export default FeaturePermissionsMatrix;
-

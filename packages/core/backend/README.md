@@ -27,11 +27,11 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # Wichtige Variablen:
-DATABASE_URL=postgresql://examcraft:examcraft_dev_password@localhost:5432/examcraft  # pragma: allowlist secret
+DATABASE_URL=postgresql://examcraft:examcraft_dev@localhost:5432/examcraft  # pragma: allowlist secret
 REDIS_URL=redis://localhost:6379/0
 CELERY_BROKER_URL=amqp://examcraft:secure_password_here@localhost:5672/  # pragma: allowlist secret
 CELERY_RESULT_BACKEND=redis://localhost:6379/1
-CLAUDE_API_KEY=sk-...  # pragma: allowlist secret
+ANTHROPIC_API_KEY=sk-ant-...  # pragma: allowlist secret
 ```
 
 ### 3. Docker Services starten

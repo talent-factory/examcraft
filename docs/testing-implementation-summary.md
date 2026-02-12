@@ -1,7 +1,7 @@
 # Testing Implementation Summary
 
-**Datum**: 21. Oktober 2025  
-**Projekt**: ExamCraft AI (TF-148)  
+**Datum**: 21. Oktober 2025
+**Projekt**: ExamCraft AI (TF-148)
 **Kontext**: Browser-Kompatibilitätsproblem beim Chat-Export
 
 ## Hintergrund
@@ -150,7 +150,7 @@ test:e2e:
 
 **Vorteil**: Regressions werden sofort erkannt
 
-**Implementierung**: 
+**Implementierung**:
 - Unit-Tests für API-Layer
 - E2E-Tests für kritische User-Flows
 
@@ -216,8 +216,7 @@ test:e2e:
 
 ## Kontakt
 
-**Team**: Talent Factory  
-**Projekt**: ExamCraft AI  
-**Linear**: TF-148 (GUI Modernization)  
+**Team**: Talent Factory
+**Projekt**: ExamCraft AI
+**Linear**: TF-148 (GUI Modernization)
 **Dokumentation**: `docs/testing-strategy.md`
-

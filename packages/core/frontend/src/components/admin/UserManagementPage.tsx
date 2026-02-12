@@ -7,17 +7,22 @@ import React, { useState } from 'react';
 import { UserList } from './UserList';
 import { UserEditDialog } from './UserEditDialog';
 import { RoleAssignmentDialog } from './RoleAssignmentDialog';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const UserManagementPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.is_superuser || user?.roles?.some(r => r.name === 'admin') || false;
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [manageRolesUserId, setManageRolesUserId] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleEditUser = (userId: number) => {
+    if (!isAdmin) return;
     setEditUserId(userId);
   };
 
   const handleManageRoles = (userId: number) => {
+    if (!isAdmin) return;
     setManageRolesUserId(userId);
   };
 
@@ -50,25 +55,29 @@ export const UserManagementPage: React.FC = () => {
           onEditUser={handleEditUser}
           onManageRoles={handleManageRoles}
           onRefresh={handleRefresh}
+          canEdit={isAdmin}
         />
 
-        {/* Edit User Dialog */}
-        <UserEditDialog
-          userId={editUserId}
-          isOpen={editUserId !== null}
-          onClose={() => setEditUserId(null)}
-          onSuccess={handleEditSuccess}
-        />
+        {/* Edit User Dialog (admin/superuser only) */}
+        {isAdmin && (
+          <UserEditDialog
+            userId={editUserId}
+            isOpen={editUserId !== null}
+            onClose={() => setEditUserId(null)}
+            onSuccess={handleEditSuccess}
+          />
+        )}
 
-        {/* Role Assignment Dialog */}
-        <RoleAssignmentDialog
-          userId={manageRolesUserId}
-          isOpen={manageRolesUserId !== null}
-          onClose={() => setManageRolesUserId(null)}
-          onSuccess={handleRolesSuccess}
-        />
+        {/* Role Assignment Dialog (admin/superuser only) */}
+        {isAdmin && (
+          <RoleAssignmentDialog
+            userId={manageRolesUserId}
+            isOpen={manageRolesUserId !== null}
+            onClose={() => setManageRolesUserId(null)}
+            onSuccess={handleRolesSuccess}
+          />
+        )}
       </div>
     </div>
   );
 };
-

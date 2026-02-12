@@ -185,4 +185,3 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ onCancel, onSuccess })
     </div>
   );
 };
-

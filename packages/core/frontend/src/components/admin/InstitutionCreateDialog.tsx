@@ -27,12 +27,12 @@ export const InstitutionCreateDialog: React.FC<InstitutionCreateDialogProps> = (
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name.trim()) {
       setError('Institution name is required');
       return;
     }
-    
+
     if (!formData.domain.trim()) {
       setError('Domain is required');
       return;
@@ -41,16 +41,16 @@ export const InstitutionCreateDialog: React.FC<InstitutionCreateDialogProps> = (
     try {
       setLoading(true);
       setError(null);
-      
+
       await AdminService.createInstitution(formData);
-      
+
       // Reset form
       setFormData({
         name: '',
         domain: '',
         subscription_tier: 'free',
       });
-      
+
       onSuccess();
       onClose();
     } catch (err) {
@@ -197,4 +197,3 @@ export const InstitutionCreateDialog: React.FC<InstitutionCreateDialogProps> = (
     </div>
   );
 };
-

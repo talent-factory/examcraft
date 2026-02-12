@@ -113,7 +113,7 @@ Format your response as structured JSON with the following fields:
 - difficulty: The difficulty level (easy/medium/hard)
 - source_reference: Reference to the specific part of the context used""",
             "description": "Default system prompt for multiple-choice question generation",
-            "category": "system_prompt",
+            "category": "template",
             "use_case": "question_generation_multiple_choice",
             "tags": ["multiple_choice", "openbook", "default"],
             "version": 1,
@@ -148,7 +148,7 @@ Format your response as structured JSON with the following fields:
 - estimated_time_minutes: Estimated time to answer (5-30 minutes)
 - source_reference: Reference to the specific part of the context used""",
             "description": "Default system prompt for open-ended question generation",
-            "category": "system_prompt",
+            "category": "template",
             "use_case": "question_generation_open_ended",
             "tags": ["open_ended", "openbook", "default"],
             "version": 1,
@@ -181,7 +181,7 @@ Format your response as structured JSON with the following fields:
 - difficulty: The difficulty level (easy/medium/hard)
 - source_reference: Reference to the specific part of the context used""",
             "description": "Default system prompt for true/false question generation",
-            "category": "system_prompt",
+            "category": "template",
             "use_case": "question_generation_true_false",
             "tags": ["true_false", "openbook", "default"],
             "version": 1,

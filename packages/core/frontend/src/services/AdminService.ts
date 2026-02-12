@@ -27,6 +27,7 @@ export interface UserListResponse {
   page: number;
   page_size: number;
   total_pages: number;
+  can_edit: boolean;
 }
 
 export interface UserDetailResponse {

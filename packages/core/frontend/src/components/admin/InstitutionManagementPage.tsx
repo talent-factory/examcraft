@@ -70,4 +70,3 @@ export const InstitutionManagementPage: React.FC = () => {
     </div>
   );
 };
-

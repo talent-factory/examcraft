@@ -18,7 +18,7 @@ POSTGRES_HOST = os.getenv(
     "POSTGRES_HOST", "postgres"
 )  # Docker: postgres, Lokal: localhost
 POSTGRES_PASSWORD = os.getenv(
-    "POSTGRES_PASSWORD", "examcraft_dev_password"
+    "POSTGRES_PASSWORD", "examcraft_dev"
 )  # Match docker-compose.yml
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",

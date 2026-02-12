@@ -11,6 +11,7 @@ export interface NavigationItem {
   label: string;
   path: string;
   icon?: string;
+  requireSuperuser?: boolean;
   requiredRoles?: UserRole[];
   requiredPermissions?: string[];
   children?: NavigationItem[];
@@ -65,25 +66,23 @@ export const useRoleBasedNavigation = () => {
       label: 'Admin',
       path: '/admin',
       icon: '⚙️',
-      requiredRoles: [UserRole.ADMIN],
       children: [
         {
           label: 'User Management',
           path: '/admin/users',
           icon: '👥',
-          requiredPermissions: ['manage_users'],
         },
         {
           label: 'Role Management',
           path: '/admin/roles',
           icon: '🔐',
-          requiredRoles: [UserRole.ADMIN],
+          requireSuperuser: true,
         },
         {
           label: 'Institution Settings',
           path: '/admin/institution',
           icon: '🏛️',
-          requiredRoles: [UserRole.ADMIN],
+          requireSuperuser: true,
         },
         {
           label: 'Audit Logs',
@@ -113,6 +112,9 @@ export const useRoleBasedNavigation = () => {
 
   const filterNavigationItems = (items: NavigationItem[]): NavigationItem[] => {
     return items.filter(item => {
+      // Check superuser-only items
+      if (item.requireSuperuser && !user?.is_superuser) return false;
+
       // Check role requirements
       if (item.requiredRoles && item.requiredRoles.length > 0) {
         const hasRequiredRole = user?.is_superuser || item.requiredRoles.some(role => hasRole(role));

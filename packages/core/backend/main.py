@@ -188,7 +188,7 @@ async def lifespan(app: FastAPI):
     )
     rbac_api = importlib.util.module_from_spec(spec_rbac)
     spec_rbac.loader.exec_module(rbac_api)
-    
+
     # Import Billing API
     spec_billing = importlib.util.spec_from_file_location(
         "core_api_v1_billing", os.path.join(core_api_path, "v1", "billing.py")
@@ -211,7 +211,9 @@ async def lifespan(app: FastAPI):
     app.include_router(rbac_api.router)
     app.include_router(question_review.router)
     app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["billing"])
-    app.include_router(webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"])
+    app.include_router(
+        webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"]
+    )
 
     # Email Webhooks (Resend)
     try:
@@ -230,6 +232,20 @@ async def lifespan(app: FastAPI):
 
     # Premium/Enterprise Features: Load additional Premium APIs
     if is_full_deployment:
+        # Create premium tables if they don't exist
+        try:
+            from premium.models.chat_db import ChatSession, ChatMessage  # noqa: F401
+            from premium.models.prompt import Prompt, PromptTemplate, PromptUsageLog  # noqa: F401
+            from database import engine
+            from database import Base
+
+            Base.metadata.create_all(bind=engine)
+            print("✅ Premium database tables created/verified")
+        except ImportError as e:
+            print(f"⚠️  Premium models not available: {e}")
+        except Exception as e:
+            print(f"❌ Error creating premium tables: {e}")
+
         # Premium: Prompts API
         try:
             from premium.api.v1 import prompts as prompts_api
@@ -301,6 +317,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
+    redirect_slashes=False,  # Prevent 307 redirects to HTTP behind proxy
 )
 
 # CORS middleware - Production-ready configuration
@@ -474,7 +491,7 @@ async def api_health_check():
 
     # Check Claude API
     health_status["services"]["claude_api"] = (
-        "configured" if os.getenv("CLAUDE_API_KEY") else "not_configured"
+        "configured" if os.getenv("ANTHROPIC_API_KEY") else "not_configured"
     )
 
     # Check Document Processor

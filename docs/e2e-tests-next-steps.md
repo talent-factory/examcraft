@@ -37,7 +37,7 @@ import bcrypt
 async def setup_test_data():
     """Erstellt Test-User und Test-Dokumente für E2E-Tests"""
     db = next(get_db())
-    
+
     try:
         # 1. Test-Institution erstellen
         institution = Institution(
@@ -46,13 +46,13 @@ async def setup_test_data():
         )
         db.add(institution)
         db.commit()
-        
+
         # 2. Test-User erstellen
         hashed_password = bcrypt.hashpw(
             "TestPassword123!".encode('utf-8'),
             bcrypt.gensalt()
         ).decode('utf-8')
-        
+
         test_user = User(
             email="test@example.com",
             hashed_password=hashed_password,
@@ -63,7 +63,7 @@ async def setup_test_data():
         )
         db.add(test_user)
         db.commit()
-        
+
         # 3. Test-Dokument erstellen
         test_doc = Document(
             title="Test Document",
@@ -74,11 +74,11 @@ async def setup_test_data():
         )
         db.add(test_doc)
         db.commit()
-        
+
         print("✅ Test-Daten erfolgreich erstellt!")
         print(f"   User: {test_user.email}")
         print(f"   Document: {test_doc.title}")
-        
+
     except Exception as e:
         print(f"❌ Fehler beim Erstellen der Test-Daten: {e}")
         db.rollback()
@@ -109,14 +109,14 @@ services:
         python scripts/setup_test_data.py &&
         uvicorn main:app --host 0.0.0.0 --port 8000
       "
-  
+
   postgres-test:
     image: postgres:15-alpine
     environment:
       - POSTGRES_DB=examcraft_test
       - POSTGRES_USER=examcraft
       - POSTGRES_PASSWORD=examcraft_test
-  
+
   redis-test:
     image: redis:7-alpine
 ```
@@ -221,4 +221,3 @@ npm run test:unit -- ChatService.test.ts
 
 **Empfehlung**:
 Verwende vorerst die Unit-Tests - sie bieten bereits sehr guten Schutz gegen Regressions!
-

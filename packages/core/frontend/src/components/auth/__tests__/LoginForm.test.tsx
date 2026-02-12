@@ -30,7 +30,7 @@ describe('LoginForm', () => {
         </AuthProvider>
       </BrowserRouter>
     );
-    
+
     expect(container).toBeTruthy();
   });
 });

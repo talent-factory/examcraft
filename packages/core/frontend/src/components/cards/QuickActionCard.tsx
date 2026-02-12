@@ -58,4 +58,3 @@ export const QuickActionCard: React.FC<QuickActionCardProps> = ({
     </Link>
   );
 };
-

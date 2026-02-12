@@ -291,4 +291,3 @@ export const PasswordChange: React.FC<PasswordChangeProps> = ({ onCancel, onSucc
     </div>
   );
 };
-

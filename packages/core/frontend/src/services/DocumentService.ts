@@ -1,8 +1,8 @@
-import { 
-  Document, 
-  DocumentUploadResponse, 
+import {
+  Document,
+  DocumentUploadResponse,
   DocumentProcessingResponse,
-  AvailableDocumentsResponse 
+  AvailableDocumentsResponse
 } from '../types/document';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -346,36 +346,36 @@ export class DocumentService {
    * Upload multiple documents
    */
   static async uploadMultipleDocuments(
-    files: File[], 
+    files: File[],
     onProgress?: (filename: string, progress: number) => void,
     onComplete?: (filename: string, result: DocumentUploadResponse) => void,
     onError?: (filename: string, error: string) => void
   ): Promise<DocumentUploadResponse[]> {
     const results: DocumentUploadResponse[] = [];
-    
+
     for (const file of files) {
       try {
         onProgress?.(file.name, 0);
-        
+
         const result = await this.uploadDocument(file);
         results.push(result);
-        
+
         onProgress?.(file.name, 100);
         onComplete?.(file.name, result);
-        
+
         // Auto-process the document
         try {
           await this.processDocument(result.document_id, true);
         } catch (processError) {
           console.warn(`Auto-processing failed for ${file.name}:`, processError);
         }
-        
+
       } catch (error) {
         const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Unknown error';
         onError?.(file.name, errorMessage);
       }
     }
-    
+
     return results;
   }
 
@@ -390,23 +390,23 @@ export class DocumentService {
     onError?: (documentId: number, error: string) => void
   ): Promise<DocumentProcessingResponse[]> {
     const results: DocumentProcessingResponse[] = [];
-    
+
     for (const documentId of documentIds) {
       try {
         onProgress?.(documentId, 0);
-        
+
         const result = await this.processDocument(documentId, createVectors);
         results.push(result);
-        
+
         onProgress?.(documentId, 100);
         onComplete?.(documentId, result);
-        
+
       } catch (error) {
         const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Unknown error';
         onError?.(documentId, errorMessage);
       }
     }
-    
+
     return results;
   }
 }

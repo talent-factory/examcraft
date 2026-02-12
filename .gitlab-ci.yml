@@ -33,7 +33,7 @@ test:backend:
     DATABASE_URL: postgresql://examcraft:test_password@postgres:5432/examcraft_test
     REDIS_URL: redis://redis:6379
     VECTOR_SERVICE_TYPE: mock
-    CLAUDE_API_KEY: test_key
+    ANTHROPIC_API_KEY: test_key
   before_script:
     - apt-get update -qq && apt-get install -y -qq libmagic1
     - cd backend
@@ -149,4 +149,3 @@ deploy:production:
   environment:
     name: production
     url: https://examcraft-production.onrender.com
-

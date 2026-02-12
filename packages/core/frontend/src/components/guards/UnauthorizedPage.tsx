@@ -21,12 +21,12 @@ export const UnauthorizedPage: React.FC = () => {
           <div className="text-center">
             {/* Icon */}
             <div className="mb-4 text-red-600 text-6xl">🚫</div>
-            
+
             {/* Title */}
             <h1 className="text-3xl font-bold mb-4 text-gray-800">
               Access Denied
             </h1>
-            
+
             {/* Message */}
             <p className="text-gray-600 mb-6">
               You don't have permission to access this page.
@@ -75,4 +75,3 @@ export const UnauthorizedPage: React.FC = () => {
     </div>
   );
 };
-

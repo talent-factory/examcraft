@@ -26,6 +26,7 @@ yarn-error.log*
 
 # IDE files
 .vscode/
+.grepai/
 .idea/
 *.swp
 *.swo
@@ -69,6 +70,10 @@ htmlcov/
 frontend/test-results/
 frontend/playwright-report/
 frontend/.playwright/
+packages/core/frontend/test-results/
+packages/core/frontend/playwright-report/
+packages/core/frontend/e2e/.auth/
+packages/core/frontend/e2e/test-downloads/
 
 # MCP configuration with API keys
 .mcp.json
@@ -78,3 +83,6 @@ backend/mock_vector_db/mock_vectors.json
 .worktrees/
 *.tsbuildinfo
 packages/core/frontend/.env.local
+
+# Local documentation (contains secrets)
+*.local.md

@@ -185,7 +185,7 @@ GET /api/v1/chat/sessions/{session_id}/download
 ```markdown
 # Chat: Session Title
 
-**Erstellt am:** 2025-01-09 14:30:00  
+**Erstellt am:** 2025-01-09 14:30:00
 **Dokumente:** Example.pdf, Tutorial.docx
 
 ---
@@ -216,11 +216,11 @@ Certainly! ...
 ```python
 class Document(Base):
     __tablename__ = "documents"
-    
+
     # ... existing fields ...
-    
+
     doc_metadata = Column(JSONB, nullable=True)
-    
+
     @property
     def title(self) -> str:
         """
@@ -271,7 +271,7 @@ docker exec examcraft_backend pytest -m integration -v
 
 ```bash
 # Claude API Configuration
-CLAUDE_API_KEY=your_api_key_here
+ANTHROPIC_API_KEY=your_api_key_here
 CLAUDE_MODEL=claude-3-5-sonnet-20241022
 
 # Chat Settings
