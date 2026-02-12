@@ -93,6 +93,8 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/backend/Dockerfile
+      ssh:
+        - default
     environment:
       # Deployment Mode
       DEPLOYMENT_MODE: full
@@ -150,6 +152,9 @@ services:
       RESEND_FROM_NAME: ${RESEND_FROM_NAME:-ExamCraft AI}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      # SubscribeFlow Newsletter Integration
+      SUBSCRIBEFLOW_API_KEY: ${SUBSCRIBEFLOW_API_KEY:-}
+      SUBSCRIBEFLOW_BASE_URL: ${SUBSCRIBEFLOW_BASE_URL:-https://api.subscribeflow.net}
 
       # Environment
       ENVIRONMENT: development
@@ -191,6 +196,8 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/backend/Dockerfile
+      ssh:
+        - default
     container_name: examcraft-celery-worker
     environment:
       # Deployment Mode
@@ -249,6 +256,9 @@ services:
       RESEND_FROM_NAME: ${RESEND_FROM_NAME:-ExamCraft AI}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      # SubscribeFlow Newsletter Integration
+      SUBSCRIBEFLOW_API_KEY: ${SUBSCRIBEFLOW_API_KEY:-}
+      SUBSCRIBEFLOW_BASE_URL: ${SUBSCRIBEFLOW_BASE_URL:-https://api.subscribeflow.net}
 
       # Environment
       ENVIRONMENT: development

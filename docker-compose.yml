@@ -71,6 +71,8 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/backend/Dockerfile
+      ssh:
+        - default
     environment:
       # Deployment Mode
       DEPLOYMENT_MODE: core
@@ -138,8 +140,10 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/backend/Dockerfile
+      ssh:
+        - default
     container_name: examcraft-celery-worker
-    command: celery -A celery_app worker --loglevel=info --concurrency=3 --queues=document_processing,rag_embedding,question_generation
+    command: celery -A celery_app worker --loglevel=info --concurrency=3 --queues=document_processing,rag_embedding,question_generation,notifications
     environment:
       # Deployment Mode
       DEPLOYMENT_MODE: core

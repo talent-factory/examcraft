@@ -1,10 +1,10 @@
 # FastAPI and ASGI server
-fastapi==0.104.1
+fastapi>=0.117.1
 uvicorn[standard]==0.24.0
 
 # Database
-sqlalchemy==2.0.23
-alembic==1.12.1
+sqlalchemy>=2.0.43
+alembic>=1.17.0
 psycopg2-binary==2.9.7
 
 # Redis
@@ -14,7 +14,7 @@ redis==5.0.1
 boto3>=1.28.0
 
 # Payment
-stripe>=7.0.0
+stripe>=14.2.0
 
 
 # Message Queue & Task Processing
@@ -23,8 +23,13 @@ kombu==5.4.0                            # Messaging Library for Celery
 amqp==5.2.0                             # AMQP Protocol Implementation
 
 # HTTP client for Claude API
-httpx==0.27.2
+httpx>=0.28.1
 
+# SubscribeFlow SDK (Newsletter Subscription)
+subscribeflow @ git+ssh://git@github.com/talent-factory/subscribe-flow.git#subdirectory=sdk/python
+
+# Configuration
+pyyaml>=6.0.2                       # YAML Configuration
 # Template Engine (required for Premium features)
 Jinja2>=3.1.0
 
@@ -33,7 +38,7 @@ python-dotenv==1.0.0
 pydantic==2.10.3
 pydantic-settings==2.7.0
 pydantic-ai==0.0.16                 # PydanticAI for ChatBot (fixed griffe issue)
-email-validator==2.1.0              # Email validation for Pydantic EmailStr
+email-validator>=2.3.0              # Email validation for Pydantic EmailStr
 
 # Security
 python-jose[cryptography]==3.3.0
@@ -66,7 +71,7 @@ python-docx==1.1.2                  # DOCX Processing
 markdown==3.5.1                     # Markdown Processing
 
 # Legacy/Alternative Processors (Optional)
-pypdf==3.17.1                       # PDF Processing Fallback
+pypdf>=6.1.0                        # PDF Processing Fallback
 # docling==2.23.0                   # IBM Docling (deprecated - too slow)
 # docling-core==2.48.4              # Docling Core (deprecated)
 # docling-ibm-models==3.9.1         # IBM Models (deprecated)
