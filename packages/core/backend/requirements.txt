@@ -19,6 +19,7 @@ stripe>=14.2.0
 
 # Message Queue & Task Processing
 celery[redis]==5.4.0                    # Celery Task Queue with Redis Backend
+flower==2.0.1                           # Celery Monitoring Dashboard
 kombu==5.4.0                            # Messaging Library for Celery
 amqp==5.2.0                             # AMQP Protocol Implementation
 

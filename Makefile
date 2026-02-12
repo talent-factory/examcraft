@@ -45,6 +45,7 @@ help:
 	@echo "  make deploy-qdrant   - Deploy Qdrant vector database"
 	@echo "  make deploy-rabbitmq - Deploy RabbitMQ message broker"
 	@echo "  make deploy-celery   - Deploy Celery worker"
+	@echo "  make deploy-flower   - Deploy Flower monitoring dashboard"
 	@echo "  make deploy-status   - Show status of all Fly.io apps"
 	@echo "  make deploy-logs     - Show logs from Backend app"
 	@echo ""
@@ -177,7 +178,7 @@ deploy: deploy-backend deploy-frontend
 	@echo "✅ Core services deployed!"
 
 # Deploy all services
-deploy-all: deploy-backend deploy-frontend deploy-qdrant deploy-rabbitmq deploy-celery
+deploy-all: deploy-backend deploy-frontend deploy-qdrant deploy-rabbitmq deploy-celery deploy-flower
 	@echo "✅ All services deployed!"
 
 # Individual service deployments
@@ -201,6 +202,10 @@ deploy-celery:
 	@echo "🚀 Deploying Celery Worker to Fly.io..."
 	fly deploy --config fly.celery.toml
 
+deploy-flower:
+	@echo "🚀 Deploying Flower Dashboard to Fly.io..."
+	fly deploy --config fly.flower.toml
+
 # Status and monitoring
 deploy-status:
 	@echo "📊 Fly.io App Status"
@@ -222,6 +227,9 @@ deploy-status:
 	@echo ""
 	@echo "=== Celery (examcraft-celery) ==="
 	@fly status -a examcraft-celery 2>/dev/null || echo "  Not deployed"
+	@echo ""
+	@echo "=== Flower (examcraft-flower) ==="
+	@fly status -a examcraft-flower 2>/dev/null || echo "  Not deployed"
 
 deploy-logs:
 	@echo "📜 Backend Logs (examcraft-api)"
