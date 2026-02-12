@@ -45,7 +45,7 @@ class InstitutionResponse(BaseModel):
     id: int
     name: str
     slug: str
-    domain: str
+    domain: Optional[str] = None
     subscription_tier: str
     max_users: int
     max_documents: int
