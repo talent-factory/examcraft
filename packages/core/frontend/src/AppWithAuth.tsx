@@ -195,11 +195,9 @@ export const AppWithAuth: React.FC = () => {
                 path="/admin"
                 element={
                   <ProtectedRoute>
-                    <RoleGuard allowedRoles={[UserRole.ADMIN]}>
-                      <AppLayout>
-                        <Admin />
-                      </AppLayout>
-                    </RoleGuard>
+                    <AppLayout>
+                      <Admin />
+                    </AppLayout>
                   </ProtectedRoute>
                 }
               />
@@ -208,11 +206,9 @@ export const AppWithAuth: React.FC = () => {
                 path="/admin/users"
                 element={
                   <ProtectedRoute>
-                    <PermissionGuard requiredPermissions={['manage_users']}>
-                      <AppLayout>
-                        <UserManagementPage />
-                      </AppLayout>
-                    </PermissionGuard>
+                    <AppLayout>
+                      <UserManagementPage />
+                    </AppLayout>
                   </ProtectedRoute>
                 }
               />

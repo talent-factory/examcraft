@@ -11,12 +11,14 @@ interface UserListProps {
   onEditUser: (userId: number) => void;
   onManageRoles: (userId: number) => void;
   onRefresh?: () => void;
+  canEdit?: boolean;
 }
 
 export const UserList: React.FC<UserListProps> = ({
   onEditUser,
   onManageRoles,
   onRefresh,
+  canEdit = false,
 }) => {
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,9 +212,11 @@ export const UserList: React.FC<UserListProps> = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Last Login
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                {canEdit && (
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -256,28 +260,30 @@ export const UserList: React.FC<UserListProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(user.last_login_at)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => onEditUser(user.id)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => onManageRoles(user.id)}
-                        className="text-indigo-600 hover:text-indigo-900"
-                      >
-                        Roles
-                      </button>
-                      <button
-                        onClick={() => handleStatusToggle(user.id, user.status)}
-                        className={user.status === UserStatus.ACTIVE ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}
-                      >
-                        {user.status === UserStatus.ACTIVE ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </div>
-                  </td>
+                  {canEdit && (
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => onEditUser(user.id)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => onManageRoles(user.id)}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
+                          Roles
+                        </button>
+                        <button
+                          onClick={() => handleStatusToggle(user.id, user.status)}
+                          className={user.status === UserStatus.ACTIVE ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}
+                        >
+                          {user.status === UserStatus.ACTIVE ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
