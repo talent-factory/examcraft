@@ -18,7 +18,7 @@ class ClaudeService:
     """Service for interacting with Claude API with full production features"""
 
     def __init__(self):
-        self.api_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
+        self.api_key = os.getenv("ANTHROPIC_API_KEY")
         self.base_url = "https://api.anthropic.com/v1/messages"
         # Using Claude Sonnet 4 (latest stable model as of 2025)
         # Previous models (claude-3-*) are being deprecated

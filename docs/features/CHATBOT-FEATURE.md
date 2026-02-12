@@ -271,7 +271,7 @@ docker exec examcraft_backend pytest -m integration -v
 
 ```bash
 # Claude API Configuration
-CLAUDE_API_KEY=your_api_key_here
+ANTHROPIC_API_KEY=your_api_key_here
 CLAUDE_MODEL=claude-3-5-sonnet-20241022
 
 # Chat Settings

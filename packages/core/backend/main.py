@@ -491,9 +491,7 @@ async def api_health_check():
 
     # Check Claude API
     health_status["services"]["claude_api"] = (
-        "configured"
-        if os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
-        else "not_configured"
+        "configured" if os.getenv("ANTHROPIC_API_KEY") else "not_configured"
     )
 
     # Check Document Processor
