@@ -74,7 +74,7 @@ npm start
 # Backend (.env)
 DATABASE_URL=postgresql://user:pass@localhost/examcraft
 REDIS_URL=redis://localhost:6379
-CLAUDE_API_KEY=your_api_key_here
+ANTHROPIC_API_KEY=your_api_key_here
 
 # Frontend (.env)
 REACT_APP_API_URL=http://localhost:8000

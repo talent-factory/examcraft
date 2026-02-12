@@ -18,7 +18,7 @@ class TestClaudeService:
         with patch.dict(
             os.environ,
             {
-                "CLAUDE_API_KEY": "test-api-key",
+                "ANTHROPIC_API_KEY": "test-api-key",
                 "CLAUDE_MODEL": "claude-3-sonnet-20240229",
                 "CLAUDE_MAX_RPM": "10",
                 "CLAUDE_MAX_TOKENS": "2000",
@@ -38,7 +38,9 @@ class TestClaudeService:
     @pytest.fixture
     def demo_claude_service(self):
         """Claude Service Fixture im Demo Mode"""
-        with patch.dict(os.environ, {"CLAUDE_API_KEY": "", "CLAUDE_DEMO_MODE": "true"}):
+        with patch.dict(
+            os.environ, {"ANTHROPIC_API_KEY": "", "CLAUDE_DEMO_MODE": "true"}
+        ):
             return ClaudeService()
 
     def test_initialization_with_api_key(self, claude_service):
@@ -266,7 +268,7 @@ class TestClaudeServiceIntegration:
         with patch.dict(
             os.environ,
             {
-                "CLAUDE_API_KEY": "test-key",
+                "ANTHROPIC_API_KEY": "test-key",
                 "CLAUDE_MAX_RPM": "2",  # Sehr niedriges Limit für Test
                 "CLAUDE_DEMO_MODE": "false",
             },
