@@ -13,10 +13,44 @@ import json
 
 from database import get_db
 from models.auth import User, Role, Institution, UserStatus
-from utils.auth_utils import get_current_superuser, require_permission
+from utils.auth_utils import get_current_superuser, get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+
+def _is_admin_role(user: User) -> bool:
+    """Check if user has admin role."""
+    return any(role.name == "admin" for role in user.roles)
+
+
+def _require_same_institution(current_user: User, target_user: User) -> None:
+    """Raise 403 if non-superuser tries to access user from different institution."""
+    if (
+        not current_user.is_superuser
+        and current_user.institution_id != target_user.institution_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot access users from other institutions",
+        )
+
+
+def _require_write_access(current_user: User, target_user: User) -> None:
+    """Raise 403 if user cannot edit the target user.
+    Superuser can edit anyone. Admin can edit users in own institution.
+    """
+    if current_user.is_superuser:
+        return
+    if (
+        _is_admin_role(current_user)
+        and current_user.institution_id == target_user.institution_id
+    ):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Not enough permissions to edit this user",
+    )
 
 
 # ============================================================================
@@ -124,6 +158,7 @@ class UserListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+    can_edit: bool = False
 
 
 # ============================================================================
@@ -139,19 +174,24 @@ async def list_users(
     role: Optional[str] = None,
     status: Optional[str] = None,
     institution_id: Optional[int] = None,
-    current_user: User = Depends(require_permission("manage_users")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    List all users (Admin only)
+    List users with institution-scoped access.
 
-    - Supports pagination
-    - Supports search by email, first_name, last_name
-    - Supports filtering by role, status, institution
-    - Requires 'manage_users' permission
+    - Superuser: sees all users, can filter by institution
+    - Admin/Others: sees only users of own institution
     """
     # Build query
     query = db.query(User)
+
+    # Non-superusers always see only their own institution
+    if not current_user.is_superuser:
+        query = query.filter(User.institution_id == current_user.institution_id)
+    elif institution_id:
+        # Superuser can optionally filter by institution
+        query = query.filter(User.institution_id == institution_id)
 
     # Apply search filter
     if search:
@@ -169,10 +209,6 @@ async def list_users(
     # Apply status filter
     if status:
         query = query.filter(User.status == status)
-
-    # Apply institution filter
-    if institution_id:
-        query = query.filter(User.institution_id == institution_id)
 
     # Get total count
     total = query.count()
@@ -204,27 +240,30 @@ async def list_users(
 
     total_pages = (total + page_size - 1) // page_size
 
+    # Superuser and admin can edit users
+    can_edit = current_user.is_superuser or _is_admin_role(current_user)
+
     return UserListResponse(
         users=user_items,
         total=total,
         page=page,
         page_size=page_size,
         total_pages=total_pages,
+        can_edit=can_edit,
     )
 
 
 @router.get("/users/{user_id}", response_model=UserDetailResponse)
 async def get_user(
     user_id: int,
-    current_user: User = Depends(require_permission("manage_users")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Get user details (Admin only)
+    Get user details with institution-scoped access.
 
-    - Returns full user information
-    - Includes roles with permissions
-    - Requires 'manage_users' permission
+    - Superuser: can view any user
+    - Others: can only view users in own institution
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -232,6 +271,8 @@ async def get_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
+
+    _require_same_institution(current_user, user)
 
     # Build role responses with parsed permissions
     role_responses = []
@@ -277,14 +318,15 @@ async def get_user(
 async def update_user(
     user_id: int,
     request: UpdateUserRequest,
-    current_user: User = Depends(require_permission("manage_users")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Update user details (Admin only)
+    Update user details.
 
-    - Updates user information
-    - Requires 'manage_users' permission
+    - Superuser: can edit any user
+    - Admin: can edit users in own institution
+    - Others: 403
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -292,6 +334,8 @@ async def update_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
+
+    _require_write_access(current_user, user)
 
     # Update fields
     if request.first_name is not None:
@@ -362,14 +406,15 @@ async def update_user(
 async def update_user_status(
     user_id: int,
     request: UpdateUserStatusRequest,
-    current_user: User = Depends(require_permission("manage_users")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Update user status (Admin only)
+    Update user status.
 
-    - Activates or deactivates user
-    - Requires 'manage_users' permission
+    - Superuser: can change any user's status
+    - Admin: can change status of users in own institution
+    - Others: 403
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -377,6 +422,8 @@ async def update_user_status(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
+
+    _require_write_access(current_user, user)
 
     # Prevent admin from deactivating themselves
     if user.id == current_user.id and request.status != UserStatus.ACTIVE:
@@ -435,14 +482,15 @@ async def update_user_status(
 async def assign_role_to_user(
     user_id: int,
     request: AssignRoleRequest,
-    current_user: User = Depends(require_permission("manage_users")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Assign role to user (Admin only)
+    Assign role to user.
 
-    - Adds role to user
-    - Requires 'manage_users' permission
+    - Superuser: can assign roles to any user
+    - Admin: can assign roles to users in own institution
+    - Others: 403
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -450,6 +498,8 @@ async def assign_role_to_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
+
+    _require_write_access(current_user, user)
 
     role = db.query(Role).filter(Role.id == request.role_id).first()
 
@@ -514,14 +564,15 @@ async def assign_role_to_user(
 async def remove_role_from_user(
     user_id: int,
     role_id: int,
-    current_user: User = Depends(require_permission("manage_users")),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Remove role from user (Admin only)
+    Remove role from user.
 
-    - Removes role from user
-    - Requires 'manage_users' permission
+    - Superuser: can remove roles from any user
+    - Admin: can remove roles from users in own institution
+    - Others: 403
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -529,6 +580,8 @@ async def remove_role_from_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
+
+    _require_write_access(current_user, user)
 
     role = db.query(Role).filter(Role.id == role_id).first()
 

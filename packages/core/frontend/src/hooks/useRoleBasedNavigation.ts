@@ -66,13 +66,11 @@ export const useRoleBasedNavigation = () => {
       label: 'Admin',
       path: '/admin',
       icon: '⚙️',
-      requiredRoles: [UserRole.ADMIN],
       children: [
         {
           label: 'User Management',
           path: '/admin/users',
           icon: '👥',
-          requiredPermissions: ['manage_users'],
         },
         {
           label: 'Role Management',
