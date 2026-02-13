@@ -37,4 +37,5 @@ primary_region = "fra"  # Frankfurt
     interval = "15s"
     timeout = "5s"
     grace_period = "120s"
-    path = "/api/v1/health"
+    restart_limit = 3            # Auto-restart nach 3 fehlgeschlagenen Checks
+    path = "/health"             # Lightweight Liveness-Check (kein DB/Redis/Qdrant)
