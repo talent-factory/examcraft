@@ -28,6 +28,9 @@ docling = [
     "docling>=2.9.0",
     "docling-core>=2.23.0",
 ]
+docs = [
+    "mkdocs-material>=9.5.0",
+]
 
 [dependency-groups]
 dev = [
