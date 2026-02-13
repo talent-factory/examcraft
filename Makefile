@@ -181,10 +181,13 @@ deploy: deploy-backend deploy-frontend
 deploy-all: deploy-backend deploy-frontend deploy-qdrant deploy-rabbitmq deploy-celery deploy-flower
 	@echo "✅ All services deployed!"
 
+# GitHub token for private dependency access (subscribeflow SDK)
+GITHUB_TOKEN ?= $(shell gh auth token 2>/dev/null)
+
 # Individual service deployments
 deploy-backend:
 	@echo "🚀 Deploying Backend to Fly.io..."
-	fly deploy --config fly.toml
+	fly deploy --config fly.toml --build-secret "GITHUB_TOKEN=$(GITHUB_TOKEN)"
 
 deploy-frontend:
 	@echo "🚀 Deploying Frontend to Fly.io..."
@@ -200,7 +203,7 @@ deploy-rabbitmq:
 
 deploy-celery:
 	@echo "🚀 Deploying Celery Worker to Fly.io..."
-	fly deploy --config fly.celery.toml
+	fly deploy --config fly.celery.toml --build-secret "GITHUB_TOKEN=$(GITHUB_TOKEN)"
 
 deploy-flower:
 	@echo "🚀 Deploying Flower Dashboard to Fly.io..."

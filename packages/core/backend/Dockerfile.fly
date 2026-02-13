@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     python3-dev \
     libmupdf-dev \
+    git \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -25,7 +27,13 @@ WORKDIR /app
 COPY packages/core/backend/requirements.txt ./
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
+# Use build secret for private GitHub repo access (subscribeflow SDK)
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    pip install --no-cache-dir --upgrade pip && \
+    if [ -f /run/secrets/GITHUB_TOKEN ]; then \
+        GITHUB_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
+        git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"; \
+    fi && \
     pip install --no-cache-dir -r requirements.txt
 
 # =========================
