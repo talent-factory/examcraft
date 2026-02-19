@@ -85,6 +85,23 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=100)
 
 
+def _parse_permissions(permissions) -> list[str]:
+    """Parse permissions from various storage formats (JSON string or PostgreSQL array)"""
+    import json
+
+    if isinstance(permissions, list):
+        return permissions
+    if isinstance(permissions, str):
+        try:
+            return json.loads(permissions)
+        except json.JSONDecodeError:
+            # Handle PostgreSQL array format: {a,b,c}
+            if permissions.startswith("{") and permissions.endswith("}"):
+                return [p.strip() for p in permissions[1:-1].split(",") if p.strip()]
+            return []
+    return []
+
+
 class RoleResponse(BaseModel):
     """Role response"""
 
@@ -221,13 +238,11 @@ async def register(
         viewer_role = Role(
             name=UserRole.VIEWER.value,
             display_name="Viewer",
-            description="Can view questions and exams, upload and manage documents",
+            description="View-only access to questions and exams",
             permissions=[
-                "view_questions",
-                "view_exams",
-                "documents:read",
-                "create_documents",
-                "delete_documents",
+                "questions:read",
+                "exams:read",
+                "prompt:read",
             ],
             is_system_role=True,
         )
@@ -413,6 +428,39 @@ async def logout(
     return None
 
 
+def _build_profile_response(user: User) -> UserProfileResponse:
+    """Build a UserProfileResponse with properly parsed role permissions"""
+    role_responses = []
+    for role in user.roles:
+        role_responses.append(
+            RoleResponse(
+                id=role.id,
+                name=role.name,
+                display_name=role.display_name,
+                description=role.description,
+                permissions=_parse_permissions(role.permissions),
+                is_system_role=role.is_system_role,
+                created_at=role.created_at.isoformat(),
+            )
+        )
+
+    return UserProfileResponse(
+        id=user.id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        status=user.status,
+        is_superuser=user.is_superuser,
+        is_email_verified=user.is_email_verified,
+        institution_id=user.institution_id,
+        institution_name=user.institution.name if user.institution else None,
+        oauth_provider=user.oauth_provider,
+        avatar_url=user.avatar_url,
+        roles=role_responses,
+        created_at=user.created_at.isoformat(),
+    )
+
+
 @router.get("/me", response_model=UserProfileResponse)
 async def get_current_user_profile(
     current_user: User = Depends(get_current_active_user),
@@ -423,50 +471,7 @@ async def get_current_user_profile(
     - Returns user information
     - Includes institution and roles with permissions
     """
-    import json
-
-    # Build role responses with parsed permissions
-    role_responses = []
-    for role in current_user.roles:
-        # Parse permissions from JSON string if needed
-        permissions = role.permissions
-        if isinstance(permissions, str):
-            try:
-                permissions = json.loads(permissions)
-            except json.JSONDecodeError:
-                permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
-
-        role_responses.append(
-            RoleResponse(
-                id=role.id,
-                name=role.name,
-                display_name=role.display_name,
-                description=role.description,
-                permissions=permissions,
-                is_system_role=role.is_system_role,
-                created_at=role.created_at.isoformat(),
-            )
-        )
-
-    return UserProfileResponse(
-        id=current_user.id,
-        email=current_user.email,
-        first_name=current_user.first_name,
-        last_name=current_user.last_name,
-        status=current_user.status,
-        is_superuser=current_user.is_superuser,
-        is_email_verified=current_user.is_email_verified,
-        institution_id=current_user.institution_id,
-        institution_name=current_user.institution.name
-        if current_user.institution
-        else None,
-        oauth_provider=current_user.oauth_provider,
-        avatar_url=current_user.avatar_url,
-        roles=role_responses,
-        created_at=current_user.created_at.isoformat(),
-    )
+    return _build_profile_response(current_user)
 
 
 @router.patch("/me", response_model=UserProfileResponse)
@@ -498,50 +503,7 @@ async def update_current_user_profile(
 
     logger.info(f"User profile updated: {current_user.email} (ID: {current_user.id})")
 
-    import json
-
-    # Build role responses with parsed permissions
-    role_responses = []
-    for role in current_user.roles:
-        # Parse permissions from JSON string if needed
-        permissions = role.permissions
-        if isinstance(permissions, str):
-            try:
-                permissions = json.loads(permissions)
-            except json.JSONDecodeError:
-                permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
-
-        role_responses.append(
-            RoleResponse(
-                id=role.id,
-                name=role.name,
-                display_name=role.display_name,
-                description=role.description,
-                permissions=permissions,
-                is_system_role=role.is_system_role,
-                created_at=role.created_at.isoformat(),
-            )
-        )
-
-    return UserProfileResponse(
-        id=current_user.id,
-        email=current_user.email,
-        first_name=current_user.first_name,
-        last_name=current_user.last_name,
-        status=current_user.status,
-        is_superuser=current_user.is_superuser,
-        is_email_verified=current_user.is_email_verified,
-        institution_id=current_user.institution_id,
-        institution_name=current_user.institution.name
-        if current_user.institution
-        else None,
-        oauth_provider=current_user.oauth_provider,
-        avatar_url=current_user.avatar_url,
-        roles=role_responses,
-        created_at=current_user.created_at.isoformat(),
-    )
+    return _build_profile_response(current_user)
 
 
 @router.post("/set-password", status_code=status.HTTP_204_NO_CONTENT)
