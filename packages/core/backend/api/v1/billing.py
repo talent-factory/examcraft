@@ -60,13 +60,31 @@ class PaymentMethodResponse(BaseModel):
 
 
 def _get_tier_from_price_id(price_id: str) -> str:
-    """Map Stripe price ID to tier name"""
-    # This mapping should match your Stripe price IDs
+    """Map Stripe price ID to tier name using environment variables"""
     price_to_tier = {
-        "price_starter_monthly": "starter",
-        "price_professional_monthly": "professional",
+        os.getenv("REACT_APP_STRIPE_PRICE_STARTER", "price_starter_monthly"): "starter",
+        os.getenv(
+            "REACT_APP_STRIPE_PRICE_PROFESSIONAL", "price_professional_monthly"
+        ): "professional",
+        os.getenv(
+            "REACT_APP_STRIPE_PRICE_ENTERPRISE", "price_enterprise_monthly"
+        ): "enterprise",
     }
-    return price_to_tier.get(price_id, "free")
+
+    tier = price_to_tier.get(price_id)
+    if tier:
+        return tier
+
+    # Fallback: infer from price_id string
+    price_id_lower = price_id.lower()
+    if "starter" in price_id_lower:
+        return "starter"
+    elif "professional" in price_id_lower or "pro" in price_id_lower:
+        return "professional"
+    elif "enterprise" in price_id_lower:
+        return "enterprise"
+
+    return "free"
 
 
 def _is_billing_owner(user: User, subscription: Subscription) -> bool:
@@ -342,7 +360,7 @@ async def create_customer_portal(
         )
         raise HTTPException(
             status_code=403,
-            detail="Only the billing owner can manage subscription settings"
+            detail="Only the billing owner can manage subscription settings",
         )
 
     try:
@@ -508,17 +526,8 @@ async def sync_subscription_from_stripe(
             db.add(new_sub)
             logger.info(f"Created subscription {stripe_sub.id}")
 
-        # Map price ID to tier
-        tier = _get_tier_from_price_id(price_id) if price_id else "starter"
-
-        # Also check environment variables for price mapping
-        env_starter_price = os.getenv("REACT_APP_STRIPE_PRICE_STARTER", "")
-        env_professional_price = os.getenv("REACT_APP_STRIPE_PRICE_PROFESSIONAL", "")
-
-        if price_id == env_starter_price:
-            tier = "starter"
-        elif price_id == env_professional_price:
-            tier = "professional"
+        # Map price ID to tier (uses env vars internally)
+        tier = _get_tier_from_price_id(price_id) if price_id else "free"
 
         # Update institution tier
         old_tier = institution.subscription_tier

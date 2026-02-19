@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { paymentService } from '../services/paymentService';
+import { useAuth } from '../contexts/AuthContext';
 
 export const PaymentSuccessPage: React.FC = () => {
     const navigate = useNavigate();
+    const { refreshProfile } = useAuth();
     const [syncing, setSyncing] = useState(true);
     const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -20,6 +22,9 @@ export const PaymentSuccessPage: React.FC = () => {
                 // Verify subscription was synced by fetching it
                 await paymentService.getSubscription();
 
+                // Refresh user profile to pick up the new subscription tier
+                await refreshProfile();
+
                 setSyncing(false);
 
                 // Redirect to subscription page after successful sync
@@ -33,6 +38,9 @@ export const PaymentSuccessPage: React.FC = () => {
                 setSyncError('Subscription sync delayed. Please refresh the page in a moment.');
                 setSyncing(false);
 
+                // Still try to refresh profile even on error
+                try { await refreshProfile(); } catch { /* ignore */ }
+
                 // Still redirect after error, user can refresh subscription page
                 const timer = setTimeout(() => {
                     navigate('/subscription');
@@ -43,7 +51,7 @@ export const PaymentSuccessPage: React.FC = () => {
         };
 
         syncSubscription();
-    }, [navigate]);
+    }, [navigate, refreshProfile]);
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">

@@ -381,6 +381,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [state.accessToken]);
 
   /**
+   * Refresh user profile from server (e.g. after subscription change)
+   */
+  const refreshProfile = useCallback(async () => {
+    try {
+      if (!state.accessToken) {
+        throw new Error('Not authenticated');
+      }
+
+      console.log('[AuthContext] Refreshing profile from server...');
+      const profile = await AuthService.getProfile(state.accessToken);
+
+      localStorage.setItem(USER_KEY, JSON.stringify(profile));
+
+      setState(prev => ({
+        ...prev,
+        user: profile,
+      }));
+
+      console.log('[AuthContext] Profile refreshed, tier:', profile.institution?.subscription_tier);
+    } catch (error) {
+      console.error('[AuthContext] Profile refresh failed:', error);
+      throw error;
+    }
+  }, [state.accessToken]);
+
+  /**
    * Clear error
    */
   const clearError = useCallback(() => {
@@ -434,6 +460,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     register,
     logout,
     refreshAccessToken,
+    refreshProfile,
     updateProfile,
     setPassword,
     changePassword,

@@ -5,7 +5,7 @@ import os
 import logging
 from database import get_db
 from models.subscription import Subscription, SubscriptionStatus
-from models.auth import Institution
+from models.auth import Institution, User, Role, UserRole
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,9 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         subscription_id = session.get("subscription")
         customer_id = session.get("customer")
         print(f"🔍 SUBSCRIPTION_ID: {subscription_id}, CUSTOMER_ID: {customer_id}")
-        logger.info(f"🔍 Subscription ID: {subscription_id}, Customer ID: {customer_id}")
+        logger.info(
+            f"🔍 Subscription ID: {subscription_id}, Customer ID: {customer_id}"
+        )
 
         # Update Institution
         institution = (
@@ -128,7 +130,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         # Fetch actual subscription details from Stripe
         print(f"🔍 FETCHING STRIPE SUBSCRIPTION: {subscription_id}")
         stripe_sub = stripe.Subscription.retrieve(subscription_id)
-        print(f"✅ STRIPE SUBSCRIPTION FETCHED")
+        print("✅ STRIPE SUBSCRIPTION FETCHED")
         price_id = stripe_sub["items"]["data"][0]["price"]["id"]
 
         # Debug: Log subscription object to see available fields
@@ -233,10 +235,10 @@ async def handle_checkout_session_completed(session: dict, db: Session):
             elif "enterprise" in price_id_lower:
                 new_tier = "enterprise"
             else:
-                # Default to starter for unknown prices
-                new_tier = "starter"
+                # Default to free for unknown prices (never grant paid tier accidentally)
+                new_tier = "free"
                 logger.warning(
-                    f"⚠️  Unknown price_id {price_id}, defaulting to starter tier"
+                    f"⚠️  Unknown price_id {price_id}, defaulting to free tier"
                 )
 
         institution.subscription_tier = new_tier
@@ -244,6 +246,19 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         logger.info(
             f"✅ Updated institution {institution_id} to tier: {new_tier} (price_id: {price_id})"
         )
+
+        # Upgrade billing owner's role to dozent for paid tiers
+        if new_tier != "free" and user_id:
+            billing_user = db.query(User).filter(User.id == int(user_id)).first()
+            if billing_user:
+                dozent_role = (
+                    db.query(Role).filter(Role.name == UserRole.DOZENT.value).first()
+                )
+                if dozent_role and dozent_role not in billing_user.roles:
+                    billing_user.roles.append(dozent_role)
+                    logger.info(
+                        f"✅ Upgraded user {user_id} to dozent role (paid tier: {new_tier})"
+                    )
 
         db.commit()
         print("✅ DATABASE COMMIT SUCCESSFUL")
@@ -347,5 +362,25 @@ async def handle_subscription_deleted(subscription: dict, db: Session):
         institution = local_sub.institution
         if institution:
             institution.subscription_tier = "free"
+
+        # Downgrade billing owner's role from dozent back to viewer
+        if local_sub.billing_owner_id:
+            billing_user = (
+                db.query(User).filter(User.id == local_sub.billing_owner_id).first()
+            )
+            if billing_user and not billing_user.has_role("admin"):
+                dozent_role = (
+                    db.query(Role).filter(Role.name == UserRole.DOZENT.value).first()
+                )
+                viewer_role = (
+                    db.query(Role).filter(Role.name == UserRole.VIEWER.value).first()
+                )
+                if dozent_role and dozent_role in billing_user.roles:
+                    billing_user.roles.remove(dozent_role)
+                if viewer_role and viewer_role not in billing_user.roles:
+                    billing_user.roles.append(viewer_role)
+                logger.info(
+                    f"✅ Downgraded user {local_sub.billing_owner_id} to viewer role (subscription canceled)"
+                )
 
         db.commit()
