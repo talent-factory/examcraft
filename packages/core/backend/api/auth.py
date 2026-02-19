@@ -117,6 +117,25 @@ class RoleResponse(BaseModel):
         from_attributes = True
 
 
+class InstitutionResponse(BaseModel):
+    """Institution response for profile"""
+
+    id: int
+    name: str
+    slug: str
+    domain: Optional[str]
+    subscription_tier: str
+    max_users: int
+    max_documents: int
+    max_questions_per_month: int
+    is_active: bool
+    created_at: str
+    updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class UserProfileResponse(BaseModel):
     """User profile response"""
 
@@ -129,6 +148,7 @@ class UserProfileResponse(BaseModel):
     is_email_verified: bool  # Email verification status
     institution_id: Optional[int]
     institution_name: Optional[str]
+    institution: Optional[InstitutionResponse] = None
     oauth_provider: Optional[str] = None  # OAuth provider (google, microsoft, etc.)
     avatar_url: Optional[str] = None  # Profile picture URL (from OAuth or uploaded)
     roles: list[RoleResponse]
@@ -444,6 +464,24 @@ def _build_profile_response(user: User) -> UserProfileResponse:
             )
         )
 
+    # Build institution response if available
+    institution_response = None
+    if user.institution:
+        inst = user.institution
+        institution_response = InstitutionResponse(
+            id=inst.id,
+            name=inst.name,
+            slug=inst.slug,
+            domain=inst.domain,
+            subscription_tier=inst.subscription_tier,
+            max_users=inst.max_users,
+            max_documents=inst.max_documents,
+            max_questions_per_month=inst.max_questions_per_month,
+            is_active=inst.is_active,
+            created_at=inst.created_at.isoformat(),
+            updated_at=inst.updated_at.isoformat() if inst.updated_at else None,
+        )
+
     return UserProfileResponse(
         id=user.id,
         email=user.email,
@@ -454,6 +492,7 @@ def _build_profile_response(user: User) -> UserProfileResponse:
         is_email_verified=user.is_email_verified,
         institution_id=user.institution_id,
         institution_name=user.institution.name if user.institution else None,
+        institution=institution_response,
         oauth_provider=user.oauth_provider,
         avatar_url=user.avatar_url,
         roles=role_responses,
