@@ -32,7 +32,7 @@ def db(test_db):
         name=UserRole.VIEWER.value,
         display_name="Viewer",
         description="Can view questions",
-        permissions=["view_questions"],
+        permissions=["questions:read", "exams:read", "prompt:read"],
         is_system_role=True,
     )
     test_db.add(viewer_role)
@@ -239,7 +239,7 @@ def test_log_permission_denied(db):
         db=db,
         user_id=user.id,
         action="create_document",
-        required_permission="create_documents",
+        required_permission="documents:create",
     )
 
     assert audit_log.action == AuditService.ACTION_PERMISSION_DENIED

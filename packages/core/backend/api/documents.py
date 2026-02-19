@@ -71,13 +71,13 @@ class UploadResponse(BaseModel):
 async def upload_document(
     file: UploadFile = File(...),
     http_request: Request = None,
-    current_user: User = Depends(require_permission("create_documents")),
+    current_user: User = Depends(require_permission("documents:create")),
     db: Session = Depends(get_db),
 ):
     """
     Upload ein neues Dokument (Asynchrone Verarbeitung mit Celery)
 
-    **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
+    **Required Permission:** `documents:create` (Dozent, Assistant, Admin)
 
     - **file**: Dokument zum Upload (PDF, DOC, DOCX, TXT, MD)
 
@@ -420,13 +420,13 @@ async def get_document_status(
 async def delete_document(
     document_id: int,
     http_request: Request = None,
-    current_user: User = Depends(require_permission("delete_documents")),
+    current_user: User = Depends(require_permission("documents:delete")),
     db: Session = Depends(get_db),
 ):
     """
     Lösche Dokument und zugehörige Datei
 
-    **Required Permission:** `delete_documents` (Dozent, Admin)
+    **Required Permission:** `documents:delete` (Dozent, Admin)
 
     - **document_id**: ID des zu löschenden Dokuments
 
@@ -495,7 +495,7 @@ async def process_document(
     document_id: int,
     create_vectors: bool = Query(True, description="Erstelle auch Vector Embeddings"),
     background_tasks: BackgroundTasks = None,
-    current_user: User = Depends(require_permission("create_documents")),
+    current_user: User = Depends(require_permission("documents:create")),
     db: Session = Depends(get_db),
 ):
     """
@@ -504,7 +504,7 @@ async def process_document(
     **ASYNCHRON:** Diese Endpoint startet die Verarbeitung im Hintergrund und antwortet sofort.
     Nutze GET /{document_id}/status um den Verarbeitungsstatus zu prüfen.
 
-    **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
+    **Required Permission:** `documents:create` (Dozent, Assistant, Admin)
 
     - **document_id**: ID des zu verarbeitenden Dokuments
     - **create_vectors**: Ob Vector Embeddings erstellt werden sollen (default: True)

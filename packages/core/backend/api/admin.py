@@ -13,44 +13,10 @@ import json
 
 from database import get_db
 from models.auth import User, Role, Institution, UserStatus
-from utils.auth_utils import get_current_superuser, get_current_user
+from utils.auth_utils import require_permission
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
-
-
-def _is_admin_role(user: User) -> bool:
-    """Check if user has admin role."""
-    return any(role.name == "admin" for role in user.roles)
-
-
-def _require_same_institution(current_user: User, target_user: User) -> None:
-    """Raise 403 if non-superuser tries to access user from different institution."""
-    if (
-        not current_user.is_superuser
-        and current_user.institution_id != target_user.institution_id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot access users from other institutions",
-        )
-
-
-def _require_write_access(current_user: User, target_user: User) -> None:
-    """Raise 403 if user cannot edit the target user.
-    Superuser can edit anyone. Admin can edit users in own institution.
-    """
-    if current_user.is_superuser:
-        return
-    if (
-        _is_admin_role(current_user)
-        and current_user.institution_id == target_user.institution_id
-    ):
-        return
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Not enough permissions to edit this user",
-    )
 
 
 # ============================================================================
@@ -79,7 +45,7 @@ class InstitutionResponse(BaseModel):
     id: int
     name: str
     slug: str
-    domain: Optional[str] = None
+    domain: str
     subscription_tier: str
     max_users: int
     max_documents: int
@@ -158,7 +124,6 @@ class UserListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
-    can_edit: bool = False
 
 
 # ============================================================================
@@ -174,24 +139,19 @@ async def list_users(
     role: Optional[str] = None,
     status: Optional[str] = None,
     institution_id: Optional[int] = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("users:manage")),
     db: Session = Depends(get_db),
 ):
     """
-    List users with institution-scoped access.
+    List all users (Admin only)
 
-    - Superuser: sees all users, can filter by institution
-    - Admin/Others: sees only users of own institution
+    - Supports pagination
+    - Supports search by email, first_name, last_name
+    - Supports filtering by role, status, institution
+    - Requires 'users:manage' permission
     """
     # Build query
     query = db.query(User)
-
-    # Non-superusers always see only their own institution
-    if not current_user.is_superuser:
-        query = query.filter(User.institution_id == current_user.institution_id)
-    elif institution_id:
-        # Superuser can optionally filter by institution
-        query = query.filter(User.institution_id == institution_id)
 
     # Apply search filter
     if search:
@@ -209,6 +169,10 @@ async def list_users(
     # Apply status filter
     if status:
         query = query.filter(User.status == status)
+
+    # Apply institution filter
+    if institution_id:
+        query = query.filter(User.institution_id == institution_id)
 
     # Get total count
     total = query.count()
@@ -240,30 +204,27 @@ async def list_users(
 
     total_pages = (total + page_size - 1) // page_size
 
-    # Superuser and admin can edit users
-    can_edit = current_user.is_superuser or _is_admin_role(current_user)
-
     return UserListResponse(
         users=user_items,
         total=total,
         page=page,
         page_size=page_size,
         total_pages=total_pages,
-        can_edit=can_edit,
     )
 
 
 @router.get("/users/{user_id}", response_model=UserDetailResponse)
 async def get_user(
     user_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("users:manage")),
     db: Session = Depends(get_db),
 ):
     """
-    Get user details with institution-scoped access.
+    Get user details (Admin only)
 
-    - Superuser: can view any user
-    - Others: can only view users in own institution
+    - Returns full user information
+    - Includes roles with permissions
+    - Requires 'users:manage' permission
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -271,8 +232,6 @@ async def get_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-
-    _require_same_institution(current_user, user)
 
     # Build role responses with parsed permissions
     role_responses = []
@@ -318,15 +277,14 @@ async def get_user(
 async def update_user(
     user_id: int,
     request: UpdateUserRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("users:manage")),
     db: Session = Depends(get_db),
 ):
     """
-    Update user details.
+    Update user details (Admin only)
 
-    - Superuser: can edit any user
-    - Admin: can edit users in own institution
-    - Others: 403
+    - Updates user information
+    - Requires 'users:manage' permission
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -334,8 +292,6 @@ async def update_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-
-    _require_write_access(current_user, user)
 
     # Update fields
     if request.first_name is not None:
@@ -406,15 +362,14 @@ async def update_user(
 async def update_user_status(
     user_id: int,
     request: UpdateUserStatusRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("users:manage")),
     db: Session = Depends(get_db),
 ):
     """
-    Update user status.
+    Update user status (Admin only)
 
-    - Superuser: can change any user's status
-    - Admin: can change status of users in own institution
-    - Others: 403
+    - Activates or deactivates user
+    - Requires 'users:manage' permission
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -422,8 +377,6 @@ async def update_user_status(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-
-    _require_write_access(current_user, user)
 
     # Prevent admin from deactivating themselves
     if user.id == current_user.id and request.status != UserStatus.ACTIVE:
@@ -482,15 +435,14 @@ async def update_user_status(
 async def assign_role_to_user(
     user_id: int,
     request: AssignRoleRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("users:manage")),
     db: Session = Depends(get_db),
 ):
     """
-    Assign role to user.
+    Assign role to user (Admin only)
 
-    - Superuser: can assign roles to any user
-    - Admin: can assign roles to users in own institution
-    - Others: 403
+    - Adds role to user
+    - Requires 'users:manage' permission
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -498,8 +450,6 @@ async def assign_role_to_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-
-    _require_write_access(current_user, user)
 
     role = db.query(Role).filter(Role.id == request.role_id).first()
 
@@ -564,15 +514,14 @@ async def assign_role_to_user(
 async def remove_role_from_user(
     user_id: int,
     role_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("users:manage")),
     db: Session = Depends(get_db),
 ):
     """
-    Remove role from user.
+    Remove role from user (Admin only)
 
-    - Superuser: can remove roles from any user
-    - Admin: can remove roles from users in own institution
-    - Others: 403
+    - Removes role from user
+    - Requires 'users:manage' permission
     """
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -580,8 +529,6 @@ async def remove_role_from_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-
-    _require_write_access(current_user, user)
 
     role = db.query(Role).filter(Role.id == role_id).first()
 
@@ -652,14 +599,14 @@ async def remove_role_from_user(
 
 @router.get("/roles", response_model=List[RoleResponse])
 async def list_roles(
-    current_user: User = Depends(get_current_superuser),
+    current_user: User = Depends(require_permission("users:manage")),
     db: Session = Depends(get_db),
 ):
     """
-    List all roles (Superuser only)
+    List all roles (Admin only)
 
     - Returns all available roles
-    - Requires 'manage_users' permission
+    - Requires 'users:manage' permission
     """
     roles = db.query(Role).all()
 
@@ -691,14 +638,14 @@ async def list_roles(
 
 @router.get("/institutions", response_model=List[InstitutionResponse])
 async def list_institutions(
-    current_user: User = Depends(get_current_superuser),
+    current_user: User = Depends(require_permission("users:manage")),
     db: Session = Depends(get_db),
 ):
     """
-    List all institutions (Superuser only)
+    List all institutions (Admin only)
 
     - Returns all institutions
-    - Requires 'manage_users' permission
+    - Requires 'users:manage' permission
     """
     institutions = db.query(Institution).all()
 
@@ -732,7 +679,7 @@ class UpdateInstitutionRequest(BaseModel):
 async def update_institution(
     institution_id: int,
     update_data: UpdateInstitutionRequest,
-    current_user: User = Depends(get_current_superuser),
+    current_user: User = Depends(require_permission("users:manage")),
     db: Session = Depends(get_db),
 ):
     """
@@ -740,7 +687,7 @@ async def update_institution(
 
     - Updates institution details
     - Automatically updates quotas when subscription_tier changes
-    - Requires 'manage_users' permission
+    - Requires 'users:manage' permission
     """
     from config.features import SubscriptionTier, TIER_QUOTAS
 
@@ -808,15 +755,15 @@ class CreateInstitutionRequest(BaseModel):
 @router.post("/institutions", response_model=InstitutionResponse, status_code=201)
 async def create_institution(
     institution_data: CreateInstitutionRequest,
-    current_user: User = Depends(get_current_superuser),
+    current_user: User = Depends(require_permission("users:manage")),
     db: Session = Depends(get_db),
 ):
     """
-    Create new institution (Superuser only)
+    Create new institution (Admin only)
 
     - Creates new institution with specified tier
     - Automatically sets quotas based on tier
-    - Requires 'manage_users' permission
+    - Requires 'users:manage' permission
     """
     from config.features import SubscriptionTier, TIER_QUOTAS
 

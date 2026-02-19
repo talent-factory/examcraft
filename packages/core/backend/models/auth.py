@@ -203,7 +203,7 @@ class Role(Base):
     # Permissions (JSON string mit Liste von Permissions)
     permissions = Column(
         Text, nullable=False
-    )  # JSON: ["create_questions", "review_questions", ...]
+    )  # JSON: ["questions:create", "questions:review", ...]
 
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
