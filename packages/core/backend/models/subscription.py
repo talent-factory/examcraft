@@ -52,10 +52,7 @@ class Subscription(Base):
     # Billing Owner - The user who purchased the subscription
     # Only this user can view billing history, invoices, and manage payment methods
     billing_owner_id = Column(
-        Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     # Stripe Identifiers
