@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from services.payment_service import PaymentService
 from utils.auth_utils import get_current_active_user
 from models.auth import User, Institution
@@ -14,13 +14,13 @@ from database import get_db
 
 logger = logging.getLogger(__name__)
 
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
 router = APIRouter()
 
 
 class CheckoutRequest(BaseModel):
     price_id: str
-    success_url: str
-    cancel_url: str
 
 
 class PortalRequest(BaseModel):
@@ -59,6 +59,20 @@ class PaymentMethodResponse(BaseModel):
     card: Optional[dict]
 
 
+def _get_allowed_price_ids() -> set:
+    """Get the set of allowed Stripe price IDs from environment variables"""
+    price_ids = set()
+    for env_var in [
+        "REACT_APP_STRIPE_PRICE_STARTER",
+        "REACT_APP_STRIPE_PRICE_PROFESSIONAL",
+        "REACT_APP_STRIPE_PRICE_ENTERPRISE",
+    ]:
+        price_id = os.getenv(env_var)
+        if price_id:
+            price_ids.add(price_id)
+    return price_ids
+
+
 def _get_tier_from_price_id(price_id: str) -> str:
     """Map Stripe price ID to tier name using environment variables"""
     price_to_tier = {
@@ -92,13 +106,14 @@ def _is_billing_owner(user: User, subscription: Subscription) -> bool:
     Check if the user is the billing owner of the subscription.
     Only the billing owner can view invoices, payment methods, and manage the subscription.
     """
-    if not subscription or not subscription.billing_owner_id:
-        # No billing owner set - allow for backwards compatibility
-        # but log a warning
+    if not subscription:
+        return False
+    if not subscription.billing_owner_id:
+        # No billing owner set - restrict access until backfilled
         logger.warning(
-            f"Subscription {subscription.id if subscription else 'N/A'} has no billing_owner_id set"
+            f"Subscription {subscription.id} has no billing_owner_id set - denying access"
         )
-        return True  # Allow access for legacy subscriptions
+        return False
     return user.id == subscription.billing_owner_id
 
 
@@ -171,7 +186,6 @@ async def get_subscription(
 
     if not subscription:
         # No active subscription - return institution tier
-        # Status should match tier: if tier is not "free", status should be "active"
         tier = institution.subscription_tier or "free"
         status = "active" if tier != "free" else "free"
 
@@ -185,7 +199,7 @@ async def get_subscription(
             "canceled_at": None,
             "plan": None,
             "default_payment_method": None,
-            "is_billing_owner": False,  # No subscription, so no billing owner
+            "is_billing_owner": False,
         }
 
     # Fetch subscription details from Stripe (includes price the user actually pays)
@@ -383,6 +397,7 @@ async def create_checkout_session(
     Create a Stripe Checkout Session for the current user's institution
 
     Requires authentication and active user status.
+    The success/cancel URLs are constructed server-side for security.
     """
     payment_service = PaymentService()
 
@@ -399,11 +414,23 @@ async def create_checkout_session(
             detail="User must be associated with an institution to subscribe",
         )
 
+    # Validate price_id against allowed prices
+    allowed_prices = _get_allowed_price_ids()
+    if allowed_prices and request.price_id not in allowed_prices:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid price ID. Please select a valid subscription plan.",
+        )
+
+    # Construct redirect URLs server-side (prevents open redirect)
+    success_url = f"{FRONTEND_URL}/billing/success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{FRONTEND_URL}/billing/cancel"
+
     try:
         session = await payment_service.create_checkout_session(
             price_id=request.price_id,
-            success_url=request.success_url,
-            cancel_url=request.cancel_url,
+            success_url=success_url,
+            cancel_url=cancel_url,
             customer_email=current_user.email,
             metadata={
                 "institution_id": str(current_user.institution_id),
@@ -500,26 +527,30 @@ async def sync_subscription_from_stripe(
             existing_sub.status = SubscriptionStatus(stripe_sub.status)
             existing_sub.stripe_price_id = price_id
             existing_sub.current_period_start = datetime.fromtimestamp(
-                stripe_sub.current_period_start
+                stripe_sub.current_period_start, tz=timezone.utc
             )
             existing_sub.current_period_end = datetime.fromtimestamp(
-                stripe_sub.current_period_end
+                stripe_sub.current_period_end, tz=timezone.utc
             )
             existing_sub.cancel_at_period_end = stripe_sub.cancel_at_period_end
+            # Set billing_owner_id if not already set
+            if not existing_sub.billing_owner_id:
+                existing_sub.billing_owner_id = current_user.id
             logger.info(f"Updated subscription {stripe_sub.id}")
         else:
             # Create new subscription record
             new_sub = Subscription(
                 institution_id=institution.id,
+                billing_owner_id=current_user.id,
                 stripe_subscription_id=stripe_sub.id,
                 stripe_customer_id=customer_id,
                 stripe_price_id=price_id,
                 status=SubscriptionStatus(stripe_sub.status),
                 current_period_start=datetime.fromtimestamp(
-                    stripe_sub.current_period_start
+                    stripe_sub.current_period_start, tz=timezone.utc
                 ),
                 current_period_end=datetime.fromtimestamp(
-                    stripe_sub.current_period_end
+                    stripe_sub.current_period_end, tz=timezone.utc
                 ),
                 cancel_at_period_end=stripe_sub.cancel_at_period_end,
             )

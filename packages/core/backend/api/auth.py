@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
+import json
 import logging
 import os
 
@@ -87,8 +88,6 @@ class PasswordChangeRequest(BaseModel):
 
 def _parse_permissions(permissions) -> list[str]:
     """Parse permissions from various storage formats (JSON string or PostgreSQL array)"""
-    import json
-
     if isinstance(permissions, list):
         return permissions
     if isinstance(permissions, str):

@@ -45,7 +45,7 @@ class InstitutionResponse(BaseModel):
     id: int
     name: str
     slug: str
-    domain: str
+    domain: Optional[str] = None
     subscription_tier: str
     max_users: int
     max_documents: int
@@ -153,6 +153,10 @@ async def list_users(
     # Build query
     query = db.query(User)
 
+    # Multi-tenancy: non-superusers can only see users in their own institution
+    if not current_user.is_superuser:
+        query = query.filter(User.institution_id == current_user.institution_id)
+
     # Apply search filter
     if search:
         search_filter = or_(
@@ -233,6 +237,15 @@ async def get_user(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
+    # Multi-tenancy: non-superusers can only access users in their own institution
+    if (
+        not current_user.is_superuser
+        and user.institution_id != current_user.institution_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+
     # Build role responses with parsed permissions
     role_responses = []
     for role in user.roles:
@@ -291,6 +304,15 @@ async def update_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Multi-tenancy: non-superusers can only modify users in their own institution
+    if (
+        not current_user.is_superuser
+        and user.institution_id != current_user.institution_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
 
     # Update fields
@@ -378,6 +400,15 @@ async def update_user_status(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
+    # Multi-tenancy: non-superusers can only modify users in their own institution
+    if (
+        not current_user.is_superuser
+        and user.institution_id != current_user.institution_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+
     # Prevent admin from deactivating themselves
     if user.id == current_user.id and request.status != UserStatus.ACTIVE:
         raise HTTPException(
@@ -449,6 +480,15 @@ async def assign_role_to_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Multi-tenancy: non-superusers can only modify users in their own institution
+    if (
+        not current_user.is_superuser
+        and user.institution_id != current_user.institution_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
 
     role = db.query(Role).filter(Role.id == request.role_id).first()
@@ -528,6 +568,15 @@ async def remove_role_from_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Multi-tenancy: non-superusers can only modify users in their own institution
+    if (
+        not current_user.is_superuser
+        and user.institution_id != current_user.institution_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
 
     role = db.query(Role).filter(Role.id == role_id).first()

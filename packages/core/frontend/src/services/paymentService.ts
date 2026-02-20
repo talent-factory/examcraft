@@ -70,8 +70,6 @@ export const paymentService = {
             `${API_URL}/api/v1/billing/create-checkout-session`,
             {
                 price_id: priceId,
-                success_url: `${window.location.origin}/billing/success`,
-                cancel_url: `${window.location.origin}/billing/cancel`,
             },
             getAuthHeaders()
         );
