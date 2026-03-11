@@ -200,6 +200,7 @@ export interface AuthContextType extends AuthState {
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
   setPassword: (password: string) => Promise<void>;
   changePassword: (data: ChangePasswordRequest) => Promise<void>;

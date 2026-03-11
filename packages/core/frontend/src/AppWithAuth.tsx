@@ -26,6 +26,7 @@ import { Admin } from './pages/Admin';
 import { BillingPage } from './pages/BillingPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
+import { SubscriptionManagementPage } from './pages/SubscriptionManagementPage';
 import { UserRole } from './types/auth';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
@@ -192,12 +193,25 @@ export const AppWithAuth: React.FC = () => {
               />
 
               <Route
-                path="/admin"
+                path="/subscription"
                 element={
                   <ProtectedRoute>
                     <AppLayout>
-                      <Admin />
+                      <SubscriptionManagementPage />
                     </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <RoleGuard allowedRoles={[UserRole.ADMIN]}>
+                      <AppLayout>
+                        <Admin />
+                      </AppLayout>
+                    </RoleGuard>
                   </ProtectedRoute>
                 }
               />
@@ -206,9 +220,11 @@ export const AppWithAuth: React.FC = () => {
                 path="/admin/users"
                 element={
                   <ProtectedRoute>
-                    <AppLayout>
-                      <UserManagementPage />
-                    </AppLayout>
+                    <PermissionGuard requiredPermissions={['users:manage']}>
+                      <AppLayout>
+                        <UserManagementPage />
+                      </AppLayout>
+                    </PermissionGuard>
                   </ProtectedRoute>
                 }
               />
@@ -217,7 +233,7 @@ export const AppWithAuth: React.FC = () => {
                 path="/admin/roles"
                 element={
                   <ProtectedRoute>
-                    <RoleGuard allowedRoles={[UserRole.ADMIN]} requireSuperuser>
+                    <RoleGuard allowedRoles={[UserRole.ADMIN]}>
                       <AppLayout>
                         <RoleManagementPage />
                       </AppLayout>

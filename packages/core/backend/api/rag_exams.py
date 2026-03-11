@@ -115,13 +115,13 @@ class ContextRetrievalRequest(BaseModel):
 @router.post("/generate-exam", response_model=RAGExamResponseModel)
 async def generate_rag_exam(
     request: RAGExamRequestModel,
-    current_user: User = Depends(require_permission("create_questions")),
+    current_user: User = Depends(require_permission("questions:create")),
     db: Session = Depends(get_db),
 ):
     """
     Generiere RAG-basierte Prüfung aus Dokumenten
 
-    **Required Permission:** `create_questions` (Dozent, Assistant, Admin)
+    **Required Permission:** `questions:create` (Dozent, Assistant, Admin)
 
     - **topic**: Thema der Prüfung (3-200 Zeichen)
     - **document_ids**: Optional spezifische Dokumente
@@ -132,6 +132,11 @@ async def generate_rag_exam(
     - **context_chunks_per_question**: Context Chunks pro Frage (1-10)
     """
     try:
+        # Check question generation quota for institution
+        from utils.tenant_utils import SubscriptionLimits
+
+        SubscriptionLimits.check_question_limit(current_user.institution, db)
+
         # Validiere Document IDs falls angegeben
         if request.document_ids:
             for doc_id in request.document_ids:

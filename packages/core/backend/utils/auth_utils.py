@@ -171,7 +171,7 @@ def require_permission(required_permission: str):
 
     Example:
         @router.post("/questions")
-        async def create_question(user: User = Depends(require_permission("create_questions"))):
+        async def create_question(user: User = Depends(require_permission("questions:create"))):
             ...
     """
 

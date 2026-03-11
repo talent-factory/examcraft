@@ -42,10 +42,10 @@ def db(test_db):
             display_name="Dozent",
             description="Can create and manage questions",
             permissions=[
-                "create_questions",
-                "approve_questions",
-                "create_documents",
-                "view_questions",
+                "questions:create",
+                "questions:approve",
+                "documents:create",
+                "questions:read",
             ],
             is_system_role=True,
         ),
@@ -53,7 +53,7 @@ def db(test_db):
             name=UserRole.VIEWER.value,
             display_name="Viewer",
             description="Can view questions",
-            permissions=["view_questions"],
+            permissions=["questions:read", "exams:read", "prompt:read"],
             is_system_role=True,
         ),
     ]

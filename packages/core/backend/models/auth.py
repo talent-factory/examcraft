@@ -100,6 +100,17 @@ class Institution(Base):
     subscription_tier = Column(
         String(50), default="free", nullable=False
     )  # free, starter, professional, enterprise
+
+    # Subscription Type: Determines billing method
+    subscription_type = Column(
+        String(50), default="self_service", nullable=False
+    )  # self_service (Stripe), enterprise (Manual Invoice)
+
+    # Institution Type: Single-user or Multi-user
+    institution_type = Column(
+        String(50), default="personal", nullable=False
+    )  # personal (1 user), organization (N users)
+
     features_enabled = Column(
         ARRAY(String), nullable=True
     )  # Optional: Manual feature overrides
@@ -192,7 +203,7 @@ class Role(Base):
     # Permissions (JSON string mit Liste von Permissions)
     permissions = Column(
         Text, nullable=False
-    )  # JSON: ["create_questions", "review_questions", ...]
+    )  # JSON: ["questions:create", "questions:review", ...]
 
     # Status
     is_active = Column(Boolean, default=True, nullable=False)

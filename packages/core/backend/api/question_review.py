@@ -281,13 +281,13 @@ async def get_question_review(
 @router.post("/review", response_model=QuestionReviewResponse, status_code=201)
 async def create_question_review(
     request: QuestionReviewCreate,
-    current_user: User = Depends(require_permission("create_questions")),
+    current_user: User = Depends(require_permission("questions:create")),
     db: Session = Depends(get_db),
 ):
     """
     Erstelle neue Question Review
 
-    **Required Permission:** `create_questions` (Dozent, Assistant, Admin)
+    **Required Permission:** `questions:create` (Dozent, Assistant, Admin)
     """
     try:
         # Check question generation limit for institution
@@ -361,13 +361,13 @@ async def create_question_review(
 async def edit_question(
     question_id: int,
     request: QuestionReviewUpdate,
-    current_user: User = Depends(require_permission("edit_questions")),
+    current_user: User = Depends(require_permission("questions:edit")),
     db: Session = Depends(get_db),
 ):
     """
     Bearbeite Question (Inline Editing)
 
-    **Required Permission:** `edit_questions` (Dozent, Assistant, Admin)
+    **Required Permission:** `questions:edit` (Dozent, Assistant, Admin)
     """
     try:
         question = (
@@ -486,13 +486,13 @@ async def edit_question(
 async def approve_question(
     question_id: int,
     request: ReviewActionRequest,
-    current_user: User = Depends(require_permission("approve_questions")),
+    current_user: User = Depends(require_permission("questions:approve")),
     db: Session = Depends(get_db),
 ):
     """
     Genehmige Question
 
-    **Required Permission:** `approve_questions` (Dozent, Admin)
+    **Required Permission:** `questions:approve` (Dozent, Admin)
     """
     try:
         question = (
@@ -566,13 +566,13 @@ async def approve_question(
 async def reject_question(
     question_id: int,
     request: ReviewActionRequest,
-    current_user: User = Depends(require_permission("approve_questions")),
+    current_user: User = Depends(require_permission("questions:approve")),
     db: Session = Depends(get_db),
 ):
     """
     Lehne Question ab
 
-    **Required Permission:** `approve_questions` (Dozent, Admin)
+    **Required Permission:** `questions:approve` (Dozent, Admin)
     """
     try:
         question = (

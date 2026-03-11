@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13.1"
 dependencies = [
+    "alembic>=1.17.0",
     "psycopg2>=2.9.11",
     "redis>=7.0.0",
     "sqlalchemy>=2.0.43",

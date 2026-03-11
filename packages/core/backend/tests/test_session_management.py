@@ -32,7 +32,7 @@ def db(test_db):
         name=UserRole.VIEWER.value,
         display_name="Viewer",
         description="Can view questions",
-        permissions=["view_questions"],
+        permissions=["questions:read", "exams:read", "prompt:read"],
         is_system_role=True,
     )
     test_db.add(viewer_role)

@@ -86,3 +86,4 @@ packages/core/frontend/.env.local
 
 # Local documentation (contains secrets)
 *.local.md
+.grepai/

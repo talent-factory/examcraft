@@ -1,15 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { paymentService } from '../services/paymentService';
+import { STRIPE_PRICES, getStripeConfigStatus } from '../config/stripe.config';
 
 export const BillingPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [currentTier, setCurrentTier] = useState<string>('free');
+    const stripeConfigStatus = getStripeConfigStatus();
 
-    const handleSubscribe = async (plan: string) => {
+    useEffect(() => {
+        const loadCurrentTier = async () => {
+            try {
+                const subscription = await paymentService.getSubscription();
+                setCurrentTier(subscription.tier || 'free');
+            } catch (err) {
+                console.error('Failed to load subscription:', err);
+            }
+        };
+        loadCurrentTier();
+    }, []);
+
+    const handleSubscribe = async (priceId: string) => {
         setLoading(true);
         setError(null);
         try {
-            const session = await paymentService.createCheckoutSession(plan);
+            const session = await paymentService.createCheckoutSession(priceId);
             // Redirect to Stripe Checkout
             window.location.href = session.url;
         } catch (err: any) {
@@ -24,13 +39,19 @@ export const BillingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-                    Pricing Plans
+                    Subscription Plans
                 </h2>
                 <p className="mt-4 text-xl text-gray-600">
                     Choose the plan that fits your needs.
                 </p>
             </div>
 
+            {!stripeConfigStatus.configured && (
+                <div className="mt-8 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative" role="alert">
+                    <strong className="font-bold">Configuration Required: </strong>
+                    <span className="block sm:inline">{stripeConfigStatus.message}</span>
+                </div>
+            )}
 
             {error && (
                 <div className="mt-8 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
@@ -44,7 +65,7 @@ export const BillingPage: React.FC = () => {
                     <div className="p-6">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Free</h2>
                         <p className="mt-4">
-                            <span className="text-4xl font-extrabold text-gray-900">€0</span>
+                            <span className="text-4xl font-extrabold text-gray-900">CHF 0</span>
                             <span className="text-base font-medium text-gray-500">/mo</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
@@ -54,7 +75,7 @@ export const BillingPage: React.FC = () => {
                             disabled
                             className="mt-8 block w-full bg-gray-100 border border-transparent rounded-md py-2 text-sm font-semibold text-gray-400 text-center cursor-not-allowed"
                         >
-                            Current Plan
+                            {currentTier === 'free' ? 'Current Plan' : 'Free Plan'}
                         </button>
                     </div>
                 </div>
@@ -67,18 +88,22 @@ export const BillingPage: React.FC = () => {
                     <div className="p-6">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Starter</h2>
                         <p className="mt-4">
-                            <span className="text-4xl font-extrabold text-gray-900">€19</span>
+                            <span className="text-4xl font-extrabold text-gray-900">CHF 19</span>
                             <span className="text-base font-medium text-gray-500">/mo</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
                             For serious exam creators.
                         </p>
                         <button
-                            onClick={() => handleSubscribe('starter')}
-                            disabled={loading}
-                            className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            onClick={() => handleSubscribe(STRIPE_PRICES.starter)}
+                            disabled={loading || !stripeConfigStatus.configured || currentTier === 'starter'}
+                            className={`mt-8 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-center ${
+                                currentTier === 'starter'
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
+                            }`}
                         >
-                            {loading ? 'Processing...' : 'Subscribe'}
+                            {currentTier === 'starter' ? 'Current Plan' : loading ? 'Processing...' : 'Subscribe'}
                         </button>
                     </div>
                 </div>
@@ -88,18 +113,22 @@ export const BillingPage: React.FC = () => {
                     <div className="p-6">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Professional</h2>
                         <p className="mt-4">
-                            <span className="text-4xl font-extrabold text-gray-900">€149</span>
+                            <span className="text-4xl font-extrabold text-gray-900">CHF 49</span>
                             <span className="text-base font-medium text-gray-500">/mo</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
                             Unlimited power for professional exam creation.
                         </p>
                         <button
-                            onClick={() => handleSubscribe('professional')}
-                            disabled={loading}
-                            className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            onClick={() => handleSubscribe(STRIPE_PRICES.professional)}
+                            disabled={loading || !stripeConfigStatus.configured || currentTier === 'professional'}
+                            className={`mt-8 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-center ${
+                                currentTier === 'professional'
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
+                            }`}
                         >
-                            {loading ? 'Processing...' : 'Subscribe'}
+                            {currentTier === 'professional' ? 'Current Plan' : loading ? 'Processing...' : 'Subscribe'}
                         </button>
                     </div>
                 </div>

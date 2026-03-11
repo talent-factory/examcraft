@@ -84,6 +84,7 @@ name = "backend"
 version = "0.1.0"
 source = { virtual = "packages/core/backend" }
 dependencies = [
+    { name = "alembic" },
     { name = "psycopg2" },
     { name = "redis" },
     { name = "sqlalchemy" },
@@ -91,6 +92,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "alembic", specifier = ">=1.17.0" },
     { name = "psycopg2", specifier = ">=2.9.11" },
     { name = "redis", specifier = ">=7.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.43" },

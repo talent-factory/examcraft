@@ -42,12 +42,13 @@ def db(test_db):
             display_name="Dozent",
             description="Can create and manage questions",
             permissions=[
-                "create_questions",
-                "approve_questions",
-                "edit_questions",
-                "create_documents",
-                "delete_documents",
-                "view_questions",
+                "questions:create",
+                "questions:approve",
+                "questions:edit",
+                "questions:read",
+                "documents:create",
+                "documents:delete",
+                "documents:read",
             ],
             is_system_role=True,
         ),
@@ -55,14 +56,19 @@ def db(test_db):
             name=UserRole.ASSISTANT.value,
             display_name="Assistant",
             description="Can create questions",
-            permissions=["create_questions", "create_documents", "view_questions"],
+            permissions=[
+                "questions:create",
+                "questions:read",
+                "documents:create",
+                "documents:read",
+            ],
             is_system_role=True,
         ),
         Role(
             name=UserRole.VIEWER.value,
             display_name="Viewer",
-            description="Can view questions",
-            permissions=["view_questions"],
+            description="View-only access to questions and exams",
+            permissions=["questions:read", "exams:read", "prompt:read"],
             is_system_role=True,
         ),
     ]
@@ -133,8 +139,8 @@ def test_admin_has_all_permissions(db):
     user = create_user_with_role(db, "admin@test.com", UserRole.ADMIN.value)
 
     # Admin should have any permission
-    assert user.has_permission("create_questions")
-    assert user.has_permission("delete_documents")
+    assert user.has_permission("questions:create")
+    assert user.has_permission("documents:delete")
     assert user.has_permission("any_permission")
 
 
@@ -143,25 +149,27 @@ def test_dozent_has_specific_permissions(db):
     user = create_user_with_role(db, "dozent@test.com", UserRole.DOZENT.value)
 
     # Dozent should have these permissions
-    assert user.has_permission("create_questions")
-    assert user.has_permission("approve_questions")
-    assert user.has_permission("create_documents")
+    assert user.has_permission("questions:create")
+    assert user.has_permission("questions:approve")
+    assert user.has_permission("documents:create")
 
     # Dozent should NOT have admin permissions
-    assert not user.has_permission("delete_users")
+    assert not user.has_permission("users:manage")
 
 
 def test_viewer_has_limited_permissions(db):
     """Test that viewer role has limited permissions"""
     user = create_user_with_role(db, "viewer@test.com", UserRole.VIEWER.value)
 
-    # Viewer should only have view permission
-    assert user.has_permission("view_questions")
+    # Viewer should only have read permissions
+    assert user.has_permission("questions:read")
+    assert user.has_permission("exams:read")
 
-    # Viewer should NOT have create/edit permissions
-    assert not user.has_permission("create_questions")
-    assert not user.has_permission("approve_questions")
-    assert not user.has_permission("create_documents")
+    # Viewer should NOT have create/edit/document permissions
+    assert not user.has_permission("questions:create")
+    assert not user.has_permission("questions:approve")
+    assert not user.has_permission("documents:create")
+    assert not user.has_permission("documents:read")
 
 
 # ============================================================================
@@ -265,9 +273,9 @@ def test_user_with_multiple_roles(db):
     db.refresh(user)
 
     # Should have permissions from both roles
-    assert user.has_permission("view_questions")  # From viewer
-    assert user.has_permission("create_questions")  # From assistant
-    assert user.has_permission("create_documents")  # From assistant
+    assert user.has_permission("questions:read")  # From viewer + assistant
+    assert user.has_permission("questions:create")  # From assistant
+    assert user.has_permission("documents:create")  # From assistant
 
 
 # ============================================================================
@@ -293,6 +301,6 @@ def test_superuser_has_all_permissions(db):
     db.refresh(user)
 
     # Superuser should have any permission even without roles
-    assert user.has_permission("create_questions")
-    assert user.has_permission("delete_users")
+    assert user.has_permission("questions:create")
+    assert user.has_permission("users:manage")
     assert user.has_permission("any_permission")

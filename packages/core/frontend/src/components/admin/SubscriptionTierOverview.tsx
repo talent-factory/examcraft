@@ -70,9 +70,9 @@ const SubscriptionTierOverview: React.FC = () => {
   };
 
   const formatPrice = (price: number): string => {
-    return new Intl.NumberFormat('de-DE', {
+    return new Intl.NumberFormat('de-CH', {
       style: 'currency',
-      currency: 'EUR'
+      currency: 'CHF'
     }).format(price);
   };
 
