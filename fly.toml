@@ -12,6 +12,11 @@ primary_region = "fra"  # Frankfurt
   PORT = "8000"
   PYTHONUNBUFFERED = "1"
   DEPLOYMENT_MODE = "full"
+  MCP_STORE_PATH = "/data/mcp_store.json"
+
+[mounts]
+  source = "mcp_data"
+  destination = "/data"
 
 [http_service]
   internal_port = 8000
