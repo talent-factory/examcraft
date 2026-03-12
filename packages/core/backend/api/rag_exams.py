@@ -436,7 +436,7 @@ async def rag_service_health():
     """
     try:
         # Teste Vector Service
-        from services.vector_service_mock import vector_service
+        from services.vector_service_factory import vector_service
 
         vector_stats = vector_service.get_collection_stats()
 

@@ -68,12 +68,30 @@ class RAGServicePlaceholder:
     Premium package provides full RAG functionality with Claude API.
     """
 
+    question_templates: Dict[str, str] = {}
+
     async def generate_exam(
         self, request: RAGExamRequest, user_id: Optional[str] = None
     ) -> RAGExamResponse:
         raise NotImplementedError(
             "RAG-based exam generation is only available in the Premium package. "
             "Please upgrade to use AI-powered question generation with document context."
+        )
+
+    async def generate_rag_exam(self, request: RAGExamRequest) -> RAGExamResponse:
+        raise NotImplementedError(
+            "RAG exam generation is only available in the Premium package."
+        )
+
+    async def retrieve_context(
+        self,
+        query: str,
+        document_ids: Optional[List[int]] = None,
+        max_chunks: int = 5,
+        min_similarity: float = 0.01,
+    ):
+        raise NotImplementedError(
+            "Context retrieval is only available in the Premium package."
         )
 
     async def generate_questions_from_context(
