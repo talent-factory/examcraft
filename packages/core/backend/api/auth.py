@@ -6,6 +6,7 @@ Login, Logout, Register, Profile, Password Reset
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
 from fastapi.responses import Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
@@ -343,6 +344,9 @@ async def login(
 
     # Reset failed login attempts
     user.failed_login_attempts = 0
+    # Track login
+    user.last_login_at = func.now()
+    user.last_login_ip = http_request.client.host if http_request.client else None
     db.commit()
 
     # Audit log: Successful login
@@ -937,6 +941,11 @@ async def oauth_callback(
 
         # Find or create user
         user = oauth_service.find_or_create_user_from_oauth(provider, user_info, token)
+
+        # Track OAuth login (separate commit — find_or_create already committed internally)
+        user.last_login_at = func.now()
+        user.last_login_ip = request.client.host if request.client else None
+        db.commit()
 
         # Generate JWT tokens and create session
         tokens = AuthService.create_tokens_for_user(
