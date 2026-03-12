@@ -3,7 +3,7 @@ ExamCraft AI - FastAPI Backend
 KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -268,7 +268,17 @@ async def lifespan(app: FastAPI):
                 oauth_authorization_server,
             )
 
-            app.mount("/mcp", create_mcp_app())
+            mcp_app = create_mcp_app()
+            app.mount("/mcp", mcp_app)
+
+            # Redirect /mcp → /mcp/ (FastAPI mount only handles /mcp/*)
+            @app.api_route("/mcp", methods=["GET", "POST", "DELETE"])
+            async def mcp_redirect(request: Request):
+                from starlette.responses import RedirectResponse
+
+                url = str(request.url).replace("/mcp", "/mcp/", 1)
+                return RedirectResponse(url=url, status_code=307)
+
             # Expose well-known endpoints at root level for MCP discovery (RFC 9728)
             # Clients try /.well-known/oauth-protected-resource/mcp before /mcp/.well-known/...
             app.get("/.well-known/oauth-protected-resource/mcp")(
