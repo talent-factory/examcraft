@@ -66,6 +66,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY packages/core/backend/ ./
 
 # Copy Premium package (for Full deployment mode)
+# Directory is created by CI if submodule checkout fails, so COPY always succeeds
 COPY packages/premium/backend/ ./premium/
 
 # Copy utils directory (RAG, extraction modules)
