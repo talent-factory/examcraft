@@ -209,9 +209,11 @@ async def register(
         status=UserStatus.PENDING.value,  # Pending until email verified
         is_email_verified=False,
         is_superuser=False,
+        registration_method="password",
     )
     db.add(user)
     db.flush()  # Get user.id
+    user.password_changed_at = func.now()
 
     # Assign default 'viewer' role
     viewer_role = db.query(Role).filter(Role.name == UserRole.VIEWER.value).first()
@@ -474,6 +476,7 @@ async def get_current_user_profile(
 @router.patch("/me", response_model=UserProfileResponse)
 async def update_current_user_profile(
     request: UserProfileUpdate,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -483,6 +486,8 @@ async def update_current_user_profile(
     - Updates user information
     - Returns updated profile
     """
+    changed_fields = list(request.model_dump(exclude_unset=True).keys())
+
     if request.first_name is not None:
         current_user.first_name = request.first_name
 
@@ -497,6 +502,20 @@ async def update_current_user_profile(
 
     db.commit()
     db.refresh(current_user)
+
+    # Audit log for profile update (only if fields actually changed)
+    if changed_fields:
+        from services.audit_service import AuditService
+
+        AuditService.log_action(
+            db=db,
+            action=AuditService.ACTION_UPDATE_USER,
+            user_id=current_user.id,
+            resource_type=AuditService.RESOURCE_USER,
+            resource_id=str(current_user.id),
+            additional_data={"changed_fields": changed_fields},
+            request=http_request,
+        )
 
     logger.info(f"User profile updated: {current_user.email} (ID: {current_user.id})")
 
@@ -571,6 +590,7 @@ async def set_password(
 
     # Set password
     current_user.password_hash = AuthService.get_password_hash(request.password)
+    current_user.password_changed_at = func.now()
     db.commit()
 
     # Audit log: Password set for OAuth user
@@ -620,6 +640,7 @@ async def change_password(
 
     # Update password
     current_user.password_hash = AuthService.get_password_hash(request.new_password)
+    current_user.password_changed_at = func.now()
     db.commit()
 
     # Revoke all sessions (force re-login on all devices)
@@ -732,6 +753,7 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
     # Mark email as verified
     user.is_email_verified = True
     user.status = UserStatus.ACTIVE.value
+    user.email_verified_at = func.now()
 
     # Mark token as used
     email_token.is_used = True
