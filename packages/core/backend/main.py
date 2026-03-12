@@ -268,6 +268,17 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"❌ Error loading Premium Chat API: {e}")
 
+        # Premium: MCP Facade Server (Fly.io Management Tools)
+        try:
+            from premium.mcp import create_mcp_app
+
+            app.mount("/mcp", create_mcp_app())
+            print("✅ Premium MCP Facade Server mounted at /mcp/")
+        except ImportError as e:
+            print(f"⚠️  Premium MCP Server not available: {e}")
+        except Exception as e:
+            print(f"❌ Error loading Premium MCP Server: {e}")
+
         print("")
     else:
         print("ℹ️  Core mode - Premium/Enterprise APIs not loaded")
