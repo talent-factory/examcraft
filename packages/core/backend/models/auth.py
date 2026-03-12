@@ -277,6 +277,13 @@ class User(Base):
     email_verification_token = Column(String(255), nullable=True, unique=True)
     email_verification_expires = Column(DateTime(timezone=True), nullable=True)
 
+    # Audit Tracking
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    password_changed_at = Column(DateTime(timezone=True), nullable=True)
+    registration_method = Column(
+        String(20), nullable=True
+    )  # password, google, microsoft
+
     # Preferences (JSON)
     preferences = Column(Text, nullable=True)  # JSON string für User Preferences
 
