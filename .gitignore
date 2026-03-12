@@ -86,3 +86,6 @@ packages/core/frontend/.env.local
 
 # Local documentation (contains secrets)
 *.local.md
+
+# Documentation build output (MkDocs)
+**/site/
