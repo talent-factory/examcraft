@@ -17,6 +17,7 @@ from database import get_db
 from models.auth import User, Role, Institution, UserStatus, UserRole
 from services.auth_service import AuthService
 from services.avatar_service import AvatarService
+from services.audit_service import AuditService
 from utils.auth_utils import get_current_user, get_current_active_user
 
 logger = logging.getLogger(__name__)
@@ -210,10 +211,10 @@ async def register(
         is_email_verified=False,
         is_superuser=False,
         registration_method="password",
+        password_changed_at=func.now(),
     )
     db.add(user)
     db.flush()  # Get user.id
-    user.password_changed_at = func.now()
 
     # Assign default 'viewer' role
     viewer_role = db.query(Role).filter(Role.name == UserRole.VIEWER.value).first()
@@ -257,8 +258,6 @@ async def register(
     db.refresh(user)
 
     # Audit log: User registration
-    from services.audit_service import AuditService
-
     AuditService.log_register(db, user.id, user.email, request=http_request)
 
     # Send verification email (async via background task)
@@ -505,17 +504,21 @@ async def update_current_user_profile(
 
     # Audit log for profile update (only if fields actually changed)
     if changed_fields:
-        from services.audit_service import AuditService
-
-        AuditService.log_action(
-            db=db,
-            action=AuditService.ACTION_UPDATE_USER,
-            user_id=current_user.id,
-            resource_type=AuditService.RESOURCE_USER,
-            resource_id=str(current_user.id),
-            additional_data={"changed_fields": changed_fields},
-            request=http_request,
-        )
+        try:
+            AuditService.log_action(
+                db=db,
+                action=AuditService.ACTION_UPDATE_USER,
+                user_id=current_user.id,
+                resource_type=AuditService.RESOURCE_USER,
+                resource_id=str(current_user.id),
+                additional_data={"changed_fields": changed_fields},
+                request=http_request,
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to create audit log for profile update of user {current_user.id}: {e}"
+            )
+            db.refresh(current_user)  # Re-sync after potential rollback in AuditService
 
     logger.info(f"User profile updated: {current_user.email} (ID: {current_user.id})")
 
@@ -965,9 +968,15 @@ async def oauth_callback(
         user = oauth_service.find_or_create_user_from_oauth(provider, user_info, token)
 
         # Track OAuth login (separate commit — find_or_create already committed internally)
-        user.last_login_at = func.now()
-        user.last_login_ip = request.client.host if request.client else None
-        db.commit()
+        try:
+            user.last_login_at = func.now()
+            user.last_login_ip = request.client.host if request.client else None
+            db.commit()
+        except Exception as e:
+            logger.error(
+                f"Failed to track OAuth login metadata for user {user.id}: {e}"
+            )
+            db.rollback()
 
         # Generate JWT tokens and create session
         tokens = AuthService.create_tokens_for_user(
