@@ -46,13 +46,9 @@ jobs:
 
       - name: Checkout Submodules
         run: |
-          # Rewrite both SSH and HTTPS URLs to use the token
           git config --global url."https://${{ secrets.SUBMODULE_TOKEN }}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://${{ secrets.SUBMODULE_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          # Checkout each submodule individually so docs failure doesn't block premium/enterprise
           git submodule update --init packages/premium
           git submodule update --init packages/enterprise
-          git submodule update --init docs-mintlify || echo "WARNING: docs-mintlify checkout failed (non-critical)"
 
       - name: Setup Fly.io CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
@@ -92,13 +88,9 @@ jobs:
 
       - name: Checkout Submodules
         run: |
-          # Rewrite both SSH and HTTPS URLs to use the token
           git config --global url."https://${{ secrets.SUBMODULE_TOKEN }}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://${{ secrets.SUBMODULE_TOKEN }}@github.com/".insteadOf "https://github.com/"
-          # Checkout each submodule individually so docs failure doesn't block premium/enterprise
           git submodule update --init packages/premium
           git submodule update --init packages/enterprise
-          git submodule update --init docs-mintlify || echo "WARNING: docs-mintlify checkout failed (non-critical)"
 
       - name: Setup Fly.io CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
