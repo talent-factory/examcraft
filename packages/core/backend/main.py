@@ -263,8 +263,24 @@ async def lifespan(app: FastAPI):
         # Premium: MCP Facade Server (Fly.io Management Tools)
         try:
             from premium.mcp import create_mcp_app
+            from premium.mcp.auth import (
+                oauth_protected_resource,
+                oauth_authorization_server,
+            )
 
             app.mount("/mcp", create_mcp_app())
+            # Expose well-known endpoints at root level for MCP discovery (RFC 9728)
+            # Clients try /.well-known/oauth-protected-resource/mcp before /mcp/.well-known/...
+            app.get("/.well-known/oauth-protected-resource/mcp")(
+                oauth_protected_resource
+            )
+            app.get("/.well-known/oauth-protected-resource")(oauth_protected_resource)
+            app.get("/.well-known/oauth-authorization-server/mcp")(
+                oauth_authorization_server
+            )
+            app.get("/.well-known/oauth-authorization-server")(
+                oauth_authorization_server
+            )
             print("✅ Premium MCP Facade Server mounted at /mcp/")
         except ImportError as e:
             print(f"⚠️  Premium MCP Server not available: {e}")
