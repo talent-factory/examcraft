@@ -126,3 +126,90 @@ class TestOAuthLoginTracking:
         test_db.refresh(user)
         assert user.last_login_at is not None
         assert user.last_login_ip == "10.0.0.1"
+
+
+class TestOAuthAuditFields:
+    """Test oauth_id, oauth_provider, registration_method, email_verified_at in OAuth flows."""
+
+    def _make_oauth_service(self, db):
+        from services.oauth_service import OAuthService
+
+        return OAuthService(db)
+
+    def _user_info(self, email="oauth-new@test.ch", provider_user_id="google-123"):
+        return {
+            "email": email,
+            "first_name": "OAuth",
+            "last_name": "User",
+            "name": "OAuth User",
+            "provider_user_id": provider_user_id,
+            "email_verified": True,
+        }
+
+    def _token(self):
+        return {"access_token": "at_xxx", "refresh_token": "rt_xxx"}
+
+    def test_new_user_gets_oauth_id(self, test_db, test_institution, test_role):
+        """Path c: new user — oauth_id, oauth_provider, registration_method, email_verified_at set."""
+        svc = self._make_oauth_service(test_db)
+        user = svc.find_or_create_user_from_oauth(
+            "google", self._user_info(), self._token()
+        )
+        assert user.oauth_id == "google-123"
+        assert user.oauth_provider == "google"
+        assert user.registration_method == "google"
+        assert user.email_verified_at is not None
+
+    def test_existing_user_linking_gets_oauth_id(
+        self, test_db, test_institution, test_role
+    ):
+        """Path b: existing password user links OAuth — oauth_id set, registration_method unchanged."""
+        existing = User(
+            email="existing@test.ch",
+            password_hash="hashed",  # pragma: allowlist secret
+            first_name="Existing",
+            last_name="User",
+            institution_id=test_institution.id,
+            status="active",
+            is_email_verified=True,
+            registration_method="password",
+        )
+        test_db.add(existing)
+        test_db.commit()
+        svc = self._make_oauth_service(test_db)
+        user = svc.find_or_create_user_from_oauth(
+            "google",
+            self._user_info(email="existing@test.ch", provider_user_id="google-456"),
+            self._token(),
+        )
+        assert user.oauth_id == "google-456"
+        assert user.registration_method == "password"  # NOT overwritten
+        assert user.email_verified_at is not None
+
+    def test_returning_oauth_user_gets_oauth_id_if_missing(
+        self, test_db, test_institution, test_role
+    ):
+        """Path a: returning OAuth user — oauth_id backfilled if NULL."""
+        svc = self._make_oauth_service(test_db)
+        user = svc.find_or_create_user_from_oauth(
+            "google", self._user_info(), self._token()
+        )
+        user.oauth_id = None
+        test_db.commit()
+        user2 = svc.find_or_create_user_from_oauth(
+            "google", self._user_info(), self._token()
+        )
+        assert user2.oauth_id == "google-123"
+
+    def test_multi_oauth_does_not_overwrite_oauth_id(
+        self, test_db, test_institution, test_role
+    ):
+        """First-write-wins: second OAuth provider does not overwrite oauth_id."""
+        svc = self._make_oauth_service(test_db)
+        user = svc.find_or_create_user_from_oauth(
+            "google", self._user_info(), self._token()
+        )
+        assert user.oauth_id == "google-123"
+        ms_info = self._user_info(email=user.email, provider_user_id="ms-789")
+        user2 = svc.find_or_create_user_from_oauth("microsoft", ms_info, self._token())
+        assert user2.oauth_id == "google-123"  # NOT overwritten
