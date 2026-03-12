@@ -86,6 +86,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Checkout Submodules
+        run: |
+          git config --global url."https://${{ secrets.SUBMODULE_TOKEN }}@github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive || echo "WARNING: Submodule checkout failed, deploying without premium/enterprise packages"
+          mkdir -p packages/premium/frontend/src packages/enterprise/frontend/src
+
       - name: Setup Fly.io CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
 
