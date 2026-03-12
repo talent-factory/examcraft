@@ -277,6 +277,8 @@ async def lifespan(app: FastAPI):
                 from starlette.responses import RedirectResponse
 
                 url = str(request.url).replace("/mcp", "/mcp/", 1)
+                # Fly.io terminates TLS, so internal URL is http
+                url = url.replace("http://", "https://", 1)
                 return RedirectResponse(url=url, status_code=307)
 
             # Expose well-known endpoints at root level for MCP discovery (RFC 9728)
