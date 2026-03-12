@@ -151,7 +151,7 @@ backend/
 ├── services/                # Business logic
 │   ├── document_service.py  # Document processing
 │   ├── docling_service.py   # Docling integration
-│   ├── vector_service.py    # ChromaDB operations
+│   ├── qdrant_vector_service.py  # Qdrant operations
 │   ├── rag_service.py       # RAG-based generation
 │   └── claude_service.py    # Claude API integration
 ├── models/                  # Database models
@@ -159,8 +159,7 @@ backend/
 │   ├── question.py
 │   └── user.py
 ├── storage/                 # File storage
-│   ├── uploads/             # Uploaded documents
-│   └── vector_db/           # ChromaDB persistence
+│   └── uploads/             # Uploaded documents
 └── tests/                   # Test suite
     ├── test_api/
     ├── test_services/

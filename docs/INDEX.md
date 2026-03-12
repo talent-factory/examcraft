@@ -2,7 +2,7 @@
 
 > **Zentrale Übersicht aller verfügbaren Dokumentationen**
 
-**Version**: 1.0.0  
+**Version**: 1.0.0
 **Stand**: Oktober 2025
 
 ---
@@ -19,19 +19,14 @@
 
 ### 📊 Für Stakeholder
 
-| Dokument | Beschreibung | Zielgruppe |
-|----------|--------------|------------|
-| **[📊 Executive Summary](EXECUTIVE_SUMMARY.md)** | Business-Übersicht, Marktchancen, Finanzprognosen | Management, Investoren |
-| **[🎯 Feature-Übersicht](FEATURES.md)** | Vollständige Feature-Liste mit Use Cases | Kunden, Sales |
-| **[📅 Release Timeline](RELEASE_TIMELINE.md)** | Detaillierte Roadmap mit quartalsweisen Releases | Produktmanagement |
-| **[🗺️ Product Roadmap](ROADMAP.md)** | Langfristige Vision und Feature-Vergleichsmatrix | Produktmanagement |
-| **[💰 Monetization Strategy](MONETIZATION_STRATEGY.md)** | Preismodelle und Umsatzprognosen | Business Development |
+> **Note:** Business documentation has been moved to the private `packages/premium/internal/` directory.
+> For public roadmap information, see the [main README.md](../README.md#-public-roadmap).
 
 ### 🔧 Für Entwickler
 
 | Dokument | Beschreibung | Zielgruppe |
 |----------|--------------|------------|
-| **[🚀 Deployment Guide](RENDER_DEPLOYMENT.md)** | Production Deployment auf Render.com | DevOps, Entwickler |
+| **[🚀 Deployment Guide](../DEPLOYMENT.md)** | Production Deployment auf Fly.io | DevOps, Entwickler |
 | **[🔄 Qdrant Migration](QDRANT_MIGRATION.md)** | Migration zu Qdrant Cloud | Backend-Entwickler |
 | **[📖 API Dokumentation](http://localhost:8000/docs)** | Interaktive API-Docs (lokal) | Backend-Entwickler |
 
@@ -81,37 +76,16 @@
 
 **Ziel**: Stakeholder über Geschäftspotential und Strategie informieren
 
-**Dokumente:**
-
-- **[EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md)** - Executive Summary
-  - Marktanalyse
-  - Wettbewerbsvorteile
-  - Finanzprognosen
-  - Go-to-Market Strategie
-
-- **[FEATURES.md](FEATURES.md)** - Feature-Übersicht
-  - Verfügbare Features (v1.0)
-  - Geplante Features (v1.1-v1.4)
-  - Use Cases
-  - Preismodelle
-
-- **[MONETIZATION_STRATEGY.md](MONETIZATION_STRATEGY.md)** - Monetarisierung
-  - Pricing Tiers
-  - Umsatzprognosen
-  - Kostenstruktur
-  - Break-Even Analyse
-
-- **[ROADMAP.md](ROADMAP.md)** - Product Roadmap
-  - Langfristige Vision
-  - Feature-Vergleichsmatrix
-  - Technologie-Stack Evolution
-
-- **[RELEASE_TIMELINE.md](RELEASE_TIMELINE.md)** - Release Timeline
-  - Quartalsweise Releases
-  - Feature-Priorisierung
-  - Meilensteine
-
-**Umfang**: 1500+ Zeilen gesamt
+> **Note:** Business documentation has been moved to the private `packages/premium/internal/` directory for security reasons.
+>
+> **Available documents (internal only):**
+> - Executive Summary → `packages/premium/internal/EXECUTIVE_SUMMARY.md`
+> - Feature Overview → `packages/premium/internal/FEATURES_COMPETITIVE.md`
+> - Monetization Strategy → `packages/premium/internal/MONETIZATION_STRATEGY.md`
+> - Product Roadmap → `packages/premium/internal/ROADMAP_INTERNAL.md`
+> - Release Timeline → `packages/premium/internal/RELEASE_TIMELINE.md`
+>
+> **Public information:** See [main README.md](../README.md#-public-roadmap) for public roadmap.
 
 ---
 
@@ -121,8 +95,8 @@
 
 **Dokumente:**
 
-- **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)** - Deployment Guide
-  - Render.com Setup
+- **[../DEPLOYMENT.md](../DEPLOYMENT.md)** - Deployment Guide
+  - Fly.io Setup
   - Environment Variables
   - Database Configuration
   - CI/CD Pipeline
@@ -174,15 +148,15 @@
 
 ### ✅ Abgeschlossen (v1.0)
 
-- [x] Benutzerhandbuch (USER_GUIDE.md)
-- [x] Admin Guide (ADMIN_PROMPT_MANAGEMENT.md)
+- [x] Benutzerhandbuch (Mintlify User Guide)
+- [x] Admin Guide (Mintlify Admin Guide)
 - [x] Screenshot-Anleitung (SCREENSHOTS.md)
-- [x] Feature-Übersicht (FEATURES.md)
-- [x] Executive Summary (EXECUTIVE_SUMMARY.md)
-- [x] Monetization Strategy (MONETIZATION_STRATEGY.md)
-- [x] Product Roadmap (ROADMAP.md)
-- [x] Release Timeline (RELEASE_TIMELINE.md)
-- [x] Deployment Guide (RENDER_DEPLOYMENT.md)
+- [x] Feature-Übersicht (Moved to Premium Package)
+- [x] Executive Summary (Moved to Premium Package)
+- [x] Monetization Strategy (Moved to Premium Package)
+- [x] Product Roadmap (Moved to Premium Package)
+- [x] Release Timeline (Moved to Premium Package)
+- [x] Deployment Guide (../DEPLOYMENT.md)
 - [x] Qdrant Migration (QDRANT_MIGRATION.md)
 
 ### 🔄 In Arbeit
@@ -208,17 +182,17 @@
 
 | Kategorie | Dokumente | Zeilen | Status |
 |-----------|-----------|--------|--------|
-| Benutzer | 3 | 900+ | ✅ Fertig |
-| Business | 5 | 1500+ | ✅ Fertig |
+| Benutzer | 2 (Mintlify) | 900+ | ✅ Fertig |
+| Business | 5 (Private) | 1500+ | ✅ Fertig (Internal) |
 | Technisch | 3 | 800+ | ✅ Fertig |
 | Visuell | 2 | 300+ | 🔄 In Arbeit |
-| **Gesamt** | **13** | **3500+** | **85% Fertig** |
+| **Gesamt** | **12** | **3500+** | **85% Fertig** |
 
 ### Zielgruppen-Abdeckung
 
-- ✅ **Endbenutzer** - 100% (Benutzerhandbuch, Screenshots)
-- ✅ **Administratoren** - 100% (Admin Guide, Deployment)
-- ✅ **Stakeholder** - 100% (Executive Summary, Features, Roadmap)
+- ✅ **Endbenutzer** - 100% (Mintlify User Guide, Screenshots)
+- ✅ **Administratoren** - 100% (Mintlify Admin Guide, Deployment)
+- ✅ **Stakeholder** - 100% (Internal Business Docs in Premium Package)
 - ✅ **Entwickler** - 80% (API Docs, Deployment, Migration)
 - 🔄 **Marketing** - 60% (Features, Use Cases, Screenshots in Arbeit)
 
@@ -235,49 +209,44 @@
 
 **Features:**
 
-- [FEATURES.md - Verfügbare Features](FEATURES.md#verfügbare-features)
-- [USER_GUIDE.md - Funktionsübersicht](USER_GUIDE.md#funktionsübersicht)
+- [README.md - Features](../README.md#-core-features-open-source)
+- [Mintlify Docs - Features](https://docs.examcraft.ch/core-features)
 
 **Deployment:**
 
-- [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)
+- [../DEPLOYMENT.md](../DEPLOYMENT.md)
 - [README.md - Docker Installation](../README.md#docker-installation)
 
 **Prompt Management:**
 
-- [ADMIN_PROMPT_MANAGEMENT.md](ADMIN_PROMPT_MANAGEMENT.md)
-- [USER_GUIDE.md - Prompt Management](USER_GUIDE.md#prompt-management)
+- [Mintlify Docs - Admin Guide](https://docs.examcraft.ch/guides/admin-guide)
 
 **Business:**
 
-- [EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md)
-- [MONETIZATION_STRATEGY.md](MONETIZATION_STRATEGY.md)
-- [ROADMAP.md](ROADMAP.md)
+> Business documentation is now private. See `packages/premium/internal/` for internal access.
 
 ### Nach Rolle
 
 **Dozent/Lehrkraft:**
 
-1. [USER_GUIDE.md](USER_GUIDE.md) - Hauptdokumentation
-2. [FEATURES.md](FEATURES.md) - Feature-Übersicht
+1. [Mintlify Docs - User Guide](https://docs.examcraft.ch/guides/user-guide) - Hauptdokumentation
+2. [README.md - Features](../README.md#-core-features-open-source) - Feature-Übersicht
 3. [SCREENSHOTS.md](SCREENSHOTS.md) - Visuelle Anleitung
 
 **Administrator:**
 
-1. [ADMIN_PROMPT_MANAGEMENT.md](ADMIN_PROMPT_MANAGEMENT.md) - Prompt Management
-2. [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) - Deployment
+1. [Mintlify Docs - Admin Guide](https://docs.examcraft.ch/guides/admin-guide) - Prompt Management
+2. [../DEPLOYMENT.md](../DEPLOYMENT.md) - Deployment
 3. [QDRANT_MIGRATION.md](QDRANT_MIGRATION.md) - Vector DB Setup
 
 **Manager/Investor:**
 
-1. [EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md) - Business Overview
-2. [MONETIZATION_STRATEGY.md](MONETIZATION_STRATEGY.md) - Finanzmodell
-3. [ROADMAP.md](ROADMAP.md) - Produktvision
+> Business documentation is now private. See `packages/premium/internal/` for internal access.
 
 **Entwickler:**
 
 1. [API Docs](http://localhost:8000/docs) - API Reference
-2. [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md) - Deployment
+2. [../DEPLOYMENT.md](../DEPLOYMENT.md) - Deployment
 3. [README.md](../README.md) - Development Setup
 
 ---
@@ -367,6 +336,6 @@ Vor jedem Release sicherstellen:
 
 ---
 
-**Letzte Aktualisierung**: Oktober 2025  
-**Version**: 1.0.0  
+**Letzte Aktualisierung**: Oktober 2025
+**Version**: 1.0.0
 **Maintainer**: ExamCraft AI Documentation Team

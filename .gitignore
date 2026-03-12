@@ -26,10 +26,14 @@ yarn-error.log*
 
 # IDE files
 .vscode/
+.grepai/
 .idea/
 *.swp
 *.swo
 *.log
+
+# Claude Code local settings
+.claude/settings.local.json
 
 # OS files
 .DS_Store
@@ -46,16 +50,39 @@ docker/volumes/
 backend/storage/uploads/
 storage/uploads/
 
+# Premium component symlinks (created by scripts/setup-premium-symlinks.sh)
+packages/core/frontend/src/premium/
+packages/core/frontend/src/enterprise/
+
 # Vector database files (generated data)
 backend/mock_vector_db/
 mock_vector_db/
 
 # Test coverage reports
+**/coverage/
 frontend/coverage/
 backend/htmlcov/
 backend/.coverage
+.coverage
+htmlcov/
+
+# Playwright test artifacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/.playwright/
+packages/core/frontend/test-results/
+packages/core/frontend/playwright-report/
+packages/core/frontend/e2e/.auth/
+packages/core/frontend/e2e/test-downloads/
 
 # MCP configuration with API keys
 .mcp.json
-backend/chroma_db/chroma.sqlite3
 backend/mock_vector_db/mock_vectors.json
+
+# Git worktrees
+.worktrees/
+*.tsbuildinfo
+packages/core/frontend/.env.local
+
+# Local documentation (contains secrets)
+*.local.md

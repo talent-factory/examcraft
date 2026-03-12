@@ -76,5 +76,5 @@ Bei Fragen zur Screenshot-Erstellung wenden Sie sich an:
 
 ---
 
-**Letzte Aktualisierung**: Oktober 2025  
+**Letzte Aktualisierung**: Oktober 2025
 **Version**: 1.0.0

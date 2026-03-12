@@ -2,9 +2,9 @@
 
 > **Schritt-für-Schritt Anleitung zur Erstellung aller 19 Screenshots**
 
-**Browser**: Chrome/Firefox  
-**Auflösung**: 1920x1080  
-**Zoom**: 100%  
+**Browser**: Chrome/Firefox
+**Auflösung**: 1920x1080
+**Zoom**: 100%
 **URL**: <http://localhost:3000>
 
 ---
@@ -703,8 +703,8 @@ Nach Erstellung aller Screenshots:
 
 ---
 
-**Geschätzte Zeit**: 30-45 Minuten  
-**Schwierigkeit**: Einfach  
+**Geschätzte Zeit**: 30-45 Minuten
+**Schwierigkeit**: Einfach
 **Voraussetzungen**: Laufende ExamCraft AI Instanz
 
 Viel Erfolg! 🚀

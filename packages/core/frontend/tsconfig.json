@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "es2017"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@examcraft/core": ["./src/lib"],
+      "@examcraft/core/*": ["./src/*"],
+      "@examcraft/premium": ["../../premium/frontend/src"],
+      "@examcraft/premium/*": ["../../premium/frontend/src/*"],
+      "@examcraft/enterprise": ["../../enterprise/frontend/src"],
+      "@examcraft/enterprise/*": ["../../enterprise/frontend/src/*"]
+    }
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**",
+    "src/setupTests.ts",
+    "src/premium/**",
+    "src/enterprise/**",
+    "../../premium/**",
+    "../../enterprise/**"
+  ]
+}

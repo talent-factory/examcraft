@@ -14,17 +14,46 @@ ExamCraft/
 ├── backend/              # FastAPI Backend
 │   ├── main.py          # API Server
 │   ├── database.py      # Database Connection
-│   ├── models.py        # Pydantic Models
-│   └── services/        # Business Logic
+│   ├── models/          # SQLAlchemy Models
+│   │   ├── auth.py      # User, Role, Institution, Session, AuditLog
+│   │   ├── document.py  # Document Models
+│   │   └── question_review.py  # Question Review Models
+│   ├── api/             # API Endpoints
+│   │   ├── auth.py      # Authentication Endpoints
+│   │   ├── documents.py # Document Management
+│   │   └── v1/          # Versioned API
+│   ├── services/        # Business Logic
+│   │   ├── auth_service.py    # JWT Authentication
+│   │   ├── oauth_service.py   # Google/Microsoft OAuth
+│   │   ├── redis_service.py   # Session Management
+│   │   └── audit_service.py   # Security Logging
+│   ├── middleware/      # Middleware
+│   │   └── rate_limit.py      # Rate Limiting
+│   ├── utils/           # Utilities
+│   │   ├── auth_utils.py      # Auth Helpers
+│   │   ├── tenant_utils.py    # Multi-Tenant Helpers
+│   │   └── seed_roles.py      # Role Seeding
+│   └── tests/           # pytest Tests
 ├── frontend/            # React 18 + TypeScript Frontend
-│   ├── src/components/  # React Components
-│   ├── src/services/    # API Services
-│   └── public/          # Static Assets
+│   ├── src/
+│   │   ├── components/  # React Components
+│   │   │   ├── auth/    # Login, Register, OAuth
+│   │   │   ├── guards/  # Route Protection
+│   │   │   ├── profile/ # User Profile
+│   │   │   └── layout/  # Navigation
+│   │   ├── contexts/    # React Context (Auth)
+│   │   ├── services/    # API Services
+│   │   ├── types/       # TypeScript Types
+│   │   └── index.css    # Tailwind CSS Entry Point
+│   ├── public/          # Static Assets
+│   ├── tailwind.config.js  # Tailwind Configuration
+│   ├── postcss.config.js   # PostCSS Configuration
+│   ├── craco.config.js     # CRA Override Configuration
+│   └── package.json        # NPM Dependencies
 ├── utils/               # Python Utilities
 │   ├── extraction.py    # Document Processing
 │   └── rag.py          # RAG System
 ├── demo/                # Workshop Demo Materials
-├── docs/                # Documentation
 ├── .claude/             # Claude Code Commands
 ├── docker-compose.yml   # Container Orchestration
 └── pyproject.toml      # Python Dependencies
@@ -39,56 +68,201 @@ ExamCraft/
 Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API
 Integration
 
-### Aktueller Projektstatus (Stand: 10.10.2025)
+### Aktueller Projektstatus (Stand: 01.11.2025)
 
 **CORE FEATURES ABGESCHLOSSEN:**
 
 - **Project Setup & Architecture** (TF-50) - Vollständig implementiert
+- **Monorepo Structure** (TF-151) - Core/Premium/Enterprise Packages
 - **React Frontend Dashboard** (TF-54) - Production-ready
 - **Document Processing Pipeline** (TF-51) - PDF/DOC/Markdown Support
 - **Question Generation Core API** (TF-52) - Claude API + PydanticAI
-- **Semantic Search & Vector Storage** (TF-55) - ChromaDB Integration
+- **Semantic Search & Vector Storage** (TF-55) - Qdrant Integration
+  (migrated from ChromaDB)
 - **Claude API Integration** (TF-59) - Rate Limiting + Cost Tracking
+- **Prompt Knowledge Base** (TF-122) - Centralized Prompt Management +
+  Seeding
+- **Prompt Template Selector UI** (TF-146) - Frontend Komponente für
+  Prompt-Auswahl
+- **Template-Variablen-System** (TF-145) - Dynamische Prompt-Konfiguration
+  mit Jinja2
+- **RAG Service Integration** (TF-147) - Prompt-Konfiguration in Question
+  Generation
+- **Question Review Interface** (TF-60) - MVP mit Review Workflow
+- **Workshop Demo Materials** (TF-58) - Vollständig abgeschlossen
+- **Authentication & User Management** (TF-57) - Backend + Frontend +
+  Tests (100%)
+- **RBAC & Subscription Tiers** - Unlimited Quotas (-1) Support
+- **Avatar Proxy** - Redis Caching für Google OAuth Avatars
+- **Institution Management** - Admin UI für Institution Creation
+- **Deployment Simplification** (NEW) - 2-Tier Architecture (Core/Full)
+
+**RECENT CHANGES (01.11.2025):**
+
+**🎯 Deployment-Vereinfachung:**
+
+- ✅ 2-Tier-Architektur: Core (OpenSource) + Full (Premium+Enterprise)
+- ✅ docker-compose.yml: Core deployment ohne Qdrant
+- ✅ docker-compose.full.yml: Full deployment mit allen Features
+- ✅ start-dev.sh: Auto-Detection mit --core/--full flags
+- ✅ Backend: DEPLOYMENT_MODE detection, intelligentes Premium API
+  loading
+- ✅ Frontend: Runtime Component Loading (ersetzt Volume Mounts)
+- ✅ DEPLOYMENT.md: Umfassender Deployment Guide
+- ✅ Entfernt: docker-compose.premium.yml,
+  docker-compose.enterprise.yml
+- ✅ Entfernt: Alle Feature-Flags (ENABLE_PREMIUM_FEATURES, etc.)
+- ✅ Feature-Kontrolle: **100% RBAC-gesteuert**
+
+**BUG FIXES (22.10.2025):**
+
+- ✅ Unlimited Quotas (-1) korrekt behandelt (Professional/Enterprise
+  Tier)
+- ✅ PackageTierBadge zeigt korrektes Tier (localStorage Key Fix)
+- ✅ Avatar URLs 429 Rate Limiting behoben (Redis Proxy)
+- ✅ Premium Models in Database Schema integriert
+- ✅ Seed Prompts implementiert (5 Default Prompts)
+- ✅ Premium Component Override via Docker Volumes
+
+**TEST COVERAGE:**
+
+- ✅ 52 Tests für Bug Fixes
+- ✅ Backend: test_subscription_limits.py (12 Tests)
+- ✅ Backend: test_avatar_proxy.py (10 Tests)
+- ✅ Backend: test_seed_prompts.py (15 Tests)
+- ✅ Frontend: PackageTierBadge.test.tsx (15 Tests)
 
 **BACKLOG FEATURES:**
 
-- Question Review Interface (TF-60)
 - Exam Composition & Export (TF-56)
-- Authentication & User Management (TF-57)
-- Workshop Demo Materials (TF-58)
+- Open Source Vorbereitung (TF-112)
+- Mintlify Dokumentation (TF-87)
 
 ### Implementierte Technologien
 
 **VOLLSTÄNDIG IMPLEMENTIERT:**
 
-- FastAPI + React 18 + TypeScript Stack
-- PostgreSQL + Redis Integration
-- Docker + Docker Compose Environment
-- Claude API Integration mit PydanticAI
-- RAG System mit ChromaDB
-- Document Processing (PDF, DOC, Markdown)
-- Semantic Search & Vector Storage
+- **Monorepo Architecture** - Core/Premium/Enterprise Packages mit Git
+  Submodules
+- **FastAPI + React 18 + TypeScript Stack**
+- **PostgreSQL + Redis Integration**
+- **Docker + Docker Compose Environment** - Multi-File Compose mit
+  Overrides
+- **Claude API Integration** mit PydanticAI
+- **RAG System** mit Qdrant (migrated from ChromaDB)
+- **Document Processing** (PDF, DOC, Markdown)
+- **Semantic Search & Vector Storage** mit Qdrant
+- **Prompt Knowledge Base** mit Versionierung & Seeding
+- **Template-Variablen-System** mit Jinja2
+- **Live-Preview** für Prompt-Rendering
+- **RAG Service Prompt-Integration** mit Auto-Variable-Merging
+- **Tailwind CSS v3 Integration** mit CRACO
+- **Modern Authentication UI** (LoginForm, AuthPage)
+- **JWT Authentication** mit bcrypt Password Hashing
+- **OAuth Integration** (Google, Microsoft)
+- **Avatar Proxy** mit Redis Caching (24h TTL)
+- **Role-Based Access Control (RBAC)**
+- **Subscription Tiers** (Free, Starter, Professional, Enterprise)
+- **Quota Enforcement** mit Unlimited Support (-1)
+- **Multi-Tenant Architecture**
+- **Session Management** mit Redis
+- **Rate Limiting Middleware**
+- **Audit Logging** für Security Events
+- **Admin User Management UI** (User List, Edit, Role Assignment)
+- **Institution Management UI** (Create, Edit, Delete)
+- **PackageTierBadge** mit dynamischer Tier-Erkennung
+- **Premium Component Override** via Docker Volume Mounts
+
+## Deployment-Architektur (Neu: 2-Tier System)
+
+ExamCraft AI verwendet eine vereinfachte 2-Tier-Deployment-Architektur:
+
+### Deployment-Modi
+
+#### Core (OpenSource)
+
+- Community Edition mit begrenzten Features
+- Docker Compose: `docker-compose.yml`
+- Keine Qdrant Vector Database
+- RBAC: Free Tier (5 Dokumente, 20 Fragen/Monat)
+- Zielgruppe: OpenSource-Community
+
+#### Full (Premium + Enterprise)
+
+- Komplette Version mit allen Features
+- Docker Compose: `docker-compose.full.yml`
+- Qdrant Vector Database inklusive
+- RBAC: Alle Tiers verfügbar (Free, Starter, Professional,
+  Enterprise)
+- Zielgruppe: Private Development & Production
+
+### Feature-Kontrolle via RBAC
+
+**WICHTIG:** Alle Features werden ausschließlich über RBAC gesteuert!
+
+- ❌ Keine Environment-Feature-Flags mehr
+- ✅ Subscription Tiers steuern Feature-Zugriff
+- ✅ User Roles steuern Berechtigungen
+- ✅ DEPLOYMENT_MODE steuert nur, welche Services verfügbar sind
 
 ## Entwicklungsumgebung
 
 ### Produktive Befehle
 
 ```bash
-# Development Stack starten
+# Development Stack starten (Auto-Detection: Core oder Full)
 ./start-dev.sh
 
-# Spezifische Services
-docker-compose up -d backend frontend postgres redis
+# Force Core-Modus (OpenSource Testing)
+./start-dev.sh --core
 
-# Logs überwachen
-docker-compose logs -f backend
+# Force Full-Modus (Premium + Enterprise)
+./start-dev.sh --full
 
-# Tests ausführen
-pytest backend/tests/
+# Environment-Variablen validieren
+bash scripts/validate-env.sh
+
+# Logs überwachen (Core)
+docker compose --env-file .env -f docker-compose.yml logs -f backend
+
+# Logs überwachen (Full)
+docker compose --env-file .env -f docker-compose.full.yml logs -f backend
+
+# Services stoppen (Auto-detect durch start-dev.sh)
+docker compose --env-file .env -f docker-compose.yml down
+docker compose --env-file .env -f docker-compose.full.yml down
+
+# Tests ausführen (Backend)
+cd packages/core/backend
+pytest tests/
+
+# Tests ausführen (Frontend)
+cd packages/core/frontend
+npm test
 
 # Code-Qualität prüfen
-ruff check backend/ utils/
-ruff format backend/ utils/
+ruff check packages/core/backend/ utils/
+ruff format packages/core/backend/ utils/
+```
+
+### ⚠️ WICHTIG: Docker Compose Environment Variables
+
+**IMMER `--env-file .env` verwenden!**
+
+Docker Compose lädt die `.env` Datei NICHT automatisch für alle Variablen.
+Das `start-dev.sh` Skript verwendet automatisch `--env-file .env`.
+
+**Beispiele:**
+
+```bash
+# ✅ RICHTIG (via Script):
+./start-dev.sh --full
+
+# ✅ RICHTIG (manuell):
+docker compose --env-file .env -f docker-compose.full.yml up -d
+
+# ❌ FALSCH (Variablen werden nicht geladen):
+docker compose -f docker-compose.full.yml up -d
 ```
 
 ### Code-Standards
@@ -97,6 +271,23 @@ ruff format backend/ utils/
 - **TypeScript**: Strikte Types, ESLint + Prettier
 - **Testing**: pytest (Backend), Jest (Frontend)
 - **Documentation**: Automatisch via FastAPI + TypeDoc
+- **CSS**: Tailwind CSS v3 Utility-First Approach
+
+### Frontend Konfiguration
+
+**Tailwind CSS Integration:**
+
+- `frontend/tailwind.config.js` - Content Scanning & Theme Config
+- `frontend/postcss.config.js` - PostCSS Plugins (Tailwind + Autoprefixer)
+- `frontend/craco.config.js` - CRA Webpack Override für PostCSS
+- `frontend/src/index.css` - Tailwind Directives (@tailwind base/components/utilities)
+
+**Build-System:**
+
+- Create React App (CRA) mit CRACO Override
+- Tailwind CSS v3.3.0 (kompatibel mit CRA)
+- PostCSS für CSS-Processing
+- Autoprefixer für Browser-Kompatibilität
 
 ## Implementierte Architektur
 
@@ -109,20 +300,22 @@ ruff format backend/ utils/
    - Claude API Integration
 
 2. **Document Processing** (`utils/extraction.py`)
-   - PDF Text Extraction mit Docling
+   - PDF Text Extraction mit PyMuPDF (schnell und effizient)
    - Markdown/DOC Processing
    - Structured Content Chunking
 
 3. **RAG System** (`utils/rag.py`)
-   - ChromaDB Vector Storage
-   - Semantic Search mit sentence-transformers
+   - Qdrant Vector Storage
+   - Semantic Search mit OpenAI Embeddings
    - Context Retrieval für Question Generation
 
 4. **Frontend UI** (`frontend/`)
    - React 18 + TypeScript
    - TanStack Query für API State
-   - Tailwind CSS + shadcn/ui Components
+   - Material-UI (MUI) + Tailwind CSS v3
+   - Tailwind CSS Integration mit CRACO
    - Responsive Multi-Device Support
+   - Modern Authentication UI
 
 ### Design-Prinzipien (Umgesetzt)
 

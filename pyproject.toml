@@ -1,17 +1,53 @@
 [project]
 name = "examcraft"
 version = "1.1.0"
-description = "AI-powered exam question generation platform with IBM Docling integration"
+description = "AI-powered exam question generation platform with PyMuPDF fast document processing"
 readme = "README.md"
-requires-python = ">=3.13.1"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.117.1",
     "sqlalchemy>=2.0.43",
-    "docling>=2.9.0",
+    "PyMuPDF>=1.24.0",
     "pypdf>=6.1.0",
+    "email-validator>=2.3.0",
+    "alembic>=1.17.0",
+    "qdrant-client>=1.16.0",
+    "sentence-transformers>=5.1.0",
+    "httpx>=0.28.1",
+    "pyyaml>=6.0.2",
+    "stripe>=14.2.0",
+    "dotenv>=0.9.9",
+    "psycopg2>=2.9.11",
+    "python-jose>=3.5.0",
+    "bcrypt>=5.0.0",
+    "redis>=7.0.0",
+]
+
+[project.optional-dependencies]
+docling = [
+    "docling>=2.9.0",
+    "docling-core>=2.23.0",
+]
+docs = [
+    "mkdocs-material>=9.5.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
 ]
+
+[tool.uv.workspace]
+members = [
+    "packages/core/backend",
+]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "1.1.0"
+tag_format = "v$version"
+# Allow emojis at the beginning of commit messages
+# Pattern: [emoji] type(scope): description
+message_template = "{{change_type}}{{scope}}: {{message}}"
+# Custom regex pattern to allow optional emoji prefix
+pattern = "^(\\S+ )?(build|bump|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\\(\\S+\\))?!?: ([^\\n\\r]+)((\\n\\n.*)|(\\s*))?$"

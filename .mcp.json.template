@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "taskmaster-ai": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "--package=task-master-ai",
+        "task-master-ai"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+      }
+    },
+    "linear": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-linear"
+      ],
+      "env": {
+        "LINEAR_API_KEY": "${LINEAR_API_KEY}"
+      }
+    }
+  }
+}

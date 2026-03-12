@@ -1,44 +1,27 @@
 # Pre-Commit Hooks für ExamCraft AI
 # Automatische Code-Qualitätsprüfung vor jedem Commit
-#
-# Installation:
-#   pip install pre-commit
-#   pre-commit install
-#
-# Manuell ausführen:
-#   pre-commit run --all-files
 
 repos:
-  # Python Code Formatting
-  - repo: https://github.com/psf/black
-    rev: 23.12.1
-    hooks:
-      - id: black
-        language_version: python3.11
-        files: ^(backend|utils)/.*\.py$
-
-  # Python Import Sorting
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: ["--profile", "black"]
-        files: ^(backend|utils)/.*\.py$
-
-  # Python Linting
+  # Python Code Quality (Ruff replaces black + isort + flake8)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.9
+    rev: v0.14.3
     hooks:
       - id: ruff
+        name: Ruff Linter
         args: [--fix, --exit-non-zero-on-fix]
-        files: ^(backend|utils)/.*\.py$
+        files: ^packages/core/(backend|utils)/.*\.py$
+        language_version: python3
+      - id: ruff-format
+        name: Ruff Formatter
+        files: ^packages/core/(backend|utils)/.*\.py$
+        language_version: python3
 
   # YAML Validation
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: check-yaml
-        args: ['--unsafe']  # Für render.yaml mit custom tags
+        args: ['--unsafe']
       - id: check-json
       - id: check-toml
       - id: end-of-file-fixer
@@ -48,57 +31,43 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
 
-  # Python Security Check
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.6
-    hooks:
-      - id: bandit
-        args: ["-c", "pyproject.toml"]
-        additional_dependencies: ["bandit[toml]"]
-        files: ^backend/.*\.py$
+  # Commit Message Linting (Disabled to allow emoji prefixes)
+  # TODO: Re-enable with custom regex support for emoji prefixes
+  # - repo: https://github.com/commitizen-tools/commitizen
+  #   rev: v4.9.1
+  #   hooks:
+  #     - id: commitizen
+  #       stages: [commit-msg]
+  #       language_version: python3
 
-  # TypeScript/JavaScript Linting
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v8.56.0
+  # Security Scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
     hooks:
-      - id: eslint
-        files: ^frontend/src/.*\.(ts|tsx|js|jsx)$
-        types: [file]
-        additional_dependencies:
-          - eslint@8.56.0
-          - "@typescript-eslint/parser@6.19.0"
-          - "@typescript-eslint/eslint-plugin@6.19.0"
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        language_version: python3
 
-  # Custom Python Import Check
+  # Pre-Push Hook: Comprehensive Lint Check
   - repo: local
     hooks:
-      - id: check-python-imports
-        name: Check Python Imports
-        entry: python scripts/check_imports.py
+      - id: pre-push-lint-check
+        name: Pre-Push Lint Check
+        entry: bash scripts/pre-push-lint-check.sh
         language: system
-        files: ^(backend|utils)/.*\.py$
+        stages: [pre-push]
         pass_filenames: false
+        always_run: true
 
-      - id: validate-requirements
-        name: Validate Requirements
-        entry: python scripts/validate_requirements.py
-        language: system
-        files: ^backend/requirements\.txt$
-        pass_filenames: false
+# Configuration
+default_stages: [pre-commit]
+fail_fast: false
 
-      - id: run-backend-tests
-        name: Run Backend Tests
-        entry: bash -c 'cd backend && python -m pytest tests/ -v --tb=short'
-        language: system
-        files: ^backend/.*\.py$
-        pass_filenames: false
-        stages: [commit]
-
-      - id: check-docker-build
-        name: Check Docker Build (Backend)
-        entry: bash -c 'docker build -f backend/Dockerfile.production -t examcraft-backend-test backend/ --quiet'
-        language: system
-        files: ^(backend/Dockerfile\.production|backend/requirements\.txt)$
-        pass_filenames: false
-        stages: [push]
-
+exclude: |
+  (?x)^(
+    packages/premium/|
+    packages/enterprise/|
+    node_modules/|
+    venv/|
+    \.venv/
+  )
