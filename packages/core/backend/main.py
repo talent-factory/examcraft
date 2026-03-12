@@ -81,18 +81,10 @@ async def lifespan(app: FastAPI):
 
     # Startup: Seed RBAC data (Features, Tiers, Quotas)
     try:
-        import subprocess
+        from scripts.seed_rbac_data import main as seed_rbac_data
 
-        result = subprocess.run(
-            ["python", "scripts/seed_rbac_data.py"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode == 0:
-            print("✅ RBAC data seeded successfully")
-        else:
-            print(f"⚠️  RBAC seed warning: {result.stderr}")
+        seed_rbac_data()
+        print("✅ RBAC data seeded successfully")
     except Exception as e:
         print(f"❌ Error seeding RBAC data: {str(e)}")
 
@@ -472,7 +464,8 @@ async def api_health_check():
             conn.execute(text("SELECT 1"))
         health_status["services"]["database"] = "connected"
     except Exception as e:
-        health_status["services"]["database"] = f"error: {str(e)}"
+        logger.error(f"Database health check failed: {e}")
+        health_status["services"]["database"] = "error"
         health_status["status"] = "degraded"
 
     # Check Redis
@@ -482,7 +475,8 @@ async def api_health_check():
         r.ping()
         health_status["services"]["redis"] = "connected"
     except Exception as e:
-        health_status["services"]["redis"] = f"error: {str(e)}"
+        logger.error(f"Redis health check failed: {e}")
+        health_status["services"]["redis"] = "error"
         health_status["status"] = "degraded"
 
     # Check Vector Database
@@ -497,7 +491,8 @@ async def api_health_check():
         else:
             health_status["services"]["vector_db"] = "available"
     except Exception as e:
-        health_status["services"]["vector_db"] = f"error: {str(e)}"
+        logger.error(f"Vector DB health check failed: {e}")
+        health_status["services"]["vector_db"] = "error"
         health_status["status"] = "degraded"
 
     # Check Claude API
@@ -516,10 +511,10 @@ async def api_health_check():
             "active": processor_class,
         }
     except Exception as e:
+        logger.error(f"Document processor health check failed: {e}")
         health_status["services"]["document_processor"] = {
             "configured": processor_type,
             "active": "error",
-            "error": str(e),
         }
         health_status["status"] = "degraded"
 
@@ -528,14 +523,18 @@ async def api_health_check():
 
 @app.get("/api/v1/claude/usage")
 async def get_claude_usage():
-    """Get Claude API usage statistics"""
+    """Get Claude API usage statistics (development only)"""
+    if os.getenv("ENVIRONMENT", "development") != "development":
+        raise HTTPException(status_code=404, detail="Not found")
     claude_service = get_claude_service()
     return claude_service.get_usage_stats()
 
 
 @app.get("/api/v1/claude/health")
 async def get_claude_health():
-    """Get Claude API health status"""
+    """Get Claude API health status (development only)"""
+    if os.getenv("ENVIRONMENT", "development") != "development":
+        raise HTTPException(status_code=404, detail="Not found")
     claude_service = get_claude_service()
     stats = claude_service.get_usage_stats()
     return {
@@ -548,13 +547,16 @@ async def get_claude_health():
     }
 
 
-# Demo endpoints for Workshop
+# Demo endpoints for Workshop (development only)
 @app.post("/api/v1/generate-exam", response_model=ExamResponse)
 async def generate_exam(request: ExamRequest):
     """
     Generate an exam with AI-powered questions using Claude API
     Falls back to demo questions if Claude API is not available
+    (development only - disabled in production)
     """
+    if os.getenv("ENVIRONMENT", "development") != "development":
+        raise HTTPException(status_code=404, detail="Not found")
     try:
         # Use Claude service to generate questions
         claude_service = get_claude_service()
