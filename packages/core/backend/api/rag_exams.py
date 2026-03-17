@@ -189,7 +189,14 @@ async def generate_rag_exam(
         # Quota-Check vor Generierung (verhindert unnoetige Claude-API-Kosten)
         from utils.tenant_utils import SubscriptionLimits
 
-        SubscriptionLimits.check_question_limit(current_user.institution, db)
+        if not current_user.institution:
+            raise HTTPException(
+                status_code=403,
+                detail="You must be associated with an institution to generate exams.",
+            )
+        SubscriptionLimits.check_question_limit(
+            current_user.institution, db, additional_count=request.question_count
+        )
 
         # Erstelle RAG Request
         rag_request = RAGExamRequest(
@@ -210,50 +217,62 @@ async def generate_rag_exam(
 
         # Persistiere generierte Fragen in question_reviews
         review_question_ids = []
-        reviews = []
-        for question in rag_response.questions:
-            # explanation kann str oder list sein (Premium dataclass)
-            explanation_text = (
-                question.explanation
-                if isinstance(question.explanation, str)
-                else str(question.explanation)
-                if question.explanation
-                else None
-            )
-            question_review = QuestionReview(
-                question_text=question.question_text,
-                question_type=question.question_type,
-                options=question.options,
-                correct_answer=question.correct_answer,
-                explanation=explanation_text,
-                difficulty=question.difficulty,
-                topic=request.topic,
-                language=request.language,
-                source_chunks=question.source_chunks,
-                source_documents=question.source_documents,
-                confidence_score=question.confidence_score,
-                review_status=ReviewStatus.PENDING.value,
-                exam_id=rag_response.exam_id,
-                created_by=current_user.id,
-                institution_id=current_user.institution_id,
-            )
-            db.add(question_review)
-            reviews.append(question_review)
+        try:
+            reviews = []
+            for question in rag_response.questions:
+                # explanation kann str oder list sein (Premium dataclass)
+                if isinstance(question.explanation, str):
+                    explanation_text = question.explanation
+                elif isinstance(question.explanation, list):
+                    explanation_text = "; ".join(
+                        str(item) for item in question.explanation
+                    )
+                elif question.explanation is not None:
+                    explanation_text = str(question.explanation)
+                else:
+                    explanation_text = None
 
-        db.flush()  # Single round-trip: all IDs populated
+                question_review = QuestionReview(
+                    question_text=question.question_text,
+                    question_type=question.question_type,
+                    options=question.options,
+                    correct_answer=question.correct_answer,
+                    explanation=explanation_text,
+                    difficulty=question.difficulty,
+                    topic=request.topic,
+                    language=request.language,
+                    source_chunks=question.source_chunks,
+                    source_documents=question.source_documents,
+                    confidence_score=question.confidence_score,
+                    review_status=ReviewStatus.PENDING.value,
+                    exam_id=rag_response.exam_id,
+                    created_by=current_user.id,
+                    institution_id=current_user.institution_id,
+                )
+                db.add(question_review)
+                reviews.append(question_review)
 
-        for question_review in reviews:
-            history = ReviewHistory(
-                question_id=question_review.id,
-                action="created",
-                new_status=ReviewStatus.PENDING.value,
-                changed_by=str(current_user.id),
-                change_reason="Auto-generated via RAG exam generation",
+            db.flush()  # Single round-trip: all IDs populated
+
+            for question_review in reviews:
+                history = ReviewHistory(
+                    question_id=question_review.id,
+                    action="created",
+                    new_status=ReviewStatus.PENDING.value,
+                    changed_by=str(current_user.id),
+                    change_reason="Auto-generated via RAG exam generation",
+                )
+                db.add(history)
+                review_question_ids.append(question_review.id)
+
+            db.commit()
+        except Exception as persist_err:
+            db.rollback()
+            logger.error(
+                f"Failed to persist questions for exam '{rag_response.exam_id}': {persist_err}",
+                exc_info=True,
             )
-            db.add(history)
-            review_question_ids.append(question_review.id)
-
-        db.commit()
+            review_question_ids = []
 
         # Konvertiere zu Response Model
         questions_response = []
@@ -297,11 +316,15 @@ async def generate_rag_exam(
         return response
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"RAG exam generation failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Exam generation failed: {str(e)}")
+        logger.error(f"RAG exam generation failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Exam generation failed. Please try again or contact support.",
+        )
 
 
 @router.post("/retrieve-context", response_model=RAGContextResponse)
