@@ -120,29 +120,62 @@ def create_tables():
 
 def _run_migrations_or_create_all():
     """
-    Fuehre Alembic-Migrationen aus wenn verfuegbar, sonst Fallback auf create_all.
+    Fuehre Alembic-Migrationen aus oder erstelle Tabellen direkt.
 
-    Ablauf:
-    1. Versuche alembic upgrade head (idempotent, sicher bei jedem Start)
-    2. Wenn Alembic nicht verfuegbar oder fehlschlaegt: Fallback auf create_all
+    Verhalten je nach AUTO_MIGRATE env var:
+    - AUTO_MIGRATE=true: Fuehre 'alembic upgrade head' aus (fuer Development)
+    - AUTO_MIGRATE nicht gesetzt: Nur pruefen ob Migrationen ausstehen und warnen
+    - Fallback: Base.metadata.create_all() wenn Alembic nicht verfuegbar
+
+    WICHTIG: In Production NIEMALS automatisch migrieren. Migrationen muessen
+    dort manuell nach Review ausgefuehrt werden:
+        alembic upgrade head
     """
     import os
 
     alembic_dir = os.path.join(os.path.dirname(__file__), "alembic")
     alembic_ini = os.path.join(os.path.dirname(__file__), "alembic.ini")
+    auto_migrate = os.getenv("AUTO_MIGRATE", "false").lower() == "true"
 
     if os.path.exists(alembic_dir) and os.path.exists(alembic_ini):
         try:
             from alembic.config import Config
             from alembic import command
+            from alembic.script import ScriptDirectory
+            from alembic.runtime.migration import MigrationContext
 
             alembic_cfg = Config(alembic_ini)
             alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
-            command.upgrade(alembic_cfg, "head")
-            print("✅ Database migrations applied successfully (alembic upgrade head)")
-            return
+
+            # Pruefe ob Migrationen ausstehen
+            script = ScriptDirectory.from_config(alembic_cfg)
+            head_rev = script.get_current_head()
+
+            with engine.connect() as conn:
+                context = MigrationContext.configure(conn)
+                current_rev = context.get_current_revision()
+
+            if current_rev == head_rev:
+                print(f"✅ Database schema is up to date (revision: {current_rev})")
+                return
+
+            pending_msg = (
+                f"Pending migrations: DB at {current_rev or 'None'}, head at {head_rev}"
+            )
+
+            if auto_migrate:
+                print(f"🔄 {pending_msg} — running alembic upgrade head...")
+                command.upgrade(alembic_cfg, "head")
+                print("✅ Database migrations applied successfully")
+                return
+            else:
+                print(f"⚠️  {pending_msg}")
+                print("⚠️  Set AUTO_MIGRATE=true or run manually: alembic upgrade head")
+                # Nicht abbrechen — App soll starten, aber Warnung ist sichtbar
+                return
+
         except Exception as e:
-            print(f"⚠️  Alembic migration failed, falling back to create_all: {e}")
+            print(f"⚠️  Alembic check failed, falling back to create_all: {e}")
 
     Base.metadata.create_all(bind=engine)
     print("Database tables created successfully (create_all fallback)")

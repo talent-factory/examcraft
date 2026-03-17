@@ -159,6 +159,9 @@ services:
       # Environment
       ENVIRONMENT: development
 
+      # Auto-Migration (nur Development, NICHT Production!)
+      AUTO_MIGRATE: "true"
+
       # Sentry Configuration
       SENTRY_DSN: ${SENTRY_DSN:-}
       ENABLE_SENTRY: ${ENABLE_SENTRY:-false}
