@@ -114,8 +114,38 @@ def create_tables():
 
         traceback.print_exc()
 
+    # Migrationen ausfuehren (Alembic) oder Tabellen direkt erstellen (Fallback)
+    _run_migrations_or_create_all()
+
+
+def _run_migrations_or_create_all():
+    """
+    Fuehre Alembic-Migrationen aus wenn verfuegbar, sonst Fallback auf create_all.
+
+    Ablauf:
+    1. Versuche alembic upgrade head (idempotent, sicher bei jedem Start)
+    2. Wenn Alembic nicht verfuegbar oder fehlschlaegt: Fallback auf create_all
+    """
+    import os
+
+    alembic_dir = os.path.join(os.path.dirname(__file__), "alembic")
+    alembic_ini = os.path.join(os.path.dirname(__file__), "alembic.ini")
+
+    if os.path.exists(alembic_dir) and os.path.exists(alembic_ini):
+        try:
+            from alembic.config import Config
+            from alembic import command
+
+            alembic_cfg = Config(alembic_ini)
+            alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
+            command.upgrade(alembic_cfg, "head")
+            print("✅ Database migrations applied successfully (alembic upgrade head)")
+            return
+        except Exception as e:
+            print(f"⚠️  Alembic migration failed, falling back to create_all: {e}")
+
     Base.metadata.create_all(bind=engine)
-    print("Database tables created successfully")
+    print("Database tables created successfully (create_all fallback)")
 
 
 if __name__ == "__main__":
