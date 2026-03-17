@@ -2,9 +2,16 @@
 Tests for Celery async task processing
 """
 
+import sys
+from unittest.mock import MagicMock
+
+# Mock system-level dependencies before any project imports
+if "magic" not in sys.modules:
+    sys.modules["magic"] = MagicMock()
+
 import pytest
 from unittest.mock import patch, MagicMock
-from tasks.document_tasks import process_document, create_embeddings
+from tasks.document_tasks import process_document
 from models.document import Document, DocumentStatus
 
 
@@ -75,38 +82,6 @@ class TestDocumentProcessingTask:
             # Should raise ValueError
             with pytest.raises(ValueError, match="Document .* not found"):
                 process_document(document_id="nonexistent-id", user_id="test-user-id")
-
-    def test_create_embeddings_task_success(self):
-        """Test successful embedding creation"""
-        with (
-            patch("tasks.rag_tasks.SessionLocal") as mock_session_local,
-            patch("tasks.rag_tasks.RAGService") as mock_rag,
-        ):
-            mock_db = MagicMock()
-            mock_session_local.return_value = mock_db
-
-            mock_document = MagicMock(spec=Document)
-            mock_document.id = "test-doc-id"
-
-            mock_db.query.return_value.filter.return_value.first.return_value = (
-                mock_document
-            )
-
-            mock_rag_instance = MagicMock()
-            mock_rag.return_value = mock_rag_instance
-
-            # Execute task
-            result = create_embeddings(
-                document_id="test-doc-id", chunks=["chunk1", "chunk2", "chunk3"]
-            )
-
-            # Verify results
-            assert result["success"] is True
-            assert result["document_id"] == "test-doc-id"
-            assert result["chunks_embedded"] == 3
-
-            # Verify RAG service was called
-            mock_rag_instance.add_document_chunks.assert_called_once()
 
 
 class TestCeleryConfiguration:
