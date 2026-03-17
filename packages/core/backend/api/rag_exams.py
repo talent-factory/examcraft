@@ -210,17 +210,22 @@ async def generate_rag_exam(
 
         # Persistiere generierte Fragen in question_reviews
         review_question_ids = []
+        reviews = []
         for question in rag_response.questions:
+            # explanation kann str oder list sein (Premium dataclass)
+            explanation_text = (
+                question.explanation
+                if isinstance(question.explanation, str)
+                else str(question.explanation)
+                if question.explanation
+                else None
+            )
             question_review = QuestionReview(
                 question_text=question.question_text,
                 question_type=question.question_type,
                 options=question.options,
                 correct_answer=question.correct_answer,
-                explanation=question.explanation
-                if isinstance(question.explanation, str)
-                else str(question.explanation)
-                if question.explanation
-                else None,
+                explanation=explanation_text,
                 difficulty=question.difficulty,
                 topic=request.topic,
                 language=request.language,
@@ -233,8 +238,11 @@ async def generate_rag_exam(
                 institution_id=current_user.institution_id,
             )
             db.add(question_review)
-            db.flush()
+            reviews.append(question_review)
 
+        db.flush()  # Single round-trip: all IDs populated
+
+        for question_review in reviews:
             history = ReviewHistory(
                 question_id=question_review.id,
                 action="created",
@@ -291,6 +299,7 @@ async def generate_rag_exam(
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         logger.error(f"RAG exam generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Exam generation failed: {str(e)}")
 
