@@ -15,13 +15,29 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class DocumentProcessingTask(Task):
-    """Base Task with retry logic and error handling"""
+class ProgressTask(Task):
+    """Base Task mit Progress-Tracking via Celery update_state"""
 
-    autoretry_for = (Exception,)
-    retry_kwargs = {"max_retries": 3, "countdown": 60}
-    retry_backoff = True
-    retry_jitter = True
+    abstract = True
+
+    def update_progress(self, current: int, total: int, message: str = "") -> None:
+        """
+        Sendet Progress-Update an Redis Result Backend.
+
+        Args:
+            current: Aktueller Schritt (0-based)
+            total: Gesamtanzahl Schritte
+            message: Deutsche Fortschrittsmessage
+        """
+        self.update_state(
+            state="PROGRESS",
+            meta={
+                "current": current,
+                "total": total,
+                "progress": int((current / total) * 100),
+                "message": message,
+            },
+        )
 
 
 def run_async(coro):
@@ -36,48 +52,66 @@ def run_async(coro):
 
 @celery_app.task(
     bind=True,
-    base=DocumentProcessingTask,
+    base=ProgressTask,
     name="tasks.document_tasks.process_document",
     priority=5,
+    autoretry_for=(Exception,),
+    retry_kwargs={"max_retries": 3, "countdown": 60},
+    retry_backoff=True,
+    retry_jitter=True,
 )
 def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
     """
-    Asynchronous document processing with Docling and Vector embedding.
+    Asynchrone Dokumentverarbeitung mit Docling und Vector Embedding.
+    Sendet granulare Progress-Updates (0-100%) an Redis.
 
     Args:
-        document_id: ID of the document
-        user_id: ID of the user
+        document_id: ID des Dokuments
+        user_id: ID des Users
 
     Returns:
-        Dict with processing status and metadata
+        Dict mit Verarbeitungsstatus und Metadaten
     """
     db = SessionLocal()
     document = None
 
     try:
-        # 1. Load document from DB
+        self.update_progress(0, 10, "Starte Verarbeitung...")
+
+        # 1. Dokument aus DB laden
+        self.update_progress(1, 10, "Dokument wird geladen...")
         document = db.query(Document).filter(Document.id == int(document_id)).first()
         if not document:
-            raise ValueError(f"Document {document_id} not found")
+            raise ValueError(f"Dokument {document_id} nicht gefunden")
 
         logger.info(
-            f"Starting document processing for {document.filename} "
+            f"Starte Dokumentverarbeitung für {document.original_filename} "
             f"(file_path: {document.file_path}, S3: {document_service.use_s3})"
         )
 
-        # 2. Process document with vectors using document_service
-        # This handles: Docling processing + Vector embedding creation
+        self.update_progress(2, 10, "Text wird extrahiert...")
+        self.update_progress(3, 10, "Docling-Verarbeitung läuft...")
+
+        # 2. Dokument verarbeiten (Docling + Vektoren)
+        self.update_progress(4, 10, "Vektoren werden erstellt...")
         result = run_async(
             document_service.process_document_with_vectors(int(document_id), db)
         )
 
         if result is None:
-            raise ValueError(f"Document processing failed for {document_id}")
+            raise ValueError(f"Dokumentverarbeitung fehlgeschlagen für {document_id}")
 
-        # Refresh document to get updated values
+        self.update_progress(8, 10, "Vektoren werden erstellt...")
+
+        # 3. Dokument aus DB neu laden
         db.refresh(document)
 
-        logger.info(f"Successfully processed document {document_id}")
+        # 4. In Datenbank speichern
+        self.update_progress(9, 10, "In Datenbank speichern...")
+        db.commit()
+
+        self.update_progress(10, 10, "Abgeschlossen!")
+        logger.info(f"Dokumentverarbeitung erfolgreich: {document_id}")
 
         return {
             "success": True,
@@ -90,20 +124,18 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"Error processing document {document_id}: {str(e)}")
+        logger.error(f"Fehler bei Dokumentverarbeitung {document_id}: {str(e)}")
 
-        # Set status to "error"
         if document:
             document.status = DocumentStatus.ERROR
             document.error_message = str(e)
             db.commit()
 
-        # Retry on temporary errors
         raise self.retry(exc=e, countdown=60)
 
     finally:
         db.close()
 
 
-# Note: create_embeddings task removed - vector embedding is now handled
-# directly in document_service.process_document_with_vectors()
+# Hinweis: create_embeddings wurde entfernt — Vector Embedding wird direkt
+# in document_service.process_document_with_vectors() behandelt
