@@ -10,7 +10,7 @@ celery_app = Celery(
     "examcraft",
     broker=os.getenv("CELERY_BROKER_URL", "amqp://examcraft:password@rabbitmq:5672/"),
     backend=os.getenv(
-        "CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", "redis://redis:6379/1")
+        "CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", "redis://redis:6379/3")
     ),
 )
 

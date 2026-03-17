@@ -18,7 +18,7 @@ celery_app = Celery(
         "amqp://examcraft:secure_password_here@rabbitmq:5672/",  # pragma: allowlist secret
     ),
     backend=os.getenv(
-        "CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", "redis://redis:6379/1")
+        "CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", "redis://redis:6379/3")
     ),
     include=[
         "tasks.document_tasks",
