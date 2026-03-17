@@ -16,6 +16,7 @@ import services.rag_service as rag_service_module
 from services.rag_service import RAGExamRequest
 from services.document_service import document_service
 from models.auth import User
+from models.question_review import QuestionReview, ReviewHistory, ReviewStatus
 from utils.auth_utils import get_current_active_user, require_permission
 import logging
 
@@ -93,6 +94,7 @@ class RAGExamResponseModel(BaseModel):
     context_summary: RAGContextResponse
     generation_time: float
     quality_metrics: Dict[str, Any]
+    review_question_ids: List[int] = []
 
 
 class ContextRetrievalRequest(BaseModel):
@@ -184,6 +186,11 @@ async def generate_rag_exam(
         else:
             logger.info("📋 API received NO prompt_config - will use default templates")
 
+        # Quota-Check vor Generierung (verhindert unnoetige Claude-API-Kosten)
+        from utils.tenant_utils import SubscriptionLimits
+
+        SubscriptionLimits.check_question_limit(current_user.institution, db)
+
         # Erstelle RAG Request
         rag_request = RAGExamRequest(
             topic=request.topic,
@@ -200,6 +207,45 @@ async def generate_rag_exam(
         rag_response = await rag_service_module.rag_service.generate_rag_exam(
             rag_request
         )
+
+        # Persistiere generierte Fragen in question_reviews
+        review_question_ids = []
+        for question in rag_response.questions:
+            question_review = QuestionReview(
+                question_text=question.question_text,
+                question_type=question.question_type,
+                options=question.options,
+                correct_answer=question.correct_answer,
+                explanation=question.explanation
+                if isinstance(question.explanation, str)
+                else str(question.explanation)
+                if question.explanation
+                else None,
+                difficulty=question.difficulty,
+                topic=request.topic,
+                language=request.language,
+                source_chunks=question.source_chunks,
+                source_documents=question.source_documents,
+                confidence_score=question.confidence_score,
+                review_status=ReviewStatus.PENDING.value,
+                exam_id=rag_response.exam_id,
+                created_by=current_user.id,
+                institution_id=current_user.institution_id,
+            )
+            db.add(question_review)
+            db.flush()
+
+            history = ReviewHistory(
+                question_id=question_review.id,
+                action="created",
+                new_status=ReviewStatus.PENDING.value,
+                changed_by=str(current_user.id),
+                change_reason="Auto-generated via RAG exam generation",
+            )
+            db.add(history)
+            review_question_ids.append(question_review.id)
+
+        db.commit()
 
         # Konvertiere zu Response Model
         questions_response = []
@@ -233,6 +279,7 @@ async def generate_rag_exam(
             context_summary=context_response,
             generation_time=rag_response.generation_time,
             quality_metrics=rag_response.quality_metrics,
+            review_question_ids=review_question_ids,
         )
 
         logger.info(

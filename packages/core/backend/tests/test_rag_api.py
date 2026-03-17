@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch, AsyncMock
 from main import app
 from services.rag_service import RAGExamResponse, RAGQuestion, RAGContext
 from models.document import Document, DocumentStatus
+from models.question_review import QuestionReview, ReviewHistory
 
 
 client = TestClient(app)
@@ -605,3 +606,183 @@ class TestRAGAPIIntegration:
         # Alle Requests sollten erfolgreich sein
         assert all(status == 200 for status in results)
         assert len(results) == 5
+
+
+class TestRAGQuestionPersistence:
+    """Tests for auto-persistence of generated questions to question_reviews"""
+
+    @pytest.fixture
+    def mock_user(self):
+        mock_institution = Mock()
+        mock_institution.id = 1
+        mock_institution.name = "Test University"
+        mock_institution.slug = "test-university"
+        mock_institution.subscription_tier = "professional"
+        mock_institution.max_users = 100
+        mock_institution.max_documents = 1000
+        mock_institution.max_questions_per_month = -1
+
+        user = Mock()
+        user.id = 42
+        user.email = "dozent@example.com"
+        user.institution_id = 1
+        user.institution = mock_institution
+        user.has_permission = Mock(return_value=True)
+        user.is_superuser = False
+        user.roles = []
+        return user
+
+    @pytest.fixture(autouse=True)
+    def ensure_rag_router(self):
+        """Ensure the RAG router is registered (locally it is not loaded via lifespan)"""
+        import api.rag_exams as rag_module
+
+        route_paths = [r.path for r in app.routes]
+        if "/api/v1/rag/generate-exam" not in route_paths:
+            app.include_router(rag_module.router)
+
+    @pytest.fixture
+    def mock_db(self):
+        db = Mock()
+        id_counter = [0]
+        added_objects = []
+
+        def mock_add(obj):
+            added_objects.append(obj)
+
+        def mock_flush():
+            for obj in added_objects:
+                if hasattr(obj, "id") and obj.id is None:
+                    id_counter[0] += 1
+                    obj.id = id_counter[0]
+
+        db.add = mock_add
+        db.flush = mock_flush
+        db.commit = Mock()
+        db._added_objects = added_objects
+        return db
+
+    @pytest.fixture
+    def auth_client(self, mock_user, mock_db):
+        from utils.auth_utils import get_current_user, get_current_active_user
+        from database import get_db
+
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_current_active_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = lambda: mock_db
+        client = TestClient(app)
+        yield client
+        app.dependency_overrides.clear()
+
+    @pytest.fixture
+    def sample_rag_response(self):
+        # Use Mock objects to build the RAG response because the Core
+        # rag_service models are placeholders; the Premium dataclass
+        # models are only available inside Docker (full deployment).
+        context = Mock()
+        context.query = "Test Topic"
+        context.retrieved_chunks = []
+        context.total_similarity_score = 1.5
+        context.source_documents = [{"id": 1, "filename": "test.txt", "chunks_used": 2}]
+        context.context_length = 150
+
+        q1 = Mock()
+        q1.question_text = "Was ist Unit Testing?"
+        q1.question_type = "multiple_choice"
+        q1.options = ["A) Spass", "B) Qualitaet", "C) Zeitverschwendung", "D) Kunst"]
+        q1.correct_answer = "B"
+        q1.explanation = "Unit Testing sichert Qualitaet"
+        q1.difficulty = "medium"
+        q1.source_chunks = ["chunk_1"]
+        q1.source_documents = ["test.txt"]
+        q1.confidence_score = 0.85
+
+        q2 = Mock()
+        q2.question_text = "Erklaeren Sie TDD."
+        q2.question_type = "open_ended"
+        q2.options = None
+        q2.correct_answer = "TDD ist test-getriebene Entwicklung..."
+        q2.explanation = "Vollstaendigkeit und Verstaendnis"
+        q2.difficulty = "medium"
+        q2.source_chunks = ["chunk_2"]
+        q2.source_documents = ["test.txt"]
+        q2.confidence_score = 0.78
+
+        response = Mock()
+        response.exam_id = "persist_test_exam_001"
+        response.topic = "Test Topic"
+        response.questions = [q1, q2]
+        response.context_summary = context
+        response.generation_time = 2.5
+        response.quality_metrics = {"total_questions": 2, "average_confidence": 0.815}
+        return response
+
+    def test_generate_exam_returns_review_question_ids(
+        self, auth_client, sample_rag_response
+    ):
+        """Generated questions must be persisted and their IDs returned"""
+        with (
+            patch("api.rag_exams.document_service") as mock_doc_svc,
+            patch("services.rag_service.rag_service") as mock_rag_svc,
+        ):
+            mock_doc_svc.get_document_by_id.return_value = None
+            mock_rag_svc.generate_rag_exam = AsyncMock(return_value=sample_rag_response)
+
+            response = auth_client.post(
+                "/api/v1/rag/generate-exam",
+                json={"topic": "Test Topic", "question_count": 2},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "review_question_ids" in data
+        assert len(data["review_question_ids"]) == 2
+        assert all(isinstance(qid, int) for qid in data["review_question_ids"])
+
+    def test_generate_exam_persists_question_reviews(
+        self, mock_user, mock_db, sample_rag_response
+    ):
+        """QuestionReview records must exist in DB after generation"""
+        from utils.auth_utils import get_current_user, get_current_active_user
+        from database import get_db
+
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_current_active_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = lambda: mock_db
+
+        try:
+            with (
+                patch("api.rag_exams.document_service") as mock_doc_svc,
+                patch("services.rag_service.rag_service") as mock_rag_svc,
+            ):
+                mock_doc_svc.get_document_by_id.return_value = None
+                mock_rag_svc.generate_rag_exam = AsyncMock(
+                    return_value=sample_rag_response
+                )
+
+                client = TestClient(app)
+                response = client.post(
+                    "/api/v1/rag/generate-exam",
+                    json={"topic": "Test Topic", "question_count": 2},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+
+        added_objects = mock_db._added_objects
+        question_reviews = [o for o in added_objects if isinstance(o, QuestionReview)]
+        assert len(question_reviews) == 2
+
+        q1 = question_reviews[0]
+        assert q1.question_text == "Was ist Unit Testing?"
+        assert q1.question_type == "multiple_choice"
+        assert q1.review_status == "pending"
+        assert q1.topic == "Test Topic"
+        assert q1.exam_id == "persist_test_exam_001"
+        assert q1.created_by == 42
+        assert q1.institution_id == 1
+
+        history_entries = [o for o in added_objects if isinstance(o, ReviewHistory)]
+        assert len(history_entries) == 2
+        assert all(h.action == "created" for h in history_entries)
