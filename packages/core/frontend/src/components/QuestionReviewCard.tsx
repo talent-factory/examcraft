@@ -39,6 +39,7 @@ import {
 } from '@mui/icons-material';
 import { QuestionReview, ReviewStatus, ReviewComment } from '../types/review';
 import { ReviewService } from '../services/ReviewService';
+import MarkdownRenderer from './MarkdownRenderer';
 
 interface QuestionReviewCardProps {
   question: QuestionReview;
@@ -138,9 +139,9 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             <Typography variant="caption" color="text.secondary">
               Question #{question.id} • {formatQuestionType(question.question_type)}
             </Typography>
-            <Typography variant="h6" sx={{ mt: 0.5 }}>
-              {question.question_text}
-            </Typography>
+            <Box sx={{ mt: 0.5 }}>
+              <MarkdownRenderer content={question.question_text} variant="compact" />
+            </Box>
           </Box>
           <Chip
             label={question.review_status.toUpperCase()}
@@ -188,7 +189,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               Correct Answer:
             </Typography>
             <Alert severity="success" icon={<CheckCircle />}>
-              {question.correct_answer}
+              <MarkdownRenderer content={question.correct_answer} variant="compact" />
             </Alert>
           </Box>
         )}
@@ -199,9 +200,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Explanation:
             </Typography>
-            <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-              {question.explanation}
-            </Typography>
+            <MarkdownRenderer content={question.explanation} variant="compact" />
           </Box>
         )}
 
