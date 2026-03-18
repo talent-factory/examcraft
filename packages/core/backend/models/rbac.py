@@ -206,7 +206,6 @@ class SubscriptionTier(Base):
     tier_features = relationship(
         "TierFeature", back_populates="tier", cascade="all, delete-orphan"
     )
-    organizations = relationship("Organization", back_populates="tier")
 
     def __repr__(self):
         return f"<SubscriptionTier(id='{self.id}', name='{self.name}')>"
@@ -287,69 +286,18 @@ class TierFeature(Base):
         )
 
 
-# ============================================
-# ORGANIZATIONS (erweitert bestehende Institution)
-# ============================================
-
-
-class Organization(Base):
-    """
-    Organization Model für Multi-Tenancy mit Subscription
-    Erweitert/ersetzt bestehende Institution-Tabelle
-    """
-
-    __tablename__ = "organizations"
-
-    id = Column(String(255), primary_key=True)  # org_uuid
-    name = Column(String(200), nullable=False, index=True)
-    tier_id = Column(
-        String(255), ForeignKey("subscription_tiers.id"), nullable=True, index=True
-    )
-    subscription_status = Column(
-        String(50), default="active", nullable=False, index=True
-    )  # active, suspended, cancelled
-    subscription_start = Column(DateTime(timezone=True), nullable=True)
-    subscription_end = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
-    # Relationships
-    tier = relationship("SubscriptionTier", back_populates="organizations")
-    resource_usage = relationship(
-        "ResourceUsage", back_populates="organization", cascade="all, delete-orphan"
-    )
-
-    # Constraints
-    __table_args__ = (
-        CheckConstraint(
-            "subscription_status IN ('active', 'suspended', 'cancelled', 'trial')",
-            name="check_subscription_status",
-        ),
-    )
-
-    def __repr__(self):
-        return f"<Organization(id='{self.id}', name='{self.name}')>"
-
-
 class ResourceUsage(Base):
     """
-    Ressourcen-Nutzungs-Tracking pro Organisation
+    Ressourcen-Nutzungs-Tracking pro Institution
     Trackt monatliche Nutzung von Dokumenten, Fragen, etc.
     """
 
     __tablename__ = "resource_usage"
 
     id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(
-        String(255),
-        ForeignKey("organizations.id", ondelete="CASCADE"),
+    institution_id = Column(
+        Integer,
+        ForeignKey("institutions.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -370,13 +318,13 @@ class ResourceUsage(Base):
     )
 
     # Relationships
-    organization = relationship("Organization", back_populates="resource_usage")
+    institution = relationship("Institution", back_populates="resource_usage")
 
     # Constraints
     __table_args__ = (
         Index(
             "idx_resource_usage_unique",
-            "organization_id",
+            "institution_id",
             "resource_type",
             "period_start",
             unique=True,
@@ -384,7 +332,7 @@ class ResourceUsage(Base):
     )
 
     def __repr__(self):
-        return f"<ResourceUsage(org='{self.organization_id}', type='{self.resource_type}', count={self.usage_count})>"
+        return f"<ResourceUsage(institution='{self.institution_id}', type='{self.resource_type}', count={self.usage_count})>"
 
 
 # ============================================
