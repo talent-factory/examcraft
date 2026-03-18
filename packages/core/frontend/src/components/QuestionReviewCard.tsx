@@ -37,7 +37,9 @@ import {
   Source,
   Lightbulb,
   RateReview,
+  Visibility,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { QuestionReview, ReviewStatus, ReviewComment } from '../types/review';
 import { ReviewService } from '../services/ReviewService';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -61,6 +63,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
   onComment,
   loading = false,
 }) => {
+  const navigate = useNavigate();
   const [showSources, setShowSources] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<ReviewComment[]>([]);
@@ -152,6 +155,12 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             size="small"
           />
         </Box>
+
+        {question.reviewer_info && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Reviewer: {question.reviewer_info.first_name} {question.reviewer_info.last_name}
+          </Typography>
+        )}
 
         {/* Options (for multiple choice) */}
         {question.options && question.options.length > 0 && (
@@ -421,6 +430,14 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               size="small"
             >
               <Comment />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Details anzeigen">
+            <IconButton
+              onClick={() => navigate(`/questions/review/${question.id}`)}
+              size="small"
+            >
+              <Visibility />
             </IconButton>
           </Tooltip>
         </Box>
