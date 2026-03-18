@@ -22,6 +22,7 @@ celery_app = Celery(
     ),
     include=[
         "tasks.document_tasks",
+        "tasks.question_tasks",
         # "tasks.rag_tasks",  # Requires Premium RAGService
         "tasks.session_cleanup",
     ],
@@ -87,6 +88,10 @@ celery_app.conf.task_routes = {
     "tasks.notification_tasks.subscribe_to_newsletter": {
         "queue": "notifications",
         "routing_key": "notification.send",
+    },
+    "tasks.question_tasks.generate_questions": {
+        "queue": "question_generation",
+        "routing_key": "question.generate",
     },
 }
 
