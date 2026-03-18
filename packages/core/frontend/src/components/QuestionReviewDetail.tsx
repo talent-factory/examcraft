@@ -237,29 +237,32 @@ const QuestionReviewDetail: React.FC = () => {
                 <TextField
                   label="Fragetext"
                   multiline
-                  rows={6}
+                  minRows={12}
                   fullWidth
                   value={editData.question_text}
                   onChange={(e) => setEditData(prev => ({ ...prev, question_text: e.target.value }))}
-                  InputProps={{ sx: { fontFamily: 'monospace' } }}
+                  InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.9rem' } }}
+                  sx={{ '& textarea': { resize: 'vertical' } }}
                 />
                 <TextField
-                  label="Korrekte Antwort"
+                  label="Korrekte Antwort / Musterloesung"
                   multiline
-                  rows={4}
+                  minRows={8}
                   fullWidth
                   value={editData.correct_answer}
                   onChange={(e) => setEditData(prev => ({ ...prev, correct_answer: e.target.value }))}
-                  InputProps={{ sx: { fontFamily: 'monospace' } }}
+                  InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.9rem' } }}
+                  sx={{ '& textarea': { resize: 'vertical' } }}
                 />
                 <TextField
-                  label="Erklaerung"
+                  label="Erklaerung / Bewertungskriterien"
                   multiline
-                  rows={4}
+                  minRows={6}
                   fullWidth
                   value={editData.explanation}
                   onChange={(e) => setEditData(prev => ({ ...prev, explanation: e.target.value }))}
-                  InputProps={{ sx: { fontFamily: 'monospace' } }}
+                  InputProps={{ sx: { fontFamily: 'monospace', fontSize: '0.9rem' } }}
+                  sx={{ '& textarea': { resize: 'vertical' } }}
                 />
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={4}>
