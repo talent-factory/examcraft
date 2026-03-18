@@ -187,7 +187,7 @@ const ReviewQueue: React.FC = () => {
   const handleSaveEdit = async (questionId: number, updates: QuestionReviewUpdateRequest) => {
     setLoading(true);
     try {
-      await ReviewService.editQuestion(questionId, updates, 'current_user'); // TODO: Get from auth
+      await ReviewService.editQuestion(questionId, updates);
       setEditorOpen(false);
       await loadQuestions();
     } catch (err) {

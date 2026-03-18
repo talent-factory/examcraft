@@ -62,6 +62,25 @@ export class ReviewService {
   }
 
   /**
+   * Get Question Detail (single question with review info)
+   */
+  static async getQuestionDetail(questionId: number): Promise<QuestionReview> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/questions/${questionId}/review`,
+      {
+        headers: this.getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to load question: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
    * Get Question Review Details (with comments and history)
    */
   static async getQuestionReview(questionId: number): Promise<QuestionReviewDetail> {
@@ -177,11 +196,10 @@ export class ReviewService {
    */
   static async editQuestion(
     questionId: number,
-    updates: QuestionReviewUpdateRequest,
-    editorId: string
+    updates: QuestionReviewUpdateRequest
   ): Promise<QuestionReview> {
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/questions/${questionId}/edit?editor_id=${encodeURIComponent(editorId)}`,
+      `${API_BASE_URL}/api/v1/questions/${questionId}/edit`,
       {
         method: 'PUT',
         headers: this.getAuthHeaders(),
@@ -294,11 +312,10 @@ export class ReviewService {
    * Batch Approve Questions
    */
   static async batchApproveQuestions(
-    questionIds: number[],
-    reviewerId: string
+    questionIds: number[]
   ): Promise<QuestionReview[]> {
     const promises = questionIds.map(id =>
-      this.approveQuestion(id, { reviewer_id: reviewerId })
+      this.approveQuestion(id, {})
     );
 
     return Promise.all(promises);
@@ -309,11 +326,10 @@ export class ReviewService {
    */
   static async batchRejectQuestions(
     questionIds: number[],
-    reviewerId: string,
     reason?: string
   ): Promise<QuestionReview[]> {
     const promises = questionIds.map(id =>
-      this.rejectQuestion(id, { reviewer_id: reviewerId, reason })
+      this.rejectQuestion(id, { reason })
     );
 
     return Promise.all(promises);
