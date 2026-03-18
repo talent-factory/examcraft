@@ -111,6 +111,18 @@ class CommentCreate(BaseModel):
     )
 
 
+class ReviewerInfo(BaseModel):
+    """Reviewer User Info"""
+
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+
+    class Config:
+        from_attributes = True
+
+
 class QuestionReviewResponse(BaseModel):
     """Response Model für Question Review"""
 
@@ -131,23 +143,11 @@ class QuestionReviewResponse(BaseModel):
     quality_tier: Optional[str]
     review_status: str
     reviewed_by: Optional[int]
-    reviewer_info: Optional["ReviewerInfo"] = None
+    reviewer_info: Optional[ReviewerInfo] = None
     reviewed_at: Optional[datetime]
     exam_id: Optional[str]
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class ReviewerInfo(BaseModel):
-    """Reviewer User Info"""
-
-    id: int
-    first_name: str
-    last_name: str
-    email: str
 
     class Config:
         from_attributes = True
