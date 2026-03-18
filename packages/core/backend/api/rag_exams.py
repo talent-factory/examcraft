@@ -563,5 +563,5 @@ async def rag_service_health():
         logger.error(f"RAG service health check failed: {str(e)}")
         raise HTTPException(
             status_code=503,
-            detail={"status": "unhealthy", "service": "RAG Service", "error": str(e)},
+            detail={"status": "unhealthy", "service": "RAG Service"},
         )

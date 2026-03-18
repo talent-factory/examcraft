@@ -97,7 +97,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
 
       if (promptId) {
         const result = await promptsApi.updatePrompt(promptId, formData);
-        const versionBumped = result.version > (formData.version || 1);
+        const versionBumped = result.version > (formData.version ?? 1);
+        setFormData(result);
         setSuccess(versionBumped
           ? `Neue Version v${result.version} erstellt`
           : 'Prompt erfolgreich aktualisiert'
