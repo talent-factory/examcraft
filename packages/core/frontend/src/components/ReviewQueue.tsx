@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -45,6 +46,7 @@ import QuestionReviewCard from './QuestionReviewCard';
 import QuestionEditor from './QuestionEditor';
 
 const ReviewQueue: React.FC = () => {
+  const navigate = useNavigate();
   const [questions, setQuestions] = useState<QuestionReview[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +128,7 @@ const ReviewQueue: React.FC = () => {
     try {
       setLoading(true);
       await ReviewService.startReview(questionId);
-      await loadQuestions();
+      navigate(`/questions/review/${questionId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Starten des Reviews');
     } finally {
