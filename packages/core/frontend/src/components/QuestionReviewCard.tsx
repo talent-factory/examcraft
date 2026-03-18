@@ -36,12 +36,17 @@ import {
   Grade,
   Source,
   Lightbulb,
+  RateReview,
+  Visibility,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { QuestionReview, ReviewStatus, ReviewComment } from '../types/review';
 import { ReviewService } from '../services/ReviewService';
+import MarkdownRenderer from './MarkdownRenderer';
 
 interface QuestionReviewCardProps {
   question: QuestionReview;
+  onStartReview?: (questionId: number) => void;
   onApprove?: (questionId: number) => void;
   onReject?: (questionId: number) => void;
   onEdit?: (questionId: number) => void;
@@ -51,12 +56,14 @@ interface QuestionReviewCardProps {
 
 const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
   question,
+  onStartReview,
   onApprove,
   onReject,
   onEdit,
   onComment,
   loading = false,
 }) => {
+  const navigate = useNavigate();
   const [showSources, setShowSources] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<ReviewComment[]>([]);
@@ -138,9 +145,9 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             <Typography variant="caption" color="text.secondary">
               Question #{question.id} • {formatQuestionType(question.question_type)}
             </Typography>
-            <Typography variant="h6" sx={{ mt: 0.5 }}>
-              {question.question_text}
-            </Typography>
+            <Box sx={{ mt: 0.5 }}>
+              <MarkdownRenderer content={question.question_text} variant="compact" />
+            </Box>
           </Box>
           <Chip
             label={question.review_status.toUpperCase()}
@@ -148,6 +155,12 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             size="small"
           />
         </Box>
+
+        {question.reviewer_info && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Reviewer: {question.reviewer_info.first_name} {question.reviewer_info.last_name}
+          </Typography>
+        )}
 
         {/* Options (for multiple choice) */}
         {question.options && question.options.length > 0 && (
@@ -188,7 +201,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               Correct Answer:
             </Typography>
             <Alert severity="success" icon={<CheckCircle />}>
-              {question.correct_answer}
+              <MarkdownRenderer content={question.correct_answer} variant="compact" />
             </Alert>
           </Box>
         )}
@@ -199,9 +212,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Explanation:
             </Typography>
-            <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-              {question.explanation}
-            </Typography>
+            <MarkdownRenderer content={question.explanation} variant="compact" />
           </Box>
         )}
 
@@ -356,6 +367,22 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
       {/* Action Buttons */}
       <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
         <Box>
+          {(question.review_status === ReviewStatus.PENDING || question.review_status === ReviewStatus.EDITED) && (
+            <Tooltip title="Review starten">
+              <span>
+                <Button
+                  variant="outlined"
+                  color="info"
+                  startIcon={<RateReview />}
+                  onClick={() => onStartReview?.(question.id)}
+                  disabled={loading}
+                  size="small"
+                >
+                  Review starten
+                </Button>
+              </span>
+            </Tooltip>
+          )}
           <Tooltip title="Approve Question">
             <span>
               <Button
@@ -403,6 +430,14 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               size="small"
             >
               <Comment />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Details anzeigen">
+            <IconButton
+              onClick={() => navigate(`/questions/review/${question.id}`)}
+              size="small"
+            >
+              <Visibility />
             </IconButton>
           </Tooltip>
         </Box>

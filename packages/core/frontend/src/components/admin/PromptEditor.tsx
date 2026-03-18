@@ -22,14 +22,17 @@ import {
 } from '@mui/material';
 import { Save, Cancel, Preview, Code, History } from '@mui/icons-material';
 import { promptsApi, Prompt } from '../../api/promptsApi';
-import { PromptCategory, QuestionType } from '../../types/prompt';
+import { PromptCategory } from '../../types/prompt';
 import MarkdownRenderer from '../MarkdownRenderer';
 
-// Question Type Labels für UI
-const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
-  [QuestionType.MULTIPLE_CHOICE]: 'Multiple Choice',
-  [QuestionType.OPEN_ENDED]: 'Offene Frage',
-  [QuestionType.TRUE_FALSE]: 'Wahr/Falsch'
+// Use Case Labels für UI — values must match the stored format (question_generation_<type>)
+const USE_CASE_LABELS: Record<string, string> = {
+  'question_generation': 'Fragengenerierung (allgemein)',
+  'question_generation_multiple_choice': 'Multiple Choice',
+  'question_generation_open_ended': 'Offene Frage',
+  'question_generation_true_false': 'Wahr/Falsch',
+  'chatbot': 'Chatbot',
+  'evaluation': 'Bewertung',
 };
 
 interface PromptEditorProps {
@@ -93,8 +96,13 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       setSuccess(null);
 
       if (promptId) {
-        await promptsApi.updatePrompt(promptId, formData);
-        setSuccess('Prompt erfolgreich aktualisiert');
+        const result = await promptsApi.updatePrompt(promptId, formData);
+        const versionBumped = result.version > (formData.version ?? 1);
+        setFormData(result);
+        setSuccess(versionBumped
+          ? `Neue Version v${result.version} erstellt`
+          : 'Prompt erfolgreich aktualisiert'
+        );
       } else {
         // Type assertion after validation
         const newPrompt = {
@@ -307,9 +315,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                 }
               >
                 <MenuItem value="">
-                  <em>Kein spezifischer Fragetyp</em>
+                  <em>Kein spezifischer Use Case</em>
                 </MenuItem>
-                {Object.entries(QUESTION_TYPE_LABELS).map(([value, label]) => (
+                {Object.entries(USE_CASE_LABELS).map(([value, label]) => (
                   <MenuItem key={value} value={value}>
                     {label}
                   </MenuItem>

@@ -25,6 +25,17 @@ export enum CommentType {
 }
 
 /**
+ * Reviewer Info Interface
+ * Enthält Informationen über den Reviewer
+ */
+export interface ReviewerInfo {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+/**
  * Question Review Interface
  * Erweitert RAGQuestion mit Review-spezifischen Feldern
  */
@@ -45,7 +56,8 @@ export interface QuestionReview {
   estimated_time_minutes?: number;
   quality_tier?: string;
   review_status: ReviewStatus;
-  reviewed_by?: string;
+  reviewed_by?: number;
+  reviewer_info?: ReviewerInfo;
   reviewed_at?: string;
   exam_id?: string;
   created_at: string;
@@ -167,7 +179,6 @@ export interface QuestionReviewUpdateRequest {
  * Review Action Request (Approve/Reject)
  */
 export interface ReviewActionRequest {
-  reviewer_id: string;
   comment?: string;
   reason?: string;
 }
@@ -178,8 +189,6 @@ export interface ReviewActionRequest {
 export interface CommentCreateRequest {
   comment_text: string;
   comment_type?: CommentType;
-  author: string;
-  author_role?: string;
 }
 
 /**

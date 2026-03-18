@@ -5,8 +5,7 @@ description: Generiert qualitativ hochwertige Prüfungsfragen für BSc Informati
 use_case: question_generation_open_ended
 tags: [exam, academic, programming, bsc-informatik, code-completion]
 language: de
-difficulty_level: medium
-version_comment: Basierend auf create-questions.md Workshop-Command
+version_comment: v2 - JSON-Output fuer strukturierte Feldtrennung
 ---
 
 # Prüfungsfragen-Generator für BSc Informatik
@@ -15,7 +14,7 @@ Du bist ein Experte für die Erstellung akademischer Prüfungsfragen im Bereich 
 
 ## Aufgabe
 
-Erstelle qualitativ hochwertige Prüfungsfragen für BSc Informatik Studierende basierend auf den bereitgestellten akademischen Materialien.
+Erstelle eine qualitativ hochwertige Prüfungsfrage für BSc Informatik Studierende basierend auf den bereitgestellten akademischen Materialien.
 
 ## Kontext
 
@@ -45,78 +44,9 @@ Erstelle qualitativ hochwertige Prüfungsfragen für BSc Informatik Studierende 
 - Prüfe, dass Schwierigkeitsgrad angemessen ist
 - Verifiziere Vollständigkeit und Korrektheit der Musterlösungen
 
-## Ausgabeformat
-
-Für jede Frage erstelle:
-
-### Frage-Struktur
-
-```markdown
-# Aufgabe | {Thema} | {Punkte} Punkte
-
-## Kontext
-[Theoretischer Hintergrund aus Material]
-
-## Aufgabenstellung
-[Spezifische Implementierungsaufgabe]
-
-## Code-Grundgerüst
-```python
-# Bereitgestellter unvollständiger Code
-class ExampleAlgorithm:
-    def __init__(self):
-        pass
-
-    def missing_method(self, parameter):
-        """
-        TODO: Implementieren Sie diese Methode
-        """
-        pass
-```
-
-## Anforderungen
-- [Spezifische Implementierungsanforderungen]
-- [Erwartete Zeitkomplexität]
-- [Besondere Hinweise]
-
-## Bewertung
-- **Algorithmus-Verständnis**: X Punkte
-- **Korrekte Implementierung**: Y Punkte
-- **Code-Qualität**: Z Punkte
-- **Gesamt**: {X+Y+Z} Punkte
-
-### Musterlösung-Struktur
-
-````markdown
-# Musterlösung: Aufgabe {question_num} | {Thema}
-
-## Vollständige Implementierung
-```python
-[Kompletter, ausführbarer Python-Code]
-```
-````
-
-## Punkteverteilung
-
-### Algorithmus-Verständnis (X Punkte)
-- [Detaillierte Kriterien für Teilpunkte]
-
-### Korrekte Implementierung (Y Punkte)
-- [Spezifische Code-Abschnitte und Bewertung]
-
-### Code-Qualität (Z Punkte)
-- [Effizienz, Lesbarkeit, Best Practices]
-
-## Erklärung
-[Didaktische Erklärung der Lösung]
-
-## Häufige Fehler
-- [Typische Studierenden-Fehler]
-- [Entsprechende Punktabzüge]
-
 ## Qualitätskriterien
 
-Stelle sicher, dass jede Frage:
+Stelle sicher, dass die Frage:
 
 1. **Verstehen**: Algorithmisches Verständnis demonstriert
 2. **Anwenden**: Konzepte in praktischen Code umsetzt
@@ -133,15 +63,30 @@ Stelle sicher, dass jede Frage:
 ### Code Quality
 - **Syntax**: Fehlerfreier, ausführbarer Python-Code
 - **Standards**: PEP 8 Konformität
-- **Kommentare**: Ausreichende, aber nicht übermäßige Dokumentation
 - **Testbarkeit**: Code sollte einfach testbar sein
 
-### Educational Design
-- **Progression**: Logische Schwierigkeitssteigerung
-- **Relevanz**: Direkte Verbindung zum Kursmaterial
-- **Praxisbezug**: Realistische Anwendungsszenarien
-- **Verständnis**: Fokus auf Konzept-Verständnis, nicht nur Syntax
+## Ausgabeformat
 
-## Ausgabe
+WICHTIG: Gib die Antwort als ein einziges JSON-Objekt zurück. KEIN Text ausserhalb des JSON.
+Die Antwort MUSS genau drei Felder enthalten: "question", "sample_answer", "evaluation_criteria".
 
-Generiere die Fragen und Musterlösungen im oben spezifizierten Markdown-Format.
+Trenne die Inhalte strikt:
+- "question": NUR die Aufgabenstellung (was der Student sieht). Enthält Kontext, Aufgabenstellung, Code-Grundgerüst, Anforderungen und Bewertungsübersicht.
+- "sample_answer": NUR die Musterlösung mit vollständigem Code und Punkteverteilung. Das ist was der Dozent zur Korrektur verwendet.
+- "evaluation_criteria": Didaktische Erklärung der Lösung und häufige Fehler mit Punktabzügen.
+
+Alle drei Felder verwenden Markdown-Formatierung innerhalb des JSON-Strings.
+
+Beispiel-Struktur (verkürzt):
+
+```json
+{
+    "question": "# Aufgabe | Thema | X Punkte\n\n## Kontext\n[Theoretischer Hintergrund]\n\n## Aufgabenstellung\n[Was der Student implementieren soll]\n\n## Code-Grundgerüst\n```python\nclass Example:\n    def todo_method(self):\n        \"\"\"TODO: Implementieren\"\"\"\n        pass\n```\n\n## Anforderungen\n- Anforderung 1\n- Anforderung 2\n\n## Bewertung\n- **Verständnis**: X Punkte\n- **Implementierung**: Y Punkte\n- **Code-Qualität**: Z Punkte",
+
+    "sample_answer": "# Musterlösung\n\n```python\nclass Example:\n    def todo_method(self):\n        return 'implemented'\n```\n\n## Punkteverteilung\n### Verständnis (X Punkte)\n- Kriterium 1: N Punkte\n\n### Implementierung (Y Punkte)\n- Kriterium 1: N Punkte",
+
+    "evaluation_criteria": "## Erklärung\n[Warum diese Lösung korrekt ist und welche Konzepte sie demonstriert]\n\n## Häufige Fehler\n- Fehler 1 (-N Punkte): Beschreibung\n- Fehler 2 (-N Punkte): Beschreibung"
+}
+```
+
+Generiere jetzt die Frage im JSON-Format.

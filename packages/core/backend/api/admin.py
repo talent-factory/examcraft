@@ -85,6 +85,7 @@ class InstitutionResponse(BaseModel):
     max_documents: int
     max_questions_per_month: int
     is_active: bool
+    require_second_reviewer: bool = False
     created_at: str
 
     class Config:
@@ -713,6 +714,7 @@ async def list_institutions(
             max_documents=inst.max_documents,
             max_questions_per_month=inst.max_questions_per_month,
             is_active=inst.is_active,
+            require_second_reviewer=getattr(inst, "require_second_reviewer", False),
             created_at=inst.created_at.isoformat(),
         )
         for inst in institutions
@@ -726,6 +728,7 @@ class UpdateInstitutionRequest(BaseModel):
     domain: Optional[str] = None
     subscription_tier: Optional[str] = None
     is_active: Optional[bool] = None
+    require_second_reviewer: Optional[bool] = None
 
 
 @router.patch("/institutions/{institution_id}", response_model=InstitutionResponse)
@@ -761,6 +764,9 @@ async def update_institution(
     if update_data.is_active is not None:
         institution.is_active = update_data.is_active
 
+    if update_data.require_second_reviewer is not None:
+        institution.require_second_reviewer = update_data.require_second_reviewer
+
     # Update subscription tier and quotas
     if update_data.subscription_tier is not None:
         # Validate tier
@@ -793,6 +799,7 @@ async def update_institution(
         max_documents=institution.max_documents,
         max_questions_per_month=institution.max_questions_per_month,
         is_active=institution.is_active,
+        require_second_reviewer=getattr(institution, "require_second_reviewer", False),
         created_at=institution.created_at.isoformat(),
     )
 
@@ -869,5 +876,6 @@ async def create_institution(
         max_documents=institution.max_documents,
         max_questions_per_month=institution.max_questions_per_month,
         is_active=institution.is_active,
+        require_second_reviewer=getattr(institution, "require_second_reviewer", False),
         created_at=institution.created_at.isoformat(),
     )

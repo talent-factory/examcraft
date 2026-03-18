@@ -109,6 +109,9 @@ class Institution(Base):
     max_documents = Column(Integer, default=5, nullable=False)
     max_questions_per_month = Column(Integer, default=20, nullable=False)
 
+    # Review-Workflow
+    require_second_reviewer = Column(Boolean, default=False)
+
     # Timestamps
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
