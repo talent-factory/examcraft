@@ -183,7 +183,7 @@ class SubscriptionLimits:
             additional_count: Number of questions about to be created
 
         Raises:
-            HTTPException: If limit would be exceeded
+            HTTPException: If adding additional_count questions would exceed the limit
         """
         # -1 means unlimited
         if institution.max_questions_per_month == -1:
@@ -209,11 +209,11 @@ class SubscriptionLimits:
 
         if (
             questions_this_month + additional_count
-            >= institution.max_questions_per_month
+            > institution.max_questions_per_month
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Monthly question limit reached ({questions_this_month}/{institution.max_questions_per_month} questions). Please upgrade your subscription.",
+                detail=f"Monthly question limit would be exceeded ({questions_this_month} existing + {additional_count} requested > {institution.max_questions_per_month} limit). Please upgrade your subscription.",
             )
 
     @staticmethod

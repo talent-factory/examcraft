@@ -54,7 +54,6 @@ class RAGExamRequestModel(BaseModel):
         3, description="Context Chunks pro Frage", ge=1, le=10
     )
 
-    # NEU: Prompt-Konfiguration pro Fragetyp
     prompt_config: Optional[Dict[str, PromptConfig]] = Field(
         None,
         description="Prompt-Konfiguration pro Fragetyp (z.B. {'multiple_choice': {...}, 'open_ended': {...}})",
@@ -95,6 +94,7 @@ class RAGExamResponseModel(BaseModel):
     generation_time: float
     quality_metrics: Dict[str, Any]
     review_question_ids: List[int] = []
+    persistence_warning: Optional[str] = None
 
 
 class ContextRetrievalRequest(BaseModel):
@@ -107,7 +107,7 @@ class ContextRetrievalRequest(BaseModel):
     max_chunks: int = Field(5, description="Maximale Anzahl Chunks", ge=1, le=20)
     min_similarity: Optional[float] = Field(
         0.01,
-        description="Mindest-Similarity (angepasst für Mock Embeddings)",
+        description="Mindest-Similarity Score (niedrig fuer maximalen Recall)",
         ge=0.0,
         le=1.0,
     )
@@ -207,7 +207,7 @@ async def generate_rag_exam(
             difficulty=request.difficulty,
             language=request.language,
             context_chunks_per_question=request.context_chunks_per_question,
-            prompt_config=prompt_config_dict,  # NEU: Prompt-Konfiguration
+            prompt_config=prompt_config_dict,
         )
 
         # Generiere RAG Exam
@@ -217,10 +217,11 @@ async def generate_rag_exam(
 
         # Persistiere generierte Fragen in question_reviews
         review_question_ids = []
+        persistence_warning = None
         try:
             reviews = []
             for question in rag_response.questions:
-                # explanation kann str oder list sein (Premium dataclass)
+                # explanation can be str or list — Premium RAG may return a list of grading criteria
                 if isinstance(question.explanation, str):
                     explanation_text = question.explanation
                 elif isinstance(question.explanation, list):
@@ -252,7 +253,7 @@ async def generate_rag_exam(
                 db.add(question_review)
                 reviews.append(question_review)
 
-            db.flush()  # Single round-trip: all IDs populated
+            db.flush()  # Flush once to populate auto-generated IDs for all pending inserts
 
             for question_review in reviews:
                 history = ReviewHistory(
@@ -273,6 +274,7 @@ async def generate_rag_exam(
                 exc_info=True,
             )
             review_question_ids = []
+            persistence_warning = "Questions were generated but could not be saved to the review workflow. Please try again."
 
         # Konvertiere zu Response Model
         questions_response = []
@@ -307,6 +309,7 @@ async def generate_rag_exam(
             generation_time=rag_response.generation_time,
             quality_metrics=rag_response.quality_metrics,
             review_question_ids=review_question_ids,
+            persistence_warning=persistence_warning,
         )
 
         logger.info(
@@ -353,7 +356,6 @@ async def retrieve_context(
                         status_code=404, detail=f"Document with ID {doc_id} not found"
                     )
 
-        # Hole Kontext (mit angepasstem min_similarity für Mock Embeddings)
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
         context = await rag_service_module.rag_service.retrieve_context(
             query=request.query,
@@ -559,4 +561,7 @@ async def rag_service_health():
 
     except Exception as e:
         logger.error(f"RAG service health check failed: {str(e)}")
-        return {"status": "unhealthy", "service": "RAG Service", "error": str(e)}
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "unhealthy", "service": "RAG Service", "error": str(e)},
+        )

@@ -106,6 +106,7 @@ export interface RAGExamResponse {
   context_summary: RAGContextSummary;
   generation_time: number;
   review_question_ids?: number[];
+  persistence_warning?: string;
   quality_metrics: {
     total_questions: number;
     average_confidence: number;

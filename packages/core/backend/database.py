@@ -78,10 +78,10 @@ def create_tables():
             "✅ Core models imported (Auth + Documents + Question Review + RBAC + Email)"
         )
     except Exception as e:
-        print(f"⚠️  Core models import error: {e}")
         import traceback
 
         traceback.print_exc()
+        raise RuntimeError(f"Failed to import core models (cannot start): {e}") from e
 
     # Import Premium models (if available)
     # NOTE: We import Premium models using standard imports (not importlib.util)
@@ -124,7 +124,7 @@ def _run_migrations_or_create_all():
 
     Verhalten je nach AUTO_MIGRATE env var:
     - AUTO_MIGRATE=true: Fuehre 'alembic upgrade head' aus (fuer Development)
-    - AUTO_MIGRATE nicht gesetzt: Nur pruefen ob Migrationen ausstehen und warnen
+    - AUTO_MIGRATE absent or not 'true': Nur pruefen ob Migrationen ausstehen und warnen
     - Fallback: Base.metadata.create_all() wenn Alembic nicht verfuegbar
 
     WICHTIG: In Production NIEMALS automatisch migrieren. Migrationen muessen
@@ -174,11 +174,21 @@ def _run_migrations_or_create_all():
                 # Nicht abbrechen — App soll starten, aber Warnung ist sichtbar
                 return
 
+        except ImportError:
+            # Alembic not installed — acceptable to fall back to create_all
+            print("⚠️  Alembic not installed, falling back to create_all")
         except Exception as e:
-            print(f"⚠️  Alembic check failed, falling back to create_all: {e}")
+            import traceback
+
+            traceback.print_exc()
+            print(f"⚠️  CRITICAL: Alembic migration failed: {e}")
+            print(
+                "⚠️  The database schema may be inconsistent. Fix migrations before proceeding."
+            )
+            # Still create missing tables, but the warning is loud
 
     Base.metadata.create_all(bind=engine)
-    print("Database tables created successfully (create_all fallback)")
+    print("Database tables created/verified (create_all fallback)")
 
 
 if __name__ == "__main__":
