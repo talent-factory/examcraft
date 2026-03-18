@@ -59,22 +59,19 @@ class QuestionReviewUpdate(BaseModel):
 
 
 class ReviewActionRequest(BaseModel):
-    """Request Model für Review Actions (Approve/Reject)"""
+    """Request Model fuer Review Actions (Approve/Reject)"""
 
-    reviewer_id: str = Field(..., min_length=1, max_length=100)
     comment: Optional[str] = Field(None, max_length=2000)
     reason: Optional[str] = Field(None, max_length=500)
 
 
 class CommentCreate(BaseModel):
-    """Request Model für neuen Comment"""
+    """Request Model fuer neuen Comment"""
 
     comment_text: str = Field(..., min_length=1, max_length=2000)
     comment_type: str = Field(
         default="general", pattern="^(general|suggestion|issue|approval_note)$"
     )
-    author: str = Field(..., min_length=1, max_length=100)
-    author_role: Optional[str] = Field(None, max_length=50)
 
 
 class QuestionReviewResponse(BaseModel):
@@ -576,7 +573,6 @@ async def approve_question(
 
         # Update Question
         question.review_status = ReviewStatus.APPROVED.value
-        question.reviewed_by = current_user.id
         question.reviewed_at = datetime.utcnow()
 
         db.commit()
@@ -599,7 +595,7 @@ async def approve_question(
                 question_id=question.id,
                 comment_text=request.comment,
                 comment_type="approval_note",
-                author=current_user.email,
+                author=f"{current_user.first_name} {current_user.last_name}",
                 author_role="reviewer",
             )
             db.add(comment)
@@ -657,7 +653,6 @@ async def reject_question(
 
         # Update Question
         question.review_status = ReviewStatus.REJECTED.value
-        question.reviewed_by = current_user.id
         question.reviewed_at = datetime.utcnow()
 
         db.commit()
@@ -680,7 +675,7 @@ async def reject_question(
                 question_id=question.id,
                 comment_text=request.comment,
                 comment_type="issue",
-                author=current_user.email,
+                author=f"{current_user.first_name} {current_user.last_name}",
                 author_role="reviewer",
             )
             db.add(comment)
@@ -778,18 +773,20 @@ async def add_comment(
 
         # Create Comment
         comment = ReviewComment(
-            question_id=question_id,
+            question_id=question.id,
             comment_text=request.comment_text,
             comment_type=request.comment_type,
-            author=request.author,
-            author_role=request.author_role,
+            author=f"{current_user.first_name} {current_user.last_name}",
+            author_role="reviewer"
+            if question.reviewed_by and current_user.id == question.reviewed_by
+            else "user",
         )
 
         db.add(comment)
         db.commit()
         db.refresh(comment)
 
-        logger.info(f"Added comment to question {question_id} by {request.author}")
+        logger.info(f"Added comment to question {question_id} by {current_user.email}")
         return comment
 
     except HTTPException:

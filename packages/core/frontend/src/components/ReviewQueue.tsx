@@ -165,7 +165,6 @@ const ReviewQueue: React.FC = () => {
     setLoading(true);
     try {
       const request: ReviewActionRequest = {
-        reviewer_id: 'current_user', // TODO: Get from auth context
         reason: actionReason || undefined,
       };
 
@@ -207,7 +206,6 @@ const ReviewQueue: React.FC = () => {
       const request: CommentCreateRequest = {
         comment_text: commentText,
         comment_type: 'general' as any,
-        author: 'current_user', // TODO: Get from auth
       };
 
       await ReviewService.addComment(commentQuestionId, request);

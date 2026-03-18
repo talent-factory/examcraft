@@ -167,7 +167,6 @@ export interface QuestionReviewUpdateRequest {
  * Review Action Request (Approve/Reject)
  */
 export interface ReviewActionRequest {
-  reviewer_id: string;
   comment?: string;
   reason?: string;
 }
@@ -178,8 +177,6 @@ export interface ReviewActionRequest {
 export interface CommentCreateRequest {
   comment_text: string;
   comment_type?: CommentType;
-  author: string;
-  author_role?: string;
 }
 
 /**
