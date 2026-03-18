@@ -182,13 +182,11 @@ class RBACService:
             seconds=1
         )
 
-        # Verwende Institution ID als Organization ID (Mapping)
-        org_id = f"org_{institution_id}"
         usage = (
             self.db.query(ResourceUsage)
             .filter(
                 and_(
-                    ResourceUsage.organization_id == org_id,
+                    ResourceUsage.institution_id == institution_id,
                     ResourceUsage.resource_type == resource_type,
                     ResourceUsage.period_start == current_period_start,
                 )
@@ -221,14 +219,11 @@ class RBACService:
             day=1
         ) - timedelta(seconds=1)
 
-        # Verwende Institution ID als Organization ID (Mapping)
-        org_id = f"org_{institution_id}"
-
         usage = (
             self.db.query(ResourceUsage)
             .filter(
                 and_(
-                    ResourceUsage.organization_id == org_id,
+                    ResourceUsage.institution_id == institution_id,
                     ResourceUsage.resource_type == resource_type,
                     ResourceUsage.period_start == current_period_start,
                 )
@@ -238,7 +233,7 @@ class RBACService:
 
         if not usage:
             usage = ResourceUsage(
-                organization_id=org_id,
+                institution_id=institution_id,
                 resource_type=resource_type,
                 usage_count=0,
                 period_start=current_period_start,

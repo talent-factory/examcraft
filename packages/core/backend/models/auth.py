@@ -130,6 +130,9 @@ class Institution(Base):
     subscriptions = relationship(
         "Subscription", back_populates="institution", cascade="all, delete-orphan"
     )
+    resource_usage = relationship(
+        "ResourceUsage", back_populates="institution", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Institution(id={self.id}, name='{self.name}', slug='{self.slug}')>"
