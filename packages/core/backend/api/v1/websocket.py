@@ -113,9 +113,19 @@ async def _check_task_ownership(websocket: WebSocket, task_id: str, user: User) 
         db.close()
 
 
-def _get_task_result(task_id: str) -> AsyncResult:
-    """Blockierender Redis-Aufruf — muss via run_in_executor aufgerufen werden."""
-    return AsyncResult(task_id, app=celery_app)
+def _get_task_result(task_id: str) -> dict:
+    """
+    Blockierender Redis-Aufruf — muss via run_in_executor aufgerufen werden.
+    Liest state, info und result in einem einzigen Executor-Aufruf,
+    damit kein blocking I/O auf dem Event-Loop stattfindet.
+    """
+    result = AsyncResult(task_id, app=celery_app)
+    state = result.state
+    return {
+        "state": state,
+        "info": result.info,
+        "result": result.result if state == "SUCCESS" else None,
+    }
 
 
 @router.websocket("/ws/tasks/{task_id}")
@@ -153,10 +163,12 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
         loop = asyncio.get_running_loop()
 
         while True:
-            result = await loop.run_in_executor(None, lambda: _get_task_result(task_id))
+            task_data = await loop.run_in_executor(
+                None, lambda: _get_task_result(task_id)
+            )
 
-            state = result.state
-            info = result.info or {}
+            state = task_data["state"]
+            info = task_data["info"] or {}
 
             if state == TaskStatus.PROGRESS:
                 msg = TaskStatusMessage(
@@ -173,14 +185,15 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
                     task_id=task_id,
                     status=TaskStatus.SUCCESS,
                     progress=100,
-                    result=result.result,
+                    result=task_data["result"],
                 )
                 await websocket.send_json(msg.model_dump())
                 await websocket.close()
                 return
 
             elif state in (TaskStatus.FAILURE, TaskStatus.REVOKED):
-                error_str = str(result.info) if result.info else "Unbekannter Fehler"
+                raw_info = task_data["info"]
+                error_str = str(raw_info) if raw_info else "Unbekannter Fehler"
                 msg = TaskStatusMessage(
                     task_id=task_id,
                     status=TaskStatus(state),
