@@ -150,7 +150,7 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
             return
 
         pending_seconds = 0
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         while True:
             result = await loop.run_in_executor(None, lambda: _get_task_result(task_id))
