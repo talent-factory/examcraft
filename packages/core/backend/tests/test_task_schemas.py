@@ -61,3 +61,25 @@ def test_task_status_enum_contains_retry():
 
     assert TaskStatus.RETRY == "RETRY"
     assert TaskStatus.REVOKED == "REVOKED"
+
+
+def test_generate_exam_task_response_valid():
+    """GenerateExamTaskResponse hat task_id und message"""
+    from schemas.task import GenerateExamTaskResponse
+
+    resp = GenerateExamTaskResponse(
+        task_id="abc-123",
+        message="Fragengenerierung gestartet",
+    )
+    assert resp.task_id == "abc-123"
+    assert resp.message == "Fragengenerierung gestartet"
+
+
+def test_generate_exam_task_response_requires_task_id():
+    """task_id ist Pflichtfeld"""
+    import pytest
+    from pydantic import ValidationError
+    from schemas.task import GenerateExamTaskResponse
+
+    with pytest.raises(ValidationError):
+        GenerateExamTaskResponse(message="test")

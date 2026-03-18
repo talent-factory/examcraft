@@ -27,3 +27,10 @@ class TaskStatusMessage(BaseModel):
     message: Optional[str] = None
     result: Optional[Any] = None
     error: Optional[str] = None
+
+
+class GenerateExamTaskResponse(BaseModel):
+    """Response für den asynchronen Fragengenerierungs-Endpoint"""
+
+    task_id: str
+    message: str
