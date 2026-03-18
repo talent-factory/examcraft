@@ -1,5 +1,5 @@
 """Pydantic Schemas für FastAPI API"""
 
-from .task import TaskStatus, TaskStatusMessage
+from .task import TaskStatus, TaskStatusMessage, GenerateExamTaskResponse
 
-__all__ = ["TaskStatus", "TaskStatusMessage"]
+__all__ = ["TaskStatus", "TaskStatusMessage", "GenerateExamTaskResponse"]
