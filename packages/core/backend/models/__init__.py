@@ -30,7 +30,6 @@ from models.rbac import (
     SubscriptionTier,
     TierQuota,
     TierFeature,
-    Organization,
     ResourceUsage,
     PermissionAuditLog,
 )
@@ -67,7 +66,6 @@ __all__ = [
     "SubscriptionTier",
     "TierQuota",
     "TierFeature",
-    "Organization",
     "ResourceUsage",
     "PermissionAuditLog",
     "Subscription",

@@ -92,7 +92,7 @@ class QuotaCheckResponse(BaseModel):
 
 
 class ResourceUsageResponse(BaseModel):
-    organization_id: str
+    institution_id: int
     resource_type: str
     usage_count: int
     period_start: datetime
