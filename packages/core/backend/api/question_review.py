@@ -25,6 +25,43 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/questions", tags=["Question Review"])
 
 
+def _attach_reviewer_info(question: QuestionReview, db: Session) -> dict:
+    """Convert QuestionReview to dict with reviewer_info joined."""
+    data = {
+        "id": question.id,
+        "question_text": question.question_text,
+        "question_type": question.question_type,
+        "options": question.options,
+        "correct_answer": question.correct_answer,
+        "explanation": question.explanation,
+        "difficulty": question.difficulty,
+        "topic": question.topic,
+        "language": question.language,
+        "source_chunks": question.source_chunks,
+        "source_documents": question.source_documents,
+        "confidence_score": question.confidence_score,
+        "bloom_level": question.bloom_level,
+        "estimated_time_minutes": question.estimated_time_minutes,
+        "quality_tier": question.quality_tier,
+        "review_status": question.review_status,
+        "reviewed_by": question.reviewed_by,
+        "reviewed_at": question.reviewed_at,
+        "exam_id": question.exam_id,
+        "created_at": question.created_at,
+        "updated_at": question.updated_at,
+    }
+    if question.reviewed_by:
+        reviewer = db.query(User).filter(User.id == question.reviewed_by).first()
+        if reviewer:
+            data["reviewer_info"] = {
+                "id": reviewer.id,
+                "first_name": reviewer.first_name,
+                "last_name": reviewer.last_name,
+                "email": reviewer.email,
+            }
+    return data
+
+
 # Pydantic Models
 class QuestionReviewCreate(BaseModel):
     """Request Model für neue Question Review"""
@@ -59,22 +96,31 @@ class QuestionReviewUpdate(BaseModel):
 
 
 class ReviewActionRequest(BaseModel):
-    """Request Model für Review Actions (Approve/Reject)"""
+    """Request Model fuer Review Actions (Approve/Reject)"""
 
-    reviewer_id: str = Field(..., min_length=1, max_length=100)
     comment: Optional[str] = Field(None, max_length=2000)
     reason: Optional[str] = Field(None, max_length=500)
 
 
 class CommentCreate(BaseModel):
-    """Request Model für neuen Comment"""
+    """Request Model fuer neuen Comment"""
 
     comment_text: str = Field(..., min_length=1, max_length=2000)
     comment_type: str = Field(
         default="general", pattern="^(general|suggestion|issue|approval_note)$"
     )
-    author: str = Field(..., min_length=1, max_length=100)
-    author_role: Optional[str] = Field(None, max_length=50)
+
+
+class ReviewerInfo(BaseModel):
+    """Reviewer User Info"""
+
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+
+    class Config:
+        from_attributes = True
 
 
 class QuestionReviewResponse(BaseModel):
@@ -96,7 +142,8 @@ class QuestionReviewResponse(BaseModel):
     estimated_time_minutes: Optional[int]
     quality_tier: Optional[str]
     review_status: str
-    reviewed_by: Optional[str]
+    reviewed_by: Optional[int]
+    reviewer_info: Optional[ReviewerInfo] = None
     reviewed_at: Optional[datetime]
     exam_id: Optional[str]
     created_at: datetime
@@ -223,12 +270,14 @@ async def get_review_queue(
         )
 
         # Get Questions with Pagination
-        questions = (
+        question_list = (
             query.order_by(QuestionReview.created_at.desc())
             .limit(limit)
             .offset(offset)
             .all()
         )
+
+        questions = [_attach_reviewer_info(q, db) for q in question_list]
 
         return ReviewQueueResponse(
             total=total,
@@ -267,7 +316,10 @@ async def get_question_review(
                 status_code=404, detail=f"Question {question_id} not found"
             )
 
-        return question
+        data = _attach_reviewer_info(question, db)
+        data["comments"] = question.comments
+        data["history"] = question.history
+        return data
 
     except HTTPException:
         raise
@@ -450,7 +502,13 @@ async def edit_question(
 
         # Set status to EDITED if changes were made
         if changed_fields:
-            question.review_status = ReviewStatus.EDITED.value
+            if (
+                question.review_status == ReviewStatus.IN_REVIEW.value
+                and current_user.id == question.reviewed_by
+            ):
+                pass  # Reviewer edits stay in_review
+            else:
+                question.review_status = ReviewStatus.EDITED.value
 
         db.commit()
         db.refresh(question)
@@ -470,7 +528,7 @@ async def edit_question(
             db.commit()
 
         logger.info(f"Edited question {question_id} by {current_user.email}")
-        return question
+        return _attach_reviewer_info(question, db)
 
     except HTTPException:
         raise
@@ -479,6 +537,74 @@ async def edit_question(
         logger.error(f"Error editing question {question_id}: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to edit question: {str(e)}"
+        )
+
+
+@router.post("/{question_id}/start-review", response_model=QuestionReviewResponse)
+async def start_review(
+    question_id: int,
+    current_user: User = Depends(require_permission("approve_questions")),
+    db: Session = Depends(get_db),
+):
+    """
+    Markiere Frage als 'In Review'.
+
+    Signalisiert anderen Reviewern, dass diese Frage gerade bearbeitet wird.
+
+    **Required Permission:** `approve_questions` (Dozent, Admin)
+    """
+    try:
+        question = (
+            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        )
+
+        if not question:
+            raise HTTPException(
+                status_code=404, detail=f"Question {question_id} not found"
+            )
+
+        if question.review_status not in (
+            ReviewStatus.PENDING.value,
+            ReviewStatus.EDITED.value,
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Frage kann nur aus Status 'pending' oder 'edited' in Review genommen werden (aktuell: {question.review_status}).",
+            )
+
+        old_status = question.review_status
+
+        question.review_status = ReviewStatus.IN_REVIEW.value
+        question.reviewed_by = current_user.id
+        question.reviewed_at = datetime.utcnow()
+
+        history = ReviewHistory(
+            question_id=question.id,
+            action="status_changed",
+            old_status=old_status,
+            new_status=ReviewStatus.IN_REVIEW.value,
+            changed_by=str(current_user.id),
+            change_reason="Review gestartet",
+        )
+        db.add(history)
+        db.commit()
+        db.refresh(question)
+
+        logger.info(
+            f"Started review for question {question_id} by {current_user.email}"
+        )
+        return _attach_reviewer_info(question, db)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Error starting review for question {question_id}: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Fehler beim Starten des Reviews. Bitte versuchen Sie es erneut.",
         )
 
 
@@ -504,11 +630,29 @@ async def approve_question(
                 status_code=404, detail=f"Question {question_id} not found"
             )
 
+        # Vier-Augen-Prinzip Check
+        if question.institution_id and question.reviewed_by:
+            from models.auth import Institution
+
+            institution = (
+                db.query(Institution)
+                .filter(Institution.id == question.institution_id)
+                .first()
+            )
+            if (
+                institution
+                and institution.require_second_reviewer
+                and current_user.id == question.reviewed_by
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Vier-Augen-Prinzip: Ein anderer Reviewer muss diese Frage genehmigen.",
+                )
+
         old_status = question.review_status
 
         # Update Question
         question.review_status = ReviewStatus.APPROVED.value
-        question.reviewed_by = current_user.email
         question.reviewed_at = datetime.utcnow()
 
         db.commit()
@@ -531,7 +675,7 @@ async def approve_question(
                 question_id=question.id,
                 comment_text=request.comment,
                 comment_type="approval_note",
-                author=current_user.email,
+                author=f"{current_user.first_name} {current_user.last_name}",
                 author_role="reviewer",
             )
             db.add(comment)
@@ -550,15 +694,16 @@ async def approve_question(
         )
 
         logger.info(f"Approved question {question_id} by {current_user.email}")
-        return question
+        return _attach_reviewer_info(question, db)
 
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error approving question {question_id}: {e}")
+        logger.error(f"Error approving question {question_id}: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to approve question: {str(e)}"
+            status_code=500,
+            detail="Fehler beim Genehmigen der Frage. Bitte versuchen Sie es erneut.",
         )
 
 
@@ -588,7 +733,6 @@ async def reject_question(
 
         # Update Question
         question.review_status = ReviewStatus.REJECTED.value
-        question.reviewed_by = current_user.email
         question.reviewed_at = datetime.utcnow()
 
         db.commit()
@@ -611,7 +755,7 @@ async def reject_question(
                 question_id=question.id,
                 comment_text=request.comment,
                 comment_type="issue",
-                author=current_user.email,
+                author=f"{current_user.first_name} {current_user.last_name}",
                 author_role="reviewer",
             )
             db.add(comment)
@@ -630,15 +774,16 @@ async def reject_question(
         )
 
         logger.info(f"Rejected question {question_id} by {current_user.email}")
-        return question
+        return _attach_reviewer_info(question, db)
 
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error rejecting question {question_id}: {e}")
+        logger.error(f"Error rejecting question {question_id}: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to reject question: {str(e)}"
+            status_code=500,
+            detail="Fehler beim Ablehnen der Frage. Bitte versuchen Sie es erneut.",
         )
 
 
@@ -708,18 +853,20 @@ async def add_comment(
 
         # Create Comment
         comment = ReviewComment(
-            question_id=question_id,
+            question_id=question.id,
             comment_text=request.comment_text,
             comment_type=request.comment_type,
-            author=request.author,
-            author_role=request.author_role,
+            author=f"{current_user.first_name} {current_user.last_name}",
+            author_role="reviewer"
+            if question.reviewed_by and current_user.id == question.reviewed_by
+            else "user",
         )
 
         db.add(comment)
         db.commit()
         db.refresh(comment)
 
-        logger.info(f"Added comment to question {question_id} by {request.author}")
+        logger.info(f"Added comment to question {question_id} by {current_user.email}")
         return comment
 
     except HTTPException:

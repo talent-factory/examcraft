@@ -16,6 +16,7 @@ import services.rag_service as rag_service_module
 from services.rag_service import RAGExamRequest
 from services.document_service import document_service
 from models.auth import User
+from models.question_review import QuestionReview, ReviewHistory, ReviewStatus
 from utils.auth_utils import get_current_active_user, require_permission
 import logging
 
@@ -53,7 +54,6 @@ class RAGExamRequestModel(BaseModel):
         3, description="Context Chunks pro Frage", ge=1, le=10
     )
 
-    # NEU: Prompt-Konfiguration pro Fragetyp
     prompt_config: Optional[Dict[str, PromptConfig]] = Field(
         None,
         description="Prompt-Konfiguration pro Fragetyp (z.B. {'multiple_choice': {...}, 'open_ended': {...}})",
@@ -93,6 +93,8 @@ class RAGExamResponseModel(BaseModel):
     context_summary: RAGContextResponse
     generation_time: float
     quality_metrics: Dict[str, Any]
+    review_question_ids: List[int] = []
+    persistence_warning: Optional[str] = None
 
 
 class ContextRetrievalRequest(BaseModel):
@@ -105,7 +107,7 @@ class ContextRetrievalRequest(BaseModel):
     max_chunks: int = Field(5, description="Maximale Anzahl Chunks", ge=1, le=20)
     min_similarity: Optional[float] = Field(
         0.01,
-        description="Mindest-Similarity (angepasst für Mock Embeddings)",
+        description="Mindest-Similarity Score (niedrig fuer maximalen Recall)",
         ge=0.0,
         le=1.0,
     )
@@ -184,6 +186,18 @@ async def generate_rag_exam(
         else:
             logger.info("📋 API received NO prompt_config - will use default templates")
 
+        # Quota-Check vor Generierung (verhindert unnoetige Claude-API-Kosten)
+        from utils.tenant_utils import SubscriptionLimits
+
+        if not current_user.institution:
+            raise HTTPException(
+                status_code=403,
+                detail="You must be associated with an institution to generate exams.",
+            )
+        SubscriptionLimits.check_question_limit(
+            current_user.institution, db, additional_count=request.question_count
+        )
+
         # Erstelle RAG Request
         rag_request = RAGExamRequest(
             topic=request.topic,
@@ -193,13 +207,74 @@ async def generate_rag_exam(
             difficulty=request.difficulty,
             language=request.language,
             context_chunks_per_question=request.context_chunks_per_question,
-            prompt_config=prompt_config_dict,  # NEU: Prompt-Konfiguration
+            prompt_config=prompt_config_dict,
         )
 
         # Generiere RAG Exam
         rag_response = await rag_service_module.rag_service.generate_rag_exam(
             rag_request
         )
+
+        # Persistiere generierte Fragen in question_reviews
+        review_question_ids = []
+        persistence_warning = None
+        try:
+            reviews = []
+            for question in rag_response.questions:
+                # explanation can be str or list — Premium RAG may return a list of grading criteria
+                if isinstance(question.explanation, str):
+                    explanation_text = question.explanation
+                elif isinstance(question.explanation, list):
+                    explanation_text = "; ".join(
+                        str(item) for item in question.explanation
+                    )
+                elif question.explanation is not None:
+                    explanation_text = str(question.explanation)
+                else:
+                    explanation_text = None
+
+                question_review = QuestionReview(
+                    question_text=question.question_text,
+                    question_type=question.question_type,
+                    options=question.options,
+                    correct_answer=question.correct_answer,
+                    explanation=explanation_text,
+                    difficulty=question.difficulty,
+                    topic=request.topic,
+                    language=request.language,
+                    source_chunks=question.source_chunks,
+                    source_documents=question.source_documents,
+                    confidence_score=question.confidence_score,
+                    review_status=ReviewStatus.PENDING.value,
+                    exam_id=rag_response.exam_id,
+                    created_by=current_user.id,
+                    institution_id=current_user.institution_id,
+                )
+                db.add(question_review)
+                reviews.append(question_review)
+
+            db.flush()  # Flush once to populate auto-generated IDs for all pending inserts
+
+            for question_review in reviews:
+                history = ReviewHistory(
+                    question_id=question_review.id,
+                    action="created",
+                    new_status=ReviewStatus.PENDING.value,
+                    changed_by=str(current_user.id),
+                    change_reason="Auto-generated via RAG exam generation",
+                )
+                db.add(history)
+                review_question_ids.append(question_review.id)
+
+            db.commit()
+        except Exception as persist_err:
+            db.rollback()
+            logger.error(
+                f"Failed to persist questions for exam '{rag_response.exam_id}': {persist_err}",
+                exc_info=True,
+            )
+            review_question_ids = []
+            persistence_warning = "Questions were generated but could not be saved to the review workflow. Please try again."
 
         # Konvertiere zu Response Model
         questions_response = []
@@ -233,6 +308,8 @@ async def generate_rag_exam(
             context_summary=context_response,
             generation_time=rag_response.generation_time,
             quality_metrics=rag_response.quality_metrics,
+            review_question_ids=review_question_ids,
+            persistence_warning=persistence_warning,
         )
 
         logger.info(
@@ -242,10 +319,15 @@ async def generate_rag_exam(
         return response
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
-        logger.error(f"RAG exam generation failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Exam generation failed: {str(e)}")
+        db.rollback()
+        logger.error(f"RAG exam generation failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Exam generation failed. Please try again or contact support.",
+        )
 
 
 @router.post("/retrieve-context", response_model=RAGContextResponse)
@@ -274,7 +356,6 @@ async def retrieve_context(
                         status_code=404, detail=f"Document with ID {doc_id} not found"
                     )
 
-        # Hole Kontext (mit angepasstem min_similarity für Mock Embeddings)
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
         context = await rag_service_module.rag_service.retrieve_context(
             query=request.query,
@@ -480,4 +561,7 @@ async def rag_service_health():
 
     except Exception as e:
         logger.error(f"RAG service health check failed: {str(e)}")
-        return {"status": "unhealthy", "service": "RAG Service", "error": str(e)}
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "unhealthy", "service": "RAG Service"},
+        )

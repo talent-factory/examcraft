@@ -28,6 +28,7 @@ import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { UserRole } from './types/auth';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
+import QuestionReviewDetail from './components/QuestionReviewDetail';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
 // Load Premium PromptLibrary with Upload (falls back to Core version)
@@ -126,6 +127,17 @@ export const AppWithAuth: React.FC = () => {
                         <Review />
                       </AppLayout>
                     </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/questions/review/:id"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <QuestionReviewDetail />
+                    </AppLayout>
                   </ProtectedRoute>
                 }
               />
