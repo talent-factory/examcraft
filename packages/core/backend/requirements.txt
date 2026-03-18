@@ -27,7 +27,7 @@ amqp==5.2.0                             # AMQP Protocol Implementation
 httpx>=0.28.1
 
 # SubscribeFlow SDK (Newsletter Subscription)
-subscribeflow @ git+ssh://git@github.com/talent-factory/subscribe-flow.git#subdirectory=sdk/python
+subscribeflow>=1.0.5
 
 # Configuration
 pyyaml>=6.0.2                       # YAML Configuration
