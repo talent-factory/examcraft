@@ -131,7 +131,7 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
             document.error_message = str(e)
             db.commit()
 
-        raise self.retry(exc=e, countdown=60)
+        raise  # autoretry_for=(Exception,) auf dem Decorator übernimmt die Retry-Logik
 
     finally:
         db.close()
