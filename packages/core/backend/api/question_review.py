@@ -96,7 +96,7 @@ class QuestionReviewResponse(BaseModel):
     estimated_time_minutes: Optional[int]
     quality_tier: Optional[str]
     review_status: str
-    reviewed_by: Optional[str]
+    reviewed_by: Optional[int]
     reviewed_at: Optional[datetime]
     exam_id: Optional[str]
     created_at: datetime
@@ -508,7 +508,7 @@ async def approve_question(
 
         # Update Question
         question.review_status = ReviewStatus.APPROVED.value
-        question.reviewed_by = current_user.email
+        question.reviewed_by = current_user.id
         question.reviewed_at = datetime.utcnow()
 
         db.commit()
@@ -556,9 +556,10 @@ async def approve_question(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error approving question {question_id}: {e}")
+        logger.error(f"Error approving question {question_id}: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to approve question: {str(e)}"
+            status_code=500,
+            detail="Fehler beim Genehmigen der Frage. Bitte versuchen Sie es erneut.",
         )
 
 
@@ -588,7 +589,7 @@ async def reject_question(
 
         # Update Question
         question.review_status = ReviewStatus.REJECTED.value
-        question.reviewed_by = current_user.email
+        question.reviewed_by = current_user.id
         question.reviewed_at = datetime.utcnow()
 
         db.commit()
@@ -636,9 +637,10 @@ async def reject_question(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error rejecting question {question_id}: {e}")
+        logger.error(f"Error rejecting question {question_id}: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to reject question: {str(e)}"
+            status_code=500,
+            detail="Fehler beim Ablehnen der Frage. Bitte versuchen Sie es erneut.",
         )
 
 
