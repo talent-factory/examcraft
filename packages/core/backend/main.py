@@ -195,6 +195,13 @@ async def lifespan(app: FastAPI):
     webhooks_api = importlib.util.module_from_spec(spec_webhooks)
     spec_webhooks.loader.exec_module(webhooks_api)
 
+    # Import WebSocket API (for task progress streaming)
+    spec_ws = importlib.util.spec_from_file_location(
+        "core_api_v1_websocket", os.path.join(core_api_path, "v1", "websocket.py")
+    )
+    websocket_api = importlib.util.module_from_spec(spec_ws)
+    spec_ws.loader.exec_module(websocket_api)
+
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(gdpr.router)
@@ -206,6 +213,7 @@ async def lifespan(app: FastAPI):
     app.include_router(
         webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"]
     )
+    app.include_router(websocket_api.router)
 
     # Email Webhooks (Resend)
     try:
