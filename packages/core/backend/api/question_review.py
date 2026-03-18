@@ -25,6 +25,43 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/questions", tags=["Question Review"])
 
 
+def _attach_reviewer_info(question: QuestionReview, db: Session) -> dict:
+    """Convert QuestionReview to dict with reviewer_info joined."""
+    data = {
+        "id": question.id,
+        "question_text": question.question_text,
+        "question_type": question.question_type,
+        "options": question.options,
+        "correct_answer": question.correct_answer,
+        "explanation": question.explanation,
+        "difficulty": question.difficulty,
+        "topic": question.topic,
+        "language": question.language,
+        "source_chunks": question.source_chunks,
+        "source_documents": question.source_documents,
+        "confidence_score": question.confidence_score,
+        "bloom_level": question.bloom_level,
+        "estimated_time_minutes": question.estimated_time_minutes,
+        "quality_tier": question.quality_tier,
+        "review_status": question.review_status,
+        "reviewed_by": question.reviewed_by,
+        "reviewed_at": question.reviewed_at,
+        "exam_id": question.exam_id,
+        "created_at": question.created_at,
+        "updated_at": question.updated_at,
+    }
+    if question.reviewed_by:
+        reviewer = db.query(User).filter(User.id == question.reviewed_by).first()
+        if reviewer:
+            data["reviewer_info"] = {
+                "id": reviewer.id,
+                "first_name": reviewer.first_name,
+                "last_name": reviewer.last_name,
+                "email": reviewer.email,
+            }
+    return data
+
+
 # Pydantic Models
 class QuestionReviewCreate(BaseModel):
     """Request Model für neue Question Review"""
@@ -94,10 +131,23 @@ class QuestionReviewResponse(BaseModel):
     quality_tier: Optional[str]
     review_status: str
     reviewed_by: Optional[int]
+    reviewer_info: Optional["ReviewerInfo"] = None
     reviewed_at: Optional[datetime]
     exam_id: Optional[str]
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ReviewerInfo(BaseModel):
+    """Reviewer User Info"""
+
+    id: int
+    first_name: str
+    last_name: str
+    email: str
 
     class Config:
         from_attributes = True
@@ -220,12 +270,14 @@ async def get_review_queue(
         )
 
         # Get Questions with Pagination
-        questions = (
+        question_list = (
             query.order_by(QuestionReview.created_at.desc())
             .limit(limit)
             .offset(offset)
             .all()
         )
+
+        questions = [_attach_reviewer_info(q, db) for q in question_list]
 
         return ReviewQueueResponse(
             total=total,
@@ -264,7 +316,10 @@ async def get_question_review(
                 status_code=404, detail=f"Question {question_id} not found"
             )
 
-        return question
+        data = _attach_reviewer_info(question, db)
+        data["comments"] = question.comments
+        data["history"] = question.history
+        return data
 
     except HTTPException:
         raise
@@ -467,7 +522,7 @@ async def edit_question(
             db.commit()
 
         logger.info(f"Edited question {question_id} by {current_user.email}")
-        return question
+        return _attach_reviewer_info(question, db)
 
     except HTTPException:
         raise
@@ -532,7 +587,7 @@ async def start_review(
         logger.info(
             f"Started review for question {question_id} by {current_user.email}"
         )
-        return question
+        return _attach_reviewer_info(question, db)
 
     except HTTPException:
         raise
@@ -614,7 +669,7 @@ async def approve_question(
         )
 
         logger.info(f"Approved question {question_id} by {current_user.email}")
-        return question
+        return _attach_reviewer_info(question, db)
 
     except HTTPException:
         raise
@@ -694,7 +749,7 @@ async def reject_question(
         )
 
         logger.info(f"Rejected question {question_id} by {current_user.email}")
-        return question
+        return _attach_reviewer_info(question, db)
 
     except HTTPException:
         raise
