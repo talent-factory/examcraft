@@ -502,7 +502,13 @@ async def edit_question(
 
         # Set status to EDITED if changes were made
         if changed_fields:
-            question.review_status = ReviewStatus.EDITED.value
+            if (
+                question.review_status == ReviewStatus.IN_REVIEW.value
+                and current_user.id == question.reviewed_by
+            ):
+                pass  # Reviewer edits stay in_review
+            else:
+                question.review_status = ReviewStatus.EDITED.value
 
         db.commit()
         db.refresh(question)
@@ -623,6 +629,25 @@ async def approve_question(
             raise HTTPException(
                 status_code=404, detail=f"Question {question_id} not found"
             )
+
+        # Vier-Augen-Prinzip Check
+        if question.institution_id and question.reviewed_by:
+            from models.auth import Institution
+
+            institution = (
+                db.query(Institution)
+                .filter(Institution.id == question.institution_id)
+                .first()
+            )
+            if (
+                institution
+                and institution.require_second_reviewer
+                and current_user.id == question.reviewed_by
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Vier-Augen-Prinzip: Ein anderer Reviewer muss diese Frage genehmigen.",
+                )
 
         old_status = question.review_status
 
