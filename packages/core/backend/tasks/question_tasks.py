@@ -45,6 +45,12 @@ def generate_questions_task(
     Returns:
         Dict mit exam_id, topic, questions, generation_time, quality_metrics
     """
+    if RAGService is None:
+        raise Reject(
+            "Premium RAGService nicht verfügbar (Core-Deployment). Task wird nicht wiederholt.",
+            requeue=False,
+        )
+
     from services.rag_service import RAGExamRequest
 
     rag_request = RAGExamRequest(**request_data)
