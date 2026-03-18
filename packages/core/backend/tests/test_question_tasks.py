@@ -52,8 +52,8 @@ def test_generate_questions_task_has_correct_queue_route():
     assert route.get("routing_key") == "question.generate"
 
 
-def test_generate_questions_task_emits_progress_steps():
-    """Task emittiert mindestens 3 Progress-Updates (0%, Context, mind. 1 Frage)"""
+def test_generate_questions_task_emits_step_zero():
+    """Task emittiert Step-0-Progress-Update (0%) beim Start"""
     from tasks.question_tasks import generate_questions_task
 
     progress_updates = []
