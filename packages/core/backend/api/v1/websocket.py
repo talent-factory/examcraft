@@ -87,23 +87,45 @@ async def _authenticate_websocket(websocket: WebSocket, token: str) -> User | No
 async def _check_task_ownership(websocket: WebSocket, task_id: str, user: User) -> bool:
     """
     Prüft ob der authentifizierte User der Owner des Tasks ist.
-    Lookup via Document.task_id Spalte.
+    Prüft Document.task_id (Dokument-Tasks) und QuestionGenerationJob.task_id
+    (Fragen-Tasks). Unbekannte task_ids werden abgelehnt.
     """
+    from models.question_generation_job import QuestionGenerationJob
+
     db = SessionLocal()
     try:
+        # Check 1: Dokument-Task
         document = db.query(Document).filter(Document.task_id == task_id).first()
-        if not document:
+        if document:
+            if document.user_id != user.id:
+                logger.warning(
+                    f"Ownership-Verletzung (Dokument): User {user.id} versucht Task "
+                    f"{task_id} (Owner: {document.user_id}) zu überwachen"
+                )
+                await websocket.close(code=1008)
+                return False
             return True
 
-        if document.user_id != user.id:
-            logger.warning(
-                f"Ownership-Verletzung: User {user.id} versucht Task "
-                f"{task_id} (Owner: {document.user_id}) zu überwachen"
-            )
-            await websocket.close(code=1008)
-            return False
+        # Check 2: Fragen-Task
+        job = (
+            db.query(QuestionGenerationJob)
+            .filter(QuestionGenerationJob.task_id == task_id)
+            .first()
+        )
+        if job:
+            if job.user_id != user.id:
+                logger.warning(
+                    f"Ownership-Verletzung (Fragen): User {user.id} versucht Task "
+                    f"{task_id} (Owner: {job.user_id}) zu überwachen"
+                )
+                await websocket.close(code=1008)
+                return False
+            return True
 
-        return True
+        # Unbekannte task_id — ablehnen (kein legitimer Fall, da Job vor apply_async erstellt wird)
+        logger.warning(f"Unbekannte task_id {task_id!r} von User {user.id} abgelehnt")
+        await websocket.close(code=1008)
+        return False
 
     except Exception as e:
         logger.error(f"Ownership-Check Fehler: {e}")
