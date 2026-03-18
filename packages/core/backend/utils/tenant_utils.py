@@ -169,12 +169,21 @@ class SubscriptionLimits:
             )
 
     @staticmethod
-    def check_question_limit(institution: Institution, db: Session) -> None:
+    def check_question_limit(
+        institution: Institution,
+        db: Session,
+        additional_count: int = 0,
+    ) -> None:
         """
         Check if institution has reached monthly question generation limit
 
+        Args:
+            institution: Institution to check
+            db: Database session
+            additional_count: Number of questions about to be created
+
         Raises:
-            HTTPException: If limit exceeded
+            HTTPException: If adding additional_count questions would exceed the limit
         """
         # -1 means unlimited
         if institution.max_questions_per_month == -1:
@@ -198,10 +207,13 @@ class SubscriptionLimits:
             .count()
         )
 
-        if questions_this_month >= institution.max_questions_per_month:
+        if (
+            questions_this_month + additional_count
+            > institution.max_questions_per_month
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Monthly question limit reached ({institution.max_questions_per_month} questions). Please upgrade your subscription.",
+                detail=f"Monthly question limit would be exceeded ({questions_this_month} existing + {additional_count} requested > {institution.max_questions_per_month} limit). Please upgrade your subscription.",
             )
 
     @staticmethod

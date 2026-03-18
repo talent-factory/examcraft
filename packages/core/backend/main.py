@@ -3,7 +3,7 @@ ExamCraft AI - FastAPI Backend
 KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -263,8 +263,38 @@ async def lifespan(app: FastAPI):
         # Premium: MCP Facade Server (Fly.io Management Tools)
         try:
             from premium.mcp import create_mcp_app
+            from premium.mcp.auth import (
+                oauth_protected_resource,
+                oauth_authorization_server,
+            )
 
-            app.mount("/mcp", create_mcp_app())
+            mcp_app = create_mcp_app()
+            app.mount("/mcp", mcp_app)
+
+            # Redirect /mcp → /mcp/ (FastAPI mount only handles /mcp/*)
+            @app.api_route("/mcp", methods=["GET", "POST", "DELETE"])
+            async def mcp_redirect(request: Request):
+                from starlette.responses import RedirectResponse
+
+                url = str(request.url).replace("/mcp", "/mcp/", 1)
+                # Respect X-Forwarded-Proto from reverse proxy (e.g. Fly.io TLS termination)
+                proto = request.headers.get("x-forwarded-proto", "")
+                if proto == "https" and url.startswith("http://"):
+                    url = url.replace("http://", "https://", 1)
+                return RedirectResponse(url=url, status_code=307)
+
+            # Expose well-known endpoints at root level for MCP discovery (RFC 9728)
+            # Clients try /.well-known/oauth-protected-resource/mcp before /mcp/.well-known/...
+            app.get("/.well-known/oauth-protected-resource/mcp")(
+                oauth_protected_resource
+            )
+            app.get("/.well-known/oauth-protected-resource")(oauth_protected_resource)
+            app.get("/.well-known/oauth-authorization-server/mcp")(
+                oauth_authorization_server
+            )
+            app.get("/.well-known/oauth-authorization-server")(
+                oauth_authorization_server
+            )
             print("✅ Premium MCP Facade Server mounted at /mcp/")
         except ImportError as e:
             print(f"⚠️  Premium MCP Server not available: {e}")

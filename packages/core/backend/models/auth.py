@@ -109,6 +109,9 @@ class Institution(Base):
     max_documents = Column(Integer, default=5, nullable=False)
     max_questions_per_month = Column(Integer, default=20, nullable=False)
 
+    # Review-Workflow
+    require_second_reviewer = Column(Boolean, default=False)
+
     # Timestamps
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -126,6 +129,9 @@ class Institution(Base):
     )
     subscriptions = relationship(
         "Subscription", back_populates="institution", cascade="all, delete-orphan"
+    )
+    resource_usage = relationship(
+        "ResourceUsage", back_populates="institution", cascade="all, delete-orphan"
     )
 
     def __repr__(self):
@@ -276,6 +282,13 @@ class User(Base):
     # Email Verification
     email_verification_token = Column(String(255), nullable=True, unique=True)
     email_verification_expires = Column(DateTime(timezone=True), nullable=True)
+
+    # Audit Tracking
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    password_changed_at = Column(DateTime(timezone=True), nullable=True)
+    registration_method = Column(
+        String(20), nullable=True
+    )  # password, google, microsoft
 
     # Preferences (JSON)
     preferences = Column(Text, nullable=True)  # JSON string für User Preferences

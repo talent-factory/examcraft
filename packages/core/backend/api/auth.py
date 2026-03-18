@@ -6,6 +6,7 @@ Login, Logout, Register, Profile, Password Reset
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
 from fastapi.responses import Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
@@ -16,6 +17,7 @@ from database import get_db
 from models.auth import User, Role, Institution, UserStatus, UserRole
 from services.auth_service import AuthService
 from services.avatar_service import AvatarService
+from services.audit_service import AuditService
 from utils.auth_utils import get_current_user, get_current_active_user
 
 logger = logging.getLogger(__name__)
@@ -208,6 +210,8 @@ async def register(
         status=UserStatus.PENDING.value,  # Pending until email verified
         is_email_verified=False,
         is_superuser=False,
+        registration_method="password",
+        password_changed_at=func.now(),
     )
     db.add(user)
     db.flush()  # Get user.id
@@ -254,8 +258,6 @@ async def register(
     db.refresh(user)
 
     # Audit log: User registration
-    from services.audit_service import AuditService
-
     AuditService.log_register(db, user.id, user.email, request=http_request)
 
     # Send verification email (async via background task)
@@ -343,6 +345,9 @@ async def login(
 
     # Reset failed login attempts
     user.failed_login_attempts = 0
+    # Track login
+    user.last_login_at = func.now()
+    user.last_login_ip = http_request.client.host if http_request.client else None
     db.commit()
 
     # Audit log: Successful login
@@ -470,6 +475,7 @@ async def get_current_user_profile(
 @router.patch("/me", response_model=UserProfileResponse)
 async def update_current_user_profile(
     request: UserProfileUpdate,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -479,6 +485,8 @@ async def update_current_user_profile(
     - Updates user information
     - Returns updated profile
     """
+    changed_fields = list(request.model_dump(exclude_unset=True).keys())
+
     if request.first_name is not None:
         current_user.first_name = request.first_name
 
@@ -493,6 +501,24 @@ async def update_current_user_profile(
 
     db.commit()
     db.refresh(current_user)
+
+    # Audit log for profile update (only if fields actually changed)
+    if changed_fields:
+        try:
+            AuditService.log_action(
+                db=db,
+                action=AuditService.ACTION_UPDATE_USER,
+                user_id=current_user.id,
+                resource_type=AuditService.RESOURCE_USER,
+                resource_id=str(current_user.id),
+                additional_data={"changed_fields": changed_fields},
+                request=http_request,
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to create audit log for profile update of user {current_user.id}: {e}"
+            )
+            db.refresh(current_user)  # Re-sync after potential rollback in AuditService
 
     logger.info(f"User profile updated: {current_user.email} (ID: {current_user.id})")
 
@@ -567,6 +593,7 @@ async def set_password(
 
     # Set password
     current_user.password_hash = AuthService.get_password_hash(request.password)
+    current_user.password_changed_at = func.now()
     db.commit()
 
     # Audit log: Password set for OAuth user
@@ -616,6 +643,7 @@ async def change_password(
 
     # Update password
     current_user.password_hash = AuthService.get_password_hash(request.new_password)
+    current_user.password_changed_at = func.now()
     db.commit()
 
     # Revoke all sessions (force re-login on all devices)
@@ -728,6 +756,7 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
     # Mark email as verified
     user.is_email_verified = True
     user.status = UserStatus.ACTIVE.value
+    user.email_verified_at = func.now()
 
     # Mark token as used
     email_token.is_used = True
@@ -937,6 +966,18 @@ async def oauth_callback(
 
         # Find or create user
         user = oauth_service.find_or_create_user_from_oauth(provider, user_info, token)
+
+        # Track OAuth login (separate commit — find_or_create already committed internally)
+        try:
+            user.last_login_at = func.now()
+            user.last_login_ip = request.client.host if request.client else None
+            db.commit()
+        except Exception as e:
+            logger.error(
+                f"Failed to track OAuth login metadata for user {user.id}: {e}"
+            )
+            db.rollback()
+            db.refresh(user)  # Re-attach user to session after rollback
 
         # Generate JWT tokens and create session
         tokens = AuthService.create_tokens_for_user(

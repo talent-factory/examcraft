@@ -9,6 +9,7 @@ from typing import Dict, Any
 import httpx
 import os
 from datetime import datetime, timezone
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.auth import User, OAuthAccount, Institution, Role
@@ -239,6 +240,12 @@ class OAuthService:
             if user_info.get("picture"):
                 user.avatar_url = user_info.get("picture")
 
+            # Backfill oauth_id/oauth_provider if missing (first-write-wins)
+            if not user.oauth_id:
+                user.oauth_id = oauth_account.provider_user_id
+            if not user.oauth_provider:
+                user.oauth_provider = provider
+
             self.db.commit()
             self.db.refresh(oauth_account)
             return oauth_account.user
@@ -260,6 +267,10 @@ class OAuthService:
                 existing_user.avatar_url = user_info.get("picture")
             existing_user.oauth_provider = provider  # Mark as OAuth user
             existing_user.is_email_verified = True  # OAuth emails are verified
+            if not existing_user.oauth_id:
+                existing_user.oauth_id = user_info["provider_user_id"]
+            if not existing_user.email_verified_at:
+                existing_user.email_verified_at = func.now()
 
             # Link OAuth account to existing user
             new_oauth_account = OAuthAccount(
@@ -317,6 +328,10 @@ class OAuthService:
             is_email_verified=user_info.get("email_verified", False),
             avatar_url=user_info.get("picture"),
             password_hash=None,  # OAuth-only user, no password
+            oauth_provider=provider,
+            oauth_id=user_info["provider_user_id"],
+            registration_method=provider,
+            email_verified_at=func.now(),
         )
         self.db.add(new_user)
         self.db.flush()  # Get user.id
