@@ -482,6 +482,74 @@ async def edit_question(
         )
 
 
+@router.post("/{question_id}/start-review", response_model=QuestionReviewResponse)
+async def start_review(
+    question_id: int,
+    current_user: User = Depends(require_permission("approve_questions")),
+    db: Session = Depends(get_db),
+):
+    """
+    Markiere Frage als 'In Review'.
+
+    Signalisiert anderen Reviewern, dass diese Frage gerade bearbeitet wird.
+
+    **Required Permission:** `approve_questions` (Dozent, Admin)
+    """
+    try:
+        question = (
+            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
+        )
+
+        if not question:
+            raise HTTPException(
+                status_code=404, detail=f"Question {question_id} not found"
+            )
+
+        if question.review_status not in (
+            ReviewStatus.PENDING.value,
+            ReviewStatus.EDITED.value,
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Frage kann nur aus Status 'pending' oder 'edited' in Review genommen werden (aktuell: {question.review_status}).",
+            )
+
+        old_status = question.review_status
+
+        question.review_status = ReviewStatus.IN_REVIEW.value
+        question.reviewed_by = current_user.id
+        question.reviewed_at = datetime.utcnow()
+
+        history = ReviewHistory(
+            question_id=question.id,
+            action="status_changed",
+            old_status=old_status,
+            new_status=ReviewStatus.IN_REVIEW.value,
+            changed_by=str(current_user.id),
+            change_reason="Review gestartet",
+        )
+        db.add(history)
+        db.commit()
+        db.refresh(question)
+
+        logger.info(
+            f"Started review for question {question_id} by {current_user.email}"
+        )
+        return question
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Error starting review for question {question_id}: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Fehler beim Starten des Reviews. Bitte versuchen Sie es erneut.",
+        )
+
+
 @router.post("/{question_id}/approve", response_model=QuestionReviewResponse)
 async def approve_question(
     question_id: int,

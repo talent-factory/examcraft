@@ -153,6 +153,26 @@ export class ReviewService {
   }
 
   /**
+   * Start Review (mark as in_review)
+   */
+  static async startReview(questionId: number): Promise<QuestionReview> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/questions/${questionId}/start-review`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to start review: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
    * Edit Question (Inline Editing)
    */
   static async editQuestion(

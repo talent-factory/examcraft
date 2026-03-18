@@ -122,6 +122,18 @@ const ReviewQueue: React.FC = () => {
     setFilters(prev => ({ ...prev, offset: (value - 1) * pageSize }));
   };
 
+  const handleStartReview = async (questionId: number) => {
+    try {
+      setLoading(true);
+      await ReviewService.startReview(questionId);
+      await loadQuestions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler beim Starten des Reviews');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApprove = (questionId: number) => {
     setActionQuestionId(questionId);
     setActionType('approve');
@@ -350,6 +362,7 @@ const ReviewQueue: React.FC = () => {
         <QuestionReviewCard
           key={question.id}
           question={question}
+          onStartReview={handleStartReview}
           onApprove={handleApprove}
           onReject={handleReject}
           onEdit={handleEdit}

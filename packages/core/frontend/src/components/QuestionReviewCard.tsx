@@ -36,6 +36,7 @@ import {
   Grade,
   Source,
   Lightbulb,
+  RateReview,
 } from '@mui/icons-material';
 import { QuestionReview, ReviewStatus, ReviewComment } from '../types/review';
 import { ReviewService } from '../services/ReviewService';
@@ -43,6 +44,7 @@ import MarkdownRenderer from './MarkdownRenderer';
 
 interface QuestionReviewCardProps {
   question: QuestionReview;
+  onStartReview?: (questionId: number) => void;
   onApprove?: (questionId: number) => void;
   onReject?: (questionId: number) => void;
   onEdit?: (questionId: number) => void;
@@ -52,6 +54,7 @@ interface QuestionReviewCardProps {
 
 const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
   question,
+  onStartReview,
   onApprove,
   onReject,
   onEdit,
@@ -355,6 +358,22 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
       {/* Action Buttons */}
       <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
         <Box>
+          {(question.review_status === ReviewStatus.PENDING || question.review_status === ReviewStatus.EDITED) && (
+            <Tooltip title="Review starten">
+              <span>
+                <Button
+                  variant="outlined"
+                  color="info"
+                  startIcon={<RateReview />}
+                  onClick={() => onStartReview?.(question.id)}
+                  disabled={loading}
+                  size="small"
+                >
+                  Review starten
+                </Button>
+              </span>
+            </Tooltip>
+          )}
           <Tooltip title="Approve Question">
             <span>
               <Button
