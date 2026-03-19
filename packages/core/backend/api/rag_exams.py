@@ -205,7 +205,12 @@ async def generate_rag_exam(
         # UUID vorab generieren — wird sowohl als DB-Record-Key als auch als
         # Celery task_id verwendet.
         task_id = str(uuid.uuid4())
-        job = QuestionGenerationJob(task_id=task_id, user_id=current_user.id)
+        job = QuestionGenerationJob(
+            task_id=task_id,
+            user_id=current_user.id,
+            topic=request.topic,
+            question_count=request.question_count,
+        )
         db.add(job)
         db.commit()
 
