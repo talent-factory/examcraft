@@ -1,5 +1,5 @@
 """
-Unit Tests für DoclingService
+Unit Tests für DoclingService und LegacyProcessor
 """
 
 import pytest
@@ -8,44 +8,45 @@ import os
 from unittest.mock import Mock, patch, mock_open
 
 from services.docling_service import DoclingService, DocumentChunk, ProcessedDocument
+from services.document_processors.legacy_processor import LegacyProcessor
 
 
-class TestDoclingService:
-    """Test Suite für DoclingService"""
+class TestLegacyProcessor:
+    """Test Suite für LegacyProcessor (the actual processing backend)"""
 
     @pytest.fixture
-    def docling_service(self):
-        """DoclingService Instanz für Tests"""
-        return DoclingService(chunk_size=100, chunk_overlap=20)
+    def processor(self):
+        """LegacyProcessor Instanz für Tests"""
+        return LegacyProcessor(chunk_size=100, chunk_overlap=20)
 
     def test_init(self):
-        """Test DoclingService Initialisierung"""
-        service = DoclingService(chunk_size=500, chunk_overlap=50)
+        """Test LegacyProcessor Initialisierung"""
+        processor = LegacyProcessor(chunk_size=500, chunk_overlap=50)
 
-        assert service.chunk_size == 500
-        assert service.chunk_overlap == 50
-        assert len(service.supported_types) == 5
-        assert "application/pdf" in service.supported_types
-        assert "text/plain" in service.supported_types
+        assert processor.chunk_size == 500
+        assert processor.chunk_overlap == 50
+        assert len(processor.supported_types) == 5
+        assert "application/pdf" in processor.supported_types
+        assert "text/plain" in processor.supported_types
 
-    def test_create_chunks_small_text(self, docling_service):
+    def test_create_chunks_small_text(self, processor):
         """Test Chunk-Erstellung für kleinen Text"""
         text = "Dies ist ein kurzer Test-Text mit wenigen Wörtern."
 
-        chunks = docling_service._create_chunks(text)
+        chunks = processor._create_chunks(text)
 
         assert len(chunks) == 1
         assert chunks[0].content == text
         assert chunks[0].chunk_index == 0
         assert chunks[0].metadata["word_count"] == 8  # Korrekte Wort-Anzahl
 
-    def test_create_chunks_large_text(self, docling_service):
+    def test_create_chunks_large_text(self, processor):
         """Test Chunk-Erstellung für großen Text"""
         # Erstelle Text mit mehr als 100 Wörtern
         words = ["Wort"] * 150
         text = " ".join(words)
 
-        chunks = docling_service._create_chunks(text)
+        chunks = processor._create_chunks(text)
 
         assert len(chunks) > 1
         assert chunks[0].chunk_index == 0
@@ -58,23 +59,23 @@ class TestDoclingService:
         assert len(chunk1_words) <= 100
         assert len(chunk2_words) <= 100
 
-    def test_create_chunks_empty_text(self, docling_service):
+    def test_create_chunks_empty_text(self, processor):
         """Test Chunk-Erstellung für leeren Text"""
-        chunks = docling_service._create_chunks("")
+        chunks = processor._create_chunks("")
         assert len(chunks) == 0
 
-        chunks = docling_service._create_chunks("   ")
+        chunks = processor._create_chunks("   ")
         assert len(chunks) == 0
 
     @pytest.mark.asyncio
-    async def test_process_text_file(self, docling_service):
+    async def test_process_text_file(self, processor):
         """Test Text-Datei Verarbeitung"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Dies ist ein Test-Text.\nMit mehreren Zeilen.\nFür Unit Tests.")
             temp_path = f.name
 
         try:
-            text, metadata = await docling_service._process_text(temp_path)
+            text, metadata = await processor._process_text(temp_path)
 
             assert "Dies ist ein Test-Text." in text
             assert "Mit mehreren Zeilen." in text
@@ -87,7 +88,7 @@ class TestDoclingService:
             os.unlink(temp_path)
 
     @pytest.mark.asyncio
-    async def test_process_markdown_file(self, docling_service):
+    async def test_process_markdown_file(self, processor):
         """Test Markdown-Datei Verarbeitung"""
         markdown_content = "# Test Überschrift\n\nDies ist **fetter Text** und *kursiver Text*.\n\n- Liste Item 1\n- Liste Item 2"
 
@@ -96,7 +97,7 @@ class TestDoclingService:
             temp_path = f.name
 
         try:
-            text, metadata = await docling_service._process_markdown(temp_path)
+            text, metadata = await processor._process_markdown(temp_path)
 
             assert "Test Überschrift" in text
             assert "fetter Text" in text
@@ -109,7 +110,7 @@ class TestDoclingService:
 
     @pytest.mark.asyncio
     @patch("pypdf.PdfReader")
-    async def test_process_pdf_file(self, mock_pdf_reader, docling_service):
+    async def test_process_pdf_file(self, mock_pdf_reader, processor):
         """Test PDF-Datei Verarbeitung"""
         # Mock PDF Reader
         mock_reader_instance = Mock()
@@ -133,7 +134,7 @@ class TestDoclingService:
 
         try:
             with patch("builtins.open", mock_open(read_data=b"fake pdf content")):
-                text, metadata = await docling_service._process_pdf(temp_path)
+                text, metadata = await processor._process_pdf(temp_path)
 
             assert "Dies ist der Text von Seite 1." in text
             assert "[Seite 1]" in text
@@ -146,7 +147,7 @@ class TestDoclingService:
 
     @pytest.mark.asyncio
     @patch("docx.Document")
-    async def test_process_docx_file(self, mock_docx_document, docling_service):
+    async def test_process_docx_file(self, mock_docx_document, processor):
         """Test DOCX-Datei Verarbeitung"""
         # Mock DOCX Document
         mock_doc_instance = Mock()
@@ -172,21 +173,21 @@ class TestDoclingService:
             temp_path = f.name
 
         try:
-            text, metadata = await docling_service._process_docx(temp_path)
+            text, metadata = await processor._process_docx(temp_path)
 
             assert "Dies ist der erste Paragraph." in text
             assert "Dies ist der zweite Paragraph." in text
             assert metadata["title"] == "Test Document"
             assert metadata["author"] == "Test Author"
             assert metadata["paragraphs"] == 2
-            # Prüfe dass subject vorhanden ist (wird vom DoclingService gesetzt)
+            # Prüfe dass subject vorhanden ist (wird vom LegacyProcessor gesetzt)
             assert "subject" in metadata
 
         finally:
             os.unlink(temp_path)
 
     @pytest.mark.asyncio
-    async def test_process_document_success(self, docling_service):
+    async def test_process_document_success(self, processor):
         """Test vollständige Dokumentenverarbeitung"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(
@@ -195,7 +196,7 @@ class TestDoclingService:
             temp_path = f.name
 
         try:
-            processed_doc = await docling_service.process_document(
+            processed_doc = await processor.process_document(
                 document_id=123,
                 file_path=temp_path,
                 filename="test.txt",
@@ -219,14 +220,14 @@ class TestDoclingService:
             os.unlink(temp_path)
 
     @pytest.mark.asyncio
-    async def test_process_document_unsupported_type(self, docling_service):
+    async def test_process_document_unsupported_type(self, processor):
         """Test Verarbeitung mit nicht unterstütztem MIME-Type"""
         with tempfile.NamedTemporaryFile(suffix=".xyz", delete=False) as f:
             temp_path = f.name
 
         try:
             with pytest.raises(ValueError) as exc_info:
-                await docling_service.process_document(
+                await processor.process_document(
                     document_id=123,
                     file_path=temp_path,
                     filename="test.xyz",
@@ -238,7 +239,11 @@ class TestDoclingService:
         finally:
             os.unlink(temp_path)
 
-    def test_get_document_summary(self, docling_service):
+
+class TestDoclingServiceFacade:
+    """Test Suite für DoclingService (Facade)"""
+
+    def test_get_document_summary(self):
         """Test Dokument-Zusammenfassung"""
         # Erstelle Mock ProcessedDocument
         chunks = [
@@ -257,7 +262,8 @@ class TestDoclingService:
             processing_time=0.5,
         )
 
-        summary = docling_service.get_document_summary(processed_doc)
+        service = DoclingService.__new__(DoclingService)
+        summary = service.get_document_summary(processed_doc)
 
         assert summary["document_id"] == 123
         assert summary["filename"] == "test.txt"

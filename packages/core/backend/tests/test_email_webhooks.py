@@ -138,13 +138,14 @@ class TestWebhookEndpoint:
 
     def test_webhook_invalid_json_rejected(self, client):
         """Webhook with invalid JSON is rejected"""
-        response = client.post(
-            "/webhooks/resend",
-            content="not json",
-            headers={"Content-Type": "application/json"},
-        )
+        with patch.dict("os.environ", {"ENVIRONMENT": "development"}, clear=True):
+            response = client.post(
+                "/webhooks/resend",
+                content="not json",
+                headers={"Content-Type": "application/json"},
+            )
 
-        assert response.status_code == 400 or response.status_code == 422
+            assert response.status_code == 400 or response.status_code == 422
 
 
 class TestEmailEventHandlers:
