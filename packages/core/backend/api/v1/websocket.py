@@ -34,8 +34,13 @@ class ConnectionManager:
         if existing:
             try:
                 await existing.close(code=1001)
-            except Exception:
-                pass
+            except (WebSocketDisconnect, RuntimeError):
+                pass  # Connection already closed — expected
+            except Exception as e:
+                logger.warning(
+                    f"Fehler beim Schliessen der bestehenden WebSocket-Verbindung "
+                    f"für Task {task_id}: {type(e).__name__}: {e}"
+                )
         await websocket.accept()
         self.active_connections[task_id] = websocket
 
@@ -70,6 +75,13 @@ async def _authenticate_websocket(websocket: WebSocket, token: str) -> User | No
         await websocket.close(code=1008)
         return None
 
+    try:
+        user_id_int = int(user_id)
+    except (ValueError, TypeError):
+        logger.warning(f"WebSocket Auth: Ungültige user_id im Token: {user_id!r}")
+        await websocket.close(code=1008)
+        return None
+
     def _db_lookup() -> User | None:
         db = SessionLocal()
         try:
@@ -80,7 +92,7 @@ async def _authenticate_websocket(websocket: WebSocket, token: str) -> User | No
             return (
                 db.query(User)
                 .options(joinedload(User.roles))
-                .filter(User.id == int(user_id))
+                .filter(User.id == user_id_int)
                 .first()
             )
         finally:
@@ -180,10 +192,10 @@ def _get_task_result(task_id: str) -> dict:
             "result": result.result if state == "SUCCESS" else None,
         }
     except Exception as e:
-        logger.warning(
+        logger.error(
             f"Redis-Fehler beim Abrufen von Task {task_id}: {type(e).__name__}: {e}"
         )
-        return {"state": "PENDING", "info": None, "result": None}
+        return {"state": "PENDING", "info": None, "result": None, "_redis_error": True}
 
 
 @router.websocket("/ws/tasks/{task_id}")
@@ -222,12 +234,31 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
             return
 
         pending_seconds = 0
+        redis_failures = 0
+        max_redis_failures = 3
         loop = asyncio.get_running_loop()
 
         while True:
             task_data = await loop.run_in_executor(
                 None, lambda: _get_task_result(task_id)
             )
+
+            if task_data.get("_redis_error"):
+                redis_failures += 1
+                if redis_failures >= max_redis_failures:
+                    msg = TaskStatusMessage(
+                        task_id=task_id,
+                        status=TaskStatus.FAILURE,
+                        progress=0,
+                        error="Task-Status kann nicht abgerufen werden (Verbindungsfehler). "
+                        "Bitte versuchen Sie es später erneut.",
+                    )
+                    await websocket.send_json(msg.model_dump())
+                    await websocket.close()
+                    return
+                await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                continue
+            redis_failures = 0
 
             state = task_data["state"]
             info = task_data["info"] or {}
