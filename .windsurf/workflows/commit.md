@@ -1,1 +1,0 @@
-/Users/daniel/GitRepository/dotfiles/claude/commands/commit.md

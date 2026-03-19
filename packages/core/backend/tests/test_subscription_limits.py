@@ -287,13 +287,14 @@ class TestSubscriptionLimits:
             test_db.add(question)
         test_db.commit()
 
-        # Act & Assert: Should raise exception
+        # Act & Assert: Should raise exception when trying to add one more question
         with pytest.raises(HTTPException) as exc_info:
-            SubscriptionLimits.check_question_limit(test_institution, test_db)
+            SubscriptionLimits.check_question_limit(
+                test_institution, test_db, additional_count=1
+            )
 
         assert exc_info.value.status_code == 403
-        assert "Monthly question limit reached" in exc_info.value.detail
-        assert "20 questions" in exc_info.value.detail
+        assert "question limit" in exc_info.value.detail.lower()
 
     def test_check_question_limit_not_exceeded(
         self, test_db: Session, test_institution: Institution

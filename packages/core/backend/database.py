@@ -78,10 +78,10 @@ def create_tables():
             "✅ Core models imported (Auth + Documents + Question Review + RBAC + Email)"
         )
     except Exception as e:
-        print(f"⚠️  Core models import error: {e}")
         import traceback
 
         traceback.print_exc()
+        raise RuntimeError(f"Failed to import core models (cannot start): {e}") from e
 
     # Import Premium models (if available)
     # NOTE: We import Premium models using standard imports (not importlib.util)
@@ -114,8 +114,81 @@ def create_tables():
 
         traceback.print_exc()
 
+    # Migrationen ausfuehren (Alembic) oder Tabellen direkt erstellen (Fallback)
+    _run_migrations_or_create_all()
+
+
+def _run_migrations_or_create_all():
+    """
+    Fuehre Alembic-Migrationen aus oder erstelle Tabellen direkt.
+
+    Verhalten je nach AUTO_MIGRATE env var:
+    - AUTO_MIGRATE=true: Fuehre 'alembic upgrade head' aus (fuer Development)
+    - AUTO_MIGRATE absent or not 'true': Nur pruefen ob Migrationen ausstehen und warnen
+    - Fallback: Base.metadata.create_all() wenn Alembic nicht verfuegbar
+
+    WICHTIG: In Production NIEMALS automatisch migrieren. Migrationen muessen
+    dort manuell nach Review ausgefuehrt werden:
+        alembic upgrade head
+    """
+    import os
+
+    alembic_dir = os.path.join(os.path.dirname(__file__), "alembic")
+    alembic_ini = os.path.join(os.path.dirname(__file__), "alembic.ini")
+    auto_migrate = os.getenv("AUTO_MIGRATE", "false").lower() == "true"
+
+    if os.path.exists(alembic_dir) and os.path.exists(alembic_ini):
+        try:
+            from alembic.config import Config
+            from alembic import command
+            from alembic.script import ScriptDirectory
+            from alembic.runtime.migration import MigrationContext
+
+            alembic_cfg = Config(alembic_ini)
+            alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
+
+            # Pruefe ob Migrationen ausstehen
+            script = ScriptDirectory.from_config(alembic_cfg)
+            head_rev = script.get_current_head()
+
+            with engine.connect() as conn:
+                context = MigrationContext.configure(conn)
+                current_rev = context.get_current_revision()
+
+            if current_rev == head_rev:
+                print(f"✅ Database schema is up to date (revision: {current_rev})")
+                return
+
+            pending_msg = (
+                f"Pending migrations: DB at {current_rev or 'None'}, head at {head_rev}"
+            )
+
+            if auto_migrate:
+                print(f"🔄 {pending_msg} — running alembic upgrade head...")
+                command.upgrade(alembic_cfg, "head")
+                print("✅ Database migrations applied successfully")
+                return
+            else:
+                print(f"⚠️  {pending_msg}")
+                print("⚠️  Set AUTO_MIGRATE=true or run manually: alembic upgrade head")
+                # Nicht abbrechen — App soll starten, aber Warnung ist sichtbar
+                return
+
+        except ImportError:
+            # Alembic not installed — acceptable to fall back to create_all
+            print("⚠️  Alembic not installed, falling back to create_all")
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+            print(f"⚠️  CRITICAL: Alembic migration failed: {e}")
+            print(
+                "⚠️  The database schema may be inconsistent. Fix migrations before proceeding."
+            )
+            # Still create missing tables, but the warning is loud
+
     Base.metadata.create_all(bind=engine)
-    print("Database tables created successfully")
+    print("Database tables created/verified (create_all fallback)")
 
 
 if __name__ == "__main__":

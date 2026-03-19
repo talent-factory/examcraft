@@ -56,15 +56,17 @@ def test_institution(test_db):
 
 @pytest.fixture
 def test_role(test_db):
-    role = Role(
-        name="Viewer",
-        display_name="Viewer",
-        description="Default role",
-        permissions="[]",
-        is_system_role=True,
-    )
-    test_db.add(role)
-    test_db.flush()
+    role = test_db.query(Role).filter(Role.name == "Viewer").first()
+    if not role:
+        role = Role(
+            name="Viewer",
+            display_name="Viewer",
+            description="Default role",
+            permissions="[]",
+            is_system_role=True,
+        )
+        test_db.add(role)
+        test_db.flush()
     return role
 
 

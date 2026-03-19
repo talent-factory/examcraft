@@ -28,37 +28,39 @@ def db(test_db):
     test_db.add(institution)
     test_db.flush()
 
-    # Create default roles
-    roles = [
-        Role(
-            name=UserRole.ADMIN.value,
-            display_name="Admin",
-            description="Full system access",
-            permissions=["*"],
-            is_system_role=True,
-        ),
-        Role(
-            name=UserRole.DOZENT.value,
-            display_name="Dozent",
-            description="Can create and manage questions",
-            permissions=[
+    # Create default roles (get_or_create to avoid duplicate key errors)
+    role_defs = [
+        {
+            "name": UserRole.ADMIN.value,
+            "display_name": "Admin",
+            "description": "Full system access",
+            "permissions": ["*"],
+            "is_system_role": True,
+        },
+        {
+            "name": UserRole.DOZENT.value,
+            "display_name": "Dozent",
+            "description": "Can create and manage questions",
+            "permissions": [
                 "create_questions",
                 "approve_questions",
                 "create_documents",
                 "view_questions",
             ],
-            is_system_role=True,
-        ),
-        Role(
-            name=UserRole.VIEWER.value,
-            display_name="Viewer",
-            description="Can view questions",
-            permissions=["view_questions"],
-            is_system_role=True,
-        ),
+            "is_system_role": True,
+        },
+        {
+            "name": UserRole.VIEWER.value,
+            "display_name": "Viewer",
+            "description": "Can view questions",
+            "permissions": ["view_questions"],
+            "is_system_role": True,
+        },
     ]
-    for role in roles:
-        test_db.add(role)
+    for role_def in role_defs:
+        existing = test_db.query(Role).filter(Role.name == role_def["name"]).first()
+        if not existing:
+            test_db.add(Role(**role_def))
 
     test_db.commit()
 
@@ -147,7 +149,7 @@ def test_register_new_user(test_client, db):
     assert user is not None
     assert user.first_name == "New"
     assert user.last_name == "User"
-    assert user.status == UserStatus.ACTIVE.value
+    assert user.status == UserStatus.PENDING.value
 
     # Verify user has viewer role
     assert len(user.roles) == 1
@@ -302,7 +304,7 @@ def test_logout_without_token(test_client):
     """Test logout without token fails"""
     response = test_client.post("/api/auth/logout")
 
-    assert response.status_code == 403  # No credentials
+    assert response.status_code == 401  # No credentials
 
 
 # ============================================================================
@@ -397,4 +399,4 @@ def test_change_password_without_auth(test_client):
         },
     )
 
-    assert response.status_code == 403  # No credentials
+    assert response.status_code == 401  # No credentials

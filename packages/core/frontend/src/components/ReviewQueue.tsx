@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -45,6 +46,7 @@ import QuestionReviewCard from './QuestionReviewCard';
 import QuestionEditor from './QuestionEditor';
 
 const ReviewQueue: React.FC = () => {
+  const navigate = useNavigate();
   const [questions, setQuestions] = useState<QuestionReview[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +124,18 @@ const ReviewQueue: React.FC = () => {
     setFilters(prev => ({ ...prev, offset: (value - 1) * pageSize }));
   };
 
+  const handleStartReview = async (questionId: number) => {
+    try {
+      setLoading(true);
+      await ReviewService.startReview(questionId);
+      navigate(`/questions/review/${questionId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler beim Starten des Reviews');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApprove = (questionId: number) => {
     setActionQuestionId(questionId);
     setActionType('approve');
@@ -153,7 +167,6 @@ const ReviewQueue: React.FC = () => {
     setLoading(true);
     try {
       const request: ReviewActionRequest = {
-        reviewer_id: 'current_user', // TODO: Get from auth context
         reason: actionReason || undefined,
       };
 
@@ -176,7 +189,7 @@ const ReviewQueue: React.FC = () => {
   const handleSaveEdit = async (questionId: number, updates: QuestionReviewUpdateRequest) => {
     setLoading(true);
     try {
-      await ReviewService.editQuestion(questionId, updates, 'current_user'); // TODO: Get from auth
+      await ReviewService.editQuestion(questionId, updates);
       setEditorOpen(false);
       await loadQuestions();
     } catch (err) {
@@ -195,7 +208,6 @@ const ReviewQueue: React.FC = () => {
       const request: CommentCreateRequest = {
         comment_text: commentText,
         comment_type: 'general' as any,
-        author: 'current_user', // TODO: Get from auth
       };
 
       await ReviewService.addComment(commentQuestionId, request);
@@ -350,6 +362,7 @@ const ReviewQueue: React.FC = () => {
         <QuestionReviewCard
           key={question.id}
           question={question}
+          onStartReview={handleStartReview}
           onApprove={handleApprove}
           onReject={handleReject}
           onEdit={handleEdit}

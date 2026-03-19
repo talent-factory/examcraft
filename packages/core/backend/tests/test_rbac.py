@@ -28,20 +28,20 @@ def db(test_db):
     test_db.add(institution)
     test_db.flush()
 
-    # Create roles with different permissions
-    roles = [
-        Role(
-            name=UserRole.ADMIN.value,
-            display_name="Admin",
-            description="Full system access",
-            permissions=["*"],
-            is_system_role=True,
-        ),
-        Role(
-            name=UserRole.DOZENT.value,
-            display_name="Dozent",
-            description="Can create and manage questions",
-            permissions=[
+    # Create roles with different permissions (get_or_create to avoid duplicate key errors)
+    role_defs = [
+        {
+            "name": UserRole.ADMIN.value,
+            "display_name": "Admin",
+            "description": "Full system access",
+            "permissions": ["*"],
+            "is_system_role": True,
+        },
+        {
+            "name": UserRole.DOZENT.value,
+            "display_name": "Dozent",
+            "description": "Can create and manage questions",
+            "permissions": [
                 "create_questions",
                 "approve_questions",
                 "edit_questions",
@@ -49,25 +49,27 @@ def db(test_db):
                 "delete_documents",
                 "view_questions",
             ],
-            is_system_role=True,
-        ),
-        Role(
-            name=UserRole.ASSISTANT.value,
-            display_name="Assistant",
-            description="Can create questions",
-            permissions=["create_questions", "create_documents", "view_questions"],
-            is_system_role=True,
-        ),
-        Role(
-            name=UserRole.VIEWER.value,
-            display_name="Viewer",
-            description="Can view questions",
-            permissions=["view_questions"],
-            is_system_role=True,
-        ),
+            "is_system_role": True,
+        },
+        {
+            "name": UserRole.ASSISTANT.value,
+            "display_name": "Assistant",
+            "description": "Can create questions",
+            "permissions": ["create_questions", "create_documents", "view_questions"],
+            "is_system_role": True,
+        },
+        {
+            "name": UserRole.VIEWER.value,
+            "display_name": "Viewer",
+            "description": "Can view questions",
+            "permissions": ["view_questions"],
+            "is_system_role": True,
+        },
     ]
-    for role in roles:
-        test_db.add(role)
+    for role_def in role_defs:
+        existing = test_db.query(Role).filter(Role.name == role_def["name"]).first()
+        if not existing:
+            test_db.add(Role(**role_def))
 
     test_db.commit()
 

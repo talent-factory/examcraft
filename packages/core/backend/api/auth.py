@@ -977,6 +977,7 @@ async def oauth_callback(
                 f"Failed to track OAuth login metadata for user {user.id}: {e}"
             )
             db.rollback()
+            db.refresh(user)  # Re-attach user to session after rollback
 
         # Generate JWT tokens and create session
         tokens = AuthService.create_tokens_for_user(
