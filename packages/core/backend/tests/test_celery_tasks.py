@@ -41,11 +41,8 @@ class TestDocumentProcessingTask:
                 "vector_embeddings": {"chunks": 5},
             }
 
-            # Mock the Celery self parameter (bind=True task)
-            mock_self = MagicMock()
-
-            # Execute task (bind=True means self is first arg)
-            result = process_document(mock_self, "1", "test-user-id")
+            # Execute task (bind=True injects self automatically)
+            result = process_document("1", "test-user-id")
 
             # Verify results
             assert result["success"] is True
@@ -59,13 +56,17 @@ class TestDocumentProcessingTask:
             mock_session_local.return_value = mock_db
             mock_db.query.return_value.filter.return_value.first.return_value = None
 
-            mock_self = MagicMock()
-            mock_self.retry.side_effect = Exception("retry")
+            # Mock the task's retry method (bind=True means self is the task)
+            original_retry = process_document.retry
+            process_document.retry = MagicMock(side_effect=Exception("retry"))
 
-            # The task uses int(document_id), so pass a valid int string
-            # that doesn't match any document
-            with pytest.raises(Exception):
-                process_document(mock_self, "999", "test-user-id")
+            try:
+                # The task uses int(document_id), so pass a valid int string
+                # that doesn't match any document
+                with pytest.raises(Exception):
+                    process_document("999", "test-user-id")
+            finally:
+                process_document.retry = original_retry
 
     def test_create_embeddings_task_success(self):
         """Test successful embedding creation"""

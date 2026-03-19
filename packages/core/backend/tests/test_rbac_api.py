@@ -96,16 +96,18 @@ def rbac_api_db(test_db):
     # Assign feature to tier
     test_db.add(TierFeature(tier_id="tier_api_test", feature_id="feat_api_test_1"))
 
-    # Create old-style role for user
-    old_role = Role(
-        name="api_test_user",
-        display_name="API Test User",
-        description="Test user role",
-        permissions=["view"],
-        is_system_role=False,
-    )
-    test_db.add(old_role)
-    test_db.flush()
+    # Get or create old-style role for user
+    old_role = test_db.query(Role).filter(Role.name == "api_test_user").first()
+    if not old_role:
+        old_role = Role(
+            name="api_test_user",
+            display_name="API Test User",
+            description="Test user role",
+            permissions=["view"],
+            is_system_role=False,
+        )
+        test_db.add(old_role)
+        test_db.flush()
 
     # Create test user
     user = User(
@@ -310,8 +312,8 @@ def test_check_permission(api_client):
 
     assert response.status_code == 200
     result = response.json()
-    assert "allowed" in result
-    assert "feature_name" in result
+    assert "has_access" in result
+    assert "feature" in result
 
 
 def test_check_quota(api_client):
