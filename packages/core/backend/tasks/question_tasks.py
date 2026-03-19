@@ -8,6 +8,7 @@ import logging
 from typing import Any, Dict
 
 from celery.exceptions import Ignore, Reject
+from pydantic import ValidationError
 
 from celery_app import celery_app
 from tasks.document_tasks import ProgressTask, run_async
@@ -30,7 +31,10 @@ except ImportError:
     dont_autoretry_for=(
         Ignore,
         Reject,
-    ),  # Celery-interne Exceptions nicht nochmals retry
+        ValidationError,  # Ungültige Eingabedaten — Retry ändert nichts
+        TypeError,  # Programmierfehler — Retry ändert nichts
+        ImportError,  # Deployment-Problem — Retry ändert nichts
+    ),
     retry_kwargs={"max_retries": 2, "countdown": 30},
 )
 def generate_questions_task(

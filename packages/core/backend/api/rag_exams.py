@@ -4,7 +4,7 @@ Implementiert dokumentenbasierte Fragenerstellung mit Retrieval-Augmented Genera
 """
 
 import uuid
-from typing import List, Optional, Dict, Any
+from typing import List, Literal, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -51,7 +51,9 @@ class RAGExamRequestModel(BaseModel):
     question_types: Optional[List[str]] = Field(
         ["multiple_choice", "open_ended"], description="Fragetypen"
     )
-    difficulty: str = Field("medium", description="Schwierigkeitsgrad")
+    difficulty: Literal["easy", "medium", "hard"] = Field(
+        "medium", description="Schwierigkeitsgrad"
+    )
     language: str = Field("de", description="Sprache")
     context_chunks_per_question: int = Field(
         3, description="Context Chunks pro Frage", ge=1, le=10
