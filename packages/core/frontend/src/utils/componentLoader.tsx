@@ -292,3 +292,20 @@ export const loadSSOConfiguration = () => {
   // );
   return () => <FeatureUnavailable featureName="SSO Configuration" />;
 };
+
+/**
+ * Loads the premium RAGService class for use by GenerationTasksContext.
+ * Returns null in Core mode (no premium package available).
+ */
+export const loadRAGService = async (): Promise<any> => {
+  if (!isFullDeployment()) return null;
+  try {
+    const module = await import(
+      /* webpackChunkName: "rag-service" */
+      '@examcraft/premium/services/RAGService'
+    );
+    return module.RAGService || module.default;
+  } catch {
+    return null;
+  }
+};
