@@ -3,9 +3,9 @@ RAG-basierte Prüfungserstellung API Endpoints für ExamCraft AI
 Implementiert dokumentenbasierte Fragenerstellung mit Retrieval-Augmented Generation
 """
 
-from typing import List, Optional, Dict, Any
+import uuid
+from typing import List, Literal, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,9 @@ import services.rag_service as rag_service_module
 from services.rag_service import RAGExamRequest
 from services.document_service import document_service
 from models.auth import User
-from models.question_review import QuestionReview, ReviewHistory, ReviewStatus
+from models.question_generation_job import QuestionGenerationJob
+from tasks.question_tasks import generate_questions_task
+from schemas.task import GenerateExamTaskResponse
 from utils.auth_utils import get_current_active_user, require_permission
 import logging
 
@@ -49,7 +51,9 @@ class RAGExamRequestModel(BaseModel):
     question_types: Optional[List[str]] = Field(
         ["multiple_choice", "open_ended"], description="Fragetypen"
     )
-    difficulty: str = Field("medium", description="Schwierigkeitsgrad")
+    difficulty: Literal["easy", "medium", "hard"] = Field(
+        "medium", description="Schwierigkeitsgrad"
+    )
     language: str = Field("de", description="Sprache")
     context_chunks_per_question: int = Field(
         3, description="Context Chunks pro Frage", ge=1, le=10
@@ -115,14 +119,15 @@ class ContextRetrievalRequest(BaseModel):
 
 
 # API Endpoints
-@router.post("/generate-exam", response_model=RAGExamResponseModel)
+@router.post("/generate-exam", response_model=GenerateExamTaskResponse)
 async def generate_rag_exam(
     request: RAGExamRequestModel,
     current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db),
 ):
     """
-    Generiere RAG-basierte Prüfung aus Dokumenten
+    Startet asynchrone Fragengenerierung via Celery Task.
+    Gibt sofort task_id zurück — Fortschritt via WebSocket /ws/tasks/{task_id}.
 
     **Required Permission:** `create_questions` (Dozent, Assistant, Admin)
 
@@ -163,31 +168,17 @@ async def generate_rag_exam(
                         detail=f"Invalid question type: {qtype}. Valid types: {valid_types}",
                     )
 
-        # Validiere Difficulty
-        valid_difficulties = ["easy", "medium", "hard"]
-        if request.difficulty not in valid_difficulties:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid difficulty: {request.difficulty}. Valid: {valid_difficulties}",
-            )
-
-        # Konvertiere prompt_config von Pydantic zu dataclass
+        # Request serialisieren
         prompt_config_dict = None
         if request.prompt_config:
-            from services.rag_service import PromptConfig as RAGPromptConfig
-
             prompt_config_dict = {}
             for question_type, config in request.prompt_config.items():
-                prompt_config_dict[question_type] = RAGPromptConfig(
-                    prompt_id=config.prompt_id, variables=config.variables
-                )
-                logger.info(
-                    f"📋 API received prompt_config for '{question_type}': prompt_id={config.prompt_id}, variables={list(config.variables.keys()) if config.variables else []}"
-                )
-        else:
-            logger.info("📋 API received NO prompt_config - will use default templates")
+                prompt_config_dict[question_type] = {
+                    "prompt_id": config.prompt_id,
+                    "variables": config.variables,
+                }
 
-        # Quota-Check vor Generierung (verhindert unnoetige Claude-API-Kosten)
+        # Quota-Check vor Generierung (verhindert unnötige Claude-API-Kosten)
         from utils.tenant_utils import SubscriptionLimits
 
         if not current_user.institution:
@@ -199,7 +190,6 @@ async def generate_rag_exam(
             current_user.institution, db, additional_count=request.question_count
         )
 
-        # Erstelle RAG Request
         rag_request = RAGExamRequest(
             topic=request.topic,
             document_ids=request.document_ids,
@@ -210,118 +200,40 @@ async def generate_rag_exam(
             context_chunks_per_question=request.context_chunks_per_question,
             prompt_config=prompt_config_dict,
         )
+        request_data = rag_request.model_dump(mode="json")
 
-        # Generiere RAG Exam
-        rag_response = await rag_service_module.rag_service.generate_rag_exam(
-            rag_request
-        )
+        # UUID vorab generieren — wird sowohl als DB-Record-Key als auch als
+        # Celery task_id verwendet.
+        task_id = str(uuid.uuid4())
+        job = QuestionGenerationJob(task_id=task_id, user_id=current_user.id)
+        db.add(job)
+        db.commit()
 
-        # Persistiere generierte Fragen in question_reviews
-        review_question_ids = []
-        persistence_warning = None
+        # Celery Task dispatchen — bei Fehler Job bereinigen
         try:
-            reviews = []
-            for question in rag_response.questions:
-                # explanation can be str or list — Premium RAG may return a list of grading criteria
-                if isinstance(question.explanation, str):
-                    explanation_text = question.explanation
-                elif isinstance(question.explanation, list):
-                    explanation_text = "; ".join(
-                        str(item) for item in question.explanation
-                    )
-                elif question.explanation is not None:
-                    explanation_text = str(question.explanation)
-                else:
-                    explanation_text = None
-
-                question_review = QuestionReview(
-                    question_text=question.question_text,
-                    question_type=question.question_type,
-                    options=question.options,
-                    correct_answer=question.correct_answer,
-                    explanation=explanation_text,
-                    difficulty=question.difficulty,
-                    topic=request.topic,
-                    language=request.language,
-                    source_chunks=question.source_chunks,
-                    source_documents=question.source_documents,
-                    confidence_score=question.confidence_score,
-                    review_status=ReviewStatus.PENDING.value,
-                    exam_id=rag_response.exam_id,
-                    created_by=current_user.id,
-                    institution_id=current_user.institution_id,
-                )
-                db.add(question_review)
-                reviews.append(question_review)
-
-            db.flush()  # Flush once to populate auto-generated IDs for all pending inserts
-
-            for question_review in reviews:
-                history = ReviewHistory(
-                    question_id=question_review.id,
-                    action="created",
-                    new_status=ReviewStatus.PENDING.value,
-                    changed_by=str(current_user.id),
-                    change_reason="Auto-generated via RAG exam generation",
-                )
-                db.add(history)
-                review_question_ids.append(question_review.id)
-
+            generate_questions_task.apply_async(
+                args=[request_data, str(current_user.id), current_user.institution_id],
+                task_id=task_id,
+                queue="question_generation",
+            )
+        except Exception as broker_error:
+            db.delete(job)
             db.commit()
-        except Exception as persist_err:
-            db.rollback()
-            logger.error(
-                f"Failed to persist questions for exam '{rag_response.exam_id}': {persist_err}",
-                exc_info=True,
+            logger.error(f"Celery Broker nicht erreichbar: {broker_error}")
+            raise HTTPException(
+                status_code=503,
+                detail="Task-Queue nicht verfügbar. Bitte später erneut versuchen.",
             )
-            review_question_ids = []
-            persistence_warning = "Questions were generated but could not be saved to the review workflow. Please try again."
-
-        # Konvertiere zu Response Model
-        questions_response = []
-        for question in rag_response.questions:
-            questions_response.append(
-                RAGQuestionResponse(
-                    question_text=question.question_text,
-                    question_type=question.question_type,
-                    options=question.options,
-                    correct_answer=question.correct_answer,
-                    explanation=question.explanation,
-                    difficulty=question.difficulty,
-                    source_chunks=question.source_chunks or [],
-                    source_documents=question.source_documents or [],
-                    confidence_score=question.confidence_score,
-                )
-            )
-
-        context_response = RAGContextResponse(
-            query=rag_response.context_summary.query,
-            total_chunks=len(rag_response.context_summary.retrieved_chunks),
-            total_similarity_score=rag_response.context_summary.total_similarity_score,
-            source_documents=rag_response.context_summary.source_documents,
-            context_length=rag_response.context_summary.context_length,
-        )
-
-        response = RAGExamResponseModel(
-            exam_id=rag_response.exam_id,
-            topic=rag_response.topic,
-            questions=questions_response,
-            context_summary=context_response,
-            generation_time=rag_response.generation_time,
-            quality_metrics=rag_response.quality_metrics,
-            review_question_ids=review_question_ids,
-            persistence_warning=persistence_warning,
-        )
 
         logger.info(
-            f"Generated RAG exam '{rag_response.exam_id}' with {len(questions_response)} questions"
+            f"Fragengenerierung gestartet: task_id={task_id}, "
+            f"user={current_user.id}, topic='{request.topic}'"
         )
 
-        if persistence_warning:
-            return JSONResponse(
-                content=response.model_dump(mode="json"), status_code=207
-            )
-        return response
+        return GenerateExamTaskResponse(
+            task_id=task_id,
+            message="Fragengenerierung gestartet",
+        )
 
     except HTTPException:
         db.rollback()
@@ -386,9 +298,9 @@ async def retrieve_context(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Context retrieval failed: {str(e)}")
+        logger.error(f"Context retrieval failed: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Context retrieval failed: {str(e)}"
+            status_code=500, detail="Context retrieval failed. Please try again."
         )
 
 
@@ -454,9 +366,9 @@ async def get_available_documents(
         }
 
     except Exception as e:
-        logger.error(f"Failed to get available documents: {str(e)}")
+        logger.error(f"Failed to get available documents: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to get documents: {str(e)}"
+            status_code=500, detail="Failed to get documents. Please try again."
         )
 
 
@@ -532,7 +444,10 @@ async def rag_service_health():
             claude_service = rag_service_module.rag_service.claude_service
             # Einfacher Test ob Service initialisiert ist
             claude_available = claude_service is not None
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                f"Claude Service Health-Check fehlgeschlagen: {type(e).__name__}: {e}"
+            )
             claude_available = False
 
         return {

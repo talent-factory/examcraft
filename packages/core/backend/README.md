@@ -30,7 +30,7 @@ cp .env.example .env
 DATABASE_URL=postgresql://examcraft:examcraft_dev@localhost:5432/examcraft  # pragma: allowlist secret
 REDIS_URL=redis://localhost:6379/0
 CELERY_BROKER_URL=amqp://examcraft:secure_password_here@localhost:5672/  # pragma: allowlist secret
-CELERY_RESULT_BACKEND=redis://localhost:6379/1
+CELERY_RESULT_BACKEND=redis://localhost:6379/3
 ANTHROPIC_API_KEY=sk-ant-...  # pragma: allowlist secret
 ```
 
