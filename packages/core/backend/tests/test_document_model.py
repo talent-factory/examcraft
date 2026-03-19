@@ -92,7 +92,7 @@ class TestDocumentModel:
             file_size=2000,
             mime_type="text/markdown",
             status=DocumentStatus.PROCESSED,
-            user_id="demo_user",
+            user_id=1,
             doc_metadata={
                 "title": "Chat: Test Session",
                 "source": "chat_export",
@@ -110,7 +110,7 @@ class TestDocumentModel:
         assert doc.title == "Chat: Test Session"
         assert doc.mime_type == "text/markdown"
         assert doc.status == DocumentStatus.PROCESSED
-        assert doc.user_id == "demo_user"
+        assert doc.user_id == 1
         assert doc.doc_metadata["source"] == "chat_export"
         assert "full_content" in doc.doc_metadata
         assert doc.has_vectors is False

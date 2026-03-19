@@ -7,8 +7,8 @@ Tests TF-192: OAuth Login should update user data (first_name, last_name, avatar
 import pytest
 from sqlalchemy.orm import Session
 
-from backend.models.auth import User, OAuthAccount, Institution
-from backend.services.oauth_service import OAuthService
+from models.auth import User, OAuthAccount, Institution
+from services.oauth_service import OAuthService
 
 
 @pytest.fixture

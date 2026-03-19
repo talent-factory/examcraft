@@ -15,7 +15,6 @@ import logging
 from typing import Any, Optional
 
 import httpx
-from pydantic import EmailStr
 
 from .base import (
     TransactionalProvider,
@@ -80,7 +79,13 @@ class ResendService(TransactionalProvider):
             httpx.HTTPStatusError: If API request fails
         """
         if not self.is_configured:
-            logger.warning("Resend not configured - simulating email send")
+            import os
+
+            if os.getenv("ENVIRONMENT", "development") == "production":
+                raise RuntimeError(
+                    "RESEND_API_KEY is not configured. Cannot send email in production."
+                )
+            logger.warning("Resend not configured - simulating email send (dev mode)")
             return f"demo_email_{id(email)}"
 
         payload: dict[str, Any] = {
@@ -198,8 +203,8 @@ class ResendService(TransactionalProvider):
         html_content = self._render_verification_template(user_name, verification_url)
 
         email = TransactionalEmail(
-            to=EmailAddress(email=EmailStr(user_email), name=user_name),
-            from_=EmailAddress(email=EmailStr(self.from_email), name=self.from_name),
+            to=EmailAddress(email=user_email, name=user_name),
+            from_=EmailAddress(email=self.from_email, name=self.from_name),
             subject="Verify your ExamCraft account",
             template=EmailTemplate(
                 subject="Verify your ExamCraft account",
@@ -234,8 +239,8 @@ class ResendService(TransactionalProvider):
         html_content = self._render_password_reset_template(user_name, reset_url)
 
         email = TransactionalEmail(
-            to=EmailAddress(email=EmailStr(user_email), name=user_name),
-            from_=EmailAddress(email=EmailStr(self.from_email), name=self.from_name),
+            to=EmailAddress(email=user_email, name=user_name),
+            from_=EmailAddress(email=self.from_email, name=self.from_name),
             subject="Reset your ExamCraft password",
             template=EmailTemplate(
                 subject="Reset your ExamCraft password",
@@ -280,8 +285,8 @@ class ResendService(TransactionalProvider):
         plan_name = payment_details.get("plan_name", "ExamCraft Plan")
 
         email = TransactionalEmail(
-            to=EmailAddress(email=EmailStr(user_email), name=user_name),
-            from_=EmailAddress(email=EmailStr(self.from_email), name=self.from_name),
+            to=EmailAddress(email=user_email, name=user_name),
+            from_=EmailAddress(email=self.from_email, name=self.from_name),
             subject=f"Payment Confirmation - {plan_name}",
             template=EmailTemplate(
                 subject=f"Payment Confirmation - {plan_name}",
@@ -324,8 +329,8 @@ class ResendService(TransactionalProvider):
         )
 
         email = TransactionalEmail(
-            to=EmailAddress(email=EmailStr(user_email), name=user_name),
-            from_=EmailAddress(email=EmailStr(self.from_email), name=self.from_name),
+            to=EmailAddress(email=user_email, name=user_name),
+            from_=EmailAddress(email=self.from_email, name=self.from_name),
             subject=subject,
             template=EmailTemplate(
                 subject=subject,

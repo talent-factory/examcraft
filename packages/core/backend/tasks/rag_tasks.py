@@ -4,7 +4,6 @@ Handles vector embedding and semantic search indexing
 """
 
 from celery_app import celery_app
-from services.rag_service import RAGService
 from database import SessionLocal
 from models.document import Document
 from typing import Dict, Any, List
@@ -41,6 +40,8 @@ def create_embeddings(document_id: str, chunks: List[str]) -> Dict[str, Any]:
         )
 
         # Create embeddings
+        from services.rag_service import RAGService
+
         rag_service = RAGService()
         rag_service.add_document_chunks(document_id=document_id, chunks=chunks)
 
@@ -96,6 +97,8 @@ def update_embeddings(document_id: str) -> Dict[str, Any]:
         logger.info(f"Updating embeddings for {document_id}")
 
         # Delete old embeddings
+        from services.rag_service import RAGService
+
         rag_service = RAGService()
         rag_service.delete_document_embeddings(document_id)
 
@@ -140,6 +143,8 @@ def delete_embeddings(document_id: str) -> Dict[str, Any]:
     """
     try:
         logger.info(f"Deleting embeddings for {document_id}")
+
+        from services.rag_service import RAGService
 
         rag_service = RAGService()
         rag_service.delete_document_embeddings(document_id)

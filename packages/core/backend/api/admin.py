@@ -714,7 +714,7 @@ async def list_institutions(
             max_documents=inst.max_documents,
             max_questions_per_month=inst.max_questions_per_month,
             is_active=inst.is_active,
-            require_second_reviewer=getattr(inst, "require_second_reviewer", False),
+            require_second_reviewer=inst.require_second_reviewer,
             created_at=inst.created_at.isoformat(),
         )
         for inst in institutions
