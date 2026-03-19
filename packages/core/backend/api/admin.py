@@ -799,7 +799,7 @@ async def update_institution(
         max_documents=institution.max_documents,
         max_questions_per_month=institution.max_questions_per_month,
         is_active=institution.is_active,
-        require_second_reviewer=getattr(institution, "require_second_reviewer", False),
+        require_second_reviewer=institution.require_second_reviewer,
         created_at=institution.created_at.isoformat(),
     )
 
@@ -876,6 +876,6 @@ async def create_institution(
         max_documents=institution.max_documents,
         max_questions_per_month=institution.max_questions_per_month,
         is_active=institution.is_active,
-        require_second_reviewer=getattr(institution, "require_second_reviewer", False),
+        require_second_reviewer=institution.require_second_reviewer,
         created_at=institution.created_at.isoformat(),
     )
