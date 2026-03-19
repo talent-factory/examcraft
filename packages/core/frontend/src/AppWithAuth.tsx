@@ -30,6 +30,7 @@ import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { UserRole } from './types/auth';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
 import QuestionReviewDetail from './components/QuestionReviewDetail';
+import GenerationTasksBar from './components/GenerationTasksBar';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
 // Load Premium PromptLibrary with Upload (falls back to Core version)
@@ -58,6 +59,7 @@ export const AppWithAuth: React.FC = () => {
           <BrowserRouter>
             {/* Sentry Test Button (only visible in development) */}
             <ErrorTestButton />
+            <GenerationTasksBar />
             <Routes>
               {/* Public Routes - Only accessible when NOT authenticated */}
               <Route
