@@ -212,7 +212,7 @@ async def generate_rag_exam(
         # Celery Task dispatchen — bei Fehler Job bereinigen
         try:
             generate_questions_task.apply_async(
-                args=[request_data, str(current_user.id)],
+                args=[request_data, str(current_user.id), current_user.institution_id],
                 task_id=task_id,
                 queue="question_generation",
             )
@@ -298,9 +298,9 @@ async def retrieve_context(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Context retrieval failed: {str(e)}")
+        logger.error(f"Context retrieval failed: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Context retrieval failed: {str(e)}"
+            status_code=500, detail="Context retrieval failed. Please try again."
         )
 
 
@@ -366,9 +366,9 @@ async def get_available_documents(
         }
 
     except Exception as e:
-        logger.error(f"Failed to get available documents: {str(e)}")
+        logger.error(f"Failed to get available documents: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to get documents: {str(e)}"
+            status_code=500, detail="Failed to get documents. Please try again."
         )
 
 
@@ -444,7 +444,10 @@ async def rag_service_health():
             claude_service = rag_service_module.rag_service.claude_service
             # Einfacher Test ob Service initialisiert ist
             claude_available = claude_service is not None
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                f"Claude Service Health-Check fehlgeschlagen: {type(e).__name__}: {e}"
+            )
             claude_available = False
 
         return {

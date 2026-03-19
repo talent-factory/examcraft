@@ -23,12 +23,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["websocket"])
 
 
-# Modul-Level-Singleton — korrekt für Single-Instance-Deployment
+# Modul-Level-Singleton — nur für Single-Instance-Deployment.
+# Bei horizontaler Skalierung muss ConnectionManager durch Redis Pub/Sub ersetzt werden.
 class ConnectionManager:
     def __init__(self) -> None:
         self.active_connections: Dict[str, WebSocket] = {}
 
     async def connect(self, task_id: str, websocket: WebSocket) -> None:
+        existing = self.active_connections.get(task_id)
+        if existing:
+            try:
+                await existing.close(code=1001)
+            except Exception:
+                pass
         await websocket.accept()
         self.active_connections[task_id] = websocket
 
@@ -38,7 +45,10 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# 120s > process_document retry countdown (60s), damit der WebSocket
+# nicht timeout bevor ein Retry-Versuch beginnt.
 PENDING_TIMEOUT_SECONDS = 120
+# 1s balanciert Responsivität mit Redis-Last; Progress-Updates sind schritt-basiert.
 POLL_INTERVAL_SECONDS = 1
 
 
@@ -46,42 +56,50 @@ async def _authenticate_websocket(websocket: WebSocket, token: str) -> User | No
     """
     Authentifiziert einen WebSocket-Client via JWT Token.
     Repliziert die Logik von get_current_user() ohne FastAPI Depends.
+
+    Returns:
+        User-Objekt bei Erfolg, None bei Fehler (WebSocket bereits geschlossen)
     """
-    db = SessionLocal()
+    payload = AuthService.decode_token(token)
+    if not payload:
+        await websocket.close(code=1008)
+        return None
+
+    user_id = payload.get("sub")
+    if not user_id:
+        await websocket.close(code=1008)
+        return None
+
+    def _db_lookup() -> User | None:
+        db = SessionLocal()
+        try:
+            token_jti = payload.get("jti")
+            if token_jti and AuthService.is_token_revoked(token_jti, db):
+                return None
+
+            return (
+                db.query(User)
+                .options(joinedload(User.roles))
+                .filter(User.id == int(user_id))
+                .first()
+            )
+        finally:
+            db.close()
+
     try:
-        payload = AuthService.decode_token(token)
-        if not payload:
-            await websocket.close(code=1008)
-            return None
-
-        user_id = payload.get("sub")
-        if not user_id:
-            await websocket.close(code=1008)
-            return None
-
-        token_jti = payload.get("jti")
-        if token_jti and AuthService.is_token_revoked(token_jti, db):
-            await websocket.close(code=1008)
-            return None
-
-        user = (
-            db.query(User)
-            .options(joinedload(User.roles))
-            .filter(User.id == int(user_id))
-            .first()
-        )
+        loop = asyncio.get_running_loop()
+        user = await loop.run_in_executor(None, _db_lookup)
         if not user:
             await websocket.close(code=1008)
             return None
-
         return user
-
     except Exception as e:
-        logger.warning(f"WebSocket Auth-Fehler: {e}")
-        await websocket.close(code=1008)
+        logger.error(
+            f"WebSocket Auth: Unerwarteter Fehler: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        await websocket.close(code=1011)
         return None
-    finally:
-        db.close()
 
 
 async def _check_task_ownership(websocket: WebSocket, task_id: str, user: User) -> bool:
@@ -92,47 +110,56 @@ async def _check_task_ownership(websocket: WebSocket, task_id: str, user: User) 
     """
     from models.question_generation_job import QuestionGenerationJob
 
-    db = SessionLocal()
+    def _db_check() -> str:
+        """Returns 'ok', 'denied', or 'unknown'. Runs in executor to avoid blocking."""
+        db = SessionLocal()
+        try:
+            document = db.query(Document).filter(Document.task_id == task_id).first()
+            if document:
+                if document.user_id != user.id:
+                    logger.warning(
+                        f"Ownership-Verletzung (Dokument): User {user.id} versucht Task "
+                        f"{task_id} (Owner: {document.user_id}) zu überwachen"
+                    )
+                    return "denied"
+                return "ok"
+
+            job = (
+                db.query(QuestionGenerationJob)
+                .filter(QuestionGenerationJob.task_id == task_id)
+                .first()
+            )
+            if job:
+                if job.user_id != user.id:
+                    logger.warning(
+                        f"Ownership-Verletzung (Fragen): User {user.id} versucht Task "
+                        f"{task_id} (Owner: {job.user_id}) zu überwachen"
+                    )
+                    return "denied"
+                return "ok"
+
+            # Unbekannte task_id — ablehnen (kein legitimer Fall, da Job vor apply_async erstellt wird)
+            logger.warning(
+                f"Unbekannte task_id {task_id!r} von User {user.id} abgelehnt"
+            )
+            return "unknown"
+        finally:
+            db.close()
+
     try:
-        # Check 1: Dokument-Task
-        document = db.query(Document).filter(Document.task_id == task_id).first()
-        if document:
-            if document.user_id != user.id:
-                logger.warning(
-                    f"Ownership-Verletzung (Dokument): User {user.id} versucht Task "
-                    f"{task_id} (Owner: {document.user_id}) zu überwachen"
-                )
-                await websocket.close(code=1008)
-                return False
-            return True
-
-        # Check 2: Fragen-Task
-        job = (
-            db.query(QuestionGenerationJob)
-            .filter(QuestionGenerationJob.task_id == task_id)
-            .first()
-        )
-        if job:
-            if job.user_id != user.id:
-                logger.warning(
-                    f"Ownership-Verletzung (Fragen): User {user.id} versucht Task "
-                    f"{task_id} (Owner: {job.user_id}) zu überwachen"
-                )
-                await websocket.close(code=1008)
-                return False
-            return True
-
-        # Unbekannte task_id — ablehnen (kein legitimer Fall, da Job vor apply_async erstellt wird)
-        logger.warning(f"Unbekannte task_id {task_id!r} von User {user.id} abgelehnt")
-        await websocket.close(code=1008)
-        return False
-
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, _db_check)
+        if result != "ok":
+            await websocket.close(code=1008)
+            return False
+        return True
     except Exception as e:
-        logger.error(f"Ownership-Check Fehler: {e}")
-        await websocket.close(code=1008)
+        logger.error(
+            f"Ownership-Check Fehler: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        await websocket.close(code=1011)
         return False
-    finally:
-        db.close()
 
 
 def _get_task_result(task_id: str) -> dict:
@@ -140,14 +167,23 @@ def _get_task_result(task_id: str) -> dict:
     Blockierender Redis-Aufruf — muss via run_in_executor aufgerufen werden.
     Liest state, info und result in einem einzigen Executor-Aufruf,
     damit kein blocking I/O auf dem Event-Loop stattfindet.
+
+    Bei Redis-Verbindungsfehlern wird ein PENDING-äquivalenter State zurückgegeben,
+    damit der Polling-Loop weiterlaufen kann (transiente Redis-Ausfälle).
     """
-    result = AsyncResult(task_id, app=celery_app)
-    state = result.state
-    return {
-        "state": state,
-        "info": result.info,
-        "result": result.result if state == "SUCCESS" else None,
-    }
+    try:
+        result = AsyncResult(task_id, app=celery_app)
+        state = result.state
+        return {
+            "state": state,
+            "info": result.info,
+            "result": result.result if state == "SUCCESS" else None,
+        }
+    except Exception as e:
+        logger.warning(
+            f"Redis-Fehler beim Abrufen von Task {task_id}: {type(e).__name__}: {e}"
+        )
+        return {"state": "PENDING", "info": None, "result": None}
 
 
 @router.websocket("/ws/tasks/{task_id}")
@@ -261,7 +297,10 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
             )
             await websocket.send_json(error_msg.model_dump())
             await websocket.close(code=1011)
-        except Exception:
-            pass
+        except Exception as cleanup_err:
+            logger.warning(
+                f"WebSocket Cleanup fehlgeschlagen für Task {task_id}: "
+                f"{type(cleanup_err).__name__}: {cleanup_err}"
+            )
     finally:
         manager.disconnect(task_id)
