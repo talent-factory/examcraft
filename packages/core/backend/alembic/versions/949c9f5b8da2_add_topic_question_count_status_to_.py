@@ -30,6 +30,10 @@ def upgrade() -> None:
         "question_generation_jobs",
         sa.Column("status", sa.String(), server_default="PENDING", nullable=False),
     )
+    # Pre-existing jobs completed before this feature — mark as SUCCESS
+    op.execute(
+        "UPDATE question_generation_jobs SET status = 'SUCCESS' WHERE topic IS NULL"
+    )
 
 
 def downgrade() -> None:
