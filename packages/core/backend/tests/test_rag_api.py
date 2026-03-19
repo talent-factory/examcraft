@@ -4,7 +4,7 @@ API Tests für RAG Endpoints
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock, MagicMock
 
 from main import app
 from services.rag_service import RAGExamResponse, RAGQuestion, RAGContext
@@ -84,10 +84,11 @@ class TestRAGAPI:
         doc.processed_at = None
         return doc
 
-    def test_generate_rag_exam_success(
-        self, sample_rag_response, mock_processed_document
-    ):
-        """Test erfolgreiche RAG Exam Generation"""
+    def test_generate_rag_exam_success(self, mock_processed_document):
+        """Test erfolgreiche RAG Exam Generation — gibt jetzt task_id zurück"""
+        from main import app
+        from database import get_db
+        from utils.auth_utils import get_current_user
 
         request_data = {
             "topic": "ExamCraft AI",
@@ -99,31 +100,38 @@ class TestRAGAPI:
             "context_chunks_per_question": 3,
         }
 
-        with (
-            patch("api.rag_exams.document_service") as mock_doc_service,
-            patch("api.rag_exams.rag_service") as mock_rag_service,
-        ):
-            # Mock Document Service
-            mock_doc_service.get_document_by_id.return_value = mock_processed_document
+        mock_db = MagicMock()
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_user.has_permission.return_value = True
 
-            # Mock RAG Service
-            mock_rag_service.generate_rag_exam = AsyncMock(
-                return_value=sample_rag_response
-            )
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_current_user] = lambda: mock_user
 
-            response = client.post("/api/v1/rag/generate-exam", json=request_data)
+        try:
+            with (
+                patch("api.rag_exams.document_service") as mock_doc_service,
+                patch("api.rag_exams.generate_questions_task") as mock_task,
+                patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+            ):
+                # Mock Document Service
+                mock_doc_service.get_document_by_id.return_value = (
+                    mock_processed_document
+                )
+
+                # Mock Celery Task und Job
+                mock_task.apply_async.return_value = MagicMock()
+                mock_job_cls.return_value = MagicMock()
+
+                response = client.post("/api/v1/rag/generate-exam", json=request_data)
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
 
-        assert data["exam_id"] == "test_exam_123"
-        assert data["topic"] == "ExamCraft AI"
-        assert len(data["questions"]) == 2
-        assert data["questions"][0]["question_type"] == "multiple_choice"
-        assert data["questions"][1]["question_type"] == "open_ended"
-        assert data["generation_time"] == 2.5
-        assert "quality_metrics" in data
-        assert data["quality_metrics"]["total_questions"] == 2
+        assert "task_id" in data
+        assert "message" in data
 
     def test_generate_rag_exam_document_not_found(self):
         """Test RAG Exam Generation mit nicht existierendem Dokument"""
@@ -172,20 +180,6 @@ class TestRAGAPI:
         assert response.status_code == 400
         assert "Invalid question type: invalid_type" in response.json()["detail"]
 
-    def test_generate_rag_exam_invalid_difficulty(self):
-        """Test RAG Exam Generation mit ungültigem Schwierigkeitsgrad"""
-
-        request_data = {
-            "topic": "Test Topic",
-            "question_count": 1,
-            "difficulty": "impossible",
-        }
-
-        response = client.post("/api/v1/rag/generate-exam", json=request_data)
-
-        assert response.status_code == 400
-        assert "Invalid difficulty: impossible" in response.json()["detail"]
-
     def test_generate_rag_exam_validation_errors(self):
         """Test RAG Exam Generation mit Validierungsfehlern"""
 
@@ -216,24 +210,25 @@ class TestRAGAPI:
         )
         assert response.status_code == 422
 
-    def test_generate_rag_exam_service_error(self, mock_processed_document):
-        """Test RAG Exam Generation mit Service Error"""
+    def test_generate_rag_exam_broker_unavailable(self, mock_processed_document):
+        """Test RAG Exam Generation wenn Celery Broker nicht erreichbar ist"""
 
         request_data = {"topic": "Test Topic", "question_count": 1}
 
         with (
             patch("api.rag_exams.document_service") as mock_doc_service,
-            patch("api.rag_exams.rag_service") as mock_rag_service,
+            patch("api.rag_exams.generate_questions_task") as mock_task,
+            patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+            patch("api.rag_exams.get_db"),
         ):
             mock_doc_service.get_document_by_id.return_value = mock_processed_document
-            mock_rag_service.generate_rag_exam = AsyncMock(
-                side_effect=Exception("Service Error")
-            )
+            mock_task.apply_async.side_effect = Exception("Broker unavailable")
+            mock_job_cls.return_value = MagicMock()
 
             response = client.post("/api/v1/rag/generate-exam", json=request_data)
 
-        assert response.status_code == 500
-        assert "Exam generation failed" in response.json()["detail"]
+        assert response.status_code == 503
+        assert "Task-Queue nicht verfügbar" in response.json()["detail"]
 
     def test_retrieve_context_success(self):
         """Test erfolgreiche Context Retrieval"""
@@ -520,35 +515,16 @@ class TestRAGAPIIntegration:
             assert context_response.status_code == 200
             assert context_response.json()["query"] == "Integration Test"
 
-        # 3. Teste RAG Exam Generation
-        mock_exam_response = RAGExamResponse(
-            exam_id="integration_test_exam",
-            topic="Integration Test",
-            questions=[
-                RAGQuestion(
-                    question_text="Integration Test Question?",
-                    question_type="multiple_choice",
-                    options=["A) Yes", "B) No"],
-                    correct_answer="A",
-                    difficulty="medium",
-                    source_chunks=["chunk_1"],
-                    source_documents=["integration_test.txt"],
-                    confidence_score=0.9,
-                )
-            ],
-            context_summary=mock_context,
-            generation_time=1.0,
-            quality_metrics={"total_questions": 1},
-        )
-
+        # 3. Teste RAG Exam Generation — gibt jetzt task_id zurück
         with (
             patch("api.rag_exams.document_service") as mock_doc_service,
-            patch("api.rag_exams.rag_service") as mock_rag_service,
+            patch("api.rag_exams.generate_questions_task") as mock_task,
+            patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+            patch("api.rag_exams.get_db"),
         ):
             mock_doc_service.get_document_by_id.return_value = mock_doc
-            mock_rag_service.generate_rag_exam = AsyncMock(
-                return_value=mock_exam_response
-            )
+            mock_task.apply_async.return_value = MagicMock()
+            mock_job_cls.return_value = MagicMock()
 
             exam_response = client.post(
                 "/api/v1/rag/generate-exam",
@@ -562,9 +538,8 @@ class TestRAGAPIIntegration:
 
             assert exam_response.status_code == 200
             exam_data = exam_response.json()
-            assert exam_data["exam_id"] == "integration_test_exam"
-            assert len(exam_data["questions"]) == 1
-            assert exam_data["questions"][0]["question_type"] == "multiple_choice"
+            assert "task_id" in exam_data
+            assert "message" in exam_data
 
     def test_error_handling_chain(self):
         """Test Error Handling in der gesamten Chain"""
