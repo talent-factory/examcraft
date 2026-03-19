@@ -7,6 +7,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
+import { GenerationTasksProvider } from './contexts/GenerationTasksContext';
 import { ProtectedRoute, GuestRoute, PermissionGuard, RoleGuard } from './components/guards';
 import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
@@ -53,6 +54,7 @@ export const AppWithAuth: React.FC = () => {
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
+          <GenerationTasksProvider>
           <BrowserRouter>
             {/* Sentry Test Button (only visible in development) */}
             <ErrorTestButton />
@@ -247,6 +249,7 @@ export const AppWithAuth: React.FC = () => {
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </BrowserRouter>
+          </GenerationTasksProvider>
         </AuthProvider>
       </QueryClientProvider>
     </AppErrorBoundary>
