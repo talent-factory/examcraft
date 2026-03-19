@@ -26,9 +26,15 @@ class ProgressTask(Task):
 
         Args:
             current: Aktueller Schritt (0-based)
-            total: Gesamtanzahl Schritte
+            total: Gesamtanzahl Schritte (muss > 0 sein)
             message: Deutsche Fortschrittsmessage
         """
+        if total <= 0:
+            logger.error(
+                f"update_progress aufgerufen mit total={total} (muss > 0 sein)"
+            )
+            total = 1
+        current = max(0, min(current, total))
         self.update_state(
             state="PROGRESS",
             meta={
@@ -41,9 +47,11 @@ class ProgressTask(Task):
 
 
 def run_async(coro):
-    """Helper to run async code in sync context"""
+    """Führt eine async Coroutine im synchronen Celery Worker aus."""
     try:
         loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError("Event loop is closed")
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -135,7 +143,3 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
 
     finally:
         db.close()
-
-
-# Hinweis: create_embeddings wurde entfernt — Vector Embedding wird direkt
-# in document_service.process_document_with_vectors() behandelt

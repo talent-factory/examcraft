@@ -1,11 +1,12 @@
 """
 Celery Task für asynchrone Fragengenerierung mit Progress-Tracking.
 Sendet per-Frage Progress-Updates via ProgressTask.update_progress().
+Persistiert generierte Fragen automatisch in question_reviews (Status: pending).
 """
 
 import dataclasses
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from celery.exceptions import Ignore, Reject
 from pydantic import ValidationError
@@ -19,8 +20,88 @@ logger = logging.getLogger(__name__)
 # In lokalen Tests wird RAGService via patch("tasks.question_tasks.RAGService") gemockt.
 try:
     from premium.services.rag_service import RAGService
-except ImportError:
+except ImportError as _import_err:
+    logger.warning(
+        f"Premium RAGService konnte nicht importiert werden: {_import_err}. "
+        "Fragengenerierung ist in diesem Worker nicht verfügbar."
+    )
     RAGService = None  # type: ignore[assignment,misc]
+
+
+def _persist_questions(
+    questions: list,
+    exam_id: str,
+    topic: str,
+    language: str,
+    user_id: int,
+    institution_id: Optional[int],
+) -> List[int]:
+    """
+    Persistiert generierte Fragen in question_reviews mit Status 'pending'.
+    Erstellt ReviewHistory-Einträge für den Audit-Trail.
+
+    Returns:
+        Liste der generierten QuestionReview-IDs
+    """
+    from database import SessionLocal
+    from models.question_review import QuestionReview, ReviewHistory, ReviewStatus
+
+    db = SessionLocal()
+    try:
+        reviews = []
+        for question in questions:
+            # explanation can be str or list — Premium RAG may return a list of grading criteria
+            explanation_raw = question.explanation
+            if isinstance(explanation_raw, str):
+                explanation_text = explanation_raw
+            elif isinstance(explanation_raw, list):
+                explanation_text = "; ".join(str(item) for item in explanation_raw)
+            elif explanation_raw is not None:
+                explanation_text = str(explanation_raw)
+            else:
+                explanation_text = None
+
+            question_review = QuestionReview(
+                question_text=question.question_text,
+                question_type=question.question_type,
+                options=question.options,
+                correct_answer=question.correct_answer,
+                explanation=explanation_text,
+                difficulty=question.difficulty,
+                topic=topic,
+                language=language,
+                source_chunks=question.source_chunks,
+                source_documents=question.source_documents,
+                confidence_score=question.confidence_score,
+                review_status=ReviewStatus.PENDING.value,
+                exam_id=exam_id,
+                created_by=user_id,
+                institution_id=institution_id,
+            )
+            db.add(question_review)
+            reviews.append(question_review)
+
+        db.flush()
+
+        review_ids = []
+        for question_review in reviews:
+            history = ReviewHistory(
+                question_id=question_review.id,
+                action="created",
+                new_status=ReviewStatus.PENDING.value,
+                changed_by=str(user_id),
+                change_reason="Auto-generated via RAG exam generation",
+            )
+            db.add(history)
+            review_ids.append(question_review.id)
+
+        db.commit()
+        return review_ids
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 @celery_app.task(
@@ -38,17 +119,21 @@ except ImportError:
     retry_kwargs={"max_retries": 2, "countdown": 30},
 )
 def generate_questions_task(
-    self, request_data: Dict[str, Any], user_id: str
+    self,
+    request_data: Dict[str, Any],
+    user_id: str,
+    institution_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Asynchrone Fragengenerierung mit per-Frage Progress-Updates.
 
     Args:
         request_data: Serialisierter RAGExamRequest als dict (via model_dump(mode='json'))
-        user_id: ID des Users (für Logging)
+        user_id: ID des Users (für Logging und Persistierung)
+        institution_id: Institution-ID für Multi-Tenancy (optional)
 
     Returns:
-        Dict mit exam_id, topic, questions, generation_time, quality_metrics
+        Dict mit exam_id, topic, questions, generation_time, quality_metrics, review_question_ids
     """
     if RAGService is None:
         raise Reject(
@@ -92,6 +177,32 @@ def generate_questions_task(
         f"({question_count} Fragen in {result.generation_time:.1f}s)"
     )
 
+    # Persistiere Fragen in question_reviews (Status: pending)
+    review_question_ids: List[int] = []
+    persistence_warning = None
+    try:
+        review_question_ids = _persist_questions(
+            questions=result.questions,
+            exam_id=result.exam_id,
+            topic=rag_request.topic,
+            language=rag_request.language,
+            user_id=int(user_id),
+            institution_id=institution_id,
+        )
+        logger.info(
+            f"Fragen persistiert: {len(review_question_ids)} Reviews für Exam {result.exam_id}"
+        )
+    except Exception as persist_err:
+        logger.error(
+            f"Persistierung fehlgeschlagen für Exam '{result.exam_id}': {persist_err}",
+            exc_info=True,
+        )
+        persistence_warning = (
+            "Questions were generated but could not be saved to the review workflow. "
+            "Please try again."
+        )
+
+    # Premium RAGQuestion/RAGContext sind @dataclass — bei Wechsel zu Pydantic .model_dump() verwenden
     return {
         "exam_id": result.exam_id,
         "topic": result.topic,
@@ -99,4 +210,6 @@ def generate_questions_task(
         "context_summary": dataclasses.asdict(result.context_summary),
         "generation_time": result.generation_time,
         "quality_metrics": result.quality_metrics,
+        "review_question_ids": review_question_ids,
+        "persistence_warning": persistence_warning,
     }
