@@ -93,8 +93,6 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/backend/Dockerfile
-      ssh:
-        - default
     environment:
       # Deployment Mode
       DEPLOYMENT_MODE: full
@@ -199,8 +197,6 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/backend/Dockerfile
-      ssh:
-        - default
     container_name: examcraft-celery-worker
     environment:
       # Deployment Mode
@@ -301,8 +297,6 @@ services:
     build:
       context: .
       dockerfile: ./packages/core/backend/Dockerfile
-      ssh:
-        - default
     container_name: examcraft-flower
     environment:
       CELERY_BROKER_URL: amqp://examcraft:examcraft_dev@rabbitmq:5672/ # pragma: allowlist secret
