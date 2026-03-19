@@ -237,6 +237,10 @@ jobs:
         if: matrix.scenario == 'full'
         run: docker compose -f docker-compose.full.yml config
 
+      - name: Create Premium Stub (Core mode)
+        if: matrix.scenario == 'core'
+        run: mkdir -p packages/premium/backend
+
       - name: Build Docker Images - Core
         if: matrix.scenario == 'core'
         run: |
@@ -325,7 +329,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v6
         with:
-          submodules: false  # Core deployment uses public repo only
+          submodules: recursive
+          token: ${{ secrets.SUBMODULE_TOKEN }}
 
       - name: Setup Fly.io CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
