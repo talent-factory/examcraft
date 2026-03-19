@@ -3,6 +3,7 @@ Celery Task für asynchrone Fragengenerierung mit Progress-Tracking.
 Sendet per-Frage Progress-Updates via ProgressTask.update_progress().
 """
 
+import dataclasses
 import logging
 from typing import Any, Dict
 
@@ -90,7 +91,7 @@ def generate_questions_task(
     return {
         "exam_id": result.exam_id,
         "topic": result.topic,
-        "questions": [q.model_dump() for q in result.questions],
+        "questions": [dataclasses.asdict(q) for q in result.questions],
         "generation_time": result.generation_time,
         "quality_metrics": result.quality_metrics,
     }
