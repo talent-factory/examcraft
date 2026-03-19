@@ -18,7 +18,6 @@ collect_ignore_glob = [
     "test_rbac_api.py",
     "test_multi_tenancy.py",
     "test_document_model.py",
-    "test_rag_api.py",
 ]
 
 # Test Database Configuration

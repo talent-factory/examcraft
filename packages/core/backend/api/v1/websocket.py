@@ -168,9 +168,13 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
             handshake = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
             token = handshake.get("token", "")
         except asyncio.TimeoutError:
+            logger.warning(f"WebSocket Handshake-Timeout für Task {task_id}")
             await websocket.close(code=1008)
             return
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                f"WebSocket Handshake-Fehler für Task {task_id}: {type(e).__name__}: {e}"
+            )
             await websocket.close(code=1008)
             return
 
@@ -244,6 +248,20 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
     except WebSocketDisconnect:
         logger.debug(f"Client disconnected von Task {task_id}")
     except Exception as e:
-        logger.error(f"WebSocket Fehler für Task {task_id}: {e}")
+        logger.error(
+            f"WebSocket Fehler für Task {task_id}: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        try:
+            error_msg = TaskStatusMessage(
+                task_id=task_id,
+                status=TaskStatus.FAILURE,
+                progress=0,
+                error="Interner Server-Fehler bei der Fortschritts-Übertragung",
+            )
+            await websocket.send_json(error_msg.model_dump())
+            await websocket.close(code=1011)
+        except Exception:
+            pass
     finally:
         manager.disconnect(task_id)
