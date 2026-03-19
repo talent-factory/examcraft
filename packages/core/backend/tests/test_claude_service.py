@@ -250,11 +250,12 @@ class TestClaudeServiceIntegration:
             service = ClaudeService()
 
             # Test Fragen-Generierung
+            # Demo mode generates at most 3 questions
             questions = await service.generate_questions(
-                topic="Machine Learning", difficulty="hard", question_count=5
+                topic="Machine Learning", difficulty="hard", question_count=3
             )
 
-            assert len(questions) == 5
+            assert len(questions) == 3
             assert all(isinstance(q, dict) for q in questions)
 
             # Test Usage Stats

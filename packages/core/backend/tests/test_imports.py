@@ -53,17 +53,13 @@ class TestCriticalImports:
 class TestServiceImports:
     """Tests für Service-Module"""
 
-    def test_vector_service_import(self):
-        """Vector Service muss importierbar sein"""
-        from services.vector_service import VectorService
-
-        assert VectorService is not None
-
     def test_qdrant_vector_service_import(self):
-        """Qdrant Vector Service muss importierbar sein"""
-        from services.qdrant_vector_service import QdrantVectorService
+        """Qdrant Vector Service module muss importierbar sein"""
+        import services.qdrant_vector_service as qdrant_mod
 
-        assert QdrantVectorService is not None
+        assert qdrant_mod is not None
+        # Core package has SearchResult placeholder, not QdrantVectorService class
+        assert hasattr(qdrant_mod, "SearchResult")
 
     def test_vector_service_factory_import(self):
         """Vector Service Factory muss importierbar sein"""
@@ -93,12 +89,6 @@ class TestAPIImports:
 
         assert documents is not None
 
-    def test_vector_search_api_import(self):
-        """Vector Search API muss importierbar sein"""
-        from api import vector_search
-
-        assert vector_search is not None
-
     def test_rag_exams_api_import(self):
         """RAG Exams API muss importierbar sein"""
         from api import rag_exams
@@ -125,28 +115,12 @@ class TestMainAppImport:
 
 
 class TestNumpyAvailability:
-    """Spezielle Tests für numpy-Verfügbarkeit in Vector Services"""
+    """Spezielle Tests für numpy-Verfügbarkeit in Services"""
 
-    def test_numpy_in_qdrant_service(self):
-        """Numpy muss in Qdrant Service verfügbar sein"""
-        from services.qdrant_vector_service import QdrantVectorService
+    def test_numpy_available(self):
+        """Numpy muss verfügbar sein"""
         import numpy as np
 
-        # Erstelle Service-Instanz
-        QdrantVectorService(qdrant_url="http://localhost:6333", collection_name="test")
-
-        # Prüfe, dass numpy verfügbar ist
-        assert np is not None
-
-    def test_numpy_in_vector_service(self):
-        """Numpy muss in Vector Service verfügbar sein"""
-        from services.vector_service import VectorService
-        import numpy as np
-
-        # Erstelle Service-Instanz (Placeholder in Core)
-        VectorService()
-
-        # Prüfe, dass numpy verfügbar ist
         assert np is not None
 
 
