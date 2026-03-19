@@ -57,7 +57,6 @@ class RAGExamRequestModel(BaseModel):
         3, description="Context Chunks pro Frage", ge=1, le=10
     )
 
-    # NEU: Prompt-Konfiguration pro Fragetyp
     prompt_config: Optional[Dict[str, PromptConfig]] = Field(
         None,
         description="Prompt-Konfiguration pro Fragetyp (z.B. {'multiple_choice': {...}, 'open_ended': {...}})",
@@ -97,6 +96,8 @@ class RAGExamResponseModel(BaseModel):
     context_summary: RAGContextResponse
     generation_time: float
     quality_metrics: Dict[str, Any]
+    review_question_ids: List[int] = []
+    persistence_warning: Optional[str] = None
 
 
 class ContextRetrievalRequest(BaseModel):
@@ -109,7 +110,7 @@ class ContextRetrievalRequest(BaseModel):
     max_chunks: int = Field(5, description="Maximale Anzahl Chunks", ge=1, le=20)
     min_similarity: Optional[float] = Field(
         0.01,
-        description="Mindest-Similarity (angepasst für Mock Embeddings)",
+        description="Mindest-Similarity Score (niedrig fuer maximalen Recall)",
         ge=0.0,
         le=1.0,
     )
@@ -175,6 +176,18 @@ async def generate_rag_exam(
                     "variables": config.variables,
                 }
 
+        # Quota-Check vor Generierung (verhindert unnötige Claude-API-Kosten)
+        from utils.tenant_utils import SubscriptionLimits
+
+        if not current_user.institution:
+            raise HTTPException(
+                status_code=403,
+                detail="You must be associated with an institution to generate exams.",
+            )
+        SubscriptionLimits.check_question_limit(
+            current_user.institution, db, additional_count=request.question_count
+        )
+
         rag_request = RAGExamRequest(
             topic=request.topic,
             document_ids=request.document_ids,
@@ -221,12 +234,14 @@ async def generate_rag_exam(
         )
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
-        logger.error(f"Fehler beim Starten der Fragengenerierung: {str(e)}")
+        db.rollback()
+        logger.error(f"RAG exam generation failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Fragengenerierung konnte nicht gestartet werden: {str(e)}",
+            detail="Exam generation failed. Please try again or contact support.",
         )
 
 
@@ -256,7 +271,6 @@ async def retrieve_context(
                         status_code=404, detail=f"Document with ID {doc_id} not found"
                     )
 
-        # Hole Kontext (mit angepasstem min_similarity für Mock Embeddings)
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
         context = await rag_service_module.rag_service.retrieve_context(
             query=request.query,
@@ -462,4 +476,7 @@ async def rag_service_health():
 
     except Exception as e:
         logger.error(f"RAG service health check failed: {str(e)}")
-        return {"status": "unhealthy", "service": "RAG Service", "error": str(e)}
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "unhealthy", "service": "RAG Service"},
+        )

@@ -13,7 +13,6 @@ from models.rbac import (
     SubscriptionTier,
     TierQuota,
     TierFeature,
-    Organization,
 )
 from models.auth import User, Role, Institution, UserStatus
 
@@ -259,16 +258,6 @@ def test_check_resource_quota_unlimited(rbac_db):
     institution.subscription_tier = "pro"  # Must match tier_id without "tier_" prefix
     rbac_db.commit()
 
-    # Create Organization for ResourceUsage
-    org = Organization(
-        id=f"org_{institution.id}",
-        name=institution.name,
-        tier_id="tier_pro",
-        subscription_status="active",
-    )
-    rbac_db.add(org)
-    rbac_db.commit()
-
     service = RBACService(rbac_db)
 
     # Pro tier has unlimited documents (-1) -> ALLOWED
@@ -282,16 +271,6 @@ def test_check_resource_quota_unlimited(rbac_db):
 def test_increment_resource_usage(rbac_db):
     """Test incrementing resource usage"""
     institution = rbac_db.query(Institution).first()
-
-    # Create Organization for ResourceUsage
-    org = Organization(
-        id=f"org_{institution.id}",
-        name=institution.name,
-        tier_id="tier_free",
-        subscription_status="active",
-    )
-    rbac_db.add(org)
-    rbac_db.commit()
 
     service = RBACService(rbac_db)
 

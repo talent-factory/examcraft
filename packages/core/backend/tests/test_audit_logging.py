@@ -27,15 +27,17 @@ def db(test_db):
     test_db.add(institution)
     test_db.flush()
 
-    # Create viewer role
-    viewer_role = Role(
-        name=UserRole.VIEWER.value,
-        display_name="Viewer",
-        description="Can view questions",
-        permissions=["view_questions"],
-        is_system_role=True,
-    )
-    test_db.add(viewer_role)
+    # Get or create viewer role
+    viewer_role = test_db.query(Role).filter(Role.name == UserRole.VIEWER.value).first()
+    if not viewer_role:
+        viewer_role = Role(
+            name=UserRole.VIEWER.value,
+            display_name="Viewer",
+            description="Can view questions",
+            permissions=["view_questions"],
+            is_system_role=True,
+        )
+        test_db.add(viewer_role)
     test_db.commit()
 
     yield test_db

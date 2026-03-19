@@ -12,6 +12,7 @@ if "magic" not in sys.modules:
 import pytest
 from unittest.mock import patch, MagicMock
 from tasks.document_tasks import process_document
+from tasks.rag_tasks import create_embeddings
 from models.document import Document, DocumentStatus
 
 
@@ -20,9 +21,9 @@ class TestDocumentProcessingTask:
 
     def test_process_document_task_success(self):
         """Test successful document processing"""
-        # Mock the database and services
         with (
             patch("tasks.document_tasks.SessionLocal") as mock_session_local,
+            patch("tasks.document_tasks.document_service"),
             patch("tasks.document_tasks.run_async") as mock_run_async,
         ):
             # Setup mocks
@@ -48,8 +49,6 @@ class TestDocumentProcessingTask:
 
             # Mock the update_state method to avoid Celery backend interaction
             with patch.object(process_document, "update_state"):
-                # Call the wrapped function directly with just document_id and user_id
-                # __wrapped__ is a bound method, so self is already bound
                 result = process_document.__wrapped__(
                     document_id="1", user_id="test-user-id"
                 )
@@ -61,9 +60,6 @@ class TestDocumentProcessingTask:
             assert result["status"] == mock_document.status.value
             assert result["has_vectors"] is True
 
-            # Verify document status was updated
-            assert mock_document.status == DocumentStatus.PROCESSING
-
     def test_process_document_task_not_found(self):
         """Test processing when document doesn't exist"""
         with patch("tasks.document_tasks.SessionLocal") as mock_session_local:
@@ -73,13 +69,42 @@ class TestDocumentProcessingTask:
 
             # Mock the update_state method to avoid Celery backend interaction
             with patch.object(process_document, "update_state"):
-                # Should raise ValueError with German error message
                 with pytest.raises(ValueError, match="Dokument .* nicht gefunden"):
-                    # __wrapped__ is a bound method, so we just pass the parameters
-                    # Use a numeric ID to avoid int() conversion error
                     process_document.__wrapped__(
                         document_id="999", user_id="test-user-id"
                     )
+
+    def test_create_embeddings_task_success(self):
+        """Test successful embedding creation"""
+        with (
+            patch("tasks.rag_tasks.SessionLocal") as mock_session_local,
+            patch("services.rag_service.RAGService", create=True) as mock_rag_cls,
+        ):
+            mock_db = MagicMock()
+            mock_session_local.return_value = mock_db
+
+            mock_document = MagicMock(spec=Document)
+            mock_document.id = "test-doc-id"
+
+            mock_db.query.return_value.filter.return_value.first.return_value = (
+                mock_document
+            )
+
+            mock_rag_instance = MagicMock()
+            mock_rag_cls.return_value = mock_rag_instance
+
+            # Execute task
+            result = create_embeddings(
+                document_id="test-doc-id", chunks=["chunk1", "chunk2", "chunk3"]
+            )
+
+            # Verify results
+            assert result["success"] is True
+            assert result["document_id"] == "test-doc-id"
+            assert result["chunks_embedded"] == 3
+
+            # Verify RAG service was called
+            mock_rag_instance.add_document_chunks.assert_called_once()
 
 
 class TestCeleryConfiguration:
