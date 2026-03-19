@@ -99,8 +99,11 @@ module.exports = {
   jest: {
     configure: {
       transformIgnorePatterns: [
-        'node_modules/(?!(axios|react-markdown|remark-.*|unified|bail|is-plain-obj|trough|vfile.*|unist-.*|mdast-.*|micromark.*|decode-named-character-reference|character-entities|property-information|hast-util-.*|comma-separated-tokens|space-separated-tokens|trim-lines|ccount|escape-string-regexp|markdown-table|zwitch|longest-streak|devlop|stringify-entities|character-entities-html4|character-entities-legacy)/)',
+        'node_modules/(?!(axios)/)',
       ],
+      moduleNameMapper: {
+        '^react-markdown$': '<rootDir>/src/__mocks__/react-markdown.js',
+      },
     },
   },
 }
