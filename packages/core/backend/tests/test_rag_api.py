@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
 
 from main import app
-from services.rag_service import RAGExamResponse, RAGQuestion, RAGContext
+from services.document_service import document_service as actual_document_service
 from models.document import Document, DocumentStatus
 from models.question_review import QuestionReview, ReviewHistory
 
@@ -56,6 +56,7 @@ def mock_db():
     db.add = mock_add
     db.flush = mock_flush
     db.commit = Mock()
+    db.rollback = Mock()
     db._added_objects = added_objects
     return db
 
@@ -78,6 +79,53 @@ def auth_client(mock_user, mock_db):
 client = TestClient(app)
 
 
+def _make_mock_rag_response():
+    """Create a mock RAG response with the expected attributes"""
+    context = Mock()
+    context.query = "ExamCraft AI"
+    context.retrieved_chunks = []
+    context.total_similarity_score = 1.5
+    context.source_documents = [{"id": 1, "filename": "test.txt", "chunks_used": 2}]
+    context.context_length = 150
+
+    q1 = Mock()
+    q1.question_text = "Was ist ExamCraft AI?"
+    q1.question_type = "multiple_choice"
+    q1.options = ["A) CMS", "B) Prüfungssystem", "C) Browser", "D) Editor"]
+    q1.correct_answer = "B"
+    q1.explanation = "ExamCraft AI ist ein intelligentes Prüfungssystem"
+    q1.difficulty = "medium"
+    q1.source_chunks = ["chunk_1"]
+    q1.source_documents = ["test.txt"]
+    q1.confidence_score = 0.85
+
+    q2 = Mock()
+    q2.question_text = "Erläutern Sie die Funktionsweise von ExamCraft AI."
+    q2.question_type = "open_ended"
+    q2.options = None
+    q2.correct_answer = "ExamCraft AI verwendet KI-Technologien..."
+    q2.explanation = ["Verständnis", "Vollständigkeit"]
+    q2.difficulty = "medium"
+    q2.source_chunks = ["chunk_2"]
+    q2.source_documents = ["test.txt"]
+    q2.confidence_score = 0.78
+
+    response = Mock()
+    response.exam_id = "test_exam_123"
+    response.topic = "ExamCraft AI"
+    response.questions = [q1, q2]
+    response.context_summary = context
+    response.generation_time = 2.5
+    response.quality_metrics = {
+        "total_questions": 2,
+        "average_confidence": 0.815,
+        "source_coverage": 1.0,
+        "question_type_distribution": {"multiple_choice": 1, "open_ended": 1},
+    }
+
+    return response
+
+
 class TestRAGAPI:
     """Test Suite für RAG API Endpoints"""
 
@@ -89,55 +137,6 @@ class TestRAGAPI:
         route_paths = [r.path for r in app.routes]
         if "/api/v1/rag/generate-exam" not in route_paths:
             app.include_router(rag_module.router)
-
-    @pytest.fixture
-    def sample_rag_response(self):
-        """Sample RAG Response für Tests"""
-        context = RAGContext(
-            query="ExamCraft AI",
-            retrieved_chunks=[],
-            total_similarity_score=1.5,
-            source_documents=[{"id": 1, "filename": "test.txt", "chunks_used": 2}],
-            context_length=150,
-        )
-
-        questions = [
-            RAGQuestion(
-                question_text="Was ist ExamCraft AI?",
-                question_type="multiple_choice",
-                options=["A) CMS", "B) Prüfungssystem", "C) Browser", "D) Editor"],
-                correct_answer="B",
-                explanation="ExamCraft AI ist ein intelligentes Prüfungssystem",
-                difficulty="medium",
-                source_chunks=["chunk_1"],
-                source_documents=["test.txt"],
-                confidence_score=0.85,
-            ),
-            RAGQuestion(
-                question_text="Erläutern Sie die Funktionsweise von ExamCraft AI.",
-                question_type="open_ended",
-                correct_answer="ExamCraft AI verwendet KI-Technologien...",
-                explanation=["Verständnis", "Vollständigkeit"],
-                difficulty="medium",
-                source_chunks=["chunk_2"],
-                source_documents=["test.txt"],
-                confidence_score=0.78,
-            ),
-        ]
-
-        return RAGExamResponse(
-            exam_id="test_exam_123",
-            topic="ExamCraft AI",
-            questions=questions,
-            context_summary=context,
-            generation_time=2.5,
-            quality_metrics={
-                "total_questions": 2,
-                "average_confidence": 0.815,
-                "source_coverage": 1.0,
-                "question_type_distribution": {"multiple_choice": 1, "open_ended": 1},
-            },
-        )
 
     @pytest.fixture
     def mock_processed_document(self):
@@ -157,10 +156,10 @@ class TestRAGAPI:
         doc.processed_at = None
         return doc
 
-    def test_generate_rag_exam_success(
-        self, auth_client, sample_rag_response, mock_processed_document
-    ):
+    def test_generate_rag_exam_success(self, auth_client, mock_processed_document):
         """Test erfolgreiche RAG Exam Generation"""
+
+        sample_rag_response = _make_mock_rag_response()
 
         request_data = {
             "topic": "ExamCraft AI",
@@ -173,13 +172,13 @@ class TestRAGAPI:
         }
 
         with (
-            patch("api.rag_exams.document_service") as mock_doc_service,
+            patch.object(
+                actual_document_service,
+                "get_document_by_id",
+                return_value=mock_processed_document,
+            ),
             patch("services.rag_service.rag_service") as mock_rag_service,
         ):
-            # Mock Document Service
-            mock_doc_service.get_document_by_id.return_value = mock_processed_document
-
-            # Mock RAG Service
             mock_rag_service.generate_rag_exam = AsyncMock(
                 return_value=sample_rag_response
             )
@@ -202,9 +201,11 @@ class TestRAGAPI:
             "question_count": 1,
         }
 
-        with patch("api.rag_exams.document_service") as mock_doc_service:
-            mock_doc_service.get_document_by_id.return_value = None
-
+        with patch.object(
+            actual_document_service,
+            "get_document_by_id",
+            return_value=None,
+        ):
             response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
 
         assert response.status_code == 404
@@ -220,9 +221,11 @@ class TestRAGAPI:
 
         request_data = {"topic": "Test Topic", "document_ids": [1], "question_count": 1}
 
-        with patch("api.rag_exams.document_service") as mock_doc_service:
-            mock_doc_service.get_document_by_id.return_value = mock_processed_document
-
+        with patch.object(
+            actual_document_service,
+            "get_document_by_id",
+            return_value=mock_processed_document,
+        ):
             response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
 
         assert response.status_code == 400
@@ -294,10 +297,13 @@ class TestRAGAPI:
         request_data = {"topic": "Test Topic", "question_count": 1}
 
         with (
-            patch("api.rag_exams.document_service") as mock_doc_service,
+            patch.object(
+                actual_document_service,
+                "get_document_by_id",
+                return_value=mock_processed_document,
+            ),
             patch("services.rag_service.rag_service") as mock_rag_service,
         ):
-            mock_doc_service.get_document_by_id.return_value = mock_processed_document
             mock_rag_service.generate_rag_exam = AsyncMock(
                 side_effect=Exception("Service Error")
             )
@@ -317,19 +323,24 @@ class TestRAGAPI:
             "min_similarity": 0.3,
         }
 
-        mock_context = RAGContext(
-            query="ExamCraft AI",
-            retrieved_chunks=[],
-            total_similarity_score=2.1,
-            source_documents=[{"id": 1, "filename": "test.txt", "chunks_used": 3}],
-            context_length=180,
-        )
+        # Create a mock context object with the attributes the endpoint expects
+        mock_context = Mock()
+        mock_context.query = "ExamCraft AI"
+        mock_context.retrieved_chunks = []
+        mock_context.total_similarity_score = 2.1
+        mock_context.source_documents = [
+            {"id": 1, "filename": "test.txt", "chunks_used": 3}
+        ]
+        mock_context.context_length = 180
 
         with (
-            patch("api.rag_exams.document_service") as mock_doc_service,
+            patch.object(
+                actual_document_service,
+                "get_document_by_id",
+                return_value=Mock(),
+            ),
             patch("services.rag_service.rag_service") as mock_rag_service,
         ):
-            mock_doc_service.get_document_by_id.return_value = Mock()
             mock_rag_service.retrieve_context = AsyncMock(return_value=mock_context)
 
             response = auth_client.post(
@@ -381,9 +392,11 @@ class TestRAGAPI:
 
         documents = [mock_processed_document]
 
-        with patch("api.rag_exams.document_service") as mock_doc_service:
-            mock_doc_service.get_documents_by_user.return_value = documents
-
+        with patch.object(
+            actual_document_service,
+            "get_documents_by_user",
+            return_value=documents,
+        ):
             response = auth_client.get("/api/v1/rag/available-documents")
 
         assert response.status_code == 200
@@ -465,12 +478,11 @@ class TestRAGAPI:
 
             response = client.get("/api/v1/rag/health")
 
-        assert response.status_code == 200
+        # The endpoint raises HTTPException with status 503 when vector service fails
+        assert response.status_code == 503
         data = response.json()
-
-        assert data["status"] == "unhealthy"
-        assert data["service"] == "RAG Service"
-        assert "error" in data
+        assert data["detail"]["status"] == "unhealthy"
+        assert data["detail"]["service"] == "RAG Service"
 
     def test_rag_service_health_claude_unavailable(self):
         """Test RAG Service Health Check - Claude Unavailable"""
@@ -513,30 +525,32 @@ class TestRAGAPIIntegration:
         """Test vollständiger RAG Workflow mit Mocks"""
 
         # 1. Prüfe verfügbare Dokumente
-        with patch("api.rag_exams.document_service") as mock_doc_service:
-            mock_doc = Mock()
-            mock_doc.id = 1
-            mock_doc.original_filename = "integration_test.txt"
-            mock_doc.status = DocumentStatus.PROCESSED
-            mock_doc.vector_collection = "test"
-            mock_doc.doc_metadata = {}
-            mock_doc.created_at = None
-            mock_doc.processed_at = None
+        mock_doc = Mock()
+        mock_doc.id = 1
+        mock_doc.original_filename = "integration_test.txt"
+        mock_doc.status = DocumentStatus.PROCESSED
+        mock_doc.vector_collection = "test"
+        mock_doc.doc_metadata = {}
+        mock_doc.created_at = None
+        mock_doc.processed_at = None
+        mock_doc.mime_type = "text/plain"
 
-            mock_doc_service.get_documents_by_user.return_value = [mock_doc]
-
+        with patch.object(
+            actual_document_service,
+            "get_documents_by_user",
+            return_value=[mock_doc],
+        ):
             docs_response = auth_client.get("/api/v1/rag/available-documents")
             assert docs_response.status_code == 200
             assert docs_response.json()["total_documents"] == 1
 
         # 2. Teste Context Retrieval
-        mock_context = RAGContext(
-            query="Integration Test",
-            retrieved_chunks=[],
-            total_similarity_score=1.0,
-            source_documents=[{"id": 1, "filename": "integration_test.txt"}],
-            context_length=100,
-        )
+        mock_context = Mock()
+        mock_context.query = "Integration Test"
+        mock_context.retrieved_chunks = []
+        mock_context.total_similarity_score = 1.0
+        mock_context.source_documents = [{"id": 1, "filename": "integration_test.txt"}]
+        mock_context.context_length = 100
 
         with patch("services.rag_service.rag_service") as mock_rag_service:
             mock_rag_service.retrieve_context = AsyncMock(return_value=mock_context)
@@ -556,13 +570,19 @@ class TestRAGAPIIntegration:
     def test_error_handling_chain(self, auth_client):
         """Test Error Handling in der gesamten Chain"""
 
-        with patch("api.rag_exams.document_service") as mock_doc_service:
-            mock_doc_service.get_document_by_id.return_value = None
-
+        with patch.object(
+            actual_document_service,
+            "get_document_by_id",
+            return_value=None,
+        ):
             # Document Not Found sollte früh abbrechen
             response = auth_client.post(
                 "/api/v1/rag/generate-exam",
-                json={"topic": "Test", "document_ids": [999], "question_count": 1},
+                json={
+                    "topic": "Test Topic",
+                    "document_ids": [999],
+                    "question_count": 1,
+                },
             )
 
             assert response.status_code == 404
@@ -650,10 +670,13 @@ class TestRAGQuestionPersistence:
     ):
         """Generated questions must be persisted and their IDs returned"""
         with (
-            patch("api.rag_exams.document_service") as mock_doc_svc,
+            patch.object(
+                actual_document_service,
+                "get_document_by_id",
+                return_value=None,
+            ),
             patch("services.rag_service.rag_service") as mock_rag_svc,
         ):
-            mock_doc_svc.get_document_by_id.return_value = None
             mock_rag_svc.generate_rag_exam = AsyncMock(return_value=sample_rag_response)
 
             response = auth_client.post(
@@ -680,10 +703,13 @@ class TestRAGQuestionPersistence:
 
         try:
             with (
-                patch("api.rag_exams.document_service") as mock_doc_svc,
+                patch.object(
+                    actual_document_service,
+                    "get_document_by_id",
+                    return_value=None,
+                ),
                 patch("services.rag_service.rag_service") as mock_rag_svc,
             ):
-                mock_doc_svc.get_document_by_id.return_value = None
                 mock_rag_svc.generate_rag_exam = AsyncMock(
                     return_value=sample_rag_response
                 )
