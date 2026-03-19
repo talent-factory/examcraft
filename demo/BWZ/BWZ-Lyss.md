@@ -2,4 +2,6 @@
 
 ## Prüfungsgenerierung
 
-QuickSort vs MergSort betreffend Komplexität und Laufzeit
+Erstellen EINER Methode einer bestehenden QuickSort Klasse
+
+Erstellen EINER Methode einer bestehenden MergeSort Klasse
