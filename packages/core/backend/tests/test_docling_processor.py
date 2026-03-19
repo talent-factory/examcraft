@@ -5,8 +5,10 @@ Tests für IBM Docling Integration
 
 import pytest
 from unittest.mock import patch, MagicMock
-from services.document_processors.docling_processor import DoclingProcessor
-from services.docling_service import DocumentChunk, ProcessedDocument
+
+docling = pytest.importorskip("docling", reason="docling not installed")
+from services.document_processors.docling_processor import DoclingProcessor  # noqa: E402
+from services.docling_service import DocumentChunk, ProcessedDocument  # noqa: E402
 
 
 @pytest.fixture
