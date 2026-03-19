@@ -25,6 +25,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/questions", tags=["Question Review"])
 
 
+def _question_to_dict(question: QuestionReview) -> dict:
+    """Convert QuestionReview to dict (without reviewer lookup)."""
+    return {
+        "id": question.id,
+        "question_text": question.question_text,
+        "question_type": question.question_type,
+        "options": question.options,
+        "correct_answer": question.correct_answer,
+        "explanation": question.explanation,
+        "difficulty": question.difficulty,
+        "topic": question.topic,
+        "language": question.language,
+        "source_chunks": question.source_chunks,
+        "source_documents": question.source_documents,
+        "confidence_score": question.confidence_score,
+        "bloom_level": question.bloom_level,
+        "estimated_time_minutes": question.estimated_time_minutes,
+        "quality_tier": question.quality_tier,
+        "review_status": question.review_status,
+        "reviewed_by": question.reviewed_by,
+        "reviewed_at": question.reviewed_at,
+        "exam_id": question.exam_id,
+        "created_at": question.created_at,
+        "updated_at": question.updated_at,
+    }
+
+
 def _attach_reviewer_info(question: QuestionReview, db: Session) -> dict:
     """Convert QuestionReview to dict with reviewer_info joined."""
     data = {
@@ -57,8 +84,13 @@ def _attach_reviewer_info(question: QuestionReview, db: Session) -> dict:
                 "id": reviewer.id,
                 "first_name": reviewer.first_name,
                 "last_name": reviewer.last_name,
-                "email": reviewer.email,
             }
+        else:
+            logger.warning(
+                "Reviewer user_id=%s not found for question_id=%s",
+                question.reviewed_by,
+                question.id,
+            )
     return data
 
 
@@ -117,7 +149,6 @@ class ReviewerInfo(BaseModel):
     id: int
     first_name: str
     last_name: str
-    email: str
 
     class Config:
         from_attributes = True
@@ -277,7 +308,30 @@ async def get_review_queue(
             .all()
         )
 
-        questions = [_attach_reviewer_info(q, db) for q in question_list]
+        # Batch-fetch reviewer info to avoid N+1 queries
+        reviewer_ids = {q.reviewed_by for q in question_list if q.reviewed_by}
+        reviewer_map = {}
+        if reviewer_ids:
+            reviewers = db.query(User).filter(User.id.in_(reviewer_ids)).all()
+            reviewer_map = {r.id: r for r in reviewers}
+
+        questions = []
+        for q in question_list:
+            data = _question_to_dict(q)
+            if q.reviewed_by and q.reviewed_by in reviewer_map:
+                r = reviewer_map[q.reviewed_by]
+                data["reviewer_info"] = {
+                    "id": r.id,
+                    "first_name": r.first_name,
+                    "last_name": r.last_name,
+                }
+            elif q.reviewed_by:
+                logger.warning(
+                    "Reviewer user_id=%s not found for question_id=%s",
+                    q.reviewed_by,
+                    q.id,
+                )
+            questions.append(data)
 
         return ReviewQueueResponse(
             total=total,
@@ -631,7 +685,7 @@ async def approve_question(
             )
 
         # Vier-Augen-Prinzip Check
-        if question.institution_id and question.reviewed_by:
+        if question.institution_id:
             from models.auth import Institution
 
             institution = (
@@ -639,21 +693,26 @@ async def approve_question(
                 .filter(Institution.id == question.institution_id)
                 .first()
             )
-            if (
-                institution
-                and institution.require_second_reviewer
-                and current_user.id == question.reviewed_by
-            ):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Vier-Augen-Prinzip: Ein anderer Reviewer muss diese Frage genehmigen.",
+            if institution and institution.require_second_reviewer:
+                is_reviewer = (
+                    question.reviewed_by and current_user.id == question.reviewed_by
                 )
+                is_creator = (
+                    question.created_by and current_user.id == question.created_by
+                )
+                if is_reviewer or is_creator:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Vier-Augen-Prinzip: Ein anderer Reviewer muss diese Frage genehmigen.",
+                    )
 
         old_status = question.review_status
 
         # Update Question
         question.review_status = ReviewStatus.APPROVED.value
         question.reviewed_at = datetime.utcnow()
+        if not question.reviewed_by:
+            question.reviewed_by = current_user.id
 
         db.commit()
         db.refresh(question)

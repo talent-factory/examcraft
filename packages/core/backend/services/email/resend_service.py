@@ -79,7 +79,13 @@ class ResendService(TransactionalProvider):
             httpx.HTTPStatusError: If API request fails
         """
         if not self.is_configured:
-            logger.warning("Resend not configured - simulating email send")
+            import os
+
+            if os.getenv("ENVIRONMENT", "development") == "production":
+                raise RuntimeError(
+                    "RESEND_API_KEY is not configured. Cannot send email in production."
+                )
+            logger.warning("Resend not configured - simulating email send (dev mode)")
             return f"demo_email_{id(email)}"
 
         payload: dict[str, Any] = {

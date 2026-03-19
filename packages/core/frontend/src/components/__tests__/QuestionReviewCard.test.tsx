@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { MemoryRouter } from 'react-router-dom';
 import QuestionReviewCard from '../QuestionReviewCard';
 import { QuestionReview, ReviewStatus } from '../../types/review';
 
@@ -10,9 +11,11 @@ const theme = createTheme();
 
 // Test wrapper with theme
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ThemeProvider theme={theme}>
-    {children}
-  </ThemeProvider>
+  <MemoryRouter>
+    <ThemeProvider theme={theme}>
+      {children}
+    </ThemeProvider>
+  </MemoryRouter>
 );
 
 // Sample test data
