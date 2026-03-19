@@ -45,9 +45,7 @@ class TestDocumentProcessingTask:
             mock_self = MagicMock()
 
             # Execute task (bind=True means self is first arg)
-            result = process_document(
-                mock_self, document_id="1", user_id="test-user-id"
-            )
+            result = process_document(mock_self, "1", "test-user-id")
 
             # Verify results
             assert result["success"] is True
@@ -67,13 +65,13 @@ class TestDocumentProcessingTask:
             # The task uses int(document_id), so pass a valid int string
             # that doesn't match any document
             with pytest.raises(Exception):
-                process_document(mock_self, document_id="999", user_id="test-user-id")
+                process_document(mock_self, "999", "test-user-id")
 
     def test_create_embeddings_task_success(self):
         """Test successful embedding creation"""
         with (
             patch("tasks.rag_tasks.SessionLocal") as mock_session_local,
-            patch("tasks.rag_tasks.RAGService") as mock_rag_cls,
+            patch("services.rag_service.RAGService", create=True) as mock_rag_cls,
         ):
             mock_db = MagicMock()
             mock_session_local.return_value = mock_db

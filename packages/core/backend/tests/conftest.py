@@ -13,17 +13,24 @@ from database import Base
 from main import app
 
 # Test Database Configuration
-# Verwende 'postgres' als Host im Docker-Netzwerk, 'localhost' außerhalb
+# CI sets DATABASE_URL with localhost; Docker uses 'postgres' as host
 POSTGRES_HOST = os.getenv(
-    "POSTGRES_HOST", "postgres"
-)  # Docker: postgres, Lokal: localhost
+    "POSTGRES_HOST", "localhost"
+)  # Docker: postgres, CI/Lokal: localhost
 POSTGRES_PASSWORD = os.getenv(
     "POSTGRES_PASSWORD", "examcraft_dev"
 )  # Match docker-compose.yml
-TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    f"postgresql://examcraft:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:5432/examcraft_test",
+_default_db_url = (
+    f"postgresql://examcraft:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:5432/examcraft_test"
 )
+# Allow override via TEST_DATABASE_URL or derive from DATABASE_URL
+_base_url = os.getenv("DATABASE_URL", "")
+if _base_url and not os.getenv("TEST_DATABASE_URL"):
+    # Derive test DB URL from DATABASE_URL by replacing the database name
+    _test_db_url = _base_url.rsplit("/", 1)[0] + "/examcraft_test"
+else:
+    _test_db_url = _default_db_url
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", _test_db_url)
 
 
 # Test Database Setup

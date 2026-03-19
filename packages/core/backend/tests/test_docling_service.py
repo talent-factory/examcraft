@@ -146,7 +146,7 @@ class TestLegacyProcessor:
             os.unlink(temp_path)
 
     @pytest.mark.asyncio
-    @patch("docx.Document")
+    @patch("services.document_processors.legacy_processor.DocxDocument")
     async def test_process_docx_file(self, mock_docx_document, processor):
         """Test DOCX-Datei Verarbeitung"""
         # Mock DOCX Document
