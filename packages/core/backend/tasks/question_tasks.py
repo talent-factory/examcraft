@@ -92,6 +92,7 @@ def generate_questions_task(
         "exam_id": result.exam_id,
         "topic": result.topic,
         "questions": [dataclasses.asdict(q) for q in result.questions],
+        "context_summary": dataclasses.asdict(result.context_summary),
         "generation_time": result.generation_time,
         "quality_metrics": result.quality_metrics,
     }
