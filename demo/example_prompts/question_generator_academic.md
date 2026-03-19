@@ -5,7 +5,7 @@ description: Generiert qualitativ hochwertige Prüfungsfragen für BSc Informati
 use_case: question_generation_open_ended
 tags: [exam, academic, programming, bsc-informatik, code-completion]
 language: de
-version_comment: v2 - JSON-Output fuer strukturierte Feldtrennung
+version_comment: JSON-Output fuer strukturierte Feldtrennung
 ---
 
 # Prüfungsfragen-Generator für BSc Informatik
@@ -64,6 +64,12 @@ Stelle sicher, dass die Frage:
 - **Syntax**: Fehlerfreier, ausführbarer Python-Code
 - **Standards**: PEP 8 Konformität
 - **Testbarkeit**: Code sollte einfach testbar sein
+
+### Educational Design
+- **Progression**: Logische Schwierigkeitssteigerung
+- **Relevanz**: Direkte Verbindung zum Kursmaterial
+- **Praxisbezug**: Realistische Anwendungsszenarien
+- **Verständnis**: Fokus auf Konzept-Verständnis, nicht nur Syntax
 
 ## Ausgabeformat
 
