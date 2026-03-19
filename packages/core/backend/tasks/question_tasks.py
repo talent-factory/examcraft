@@ -12,6 +12,7 @@ from celery.exceptions import Ignore, Reject
 from pydantic import ValidationError
 
 from celery_app import celery_app
+from models.question_generation_job import QuestionGenerationJob
 from tasks.document_tasks import ProgressTask, run_async
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,23 @@ except ImportError as _import_err:
         "Fragengenerierung ist in diesem Worker nicht verfügbar."
     )
     RAGService = None  # type: ignore[assignment,misc]
+
+
+def _update_job_status(task_id: str, status: str) -> None:
+    """Update QuestionGenerationJob.status to terminal state."""
+    from database import SessionLocal
+
+    session = SessionLocal()
+    try:
+        job = session.query(QuestionGenerationJob).filter_by(task_id=task_id).first()
+        if job:
+            job.status = status
+            session.commit()
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Failed to update job status for {task_id}: {e}")
+    finally:
+        session.close()
 
 
 def _persist_questions(
@@ -167,49 +185,63 @@ def generate_questions_task(
         f"{question_count} Fragen zum Thema '{rag_request.topic}'"
     )
 
-    rag_service = RAGService()
-    result = run_async(
-        rag_service.generate_rag_exam(rag_request, progress_callback=progress_callback)
-    )
-
-    logger.info(
-        f"Fragengenerierung abgeschlossen: {result.exam_id} "
-        f"({question_count} Fragen in {result.generation_time:.1f}s)"
-    )
-
-    # Persistiere Fragen in question_reviews (Status: pending)
-    review_question_ids: List[int] = []
-    persistence_warning = None
     try:
-        review_question_ids = _persist_questions(
-            questions=result.questions,
-            exam_id=result.exam_id,
-            topic=rag_request.topic,
-            language=rag_request.language,
-            user_id=int(user_id),
-            institution_id=institution_id,
+        rag_service = RAGService()
+        result = run_async(
+            rag_service.generate_rag_exam(
+                rag_request, progress_callback=progress_callback
+            )
         )
+
         logger.info(
-            f"Fragen persistiert: {len(review_question_ids)} Reviews für Exam {result.exam_id}"
+            f"Fragengenerierung abgeschlossen: {result.exam_id} "
+            f"({question_count} Fragen in {result.generation_time:.1f}s)"
         )
-    except Exception as persist_err:
+
+        # Persistiere Fragen in question_reviews (Status: pending)
+        review_question_ids: List[int] = []
+        persistence_warning = None
+        try:
+            review_question_ids = _persist_questions(
+                questions=result.questions,
+                exam_id=result.exam_id,
+                topic=rag_request.topic,
+                language=rag_request.language,
+                user_id=int(user_id),
+                institution_id=institution_id,
+            )
+            logger.info(
+                f"Fragen persistiert: {len(review_question_ids)} Reviews für Exam {result.exam_id}"
+            )
+        except Exception as persist_err:
+            logger.error(
+                f"Persistierung fehlgeschlagen für Exam '{result.exam_id}': {persist_err}",
+                exc_info=True,
+            )
+            persistence_warning = (
+                "Questions were generated but could not be saved to the review workflow. "
+                "Please try again."
+            )
+
+        _update_job_status(self.request.id, "SUCCESS")
+
+        # Premium RAGQuestion/RAGContext sind @dataclass — bei Wechsel zu Pydantic .model_dump() verwenden
+        return {
+            "exam_id": result.exam_id,
+            "topic": result.topic,
+            "questions": [dataclasses.asdict(q) for q in result.questions],
+            "context_summary": dataclasses.asdict(result.context_summary),
+            "generation_time": result.generation_time,
+            "quality_metrics": result.quality_metrics,
+            "review_question_ids": review_question_ids,
+            "persistence_warning": persistence_warning,
+        }
+    except (Ignore, Reject, ValidationError, TypeError, ImportError):
+        raise
+    except Exception as generation_err:
         logger.error(
-            f"Persistierung fehlgeschlagen für Exam '{result.exam_id}': {persist_err}",
+            f"Fragengenerierung fehlgeschlagen für User {user_id}: {generation_err}",
             exc_info=True,
         )
-        persistence_warning = (
-            "Questions were generated but could not be saved to the review workflow. "
-            "Please try again."
-        )
-
-    # Premium RAGQuestion/RAGContext sind @dataclass — bei Wechsel zu Pydantic .model_dump() verwenden
-    return {
-        "exam_id": result.exam_id,
-        "topic": result.topic,
-        "questions": [dataclasses.asdict(q) for q in result.questions],
-        "context_summary": dataclasses.asdict(result.context_summary),
-        "generation_time": result.generation_time,
-        "quality_metrics": result.quality_metrics,
-        "review_question_ids": review_question_ids,
-        "persistence_warning": persistence_warning,
-    }
+        _update_job_status(self.request.id, "FAILURE")
+        raise
