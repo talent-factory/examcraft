@@ -305,7 +305,8 @@ export const loadRAGService = async (): Promise<any> => {
       '@examcraft/premium/services/RAGService'
     );
     return module.RAGService || module.default;
-  } catch {
+  } catch (err) {
+    console.error('[componentLoader] Failed to load premium RAGService:', err);
     return null;
   }
 };

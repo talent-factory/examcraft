@@ -39,6 +39,11 @@ def _update_job_status(task_id: str, status: str) -> None:
         if job:
             job.status = status
             session.commit()
+        else:
+            logger.warning(
+                "Cannot update job status: no QuestionGenerationJob found with task_id=%s",
+                task_id,
+            )
     except Exception as e:
         session.rollback()
         logger.error(f"Failed to update job status for {task_id}: {e}")
@@ -236,7 +241,10 @@ def generate_questions_task(
             "review_question_ids": review_question_ids,
             "persistence_warning": persistence_warning,
         }
-    except (Ignore, Reject, ValidationError, TypeError, ImportError):
+    except Ignore:
+        raise
+    except (Reject, ValidationError, TypeError, ImportError):
+        _update_job_status(self.request.id, "FAILURE")
         raise
     except Exception as generation_err:
         logger.error(

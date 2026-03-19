@@ -40,10 +40,10 @@ def mock_db():
 @pytest.fixture
 def auth_client(mock_user, mock_db):
     """Test client with auth and DB overrides applied."""
-    from utils.auth_utils import get_current_user
+    from utils.auth_utils import get_current_active_user
     from database import get_db
 
-    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_current_active_user] = lambda: mock_user
     app.dependency_overrides[get_db] = lambda: mock_db
     with TestClient(app) as c:
         yield c

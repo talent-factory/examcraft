@@ -24,7 +24,6 @@ from schemas.task import GenerateExamTaskResponse
 from schemas.active_tasks import ActiveTaskInfo, ActiveTasksResponse
 from utils.auth_utils import (
     get_current_active_user,
-    get_current_user,
     require_permission,
 )
 import logging
@@ -504,7 +503,7 @@ ACTIVE_TASK_MAX_AGE = timedelta(hours=2)
 
 @router.get("/active-tasks", response_model=ActiveTasksResponse)
 async def get_active_tasks(
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """Return all active (non-terminal) generation tasks for the current user."""
@@ -536,8 +535,12 @@ async def get_active_tasks(
             elif result.state == "STARTED":
                 progress = 0
                 message = "Gestartet..."
-        except Exception:
-            pass  # Return defaults: progress=0, message=None
+        except Exception as celery_err:
+            logger.warning(
+                "Failed to fetch Celery state for task %s: %s",
+                job.task_id,
+                celery_err,
+            )
 
         tasks.append(
             ActiveTaskInfo(

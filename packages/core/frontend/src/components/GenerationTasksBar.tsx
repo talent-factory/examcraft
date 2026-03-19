@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
+import WarningIcon from '@mui/icons-material/Warning';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CloseIcon from '@mui/icons-material/Close';
@@ -111,6 +112,7 @@ const GenerationTasksBar: React.FC = () => {
               task.status === 'SUCCESS' || task.status === 'FAILURE' || task.status === 'REVOKED';
             const isSuccess = task.status === 'SUCCESS';
             const isFailure = task.status === 'FAILURE' || task.status === 'REVOKED';
+            const isUnknown = task.status === 'UNKNOWN';
 
             return (
               <Box
@@ -150,7 +152,7 @@ const GenerationTasksBar: React.FC = () => {
                     {task.topic || 'Generierung'}
                   </Typography>
 
-                  {isTerminal && (
+                  {(isTerminal || isUnknown) && (
                     <IconButton
                       size="small"
                       onClick={(e) => {
@@ -165,8 +167,18 @@ const GenerationTasksBar: React.FC = () => {
                   )}
                 </Box>
 
+                {/* Unknown status: connection lost */}
+                {isUnknown && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <WarningIcon fontSize="small" color="warning" />
+                    <Typography variant="caption" color="warning.main">
+                      Verbindung verloren – Status unbekannt
+                    </Typography>
+                  </Box>
+                )}
+
                 {/* Active task: progress bar */}
-                {!isTerminal && (
+                {!isTerminal && !isUnknown && (
                   <>
                     <LinearProgress
                       variant="determinate"

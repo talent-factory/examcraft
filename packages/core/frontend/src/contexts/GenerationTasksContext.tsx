@@ -66,7 +66,13 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
     };
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      let data: any;
+      try {
+        data = JSON.parse(event.data);
+      } catch (parseErr) {
+        console.warn('[GenerationTasks] Failed to parse WebSocket message:', parseErr);
+        return;
+      }
 
       if (data.status === 'SUCCESS') {
         setTasks((prev) => ({
@@ -115,8 +121,9 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
       }
     };
 
-    ws.onerror = () => {
-      // onclose will fire after onerror
+    ws.onerror = (event) => {
+      console.warn(`[GenerationTasks] WebSocket error for task ${taskId}:`, event);
+      // onclose will fire after onerror and handle reconnection
     };
   }, []);
 
@@ -150,8 +157,8 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
         if (Object.keys(recovered).length > 0) {
           setTasks((prev) => ({ ...prev, ...recovered }));
         }
-      } catch {
-        // Silent degradation
+      } catch (err) {
+        console.error('[GenerationTasks] Failed to recover active tasks:', err);
       }
     };
 
@@ -205,7 +212,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
 
   const getTask = useCallback((taskId: string) => tasks[taskId], [tasks]);
 
-  const activeTasks = Object.values(tasks).filter((t) => !TERMINAL_STATUSES.has(t.status) && t.status !== 'UNKNOWN');
+  const activeTasks = Object.values(tasks).filter((t) => !TERMINAL_STATUSES.has(t.status));
   const completedTasks = Object.values(tasks).filter((t) => TERMINAL_STATUSES.has(t.status));
 
   return (

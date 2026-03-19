@@ -5,10 +5,12 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from schemas.task import TaskStatus
+
 
 class ActiveTaskInfo(BaseModel):
     task_id: str
-    status: str
+    status: TaskStatus
     progress: int = Field(ge=0, le=100, default=0)
     message: Optional[str] = None
     created_at: datetime
