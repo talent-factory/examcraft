@@ -5,6 +5,7 @@ Implementiert dokumentenbasierte Fragenerstellung mit Retrieval-Augmented Genera
 
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -316,7 +317,8 @@ async def generate_rag_exam(
             f"Generated RAG exam '{rag_response.exam_id}' with {len(questions_response)} questions"
         )
 
-        return response
+        status_code = 207 if persistence_warning else 200
+        return JSONResponse(content=response.model_dump(), status_code=status_code)
 
     except HTTPException:
         db.rollback()
