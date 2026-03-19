@@ -317,8 +317,11 @@ async def generate_rag_exam(
             f"Generated RAG exam '{rag_response.exam_id}' with {len(questions_response)} questions"
         )
 
-        status_code = 207 if persistence_warning else 200
-        return JSONResponse(content=response.model_dump(), status_code=status_code)
+        if persistence_warning:
+            return JSONResponse(
+                content=response.model_dump(mode="json"), status_code=207
+            )
+        return response
 
     except HTTPException:
         db.rollback()

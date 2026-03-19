@@ -149,7 +149,6 @@ class ReviewerInfo(BaseModel):
     id: int
     first_name: str
     last_name: str
-    email: str
 
     class Config:
         from_attributes = True
@@ -694,16 +693,18 @@ async def approve_question(
                 .filter(Institution.id == question.institution_id)
                 .first()
             )
-            if (
-                institution
-                and institution.require_second_reviewer
-                and question.reviewed_by
-                and current_user.id == question.reviewed_by
-            ):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Vier-Augen-Prinzip: Ein anderer Reviewer muss diese Frage genehmigen.",
+            if institution and institution.require_second_reviewer:
+                is_reviewer = (
+                    question.reviewed_by and current_user.id == question.reviewed_by
                 )
+                is_creator = (
+                    question.created_by and current_user.id == question.created_by
+                )
+                if is_reviewer or is_creator:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Vier-Augen-Prinzip: Ein anderer Reviewer muss diese Frage genehmigen.",
+                    )
 
         old_status = question.review_status
 
