@@ -6,9 +6,11 @@ Tests für dynamische Processor-Auswahl
 import pytest
 import os
 from unittest.mock import patch
-from services.document_processors.processor_factory import DocumentProcessorFactory
-from services.document_processors.docling_processor import DoclingProcessor
-from services.document_processors.legacy_processor import LegacyProcessor
+
+docling = pytest.importorskip("docling", reason="docling not installed")
+from services.document_processors.processor_factory import DocumentProcessorFactory  # noqa: E402
+from services.document_processors.docling_processor import DoclingProcessor  # noqa: E402
+from services.document_processors.legacy_processor import LegacyProcessor  # noqa: E402
 
 
 class TestProcessorFactoryCreation:

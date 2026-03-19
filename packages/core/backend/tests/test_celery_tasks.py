@@ -4,7 +4,8 @@ Tests for Celery async task processing
 
 import pytest
 from unittest.mock import patch, MagicMock
-from tasks.document_tasks import process_document, create_embeddings
+from tasks.document_tasks import process_document
+from tasks.rag_tasks import create_embeddings
 from models.document import Document, DocumentStatus
 
 
