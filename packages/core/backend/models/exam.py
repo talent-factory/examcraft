@@ -53,7 +53,7 @@ class Exam(Base):
     created_by = Column(
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 

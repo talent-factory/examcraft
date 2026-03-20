@@ -4,13 +4,28 @@ Exports exams to Markdown, JSON, and Moodle XML formats.
 """
 
 import json
+import logging
 from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom.minidom import parseString
+
+logger = logging.getLogger(__name__)
 
 
 class MarkdownExporter:
     @staticmethod
     def export(exam_data: dict, include_solutions: bool = False) -> str:
+        try:
+            return MarkdownExporter._export(exam_data, include_solutions)
+        except Exception as exc:
+            logger.error(
+                "Export failed for exam '%s': %s",
+                exam_data.get("title", "unknown"),
+                exc,
+            )
+            raise
+
+    @staticmethod
+    def _export(exam_data: dict, include_solutions: bool = False) -> str:
         lines = []
         lines.append(f"# {exam_data['title']}\n")
 
@@ -66,6 +81,18 @@ class MarkdownExporter:
 class JsonExporter:
     @staticmethod
     def export(exam_data: dict) -> str:
+        try:
+            return JsonExporter._export(exam_data)
+        except Exception as exc:
+            logger.error(
+                "Export failed for exam '%s': %s",
+                exam_data.get("title", "unknown"),
+                exc,
+            )
+            raise
+
+    @staticmethod
+    def _export(exam_data: dict) -> str:
         output = {
             "exam": {
                 "title": exam_data["title"],
@@ -98,6 +125,18 @@ class JsonExporter:
 class MoodleXmlExporter:
     @staticmethod
     def export(exam_data: dict) -> str:
+        try:
+            return MoodleXmlExporter._export(exam_data)
+        except Exception as exc:
+            logger.error(
+                "Export failed for exam '%s': %s",
+                exam_data.get("title", "unknown"),
+                exc,
+            )
+            raise
+
+    @staticmethod
+    def _export(exam_data: dict) -> str:
         quiz = Element("quiz")
 
         for q in exam_data["questions"]:
@@ -138,6 +177,12 @@ def _add_mc_question(quiz: Element, q: dict):
     SubElement(question, "shuffleanswers").text = "0"
 
     correct = q.get("correct_answer", "")
+    if correct and correct not in (q.get("options") or []):
+        logger.warning(
+            "MC question at position %s: correct_answer '%s' does not match any option",
+            q.get("position"),
+            correct,
+        )
     for opt in q.get("options", []):
         answer = SubElement(
             question, "answer", fraction="100" if opt == correct else "0"
