@@ -3,15 +3,19 @@ Authentication API Endpoints
 Login, Logout, Register, Profile, Password Reset
 """
 
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
 from fastapi.responses import Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List
 import logging
 import os
+import re
+import json
+import secrets
 
 from database import get_db
 from models.auth import User, Role, Institution, UserStatus, UserRole
@@ -38,6 +42,17 @@ class RegisterRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
     institution_slug: Optional[str] = None  # Optional: join existing institution
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Passwort muss mindestens einen Grossbuchstaben enthalten")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Passwort muss mindestens einen Kleinbuchstaben enthalten")
+        if not re.search(r"\d", v):
+            raise ValueError("Passwort muss mindestens eine Zahl enthalten")
+        return v
 
 
 class LoginRequest(BaseModel):
@@ -85,6 +100,17 @@ class PasswordChangeRequest(BaseModel):
 
     current_password: str
     new_password: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Passwort muss mindestens einen Grossbuchstaben enthalten")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Passwort muss mindestens einen Kleinbuchstaben enthalten")
+        if not re.search(r"\d", v):
+            raise ValueError("Passwort muss mindestens eine Zahl enthalten")
+        return v
 
 
 class RoleResponse(BaseModel):
@@ -317,10 +343,37 @@ async def login(
             detail="Incorrect email or password",
         )
 
+    # Account lockout check
+    MAX_FAILED_ATTEMPTS = 10
+    LOCKOUT_DURATION_SECONDS = 30 * 60  # 30 minutes
+
+    if (user.failed_login_attempts or 0) >= MAX_FAILED_ATTEMPTS:
+        if (
+            user.last_failed_login
+            and (datetime.now(timezone.utc) - user.last_failed_login).total_seconds()
+            < LOCKOUT_DURATION_SECONDS
+        ):
+            AuditService.log_login(
+                db,
+                user.id,
+                success=False,
+                request=http_request,
+                error_message="Account locked due to too many failed attempts",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie 30 Minuten.",
+            )
+        else:
+            # Lockout period expired, reset counter
+            user.failed_login_attempts = 0
+            db.commit()
+
     # Verify password
     if not AuthService.verify_password(request.password, user.password_hash):
         # Increment failed login attempts
         user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+        user.last_failed_login = datetime.now(timezone.utc)
         db.commit()
 
         # Audit log: Failed login (wrong password)
@@ -426,7 +479,6 @@ async def get_current_user_profile(
     - Returns user information
     - Includes institution and roles with permissions
     """
-    import json
 
     # Build role responses with parsed permissions
     role_responses = []
@@ -521,8 +573,6 @@ async def update_current_user_profile(
             db.refresh(current_user)  # Re-sync after potential rollback in AuditService
 
     logger.info(f"User profile updated: {current_user.email} (ID: {current_user.id})")
-
-    import json
 
     # Build role responses with parsed permissions
     role_responses = []
@@ -915,7 +965,19 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
     redirect_uri = f"{base_url}/api/auth/oauth/{provider}/callback"
 
     try:
-        authorization_url = oauth_service.get_authorization_url(provider, redirect_uri)
+        # Generate CSRF state token and store in Redis
+        state = secrets.token_urlsafe(32)
+        try:
+            from services.redis_service import RedisService
+
+            redis_client = RedisService.get_session_client()
+            redis_client.setex(f"oauth_state:{state}", 600, "valid")  # 10 min TTL
+        except Exception as redis_err:
+            logger.warning(f"Redis unavailable for OAuth state storage: {redis_err}")
+
+        authorization_url = oauth_service.get_authorization_url(
+            provider, redirect_uri, state=state
+        )
         # Direct redirect to OAuth provider
         return RedirectResponse(url=authorization_url, status_code=302)
     except Exception as e:
