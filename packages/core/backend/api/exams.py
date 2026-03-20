@@ -4,10 +4,11 @@ CRUD, question management, auto-fill, finalize, and export.
 """
 
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func as sa_func
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
@@ -26,6 +27,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/exams", tags=["Exam Composer"])
+
+
+def _to_utc(dt: datetime) -> datetime:
+    """Normalise a datetime to UTC, treating naive datetimes as UTC."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 # --- Point auto-suggestion table ---
@@ -212,8 +220,19 @@ async def create_exam(
         created_by=current_user.id,
     )
     db.add(exam)
-    db.commit()
-    db.refresh(exam)
+    try:
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error("IntegrityError in create_exam: %s", exc)
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error("Database error in create_exam: %s", exc)
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
     logger.info(f"Created exam {exam.id} by user {current_user.id}")
     return _exam_to_out(exam)
 
@@ -307,13 +326,18 @@ async def list_approved_questions(
         .all()
     )
 
+    question_ids = [q.id for q in questions]
+    usage_counts = {}
+    if question_ids:
+        usage_counts = dict(
+            db.query(ExamQuestion.question_id, sa_func.count(ExamQuestion.id))
+            .filter(ExamQuestion.question_id.in_(question_ids))
+            .group_by(ExamQuestion.question_id)
+            .all()
+        )
+
     result = []
     for q in questions:
-        usage_count = (
-            db.query(sa_func.count(ExamQuestion.id))
-            .filter(ExamQuestion.question_id == q.id)
-            .scalar()
-        )
         result.append(
             {
                 "id": q.id,
@@ -323,7 +347,7 @@ async def list_approved_questions(
                 "topic": q.topic,
                 "bloom_level": q.bloom_level,
                 "options": q.options,
-                "usage_count": usage_count,
+                "usage_count": usage_counts.get(q.id, 0),
             }
         )
 
@@ -352,12 +376,9 @@ async def update_exam(
     exam = _get_exam_or_404(exam_id, db, current_user)
     _require_draft(exam)
 
-    # Optimistic locking — compare at microsecond precision
+    # Optimistic locking — compare at microsecond precision with UTC normalisation
     if exam.updated_at and request.updated_at:
-        # Normalise timezone so tz-aware and tz-naive timestamps compare correctly
-        db_updated = exam.updated_at
-        req_updated = request.updated_at.replace(tzinfo=db_updated.tzinfo)
-        if db_updated != req_updated:
+        if _to_utc(exam.updated_at) != _to_utc(request.updated_at):
             raise HTTPException(
                 status_code=409,
                 detail="Conflict: exam was modified by another user. Please reload.",
@@ -367,8 +388,19 @@ async def update_exam(
     for field, value in update_data.items():
         setattr(exam, field, value)
 
-    db.commit()
-    db.refresh(exam)
+    try:
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error("IntegrityError in update_exam for exam %s: %s", exam_id, exc)
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error("Database error in update_exam for exam %s: %s", exam_id, exc)
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
     logger.info(f"Updated exam {exam_id} by user {current_user.id}")
     return _exam_to_out(exam)
 
@@ -383,7 +415,18 @@ async def delete_exam(
     exam = _get_exam_or_404(exam_id, db, current_user)
     _require_draft(exam)
     db.delete(exam)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error("IntegrityError in delete_exam for exam %s: %s", exam_id, exc)
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error("Database error in delete_exam for exam %s: %s", exam_id, exc)
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
     logger.info(f"Deleted exam {exam_id} by user {current_user.id}")
 
 
@@ -453,11 +496,22 @@ async def add_questions(
         db.add(eq)
         existing_qids.add(qid)
 
-    db.flush()
-    db.refresh(exam)
-    exam.recalculate_total_points()
-    db.commit()
-    db.refresh(exam)
+    try:
+        db.flush()
+        db.refresh(exam)
+        exam.recalculate_total_points()
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error("IntegrityError in add_questions for exam %s: %s", exam_id, exc)
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error("Database error in add_questions for exam %s: %s", exam_id, exc)
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
 
     return _exam_detail_to_out(exam)
 
@@ -487,11 +541,26 @@ async def update_exam_question(
     if request.section is not None:
         eq.section = request.section
 
-    db.flush()
-    db.refresh(exam)
-    exam.recalculate_total_points()
-    db.commit()
-    db.refresh(exam)
+    try:
+        db.flush()
+        db.refresh(exam)
+        exam.recalculate_total_points()
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error(
+            "IntegrityError in update_exam_question for exam %s: %s", exam_id, exc
+        )
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error(
+            "Database error in update_exam_question for exam %s: %s", exam_id, exc
+        )
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
 
     return _exam_detail_to_out(exam)
 
@@ -527,11 +596,26 @@ async def remove_exam_question(
     for i, item in enumerate(remaining, 1):
         item.position = i
 
-    db.flush()
-    db.refresh(exam)
-    exam.recalculate_total_points()
-    db.commit()
-    db.refresh(exam)
+    try:
+        db.flush()
+        db.refresh(exam)
+        exam.recalculate_total_points()
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error(
+            "IntegrityError in remove_exam_question for exam %s: %s", exam_id, exc
+        )
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error(
+            "Database error in remove_exam_question for exam %s: %s", exam_id, exc
+        )
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
 
     return _exam_detail_to_out(exam)
 
@@ -549,20 +633,38 @@ async def reorder_questions(
 
     eq_map = {eq.id: eq for eq in exam.questions}
 
+    # Validate all IDs first before any mutations
+    for item in request.order:
+        if item.id not in eq_map:
+            raise HTTPException(
+                status_code=404, detail=f"Exam question {item.id} not found"
+            )
+
     # Temporarily set positions negative to avoid unique constraint violations
     for eq in exam.questions:
         eq.position = -eq.position
     db.flush()
 
     for item in request.order:
-        if item.id not in eq_map:
-            raise HTTPException(
-                status_code=404, detail=f"Exam question {item.id} not found"
-            )
         eq_map[item.id].position = item.position
 
-    db.commit()
-    db.refresh(exam)
+    try:
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error(
+            "IntegrityError in reorder_questions for exam %s: %s", exam_id, exc
+        )
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error(
+            "Database error in reorder_questions for exam %s: %s", exam_id, exc
+        )
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
     return _exam_detail_to_out(exam)
 
 
@@ -627,11 +729,26 @@ async def auto_fill_questions(
         )
         db.add(eq)
 
-    db.flush()
-    db.refresh(exam)
-    exam.recalculate_total_points()
-    db.commit()
-    db.refresh(exam)
+    try:
+        db.flush()
+        db.refresh(exam)
+        exam.recalculate_total_points()
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error(
+            "IntegrityError in auto_fill_questions for exam %s: %s", exam_id, exc
+        )
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error(
+            "Database error in auto_fill_questions for exam %s: %s", exam_id, exc
+        )
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
 
     return _exam_detail_to_out(exam)
 
@@ -666,8 +783,19 @@ async def finalize_exam(
         )
 
     exam.status = ExamStatus.FINALIZED.value
-    db.commit()
-    db.refresh(exam)
+    try:
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error("IntegrityError in finalize_exam for exam %s: %s", exam_id, exc)
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error("Database error in finalize_exam for exam %s: %s", exam_id, exc)
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
     return _exam_to_out(exam)
 
 
@@ -683,8 +811,19 @@ async def unfinalize_exam(
         raise HTTPException(status_code=400, detail="Exam is already a draft")
 
     exam.status = ExamStatus.DRAFT.value
-    db.commit()
-    db.refresh(exam)
+    try:
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error("IntegrityError in unfinalize_exam for exam %s: %s", exam_id, exc)
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error("Database error in unfinalize_exam for exam %s: %s", exam_id, exc)
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
     return _exam_to_out(exam)
 
 
@@ -701,6 +840,12 @@ async def export_exam(
 ):
     """Export exam in specified format (md, json, moodle)."""
     exam = _get_exam_or_404(exam_id, db, current_user)
+
+    if exam.status == ExamStatus.DRAFT.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Prüfung muss vor dem Export finalisiert werden.",
+        )
 
     if not exam.questions:
         raise HTTPException(status_code=400, detail="Cannot export an empty exam")

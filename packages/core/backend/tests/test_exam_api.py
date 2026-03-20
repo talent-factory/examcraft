@@ -1796,7 +1796,7 @@ class TestExamExportApi(
     def _create_exam_with_question(
         self, client, db, institution_id, user_id, title="Export Exam"
     ):
-        """Helper: create exam + finalize with one approved MC question."""
+        """Helper: create exam, add one approved MC question, and finalize."""
         create_resp = client.post("/api/v1/exams/", json={"title": title})
         assert create_resp.status_code == 201
         exam_id = create_resp.json()["id"]
@@ -1806,16 +1806,19 @@ class TestExamExportApi(
             f"/api/v1/exams/{exam_id}/questions",
             json={"question_ids": [q.id]},
         )
+        fin_resp = client.post(f"/api/v1/exams/{exam_id}/finalize")
+        assert fin_resp.status_code == 200
         return exam_id
 
     def test_export_empty_exam_returns_400(self, exam_client):
-        """GET /export/md returns 400 for an exam with no questions."""
+        """GET /export/md returns 400 for a draft exam (not finalized)."""
         create_resp = exam_client.post("/api/v1/exams/", json={"title": "Empty Export"})
         exam_id = create_resp.json()["id"]
 
         response = exam_client.get(f"/api/v1/exams/{exam_id}/export/md")
         assert response.status_code == 400
-        assert "empty" in response.json()["detail"].lower()
+        # Draft guard fires before the empty-check — message mentions finalisiert
+        assert "finalisiert" in response.json()["detail"].lower()
 
     def test_export_unsupported_format_returns_400(
         self, exam_client, exam_db, exam_institution, exam_user
@@ -1903,6 +1906,7 @@ class TestExamExportApi(
         self, exam_client, exam_db, exam_institution, exam_user
     ):
         """Exporting a finalized exam changes its status to 'exported'."""
+        # _create_exam_with_question already finalizes the exam
         exam_id = self._create_exam_with_question(
             exam_client,
             exam_db,
@@ -1910,10 +1914,10 @@ class TestExamExportApi(
             exam_user.id,
             title="Status Export",
         )
-        # Finalize first
-        fin_resp = exam_client.post(f"/api/v1/exams/{exam_id}/finalize")
-        assert fin_resp.status_code == 200
-        assert fin_resp.json()["status"] == "finalized"
+
+        # Verify it is finalized
+        detail = exam_client.get(f"/api/v1/exams/{exam_id}").json()
+        assert detail["status"] == "finalized"
 
         # Export
         export_resp = exam_client.get(f"/api/v1/exams/{exam_id}/export/md")
@@ -1923,22 +1927,28 @@ class TestExamExportApi(
         detail = exam_client.get(f"/api/v1/exams/{exam_id}").json()
         assert detail["status"] == "exported"
 
-    def test_export_draft_exam_does_not_change_status(
+    def test_export_draft_exam_returns_400(
         self, exam_client, exam_db, exam_institution, exam_user
     ):
-        """Exporting a draft exam does not change its status (still draft)."""
-        exam_id = self._create_exam_with_question(
-            exam_client,
-            exam_db,
-            exam_institution.id,
-            exam_user.id,
-            title="Draft Export Status",
+        """GET /export/json returns 400 when the exam is still in draft status."""
+        # Create an exam with a question but do NOT finalize
+        create_resp = exam_client.post(
+            "/api/v1/exams/", json={"title": "Draft Export Status"}
         )
-        # Export without finalizing
-        exam_client.get(f"/api/v1/exams/{exam_id}/export/json")
+        exam_id = create_resp.json()["id"]
+        q = self._create_approved_question(exam_db, exam_institution.id, exam_user.id)
+        exam_client.post(
+            f"/api/v1/exams/{exam_id}/questions",
+            json={"question_ids": [q.id]},
+        )
 
+        # Attempt export without finalizing — must be rejected
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/json")
+        assert response.status_code == 400
+        assert "finalisiert" in response.json()["detail"].lower()
+
+        # Status remains draft
         detail = exam_client.get(f"/api/v1/exams/{exam_id}").json()
-        # Status stays 'draft' since it was never finalized
         assert detail["status"] == "draft"
 
     def test_export_404_non_existent_exam(self, exam_client):
