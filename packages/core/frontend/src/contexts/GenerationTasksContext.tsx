@@ -56,8 +56,8 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
       wsRef.current[taskId].close();
     }
 
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsBase = `${wsProtocol}//${window.location.host}`;
+    const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+    const wsBase = apiBaseUrl.replace(/^http/, 'ws');
     const ws = new WebSocket(`${wsBase}/ws/tasks/${taskId}`);
     wsRef.current[taskId] = ws;
 
