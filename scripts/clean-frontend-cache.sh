@@ -117,14 +117,7 @@ fi
 if [ "$REINSTALL" = true ]; then
     echo -e "${BLUE}📦 Reinstalling dependencies...${NC}"
 
-    # Check if bun is available
-    if command -v bun &> /dev/null; then
-        echo "  Using Bun..."
-        bun install
-    else
-        echo "  Using npm..."
-        npm install
-    fi
+    bun install
 
     echo ""
 fi

@@ -32,25 +32,25 @@ frontend/e2e/
 ### Alle E2E-Tests
 
 ```bash
-npm run test:e2e
+bun run test:e2e
 ```
 
 ### Mit UI (interaktiv)
 
 ```bash
-npm run test:e2e:ui
+bun run test:e2e:ui
 ```
 
 ### Mit sichtbarem Browser (Debugging)
 
 ```bash
-npm run test:e2e:headed
+bun run test:e2e:headed
 ```
 
 ### Debug-Modus (Step-by-Step)
 
 ```bash
-npm run test:e2e:debug
+bun run test:e2e:debug
 ```
 
 ### Spezifischer Test
@@ -78,7 +78,7 @@ docker-compose up -d backend postgres redis
 ### 2. Frontend muss laufen
 
 ```bash
-npm start
+bun start
 # oder
 docker-compose up -d frontend
 ```
@@ -182,8 +182,8 @@ test:e2e:
   image: mcr.microsoft.com/playwright:v1.40.0
   script:
     - cd frontend
-    - npm ci
-    - npm run test:e2e
+    - bun install --frozen-lockfile
+    - bun run test:e2e
   artifacts:
     when: on_failure
     paths:
@@ -196,9 +196,9 @@ test:e2e:
 - name: Run E2E Tests
   run: |
     cd frontend
-    npm ci
+    bun install --frozen-lockfile
     npx playwright install --with-deps
-    npm run test:e2e
+    bun run test:e2e
 ```
 
 ## Best Practices
@@ -247,7 +247,7 @@ npx playwright install chromium
 
 Stelle sicher, dass Frontend läuft:
 ```bash
-npm start
+bun start
 ```
 
 ### Problem: "Test timeout"

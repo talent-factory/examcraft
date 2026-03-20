@@ -238,7 +238,7 @@ pytest tests/
 
 # Tests ausführen (Frontend)
 cd packages/core/frontend
-npm test
+bun test
 
 # Code-Qualität prüfen
 ruff check packages/core/backend/ utils/

@@ -582,7 +582,7 @@ Remove the `it('shows quality metrics after generation')` test -- quality metric
 
 ### Step 2.5: Run frontend tests
 
-- [ ] Run: `cd packages/premium/frontend && npm test -- --watchAll=false`
+- [ ] Run: `cd packages/premium/frontend && bun test -- --watchAll=false`
 
 Expected: All tests PASS.
 
