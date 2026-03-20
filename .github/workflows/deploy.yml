@@ -56,6 +56,9 @@ jobs:
       - name: Deploy Backend
         run: flyctl deploy --config fly.toml --remote-only
 
+      - name: Deploy Celery Worker
+        run: flyctl deploy --config fly.celery.toml --remote-only
+
       - name: Verify Backend Health
         run: |
           echo "Waiting for deployment to stabilize..."
@@ -162,6 +165,14 @@ jobs:
             echo "| Backend | https://examcraft-api.fly.dev | ✅ Healthy |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| Backend | https://examcraft-api.fly.dev | ⚠️ Check needed |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check Celery Worker
+          CELERY_STATUS=$(flyctl status -a examcraft-celery --json 2>/dev/null | jq -r '.Machines[0].state // "unknown"')
+          if [ "$CELERY_STATUS" = "started" ]; then
+            echo "| Celery Worker | examcraft-celery.internal | ✅ Running |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Celery Worker | examcraft-celery.internal | ⚠️ $CELERY_STATUS |" >> $GITHUB_STEP_SUMMARY
           fi
 
           # Check Frontend
