@@ -710,7 +710,8 @@ async def export_exam(
     if exam_data.get("exam_date"):
         exam_data["exam_date"] = str(exam_data["exam_date"])
 
-    safe_title = exam.title.replace(" ", "_")[:50]
+    safe_title = exam.title.lower().replace(" ", "_")[:50]
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if format == "md":
         content = MarkdownExporter.export(
@@ -718,15 +719,15 @@ async def export_exam(
         )
         suffix = "_solutions" if include_solutions else ""
         media_type = "text/markdown"
-        filename = f"exam_{safe_title}{suffix}.md"
+        filename = f"{safe_title}_{timestamp}{suffix}.md"
     elif format == "json":
         content = JsonExporter.export(exam_data)
         media_type = "application/json"
-        filename = f"exam_{safe_title}.json"
+        filename = f"{safe_title}_{timestamp}.json"
     elif format == "moodle":
         content = MoodleXmlExporter.export(exam_data)
         media_type = "application/xml"
-        filename = f"exam_{safe_title}_moodle.xml"
+        filename = f"{safe_title}_{timestamp}_moodle.xml"
     else:
         raise HTTPException(
             status_code=400,
