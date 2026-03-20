@@ -129,7 +129,7 @@ docker-compose -f docker-compose.test.yml up -d
 
 # 2. E2E-Tests ausführen
 cd frontend
-npm run test:e2e
+bun run test:e2e
 
 # 3. Cleanup
 docker-compose -f docker-compose.test.yml down
@@ -194,7 +194,7 @@ test.describe('API Tests', () => {
 Die Unit-Tests funktionieren perfekt und bieten bereits guten Schutz:
 
 ```bash
-npm run test:unit -- ChatService.test.ts
+bun run test:unit -- ChatService.test.ts
 ```
 
 **Ergebnis**: ✅ 10/10 Tests bestanden

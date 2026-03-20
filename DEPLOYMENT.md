@@ -482,7 +482,7 @@ git submodule update --init --recursive
 **Note:** The `start-dev.sh` script automatically runs `scripts/setup-premium-symlinks.sh` to create symlinks for Premium/Enterprise components. This enables:
 - Native Node.js development (without Docker)
 - IDE autocomplete for Premium components
-- Local testing with `npm start`
+- Local testing with `bun start`
 
 If developing inside Docker containers, symlinks are not needed as volume mounts handle component loading.
 
@@ -509,7 +509,7 @@ If developing inside Docker containers, symlinks are not needed as volume mounts
 3. Rebuild frontend container: `docker compose -f docker-compose.full.yml up -d --build frontend`
 4. Clear browser cache (Cmd+Shift+R / Ctrl+Shift+R)
 
-**For Native Development (npm start):**
+**For Native Development (bun start):**
 1. Ensure symlinks are created: `bash scripts/setup-premium-symlinks.sh`
 2. Verify symlinks exist:
    ```bash
@@ -517,7 +517,7 @@ If developing inside Docker containers, symlinks are not needed as volume mounts
    # Should show symlinks to Premium components
    ```
 3. Check `REACT_APP_DEPLOYMENT_MODE=full` in `.env`
-4. Restart dev server: `npm start` (in packages/core/frontend)
+4. Restart dev server: `bun start` (in packages/core/frontend)
 
 **Common Issue - Missing RAGExamCreator Symlink:**
 If only DocumentChat works but RAG Exam Creator shows upgrade prompt:

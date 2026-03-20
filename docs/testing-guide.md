@@ -149,13 +149,13 @@ it('exports RAG exam as text with improved formatting', () => {
 ```bash
 # Alle Tests
 cd packages/core/frontend
-npm test
+bun test
 
 # Spezifische Test-Datei
-npm test -- RAGService.test.ts
+bun test -- RAGService.test.ts
 
 # Mit Coverage
-npm test -- --coverage
+bun test -- --coverage
 ```
 
 ### Backend Tests
@@ -194,7 +194,7 @@ Die Tests werden automatisch bei jedem Push ausgeführt:
 - name: Run Frontend Tests
   run: |
     cd packages/core/frontend
-    npm test -- --watchAll=false --coverage
+    bun test -- --watchAll=false --coverage
 
 - name: Run Backend Tests
   run: |

@@ -8,7 +8,7 @@ from starlette.config import Config
 from typing import Dict, Any
 import httpx
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -45,13 +45,16 @@ class OAuthService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_authorization_url(self, provider: str, redirect_uri: str) -> str:
+    def get_authorization_url(
+        self, provider: str, redirect_uri: str, state: str = ""
+    ) -> str:
         """
         Generate OAuth authorization URL
 
         Args:
             provider: OAuth provider (google, microsoft)
             redirect_uri: Callback URL after OAuth authorization
+            state: CSRF protection state token
 
         Returns:
             Authorization URL to redirect user to
@@ -69,7 +72,8 @@ class OAuthService:
                 f"client_id={client_id}&"
                 f"redirect_uri={redirect_uri}&"
                 f"response_type=code&"
-                f"scope=openid%20email%20profile"
+                f"scope=openid%20email%20profile&"
+                f"state={state}"
             )
         elif provider == "microsoft":
             client_id = os.getenv("MICROSOFT_CLIENT_ID")
@@ -78,7 +82,8 @@ class OAuthService:
                 f"client_id={client_id}&"
                 f"redirect_uri={redirect_uri}&"
                 f"response_type=code&"
-                f"scope=openid%20email%20profile"
+                f"scope=openid%20email%20profile&"
+                f"state={state}"
             )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
@@ -221,9 +226,14 @@ class OAuthService:
             # Update OAuth account with new token
             oauth_account.access_token = token.get("access_token")
             oauth_account.refresh_token = token.get("refresh_token")
-            oauth_account.token_expires_at = datetime.now(
-                timezone.utc
-            )  # TODO: Calculate from expires_in
+            # BUG: token_expires_at set to now(), not (now + expires_in) — stored tokens always appear expired
+            expires_in = token.get("expires_in")
+            if expires_in:
+                oauth_account.token_expires_at = datetime.now(timezone.utc) + timedelta(
+                    seconds=int(expires_in)
+                )
+            else:
+                oauth_account.token_expires_at = datetime.now(timezone.utc)
             oauth_account.last_login_at = datetime.now(timezone.utc)
             oauth_account.email = user_info.get("email")
             oauth_account.name = user_info.get("name")

@@ -60,7 +60,7 @@ lint-backend:
 
 lint-frontend:
 	@echo "🔍 Linting Frontend..."
-	cd packages/core/frontend && npm run lint || echo "⚠️  ESLint warnings found (non-blocking)"
+	cd packages/core/frontend && bun run lint || echo "⚠️  ESLint warnings found (non-blocking)"
 
 lint-fix: lint-fix-backend lint-fix-frontend
 
@@ -71,7 +71,7 @@ lint-fix-backend:
 
 lint-fix-frontend:
 	@echo "🔧 Auto-fixing Frontend..."
-	cd packages/core/frontend && npm run lint:fix
+	cd packages/core/frontend && bun run lint:fix
 
 # Test Commands
 test: test-backend test-frontend
@@ -82,24 +82,24 @@ test-backend:
 
 test-frontend:
 	@echo "🧪 Running Frontend Tests..."
-	cd packages/core/frontend && npm test -- --watchAll=false
+	cd packages/core/frontend && bun test -- --watchAll=false
 
 # E2E Test Commands (Playwright)
 e2e:
 	@echo "🎭 Running E2E Tests..."
-	cd packages/core/frontend && npm run test:e2e
+	cd packages/core/frontend && bun run test:e2e
 
 e2e-ui:
 	@echo "🎭 Running E2E Tests with UI..."
-	cd packages/core/frontend && npm run test:e2e:ui
+	cd packages/core/frontend && bun run test:e2e:ui
 
 e2e-headed:
 	@echo "🎭 Running E2E Tests (Headed)..."
-	cd packages/core/frontend && npm run test:e2e:headed
+	cd packages/core/frontend && bun run test:e2e:headed
 
 e2e-debug:
 	@echo "🎭 Running E2E Tests (Debug)..."
-	cd packages/core/frontend && npm run test:e2e:debug
+	cd packages/core/frontend && bun run test:e2e:debug
 
 e2e-setup:
 	@echo "📦 Setting up E2E Test Data..."
