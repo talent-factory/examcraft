@@ -131,7 +131,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
               </span>
             )}
             {exam.exam_date && (
-              <span>Datum: <strong>{exam.exam_date}</strong></span>
+              <span>Datum: <strong>{new Date(exam.exam_date).toLocaleDateString('de-CH')}</strong></span>
             )}
           </div>
         </div>
