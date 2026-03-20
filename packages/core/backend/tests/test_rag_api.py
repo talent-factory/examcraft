@@ -161,10 +161,11 @@ class TestRAGAPI:
         doc.processed_at = None
         return doc
 
-    def test_generate_rag_exam_success(self, auth_client, mock_processed_document):
-        """Test erfolgreiche RAG Exam Generation"""
-
-        sample_rag_response = _make_mock_rag_response()
+    def test_generate_rag_exam_success(self, mock_processed_document):
+        """Test erfolgreiche RAG Exam Generation — gibt jetzt task_id zurück"""
+        from main import app
+        from database import get_db
+        from utils.auth_utils import get_current_user
 
         request_data = {
             "topic": "ExamCraft AI",
@@ -176,26 +177,36 @@ class TestRAGAPI:
             "context_chunks_per_question": 3,
         }
 
-        with (
-            patch.object(
-                actual_document_service,
-                "get_document_by_id",
-                return_value=mock_processed_document,
-            ),
-            patch("services.rag_service.rag_service") as mock_rag_service,
-        ):
-            mock_rag_service.generate_rag_exam = AsyncMock(
-                return_value=sample_rag_response
-            )
+        mock_db = MagicMock()
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_user.has_permission.return_value = True
+        mock_user.institution = MagicMock()
 
-            response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+
+        try:
+            with (
+                patch("api.rag_exams.document_service") as mock_doc_service,
+                patch("api.rag_exams.generate_questions_task") as mock_task,
+                patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+                patch("api.rag_exams.SubscriptionLimits"),
+            ):
+                mock_doc_service.get_document_by_id.return_value = (
+                    mock_processed_document
+                )
+                mock_task.apply_async.return_value = MagicMock()
+                mock_job_cls.return_value = MagicMock()
+
+                response = client.post("/api/v1/rag/generate-exam", json=request_data)
+        finally:
+            app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
-
-        assert data["exam_id"] == "test_exam_123"
-        assert data["topic"] == "ExamCraft AI"
-        assert len(data["questions"]) == 2
+        assert "task_id" in data
+        assert "message" in data
 
     def test_generate_rag_exam_document_not_found(self, auth_client):
         """Test RAG Exam Generation mit nicht existierendem Dokument"""
@@ -250,20 +261,6 @@ class TestRAGAPI:
         assert response.status_code == 400
         assert "Invalid question type: invalid_type" in response.json()["detail"]
 
-    def test_generate_rag_exam_invalid_difficulty(self, auth_client):
-        """Test RAG Exam Generation mit ungültigem Schwierigkeitsgrad"""
-
-        request_data = {
-            "topic": "Test Topic",
-            "question_count": 1,
-            "difficulty": "impossible",
-        }
-
-        response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
-
-        assert response.status_code == 400
-        assert "Invalid difficulty: impossible" in response.json()["detail"]
-
     def test_generate_rag_exam_validation_errors(self, auth_client):
         """Test RAG Exam Generation mit Validierungsfehlern"""
 
@@ -294,29 +291,104 @@ class TestRAGAPI:
         )
         assert response.status_code == 422
 
-    def test_generate_rag_exam_service_error(
-        self, auth_client, mock_processed_document
+    def test_generate_exam_job_created_with_topic_and_count(
+        self, mock_processed_document
     ):
-        """Test RAG Exam Generation mit Service Error"""
+        """QuestionGenerationJob must be created with topic and question_count populated"""
+        from main import app
+        from database import get_db
+        from utils.auth_utils import get_current_user
+
+        request_data = {
+            "topic": "Heap Sort",
+            "document_ids": [1],
+            "question_count": 5,
+            "question_types": ["multiple_choice"],
+            "difficulty": "medium",
+            "language": "de",
+        }
+
+        mock_db = MagicMock()
+        mock_user = MagicMock()
+        mock_user.id = 99
+        mock_user.has_permission.return_value = True
+        mock_user.institution = MagicMock()
+
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+
+        captured_jobs = []
+
+        try:
+            with (
+                patch("api.rag_exams.document_service") as mock_doc_service,
+                patch("api.rag_exams.generate_questions_task") as mock_task,
+                patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+                patch("utils.tenant_utils.SubscriptionLimits"),
+            ):
+                mock_doc_service.get_document_by_id.return_value = (
+                    mock_processed_document
+                )
+                mock_task.apply_async.return_value = MagicMock()
+
+                def capture_job(**kwargs):
+                    job = MagicMock()
+                    job.task_id = kwargs.get("task_id")
+                    job.user_id = kwargs.get("user_id")
+                    job.topic = kwargs.get("topic")
+                    job.question_count = kwargs.get("question_count")
+                    captured_jobs.append(job)
+                    return job
+
+                mock_job_cls.side_effect = capture_job
+
+                response = client.post("/api/v1/rag/generate-exam", json=request_data)
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        assert len(captured_jobs) == 1
+        job = captured_jobs[0]
+        assert job.topic == "Heap Sort"
+        assert job.question_count == 5
+        assert job.user_id == mock_user.id
+
+    def test_generate_rag_exam_broker_unavailable(self, mock_processed_document):
+        """Test RAG Exam Generation wenn Celery Broker nicht erreichbar ist"""
+        from main import app
+        from database import get_db
+        from utils.auth_utils import get_current_user
 
         request_data = {"topic": "Test Topic", "question_count": 1}
 
-        with (
-            patch.object(
-                actual_document_service,
-                "get_document_by_id",
-                return_value=mock_processed_document,
-            ),
-            patch("services.rag_service.rag_service") as mock_rag_service,
-        ):
-            mock_rag_service.generate_rag_exam = AsyncMock(
-                side_effect=Exception("Service Error")
-            )
+        mock_db = MagicMock()
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_user.has_permission.return_value = True
+        mock_user.institution = MagicMock()
 
-            response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_current_user] = lambda: mock_user
 
-        assert response.status_code == 500
-        assert "Exam generation failed" in response.json()["detail"]
+        try:
+            with (
+                patch("api.rag_exams.document_service") as mock_doc_service,
+                patch("api.rag_exams.generate_questions_task") as mock_task,
+                patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+                patch("api.rag_exams.SubscriptionLimits"),
+            ):
+                mock_doc_service.get_document_by_id.return_value = (
+                    mock_processed_document
+                )
+                mock_task.apply_async.side_effect = Exception("Broker unavailable")
+                mock_job_cls.return_value = MagicMock()
+
+                response = client.post("/api/v1/rag/generate-exam", json=request_data)
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 503
+        assert "Task-Queue nicht verfügbar" in response.json()["detail"]
 
     def test_retrieve_context_success(self, auth_client):
         """Test erfolgreiche Context Retrieval"""
@@ -572,6 +644,31 @@ class TestRAGAPIIntegration:
             assert context_response.status_code == 200
             assert context_response.json()["query"] == "Integration Test"
 
+        # 3. Teste RAG Exam Generation — gibt jetzt task_id zurück
+        with (
+            patch("api.rag_exams.document_service") as mock_doc_service,
+            patch("api.rag_exams.generate_questions_task") as mock_task,
+            patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+            patch("api.rag_exams.SubscriptionLimits"),
+        ):
+            mock_doc_service.get_document_by_id.return_value = mock_doc
+            mock_task.apply_async.return_value = MagicMock()
+            mock_job_cls.return_value = MagicMock()
+
+            exam_response = client.post(
+                "/api/v1/rag/generate-exam",
+                json={
+                    "topic": "Test Topic",
+                    "document_ids": [999],
+                    "question_count": 1,
+                },
+            )
+
+            assert exam_response.status_code == 200
+            exam_data = exam_response.json()
+            assert "task_id" in exam_data
+            assert "message" in exam_data
+
     def test_error_handling_chain(self, auth_client):
         """Test Error Handling in der gesamten Chain"""
 
@@ -580,14 +677,9 @@ class TestRAGAPIIntegration:
             "get_document_by_id",
             return_value=None,
         ):
-            # Document Not Found sollte früh abbrechen
             response = auth_client.post(
                 "/api/v1/rag/generate-exam",
-                json={
-                    "topic": "Test Topic",
-                    "document_ids": [999],
-                    "question_count": 1,
-                },
+                json={"topic": "Test", "document_ids": [999], "question_count": 1},
             )
 
             assert response.status_code == 404

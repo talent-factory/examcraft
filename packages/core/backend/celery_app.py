@@ -18,10 +18,11 @@ celery_app = Celery(
         "amqp://examcraft:secure_password_here@rabbitmq:5672/",  # pragma: allowlist secret
     ),
     backend=os.getenv(
-        "CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", "redis://redis:6379/1")
+        "CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", "redis://redis:6379/3")
     ),
     include=[
         "tasks.document_tasks",
+        "tasks.question_tasks",
         # "tasks.rag_tasks",  # Requires Premium RAGService
         "tasks.session_cleanup",
     ],
@@ -87,6 +88,10 @@ celery_app.conf.task_routes = {
     "tasks.notification_tasks.subscribe_to_newsletter": {
         "queue": "notifications",
         "routing_key": "notification.send",
+    },
+    "tasks.question_tasks.generate_questions": {
+        "queue": "question_generation",
+        "routing_key": "question.generate",
     },
 }
 

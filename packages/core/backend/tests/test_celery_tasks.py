@@ -2,6 +2,13 @@
 Tests for Celery async task processing
 """
 
+import sys
+from unittest.mock import MagicMock
+
+# Mock system-level dependencies before any project imports
+if "magic" not in sys.modules:
+    sys.modules["magic"] = MagicMock()
+
 import pytest
 from unittest.mock import patch, MagicMock
 from tasks.document_tasks import process_document
@@ -25,29 +32,33 @@ class TestDocumentProcessingTask:
 
             mock_document = MagicMock(spec=Document)
             mock_document.id = 1
-            mock_document.filename = "test.pdf"
+            mock_document.original_filename = "test.pdf"
             mock_document.file_path = "/path/to/test.pdf"
-            mock_document.original_filename = "Test Document"
-            mock_document.status = DocumentStatus.COMPLETED
+            mock_document.status = DocumentStatus.PROCESSING
             mock_document.has_vectors = True
 
             mock_db.query.return_value.filter.return_value.first.return_value = (
                 mock_document
             )
 
-            # Mock process_document_with_vectors result
+            # Mock document_service.process_document_with_vectors
             mock_run_async.return_value = {
                 "docling_processing": {"pages": 10},
-                "vector_embeddings": {"chunks": 5},
+                "vector_embeddings": {"count": 2},
             }
 
-            # Execute task (bind=True injects self automatically)
-            result = process_document("1", "test-user-id")
+            # Mock the update_state method to avoid Celery backend interaction
+            with patch.object(process_document, "update_state"):
+                result = process_document.__wrapped__(
+                    document_id="1", user_id="test-user-id"
+                )
 
             # Verify results
             assert result["success"] is True
             assert result["document_id"] == "1"
-            assert result["title"] == "Test Document"
+            assert result["title"] == "test.pdf"
+            assert result["status"] == mock_document.status.value
+            assert result["has_vectors"] is True
 
     def test_process_document_task_not_found(self):
         """Test processing when document doesn't exist"""
@@ -56,17 +67,12 @@ class TestDocumentProcessingTask:
             mock_session_local.return_value = mock_db
             mock_db.query.return_value.filter.return_value.first.return_value = None
 
-            # Mock the task's retry method (bind=True means self is the task)
-            original_retry = process_document.retry
-            process_document.retry = MagicMock(side_effect=Exception("retry"))
-
-            try:
-                # The task uses int(document_id), so pass a valid int string
-                # that doesn't match any document
-                with pytest.raises(Exception):
-                    process_document("999", "test-user-id")
-            finally:
-                process_document.retry = original_retry
+            # Mock the update_state method to avoid Celery backend interaction
+            with patch.object(process_document, "update_state"):
+                with pytest.raises(ValueError, match="Dokument .* nicht gefunden"):
+                    process_document.__wrapped__(
+                        document_id="999", user_id="test-user-id"
+                    )
 
     def test_create_embeddings_task_success(self):
         """Test successful embedding creation"""
