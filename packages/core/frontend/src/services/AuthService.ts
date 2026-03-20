@@ -242,6 +242,24 @@ class AuthService {
 
     return response.json();
   }
+
+  /**
+   * Exchange a short-lived OAuth code for tokens
+   */
+  async exchangeOAuthCode(code: string): Promise<TokenResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/oauth/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'OAuth code exchange failed');
+    }
+
+    return response.json();
+  }
 }
 
 const authService = new AuthService();
