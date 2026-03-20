@@ -122,8 +122,21 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       setTimeout(() => {
         onSave?.();
       }, 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Speichern');
+    } catch (err: any) {
+      if (err?.response?.status === 422 && err?.response?.data?.detail) {
+        const details = err.response.data.detail;
+        const messages = Array.isArray(details)
+          ? details.map((d: any) => {
+              const field = d.loc?.slice(1).join('.') || 'Feld';
+              return `${field}: ${d.msg}`;
+            })
+          : [String(details)];
+        setError(`Validierungsfehler: ${messages.join(', ')}`);
+      } else if (err?.response?.data?.detail) {
+        setError(String(err.response.data.detail));
+      } else {
+        setError(err instanceof Error ? err.message : 'Fehler beim Speichern');
+      }
     } finally {
       setSaving(false);
     }
