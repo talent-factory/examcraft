@@ -8,7 +8,7 @@ import {
   TextField,
   Button,
 } from '@mui/material';
-import { ComposerService } from '../../services/ComposerService';
+import { ComposerService, getErrorMessage } from '../../services/ComposerService';
 import type { ApprovedQuestion, AutoFillRequest } from '../../types/composer';
 
 interface QuestionPoolPanelProps {
@@ -56,6 +56,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   const [filterType, setFilterType] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState('');
   const [autoFillOpen, setAutoFillOpen] = useState(false);
+  const [autoFillError, setAutoFillError] = useState<string | null>(null);
   const [autoFillForm, setAutoFillForm] = useState<AutoFillForm>({
     count: '5',
     topic: '',
@@ -79,8 +80,12 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   const autoFillMutation = useMutation({
     mutationFn: (req: AutoFillRequest) => ComposerService.autoFill(examId, req),
     onSuccess: () => {
+      setAutoFillError(null);
       setAutoFillOpen(false);
       onInvalidate();
+    },
+    onError: (err) => {
+      setAutoFillError(getErrorMessage(err, 'Auto-Fill fehlgeschlagen. Nicht genug passende Fragen?'));
     },
   });
 
@@ -201,7 +206,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       )}
 
       {/* Auto-Fill Dialog */}
-      <Dialog open={autoFillOpen} onClose={() => setAutoFillOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={autoFillOpen} onClose={() => { setAutoFillOpen(false); setAutoFillError(null); }} maxWidth="xs" fullWidth>
         <DialogTitle>Auto-Fill Kriterien</DialogTitle>
         <DialogContent>
           <div className="space-y-4 mt-2">
@@ -268,14 +273,12 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
               }
             />
           </div>
-          {autoFillMutation.isError && (
-            <p className="text-red-500 text-sm mt-2">
-              Auto-Fill fehlgeschlagen. Nicht genug passende Fragen?
-            </p>
+          {autoFillError && (
+            <p className="text-red-500 text-sm mt-2">{autoFillError}</p>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAutoFillOpen(false)} disabled={autoFillMutation.isPending}>
+          <Button onClick={() => { setAutoFillOpen(false); setAutoFillError(null); }} disabled={autoFillMutation.isPending}>
             Abbrechen
           </Button>
           <Button

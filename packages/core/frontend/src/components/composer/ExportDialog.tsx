@@ -53,7 +53,27 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
       );
       onClose();
     } catch (err) {
-      setError('Export fehlgeschlagen. Bitte versuche es erneut.');
+      console.error('Export failed:', err);
+      // Try to extract detail from blob response for better error messages
+      let message = 'Export fehlgeschlagen. Bitte versuche es erneut.';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: Blob | { detail?: string }; headers?: Record<string, string> } };
+        const responseData = axiosError.response?.data;
+        if (responseData instanceof Blob && responseData.type === 'application/json') {
+          try {
+            const text = await responseData.text();
+            const parsed = JSON.parse(text) as { detail?: string };
+            if (parsed.detail) {
+              message = parsed.detail;
+            }
+          } catch {
+            // ignore parse errors, keep fallback message
+          }
+        } else if (responseData && typeof responseData === 'object' && 'detail' in responseData && responseData.detail) {
+          message = responseData.detail as string;
+        }
+      }
+      setError(message);
     } finally {
       setIsDownloading(false);
     }

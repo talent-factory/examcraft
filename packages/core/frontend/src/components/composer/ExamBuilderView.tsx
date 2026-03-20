@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ComposerService } from '../../services/ComposerService';
+import { ComposerService, getErrorMessage } from '../../services/ComposerService';
 import { ExamStatus } from '../../types/composer';
 import ExamMetadataBar from './ExamMetadataBar';
 import QuestionPoolPanel from './QuestionPoolPanel';
@@ -15,6 +15,7 @@ interface ExamBuilderViewProps {
 const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => {
   const queryClient = useQueryClient();
   const [exportOpen, setExportOpen] = useState(false);
+  const [builderError, setBuilderError] = useState<string | null>(null);
 
   const { data: exam, isLoading, isError } = useQuery({
     queryKey: ['exam', examId],
@@ -29,23 +30,35 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
   const addMutation = useMutation({
     mutationFn: (qIds: number[]) => ComposerService.addQuestions(examId, qIds),
     onSuccess: invalidateExam,
+    onError: (err) => {
+      setBuilderError(getErrorMessage(err, 'Fragen konnten nicht hinzugefügt werden.'));
+    },
   });
 
   const removeMutation = useMutation({
     mutationFn: (eqId: number) => ComposerService.removeExamQuestion(examId, eqId),
     onSuccess: invalidateExam,
+    onError: (err) => {
+      setBuilderError(getErrorMessage(err, 'Frage konnte nicht entfernt werden.'));
+    },
   });
 
   const updatePointsMutation = useMutation({
     mutationFn: ({ eqId, points }: { eqId: number; points: number }) =>
       ComposerService.updateExamQuestion(examId, eqId, { points }),
     onSuccess: invalidateExam,
+    onError: (err) => {
+      setBuilderError(getErrorMessage(err, 'Punktzahl konnte nicht aktualisiert werden.'));
+    },
   });
 
   const reorderMutation = useMutation({
     mutationFn: (order: { id: number; position: number }[]) =>
       ComposerService.reorderQuestions(examId, order),
     onSuccess: invalidateExam,
+    onError: (err) => {
+      setBuilderError(getErrorMessage(err, 'Reihenfolge konnte nicht gespeichert werden.'));
+    },
   });
 
   if (isLoading) {
@@ -78,6 +91,20 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
       >
         <span aria-hidden="true">&larr;</span> Zurück zur Übersicht
       </button>
+
+      {/* Error banner */}
+      {builderError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex justify-between items-center">
+          <span>{builderError}</span>
+          <button
+            onClick={() => setBuilderError(null)}
+            className="ml-4 text-red-500 hover:text-red-700 font-bold text-lg leading-none"
+            aria-label="Fehlermeldung schliessen"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Top metadata bar */}
       <ExamMetadataBar

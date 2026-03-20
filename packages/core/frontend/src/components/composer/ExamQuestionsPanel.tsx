@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -133,6 +133,12 @@ const SortableExamQuestionItem: React.FC<SortableExamQuestionItemProps> = ({
     disabled,
   });
 
+  const [localPoints, setLocalPoints] = useState(question.points);
+
+  useEffect(() => {
+    setLocalPoints(question.points);
+  }, [question.points]);
+
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -195,12 +201,12 @@ const SortableExamQuestionItem: React.FC<SortableExamQuestionItemProps> = ({
           type="number"
           min={0}
           step={0.5}
-          value={question.points}
+          value={localPoints}
           disabled={disabled}
-          onChange={(e) => {
-            const val = parseFloat(e.target.value);
-            if (!isNaN(val) && val >= 0) {
-              onUpdatePoints(question.id, val);
+          onChange={(e) => setLocalPoints(parseFloat(e.target.value) || 0)}
+          onBlur={() => {
+            if (localPoints !== question.points && localPoints >= 0) {
+              onUpdatePoints(question.id, localPoints);
             }
           }}
           className="w-14 text-sm text-center border border-gray-300 rounded px-1 py-0.5 disabled:bg-gray-50 disabled:text-gray-400 flex-shrink-0"
