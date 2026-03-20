@@ -251,5 +251,8 @@ def generate_questions_task(
             f"Fragengenerierung fehlgeschlagen für User {user_id}: {generation_err}",
             exc_info=True,
         )
-        _update_job_status(self.request.id, "FAILURE")
+        # Only mark as FAILURE on final retry attempt — autoretry_for may still retry
+        max_retries = self.retry_kwargs.get("max_retries", 0)
+        if self.request.retries >= max_retries:
+            _update_job_status(self.request.id, "FAILURE")
         raise
