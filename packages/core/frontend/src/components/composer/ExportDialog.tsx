@@ -22,12 +22,12 @@ interface ExportDialogProps {
   hasQuestions: boolean;
 }
 
-type ExportFormat = 'markdown' | 'json' | 'moodle_xml';
+type ExportFormat = 'md' | 'json' | 'moodle';
 
 const FORMAT_LABELS: Record<ExportFormat, string> = {
-  markdown: 'Markdown (.md)',
+  md: 'Markdown (.md)',
   json: 'JSON (.json)',
-  moodle_xml: 'Moodle XML (.xml)',
+  moodle: 'Moodle XML (.xml)',
 };
 
 const ExportDialog: React.FC<ExportDialogProps> = ({
@@ -37,7 +37,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   examTitle,
   hasQuestions,
 }) => {
-  const [format, setFormat] = useState<ExportFormat>('markdown');
+  const [format, setFormat] = useState<ExportFormat>('md');
   const [includeSolutions, setIncludeSolutions] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +49,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
       await ComposerService.downloadExport(
         examId,
         format,
-        format === 'markdown' ? includeSolutions : false
+        format === 'md' ? includeSolutions : false
       );
       onClose();
     } catch (err) {
@@ -93,7 +93,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
           </RadioGroup>
         </FormControl>
 
-        {format === 'markdown' && (
+        {format === 'md' && (
           <div className="mt-3">
             <FormControlLabel
               control={

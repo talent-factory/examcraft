@@ -162,7 +162,7 @@ describe('ExportDialog', () => {
       await waitFor(() => {
         expect(mockComposerService.downloadExport).toHaveBeenCalledWith(
           1,
-          'markdown',
+          'md',
           false
         );
       });
@@ -177,7 +177,7 @@ describe('ExportDialog', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
 
       await waitFor(() => {
-        expect(mockComposerService.downloadExport).toHaveBeenCalledWith(1, 'markdown', true);
+        expect(mockComposerService.downloadExport).toHaveBeenCalledWith(1, 'md', true);
       });
     });
 
