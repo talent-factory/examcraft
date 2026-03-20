@@ -121,7 +121,7 @@ class AuthService {
    */
   async updateProfile(accessToken: string, data: UpdateProfileRequest): Promise<UserResponse> {
     const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -222,22 +222,6 @@ class AuthService {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to get OAuth URL');
-    }
-
-    return response.json();
-  }
-
-  /**
-   * Handle OAuth callback
-   */
-  async handleOAuthCallback(provider: OAuthProvider, code: string, state: string): Promise<TokenResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/oauth/${provider}/callback?code=${code}&state=${state}`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'OAuth authentication failed');
     }
 
     return response.json();

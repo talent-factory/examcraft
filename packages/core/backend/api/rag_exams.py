@@ -18,6 +18,7 @@ import services.rag_service as rag_service_module
 from services.rag_service import RAGExamRequest
 from services.document_service import document_service
 from models.auth import User
+from models.document import Document, DocumentStatus
 from models.question_generation_job import QuestionGenerationJob
 from tasks.question_tasks import generate_questions_task
 from schemas.task import GenerateExamTaskResponse
@@ -26,6 +27,7 @@ from utils.auth_utils import (
     get_current_active_user,
     require_permission,
 )
+from utils.tenant_utils import TenantFilter, get_tenant_context
 import logging
 
 logger = logging.getLogger(__name__)
@@ -145,9 +147,6 @@ async def generate_rag_exam(
     - **context_chunks_per_question**: Context Chunks pro Frage (1-10)
     """
     try:
-        from models.document import DocumentStatus
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
         # Validiere Document IDs falls angegeben
         if request.document_ids:
             tenant_context = get_tenant_context(current_user)
@@ -279,8 +278,6 @@ async def retrieve_context(
     - **min_similarity**: Mindest-Similarity Score (0.0-1.0)
     """
     try:
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
         # Validiere Document IDs falls angegeben
         if request.document_ids:
             tenant_context = get_tenant_context(current_user)
@@ -339,9 +336,6 @@ async def get_available_documents(
     - **processed_only**: Nur verarbeitete Dokumente anzeigen (empfohlen)
     """
     try:
-        from models.document import Document, DocumentStatus
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
         if not current_user.institution:
             raise HTTPException(
                 status_code=403,
@@ -395,6 +389,8 @@ async def get_available_documents(
             "documents": available_docs,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get available documents: {e}", exc_info=True)
         raise HTTPException(

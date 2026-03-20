@@ -8,7 +8,7 @@ from starlette.config import Config
 from typing import Dict, Any
 import httpx
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -226,9 +226,14 @@ class OAuthService:
             # Update OAuth account with new token
             oauth_account.access_token = token.get("access_token")
             oauth_account.refresh_token = token.get("refresh_token")
-            oauth_account.token_expires_at = datetime.now(
-                timezone.utc
-            )  # TODO: Calculate from expires_in
+            # BUG: token_expires_at set to now(), not (now + expires_in) — stored tokens always appear expired
+            expires_in = token.get("expires_in")
+            if expires_in:
+                oauth_account.token_expires_at = datetime.now(timezone.utc) + timedelta(
+                    seconds=int(expires_in)
+                )
+            else:
+                oauth_account.token_expires_at = datetime.now(timezone.utc)
             oauth_account.last_login_at = datetime.now(timezone.utc)
             oauth_account.email = user_info.get("email")
             oauth_account.name = user_info.get("name")
