@@ -37,20 +37,6 @@ export const OAuthCallback: React.FC = () => {
           return;
         }
 
-        // Check if backend already exchanged tokens (new flow)
-        const accessToken = searchParams.get('access_token');
-        const refreshToken = searchParams.get('refresh_token');
-
-        if (accessToken && refreshToken) {
-          console.log('[OAuthCallback] Tokens received from backend, storing...');
-          localStorage.setItem('examcraft_access_token', accessToken);
-          localStorage.setItem('examcraft_refresh_token', refreshToken);
-          console.log('[OAuthCallback] Redirecting to dashboard...');
-          navigate('/dashboard', { replace: true });
-          return;
-        }
-
-        // Fallback: Old flow with code exchange (for compatibility)
         const code = searchParams.get('code');
 
         if (!code) {

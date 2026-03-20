@@ -6,7 +6,7 @@ Login, Logout, Register, Profile, Password Reset
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -22,6 +22,8 @@ from models.auth import User, Role, Institution, UserStatus, UserRole
 from services.auth_service import AuthService
 from services.avatar_service import AvatarService
 from services.audit_service import AuditService
+from services.oauth_service import OAuthService
+from services.redis_service import RedisService
 from utils.auth_utils import get_current_user, get_current_active_user
 
 logger = logging.getLogger(__name__)
@@ -358,10 +360,11 @@ async def login(
 
     if (user.failed_login_attempts or 0) >= MAX_FAILED_ATTEMPTS:
         if (
-            user.last_failed_login
-            and (datetime.now(timezone.utc) - user.last_failed_login).total_seconds()
+            user.last_failed_login is None
+            or (datetime.now(timezone.utc) - user.last_failed_login).total_seconds()
             < LOCKOUT_DURATION_SECONDS
         ):
+            # Still locked (or timestamp missing from migration — treat as locked for safety)
             AuditService.log_login(
                 db,
                 user.id,
@@ -380,9 +383,14 @@ async def login(
                 db.commit()
             except Exception as commit_err:
                 logger.error(
-                    f"Failed to reset lockout counter for user {user.id}: {commit_err}"
+                    f"Failed to reset lockout counter for user {user.id}: {commit_err}",
+                    exc_info=True,
                 )
                 db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Anmeldung voruebergehend nicht moeglich. Bitte erneut versuchen.",
+                )
 
     # Verify password
     if not AuthService.verify_password(request.password, user.password_hash):
@@ -973,9 +981,6 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
             detail=f"Unsupported OAuth provider: {provider}. Supported: google, microsoft",
         )
 
-    from services.oauth_service import OAuthService
-    from fastapi.responses import RedirectResponse
-
     oauth_service = OAuthService(db)
 
     # Generate callback URL
@@ -990,8 +995,6 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
         # Generate CSRF state token and store in Redis
         state = secrets.token_urlsafe(32)
         try:
-            from services.redis_service import RedisService
-
             redis_client = RedisService.get_session_client()
             redis_client.setex(f"oauth_state:{state}", 600, "valid")  # 10 min TTL
         except Exception as redis_err:
@@ -1006,6 +1009,8 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
         )
         # Direct redirect to OAuth provider
         return RedirectResponse(url=authorization_url, status_code=302)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"OAuth login failed for {provider}: {e}", exc_info=True)
         raise HTTPException(
@@ -1039,16 +1044,20 @@ async def oauth_callback(
             detail="Missing OAuth state parameter",
         )
     try:
-        from services.redis_service import RedisService
-
         redis_client = RedisService.get_session_client()
-        stored = redis_client.get(f"oauth_state:{state}")
+        # Atomic get-and-delete to prevent TOCTOU race on single-use state token
+        try:
+            stored = redis_client.getdel(f"oauth_state:{state}")
+        except AttributeError:
+            # redis-py < 4.0 does not expose getdel; fall back to non-atomic get+delete
+            stored = redis_client.get(f"oauth_state:{state}")
+            if stored:
+                redis_client.delete(f"oauth_state:{state}")
         if not stored:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid OAuth state - possible CSRF attack",
             )
-        redis_client.delete(f"oauth_state:{state}")
     except HTTPException:
         raise
     except Exception as redis_err:
@@ -1057,8 +1066,6 @@ async def oauth_callback(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentifizierungsdienst voruebergehend nicht verfuegbar.",
         )
-
-    from services.oauth_service import OAuthService
 
     oauth_service = OAuthService(db)
 
@@ -1105,12 +1112,8 @@ async def oauth_callback(
         logger.info(f"OAuth login successful for user {user.email} via {provider}")
 
         # Redirect to frontend using a short-lived code instead of passing tokens in URL
-        from fastapi.responses import RedirectResponse
-
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         try:
-            from services.redis_service import RedisService
-
             redis_client = RedisService.get_session_client()
             oauth_code = secrets.token_urlsafe(32)
             redis_client.setex(
@@ -1120,8 +1123,14 @@ async def oauth_callback(
             )
             redirect_url = f"{frontend_url}/auth/callback?code={oauth_code}"
         except Exception as redis_err:
-            logger.error(f"Redis unavailable for OAuth code exchange: {redis_err}")
-            redirect_url = f"{frontend_url}/auth/callback?error=service_unavailable"
+            logger.error(
+                f"Redis unavailable when storing OAuth code for user {user.id}: {redis_err}",
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentifizierungsdienst voruebergehend nicht verfuegbar. Bitte erneut versuchen.",
+            )
         return RedirectResponse(url=redirect_url)
 
     except ValueError as e:
@@ -1139,6 +1148,8 @@ async def oauth_callback(
 
 
 class OAuthCodeExchangeRequest(BaseModel):
+    """Short-lived OAuth code exchange request"""
+
     code: str
 
 
@@ -1146,32 +1157,56 @@ class OAuthCodeExchangeRequest(BaseModel):
 async def exchange_oauth_code(request: OAuthCodeExchangeRequest):
     """Exchange a short-lived OAuth code for tokens."""
     try:
-        from services.redis_service import RedisService
-
         redis_client = RedisService.get_session_client()
     except Exception as e:
         logger.error(f"Redis unavailable for OAuth code exchange: {e}")
-        raise HTTPException(status_code=503, detail="Service unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service unavailable",
+        )
 
     key = f"oauth_code:{request.code}"
     try:
         # Atomic get-and-delete to prevent TOCTOU race (single-use code)
         token_data = redis_client.getdel(key)
     except AttributeError:
-        # Redis < 6.2 fallback
-        token_data = redis_client.get(key)
-        if token_data:
-            redis_client.delete(key)
+        # redis-py < 4.0 does not expose getdel; fall back to non-atomic get+delete
+        try:
+            token_data = redis_client.get(key)
+            if token_data:
+                redis_client.delete(key)
+        except Exception as fallback_err:
+            logger.error(
+                f"Redis error in getdel fallback for OAuth code exchange: {fallback_err}",
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Service unavailable",
+            )
     except Exception as e:
         logger.error(f"Redis error during OAuth code exchange: {e}", exc_info=True)
-        raise HTTPException(status_code=503, detail="Service unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service unavailable",
+        )
     if not token_data:
-        raise HTTPException(status_code=400, detail="Invalid or expired code")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired code",
+        )
 
     try:
         tokens = json.loads(token_data)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Invalid token data")
+    except (json.JSONDecodeError, ValueError) as decode_err:
+        logger.error(
+            f"Failed to deserialize OAuth token data from Redis key {key!r}: {decode_err}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentifizierungsdaten konnten nicht gelesen werden.",
+        )
 
     return tokens
 

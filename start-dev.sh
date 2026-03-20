@@ -178,8 +178,12 @@ if [ "$DEPLOYMENT_MODE" = "full" ]; then
         echo -e "${YELLOW}⚠️  Warning: scripts/setup-premium-symlinks.sh not found${NC}"
     fi
 
-    # Install NPM/Bun dependencies
+    # Install dependencies (requires bun)
     echo ""
+    if ! command -v bun &>/dev/null; then
+        echo -e "${RED}❌ bun is required but not installed. Install from https://bun.sh${NC}"
+        exit 1
+    fi
     echo -e "${BLUE}📦 Installing frontend dependencies...${NC}"
     bun install
 fi
