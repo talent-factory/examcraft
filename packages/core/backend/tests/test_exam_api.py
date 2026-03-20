@@ -794,3 +794,194 @@ class TestExamQuestionApi:
         # After swap, former second question should now be first
         assert questions[0]["id"] == eq_ids[1]
         assert questions[1]["id"] == eq_ids[0]
+
+
+# ---------------------------------------------------------------------------
+# Task 4: Workflow API Tests (finalize, unfinalize, approved-questions)
+# ---------------------------------------------------------------------------
+
+
+class TestExamWorkflowApi:
+    """Tests for finalize, unfinalize, and approved-questions endpoints."""
+
+    @pytest.fixture
+    def exam_db(self, test_engine):
+        """Fresh DB session that supports commit/rollback (no wrapping transaction)."""
+        from sqlalchemy.orm import sessionmaker
+
+        TestSession = sessionmaker(bind=test_engine)
+        session = TestSession()
+        yield session
+        session.close()
+
+    @pytest.fixture
+    def exam_institution(self, exam_db):
+        """Institution created with a committable session."""
+        from models.auth import Institution
+
+        existing = (
+            exam_db.query(Institution).filter_by(slug="examwf-test-university").first()
+        )
+        if existing:
+            return existing
+
+        institution = Institution(
+            name="ExamWF Test University",
+            slug="examwf-test-university",
+            subscription_tier="professional",
+            max_users=-1,
+            max_documents=-1,
+            max_questions_per_month=-1,
+        )
+        exam_db.add(institution)
+        exam_db.commit()
+        exam_db.refresh(institution)
+        return institution
+
+    @pytest.fixture
+    def exam_user(self, exam_db, exam_institution):
+        """Real user record in the test DB so FK constraints pass."""
+        from models.auth import User, UserStatus
+
+        existing = exam_db.query(User).filter_by(email="examwfcrud@test.com").first()
+        if existing:
+            return existing
+
+        user = User(
+            email="examwfcrud@test.com",
+            first_name="ExamWF",
+            last_name="CRUD",
+            password_hash="dummy_hash",  # pragma: allowlist secret
+            institution_id=exam_institution.id,
+            status=UserStatus.ACTIVE.value,
+        )
+        exam_db.add(user)
+        exam_db.commit()
+        exam_db.refresh(user)
+        return user
+
+    @pytest.fixture
+    def mock_user(self, exam_institution, exam_user):
+        return _make_mock_user(institution_id=exam_institution.id, user_id=exam_user.id)
+
+    @pytest.fixture
+    def exam_client(self, exam_db, exam_institution, mock_user):
+        """TestClient with auth overrides and committable DB session."""
+        from utils.auth_utils import get_current_user
+        from database import get_db
+        import api.exams as exams_module
+
+        app.include_router(exams_module.router)
+
+        def override_get_db():
+            yield exam_db
+
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = override_get_db
+
+        client = TestClient(app, raise_server_exceptions=True)
+        yield client
+        app.dependency_overrides.clear()
+
+    def _create_approved_question(
+        self,
+        db,
+        institution_id,
+        user_id,
+        text="Test Q",
+        question_type="multiple_choice",
+        difficulty="medium",
+        topic="Test",
+    ):
+        from models.question_review import QuestionReview
+
+        q = QuestionReview(
+            question_text=text,
+            question_type=question_type,
+            difficulty=difficulty,
+            topic=topic,
+            review_status="approved",
+            options=["A", "B", "C", "D"]
+            if question_type == "multiple_choice"
+            else None,
+            correct_answer="A" if question_type == "multiple_choice" else None,
+            explanation="A is correct." if question_type == "multiple_choice" else None,
+            institution_id=institution_id,
+            created_by=user_id,
+        )
+        db.add(q)
+        db.commit()
+        db.refresh(q)
+        return q
+
+    def _create_exam_with_question(self, client, db, institution_id, user_id):
+        """Helper: create exam + add one approved question."""
+        create_resp = client.post("/api/v1/exams/", json={"title": "Workflow Test"})
+        assert create_resp.status_code == 201
+        exam = create_resp.json()
+
+        q = self._create_approved_question(db, institution_id, user_id)
+
+        add_resp = client.post(
+            f"/api/v1/exams/{exam['id']}/questions",
+            json={"question_ids": [q.id]},
+        )
+        assert add_resp.status_code == 200
+        return exam, q
+
+    def test_finalize_exam(self, exam_client, exam_db, exam_institution, exam_user):
+        """POST /{exam_id}/finalize sets status to finalized."""
+        exam, _ = self._create_exam_with_question(
+            exam_client, exam_db, exam_institution.id, exam_user.id
+        )
+        response = exam_client.post(f"/api/v1/exams/{exam['id']}/finalize")
+        assert response.status_code == 200
+        assert response.json()["status"] == "finalized"
+
+    def test_finalize_empty_exam_fails(self, exam_client):
+        """POST /{exam_id}/finalize returns 400 for an exam with no questions."""
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "Empty Exam"})
+        assert create_resp.status_code == 201
+        exam_id = create_resp.json()["id"]
+
+        response = exam_client.post(f"/api/v1/exams/{exam_id}/finalize")
+        assert response.status_code == 400
+        assert "empty" in response.json()["detail"].lower()
+
+    def test_unfinalize_exam(self, exam_client, exam_db, exam_institution, exam_user):
+        """POST /{exam_id}/unfinalize reverts status from finalized to draft."""
+        exam, _ = self._create_exam_with_question(
+            exam_client, exam_db, exam_institution.id, exam_user.id
+        )
+        # Finalize first
+        fin_resp = exam_client.post(f"/api/v1/exams/{exam['id']}/finalize")
+        assert fin_resp.status_code == 200
+        assert fin_resp.json()["status"] == "finalized"
+
+        # Then unfinalize
+        response = exam_client.post(f"/api/v1/exams/{exam['id']}/unfinalize")
+        assert response.status_code == 200
+        assert response.json()["status"] == "draft"
+
+    def test_approved_questions_endpoint(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """GET /approved-questions returns approved questions, filterable by topic."""
+        self._create_approved_question(
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            text="Searchable Q about Heapsort",
+            topic="Heapsort",
+            question_type="open_ended",
+            difficulty="hard",
+        )
+
+        response = exam_client.get("/api/v1/exams/approved-questions?topic=Heapsort")
+        assert response.status_code == 200
+        data = response.json()
+        assert "total" in data
+        assert "questions" in data
+        assert data["total"] >= 1
+        topics = [q["topic"] for q in data["questions"]]
+        assert any("Heapsort" in t for t in topics)
