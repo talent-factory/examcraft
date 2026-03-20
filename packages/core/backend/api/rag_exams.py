@@ -4,6 +4,7 @@ Implementiert dokumentenbasierte Fragenerstellung mit Retrieval-Augmented Genera
 """
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import List, Literal, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
@@ -20,7 +21,11 @@ from models.auth import User
 from models.question_generation_job import QuestionGenerationJob
 from tasks.question_tasks import generate_questions_task
 from schemas.task import GenerateExamTaskResponse
-from utils.auth_utils import get_current_active_user, require_permission
+from schemas.active_tasks import ActiveTaskInfo, ActiveTasksResponse
+from utils.auth_utils import (
+    get_current_active_user,
+    require_permission,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -205,7 +210,12 @@ async def generate_rag_exam(
         # UUID vorab generieren — wird sowohl als DB-Record-Key als auch als
         # Celery task_id verwendet.
         task_id = str(uuid.uuid4())
-        job = QuestionGenerationJob(task_id=task_id, user_id=current_user.id)
+        job = QuestionGenerationJob(
+            task_id=task_id,
+            user_id=current_user.id,
+            topic=request.topic,
+            question_count=request.question_count,
+        )
         db.add(job)
         db.commit()
 
@@ -485,3 +495,63 @@ async def rag_service_health():
             status_code=503,
             detail={"status": "unhealthy", "service": "RAG Service"},
         )
+
+
+TERMINAL_STATUSES = {"SUCCESS", "FAILURE", "REVOKED"}
+ACTIVE_TASK_MAX_AGE = timedelta(hours=2)
+
+
+@router.get("/active-tasks", response_model=ActiveTasksResponse)
+async def get_active_tasks(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Return all active (non-terminal) generation tasks for the current user."""
+    from celery.result import AsyncResult
+
+    # created_at is timezone-aware (UTC) — use aware cutoff
+    cutoff = datetime.now(timezone.utc) - ACTIVE_TASK_MAX_AGE
+    jobs = (
+        db.query(QuestionGenerationJob)
+        .filter(
+            QuestionGenerationJob.user_id == current_user.id,
+            QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
+            QuestionGenerationJob.created_at > cutoff,
+        )
+        .all()
+    )
+
+    tasks = []
+    for job in jobs:
+        progress = 0
+        message = None
+        try:
+            result = AsyncResult(job.task_id)
+            if result.state == "PROGRESS" and isinstance(result.info, dict):
+                current = result.info.get("current", 0)
+                total = result.info.get("total", 1)
+                progress = int((current / max(total, 1)) * 100)
+                message = result.info.get("message")
+            elif result.state == "STARTED":
+                progress = 0
+                message = "Gestartet..."
+        except Exception as celery_err:
+            logger.warning(
+                "Failed to fetch Celery state for task %s: %s",
+                job.task_id,
+                celery_err,
+            )
+
+        tasks.append(
+            ActiveTaskInfo(
+                task_id=job.task_id,
+                status=job.status,
+                progress=progress,
+                message=message,
+                created_at=job.created_at,
+                topic=job.topic,
+                question_count=job.question_count,
+            )
+        )
+
+    return ActiveTasksResponse(tasks=tasks)

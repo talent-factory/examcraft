@@ -7,6 +7,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
+import { GenerationTasksProvider } from './contexts/GenerationTasksContext';
 import { ProtectedRoute, GuestRoute, PermissionGuard, RoleGuard } from './components/guards';
 import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
@@ -29,6 +30,7 @@ import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { UserRole } from './types/auth';
 import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
 import QuestionReviewDetail from './components/QuestionReviewDetail';
+import GenerationTasksBar from './components/GenerationTasksBar';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
 // Load Premium PromptLibrary with Upload (falls back to Core version)
@@ -53,9 +55,11 @@ export const AppWithAuth: React.FC = () => {
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
+          <GenerationTasksProvider>
           <BrowserRouter>
             {/* Sentry Test Button (only visible in development) */}
             <ErrorTestButton />
+            <GenerationTasksBar />
             <Routes>
               {/* Public Routes - Only accessible when NOT authenticated */}
               <Route
@@ -247,6 +251,7 @@ export const AppWithAuth: React.FC = () => {
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </BrowserRouter>
+          </GenerationTasksProvider>
         </AuthProvider>
       </QueryClientProvider>
     </AppErrorBoundary>

@@ -291,6 +291,68 @@ class TestRAGAPI:
         )
         assert response.status_code == 422
 
+    def test_generate_exam_job_created_with_topic_and_count(
+        self, mock_processed_document
+    ):
+        """QuestionGenerationJob must be created with topic and question_count populated"""
+        from main import app
+        from database import get_db
+        from utils.auth_utils import get_current_user
+
+        request_data = {
+            "topic": "Heap Sort",
+            "document_ids": [1],
+            "question_count": 5,
+            "question_types": ["multiple_choice"],
+            "difficulty": "medium",
+            "language": "de",
+        }
+
+        mock_db = MagicMock()
+        mock_user = MagicMock()
+        mock_user.id = 99
+        mock_user.has_permission.return_value = True
+        mock_user.institution = MagicMock()
+
+        app.dependency_overrides[get_db] = lambda: mock_db
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+
+        captured_jobs = []
+
+        try:
+            with (
+                patch("api.rag_exams.document_service") as mock_doc_service,
+                patch("api.rag_exams.generate_questions_task") as mock_task,
+                patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+                patch("utils.tenant_utils.SubscriptionLimits"),
+            ):
+                mock_doc_service.get_document_by_id.return_value = (
+                    mock_processed_document
+                )
+                mock_task.apply_async.return_value = MagicMock()
+
+                def capture_job(**kwargs):
+                    job = MagicMock()
+                    job.task_id = kwargs.get("task_id")
+                    job.user_id = kwargs.get("user_id")
+                    job.topic = kwargs.get("topic")
+                    job.question_count = kwargs.get("question_count")
+                    captured_jobs.append(job)
+                    return job
+
+                mock_job_cls.side_effect = capture_job
+
+                response = client.post("/api/v1/rag/generate-exam", json=request_data)
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+        assert len(captured_jobs) == 1
+        job = captured_jobs[0]
+        assert job.topic == "Heap Sort"
+        assert job.question_count == 5
+        assert job.user_id == mock_user.id
+
     def test_generate_rag_exam_broker_unavailable(self, mock_processed_document):
         """Test RAG Exam Generation wenn Celery Broker nicht erreichbar ist"""
         from main import app

@@ -56,6 +56,7 @@ export { default as QuestionReviewCard } from './components/QuestionReviewCard';
 // ============================================================================
 
 export { AuthProvider, useAuth } from './contexts/AuthContext';
+export { GenerationTasksProvider, useGenerationTasks } from './contexts/GenerationTasksContext';
 
 // ============================================================================
 // Hooks
