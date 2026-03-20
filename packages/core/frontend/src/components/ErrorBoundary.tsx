@@ -100,27 +100,3 @@ export const AppErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ chil
     </Sentry.ErrorBoundary>
   );
 };
-
-/**
- * Test Component to trigger errors (only for development/testing)
- */
-export const ErrorTestButton: React.FC = () => {
-  const isDevelopment = process.env.REACT_APP_ENVIRONMENT === 'development';
-
-  if (!isDevelopment) {
-    return null;
-  }
-
-  const triggerError = () => {
-    throw new Error('Test Error: This is a test error triggered manually');
-  };
-
-  return (
-    <button
-      onClick={triggerError}
-      className="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg hover:bg-red-700 transition-colors text-sm"
-    >
-      🐛 Trigger Test Error
-    </button>
-  );
-};
