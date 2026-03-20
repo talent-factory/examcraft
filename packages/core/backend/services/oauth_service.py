@@ -45,13 +45,16 @@ class OAuthService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_authorization_url(self, provider: str, redirect_uri: str) -> str:
+    def get_authorization_url(
+        self, provider: str, redirect_uri: str, state: str = ""
+    ) -> str:
         """
         Generate OAuth authorization URL
 
         Args:
             provider: OAuth provider (google, microsoft)
             redirect_uri: Callback URL after OAuth authorization
+            state: CSRF protection state token
 
         Returns:
             Authorization URL to redirect user to
@@ -69,7 +72,8 @@ class OAuthService:
                 f"client_id={client_id}&"
                 f"redirect_uri={redirect_uri}&"
                 f"response_type=code&"
-                f"scope=openid%20email%20profile"
+                f"scope=openid%20email%20profile&"
+                f"state={state}"
             )
         elif provider == "microsoft":
             client_id = os.getenv("MICROSOFT_CLIENT_ID")
@@ -78,7 +82,8 @@ class OAuthService:
                 f"client_id={client_id}&"
                 f"redirect_uri={redirect_uri}&"
                 f"response_type=code&"
-                f"scope=openid%20email%20profile"
+                f"scope=openid%20email%20profile&"
+                f"state={state}"
             )
         else:
             raise ValueError(f"Unsupported provider: {provider}")

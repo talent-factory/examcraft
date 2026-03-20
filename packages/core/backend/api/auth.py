@@ -981,10 +981,10 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
         # Direct redirect to OAuth provider
         return RedirectResponse(url=authorization_url, status_code=302)
     except Exception as e:
-        logger.error(f"OAuth login failed for {provider}: {str(e)}")
+        logger.error(f"OAuth login failed for {provider}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth login failed: {str(e)}",
+            detail="OAuth-Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
         )
 
 
@@ -1004,6 +1004,27 @@ async def oauth_callback(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported OAuth provider: {provider}",
         )
+
+    # Verify CSRF state parameter
+    state = request.query_params.get("state", "")
+    if state:
+        try:
+            from services.redis_service import RedisService
+
+            redis_client = RedisService.get_session_client()
+            stored = redis_client.get(f"oauth_state:{state}")
+            if not stored:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid OAuth state - possible CSRF attack",
+                )
+            redis_client.delete(f"oauth_state:{state}")
+        except HTTPException:
+            raise
+        except Exception as redis_err:
+            logger.warning(
+                f"Redis unavailable for OAuth state verification: {redis_err}"
+            )
 
     from services.oauth_service import OAuthService
 
@@ -1051,27 +1072,74 @@ async def oauth_callback(
 
         logger.info(f"OAuth login successful for user {user.email} via {provider}")
 
-        # Redirect to frontend with tokens
+        # Redirect to frontend using a short-lived code instead of passing tokens in URL
         from fastapi.responses import RedirectResponse
 
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        redirect_url = (
-            f"{frontend_url}/auth/callback?"
-            f"access_token={tokens['access_token']}&"
-            f"refresh_token={tokens['refresh_token']}&"
-            f"token_type={tokens['token_type']}"
-        )
+        try:
+            from services.redis_service import RedisService
+
+            redis_client = RedisService.get_session_client()
+            oauth_code = secrets.token_urlsafe(32)
+            redis_client.setex(
+                f"oauth_code:{oauth_code}",
+                60,  # 60 seconds TTL
+                json.dumps(tokens),
+            )
+            redirect_url = f"{frontend_url}/auth/callback?code={oauth_code}"
+        except Exception as redis_err:
+            # Fallback if Redis unavailable - use URL params (less secure but functional)
+            logger.warning(
+                f"Redis unavailable for OAuth code exchange, falling back to URL params: {redis_err}"
+            )
+            redirect_url = (
+                f"{frontend_url}/auth/callback?"
+                f"access_token={tokens['access_token']}&"
+                f"refresh_token={tokens['refresh_token']}&"
+                f"token_type={tokens['token_type']}"
+            )
         return RedirectResponse(url=redirect_url)
 
     except ValueError as e:
         logger.error(f"OAuth callback failed for {provider}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"OAuth callback error for {provider}: {str(e)}")
+        logger.error(f"OAuth callback error for {provider}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth authentication failed: {str(e)}",
+            detail="OAuth-Authentifizierung fehlgeschlagen. Bitte erneut versuchen.",
         )
+
+
+class OAuthCodeExchangeRequest(BaseModel):
+    code: str
+
+
+@router.post("/oauth/exchange")
+async def exchange_oauth_code(request: OAuthCodeExchangeRequest):
+    """Exchange a short-lived OAuth code for tokens."""
+    try:
+        from services.redis_service import RedisService
+
+        redis_client = RedisService.get_session_client()
+    except Exception as e:
+        logger.error(f"Redis unavailable for OAuth code exchange: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable")
+
+    key = f"oauth_code:{request.code}"
+    token_data = redis_client.get(key)
+    if not token_data:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+
+    # Delete immediately (single use)
+    redis_client.delete(key)
+
+    try:
+        tokens = json.loads(token_data)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Invalid token data")
+
+    return tokens
 
 
 # ============================================================================

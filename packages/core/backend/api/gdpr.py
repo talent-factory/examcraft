@@ -136,8 +136,13 @@ async def export_user_data(
         }
 
     except Exception as e:
-        logger.error(f"Data export failed for user {current_user.email}: {e}")
-        raise HTTPException(status_code=500, detail=f"Data export failed: {str(e)}")
+        logger.error(
+            f"Data export failed for user {current_user.id}: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Datenexport fehlgeschlagen. Bitte erneut versuchen.",
+        )
 
 
 @router.post("/request-deletion")
@@ -203,10 +208,13 @@ async def request_account_deletion(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Deletion request failed for user {current_user.email}: {e}")
+        logger.error(
+            f"Deletion request failed for user {current_user.id}: {e}", exc_info=True
+        )
         db.rollback()
         raise HTTPException(
-            status_code=500, detail=f"Deletion request failed: {str(e)}"
+            status_code=500,
+            detail="Löschanfrage fehlgeschlagen. Bitte erneut versuchen.",
         )
 
 
@@ -251,10 +259,14 @@ async def cancel_account_deletion(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Deletion cancellation failed for user {current_user.email}: {e}")
+        logger.error(
+            f"Deletion cancellation failed for user {current_user.id}: {e}",
+            exc_info=True,
+        )
         db.rollback()
         raise HTTPException(
-            status_code=500, detail=f"Deletion cancellation failed: {str(e)}"
+            status_code=500,
+            detail="Abbruch der Löschanfrage fehlgeschlagen. Bitte erneut versuchen.",
         )
 
 
@@ -326,8 +338,11 @@ async def delete_account_immediately(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Account deletion failed for user {current_user.email}: {e}")
+        logger.error(
+            f"Account deletion failed for user {current_user.id}: {e}", exc_info=True
+        )
         db.rollback()
         raise HTTPException(
-            status_code=500, detail=f"Account deletion failed: {str(e)}"
+            status_code=500,
+            detail="Kontolöschung fehlgeschlagen. Bitte erneut versuchen.",
         )
