@@ -116,8 +116,8 @@ jobs:
   test-premium:
     name: Test Premium Package
     runs-on: ubuntu-latest
-    # Only run on push to main/develop, NOT on pull requests (submodule access requires token)
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    # Only run when SUBMODULE_TOKEN is configured (private repo access required)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && secrets.SUBMODULE_TOKEN != ''
     continue-on-error: true  # Don't fail pipeline if Premium tests fail (private repo)
 
     services:
