@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, joinedload
 from database import get_db
 from models.exam import Exam, ExamQuestion, ExamStatus
 from models.auth import User
+from models.question_review import QuestionReview, ReviewStatus
 from utils.auth_utils import require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
 import logging
@@ -293,3 +294,182 @@ async def delete_exam(
     db.delete(exam)
     db.commit()
     logger.info(f"Deleted exam {exam_id} by user {current_user.id}")
+
+
+# --- Question Management Schemas ---
+
+
+class AddQuestionsRequest(BaseModel):
+    question_ids: List[int] = Field(..., min_length=1)
+
+
+class UpdateExamQuestionRequest(BaseModel):
+    points: Optional[float] = Field(None, ge=0)
+    section: Optional[str] = Field(None, max_length=100)
+
+
+class ReorderItem(BaseModel):
+    id: int
+    position: int
+
+
+class ReorderRequest(BaseModel):
+    order: List[ReorderItem]
+
+
+# --- Question Management Endpoints ---
+
+
+@router.post("/{exam_id}/questions", response_model=ExamDetailOut)
+async def add_questions(
+    exam_id: int,
+    request: AddQuestionsRequest,
+    current_user: User = Depends(require_permission("exams:create")),
+    db: Session = Depends(get_db),
+):
+    """Add approved questions to exam with auto-suggested points."""
+    exam = _get_exam_or_404(exam_id, db, current_user)
+    _require_draft(exam)
+
+    max_pos = max((eq.position for eq in exam.questions), default=0)
+    existing_qids = {eq.question_id for eq in exam.questions}
+    tenant_context = get_tenant_context(current_user)
+
+    for qid in request.question_ids:
+        if qid in existing_qids:
+            continue  # Skip duplicates silently
+
+        question = db.query(QuestionReview).filter(QuestionReview.id == qid).first()
+        if not question:
+            raise HTTPException(status_code=404, detail=f"Question {qid} not found")
+
+        TenantFilter.verify_tenant_access(question, tenant_context)
+
+        if question.review_status != ReviewStatus.APPROVED.value:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Question {qid} is not approved (status: {question.review_status})",
+            )
+
+        max_pos += 1
+        points = suggest_points(question.question_type, question.difficulty)
+        eq = ExamQuestion(
+            exam_id=exam.id,
+            question_id=qid,
+            position=max_pos,
+            points=points,
+        )
+        db.add(eq)
+        existing_qids.add(qid)
+
+    db.flush()
+    db.refresh(exam)
+    exam.recalculate_total_points()
+    db.commit()
+    db.refresh(exam)
+
+    return _exam_detail_to_out(exam)
+
+
+@router.put("/{exam_id}/questions/{eq_id}", response_model=ExamDetailOut)
+async def update_exam_question(
+    exam_id: int,
+    eq_id: int,
+    request: UpdateExamQuestionRequest,
+    current_user: User = Depends(require_permission("exams:create")),
+    db: Session = Depends(get_db),
+):
+    """Update points or section of a question in the exam."""
+    exam = _get_exam_or_404(exam_id, db, current_user)
+    _require_draft(exam)
+
+    eq = (
+        db.query(ExamQuestion)
+        .filter(ExamQuestion.id == eq_id, ExamQuestion.exam_id == exam_id)
+        .first()
+    )
+    if not eq:
+        raise HTTPException(status_code=404, detail=f"Exam question {eq_id} not found")
+
+    if request.points is not None:
+        eq.points = request.points
+    if request.section is not None:
+        eq.section = request.section
+
+    db.flush()
+    db.refresh(exam)
+    exam.recalculate_total_points()
+    db.commit()
+    db.refresh(exam)
+
+    return _exam_detail_to_out(exam)
+
+
+@router.delete("/{exam_id}/questions/{eq_id}", response_model=ExamDetailOut)
+async def remove_exam_question(
+    exam_id: int,
+    eq_id: int,
+    current_user: User = Depends(require_permission("exams:create")),
+    db: Session = Depends(get_db),
+):
+    """Remove a question from the exam and re-number remaining positions."""
+    exam = _get_exam_or_404(exam_id, db, current_user)
+    _require_draft(exam)
+
+    eq = (
+        db.query(ExamQuestion)
+        .filter(ExamQuestion.id == eq_id, ExamQuestion.exam_id == exam_id)
+        .first()
+    )
+    if not eq:
+        raise HTTPException(status_code=404, detail=f"Exam question {eq_id} not found")
+
+    db.delete(eq)
+
+    # Re-number remaining positions
+    remaining = (
+        db.query(ExamQuestion)
+        .filter(ExamQuestion.exam_id == exam_id)
+        .order_by(ExamQuestion.position)
+        .all()
+    )
+    for i, item in enumerate(remaining, 1):
+        item.position = i
+
+    db.flush()
+    db.refresh(exam)
+    exam.recalculate_total_points()
+    db.commit()
+    db.refresh(exam)
+
+    return _exam_detail_to_out(exam)
+
+
+@router.post("/{exam_id}/reorder", response_model=ExamDetailOut)
+async def reorder_questions(
+    exam_id: int,
+    request: ReorderRequest,
+    current_user: User = Depends(require_permission("exams:create")),
+    db: Session = Depends(get_db),
+):
+    """Batch reorder questions in the exam."""
+    exam = _get_exam_or_404(exam_id, db, current_user)
+    _require_draft(exam)
+
+    eq_map = {eq.id: eq for eq in exam.questions}
+
+    # Temporarily set positions negative to avoid unique constraint violations
+    for eq in exam.questions:
+        eq.position = -eq.position
+    db.flush()
+
+    for item in request.order:
+        if item.id not in eq_map:
+            raise HTTPException(
+                status_code=404, detail=f"Exam question {item.id} not found"
+            )
+        eq_map[item.id].position = item.position
+
+    db.commit()
+    db.refresh(exam)
+    return _exam_detail_to_out(exam)

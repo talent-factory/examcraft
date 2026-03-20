@@ -552,3 +552,245 @@ class TestExamCRUDApi:
             json={"title": "Stale Update", "updated_at": exam["updated_at"]},
         )
         assert response.status_code == 409
+
+
+# ---------------------------------------------------------------------------
+# Task 3: Question Management API Tests
+# ---------------------------------------------------------------------------
+
+
+class TestExamQuestionApi:
+    """Tests for exam question management endpoints — add, update, remove, reorder."""
+
+    @pytest.fixture
+    def exam_db(self, test_engine):
+        """Fresh DB session that supports commit/rollback (no wrapping transaction)."""
+        from sqlalchemy.orm import sessionmaker
+
+        TestSession = sessionmaker(bind=test_engine)
+        session = TestSession()
+        yield session
+        session.close()
+
+    @pytest.fixture
+    def exam_institution(self, exam_db):
+        """Institution created with a committable session."""
+        from models.auth import Institution
+
+        existing = (
+            exam_db.query(Institution).filter_by(slug="examq-test-university").first()
+        )
+        if existing:
+            return existing
+
+        institution = Institution(
+            name="ExamQ Test University",
+            slug="examq-test-university",
+            subscription_tier="professional",
+            max_users=-1,
+            max_documents=-1,
+            max_questions_per_month=-1,
+        )
+        exam_db.add(institution)
+        exam_db.commit()
+        exam_db.refresh(institution)
+        return institution
+
+    @pytest.fixture
+    def exam_user(self, exam_db, exam_institution):
+        """Real user record in the test DB so FK constraints pass."""
+        from models.auth import User, UserStatus
+
+        existing = exam_db.query(User).filter_by(email="examqcrud@test.com").first()
+        if existing:
+            return existing
+
+        user = User(
+            email="examqcrud@test.com",
+            first_name="ExamQ",
+            last_name="CRUD",
+            password_hash="dummy_hash",  # pragma: allowlist secret
+            institution_id=exam_institution.id,
+            status=UserStatus.ACTIVE.value,
+        )
+        exam_db.add(user)
+        exam_db.commit()
+        exam_db.refresh(user)
+        return user
+
+    @pytest.fixture
+    def mock_user(self, exam_institution, exam_user):
+        return _make_mock_user(institution_id=exam_institution.id, user_id=exam_user.id)
+
+    @pytest.fixture
+    def exam_client(self, exam_db, exam_institution, mock_user):
+        """TestClient with auth overrides and committable DB session."""
+        from utils.auth_utils import get_current_user
+        from database import get_db
+        import api.exams as exams_module
+
+        app.include_router(exams_module.router)
+
+        def override_get_db():
+            yield exam_db
+
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = override_get_db
+
+        client = TestClient(app, raise_server_exceptions=True)
+        yield client
+        app.dependency_overrides.clear()
+
+    def _create_approved_question(
+        self,
+        db,
+        institution_id,
+        user_id,
+        text="Test Q",
+        question_type="multiple_choice",
+        difficulty="medium",
+    ):
+        from models.question_review import QuestionReview
+
+        q = QuestionReview(
+            question_text=text,
+            question_type=question_type,
+            difficulty=difficulty,
+            topic="Test",
+            review_status="approved",
+            options=["A", "B", "C", "D"],
+            correct_answer="A",
+            institution_id=institution_id,
+            created_by=user_id,
+        )
+        db.add(q)
+        db.commit()
+        db.refresh(q)
+        return q
+
+    def test_add_questions(self, exam_client, exam_db, exam_institution, exam_user):
+        """POST /{exam_id}/questions adds approved question with auto-suggested points."""
+        # Create exam
+        create_resp = exam_client.post(
+            "/api/v1/exams/", json={"title": "Add Questions Test"}
+        )
+        assert create_resp.status_code == 201
+        exam_id = create_resp.json()["id"]
+
+        # Create approved question (multiple_choice + medium => 4 pts)
+        q = self._create_approved_question(
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            question_type="multiple_choice",
+            difficulty="medium",
+        )
+
+        response = exam_client.post(
+            f"/api/v1/exams/{exam_id}/questions",
+            json={"question_ids": [q.id]},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["questions"]) == 1
+        assert data["questions"][0]["question_id"] == q.id
+        assert data["questions"][0]["points"] == 4.0  # medium MC = 4 pts
+        assert data["total_points"] == 4.0
+
+    def test_add_non_approved_question_fails(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """POST /{exam_id}/questions rejects non-approved (pending) questions."""
+        from models.question_review import QuestionReview
+
+        create_resp = exam_client.post(
+            "/api/v1/exams/", json={"title": "Non-Approved Test"}
+        )
+        assert create_resp.status_code == 201
+        exam_id = create_resp.json()["id"]
+
+        q = QuestionReview(
+            question_text="Pending Q",
+            question_type="open_ended",
+            difficulty="easy",
+            topic="Test",
+            review_status="pending",
+            institution_id=exam_institution.id,
+            created_by=exam_user.id,
+        )
+        exam_db.add(q)
+        exam_db.commit()
+
+        response = exam_client.post(
+            f"/api/v1/exams/{exam_id}/questions",
+            json={"question_ids": [q.id]},
+        )
+        assert response.status_code == 400
+
+    def test_remove_question(self, exam_client, exam_db, exam_institution, exam_user):
+        """DELETE /{exam_id}/questions/{eq_id} removes question and recalculates total_points."""
+        create_resp = exam_client.post(
+            "/api/v1/exams/", json={"title": "Remove Question Test"}
+        )
+        assert create_resp.status_code == 201
+        exam_id = create_resp.json()["id"]
+
+        q = self._create_approved_question(exam_db, exam_institution.id, exam_user.id)
+
+        # Add question
+        exam_client.post(
+            f"/api/v1/exams/{exam_id}/questions",
+            json={"question_ids": [q.id]},
+        )
+
+        # Get exam to find eq_id
+        detail = exam_client.get(f"/api/v1/exams/{exam_id}").json()
+        assert len(detail["questions"]) == 1
+        eq_id = detail["questions"][0]["id"]
+
+        # Remove it
+        response = exam_client.delete(f"/api/v1/exams/{exam_id}/questions/{eq_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["questions"]) == 0
+        assert data["total_points"] == 0.0
+
+    def test_reorder_questions(self, exam_client, exam_db, exam_institution, exam_user):
+        """POST /{exam_id}/reorder swaps positions of two questions."""
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "Reorder Test"})
+        assert create_resp.status_code == 201
+        exam_id = create_resp.json()["id"]
+
+        q1 = self._create_approved_question(
+            exam_db, exam_institution.id, exam_user.id, text="Q1"
+        )
+        q2 = self._create_approved_question(
+            exam_db, exam_institution.id, exam_user.id, text="Q2"
+        )
+
+        # Add both questions
+        exam_client.post(
+            f"/api/v1/exams/{exam_id}/questions",
+            json={"question_ids": [q1.id, q2.id]},
+        )
+
+        # Get current order (q1 at pos 1, q2 at pos 2)
+        detail = exam_client.get(f"/api/v1/exams/{exam_id}").json()
+        eq_ids = [q["id"] for q in detail["questions"]]
+        assert len(eq_ids) == 2
+
+        # Swap: first eq gets position 2, second gets position 1
+        response = exam_client.post(
+            f"/api/v1/exams/{exam_id}/reorder",
+            json={
+                "order": [
+                    {"id": eq_ids[0], "position": 2},
+                    {"id": eq_ids[1], "position": 1},
+                ]
+            },
+        )
+        assert response.status_code == 200
+        questions = response.json()["questions"]
+        # After swap, former second question should now be first
+        assert questions[0]["id"] == eq_ids[1]
+        assert questions[1]["id"] == eq_ids[0]
