@@ -265,6 +265,32 @@ docker compose --env-file .env -f docker-compose.full.yml up -d
 docker compose -f docker-compose.full.yml up -d
 ```
 
+### ⚠️ WICHTIG: Git Submodules beim Push
+
+**Submodule-Commits IMMER vor oder mit dem Parent-Repo pushen!**
+
+Das Repository verwendet Git Submodules (`packages/premium`,
+`packages/enterprise`, `docs-mintlify`). Wenn Submodule-Commits nicht
+gepusht werden, schlägt CI fehl, weil GitHub den referenzierten Commit
+nicht finden kann.
+
+**Git-Konfiguration** (bereits gesetzt):
+
+```bash
+git config push.recurseSubmodules on-demand
+```
+
+Dies sorgt dafür, dass `git push` im Parent-Repo automatisch auch
+ausstehende Submodule-Commits pusht. Falls die Konfiguration fehlt:
+
+```bash
+# Prüfen ob gesetzt:
+git config --get push.recurseSubmodules
+
+# Manuell Submodules pushen:
+git submodule foreach 'git push || true'
+```
+
 ### Code-Standards
 
 - **Python**: PEP 8, Type Hints, Docstrings
