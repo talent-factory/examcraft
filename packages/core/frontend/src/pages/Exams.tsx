@@ -18,10 +18,6 @@ export const Exams: React.FC = () => {
     // Do nothing - let RAGExamCreator handle the display
   };
 
-  const handleBack = () => {
-    console.log('Back to exams');
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -38,7 +34,6 @@ export const Exams: React.FC = () => {
       <RAGExamCreator
         selectedDocuments={[]}
         onExamGenerated={handleExamGenerated}
-        onBack={handleBack}
       />
     </div>
   );

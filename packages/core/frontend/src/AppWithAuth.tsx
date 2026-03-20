@@ -28,7 +28,7 @@ import { BillingPage } from './pages/BillingPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { UserRole } from './types/auth';
-import { AppErrorBoundary, ErrorTestButton } from './components/ErrorBoundary';
+import { AppErrorBoundary } from './components/ErrorBoundary';
 import QuestionReviewDetail from './components/QuestionReviewDetail';
 import GenerationTasksBar from './components/GenerationTasksBar';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
@@ -57,8 +57,6 @@ export const AppWithAuth: React.FC = () => {
         <AuthProvider>
           <GenerationTasksProvider>
           <BrowserRouter>
-            {/* Sentry Test Button (only visible in development) */}
-            <ErrorTestButton />
             <GenerationTasksBar />
             <Routes>
               {/* Public Routes - Only accessible when NOT authenticated */}
