@@ -26,7 +26,7 @@
 1. Gehe zu https://dashboard.stripe.com/test/apikeys
 2. Kopiere:
    - **Publishable key** (beginnt mit `pk_test_...`) - Wird NICHT benötigt (Checkout Session Redirect)
-   - **Secret key** (beginnt mit `sk_test_...`) - WICHTIG! Zur .env hinzufügen
+   - **Secret key** (beginnt mit `sk_test_`) - WICHTIG! Zur .env hinzufügen
 
 ## Schritt 3: Webhook erstellen
 
@@ -38,7 +38,7 @@
    - `checkout.session.completed`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
-5. **After Creation**: Kopiere den **Signing secret** (beginnt mit `whsec_...`)
+5. **After Creation**: Kopiere den **Signing secret** (beginnt mit `whsec_`)
 
 ## Schritt 4: Environment Variables aktualisieren
 
@@ -46,8 +46,8 @@ Füge diese Variablen zu deiner `.env` Datei hinzu:
 
 ```env
 # Stripe Configuration
-STRIPE_SECRET_KEY=sk_test_...  # Dein Secret Key von Schritt 2
-STRIPE_WEBHOOK_SECRET=whsec_...  # Dein Webhook Secret von Schritt 3
+STRIPE_SECRET_KEY=<YOUR_STRIPE_SECRET_KEY>  # Dein Secret Key von Schritt 2
+STRIPE_WEBHOOK_SECRET=<YOUR_STRIPE_WEBHOOK_SECRET>  # Dein Webhook Secret von Schritt 3
 ```
 
 ## Schritt 5: Price IDs im Frontend aktualisieren
@@ -98,7 +98,7 @@ stripe listen --forward-to localhost:8000/api/v1/webhooks/stripe
 Dies gibt dir einen **Webhook Signing Secret** für lokale Tests. Füge diesen zu deiner `.env` hinzu:
 
 ```env
-STRIPE_WEBHOOK_SECRET=whsec_...  # Von stripe listen Befehl
+STRIPE_WEBHOOK_SECRET=<YOUR_STRIPE_WEBHOOK_SECRET>  # Von stripe listen Befehl
 ```
 
 ### Production Deployment

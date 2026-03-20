@@ -37,7 +37,7 @@ Kopiere die **Price ID** (beginnt mit `price_...`)
 ### Schritt 2: API Keys kopieren (1 Minute)
 
 1. Öffne https://dashboard.stripe.com/test/apikeys
-2. Kopiere den **Secret key** (beginnt mit `sk_test_...`)
+2. Kopiere den **Secret key** (beginnt mit `sk_test_`)
 
 ### Schritt 3: Environment Variables setzen (1 Minute)
 
@@ -45,8 +45,8 @@ Füge folgende Zeilen zu deiner `.env` Datei hinzu:
 
 ```env
 # Stripe Configuration
-STRIPE_SECRET_KEY=sk_test_...                    # Dein Secret Key
-STRIPE_WEBHOOK_SECRET=whsec_...                  # Wird im nächsten Schritt generiert
+STRIPE_SECRET_KEY=<YOUR_STRIPE_SECRET_KEY>        # Dein Secret Key
+STRIPE_WEBHOOK_SECRET=<YOUR_STRIPE_WEBHOOK_SECRET>  # Wird im nächsten Schritt generiert
 REACT_APP_STRIPE_PRICE_STARTER=price_...         # Starter Price ID
 REACT_APP_STRIPE_PRICE_PROFESSIONAL=price_...    # Professional Price ID
 ```
@@ -62,12 +62,12 @@ REACT_APP_STRIPE_PRICE_PROFESSIONAL=price_...    # Professional Price ID
 Das Script wird:
 - Stripe CLI mit deinem Backend verbinden
 - Einen **Webhook Signing Secret** generieren
-- Diesen Secret als `whsec_...` ausgeben
+- Diesen Secret als `whsec_<SECRET>` ausgeben
 
 **WICHTIG:** Kopiere den Webhook Secret und füge ihn zu `.env` hinzu:
 
 ```env
-STRIPE_WEBHOOK_SECRET=whsec_...  # Der generierte Secret
+STRIPE_WEBHOOK_SECRET=<YOUR_STRIPE_WEBHOOK_SECRET>  # Der generierte Secret
 ```
 
 Starte dann das Backend neu:
@@ -170,7 +170,7 @@ Für Production:
 
 1. **Verwende Live Mode Keys** (nicht Test Mode)
    ```env
-   STRIPE_SECRET_KEY=sk_live_...
+   STRIPE_SECRET_KEY=<YOUR_STRIPE_LIVE_SECRET_KEY>
    ```
 
 2. **Erstelle Webhook im Dashboard**
@@ -180,8 +180,8 @@ Für Production:
 
 3. **Setze Production Environment Variables**
    ```env
-   STRIPE_SECRET_KEY=sk_live_...
-   STRIPE_WEBHOOK_SECRET=whsec_...  # Aus Stripe Dashboard
+   STRIPE_SECRET_KEY=<YOUR_STRIPE_LIVE_SECRET_KEY>
+   STRIPE_WEBHOOK_SECRET=<YOUR_STRIPE_WEBHOOK_SECRET>  # Aus Stripe Dashboard
    REACT_APP_STRIPE_PRICE_STARTER=price_...
    REACT_APP_STRIPE_PRICE_PROFESSIONAL=price_...
    ```
