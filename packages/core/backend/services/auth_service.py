@@ -20,11 +20,16 @@ logger = logging.getLogger(__name__)
 # JWT Configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
 if not SECRET_KEY:
-    import warnings
-
-    warnings.warn(
-        "JWT_SECRET_KEY not set! Using insecure default. Set JWT_SECRET_KEY in production.",
-        stacklevel=2,
+    _env = os.getenv("ENVIRONMENT", "development")
+    _mode = os.getenv("DEPLOYMENT_MODE", "core")
+    if _env == "production" or _mode == "full":
+        raise RuntimeError(
+            "FATAL: JWT_SECRET_KEY muss in Produktion gesetzt sein. "
+            "Start mit unsicherem Default verweigert."
+        )
+    logger.warning(
+        "JWT_SECRET_KEY nicht gesetzt! Verwende unsicheren Default. "
+        "Dies ist nur in der Entwicklung akzeptabel."
     )
     SECRET_KEY = (
         "insecure-dev-default-do-not-use-in-production"  # pragma: allowlist secret
