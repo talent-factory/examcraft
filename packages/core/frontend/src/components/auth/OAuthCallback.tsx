@@ -7,10 +7,12 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Typography, Alert } from '@mui/material';
 import AuthService from '../../services/AuthService';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const OAuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { loginWithTokens } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(true);
   const hasProcessed = useRef(false);
@@ -59,9 +61,8 @@ export const OAuthCallback: React.FC = () => {
           return;
         }
 
-        console.log('[OAuthCallback] Storing tokens in localStorage...');
-        localStorage.setItem('examcraft_access_token', newAccessToken);
-        localStorage.setItem('examcraft_refresh_token', newRefreshToken);
+        console.log('[OAuthCallback] Setting auth state via context...');
+        await loginWithTokens(newAccessToken, newRefreshToken);
 
         console.log('[OAuthCallback] Redirecting to dashboard...');
         navigate('/dashboard', { replace: true });
@@ -73,7 +74,7 @@ export const OAuthCallback: React.FC = () => {
     };
 
     handleCallback();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, loginWithTokens]);
 
   if (isProcessing) {
     return (
