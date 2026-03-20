@@ -121,7 +121,7 @@ class AuthService {
    */
   async updateProfile(accessToken: string, data: UpdateProfileRequest): Promise<UserResponse> {
     const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -228,16 +228,18 @@ class AuthService {
   }
 
   /**
-   * Handle OAuth callback
+   * Exchange a short-lived OAuth code for tokens
    */
-  async handleOAuthCallback(provider: OAuthProvider, code: string, state: string): Promise<TokenResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/oauth/${provider}/callback?code=${code}&state=${state}`, {
-      method: 'GET',
+  async exchangeOAuthCode(code: string): Promise<TokenResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/oauth/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'OAuth authentication failed');
+      throw new Error(error.detail || 'OAuth code exchange failed');
     }
 
     return response.json();

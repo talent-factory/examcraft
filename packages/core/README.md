@@ -64,8 +64,8 @@ alembic upgrade head
 
 # Frontend Setup
 cd ../frontend
-npm install
-npm start
+bun install
+bun start
 ```
 
 ### Environment Variables

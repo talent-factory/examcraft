@@ -1,13 +1,13 @@
-FROM node:18-alpine
+FROM oven/bun:1-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY packages/core/frontend/package*.json ./
+# Copy package files (bun.lock is at repo root)
+COPY bun.lock packages/core/frontend/package.json ./
 
 # Install dependencies
-RUN npm install
+RUN bun install
 
 # Copy source code
 COPY packages/core/frontend/ ./
@@ -26,4 +26,4 @@ EXPOSE 3000
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Start the application
-CMD ["npm", "start"]
+CMD ["bun", "start"]

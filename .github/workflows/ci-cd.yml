@@ -340,6 +340,11 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
+      - name: Deploy Celery Worker to Fly.io
+        run: flyctl deploy --config fly.celery.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
       - name: Deploy Frontend to Fly.io
         run: flyctl deploy --config fly.frontend.toml --remote-only
         env:

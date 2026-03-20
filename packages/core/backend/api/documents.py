@@ -135,8 +135,10 @@ async def upload_document(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Upload failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        logger.error(f"Upload failed for user {current_user.id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="Upload fehlgeschlagen. Bitte erneut versuchen."
+        )
 
 
 @router.get("/", response_model=DocumentListResponse)
@@ -193,8 +195,12 @@ async def list_documents(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(
+            f"Failed to list documents for user {current_user.id}: {e}", exc_info=True
+        )
         raise HTTPException(
-            status_code=500, detail=f"Failed to list documents: {str(e)}"
+            status_code=500,
+            detail="Dokumente konnten nicht geladen werden. Bitte erneut versuchen.",
         )
 
 
@@ -244,7 +250,14 @@ async def get_document(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get document: {str(e)}")
+        logger.error(
+            f"Failed to get document {document_id} for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Dokument konnte nicht geladen werden. Bitte erneut versuchen.",
+        )
 
 
 @router.get("/{document_id}/download")
@@ -342,9 +355,13 @@ async def download_document(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to download document {document_id}: {str(e)}")
+        logger.error(
+            f"Failed to download document {document_id} for user {current_user.id}: {e}",
+            exc_info=True,
+        )
         raise HTTPException(
-            status_code=500, detail=f"Failed to download document: {str(e)}"
+            status_code=500,
+            detail="Dokument-Download fehlgeschlagen. Bitte erneut versuchen.",
         )
 
 
@@ -410,9 +427,13 @@ async def get_document_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get document status: {str(e)}")
+        logger.error(
+            f"Failed to get document status for document {document_id}: {e}",
+            exc_info=True,
+        )
         raise HTTPException(
-            status_code=500, detail=f"Failed to get document status: {str(e)}"
+            status_code=500,
+            detail="Dokumentstatus konnte nicht abgerufen werden. Bitte erneut versuchen.",
         )
 
 
@@ -485,8 +506,13 @@ async def delete_document(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(
+            f"Failed to delete document {document_id} for user {current_user.id}: {e}",
+            exc_info=True,
+        )
         raise HTTPException(
-            status_code=500, detail=f"Failed to delete document: {str(e)}"
+            status_code=500,
+            detail="Dokument konnte nicht gelöscht werden. Bitte erneut versuchen.",
         )
 
 
@@ -539,8 +565,13 @@ async def process_document(
         }
 
     except Exception as e:
-        logger.error(f"Document processing failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+        logger.error(
+            f"Document processing failed for document {document_id}: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Dokumentverarbeitung fehlgeschlagen. Bitte erneut versuchen.",
+        )
 
 
 @router.get("/{document_id}/content")
@@ -596,7 +627,13 @@ async def get_document_content(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get content: {str(e)}")
+        logger.error(
+            f"Failed to get content for document {document_id}: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Dokumentinhalt konnte nicht geladen werden. Bitte erneut versuchen.",
+        )
 
 
 @router.get("/{document_id}/chunks")
@@ -650,7 +687,13 @@ async def get_document_chunks(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get chunks: {str(e)}")
+        logger.error(
+            f"Failed to get chunks for document {document_id}: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Dokument-Chunks konnten nicht geladen werden. Bitte erneut versuchen.",
+        )
 
 
 @router.get("/{document_id}/chunks-paginated")
@@ -745,8 +788,10 @@ async def get_document_chunks_paginated(
         raise
     except Exception as e:
         logger.error(
-            f"Failed to get paginated chunks for document {document_id}: {str(e)}"
+            f"Failed to get paginated chunks for document {document_id}: {e}",
+            exc_info=True,
         )
         raise HTTPException(
-            status_code=500, detail=f"Failed to get paginated chunks: {str(e)}"
+            status_code=500,
+            detail="Dokument-Chunks konnten nicht geladen werden. Bitte erneut versuchen.",
         )

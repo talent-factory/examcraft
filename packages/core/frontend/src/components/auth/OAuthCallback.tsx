@@ -7,7 +7,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Typography, Alert } from '@mui/material';
 import AuthService from '../../services/AuthService';
-import { OAuthProvider } from '../../types/auth';
 
 export const OAuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -38,22 +37,7 @@ export const OAuthCallback: React.FC = () => {
           return;
         }
 
-        // Check if backend already exchanged tokens (new flow)
-        const accessToken = searchParams.get('access_token');
-        const refreshToken = searchParams.get('refresh_token');
-
-        if (accessToken && refreshToken) {
-          console.log('[OAuthCallback] Tokens received from backend, storing...');
-          localStorage.setItem('examcraft_access_token', accessToken);
-          localStorage.setItem('examcraft_refresh_token', refreshToken);
-          console.log('[OAuthCallback] Redirecting to dashboard...');
-          navigate('/dashboard', { replace: true });
-          return;
-        }
-
-        // Fallback: Old flow with code exchange (for compatibility)
         const code = searchParams.get('code');
-        const state = searchParams.get('state');
 
         if (!code) {
           console.error('[OAuthCallback] No authorization code or tokens received');
@@ -64,11 +48,8 @@ export const OAuthCallback: React.FC = () => {
 
         console.log('[OAuthCallback] Exchanging code for tokens...');
 
-        // Extract provider from state or URL path
-        const provider: OAuthProvider = (state || window.location.pathname.split('/')[2] || 'google') as OAuthProvider;
-
-        // Exchange code for tokens
-        const response = await AuthService.handleOAuthCallback(provider, code, state || '');
+        // Exchange short-lived OAuth code for tokens via dedicated endpoint
+        const response = await AuthService.exchangeOAuthCode(code);
         const { access_token: newAccessToken, refresh_token: newRefreshToken } = response;
 
         if (!newAccessToken || !newRefreshToken) {

@@ -540,7 +540,7 @@ include::../diagrams/deployment.puml[]
 # Multi-stage build for optimization
 FROM node:18-alpine AS frontend-builder
 COPY frontend/ .
-RUN npm ci --only=production && npm run build
+RUN bun install --frozen-lockfile && bun run build
 
 FROM python:3.13-slim AS backend-builder
 COPY backend/ .

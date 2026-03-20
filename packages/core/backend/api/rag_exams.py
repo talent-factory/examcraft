@@ -18,6 +18,7 @@ import services.rag_service as rag_service_module
 from services.rag_service import RAGExamRequest
 from services.document_service import document_service
 from models.auth import User
+from models.document import Document, DocumentStatus
 from models.question_generation_job import QuestionGenerationJob
 from tasks.question_tasks import generate_questions_task
 from schemas.task import GenerateExamTaskResponse
@@ -26,6 +27,7 @@ from utils.auth_utils import (
     get_current_active_user,
     require_permission,
 )
+from utils.tenant_utils import TenantFilter, get_tenant_context
 import logging
 
 logger = logging.getLogger(__name__)
@@ -147,6 +149,7 @@ async def generate_rag_exam(
     try:
         # Validiere Document IDs falls angegeben
         if request.document_ids:
+            tenant_context = get_tenant_context(current_user)
             for doc_id in request.document_ids:
                 document = document_service.get_document_by_id(doc_id, db)
                 if not document:
@@ -154,9 +157,10 @@ async def generate_rag_exam(
                         status_code=404, detail=f"Document with ID {doc_id} not found"
                     )
 
-                # Prüfe ob Dokument verarbeitet ist
-                from models.document import DocumentStatus
+                # Tenant-Check: Dokument muss zur Institution des Users gehoeren
+                TenantFilter.verify_tenant_access(document, tenant_context)
 
+                # Prüfe ob Dokument verarbeitet ist
                 if document.status != DocumentStatus.PROCESSED:
                     raise HTTPException(
                         status_code=400,
@@ -276,12 +280,16 @@ async def retrieve_context(
     try:
         # Validiere Document IDs falls angegeben
         if request.document_ids:
+            tenant_context = get_tenant_context(current_user)
             for doc_id in request.document_ids:
                 document = document_service.get_document_by_id(doc_id, db)
                 if not document:
                     raise HTTPException(
                         status_code=404, detail=f"Document with ID {doc_id} not found"
                     )
+
+                # Tenant-Check: Dokument muss zur Institution des Users gehoeren
+                TenantFilter.verify_tenant_access(document, tenant_context)
 
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
         context = await rag_service_module.rag_service.retrieve_context(
@@ -328,15 +336,21 @@ async def get_available_documents(
     - **processed_only**: Nur verarbeitete Dokumente anzeigen (empfohlen)
     """
     try:
-        # Hole alle Dokumente des aktuellen Users
-        documents = document_service.get_documents_by_user(str(current_user.id), db)
+        if not current_user.institution:
+            raise HTTPException(
+                status_code=403,
+                detail="You must be associated with an institution to view documents.",
+            )
+
+        # Tenant-aware: Alle Dokumente der Institution (konsistent mit list_documents)
+        tenant_context = get_tenant_context(current_user)
+        query = db.query(Document)
+        query = TenantFilter.filter_by_tenant(query, Document, tenant_context)
 
         if processed_only:
-            from models.document import DocumentStatus
+            query = query.filter(Document.status == DocumentStatus.PROCESSED)
 
-            documents = [
-                doc for doc in documents if doc.status == DocumentStatus.PROCESSED
-            ]
+        documents = query.order_by(Document.created_at.desc()).all()
 
         # Konvertiere zu Response Format
         available_docs = []
@@ -375,6 +389,8 @@ async def get_available_documents(
             "documents": available_docs,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get available documents: {e}", exc_info=True)
         raise HTTPException(
