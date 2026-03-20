@@ -8,7 +8,7 @@ import {
   TextField,
   Button,
 } from '@mui/material';
-import { ComposerService } from '../../services/ComposerService';
+import { ComposerService, getErrorMessage } from '../../services/ComposerService';
 import type { ExamDetail, UpdateExamRequest } from '../../types/composer';
 import { ExamStatus } from '../../types/composer';
 
@@ -51,6 +51,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
     instructions: '',
     passing_percentage: '',
   });
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
 
   const openEdit = () => {
     setForm({
@@ -71,16 +72,31 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       setEditOpen(false);
       onInvalidate();
     },
+    onError: (err) => {
+      setFinalizeError(getErrorMessage(err, 'Fehler beim Speichern. Bitte lade die Seite neu und versuche es erneut.'));
+    },
   });
 
   const finalizeMutation = useMutation({
     mutationFn: () => ComposerService.finalizeExam(exam.id),
-    onSuccess: onInvalidate,
+    onSuccess: () => {
+      setFinalizeError(null);
+      onInvalidate();
+    },
+    onError: (err) => {
+      setFinalizeError(getErrorMessage(err, 'Finalisierung fehlgeschlagen. Bitte versuche es erneut.'));
+    },
   });
 
   const unfinalizeMutation = useMutation({
     mutationFn: () => ComposerService.unfinalizeExam(exam.id),
-    onSuccess: onInvalidate,
+    onSuccess: () => {
+      setFinalizeError(null);
+      onInvalidate();
+    },
+    onError: (err) => {
+      setFinalizeError(getErrorMessage(err, 'Zurücksetzen fehlgeschlagen. Bitte versuche es erneut.'));
+    },
   });
 
   const handleSave = () => {
@@ -137,43 +153,49 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-          {isDraft && (
-            <button
-              onClick={openEdit}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Metadaten bearbeiten
-            </button>
-          )}
+        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {isDraft && (
+              <button
+                onClick={openEdit}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Metadaten bearbeiten
+              </button>
+            )}
 
-          {isDraft && (
-            <button
-              onClick={() => finalizeMutation.mutate()}
-              disabled={finalizeMutation.isPending}
-              className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-            >
-              {finalizeMutation.isPending ? 'Finalisiere...' : 'Finalisieren'}
-            </button>
-          )}
+            {isDraft && (
+              <button
+                onClick={() => { setFinalizeError(null); finalizeMutation.mutate(); }}
+                disabled={finalizeMutation.isPending}
+                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              >
+                {finalizeMutation.isPending ? 'Finalisiere...' : 'Finalisieren'}
+              </button>
+            )}
 
-          {isFinalized && (
-            <button
-              onClick={() => unfinalizeMutation.mutate()}
-              disabled={unfinalizeMutation.isPending}
-              className="px-3 py-1.5 text-sm border border-yellow-500 text-yellow-700 rounded-lg hover:bg-yellow-50 transition-colors disabled:opacity-50"
-            >
-              {unfinalizeMutation.isPending ? 'Zurücksetzen...' : 'Als Entwurf markieren'}
-            </button>
-          )}
+            {isFinalized && (
+              <button
+                onClick={() => { setFinalizeError(null); unfinalizeMutation.mutate(); }}
+                disabled={unfinalizeMutation.isPending}
+                className="px-3 py-1.5 text-sm border border-yellow-500 text-yellow-700 rounded-lg hover:bg-yellow-50 transition-colors disabled:opacity-50"
+              >
+                {unfinalizeMutation.isPending ? 'Zurücksetzen...' : 'Als Entwurf markieren'}
+              </button>
+            )}
 
-          <button
-            onClick={onExport}
-            disabled={exam.question_count === 0}
-            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Exportieren
-          </button>
+            <button
+              onClick={onExport}
+              disabled={exam.question_count === 0}
+              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Exportieren
+            </button>
+          </div>
+
+          {finalizeError && (
+            <p className="text-red-500 text-sm text-right max-w-xs">{finalizeError}</p>
+          )}
         </div>
       </div>
 
@@ -235,10 +257,8 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
               onChange={(e) => setForm({ ...form, passing_percentage: e.target.value })}
             />
           </div>
-          {updateMutation.isError && (
-            <p className="text-red-500 text-sm mt-2">
-              Fehler beim Speichern. Bitte lade die Seite neu und versuche es erneut.
-            </p>
+          {updateMutation.isError && finalizeError && (
+            <p className="text-red-500 text-sm mt-2">{finalizeError}</p>
           )}
         </DialogContent>
         <DialogActions>

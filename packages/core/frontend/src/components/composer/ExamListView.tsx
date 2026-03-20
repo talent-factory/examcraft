@@ -8,7 +8,7 @@ import {
   TextField,
   Button,
 } from '@mui/material';
-import { ComposerService } from '../../services/ComposerService';
+import { ComposerService, getErrorMessage } from '../../services/ComposerService';
 import type { CreateExamRequest } from '../../types/composer';
 
 interface ExamListViewProps {
@@ -32,8 +32,9 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<CreateExamRequest>({ title: '', language: 'de' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError: isQueryError } = useQuery({
     queryKey: ['exams', searchQuery],
     queryFn: () => ComposerService.listExams({ search: searchQuery || undefined }),
   });
@@ -46,11 +47,17 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
       setForm({ title: '', language: 'de' });
       onSelectExam(exam.id);
     },
+    onError: (err) => {
+      setError(getErrorMessage(err, 'Prüfung konnte nicht erstellt werden. Bitte versuche es erneut.'));
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: ComposerService.deleteExam,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exams'] }),
+    onError: (err) => {
+      setError(getErrorMessage(err, 'Prüfung konnte nicht gelöscht werden. Bitte versuche es erneut.'));
+    },
   });
 
   const handleCreate = () => {
@@ -84,6 +91,20 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
         </button>
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex justify-between items-center">
+          <span>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="ml-4 text-red-500 hover:text-red-700 font-bold text-lg leading-none"
+            aria-label="Fehlermeldung schliessen"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {/* Search */}
       <div>
         <input
@@ -98,6 +119,12 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
       {/* Exam Grid */}
       {isLoading ? (
         <div className="text-center py-12 text-gray-500">Lade Prüfungen...</div>
+      ) : isQueryError ? (
+        <div className="card p-12 text-center">
+          <p className="text-red-500 text-lg">
+            Fehler beim Laden der Prüfungen. Bitte lade die Seite neu.
+          </p>
+        </div>
       ) : !data?.exams.length ? (
         <div className="card p-12 text-center">
           <p className="text-gray-500 text-lg">

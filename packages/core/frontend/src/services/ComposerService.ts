@@ -11,6 +11,20 @@ import type {
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
+/**
+ * Extracts a human-readable error message from an Axios error response.
+ * Falls back to the provided fallback string if no detail is available.
+ */
+export const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const axiosError = error as { response?: { data?: { detail?: string } } };
+    if (axiosError.response?.data?.detail) {
+      return axiosError.response.data.detail;
+    }
+  }
+  return fallback;
+};
+
 const apiClient = axios.create({
   baseURL: API_BASE,
   timeout: 30000,
