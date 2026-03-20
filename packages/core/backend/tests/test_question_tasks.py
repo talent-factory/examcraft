@@ -192,3 +192,56 @@ def test_generate_questions_task_rejects_when_rag_service_unavailable():
             assert False, "Reject hätte geworfen werden sollen"
         except Reject as e:
             assert e.requeue is False
+
+
+def test_update_job_status_sets_success():
+    """_update_job_status should set job.status to SUCCESS and commit."""
+    with patch("database.SessionLocal") as mock_session_cls:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_job = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            mock_job
+        )
+
+        from tasks.question_tasks import _update_job_status
+
+        _update_job_status("test-task-id", "SUCCESS")
+
+        assert mock_job.status == "SUCCESS"
+        mock_session.commit.assert_called_once()
+        mock_session.close.assert_called_once()
+
+
+def test_update_job_status_sets_failure():
+    """_update_job_status should set job.status to FAILURE and commit."""
+    with patch("database.SessionLocal") as mock_session_cls:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_job = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = (
+            mock_job
+        )
+
+        from tasks.question_tasks import _update_job_status
+
+        _update_job_status("test-task-id", "FAILURE")
+
+        assert mock_job.status == "FAILURE"
+        mock_session.commit.assert_called_once()
+        mock_session.close.assert_called_once()
+
+
+def test_update_job_status_handles_missing_job():
+    """_update_job_status should not crash if job not found."""
+    with patch("database.SessionLocal") as mock_session_cls:
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_session.query.return_value.filter_by.return_value.first.return_value = None
+
+        from tasks.question_tasks import _update_job_status
+
+        _update_job_status("nonexistent-task", "SUCCESS")
+
+        mock_session.commit.assert_not_called()
+        mock_session.close.assert_called_once()

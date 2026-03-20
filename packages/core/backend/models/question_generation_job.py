@@ -20,3 +20,10 @@ class QuestionGenerationJob(Base):
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    topic = Column(String, nullable=True)
+    question_count = Column(Integer, nullable=True)
+    status = Column(String, default="PENDING", server_default="PENDING", nullable=False)
+
+    def __init__(self, **kwargs: object) -> None:
+        kwargs.setdefault("status", "PENDING")
+        super().__init__(**kwargs)

@@ -141,3 +141,40 @@ export interface QuestionTypesResponse {
   difficulty_levels: DifficultyLevel[];
   supported_languages: SupportedLanguage[];
 }
+
+/** State of a single generation task tracked by GenerationTasksContext */
+export interface GenerationTaskState {
+  taskId: string;
+  status: 'PENDING' | 'STARTED' | 'PROGRESS' | 'SUCCESS' | 'FAILURE' | 'REVOKED' | 'RETRY' | 'UNKNOWN';
+  progress: number;
+  message: string | null;
+  topic: string | null;
+  questionCount: number | null;
+  createdAt: string;
+  result: RAGExamResponse | null;
+}
+
+/** Response from GET /api/v1/rag/active-tasks */
+export interface ActiveTaskInfo {
+  task_id: string;
+  status: string;
+  progress: number;
+  message: string | null;
+  created_at: string;
+  topic: string | null;
+  question_count: number | null;
+}
+
+export interface ActiveTasksResponse {
+  tasks: ActiveTaskInfo[];
+}
+
+/** Context value exposed by GenerationTasksContext */
+export interface GenerationTasksContextType {
+  tasks: Record<string, GenerationTaskState>;
+  activeTasks: GenerationTaskState[];
+  completedTasks: GenerationTaskState[];
+  startGeneration: (request: RAGExamRequest) => Promise<string>;
+  dismissTask: (taskId: string) => void;
+  getTask: (taskId: string) => GenerationTaskState | undefined;
+}
