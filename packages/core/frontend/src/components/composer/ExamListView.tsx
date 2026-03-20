@@ -130,7 +130,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
               <div className="flex gap-4 mt-3 text-sm text-gray-600">
                 <span>{exam.question_count} Fragen</span>
                 <span>{exam.total_points} Punkte</span>
-                {exam.exam_date && <span>{new Date(exam.exam_date).toLocaleDateString('de-CH')}</span>}
+                {exam.exam_date && <span>{new Date(exam.exam_date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>}
               </div>
               {exam.status === 'draft' && (
                 <button
