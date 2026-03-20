@@ -102,8 +102,11 @@ def create_tables():
             try:
                 from premium.models.prompt import Prompt  # noqa: F401
                 from premium.models.chat_db import ChatSession  # noqa: F401
+                from premium.models.wizard import WizardSession, WizardMessage  # noqa: F401
 
-                print("✅ Premium models imported (Prompt Knowledge Base + ChatBot)")
+                print(
+                    "✅ Premium models imported (Prompt Knowledge Base + ChatBot + Wizard)"
+                )
             except ImportError as ie:
                 print(f"⚠️  Premium models import failed: {ie}")
         else:
