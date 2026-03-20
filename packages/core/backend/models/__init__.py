@@ -43,6 +43,7 @@ from models.email_event import (
     EmailEventType,
     EmailType,
 )
+from models.exam import Exam, ExamQuestion, ExamStatus
 
 __all__ = [
     "Document",
@@ -75,4 +76,8 @@ __all__ = [
     "EmailSuppressionList",
     "EmailEventType",
     "EmailType",
+    # Exam Composer Models
+    "Exam",
+    "ExamQuestion",
+    "ExamStatus",
 ]
