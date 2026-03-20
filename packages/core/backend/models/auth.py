@@ -273,6 +273,7 @@ class User(Base):
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     last_login_ip = Column(String(45), nullable=True)  # IPv6 support
     failed_login_attempts = Column(Integer, default=0, nullable=False)
+    last_failed_login = Column(DateTime(timezone=True), nullable=True)
     locked_until = Column(DateTime(timezone=True), nullable=True)
 
     # Password Reset

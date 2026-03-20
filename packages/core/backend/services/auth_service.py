@@ -18,7 +18,22 @@ from services.redis_service import SessionStore, TokenBlacklist
 logger = logging.getLogger(__name__)
 
 # JWT Configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
+if not SECRET_KEY:
+    _env = os.getenv("ENVIRONMENT", "development")
+    _mode = os.getenv("DEPLOYMENT_MODE", "core")
+    if _env == "production" or _mode == "full":
+        raise RuntimeError(
+            "FATAL: JWT_SECRET_KEY muss in Produktion gesetzt sein. "
+            "Start mit unsicherem Default verweigert."
+        )
+    logger.warning(
+        "JWT_SECRET_KEY nicht gesetzt! Verwende unsicheren Default. "
+        "Dies ist nur in der Entwicklung akzeptabel."
+    )
+    SECRET_KEY = (
+        "insecure-dev-default-do-not-use-in-production"  # pragma: allowlist secret
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))

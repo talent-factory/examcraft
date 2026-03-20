@@ -3,15 +3,19 @@ Authentication API Endpoints
 Login, Logout, Register, Profile, Password Reset
 """
 
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
 from fastapi.responses import Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List
 import logging
 import os
+import re
+import json
+import secrets
 
 from database import get_db
 from models.auth import User, Role, Institution, UserStatus, UserRole
@@ -38,6 +42,11 @@ class RegisterRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
     institution_slug: Optional[str] = None  # Optional: join existing institution
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 class LoginRequest(BaseModel):
@@ -67,11 +76,27 @@ class PasswordResetRequest(BaseModel):
     email: EmailStr
 
 
+def _validate_password_strength(v: str) -> str:
+    """Shared password strength validator."""
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Passwort muss mindestens einen Grossbuchstaben enthalten")
+    if not re.search(r"[a-z]", v):
+        raise ValueError("Passwort muss mindestens einen Kleinbuchstaben enthalten")
+    if not re.search(r"\d", v):
+        raise ValueError("Passwort muss mindestens eine Zahl enthalten")
+    return v
+
+
 class PasswordResetConfirm(BaseModel):
     """Password reset confirmation"""
 
     token: str
     new_password: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 class SetPasswordRequest(BaseModel):
@@ -79,12 +104,22 @@ class SetPasswordRequest(BaseModel):
 
     password: str = Field(..., min_length=8, max_length=100)
 
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
+
 
 class PasswordChangeRequest(BaseModel):
     """Password change request (authenticated user)"""
 
     current_password: str
     new_password: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 class RoleResponse(BaseModel):
@@ -317,11 +352,50 @@ async def login(
             detail="Incorrect email or password",
         )
 
+    # Account lockout check
+    MAX_FAILED_ATTEMPTS = 10
+    LOCKOUT_DURATION_SECONDS = 30 * 60  # 30 minutes
+
+    if (user.failed_login_attempts or 0) >= MAX_FAILED_ATTEMPTS:
+        if (
+            user.last_failed_login
+            and (datetime.now(timezone.utc) - user.last_failed_login).total_seconds()
+            < LOCKOUT_DURATION_SECONDS
+        ):
+            AuditService.log_login(
+                db,
+                user.id,
+                success=False,
+                request=http_request,
+                error_message="Account locked due to too many failed attempts",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie 30 Minuten.",
+            )
+        else:
+            # Lockout period expired, reset counter
+            user.failed_login_attempts = 0
+            try:
+                db.commit()
+            except Exception as commit_err:
+                logger.error(
+                    f"Failed to reset lockout counter for user {user.id}: {commit_err}"
+                )
+                db.rollback()
+
     # Verify password
     if not AuthService.verify_password(request.password, user.password_hash):
         # Increment failed login attempts
         user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
-        db.commit()
+        user.last_failed_login = datetime.now(timezone.utc)
+        try:
+            db.commit()
+        except Exception as commit_err:
+            logger.error(
+                f"Failed to persist login attempt counter for user {user.id}: {commit_err}"
+            )
+            db.rollback()
 
         # Audit log: Failed login (wrong password)
         AuditService.log_login(
@@ -345,6 +419,7 @@ async def login(
 
     # Reset failed login attempts
     user.failed_login_attempts = 0
+    user.last_failed_login = None
     # Track login
     user.last_login_at = func.now()
     user.last_login_ip = http_request.client.host if http_request.client else None
@@ -426,7 +501,6 @@ async def get_current_user_profile(
     - Returns user information
     - Includes institution and roles with permissions
     """
-    import json
 
     # Build role responses with parsed permissions
     role_responses = []
@@ -521,8 +595,6 @@ async def update_current_user_profile(
             db.refresh(current_user)  # Re-sync after potential rollback in AuditService
 
     logger.info(f"User profile updated: {current_user.email} (ID: {current_user.id})")
-
-    import json
 
     # Build role responses with parsed permissions
     role_responses = []
@@ -915,14 +987,30 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
     redirect_uri = f"{base_url}/api/auth/oauth/{provider}/callback"
 
     try:
-        authorization_url = oauth_service.get_authorization_url(provider, redirect_uri)
+        # Generate CSRF state token and store in Redis
+        state = secrets.token_urlsafe(32)
+        try:
+            from services.redis_service import RedisService
+
+            redis_client = RedisService.get_session_client()
+            redis_client.setex(f"oauth_state:{state}", 600, "valid")  # 10 min TTL
+        except Exception as redis_err:
+            logger.error(f"Redis unavailable for OAuth state storage: {redis_err}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentifizierungsdienst voruebergehend nicht verfuegbar.",
+            )
+
+        authorization_url = oauth_service.get_authorization_url(
+            provider, redirect_uri, state=state
+        )
         # Direct redirect to OAuth provider
         return RedirectResponse(url=authorization_url, status_code=302)
     except Exception as e:
-        logger.error(f"OAuth login failed for {provider}: {str(e)}")
+        logger.error(f"OAuth login failed for {provider}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth login failed: {str(e)}",
+            detail="OAuth-Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
         )
 
 
@@ -941,6 +1029,33 @@ async def oauth_callback(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported OAuth provider: {provider}",
+        )
+
+    # Verify CSRF state parameter (required)
+    state = request.query_params.get("state", "")
+    if not state:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing OAuth state parameter",
+        )
+    try:
+        from services.redis_service import RedisService
+
+        redis_client = RedisService.get_session_client()
+        stored = redis_client.get(f"oauth_state:{state}")
+        if not stored:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid OAuth state - possible CSRF attack",
+            )
+        redis_client.delete(f"oauth_state:{state}")
+    except HTTPException:
+        raise
+    except Exception as redis_err:
+        logger.error(f"Redis unavailable for OAuth state verification: {redis_err}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentifizierungsdienst voruebergehend nicht verfuegbar.",
         )
 
     from services.oauth_service import OAuthService
@@ -989,27 +1104,76 @@ async def oauth_callback(
 
         logger.info(f"OAuth login successful for user {user.email} via {provider}")
 
-        # Redirect to frontend with tokens
+        # Redirect to frontend using a short-lived code instead of passing tokens in URL
         from fastapi.responses import RedirectResponse
 
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        redirect_url = (
-            f"{frontend_url}/auth/callback?"
-            f"access_token={tokens['access_token']}&"
-            f"refresh_token={tokens['refresh_token']}&"
-            f"token_type={tokens['token_type']}"
-        )
+        try:
+            from services.redis_service import RedisService
+
+            redis_client = RedisService.get_session_client()
+            oauth_code = secrets.token_urlsafe(32)
+            redis_client.setex(
+                f"oauth_code:{oauth_code}",
+                60,  # 60 seconds TTL
+                json.dumps(tokens),
+            )
+            redirect_url = f"{frontend_url}/auth/callback?code={oauth_code}"
+        except Exception as redis_err:
+            logger.error(f"Redis unavailable for OAuth code exchange: {redis_err}")
+            redirect_url = f"{frontend_url}/auth/callback?error=service_unavailable"
         return RedirectResponse(url=redirect_url)
 
     except ValueError as e:
         logger.error(f"OAuth callback failed for {provider}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OAuth-Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
+        )
     except Exception as e:
-        logger.error(f"OAuth callback error for {provider}: {str(e)}")
+        logger.error(f"OAuth callback error for {provider}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth authentication failed: {str(e)}",
+            detail="OAuth-Authentifizierung fehlgeschlagen. Bitte erneut versuchen.",
         )
+
+
+class OAuthCodeExchangeRequest(BaseModel):
+    code: str
+
+
+@router.post("/oauth/exchange")
+async def exchange_oauth_code(request: OAuthCodeExchangeRequest):
+    """Exchange a short-lived OAuth code for tokens."""
+    try:
+        from services.redis_service import RedisService
+
+        redis_client = RedisService.get_session_client()
+    except Exception as e:
+        logger.error(f"Redis unavailable for OAuth code exchange: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable")
+
+    key = f"oauth_code:{request.code}"
+    try:
+        # Atomic get-and-delete to prevent TOCTOU race (single-use code)
+        token_data = redis_client.getdel(key)
+    except AttributeError:
+        # Redis < 6.2 fallback
+        token_data = redis_client.get(key)
+        if token_data:
+            redis_client.delete(key)
+    except Exception as e:
+        logger.error(f"Redis error during OAuth code exchange: {e}", exc_info=True)
+        raise HTTPException(status_code=503, detail="Service unavailable")
+    if not token_data:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+
+    try:
+        tokens = json.loads(token_data)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Invalid token data")
+
+    return tokens
 
 
 # ============================================================================
