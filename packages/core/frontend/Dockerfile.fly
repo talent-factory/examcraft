@@ -27,7 +27,7 @@ WORKDIR /app/packages/core/frontend
 COPY bun.lock packages/core/frontend/package.json ./
 
 # Install all dependencies (including devDependencies for build)
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy core source code
 COPY packages/core/frontend/ ./

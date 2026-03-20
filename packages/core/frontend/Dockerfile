@@ -7,7 +7,7 @@ WORKDIR /app
 COPY bun.lock packages/core/frontend/package.json ./
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy source code
 COPY packages/core/frontend/ ./
