@@ -301,7 +301,7 @@ services:
     environment:
       CELERY_BROKER_URL: amqp://examcraft:examcraft_dev@rabbitmq:5672/ # pragma: allowlist secret
       CELERY_RESULT_BACKEND: redis://redis:6379/3
-      FLOWER_UNAUTHENTICATED_API: "true"
+      FLOWER_BASIC_AUTH: "${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-examcraft_flower_2026}"
     ports:
       - "5555:5555"
     depends_on:
@@ -311,7 +311,7 @@ services:
         condition: service_healthy
     networks:
       - examcraft_network
-    command: celery -A celery_app flower --port=5555 --broker_api=http://examcraft:examcraft_dev@rabbitmq:15672/api/ # pragma: allowlist secret
+    command: celery -A celery_app flower --port=5555 --broker_api=http://examcraft:examcraft_dev@rabbitmq:15672/api/ --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-examcraft_flower_2026} # pragma: allowlist secret
 
   # Frontend (Full Version: Core + Premium + Enterprise)
   frontend:
