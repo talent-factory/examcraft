@@ -150,6 +150,12 @@ async def lifespan(app: FastAPI):
     question_review = importlib.util.module_from_spec(spec_qr)
     spec_qr.loader.exec_module(question_review)
 
+    spec_exams = importlib.util.spec_from_file_location(
+        "core_api_exams", os.path.join(core_api_path, "exams.py")
+    )
+    exams_api = importlib.util.module_from_spec(spec_exams)
+    spec_exams.loader.exec_module(exams_api)
+
     spec_auth = importlib.util.spec_from_file_location(
         "core_api_auth", os.path.join(core_api_path, "auth.py")
     )
@@ -209,6 +215,7 @@ async def lifespan(app: FastAPI):
     app.include_router(rag_exams.router)
     app.include_router(rbac_api.router)
     app.include_router(question_review.router)
+    app.include_router(exams_api.router)
     app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["billing"])
     app.include_router(
         webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"]
