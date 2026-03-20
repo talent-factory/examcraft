@@ -21,8 +21,10 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
     queryFn: () => ComposerService.getExam(examId),
   });
 
-  const invalidateExam = () =>
+  const invalidateExam = () => {
     queryClient.invalidateQueries({ queryKey: ['exam', examId] });
+    queryClient.invalidateQueries({ queryKey: ['exams'] });
+  };
 
   const addMutation = useMutation({
     mutationFn: (qIds: number[]) => ComposerService.addQuestions(examId, qIds),
