@@ -5,8 +5,9 @@ CRUD, question management, auto-fill, finalize, and export.
 
 from typing import List, Optional
 from datetime import date, datetime
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from pydantic import BaseModel, Field
+from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
@@ -15,6 +16,11 @@ from models.auth import User
 from models.question_review import QuestionReview, ReviewStatus
 from utils.auth_utils import require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
+from services.exam_export_service import (
+    MarkdownExporter,
+    JsonExporter,
+    MoodleXmlExporter,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -237,6 +243,91 @@ async def list_exams(
         total=total,
         exams=[_exam_to_out(e) for e in exams],
     )
+
+
+# --- Approved Questions Schemas (must be before /{exam_id} routes!) ---
+
+
+class ApprovedQuestionOut(BaseModel):
+    id: int
+    question_text: str
+    question_type: str
+    difficulty: str
+    topic: str
+    bloom_level: Optional[int]
+    options: Optional[list]
+    usage_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class ApprovedQuestionsListOut(BaseModel):
+    total: int
+    questions: List[ApprovedQuestionOut]
+
+
+@router.get("/approved-questions", response_model=ApprovedQuestionsListOut)
+async def list_approved_questions(
+    topic: Optional[str] = None,
+    difficulty: Optional[str] = Query(None, pattern="^(easy|medium|hard)$"),
+    bloom_level: Optional[int] = Query(None, ge=1, le=6),
+    question_type: Optional[str] = Query(
+        None, pattern="^(multiple_choice|open_ended|true_false)$"
+    ),
+    search: Optional[str] = Query(None, max_length=500),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(require_permission("exams:create")),
+    db: Session = Depends(get_db),
+):
+    """Browse approved questions for exam composition."""
+    tenant_context = get_tenant_context(current_user)
+    query = db.query(QuestionReview).filter(
+        QuestionReview.review_status == ReviewStatus.APPROVED.value
+    )
+    query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
+
+    if topic:
+        query = query.filter(QuestionReview.topic.ilike(f"%{topic}%"))
+    if difficulty:
+        query = query.filter(QuestionReview.difficulty == difficulty)
+    if bloom_level:
+        query = query.filter(QuestionReview.bloom_level == bloom_level)
+    if question_type:
+        query = query.filter(QuestionReview.question_type == question_type)
+    if search:
+        query = query.filter(QuestionReview.question_text.ilike(f"%{search}%"))
+
+    total = query.count()
+    questions = (
+        query.order_by(QuestionReview.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
+
+    result = []
+    for q in questions:
+        usage_count = (
+            db.query(sa_func.count(ExamQuestion.id))
+            .filter(ExamQuestion.question_id == q.id)
+            .scalar()
+        )
+        result.append(
+            {
+                "id": q.id,
+                "question_text": q.question_text,
+                "question_type": q.question_type,
+                "difficulty": q.difficulty,
+                "topic": q.topic,
+                "bloom_level": q.bloom_level,
+                "options": q.options,
+                "usage_count": usage_count,
+            }
+        )
+
+    return ApprovedQuestionsListOut(total=total, questions=result)
 
 
 @router.get("/{exam_id}", response_model=ExamDetailOut)
@@ -473,3 +564,182 @@ async def reorder_questions(
     db.commit()
     db.refresh(exam)
     return _exam_detail_to_out(exam)
+
+
+# --- Auto-Fill ---
+
+
+class AutoFillRequest(BaseModel):
+    count: int = Field(5, ge=1, le=20)
+    topic: Optional[str] = None
+    difficulty: Optional[List[str]] = None
+    bloom_level_min: Optional[int] = Field(None, ge=1, le=6)
+    question_types: Optional[List[str]] = None
+    exclude_question_ids: Optional[List[int]] = None
+
+
+@router.post("/{exam_id}/auto-fill", response_model=ExamDetailOut)
+async def auto_fill_questions(
+    exam_id: int,
+    request: AutoFillRequest,
+    current_user: User = Depends(require_permission("exams:create")),
+    db: Session = Depends(get_db),
+):
+    """Auto-fill exam with questions matching criteria."""
+    exam = _get_exam_or_404(exam_id, db, current_user)
+    _require_draft(exam)
+
+    tenant_context = get_tenant_context(current_user)
+    query = db.query(QuestionReview).filter(
+        QuestionReview.review_status == ReviewStatus.APPROVED.value
+    )
+    query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
+
+    # Exclude already-added questions
+    existing_qids = {eq.question_id for eq in exam.questions}
+    exclude_ids = existing_qids | set(request.exclude_question_ids or [])
+    if exclude_ids:
+        query = query.filter(QuestionReview.id.notin_(exclude_ids))
+
+    if request.topic:
+        query = query.filter(QuestionReview.topic.ilike(f"%{request.topic}%"))
+    if request.difficulty:
+        query = query.filter(QuestionReview.difficulty.in_(request.difficulty))
+    if request.bloom_level_min:
+        query = query.filter(QuestionReview.bloom_level >= request.bloom_level_min)
+    if request.question_types:
+        query = query.filter(QuestionReview.question_type.in_(request.question_types))
+
+    # Random selection for diversity
+    candidates = query.order_by(sa_func.random()).limit(request.count).all()
+
+    if not candidates:
+        raise HTTPException(status_code=404, detail="No matching questions found")
+
+    max_pos = max((eq.position for eq in exam.questions), default=0)
+    for q in candidates:
+        max_pos += 1
+        eq = ExamQuestion(
+            exam_id=exam.id,
+            question_id=q.id,
+            position=max_pos,
+            points=suggest_points(q.question_type, q.difficulty),
+        )
+        db.add(eq)
+
+    db.flush()
+    db.refresh(exam)
+    exam.recalculate_total_points()
+    db.commit()
+    db.refresh(exam)
+
+    return _exam_detail_to_out(exam)
+
+
+# --- Finalize / Unfinalize ---
+
+
+@router.post("/{exam_id}/finalize", response_model=ExamOut)
+async def finalize_exam(
+    exam_id: int,
+    current_user: User = Depends(require_permission("exams:create")),
+    db: Session = Depends(get_db),
+):
+    """Finalize exam. Validates all questions are still approved."""
+    exam = _get_exam_or_404(exam_id, db, current_user)
+    _require_draft(exam)
+
+    if not exam.questions:
+        raise HTTPException(status_code=400, detail="Cannot finalize an empty exam")
+
+    # Check all questions are still approved
+    non_approved = [
+        eq
+        for eq in exam.questions
+        if eq.question.review_status != ReviewStatus.APPROVED.value
+    ]
+    if non_approved:
+        ids = [eq.question_id for eq in non_approved]
+        raise HTTPException(
+            status_code=400,
+            detail=f"Questions no longer approved: {ids}. Remove them before finalizing.",
+        )
+
+    exam.status = ExamStatus.FINALIZED.value
+    db.commit()
+    db.refresh(exam)
+    return _exam_to_out(exam)
+
+
+@router.post("/{exam_id}/unfinalize", response_model=ExamOut)
+async def unfinalize_exam(
+    exam_id: int,
+    current_user: User = Depends(require_permission("exams:create")),
+    db: Session = Depends(get_db),
+):
+    """Revert exam from finalized/exported to draft."""
+    exam = _get_exam_or_404(exam_id, db, current_user)
+    if exam.status not in (ExamStatus.FINALIZED.value, ExamStatus.EXPORTED.value):
+        raise HTTPException(status_code=400, detail="Exam is already a draft")
+
+    exam.status = ExamStatus.DRAFT.value
+    db.commit()
+    db.refresh(exam)
+    return _exam_to_out(exam)
+
+
+# --- Export ---
+
+
+@router.get("/{exam_id}/export/{format}")
+async def export_exam(
+    exam_id: int,
+    format: str,
+    include_solutions: bool = Query(False),
+    current_user: User = Depends(require_permission("exams:create")),
+    db: Session = Depends(get_db),
+):
+    """Export exam in specified format (md, json, moodle)."""
+    exam = _get_exam_or_404(exam_id, db, current_user)
+
+    if not exam.questions:
+        raise HTTPException(status_code=400, detail="Cannot export an empty exam")
+
+    exam_data = _exam_detail_to_out(exam)
+    # Convert date to string for export
+    if exam_data.get("exam_date"):
+        exam_data["exam_date"] = str(exam_data["exam_date"])
+
+    safe_title = exam.title.replace(" ", "_")[:50]
+
+    if format == "md":
+        content = MarkdownExporter.export(
+            exam_data, include_solutions=include_solutions
+        )
+        suffix = "_solutions" if include_solutions else ""
+        media_type = "text/markdown"
+        filename = f"exam_{safe_title}{suffix}.md"
+    elif format == "json":
+        content = JsonExporter.export(exam_data)
+        media_type = "application/json"
+        filename = f"exam_{safe_title}.json"
+    elif format == "moodle":
+        content = MoodleXmlExporter.export(exam_data)
+        media_type = "application/xml"
+        filename = f"exam_{safe_title}_moodle.xml"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported format: {format}. Use md, json, or moodle.",
+        )
+
+    # Update status to exported if currently finalized
+    if exam.status == ExamStatus.FINALIZED.value:
+        exam.status = ExamStatus.EXPORTED.value
+        db.commit()
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
