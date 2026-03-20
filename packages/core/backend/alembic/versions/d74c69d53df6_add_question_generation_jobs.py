@@ -39,13 +39,29 @@ def upgrade() -> None:
         ["task_id"],
         unique=True,
     )
-    op.drop_column("institutions", "subscription_type")
-    op.drop_column("institutions", "institution_type")
-    op.drop_index(op.f("ix_subscriptions_billing_owner_id"), table_name="subscriptions")
-    op.drop_constraint(
-        op.f("subscriptions_billing_owner_id_fkey"), "subscriptions", type_="foreignkey"
-    )
-    op.drop_column("subscriptions", "billing_owner_id")
+    # Drop stale columns only if they exist (auto-generated artifacts, already removed in prod)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    institution_cols = [c["name"] for c in inspector.get_columns("institutions")]
+    if "subscription_type" in institution_cols:
+        op.drop_column("institutions", "subscription_type")
+    if "institution_type" in institution_cols:
+        op.drop_column("institutions", "institution_type")
+    subscription_cols = [c["name"] for c in inspector.get_columns("subscriptions")]
+    if "billing_owner_id" in subscription_cols:
+        indexes = [idx["name"] for idx in inspector.get_indexes("subscriptions")]
+        if "ix_subscriptions_billing_owner_id" in indexes:
+            op.drop_index(
+                op.f("ix_subscriptions_billing_owner_id"), table_name="subscriptions"
+            )
+        fks = [fk["name"] for fk in inspector.get_foreign_keys("subscriptions")]
+        if "subscriptions_billing_owner_id_fkey" in fks:
+            op.drop_constraint(
+                op.f("subscriptions_billing_owner_id_fkey"),
+                "subscriptions",
+                type_="foreignkey",
+            )
+        op.drop_column("subscriptions", "billing_owner_id")
     # ### end Alembic commands ###
 
 
