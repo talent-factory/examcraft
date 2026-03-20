@@ -238,7 +238,7 @@ docker-compose up -d
 ----
 # Frontend auto-reloads on file changes
 cd frontend
-npm start
+bun start
 # Opens http://localhost:3000 with hot reload
 ----
 
@@ -261,7 +261,7 @@ pytest
 
 # Frontend tests
 cd frontend
-npm test
+bun test
 
 # All tests with Docker
 docker-compose -f docker-compose.test.yml up --build

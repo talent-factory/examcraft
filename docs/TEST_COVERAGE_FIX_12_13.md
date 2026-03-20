@@ -116,7 +116,7 @@ Dieses Dokument beschreibt die vollständige Test-Abdeckung für die implementie
 ```bash
 # Frontend Tests (Core Package)
 cd packages/core/frontend
-npm test
+bun test
 
 # Backend Tests
 cd packages/core/backend
@@ -127,20 +127,20 @@ pytest
 
 ```bash
 # RAGExamDisplay Tests
-npm test -- RAGExamDisplay.test.tsx
+bun test -- RAGExamDisplay.test.tsx
 
 # RAGService Tests
-npm test -- RAGService.test.ts
+bun test -- RAGService.test.ts
 
 # RAGExamCreator Tests
-npm test -- RAGExamCreator.test.tsx
+bun test -- RAGExamCreator.test.tsx
 ```
 
 ### Mit Coverage
 
 ```bash
 # Frontend mit Coverage
-npm test -- --coverage --watchAll=false
+bun test -- --coverage --watchAll=false
 
 # Backend mit Coverage
 pytest --cov=. --cov-report=html

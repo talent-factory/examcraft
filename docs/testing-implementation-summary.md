@@ -35,10 +35,10 @@ Nach dem erfolgreichen Fix des Download-Filename-Problems (Safari ignorierte `do
 
 **Ausführen**:
 ```bash
-npm run test:e2e           # Alle E2E-Tests
-npm run test:e2e:ui        # Interactive Mode
-npm run test:e2e:headed    # Mit sichtbarem Browser
-npm run test:e2e:debug     # Step-by-Step Debugging
+bun run test:e2e           # Alle E2E-Tests
+bun run test:e2e:ui        # Interactive Mode
+bun run test:e2e:headed    # Mit sichtbarem Browser
+bun run test:e2e:debug     # Step-by-Step Debugging
 ```
 
 ### 2. Unit-Tests für ChatService ✅
@@ -62,8 +62,8 @@ npm run test:e2e:debug     # Step-by-Step Debugging
 
 **Ausführen**:
 ```bash
-npm run test:unit                    # Alle Unit-Tests
-npm run test:unit -- ChatService     # Nur ChatService Tests
+bun run test:unit                    # Alle Unit-Tests
+bun run test:unit -- ChatService     # Nur ChatService Tests
 ```
 
 ### 3. Dokumentation ✅
@@ -74,7 +74,7 @@ npm run test:unit -- ChatService     # Nur ChatService Tests
 - `docs/testing-implementation-summary.md` - Diese Datei
 - `frontend/e2e/README.md` - E2E-Test Anleitung
 
-## NPM Scripts
+## Bun Scripts
 
 **Neue Scripts in `package.json`**:
 ```json
@@ -86,7 +86,7 @@ npm run test:unit -- ChatService     # Nur ChatService Tests
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
-    "test:all": "npm run test:unit && npm run test:e2e"
+    "test:all": "bun run test:unit && bun run test:e2e"
   }
 }
 ```
@@ -128,8 +128,8 @@ test:e2e:
   image: mcr.microsoft.com/playwright:v1.40.0
   script:
     - cd frontend
-    - npm ci
-    - npm run test:e2e
+    - bun install --frozen-lockfile
+    - bun run test:e2e
   artifacts:
     when: on_failure
     paths:
@@ -202,7 +202,7 @@ test:e2e:
 - Playwright E2E-Tests für Chat-Export
 - Unit-Tests für ChatService
 - Umfassende Dokumentation
-- NPM Scripts für einfache Ausführung
+- Bun Scripts für einfache Ausführung
 
 ✅ **Verhindert zukünftige Probleme**:
 - Browser-Kompatibilitäts-Regressions

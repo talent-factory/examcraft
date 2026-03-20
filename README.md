@@ -305,7 +305,7 @@ make pre-push
 
 # Oder manuell:
 cd packages/core/backend && ruff check . --fix && ruff format .
-cd packages/core/frontend && npm run lint:fix
+cd packages/core/frontend && bun run lint:fix
 ```
 
 **Siehe [docs/LINT_CHECKS.md](docs/LINT_CHECKS.md) für detaillierte Informationen.**
@@ -352,29 +352,28 @@ docker-compose logs -f frontend
 # Option 3: Manuell (Core Frontend)
 cd packages/core/frontend
 rm -rf node_modules/.cache build/
-bun install  # oder: npm install
+bun install
 ```
 
-#### Bun vs NPM
+#### Bun
 
-ExamCraft AI unterstützt sowohl **Bun** (empfohlen) als auch **npm**:
+ExamCraft AI verwendet **Bun** als Package Manager:
 
 ```bash
 # Bun installieren (10-100x schneller!)
 curl -fsSL https://bun.sh/install | bash
 
 # Dependencies installieren
-bun install  # oder: npm install
+bun install
 
 # Scripts ausführen
-bun run build:core  # oder: npm run build:core
+bun run build:core
 ```
 
 **Vorteile von Bun:**
 - ⚡ 10-100x schnellere Installation
 - 🚀 Schnellere Script-Ausführung
 - 📦 Besseres Monorepo-Handling
-- ✅ Drop-in Replacement für npm
 
 #### Docker Container Probleme
 

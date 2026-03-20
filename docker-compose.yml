@@ -202,7 +202,7 @@ services:
       - backend
     networks:
       - examcraft_network
-    command: npm start
+    command: bun start
 
 volumes:
   postgres_data:

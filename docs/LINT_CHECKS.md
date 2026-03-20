@@ -38,7 +38,7 @@ ruff format .
 
 # Frontend: ESLint + Auto-Fix
 cd packages/core/frontend
-npm run lint:fix
+bun run lint:fix
 
 # Alle Pre-Commit-Hooks manuell ausführen
 pre-commit run --all-files
@@ -120,7 +120,7 @@ git commit -m "feat: Add feature"
 
 # 2. Lint-Checks ausführen
 cd packages/core/backend && ruff check . --fix && ruff format .
-cd packages/core/frontend && npm run lint:fix
+cd packages/core/frontend && bun run lint:fix
 
 # 3. Fixes committen
 git add -A
@@ -167,7 +167,7 @@ ruff format .
 
 # Frontend
 cd packages/core/frontend
-npm run lint:fix
+bun run lint:fix
 
 # Alle Checks
 pre-commit run --all-files
@@ -210,10 +210,10 @@ ruff check packages/core/backend --fix
 cd packages/core/frontend
 
 # Auto-Fix
-npm run lint:fix
+bun run lint:fix
 
 # Nur prüfen
-npm run lint
+bun run lint
 ```
 
 ## 📚 Weitere Ressourcen
