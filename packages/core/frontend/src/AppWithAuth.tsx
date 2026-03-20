@@ -25,6 +25,7 @@ import { Exams } from './pages/Exams';
 import { Review } from './pages/Review';
 import { Admin } from './pages/Admin';
 import { BillingPage } from './pages/BillingPage';
+import { ExamComposer } from './pages/ExamComposer';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { UserRole } from './types/auth';
@@ -150,7 +151,7 @@ export const AppWithAuth: React.FC = () => {
                   <ProtectedRoute>
                     <PermissionGuard requiredPermissions={['exams:create']}>
                       <AppLayout>
-                        <Exams />
+                        <ExamComposer />
                       </AppLayout>
                     </PermissionGuard>
                   </ProtectedRoute>
