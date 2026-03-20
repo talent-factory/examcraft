@@ -268,6 +268,17 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"❌ Error loading Premium Chat API: {e}")
 
+        # Premium: Wizard API
+        try:
+            from premium.api.v1 import wizard as wizard_api
+
+            app.include_router(wizard_api.router)
+            print("✅ Premium Wizard API loaded")
+        except ImportError as e:
+            print(f"⚠️  Premium Wizard API not available: {e}")
+        except Exception as e:
+            print(f"❌ Error loading Premium Wizard API: {e}")
+
         # Premium: MCP Facade Server (Fly.io Management Tools)
         try:
             from premium.mcp import create_mcp_app
