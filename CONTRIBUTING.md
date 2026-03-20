@@ -69,9 +69,9 @@ pytest backend/tests/
 ```bash
 # Frontend checks
 cd frontend
-npm run lint
-npm run type-check
-npm test
+bun run lint
+bun run type-check
+bun test
 ```
 
 ## Types of Contributions
@@ -191,11 +191,11 @@ docker-compose logs -f backend
 ```bash
 # Run frontend with hot reload
 cd frontend
-npm start
+bun start
 
 # Debug build issues
-npm run build
-npm run type-check
+bun run build
+bun run type-check
 ```
 
 ## Testing Guidelines
@@ -217,13 +217,13 @@ pytest --cov=backend backend/tests/
 
 ```bash
 # Run frontend tests
-npm test
+bun test
 
 # Coverage report
-npm run test:coverage
+bun run test:coverage
 
 # E2E tests (if implemented)
-npm run test:e2e
+bun run test:e2e
 ```
 
 ## Getting Help

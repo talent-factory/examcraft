@@ -55,12 +55,12 @@ test:backend:
 
 test:frontend:
   stage: test
-  image: node:${NODE_VERSION}
+  image: oven/bun:1
   before_script:
     - cd frontend
-    - npm ci --quiet
+    - bun install --frozen-lockfile
   script:
-    - npm run test -- --watchAll=false --coverage || echo "Frontend tests have known failures - continuing"
+    - bun run test -- --watchAll=false --coverage || echo "Frontend tests have known failures - continuing"
   allow_failure: true
   artifacts:
     reports:

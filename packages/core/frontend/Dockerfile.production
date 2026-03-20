@@ -2,21 +2,24 @@
 # Multi-stage build für optimierte Static Site
 
 # Build Stage
-FROM node:18-alpine AS builder
+FROM oven/bun:1-alpine AS builder
+
+# Install Node.js (needed for react-scripts build)
+RUN apk add --no-cache nodejs
 
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json bun.lock* ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN bun install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
 # Build for production
-RUN npm run build
+RUN bun run build
 
 # Production Stage (Nginx)
 FROM nginx:alpine

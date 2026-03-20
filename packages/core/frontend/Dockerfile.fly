@@ -6,7 +6,10 @@
 # =========================
 # Stage 1: Build Stage
 # =========================
-FROM node:18-alpine AS builder
+FROM oven/bun:1-alpine AS builder
+
+# Install Node.js (needed for react-scripts build)
+RUN apk add --no-cache nodejs
 
 WORKDIR /app
 
@@ -21,11 +24,10 @@ ENV REACT_APP_DEPLOYMENT_MODE=${REACT_APP_DEPLOYMENT_MODE}
 WORKDIR /app/packages/core/frontend
 
 # Copy package files
-COPY packages/core/frontend/package*.json ./
+COPY packages/core/frontend/package.json packages/core/frontend/bun.lock* ./
 
 # Install all dependencies (including devDependencies for build)
-# Using npm install instead of npm ci due to lockfile sync issues
-RUN npm install --legacy-peer-deps
+RUN bun install
 
 # Copy core source code
 COPY packages/core/frontend/ ./
@@ -36,7 +38,7 @@ COPY packages/premium/frontend/src/ /app/packages/premium/frontend/src/
 COPY packages/enterprise/frontend/src/ /app/packages/enterprise/frontend/src/
 
 # Build for production
-RUN npm run build
+RUN bun run build
 
 # =========================
 # Stage 2: Production Stage (Nginx)

@@ -52,7 +52,7 @@ pytest tests/ -v --cov=. --cov-report=term-missing
 **Ausführen**:
 ```bash
 cd frontend
-npm run test:unit
+bun run test:unit
 ```
 
 ## 2. Integration Tests
@@ -89,7 +89,7 @@ pytest tests/integration/ -v -m integration
 
 **Ausführen**:
 ```bash
-npm run test -- integration.test.tsx
+bun run test -- integration.test.tsx
 ```
 
 ## 3. E2E Tests (Playwright)
@@ -117,8 +117,8 @@ npm run test -- integration.test.tsx
 
 **Ausführen**:
 ```bash
-npm run test:e2e
-npm run test:e2e:ui  # Interactive Mode
+bun run test:e2e
+bun run test:e2e:ui  # Interactive Mode
 ```
 
 ## 4. Test-Daten Management
@@ -179,12 +179,12 @@ test:backend:
 test:frontend:
   stage: test
   script:
-    - npm run test:unit -- --watchAll=false --coverage
+    - bun run test:unit -- --watchAll=false --coverage
 
 test:e2e:
   stage: test
   script:
-    - npm run test:e2e
+    - bun run test:e2e
   artifacts:
     when: on_failure
     paths:

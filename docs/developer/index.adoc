@@ -94,7 +94,7 @@ curl http://localhost:8000/health
 ----
 # Frontend changes (auto-reload)
 cd frontend
-npm start
+bun start
 
 # Backend changes (auto-reload with uvicorn)
 cd backend
@@ -112,7 +112,7 @@ pytest
 
 # Frontend tests
 cd frontend
-npm test
+bun test
 
 # Integration tests
 docker-compose -f docker-compose.test.yml up --build
@@ -413,7 +413,7 @@ docker-compose restart <service>  # Restart specific service
 # Testing
 docker-compose -f docker-compose.test.yml up   # Run test suite
 pytest backend/tests/                          # Backend unit tests
-npm test --prefix frontend                     # Frontend tests
+bun test --prefix frontend                     # Frontend tests
 
 # Database
 docker exec -it examcraft_postgres psql -U examcraft -d examcraft_dev

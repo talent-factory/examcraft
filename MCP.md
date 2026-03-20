@@ -314,8 +314,8 @@ Once configured, the following tools are available in Claude Code:
 3. **Manually install packages**:
 
    ```bash
-   npm install -g task-master-ai
-   npm install -g @modelcontextprotocol/server-linear
+   bun install -g task-master-ai
+   bun install -g @modelcontextprotocol/server-linear
    ```
 
 ## Security Best Practices
