@@ -37,12 +37,14 @@ const USE_CASE_LABELS: Record<string, string> = {
 
 interface PromptEditorProps {
   promptId?: string;
+  initialData?: Partial<Prompt>;
   onSave?: () => void;
   onCancel?: () => void;
 }
 
 export const PromptEditor: React.FC<PromptEditorProps> = ({
   promptId,
+  initialData,
   onSave,
   onCancel
 }) => {
@@ -83,6 +85,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       loadPrompt();
     }
   }, [promptId, loadPrompt]);
+
+  useEffect(() => {
+    if (!promptId && initialData) {
+      setFormData(prev => ({ ...prev, ...initialData }));
+    }
+  }, [promptId, initialData]);
 
   const handleSave = async () => {
     if (!formData.name || !formData.content || !formData.category) {
