@@ -3,8 +3,12 @@ Tests for Exam Composer Models: Exam, ExamQuestion, ExamStatus
 TDD: These tests are written before the model implementation.
 """
 
+import pytest
+from unittest.mock import Mock
+from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from main import app
 from models.auth import Institution, User, UserStatus
 from models.question_review import QuestionReview, ReviewStatus
 from models.exam import Exam, ExamQuestion, ExamStatus
@@ -331,3 +335,220 @@ class TestExamQuestionModel:
 
         remaining = test_db.query(EQ).filter_by(exam_id=exam_id).all()
         assert remaining == []
+
+
+# ---------------------------------------------------------------------------
+# Task 2: CRUD API Tests
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_user(institution_id: int = 1, user_id: int = 1) -> Mock:
+    """Create a mock user with full permission for exam endpoints."""
+    mock_institution = Mock()
+    mock_institution.id = institution_id
+    mock_institution.name = "Test University"
+    mock_institution.slug = "test-university"
+    mock_institution.subscription_tier = "professional"
+    mock_institution.max_users = -1
+    mock_institution.max_documents = -1
+    mock_institution.max_questions_per_month = -1
+
+    user = Mock()
+    user.id = user_id
+    user.email = f"examuser{user_id}@test.com"
+    user.first_name = "Exam"
+    user.last_name = "User"
+    user.institution_id = institution_id
+    user.institution = mock_institution
+    user.has_permission = Mock(return_value=True)
+    user.is_superuser = True  # superuser bypasses tenant filter
+    user.roles = []
+    user.status = "active"
+    return user
+
+
+class TestExamCRUDApi:
+    """Tests for exam CRUD endpoints — uses dependency overrides, real DB."""
+
+    @pytest.fixture
+    def exam_db(self, test_engine):
+        """Fresh DB session that supports commit/rollback (no wrapping transaction).
+
+        test_db uses a connection-level transaction which prevents commit()
+        inside the API endpoints. This fixture creates a plain session instead.
+        """
+        from sqlalchemy.orm import sessionmaker
+
+        TestSession = sessionmaker(bind=test_engine)
+        session = TestSession()
+        yield session
+        session.close()
+
+    @pytest.fixture
+    def exam_institution(self, exam_db):
+        """Institution created with a committable session."""
+        from models.auth import Institution
+
+        # Check for existing institution to allow fixture reuse across tests
+        existing = (
+            exam_db.query(Institution).filter_by(slug="exam-test-university").first()
+        )
+        if existing:
+            return existing
+
+        institution = Institution(
+            name="Exam Test University",
+            slug="exam-test-university",
+            subscription_tier="professional",
+            max_users=-1,
+            max_documents=-1,
+            max_questions_per_month=-1,
+        )
+        exam_db.add(institution)
+        exam_db.commit()
+        exam_db.refresh(institution)
+        return institution
+
+    @pytest.fixture
+    def exam_user(self, exam_db, exam_institution):
+        """Real user record in the test DB so FK constraints pass."""
+        from models.auth import User, UserStatus
+
+        existing = exam_db.query(User).filter_by(email="examcrud@test.com").first()
+        if existing:
+            return existing
+
+        user = User(
+            email="examcrud@test.com",
+            first_name="Exam",
+            last_name="CRUD",
+            password_hash="dummy_hash",  # pragma: allowlist secret
+            institution_id=exam_institution.id,
+            status=UserStatus.ACTIVE.value,
+        )
+        exam_db.add(user)
+        exam_db.commit()
+        exam_db.refresh(user)
+        return user
+
+    @pytest.fixture
+    def mock_user(self, exam_institution, exam_user):
+        return _make_mock_user(institution_id=exam_institution.id, user_id=exam_user.id)
+
+    @pytest.fixture
+    def exam_client(self, exam_db, exam_institution, mock_user):
+        """TestClient with auth overrides and committable DB session.
+
+        Uses TestClient without context manager to avoid triggering the
+        full lifespan event (which requires optional services like Celery).
+        The exams router is included directly before creating the client.
+        """
+        from utils.auth_utils import get_current_user
+        from database import get_db
+        import api.exams as exams_module
+
+        # Include the exams router (FastAPI deduplicates identical routes)
+        app.include_router(exams_module.router)
+
+        def override_get_db():
+            yield exam_db
+
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = override_get_db
+
+        # No context manager — avoids triggering the full lifespan
+        client = TestClient(app, raise_server_exceptions=True)
+        yield client
+        app.dependency_overrides.clear()
+
+    def test_create_exam(self, exam_client):
+        """POST /api/v1/exams/ creates a new exam with defaults."""
+        response = exam_client.post(
+            "/api/v1/exams/",
+            json={"title": "Midterm 2026", "course": "Algo & DS", "language": "de"},
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["title"] == "Midterm 2026"
+        assert data["status"] == "draft"
+        assert data["total_points"] == 0.0
+        assert data["passing_percentage"] == 50.0
+        assert data["language"] == "de"
+        assert "id" in data
+        assert "created_at" in data
+        assert "updated_at" in data
+
+    def test_list_exams(self, exam_client):
+        """GET /api/v1/exams/ returns list with total."""
+        # Create two exams first
+        for title in ["Exam A", "Exam B"]:
+            exam_client.post("/api/v1/exams/", json={"title": title})
+
+        response = exam_client.get("/api/v1/exams/")
+        assert response.status_code == 200
+        data = response.json()
+        assert "total" in data
+        assert "exams" in data
+        assert data["total"] >= 2
+        assert len(data["exams"]) >= 2
+
+    def test_get_exam(self, exam_client):
+        """GET /api/v1/exams/{id} returns exam with empty questions list."""
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "Detail Test"})
+        assert create_resp.status_code == 201
+        exam_id = create_resp.json()["id"]
+
+        response = exam_client.get(f"/api/v1/exams/{exam_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["title"] == "Detail Test"
+        assert data["questions"] == []
+
+    def test_update_exam(self, exam_client):
+        """PUT /api/v1/exams/{id} updates metadata."""
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "Old Title"})
+        exam = create_resp.json()
+
+        response = exam_client.put(
+            f"/api/v1/exams/{exam['id']}",
+            json={
+                "title": "New Title",
+                "time_limit_minutes": 90,
+                "updated_at": exam["updated_at"],
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["title"] == "New Title"
+        assert data["time_limit_minutes"] == 90
+
+    def test_delete_draft_exam(self, exam_client):
+        """DELETE /api/v1/exams/{id} deletes a draft exam (status 204)."""
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "To Delete"})
+        exam_id = create_resp.json()["id"]
+
+        response = exam_client.delete(f"/api/v1/exams/{exam_id}")
+        assert response.status_code == 204
+
+        # Verify it's gone
+        get_resp = exam_client.get(f"/api/v1/exams/{exam_id}")
+        assert get_resp.status_code == 404
+
+    def test_optimistic_locking_conflict(self, exam_client):
+        """PUT /api/v1/exams/{id} returns 409 on stale updated_at."""
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "Locking Test"})
+        exam = create_resp.json()
+
+        # First update succeeds
+        first_update = exam_client.put(
+            f"/api/v1/exams/{exam['id']}",
+            json={"title": "Updated Once", "updated_at": exam["updated_at"]},
+        )
+        assert first_update.status_code == 200
+
+        # Second update with the original (now stale) updated_at fails
+        response = exam_client.put(
+            f"/api/v1/exams/{exam['id']}",
+            json={"title": "Stale Update", "updated_at": exam["updated_at"]},
+        )
+        assert response.status_code == 409
