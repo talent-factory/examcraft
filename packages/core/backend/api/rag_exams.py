@@ -279,14 +279,20 @@ async def retrieve_context(
     - **min_similarity**: Mindest-Similarity Score (0.0-1.0)
     """
     try:
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+
         # Validiere Document IDs falls angegeben
         if request.document_ids:
+            tenant_context = get_tenant_context(current_user)
             for doc_id in request.document_ids:
                 document = document_service.get_document_by_id(doc_id, db)
                 if not document:
                     raise HTTPException(
                         status_code=404, detail=f"Document with ID {doc_id} not found"
                     )
+
+                # Tenant-Check: Dokument muss zur Institution des Users gehoeren
+                TenantFilter.verify_tenant_access(document, tenant_context)
 
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
         context = await rag_service_module.rag_service.retrieve_context(
@@ -335,6 +341,12 @@ async def get_available_documents(
     try:
         from models.document import Document, DocumentStatus
         from utils.tenant_utils import TenantFilter, get_tenant_context
+
+        if not current_user.institution:
+            raise HTTPException(
+                status_code=403,
+                detail="You must be associated with an institution to view documents.",
+            )
 
         # Tenant-aware: Alle Dokumente der Institution (konsistent mit list_documents)
         tenant_context = get_tenant_context(current_user)
