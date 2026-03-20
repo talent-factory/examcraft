@@ -67,11 +67,13 @@ async def _authenticate_websocket(websocket: WebSocket, token: str) -> User | No
     """
     payload = AuthService.decode_token(token)
     if not payload:
+        logger.warning("WebSocket Auth: Token decode fehlgeschlagen")
         await websocket.close(code=1008)
         return None
 
     user_id = payload.get("sub")
     if not user_id:
+        logger.warning("WebSocket Auth: Token enthält kein 'sub' Claim")
         await websocket.close(code=1008)
         return None
 
@@ -286,16 +288,31 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
 
             elif state in (TaskStatus.FAILURE, TaskStatus.REVOKED):
                 raw_info = task_data["info"]
-                error_str = str(raw_info) if raw_info else "Unbekannter Fehler"
+                logger.error(f"Task {task_id} failed: {raw_info}")
                 msg = TaskStatusMessage(
                     task_id=task_id,
                     status=TaskStatus(state),
                     progress=0,
-                    error=error_str,
+                    error="Verarbeitung fehlgeschlagen. Bitte erneut versuchen.",
                 )
                 await websocket.send_json(msg.model_dump())
                 await websocket.close()
                 return
+
+            elif state in (TaskStatus.STARTED, TaskStatus.RETRY):
+                pending_seconds = 0
+                message = (
+                    "Task gestartet..."
+                    if state == TaskStatus.STARTED
+                    else "Task wird erneut versucht..."
+                )
+                msg = TaskStatusMessage(
+                    task_id=task_id,
+                    status=TaskStatus.PROGRESS,
+                    progress=info.get("progress", 0) if isinstance(info, dict) else 0,
+                    message=message,
+                )
+                await websocket.send_json(msg.model_dump())
 
             else:
                 pending_seconds += POLL_INTERVAL_SECONDS

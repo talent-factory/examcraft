@@ -132,12 +132,23 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"Fehler bei Dokumentverarbeitung {document_id}: {str(e)}")
+        logger.error(
+            f"Fehler bei Dokumentverarbeitung {document_id}: {str(e)}", exc_info=True
+        )
 
         if document:
-            document.status = DocumentStatus.ERROR
-            document.error_message = str(e)
-            db.commit()
+            try:
+                document.status = DocumentStatus.ERROR
+                document.error_message = str(e)
+                db.commit()
+            except Exception as db_err:
+                logger.error(
+                    f"DB-Commit beim Fehler-Status fehlgeschlagen für {document_id}: {db_err}"
+                )
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
 
         raise  # autoretry_for=(Exception,) auf dem Decorator übernimmt die Retry-Logik
 
