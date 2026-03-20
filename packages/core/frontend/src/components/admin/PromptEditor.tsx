@@ -21,9 +21,34 @@ import {
   FormControlLabel
 } from '@mui/material';
 import { Save, Cancel, Preview, Code, History } from '@mui/icons-material';
+import axios from 'axios';
 import { promptsApi, Prompt } from '../../api/promptsApi';
 import { PromptCategory } from '../../types/prompt';
 import MarkdownRenderer from '../MarkdownRenderer';
+
+/** Extract a user-friendly error message from Axios/FastAPI errors. */
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const detail = err.response?.data?.detail;
+    if (err.response?.status === 422 && detail) {
+      const details = Array.isArray(detail) ? detail : [detail];
+      const messages = details.map((d: unknown) => {
+        if (typeof d === 'object' && d !== null && 'msg' in d) {
+          const entry = d as { loc?: unknown; msg?: unknown; message?: unknown };
+          const field = (Array.isArray(entry.loc) ? entry.loc.slice(1).join('.') : '') || 'Feld';
+          const msg = String(entry.msg || entry.message || 'Ungültig');
+          return `${field}: ${msg}`;
+        }
+        return String(d);
+      });
+      return `Validierungsfehler: ${messages.join(', ')}`;
+    }
+    if (detail) {
+      return String(detail);
+    }
+  }
+  return err instanceof Error ? err.message : fallback;
+}
 
 // Use Case Labels für UI — values must match the stored format (question_generation_<type>)
 const USE_CASE_LABELS: Record<string, string> = {
@@ -73,8 +98,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       setError(null);
       const data = await promptsApi.getPrompt(promptId);
       setFormData(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Laden des Prompts');
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, 'Fehler beim Laden des Prompts'));
     } finally {
       setLoading(false);
     }
@@ -130,8 +155,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       setTimeout(() => {
         onSave?.();
       }, 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Speichern');
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, 'Fehler beim Speichern'));
     } finally {
       setSaving(false);
     }
