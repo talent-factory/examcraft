@@ -274,6 +274,7 @@ class ApprovedQuestionOut(BaseModel):
     difficulty: str
     topic: str
     bloom_level: Optional[int]
+    estimated_time_minutes: Optional[int] = None
     options: Optional[list]
     usage_count: int = 0
 
