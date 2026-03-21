@@ -9,26 +9,13 @@ Usage:
 
 Requires:
     - DATABASE_URL env var (or .env file)
-    - ANTHROPIC_API_KEY env var (or .env file)
+    - ANTHROPIC_API_KEY env var
 """
 
 import json
 import logging
 import os
 import sys
-
-from dotenv import load_dotenv
-
-# Add backend to path so we can import models
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "packages", "core", "backend"))
-
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
-
-import anthropic  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
-from sqlalchemy.orm import sessionmaker  # noqa: E402
-
-from models.question_review import QuestionReview  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -48,7 +35,7 @@ TIME_ESTIMATES = {
 BATCH_SIZE = 10
 
 
-def get_bloom_levels(client: anthropic.Anthropic, questions: list[dict]) -> list[dict]:
+def get_bloom_levels(client, questions: list[dict]) -> list[dict]:
     """Ask Claude to determine bloom levels for a batch of questions."""
     questions_text = json.dumps(questions, ensure_ascii=False, indent=2)
 
@@ -79,6 +66,21 @@ Antwort als JSON-Array (NUR das Array, kein Markdown):
 
 
 def main():
+    # Deferred imports: path setup needed for model imports
+    sys.path.insert(
+        0, os.path.join(os.path.dirname(__file__), "..", "packages", "core", "backend")
+    )
+
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+    import anthropic
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from models.question_review import QuestionReview
+
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         logger.error("DATABASE_URL not set")
@@ -96,9 +98,7 @@ def main():
 
     # Find questions missing bloom_level
     questions_to_enrich = (
-        db.query(QuestionReview)
-        .filter(QuestionReview.bloom_level.is_(None))
-        .all()
+        db.query(QuestionReview).filter(QuestionReview.bloom_level.is_(None)).all()
     )
 
     total = len(questions_to_enrich)
