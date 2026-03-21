@@ -24,11 +24,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "packages", "co
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-import anthropic
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+import anthropic  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from models.question_review import QuestionReview
+from models.question_review import QuestionReview  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
