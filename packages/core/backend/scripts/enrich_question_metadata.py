@@ -4,12 +4,14 @@ Bloom-level is determined by Claude API in batches.
 Estimated time is computed via a lookup table.
 
 Usage:
-    cd packages/core/backend
-    python ../../../scripts/enrich_question_metadata.py
+    # From backend directory (local or Docker):
+    python scripts/enrich_question_metadata.py
+
+    # Also called automatically by docker-entrypoint.sh on startup.
 
 Requires:
     - DATABASE_URL env var (or .env file)
-    - ANTHROPIC_API_KEY env var (or .env file)
+    - ANTHROPIC_API_KEY env var
 """
 
 import json
@@ -19,16 +21,16 @@ import sys
 
 from dotenv import load_dotenv
 
-# Add backend to path so we can import models
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "packages", "core", "backend"))
+# Add parent directory to path so we can import models when run from scripts/
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+load_dotenv()
 
-import anthropic
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+import anthropic  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from models.question_review import QuestionReview
+from models.question_review import QuestionReview  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -96,9 +98,7 @@ def main():
 
     # Find questions missing bloom_level
     questions_to_enrich = (
-        db.query(QuestionReview)
-        .filter(QuestionReview.bloom_level.is_(None))
-        .all()
+        db.query(QuestionReview).filter(QuestionReview.bloom_level.is_(None)).all()
     )
 
     total = len(questions_to_enrich)
