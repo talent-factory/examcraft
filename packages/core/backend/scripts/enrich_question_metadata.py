@@ -19,19 +19,6 @@ import logging
 import os
 import sys
 
-from dotenv import load_dotenv
-
-# Add parent directory to path so we can import models when run from scripts/
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-load_dotenv()
-
-import anthropic  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
-from sqlalchemy.orm import sessionmaker  # noqa: E402
-
-from models.question_review import QuestionReview  # noqa: E402
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -50,7 +37,7 @@ TIME_ESTIMATES = {
 BATCH_SIZE = 10
 
 
-def get_bloom_levels(client: anthropic.Anthropic, questions: list[dict]) -> list[dict]:
+def get_bloom_levels(client, questions: list[dict]) -> list[dict]:
     """Ask Claude to determine bloom levels for a batch of questions."""
     questions_text = json.dumps(questions, ensure_ascii=False, indent=2)
 
@@ -81,6 +68,19 @@ Antwort als JSON-Array (NUR das Array, kein Markdown):
 
 
 def main():
+    # Deferred imports: path setup needed for model imports
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    import anthropic
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from models.question_review import QuestionReview
+
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         logger.error("DATABASE_URL not set")
