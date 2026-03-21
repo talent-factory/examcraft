@@ -17,6 +17,19 @@ from tasks.document_tasks import ProgressTask, run_async
 
 logger = logging.getLogger(__name__)
 
+# Time estimation lookup table (minutes) based on question type and difficulty
+TIME_ESTIMATES = {
+    ("multiple_choice", "easy"): 1,
+    ("multiple_choice", "medium"): 2,
+    ("multiple_choice", "hard"): 3,
+    ("true_false", "easy"): 1,
+    ("true_false", "medium"): 1,
+    ("true_false", "hard"): 2,
+    ("open_ended", "easy"): 3,
+    ("open_ended", "medium"): 5,
+    ("open_ended", "hard"): 8,
+}
+
 # Premium-Package ist im Worker unter /app/premium verfügbar.
 # In lokalen Tests wird RAGService via patch("tasks.question_tasks.RAGService") gemockt.
 try:
@@ -100,6 +113,10 @@ def _persist_questions(
                 exam_id=exam_id,
                 created_by=user_id,
                 institution_id=institution_id,
+                bloom_level=getattr(question, "bloom_level", None),
+                estimated_time_minutes=TIME_ESTIMATES.get(
+                    (question.question_type, question.difficulty), 3
+                ),
             )
             db.add(question_review)
             reviews.append(question_review)
