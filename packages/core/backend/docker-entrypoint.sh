@@ -38,5 +38,11 @@ for i in $(seq 1 $MAX_RETRIES); do
     sleep $RETRY_INTERVAL
 done
 
+# One-time data enrichment: add bloom_level + estimated_time to existing questions
+if [ -n "$ANTHROPIC_API_KEY" ] && [ -f "scripts/enrich_question_metadata.py" ]; then
+    echo "Running question metadata enrichment..."
+    python scripts/enrich_question_metadata.py || echo "⚠ Enrichment failed (non-fatal), continuing startup..."
+fi
+
 echo "Starting application..."
 exec "$@"
