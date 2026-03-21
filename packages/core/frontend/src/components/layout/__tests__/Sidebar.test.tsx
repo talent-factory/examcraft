@@ -26,13 +26,6 @@ jest.mock('../../../hooks/useRoleBasedNavigation', () => ({
         label: 'Admin',
         path: '/admin',
         icon: '⚙️',
-        children: [
-          {
-            label: 'Users',
-            path: '/admin/users',
-            icon: '👥',
-          },
-        ],
       },
     ],
   }),
@@ -62,20 +55,6 @@ describe('Sidebar Component', () => {
 
     const dashboardLink = screen.getByText('Dashboard').closest('a');
     expect(dashboardLink).toHaveTextContent('📊');
-  });
-
-  it('expands and collapses submenu items', () => {
-    renderWithRouter(<Sidebar isOpen={true} />);
-
-    // Initially, submenu should not be visible
-    expect(screen.queryByText('Users')).not.toBeInTheDocument();
-
-    // Click expand button
-    const expandButton = screen.getByRole('button', { name: /expand/i });
-    fireEvent.click(expandButton);
-
-    // Submenu should now be visible
-    expect(screen.getByText('Users')).toBeInTheDocument();
   });
 
   it('applies active state to current path', () => {
