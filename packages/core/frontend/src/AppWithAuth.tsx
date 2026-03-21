@@ -17,8 +17,6 @@ import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import RegistrationSuccessPage from './pages/RegistrationSuccessPage';
-import { UserManagementPage } from './components/admin/UserManagementPage';
-import RoleManagementPage from './components/admin/RoleManagementPage';
 import { Dashboard } from './pages/Dashboard';
 import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
@@ -217,29 +215,7 @@ export const AppWithAuth: React.FC = () => {
                 }
               />
 
-              <Route
-                path="/admin/users"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <UserManagementPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
 
-              <Route
-                path="/admin/roles"
-                element={
-                  <ProtectedRoute>
-                    <RoleGuard allowedRoles={[UserRole.ADMIN]} requireSuperuser>
-                      <AppLayout>
-                        <RoleManagementPage />
-                      </AppLayout>
-                    </RoleGuard>
-                  </ProtectedRoute>
-                }
-              />
               <Route path="/billing/success" element={<PaymentSuccessPage />} />
               <Route path="/billing/cancel" element={<PaymentCancelPage />} />
 
