@@ -66,37 +66,7 @@ export const useRoleBasedNavigation = () => {
       label: 'Admin',
       path: '/admin',
       icon: '⚙️',
-      children: [
-        {
-          label: 'User Management',
-          path: '/admin/users',
-          icon: '👥',
-        },
-        {
-          label: 'Role Management',
-          path: '/admin/roles',
-          icon: '🔐',
-          requireSuperuser: true,
-        },
-        {
-          label: 'Institution Settings',
-          path: '/admin/institution',
-          icon: '🏛️',
-          requireSuperuser: true,
-        },
-        {
-          label: 'Audit Logs',
-          path: '/admin/audit',
-          icon: '📋',
-          requiredRoles: [UserRole.ADMIN],
-        },
-        {
-          label: 'Subscription',
-          path: '/admin/subscription',
-          icon: '💳',
-          requiredRoles: [UserRole.ADMIN],
-        },
-      ],
+      requiredRoles: [UserRole.ADMIN],
     },
     {
       label: 'Pricing',
