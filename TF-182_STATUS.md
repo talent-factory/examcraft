@@ -62,8 +62,8 @@ Follow the **Quick Start Guide** in `STRIPE_QUICKSTART.md` (5 minutes):
 - [ ] **Step 2**: Configure Environment Variables (1 min)
     ```env
     # Add to .env (see .env.stripe.example for details)
-    STRIPE_SECRET_KEY=sk_test_...
-    STRIPE_WEBHOOK_SECRET=whsec_...  # From stripe listen
+    STRIPE_SECRET_KEY=<YOUR_STRIPE_SECRET_KEY>
+    STRIPE_WEBHOOK_SECRET=<YOUR_STRIPE_WEBHOOK_SECRET>  # From stripe listen
     REACT_APP_STRIPE_PRICE_STARTER=price_...
     REACT_APP_STRIPE_PRICE_PROFESSIONAL=price_...
     ```

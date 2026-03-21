@@ -38,5 +38,18 @@ for i in $(seq 1 $MAX_RETRIES); do
     sleep $RETRY_INTERVAL
 done
 
+# One-time data enrichment: add bloom_level + estimated_time to existing questions
+# Set RUN_ENRICHMENT=true for first deployment, then remove the env var
+if [ "$RUN_ENRICHMENT" = "true" ] && [ -f "scripts/enrich_question_metadata.py" ]; then
+    echo "Running one-time question metadata enrichment..."
+    python scripts/enrich_question_metadata.py
+    exit_code=$?
+    if [ $exit_code -eq 0 ]; then
+        echo "✓ Enrichment completed successfully"
+    else
+        echo "⚠ Enrichment finished with errors (exit code $exit_code), continuing startup..."
+    fi
+fi
+
 echo "Starting application..."
 exec "$@"

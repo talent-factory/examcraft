@@ -204,6 +204,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   /**
+   * Login with pre-existing tokens (used by OAuth callback)
+   */
+  const loginWithTokens = useCallback(async (accessToken: string, refreshToken: string) => {
+    try {
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+      const user = await AuthService.getProfile(accessToken);
+
+      localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+
+      setState({
+        user,
+        accessToken,
+        refreshToken,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Token login failed';
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage,
+      }));
+      throw error;
+    }
+  }, []);
+
+  /**
    * Register new user
    */
   const register = useCallback(async (data: RegisterRequest) => {
@@ -431,6 +463,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value: AuthContextType = {
     ...state,
     login,
+    loginWithTokens,
     register,
     logout,
     refreshAccessToken,

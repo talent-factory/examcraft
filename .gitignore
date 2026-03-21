@@ -89,3 +89,6 @@ packages/core/frontend/.env.local
 
 # Documentation build output (MkDocs)
 **/site/
+
+# Superpowers brainstorm sessions
+.superpowers/

@@ -17,14 +17,13 @@ import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import RegistrationSuccessPage from './pages/RegistrationSuccessPage';
-import { UserManagementPage } from './components/admin/UserManagementPage';
-import RoleManagementPage from './components/admin/RoleManagementPage';
 import { Dashboard } from './pages/Dashboard';
 import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
 import { Review } from './pages/Review';
 import { Admin } from './pages/Admin';
 import { BillingPage } from './pages/BillingPage';
+import { ExamComposer } from './pages/ExamComposer';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { UserRole } from './types/auth';
@@ -150,7 +149,7 @@ export const AppWithAuth: React.FC = () => {
                   <ProtectedRoute>
                     <PermissionGuard requiredPermissions={['exams:create']}>
                       <AppLayout>
-                        <Exams />
+                        <ExamComposer />
                       </AppLayout>
                     </PermissionGuard>
                   </ProtectedRoute>
@@ -209,36 +208,16 @@ export const AppWithAuth: React.FC = () => {
                 path="/admin"
                 element={
                   <ProtectedRoute>
-                    <AppLayout>
-                      <Admin />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/admin/users"
-                element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <UserManagementPage />
-                    </AppLayout>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/admin/roles"
-                element={
-                  <ProtectedRoute>
-                    <RoleGuard allowedRoles={[UserRole.ADMIN]} requireSuperuser>
+                    <RoleGuard allowedRoles={[UserRole.ADMIN]}>
                       <AppLayout>
-                        <RoleManagementPage />
+                        <Admin />
                       </AppLayout>
                     </RoleGuard>
                   </ProtectedRoute>
                 }
               />
+
+
               <Route path="/billing/success" element={<PaymentSuccessPage />} />
               <Route path="/billing/cancel" element={<PaymentCancelPage />} />
 
