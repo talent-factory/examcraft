@@ -65,6 +65,8 @@ Entfernt werden:
 
 Die Route `/admin` bleibt bestehen. Keine neuen Routen noetig.
 
+Direkte URL-Zugriffe auf `/admin/users` oder `/admin/roles` werden durch die Wildcard-Route auf `/dashboard` umgeleitet. Dies ist akzeptabel, da diese URLs nicht extern verlinkt sind.
+
 ### 4. Nicht betroffen
 
 - Sidebar-Komponente (`Sidebar.tsx`): Rendert Items bereits korrekt mit und ohne Children, keine Aenderung noetig.
