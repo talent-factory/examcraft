@@ -64,7 +64,10 @@ Antwort als JSON-Array (NUR das Array, kein Markdown):
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
 
-    return json.loads(text)
+    results = json.loads(text, strict=False)
+    if not isinstance(results, list):
+        raise ValueError(f"Expected list from Claude, got {type(results).__name__}")
+    return results
 
 
 def main():
@@ -84,64 +87,88 @@ def main():
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         logger.error("DATABASE_URL not set")
-        sys.exit(1)
+        return
     api_key = os.getenv("ANTHROPIC_API_KEY")
 
     if not api_key:
         logger.error("ANTHROPIC_API_KEY not set")
-        sys.exit(1)
+        return
 
     engine = create_engine(database_url)
     Session = sessionmaker(bind=engine)
     db = Session()
     client = anthropic.Anthropic(api_key=api_key)
 
-    # Find questions missing bloom_level
-    questions_to_enrich = (
-        db.query(QuestionReview).filter(QuestionReview.bloom_level.is_(None)).all()
-    )
+    try:
+        # Find questions missing bloom_level
+        questions_to_enrich = (
+            db.query(QuestionReview).filter(QuestionReview.bloom_level.is_(None)).all()
+        )
 
-    total = len(questions_to_enrich)
-    logger.info(f"Found {total} questions to enrich")
+        total = len(questions_to_enrich)
+        logger.info(f"Found {total} questions to enrich")
 
-    if total == 0:
-        logger.info("Nothing to do")
-        return
+        if total == 0:
+            logger.info("Nothing to do")
+            return
 
-    enriched = 0
-    for i in range(0, total, BATCH_SIZE):
-        batch = questions_to_enrich[i : i + BATCH_SIZE]
+        enriched = 0
+        for i in range(0, total, BATCH_SIZE):
+            batch = questions_to_enrich[i : i + BATCH_SIZE]
 
-        batch_data = [
-            {"id": q.id, "question": q.question_text, "type": q.question_type}
-            for q in batch
-        ]
+            batch_data = [
+                {"id": q.id, "question": q.question_text, "type": q.question_type}
+                for q in batch
+            ]
 
-        try:
-            results = get_bloom_levels(client, batch_data)
-            bloom_map = {r["id"]: r["bloom_level"] for r in results}
+            try:
+                actually_enriched = 0
+                results = get_bloom_levels(client, batch_data)
+                bloom_map = {r["id"]: r["bloom_level"] for r in results}
 
-            for q in batch:
-                bloom = bloom_map.get(q.id)
-                if bloom and 1 <= bloom <= 6:
-                    q.bloom_level = bloom
+                for q in batch:
+                    bloom = bloom_map.get(q.id)
+                    if bloom is None:
+                        logger.warning(f"No bloom_level returned for question {q.id}")
+                    elif not isinstance(bloom, int) or not (1 <= bloom <= 6):
+                        logger.warning(
+                            f"Invalid bloom_level {bloom} for question {q.id}, skipping"
+                        )
+                    else:
+                        q.bloom_level = bloom
+                        actually_enriched += 1
 
-                if q.estimated_time_minutes is None:
-                    q.estimated_time_minutes = TIME_ESTIMATES.get(
-                        (q.question_type, q.difficulty), 3
-                    )
+                    if q.estimated_time_minutes is None:
+                        q.estimated_time_minutes = TIME_ESTIMATES.get(
+                            (q.question_type, q.difficulty), 3
+                        )
 
-            db.commit()
-            enriched += len(batch)
-            logger.info(f"Progress: {enriched}/{total} questions enriched")
+                db.commit()
+                enriched += actually_enriched
+                logger.info(f"Progress: {enriched}/{total} questions enriched")
 
-        except Exception as e:
-            logger.error(f"Batch {i}-{i + BATCH_SIZE} failed: {e}")
-            db.rollback()
-            continue
+            except anthropic.AuthenticationError:
+                logger.error("ANTHROPIC_API_KEY is invalid. Aborting enrichment.")
+                break
+            except anthropic.RateLimitError:
+                logger.warning(f"Rate limited at batch {i}. Stopping enrichment.")
+                break
+            except json.JSONDecodeError as e:
+                logger.error(
+                    f"Batch {i}-{i + BATCH_SIZE}: Claude returned unparseable JSON: {e}"
+                )
+                db.rollback()
+                continue
+            except Exception as e:
+                logger.error(
+                    f"Batch {i}-{i + BATCH_SIZE} unexpected failure: {e}", exc_info=True
+                )
+                db.rollback()
+                continue
 
-    logger.info(f"Done. Enriched {enriched}/{total} questions.")
-    db.close()
+        logger.info(f"Done. Enriched {enriched}/{total} questions.")
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

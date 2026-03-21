@@ -208,9 +208,11 @@ export const AppWithAuth: React.FC = () => {
                 path="/admin"
                 element={
                   <ProtectedRoute>
-                    <AppLayout>
-                      <Admin />
-                    </AppLayout>
+                    <RoleGuard allowedRoles={[UserRole.ADMIN]}>
+                      <AppLayout>
+                        <Admin />
+                      </AppLayout>
+                    </RoleGuard>
                   </ProtectedRoute>
                 }
               />

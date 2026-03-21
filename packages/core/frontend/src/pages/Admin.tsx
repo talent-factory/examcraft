@@ -33,6 +33,7 @@ export const Admin: React.FC = () => {
   ].filter((t): t is TabConfig => t.visible);
 
   const [activeTab, setActiveTab] = useState<AdminTab>(tabs[0]?.key ?? 'users');
+  const effectiveTab = tabs.some(t => t.key === activeTab) ? activeTab : (tabs[0]?.key ?? 'users');
 
   return (
     <div className="space-y-6">
@@ -50,7 +51,7 @@ export const Admin: React.FC = () => {
             type="button"
             onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              activeTab === tab.key
+              effectiveTab === tab.key
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
@@ -61,15 +62,15 @@ export const Admin: React.FC = () => {
       </div>
 
       <div className="card p-6">
-        {activeTab === 'users' && <UserManagementPage />}
-        {activeTab === 'institutions' && <InstitutionManagementPage />}
-        {activeTab === 'roles' && <RoleManagementPage />}
-        {activeTab === 'audit' && (
+        {effectiveTab === 'users' && <UserManagementPage />}
+        {effectiveTab === 'institutions' && <InstitutionManagementPage />}
+        {effectiveTab === 'roles' && <RoleManagementPage />}
+        {effectiveTab === 'audit' && (
           <div className="text-center py-12">
             <p className="text-gray-500 text-lg">Audit Logs — Demnachst verfugbar</p>
           </div>
         )}
-        {activeTab === 'subscription' && <SubscriptionTierOverview />}
+        {effectiveTab === 'subscription' && <SubscriptionTierOverview />}
       </div>
     </div>
   );
