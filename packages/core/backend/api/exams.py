@@ -17,6 +17,7 @@ from models.auth import User
 from models.question_review import QuestionReview, ReviewStatus
 from utils.auth_utils import require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
+from services.point_utils import suggest_points
 from services.exam_export_service import (
     MarkdownExporter,
     JsonExporter,
@@ -34,24 +35,6 @@ def _to_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
-
-
-# --- Point auto-suggestion table ---
-POINT_SUGGESTIONS = {
-    ("multiple_choice", "easy"): 2,
-    ("multiple_choice", "medium"): 4,
-    ("multiple_choice", "hard"): 6,
-    ("true_false", "easy"): 1,
-    ("true_false", "medium"): 2,
-    ("true_false", "hard"): 3,
-    ("open_ended", "easy"): 3,
-    ("open_ended", "medium"): 6,
-    ("open_ended", "hard"): 10,
-}
-
-
-def suggest_points(question_type: str, difficulty: str) -> float:
-    return float(POINT_SUGGESTIONS.get((question_type, difficulty), 4))
 
 
 # --- Pydantic Schemas ---
