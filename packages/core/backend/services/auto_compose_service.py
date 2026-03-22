@@ -1,12 +1,21 @@
 """
 Auto-Composition Engine for ExamCraft.
 
-Greedy constraint-based algorithm that selects questions to match
-distribution targets within point/duration budgets.
+Greedy constraint-based algorithm that selects questions to best-fit
+distribution targets within point/duration budgets. Each iteration selects
+the candidate that best improves distribution alignment. No backtracking
+is performed, so results are not globally optimal.
 """
 
+import logging
 from dataclasses import dataclass
+
 from services.point_utils import suggest_points
+
+logger = logging.getLogger(__name__)
+
+TOLERANCE_PCT = 5.0  # Distribution tolerance threshold in percentage points
+MAX_QUESTIONS = 50  # Safety limit to prevent unbounded selection
 
 
 @dataclass
@@ -36,7 +45,7 @@ class SelectedQuestion:
 class DistributionResult:
     target_pct: float
     achieved_pct: float
-    within_tolerance: bool  # +/-5%
+    within_tolerance: bool  # +/- TOLERANCE_PCT, used in constraint report only
 
 
 @dataclass
@@ -47,7 +56,7 @@ class ConstraintReport:
     duration_achieved: int
     bloom_distribution: dict[int, DistributionResult]
     difficulty_distribution: dict[str, DistributionResult]
-    overall_satisfaction: float  # 0-100%
+    overall_satisfaction: float  # 0-100%, defaults to 100 when no constraints active
 
 
 @dataclass
@@ -62,46 +71,76 @@ class CompositionResult:
 class CompositionConstraints:
     target_points: float | None = None
     target_duration_minutes: int | None = None
-    bloom_distribution: dict[int, float] | None = None  # {1: 20, 2: 30, ...}
-    difficulty_distribution: dict[str, float] | None = None  # {"easy": 30, ...}
+    bloom_distribution: dict[int, float] | None = (
+        None  # Bloom level -> target %, should sum to 100
+    )
+    difficulty_distribution: dict[str, float] | None = (
+        None  # Difficulty -> target %, should sum to 100
+    )
 
 
 def compose_questions(
     candidates: list[QuestionCandidate],
     constraints: CompositionConstraints,
 ) -> CompositionResult:
-    """Select questions from candidates to satisfy constraints using greedy optimization."""
+    """Select questions from candidates to best-fit constraints using greedy optimization.
+
+    Distribution targets are pursued on a best-effort basis; the returned
+    ConstraintReport indicates how closely they were met.
+    """
+    if (
+        constraints.target_points is None
+        and constraints.target_duration_minutes is None
+    ):
+        raise ValueError(
+            "At least one budget constraint (target_points or target_duration_minutes) is required"
+        )
+
+    logger.info(
+        "Starting composition: %d candidates, target_points=%s, target_duration=%s",
+        len(candidates),
+        constraints.target_points,
+        constraints.target_duration_minutes,
+    )
+
     selected: list[SelectedQuestion] = []
     remaining = list(candidates)
+    running_points = 0.0
+    running_duration = 0
 
-    while remaining:
+    while remaining and len(selected) < MAX_QUESTIONS:
         # Check if budget is exhausted
-        if _budget_exhausted(selected, constraints):
+        if _budget_exhausted(running_points, running_duration, constraints):
+            logger.debug("Budget exhausted after %d selections", len(selected))
             break
 
         # Score each remaining candidate
         best_candidate = None
         best_score = -1.0
         best_idx = -1
+        best_pts = 0.0
 
         for i, candidate in enumerate(remaining):
             pts = suggest_points(candidate.question_type, candidate.difficulty)
             time = candidate.estimated_time_minutes or 0
 
             # Skip if adding would exceed either active budget
-            if _would_exceed_budget(selected, pts, time, constraints):
+            if _would_exceed_budget(
+                running_points, running_duration, pts, time, constraints
+            ):
                 continue
 
-            score = _score_candidate(candidate, pts, selected, constraints)
+            score = _score_candidate(candidate, selected, constraints)
             if score > best_score:
                 best_score = score
                 best_candidate = candidate
                 best_idx = i
+                best_pts = pts
 
         if best_candidate is None:
-            break  # No valid candidate found
+            logger.debug("No valid candidate found after %d selections", len(selected))
+            break
 
-        pts = suggest_points(best_candidate.question_type, best_candidate.difficulty)
         selected.append(
             SelectedQuestion(
                 id=best_candidate.id,
@@ -111,14 +150,24 @@ def compose_questions(
                 topic=best_candidate.topic,
                 bloom_level=best_candidate.bloom_level,
                 estimated_time_minutes=best_candidate.estimated_time_minutes,
-                suggested_points=pts,
+                suggested_points=best_pts,
             )
         )
+        running_points += best_pts
+        running_duration += best_candidate.estimated_time_minutes or 0
         remaining.pop(best_idx)
 
     total_points = sum(q.suggested_points for q in selected)
     total_duration = sum(q.estimated_time_minutes or 0 for q in selected)
     report = _build_report(selected, constraints)
+
+    logger.info(
+        "Composition complete: %d questions, %.1f points, %d min, %.1f%% satisfaction",
+        len(selected),
+        total_points,
+        total_duration,
+        report.overall_satisfaction,
+    )
 
     return CompositionResult(
         questions=selected,
@@ -129,48 +178,43 @@ def compose_questions(
 
 
 def _budget_exhausted(
-    selected: list[SelectedQuestion],
+    running_points: float,
+    running_duration: int,
     constraints: CompositionConstraints,
 ) -> bool:
     if constraints.target_points is not None:
-        total_pts = sum(q.suggested_points for q in selected)
-        if total_pts >= constraints.target_points:
+        if running_points >= constraints.target_points:
             return True
     if constraints.target_duration_minutes is not None:
-        total_dur = sum(q.estimated_time_minutes or 0 for q in selected)
-        if total_dur >= constraints.target_duration_minutes:
+        if running_duration >= constraints.target_duration_minutes:
             return True
     return False
 
 
 def _would_exceed_budget(
-    selected: list[SelectedQuestion],
+    running_points: float,
+    running_duration: int,
     candidate_points: float,
     candidate_duration: int,
     constraints: CompositionConstraints,
 ) -> bool:
     if constraints.target_points is not None:
-        total_pts = sum(q.suggested_points for q in selected) + candidate_points
-        if total_pts > constraints.target_points:
+        if running_points + candidate_points > constraints.target_points:
             return True
     if constraints.target_duration_minutes is not None:
-        total_dur = (
-            sum(q.estimated_time_minutes or 0 for q in selected) + candidate_duration
-        )
-        if total_dur > constraints.target_duration_minutes:
+        if running_duration + candidate_duration > constraints.target_duration_minutes:
             return True
     return False
 
 
 def _score_candidate(
     candidate: QuestionCandidate,
-    candidate_points: float,
     selected: list[SelectedQuestion],
     constraints: CompositionConstraints,
 ) -> float:
     """Score a candidate based on how much it improves constraint satisfaction.
 
-    Higher score = better fit. Returns value >= 0.
+    Higher score = better fit. Returns value >= 1.0 (base score).
     """
     score = 1.0  # Base score so every candidate has some value
 
@@ -229,7 +273,7 @@ def _build_report(
             bloom_report[level] = DistributionResult(
                 target_pct=target_pct,
                 achieved_pct=round(achieved_pct, 1),
-                within_tolerance=abs(achieved_pct - target_pct) <= 5.0,
+                within_tolerance=abs(achieved_pct - target_pct) <= TOLERANCE_PCT,
             )
 
     # Difficulty distribution report
@@ -243,10 +287,12 @@ def _build_report(
             diff_report[diff] = DistributionResult(
                 target_pct=target_pct,
                 achieved_pct=round(achieved_pct, 1),
-                within_tolerance=abs(achieved_pct - target_pct) <= 5.0,
+                within_tolerance=abs(achieved_pct - target_pct) <= TOLERANCE_PCT,
             )
 
     # Overall satisfaction: average of (100 - abs_deviation) for all constraints
+    # Note: each distribution key contributes one score, so distributions with
+    # more keys have proportionally more weight.
     satisfaction_scores: list[float] = []
     for dr in bloom_report.values():
         satisfaction_scores.append(max(0, 100 - abs(dr.achieved_pct - dr.target_pct)))

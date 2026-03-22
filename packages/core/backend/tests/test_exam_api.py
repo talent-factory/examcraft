@@ -2012,6 +2012,7 @@ class TestAutoComposeQuestions(
         )
         assert response.status_code == 200
         data = response.json()
+        assert data["mode"] == "preview"
         assert "questions" in data
         assert "constraint_report" in data
         assert data["total_points"] <= 20.0
@@ -2037,6 +2038,12 @@ class TestAutoComposeQuestions(
         data = response.json()
         assert len(data["questions"]) > 0
         assert data["total_points"] > 0
+
+        # Verify questions are actually persisted by re-fetching the exam
+        get_resp = exam_client.get(f"/api/v1/exams/{exam_id}")
+        assert get_resp.status_code == 200
+        exam_data = get_resp.json()
+        assert len(exam_data["questions"]) == len(data["questions"])
 
     def test_backward_compat_simple_mode(
         self, exam_client, exam_db, exam_institution, exam_user

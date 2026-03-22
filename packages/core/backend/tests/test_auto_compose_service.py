@@ -1,10 +1,12 @@
 """Unit tests for the auto-composition engine."""
 
+import pytest
 from services.auto_compose_service import (
     compose_questions,
     QuestionCandidate,
     CompositionConstraints,
 )
+from services.point_utils import suggest_points, POINT_SUGGESTIONS, DEFAULT_POINTS
 
 
 def _candidate(
@@ -25,6 +27,27 @@ def _candidate(
     )
 
 
+class TestSuggestPoints:
+    """Tests for the point suggestion utility."""
+
+    def test_known_combinations(self):
+        """All known type/difficulty combos return correct values."""
+        for (qtype, diff), expected in POINT_SUGGESTIONS.items():
+            assert suggest_points(qtype, diff) == float(expected)
+
+    def test_unknown_type_returns_default(self):
+        """Unknown question type falls back to DEFAULT_POINTS."""
+        assert suggest_points("essay", "medium") == DEFAULT_POINTS
+
+    def test_unknown_difficulty_returns_default(self):
+        """Unknown difficulty falls back to DEFAULT_POINTS."""
+        assert suggest_points("open_ended", "impossible") == DEFAULT_POINTS
+
+    def test_case_sensitive(self):
+        """Lookup is case-sensitive -- capitalized keys get default."""
+        assert suggest_points("Open_Ended", "Medium") == DEFAULT_POINTS
+
+
 class TestComposeQuestions:
     def test_basic_point_budget(self):
         """Selects questions until point budget is reached."""
@@ -40,6 +63,8 @@ class TestComposeQuestions:
         assert result.total_points <= 12.0
         assert result.total_points > 0
         assert len(result.questions) >= 1
+        assert result.constraint_report.points_target == 12.0
+        assert result.constraint_report.points_achieved == result.total_points
 
     def test_duration_budget(self):
         """Selects questions until duration budget is reached."""
@@ -90,8 +115,10 @@ class TestComposeQuestions:
         result = compose_questions(candidates, constraints)
 
         bloom_levels = [q.bloom_level for q in result.questions]
-        # Should pick a mix, not all from one level
-        assert len(set(bloom_levels)) > 1
+        # Should pick from all three target levels
+        assert len(set(bloom_levels)) >= 3, (
+            f"Expected all 3 levels, got {set(bloom_levels)}"
+        )
 
     def test_difficulty_distribution_targeting(self):
         """Questions are selected to match difficulty distribution targets."""
@@ -110,7 +137,9 @@ class TestComposeQuestions:
         result = compose_questions(candidates, constraints)
 
         difficulties = [q.difficulty for q in result.questions]
-        assert len(set(difficulties)) > 1
+        assert len(set(difficulties)) >= 3, (
+            f"Expected all 3 difficulties, got {set(difficulties)}"
+        )
 
     def test_empty_candidates(self):
         """Empty candidate pool returns empty result with report."""
@@ -144,6 +173,18 @@ class TestComposeQuestions:
         assert len(result.questions) == 1
         assert result.questions[0].suggested_points == 2.0
 
+    def test_all_candidates_exceed_budget(self):
+        """When all candidates exceed budget, returns empty result."""
+        candidates = [
+            _candidate(1, "open_ended", "hard"),  # 10 pts
+            _candidate(2, "open_ended", "hard"),  # 10 pts
+        ]
+        constraints = CompositionConstraints(target_points=5.0)
+        result = compose_questions(candidates, constraints)
+
+        assert len(result.questions) == 0
+        assert result.total_points == 0
+
     def test_constraint_report_tolerance(self):
         """Constraint report correctly flags within/outside tolerance."""
         candidates = [
@@ -166,31 +207,37 @@ class TestComposeQuestions:
             assert dr.target_pct >= 0
             assert dr.achieved_pct >= 0
 
+    def test_constraint_report_overall_satisfaction(self):
+        """Overall satisfaction reflects how well constraints were met."""
+        candidates = [_candidate(1, "open_ended", "medium")]  # 6 pts
+        constraints = CompositionConstraints(target_points=6.0)
+        result = compose_questions(candidates, constraints)
+
+        # Perfect match on points should give high satisfaction
+        assert result.constraint_report.overall_satisfaction >= 90.0
+
     def test_null_bloom_gets_base_score_only(self):
         """Candidates with None bloom_level get base score when bloom constraints active."""
         candidates = [
             _candidate(1, bloom_level=1),
-            _candidate(2, bloom_level=None),  # NULL bloom
+            QuestionCandidate(
+                id=2,
+                question_text="Question 2",
+                question_type="open_ended",
+                difficulty="medium",
+                topic="Test",
+                bloom_level=None,
+                estimated_time_minutes=5,
+            ),
             _candidate(3, bloom_level=3),
         ]
-        # Need to set bloom_level=None manually since _candidate default is 2
-        candidates[1] = QuestionCandidate(
-            id=2,
-            question_text="Question 2",
-            question_type="open_ended",
-            difficulty="medium",
-            topic="Test",
-            bloom_level=None,
-            estimated_time_minutes=5,
-        )
         constraints = CompositionConstraints(
             target_points=50.0,
             bloom_distribution={1: 50, 3: 50},
         )
         result = compose_questions(candidates, constraints)
 
-        # NULL-bloom candidate may still be selected (gets base score)
-        # but bloom-matching candidates should be preferred
+        # Bloom-matching candidates should be preferred
         ids = [q.id for q in result.questions]
         assert 1 in ids  # bloom=1 matches target
         assert 3 in ids  # bloom=3 matches target
@@ -212,3 +259,26 @@ class TestComposeQuestions:
         ids1 = [q.id for q in result1.questions]
         ids2 = [q.id for q in result2.questions]
         assert ids1 == ids2
+
+    def test_requires_at_least_one_budget_constraint(self):
+        """Raises ValueError when no budget constraint is provided."""
+        candidates = [_candidate(1)]
+        constraints = CompositionConstraints()
+        with pytest.raises(ValueError, match="At least one budget constraint"):
+            compose_questions(candidates, constraints)
+
+    def test_distribution_only_with_point_budget(self):
+        """Difficulty-only distribution works correctly with a point budget."""
+        candidates = [
+            _candidate(1, difficulty="easy"),
+            _candidate(2, difficulty="medium"),
+            _candidate(3, difficulty="hard"),
+        ]
+        constraints = CompositionConstraints(
+            target_points=50.0,
+            difficulty_distribution={"easy": 33, "medium": 34, "hard": 33},
+        )
+        result = compose_questions(candidates, constraints)
+
+        difficulties = [q.difficulty for q in result.questions]
+        assert len(set(difficulties)) >= 2

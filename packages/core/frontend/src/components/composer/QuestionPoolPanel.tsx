@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
 import type { ApprovedQuestion, AutoFillRequest, AutoComposePreview, ProposedQuestion } from '../../types/composer';
+import { isAutoComposePreview } from '../../types/composer';
 
 interface QuestionPoolPanelProps {
   addedQuestionIds: Set<number>;
@@ -171,8 +172,8 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   const composeMutation = useMutation({
     mutationFn: (req: AutoFillRequest) => ComposerService.autoFill(examId, req),
     onSuccess: (data) => {
-      if ('constraint_report' in data) {
-        setPreview(data as AutoComposePreview);
+      if (isAutoComposePreview(data)) {
+        setPreview(data);
         setAutoFillError(null);
       } else {
         setPreview(null);
@@ -187,6 +188,20 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   });
 
   const handleCompose = () => {
+    const targetPoints = compositionForm.target_points.trim() !== ''
+      ? parseFloat(compositionForm.target_points) : undefined;
+    const targetDuration = compositionForm.target_duration_minutes.trim() !== ''
+      ? parseInt(compositionForm.target_duration_minutes) : undefined;
+
+    if (targetPoints !== undefined && (isNaN(targetPoints) || targetPoints <= 0)) {
+      setAutoFillError('Zielpunkte muss eine positive Zahl sein.');
+      return;
+    }
+    if (targetDuration !== undefined && (isNaN(targetDuration) || targetDuration <= 0)) {
+      setAutoFillError('Zieldauer muss eine positive Zahl sein.');
+      return;
+    }
+
     const bloomDist: Record<number, number> = {};
     let hasBloom = false;
     for (const [k, v] of Object.entries(compositionForm.bloom_distribution)) {
@@ -207,9 +222,15 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       }
     }
 
+    if (targetPoints === undefined && targetDuration === undefined && !hasBloom && !hasDiff) {
+      setAutoFillError('Bitte geben Sie mindestens Zielpunkte, eine Zieldauer oder eine Verteilung an.');
+      return;
+    }
+
+    setAutoFillError(null);
     const req: AutoFillRequest = {
-      target_points: parseFloat(compositionForm.target_points) || undefined,
-      target_duration_minutes: parseInt(compositionForm.target_duration_minutes) || undefined,
+      target_points: targetPoints,
+      target_duration_minutes: targetDuration,
       bloom_distribution: hasBloom ? bloomDist : undefined,
       difficulty_distribution: hasDiff ? diffDist : undefined,
       topic: compositionForm.topic || undefined,

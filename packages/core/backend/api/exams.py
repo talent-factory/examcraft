@@ -3,7 +3,7 @@ Exam Composer API Endpoints for ExamCraft AI
 CRUD, question management, auto-fill, finalize, and export.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import date, datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from pydantic import BaseModel, Field
@@ -656,7 +656,7 @@ async def reorder_questions(
 
 
 class AutoFillRequest(BaseModel):
-    # Existing fields (simple mode)
+    # Simple mode fields
     count: Optional[int] = Field(None, ge=1, le=20)
     topic: Optional[str] = None
     difficulty: Optional[List[str]] = None
@@ -664,7 +664,7 @@ class AutoFillRequest(BaseModel):
     question_types: Optional[List[str]] = None
     exclude_question_ids: Optional[List[int]] = None
 
-    # New constraint fields (composition mode)
+    # Composition mode fields
     target_points: Optional[float] = Field(None, gt=0)
     target_duration_minutes: Optional[int] = Field(None, gt=0)
     bloom_distribution: Optional[dict[int, float]] = None
@@ -674,7 +674,10 @@ class AutoFillRequest(BaseModel):
     @property
     def is_composition_mode(self) -> bool:
         return (
-            self.target_points is not None or self.target_duration_minutes is not None
+            self.target_points is not None
+            or self.target_duration_minutes is not None
+            or self.bloom_distribution is not None
+            or self.difficulty_distribution is not None
         )
 
 
@@ -706,13 +709,17 @@ class ProposedQuestionOut(BaseModel):
 
 
 class AutoComposePreview(BaseModel):
+    mode: str = "preview"
     questions: list[ProposedQuestionOut]
     total_points: float
     total_duration_minutes: int
     constraint_report: ConstraintReportOut
 
 
-@router.post("/{exam_id}/auto-fill")
+@router.post(
+    "/{exam_id}/auto-fill",
+    response_model=Union[ExamDetailOut, AutoComposePreview],
+)
 async def auto_fill_questions(
     exam_id: int,
     request: AutoFillRequest,
@@ -721,7 +728,7 @@ async def auto_fill_questions(
 ):
     """Auto-fill exam with questions matching criteria.
 
-    Simple mode: random selection by count (legacy behavior).
+    Simple mode: random selection by count (default when no composition constraints set).
     Composition mode: constraint-based greedy optimization with optional preview.
     """
     exam = _get_exam_or_404(exam_id, db, current_user)
@@ -734,7 +741,7 @@ async def auto_fill_questions(
 
 
 def _validate_distribution(dist: dict, name: str, valid_keys: set | None = None):
-    """Validate that distribution values sum to ~100."""
+    """Validate that distribution percentage values sum to ~100 (+/-1) and optionally check keys against a valid set."""
     total = sum(dist.values())
     if abs(total - 100) > 1.0:
         raise HTTPException(
@@ -748,6 +755,59 @@ def _validate_distribution(dist: dict, name: str, valid_keys: set | None = None)
                 status_code=422,
                 detail=f"Invalid {name} keys: {invalid}",
             )
+
+
+def _build_candidate_query(
+    exam: Exam, request: AutoFillRequest, current_user: User, db: Session
+):
+    """Build filtered query for approved question candidates."""
+    tenant_context = get_tenant_context(current_user)
+    query = db.query(QuestionReview).filter(
+        QuestionReview.review_status == ReviewStatus.APPROVED.value
+    )
+    query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
+
+    # Exclude already-added and user-excluded questions
+    existing_qids = {eq.question_id for eq in exam.questions}
+    exclude_ids = existing_qids | set(request.exclude_question_ids or [])
+    if exclude_ids:
+        query = query.filter(QuestionReview.id.notin_(exclude_ids))
+
+    # Apply filters
+    if request.topic:
+        query = query.filter(QuestionReview.topic.ilike(f"%{request.topic}%"))
+    if request.difficulty:
+        query = query.filter(QuestionReview.difficulty.in_(request.difficulty))
+    if request.bloom_level_min:
+        query = query.filter(QuestionReview.bloom_level >= request.bloom_level_min)
+    if request.question_types:
+        query = query.filter(QuestionReview.question_type.in_(request.question_types))
+
+    return query
+
+
+def _commit_exam_changes(exam: Exam, db: Session, operation_name: str):
+    """Flush, recalculate points, and commit exam changes with error handling."""
+    try:
+        db.flush()
+        db.refresh(exam)
+        exam.recalculate_total_points()
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error(
+            "IntegrityError in %s for exam %s: %s", operation_name, exam.id, exc
+        )
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error(
+            "Database error in %s for exam %s: %s", operation_name, exam.id, exc
+        )
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
 
 
 def _auto_compose(
@@ -774,28 +834,7 @@ def _auto_compose(
             valid_keys={"easy", "medium", "hard"},
         )
 
-    # Query candidates
-    tenant_context = get_tenant_context(current_user)
-    query = db.query(QuestionReview).filter(
-        QuestionReview.review_status == ReviewStatus.APPROVED.value
-    )
-    query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
-
-    # Exclude already-added and user-excluded questions
-    existing_qids = {eq.question_id for eq in exam.questions}
-    exclude_ids = existing_qids | set(request.exclude_question_ids or [])
-    if exclude_ids:
-        query = query.filter(QuestionReview.id.notin_(exclude_ids))
-
-    # Apply filters
-    if request.topic:
-        query = query.filter(QuestionReview.topic.ilike(f"%{request.topic}%"))
-    if request.difficulty:
-        query = query.filter(QuestionReview.difficulty.in_(request.difficulty))
-    if request.bloom_level_min:
-        query = query.filter(QuestionReview.bloom_level >= request.bloom_level_min)
-    if request.question_types:
-        query = query.filter(QuestionReview.question_type.in_(request.question_types))
+    query = _build_candidate_query(exam, request, current_user, db)
 
     # Exclude NULL metadata when corresponding constraints are active
     if request.bloom_distribution:
@@ -837,44 +876,27 @@ def _auto_compose(
 
     # Preview mode: return proposal without modifying exam
     if request.preview:
+        from dataclasses import asdict
+
+        report = result.constraint_report
         return AutoComposePreview(
-            questions=[
-                ProposedQuestionOut(
-                    id=q.id,
-                    question_text=q.question_text,
-                    question_type=q.question_type,
-                    difficulty=q.difficulty,
-                    topic=q.topic,
-                    bloom_level=q.bloom_level,
-                    estimated_time_minutes=q.estimated_time_minutes,
-                    suggested_points=q.suggested_points,
-                )
-                for q in result.questions
-            ],
+            questions=[ProposedQuestionOut(**asdict(q)) for q in result.questions],
             total_points=result.total_points,
             total_duration_minutes=result.total_duration_minutes,
             constraint_report=ConstraintReportOut(
-                points_target=result.constraint_report.points_target,
-                points_achieved=result.constraint_report.points_achieved,
-                duration_target=result.constraint_report.duration_target,
-                duration_achieved=result.constraint_report.duration_achieved,
+                points_target=report.points_target,
+                points_achieved=report.points_achieved,
+                duration_target=report.duration_target,
+                duration_achieved=report.duration_achieved,
                 bloom_distribution={
-                    k: DistributionResultOut(
-                        target_pct=v.target_pct,
-                        achieved_pct=v.achieved_pct,
-                        within_tolerance=v.within_tolerance,
-                    )
-                    for k, v in result.constraint_report.bloom_distribution.items()
+                    k: DistributionResultOut(**asdict(v))
+                    for k, v in report.bloom_distribution.items()
                 },
                 difficulty_distribution={
-                    k: DistributionResultOut(
-                        target_pct=v.target_pct,
-                        achieved_pct=v.achieved_pct,
-                        within_tolerance=v.within_tolerance,
-                    )
-                    for k, v in result.constraint_report.difficulty_distribution.items()
+                    k: DistributionResultOut(**asdict(v))
+                    for k, v in report.difficulty_distribution.items()
                 },
-                overall_satisfaction=result.constraint_report.overall_satisfaction,
+                overall_satisfaction=report.overall_satisfaction,
             ),
         )
 
@@ -890,52 +912,17 @@ def _auto_compose(
         )
         db.add(eq)
 
-    try:
-        db.flush()
-        db.refresh(exam)
-        exam.recalculate_total_points()
-        db.commit()
-        db.refresh(exam)
-    except IntegrityError as exc:
-        db.rollback()
-        logger.error("IntegrityError in auto_compose for exam %s: %s", exam.id, exc)
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
-    except SQLAlchemyError as exc:
-        db.rollback()
-        logger.error("Database error in auto_compose for exam %s: %s", exam.id, exc)
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
-
+    _commit_exam_changes(exam, db, "auto_compose")
     return _exam_detail_to_out(exam)
 
 
 def _auto_fill_simple(
     exam: Exam, request: AutoFillRequest, current_user: User, db: Session
 ):
-    """Simple mode: random selection by count (legacy behavior)."""
+    """Simple mode: random selection by count."""
     count = request.count or 5
 
-    tenant_context = get_tenant_context(current_user)
-    query = db.query(QuestionReview).filter(
-        QuestionReview.review_status == ReviewStatus.APPROVED.value
-    )
-    query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
-
-    existing_qids = {eq.question_id for eq in exam.questions}
-    exclude_ids = existing_qids | set(request.exclude_question_ids or [])
-    if exclude_ids:
-        query = query.filter(QuestionReview.id.notin_(exclude_ids))
-
-    if request.topic:
-        query = query.filter(QuestionReview.topic.ilike(f"%{request.topic}%"))
-    if request.difficulty:
-        query = query.filter(QuestionReview.difficulty.in_(request.difficulty))
-    if request.bloom_level_min:
-        query = query.filter(QuestionReview.bloom_level >= request.bloom_level_min)
-    if request.question_types:
-        query = query.filter(QuestionReview.question_type.in_(request.question_types))
-
+    query = _build_candidate_query(exam, request, current_user, db)
     candidates = query.order_by(sa_func.random()).limit(count).all()
     if not candidates:
         raise HTTPException(status_code=404, detail="No matching questions found")
@@ -951,23 +938,7 @@ def _auto_fill_simple(
         )
         db.add(eq)
 
-    try:
-        db.flush()
-        db.refresh(exam)
-        exam.recalculate_total_points()
-        db.commit()
-        db.refresh(exam)
-    except IntegrityError as exc:
-        db.rollback()
-        logger.error("IntegrityError in auto_fill for exam %s: %s", exam.id, exc)
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
-    except SQLAlchemyError as exc:
-        db.rollback()
-        logger.error("Database error in auto_fill for exam %s: %s", exam.id, exc)
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
-
+    _commit_exam_changes(exam, db, "auto_fill")
     return _exam_detail_to_out(exam)
 
 

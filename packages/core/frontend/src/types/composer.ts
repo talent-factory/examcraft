@@ -90,8 +90,13 @@ export interface ProposedQuestion {
 }
 
 export interface AutoComposePreview {
+  mode: 'preview';
   questions: ProposedQuestion[];
   total_points: number;
   total_duration_minutes: number;
   constraint_report: ConstraintReport;
+}
+
+export function isAutoComposePreview(data: unknown): data is AutoComposePreview {
+  return typeof data === 'object' && data !== null && 'mode' in data && (data as AutoComposePreview).mode === 'preview';
 }
