@@ -656,24 +656,265 @@ async def reorder_questions(
 
 
 class AutoFillRequest(BaseModel):
-    count: int = Field(5, ge=1, le=20)
+    # Existing fields (simple mode)
+    count: Optional[int] = Field(None, ge=1, le=20)
     topic: Optional[str] = None
     difficulty: Optional[List[str]] = None
     bloom_level_min: Optional[int] = Field(None, ge=1, le=6)
     question_types: Optional[List[str]] = None
     exclude_question_ids: Optional[List[int]] = None
 
+    # New constraint fields (composition mode)
+    target_points: Optional[float] = Field(None, gt=0)
+    target_duration_minutes: Optional[int] = Field(None, gt=0)
+    bloom_distribution: Optional[dict[int, float]] = None
+    difficulty_distribution: Optional[dict[str, float]] = None
+    preview: bool = False
 
-@router.post("/{exam_id}/auto-fill", response_model=ExamDetailOut)
+    @property
+    def is_composition_mode(self) -> bool:
+        return (
+            self.target_points is not None or self.target_duration_minutes is not None
+        )
+
+
+class DistributionResultOut(BaseModel):
+    target_pct: float
+    achieved_pct: float
+    within_tolerance: bool
+
+
+class ConstraintReportOut(BaseModel):
+    points_target: Optional[float]
+    points_achieved: float
+    duration_target: Optional[int]
+    duration_achieved: int
+    bloom_distribution: dict[int, DistributionResultOut]
+    difficulty_distribution: dict[str, DistributionResultOut]
+    overall_satisfaction: float
+
+
+class ProposedQuestionOut(BaseModel):
+    id: int
+    question_text: str
+    question_type: str
+    difficulty: str
+    topic: str
+    bloom_level: Optional[int]
+    estimated_time_minutes: Optional[int]
+    suggested_points: float
+
+
+class AutoComposePreview(BaseModel):
+    questions: list[ProposedQuestionOut]
+    total_points: float
+    total_duration_minutes: int
+    constraint_report: ConstraintReportOut
+
+
+@router.post("/{exam_id}/auto-fill")
 async def auto_fill_questions(
     exam_id: int,
     request: AutoFillRequest,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
-    """Auto-fill exam with questions matching criteria."""
+    """Auto-fill exam with questions matching criteria.
+
+    Simple mode: random selection by count (legacy behavior).
+    Composition mode: constraint-based greedy optimization with optional preview.
+    """
     exam = _get_exam_or_404(exam_id, db, current_user)
     _require_draft(exam)
+
+    if request.is_composition_mode:
+        return _auto_compose(exam, request, current_user, db)
+    else:
+        return _auto_fill_simple(exam, request, current_user, db)
+
+
+def _validate_distribution(dist: dict, name: str, valid_keys: set | None = None):
+    """Validate that distribution values sum to ~100."""
+    total = sum(dist.values())
+    if abs(total - 100) > 1.0:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{name} must sum to 100 (got {total})",
+        )
+    if valid_keys:
+        invalid = set(dist.keys()) - valid_keys
+        if invalid:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid {name} keys: {invalid}",
+            )
+
+
+def _auto_compose(
+    exam: Exam, request: AutoFillRequest, current_user: User, db: Session
+):
+    """Composition mode: constraint-based greedy optimization."""
+    from services.auto_compose_service import (
+        compose_questions,
+        QuestionCandidate,
+        CompositionConstraints,
+    )
+
+    # Validate distributions
+    if request.bloom_distribution:
+        _validate_distribution(
+            request.bloom_distribution,
+            "bloom_distribution",
+            valid_keys={1, 2, 3, 4, 5, 6},
+        )
+    if request.difficulty_distribution:
+        _validate_distribution(
+            request.difficulty_distribution,
+            "difficulty_distribution",
+            valid_keys={"easy", "medium", "hard"},
+        )
+
+    # Query candidates
+    tenant_context = get_tenant_context(current_user)
+    query = db.query(QuestionReview).filter(
+        QuestionReview.review_status == ReviewStatus.APPROVED.value
+    )
+    query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
+
+    # Exclude already-added and user-excluded questions
+    existing_qids = {eq.question_id for eq in exam.questions}
+    exclude_ids = existing_qids | set(request.exclude_question_ids or [])
+    if exclude_ids:
+        query = query.filter(QuestionReview.id.notin_(exclude_ids))
+
+    # Apply filters
+    if request.topic:
+        query = query.filter(QuestionReview.topic.ilike(f"%{request.topic}%"))
+    if request.difficulty:
+        query = query.filter(QuestionReview.difficulty.in_(request.difficulty))
+    if request.bloom_level_min:
+        query = query.filter(QuestionReview.bloom_level >= request.bloom_level_min)
+    if request.question_types:
+        query = query.filter(QuestionReview.question_type.in_(request.question_types))
+
+    # Exclude NULL metadata when corresponding constraints are active
+    if request.bloom_distribution:
+        query = query.filter(QuestionReview.bloom_level.isnot(None))
+    if request.target_duration_minutes:
+        query = query.filter(QuestionReview.estimated_time_minutes.isnot(None))
+
+    all_candidates = query.all()
+    if not all_candidates:
+        raise HTTPException(status_code=404, detail="No matching questions found")
+
+    candidates = [
+        QuestionCandidate(
+            id=q.id,
+            question_text=q.question_text,
+            question_type=q.question_type,
+            difficulty=q.difficulty,
+            topic=q.topic,
+            bloom_level=q.bloom_level,
+            estimated_time_minutes=q.estimated_time_minutes,
+        )
+        for q in all_candidates
+    ]
+
+    constraints = CompositionConstraints(
+        target_points=request.target_points,
+        target_duration_minutes=request.target_duration_minutes,
+        bloom_distribution=request.bloom_distribution,
+        difficulty_distribution=request.difficulty_distribution,
+    )
+
+    result = compose_questions(candidates, constraints)
+
+    if not result.questions:
+        raise HTTPException(
+            status_code=404,
+            detail="No questions fit within the specified constraints",
+        )
+
+    # Preview mode: return proposal without modifying exam
+    if request.preview:
+        return AutoComposePreview(
+            questions=[
+                ProposedQuestionOut(
+                    id=q.id,
+                    question_text=q.question_text,
+                    question_type=q.question_type,
+                    difficulty=q.difficulty,
+                    topic=q.topic,
+                    bloom_level=q.bloom_level,
+                    estimated_time_minutes=q.estimated_time_minutes,
+                    suggested_points=q.suggested_points,
+                )
+                for q in result.questions
+            ],
+            total_points=result.total_points,
+            total_duration_minutes=result.total_duration_minutes,
+            constraint_report=ConstraintReportOut(
+                points_target=result.constraint_report.points_target,
+                points_achieved=result.constraint_report.points_achieved,
+                duration_target=result.constraint_report.duration_target,
+                duration_achieved=result.constraint_report.duration_achieved,
+                bloom_distribution={
+                    k: DistributionResultOut(
+                        target_pct=v.target_pct,
+                        achieved_pct=v.achieved_pct,
+                        within_tolerance=v.within_tolerance,
+                    )
+                    for k, v in result.constraint_report.bloom_distribution.items()
+                },
+                difficulty_distribution={
+                    k: DistributionResultOut(
+                        target_pct=v.target_pct,
+                        achieved_pct=v.achieved_pct,
+                        within_tolerance=v.within_tolerance,
+                    )
+                    for k, v in result.constraint_report.difficulty_distribution.items()
+                },
+                overall_satisfaction=result.constraint_report.overall_satisfaction,
+            ),
+        )
+
+    # Apply mode: add questions to exam
+    max_pos = max((eq.position for eq in exam.questions), default=0)
+    for q in result.questions:
+        max_pos += 1
+        eq = ExamQuestion(
+            exam_id=exam.id,
+            question_id=q.id,
+            position=max_pos,
+            points=q.suggested_points,
+        )
+        db.add(eq)
+
+    try:
+        db.flush()
+        db.refresh(exam)
+        exam.recalculate_total_points()
+        db.commit()
+        db.refresh(exam)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error("IntegrityError in auto_compose for exam %s: %s", exam.id, exc)
+        raise HTTPException(
+            status_code=409, detail="Conflict. Please reload and try again."
+        )
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error("Database error in auto_compose for exam %s: %s", exam.id, exc)
+        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+
+    return _exam_detail_to_out(exam)
+
+
+def _auto_fill_simple(
+    exam: Exam, request: AutoFillRequest, current_user: User, db: Session
+):
+    """Simple mode: random selection by count (legacy behavior)."""
+    count = request.count or 5
 
     tenant_context = get_tenant_context(current_user)
     query = db.query(QuestionReview).filter(
@@ -681,7 +922,6 @@ async def auto_fill_questions(
     )
     query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
 
-    # Exclude already-added questions
     existing_qids = {eq.question_id for eq in exam.questions}
     exclude_ids = existing_qids | set(request.exclude_question_ids or [])
     if exclude_ids:
@@ -696,9 +936,7 @@ async def auto_fill_questions(
     if request.question_types:
         query = query.filter(QuestionReview.question_type.in_(request.question_types))
 
-    # Random selection for diversity
-    candidates = query.order_by(sa_func.random()).limit(request.count).all()
-
+    candidates = query.order_by(sa_func.random()).limit(count).all()
     if not candidates:
         raise HTTPException(status_code=404, detail="No matching questions found")
 
@@ -721,17 +959,13 @@ async def auto_fill_questions(
         db.refresh(exam)
     except IntegrityError as exc:
         db.rollback()
-        logger.error(
-            "IntegrityError in auto_fill_questions for exam %s: %s", exam_id, exc
-        )
+        logger.error("IntegrityError in auto_fill for exam %s: %s", exam.id, exc)
         raise HTTPException(
             status_code=409, detail="Conflict. Please reload and try again."
         )
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.error(
-            "Database error in auto_fill_questions for exam %s: %s", exam_id, exc
-        )
+        logger.error("Database error in auto_fill for exam %s: %s", exam.id, exc)
         raise HTTPException(status_code=500, detail="Database error. Please try again.")
 
     return _exam_detail_to_out(exam)
