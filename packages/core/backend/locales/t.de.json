@@ -1,0 +1,26 @@
+{
+  "de": {
+    "auth_email_taken": "E-Mail-Adresse ist bereits registriert",
+    "auth_username_taken": "Benutzername ist bereits vergeben",
+    "auth_invalid_credentials": "Ungültige E-Mail oder Passwort",
+    "auth_account_disabled": "Ihr Konto wurde deaktiviert",
+    "auth_session_expired": "Ihre Sitzung ist abgelaufen, bitte melden Sie sich erneut an",
+    "auth_token_invalid": "Ungültiger oder abgelaufener Token",
+    "auth_token_missing": "Authentifizierungstoken fehlt",
+    "auth_insufficient_permissions": "Unzureichende Berechtigungen",
+    "auth_registration_failed": "Registrierung fehlgeschlagen",
+    "auth_logout_success": "Erfolgreich abgemeldet",
+    "document_not_found": "Dokument nicht gefunden",
+    "document_upload_failed": "Dokument-Upload fehlgeschlagen",
+    "document_processing_failed": "Dokumentverarbeitung fehlgeschlagen",
+    "document_quota_exceeded": "Dokument-Kontingent erschöpft",
+    "question_generation_failed": "Fragengeenerierung fehlgeschlagen",
+    "question_quota_exceeded": "Fragen-Kontingent erschöpft",
+    "validation_required_field": "Dieses Feld ist erforderlich",
+    "validation_invalid_email": "Ungültige E-Mail-Adresse",
+    "validation_password_too_short": "Passwort muss mindestens 8 Zeichen lang sein",
+    "server_error": "Interner Serverfehler",
+    "not_found": "Nicht gefunden",
+    "test_only_in_de": "Nur auf Deutsch"
+  }
+}

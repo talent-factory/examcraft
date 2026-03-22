@@ -1,0 +1,25 @@
+{
+  "it": {
+    "auth_email_taken": "L'indirizzo e-mail è già registrato",
+    "auth_username_taken": "Il nome utente è già in uso",
+    "auth_invalid_credentials": "E-mail o password non validi",
+    "auth_account_disabled": "Il tuo account è stato disabilitato",
+    "auth_session_expired": "La tua sessione è scaduta, effettua nuovamente il login",
+    "auth_token_invalid": "Token non valido o scaduto",
+    "auth_token_missing": "Token di autenticazione mancante",
+    "auth_insufficient_permissions": "Permessi insufficienti",
+    "auth_registration_failed": "Registrazione fallita",
+    "auth_logout_success": "Disconnessione effettuata con successo",
+    "document_not_found": "Documento non trovato",
+    "document_upload_failed": "Caricamento del documento fallito",
+    "document_processing_failed": "Elaborazione del documento fallita",
+    "document_quota_exceeded": "Quota documenti esaurita",
+    "question_generation_failed": "Generazione delle domande fallita",
+    "question_quota_exceeded": "Quota domande esaurita",
+    "validation_required_field": "Questo campo è obbligatorio",
+    "validation_invalid_email": "Indirizzo e-mail non valido",
+    "validation_password_too_short": "La password deve contenere almeno 8 caratteri",
+    "server_error": "Errore interno del server",
+    "not_found": "Non trovato"
+  }
+}
