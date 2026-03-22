@@ -33,6 +33,7 @@ import {
   FilterList,
   Refresh,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { ReviewService } from '../services/ReviewService';
 import {
   QuestionReview,
@@ -46,6 +47,7 @@ import QuestionReviewCard from './QuestionReviewCard';
 import QuestionEditor from './QuestionEditor';
 
 const ReviewQueue: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [questions, setQuestions] = useState<QuestionReview[]>([]);
   const [loading, setLoading] = useState(false);
@@ -228,10 +230,10 @@ const ReviewQueue: React.FC = () => {
       {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" gutterBottom>
-          Question Review Queue
+          {t('components.reviewQueue.title')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Review and approve AI-generated exam questions
+          {t('components.reviewQueue.subtitle')}
         </Typography>
       </Box>
 
@@ -241,7 +243,7 @@ const ReviewQueue: React.FC = () => {
           <Card>
             <CardContent>
               <Typography variant="h4">{stats.total}</Typography>
-              <Typography variant="body2" color="text.secondary">Total</Typography>
+              <Typography variant="body2" color="text.secondary">{t('components.reviewQueue.statsTotal')}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -249,7 +251,7 @@ const ReviewQueue: React.FC = () => {
           <Card sx={{ bgcolor: 'warning.light' }}>
             <CardContent>
               <Typography variant="h4">{stats.pending}</Typography>
-              <Typography variant="body2">Pending</Typography>
+              <Typography variant="body2">{t('components.reviewQueue.statsPending')}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -257,7 +259,7 @@ const ReviewQueue: React.FC = () => {
           <Card sx={{ bgcolor: 'success.light' }}>
             <CardContent>
               <Typography variant="h4">{stats.approved}</Typography>
-              <Typography variant="body2">Approved</Typography>
+              <Typography variant="body2">{t('components.reviewQueue.statsApproved')}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -265,7 +267,7 @@ const ReviewQueue: React.FC = () => {
           <Card sx={{ bgcolor: 'error.light' }}>
             <CardContent>
               <Typography variant="h4">{stats.rejected}</Typography>
-              <Typography variant="body2">Rejected</Typography>
+              <Typography variant="body2">{t('components.reviewQueue.statsRejected')}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -273,7 +275,7 @@ const ReviewQueue: React.FC = () => {
           <Card sx={{ bgcolor: 'info.light' }}>
             <CardContent>
               <Typography variant="h4">{stats.in_review}</Typography>
-              <Typography variant="body2">In Review</Typography>
+              <Typography variant="body2">{t('components.reviewQueue.statsInReview')}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -284,52 +286,52 @@ const ReviewQueue: React.FC = () => {
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <FilterList />
           <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Status</InputLabel>
+            <InputLabel>{t('components.reviewQueue.filterStatus')}</InputLabel>
             <Select
               value={filters.status || ''}
               onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
-              label="Status"
+              label={t('components.reviewQueue.filterStatus')}
             >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value={ReviewStatus.PENDING}>Pending</MenuItem>
-              <MenuItem value={ReviewStatus.APPROVED}>Approved</MenuItem>
-              <MenuItem value={ReviewStatus.REJECTED}>Rejected</MenuItem>
-              <MenuItem value={ReviewStatus.EDITED}>Edited</MenuItem>
-              <MenuItem value={ReviewStatus.IN_REVIEW}>In Review</MenuItem>
+              <MenuItem value="">{t('components.reviewQueue.filterAll')}</MenuItem>
+              <MenuItem value={ReviewStatus.PENDING}>{t('components.reviewQueue.filterPending')}</MenuItem>
+              <MenuItem value={ReviewStatus.APPROVED}>{t('components.reviewQueue.filterApproved')}</MenuItem>
+              <MenuItem value={ReviewStatus.REJECTED}>{t('components.reviewQueue.filterRejected')}</MenuItem>
+              <MenuItem value={ReviewStatus.EDITED}>{t('components.reviewQueue.filterEdited')}</MenuItem>
+              <MenuItem value={ReviewStatus.IN_REVIEW}>{t('components.reviewQueue.filterInReview')}</MenuItem>
             </Select>
           </FormControl>
 
           <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Difficulty</InputLabel>
+            <InputLabel>{t('components.reviewQueue.filterDifficulty')}</InputLabel>
             <Select
               value={filters.difficulty || ''}
               onChange={(e) => handleFilterChange('difficulty', e.target.value || undefined)}
-              label="Difficulty"
+              label={t('components.reviewQueue.filterDifficulty')}
             >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="easy">Easy</MenuItem>
-              <MenuItem value="medium">Medium</MenuItem>
-              <MenuItem value="hard">Hard</MenuItem>
+              <MenuItem value="">{t('components.reviewQueue.filterAll')}</MenuItem>
+              <MenuItem value="easy">{t('components.reviewQueue.filterEasy')}</MenuItem>
+              <MenuItem value="medium">{t('components.reviewQueue.filterMedium')}</MenuItem>
+              <MenuItem value="hard">{t('components.reviewQueue.filterHard')}</MenuItem>
             </Select>
           </FormControl>
 
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Question Type</InputLabel>
+            <InputLabel>{t('components.reviewQueue.filterQuestionType')}</InputLabel>
             <Select
               value={filters.question_type || ''}
               onChange={(e) => handleFilterChange('question_type', e.target.value || undefined)}
-              label="Question Type"
+              label={t('components.reviewQueue.filterQuestionType')}
             >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="multiple_choice">Multiple Choice</MenuItem>
-              <MenuItem value="open_ended">Open Ended</MenuItem>
-              <MenuItem value="true_false">True/False</MenuItem>
+              <MenuItem value="">{t('components.reviewQueue.filterAll')}</MenuItem>
+              <MenuItem value="multiple_choice">{t('components.reviewQueue.filterMultipleChoice')}</MenuItem>
+              <MenuItem value="open_ended">{t('components.reviewQueue.filterOpenEnded')}</MenuItem>
+              <MenuItem value="true_false">{t('components.reviewQueue.filterTrueFalse')}</MenuItem>
             </Select>
           </FormControl>
 
           <Box sx={{ flexGrow: 1 }} />
 
-          <Tooltip title="Refresh">
+          <Tooltip title={t('components.reviewQueue.refresh')}>
             <IconButton onClick={loadQuestions} disabled={loading}>
               <Refresh />
             </IconButton>
@@ -354,7 +356,7 @@ const ReviewQueue: React.FC = () => {
       {/* Questions List */}
       {!loading && questions.length === 0 && (
         <Alert severity="info">
-          No questions found matching your filters.
+          {t('components.reviewQueue.noQuestions')}
         </Alert>
       )}
 
@@ -397,23 +399,23 @@ const ReviewQueue: React.FC = () => {
 
       {/* Comment Dialog */}
       <Dialog open={commentDialogOpen} onClose={() => setCommentDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Comment</DialogTitle>
+        <DialogTitle>{t('components.reviewQueue.addComment')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             multiline
             rows={4}
             fullWidth
-            label="Comment"
+            label={t('components.reviewQueue.commentLabel')}
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             sx={{ mt: 1 }}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCommentDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setCommentDialogOpen(false)}>{t('components.reviewQueue.cancelBtn')}</Button>
           <Button onClick={handleAddComment} variant="contained" disabled={!commentText.trim() || loading}>
-            Add Comment
+            {t('components.reviewQueue.addCommentBtn')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -421,7 +423,7 @@ const ReviewQueue: React.FC = () => {
       {/* Action Dialog */}
       <Dialog open={actionDialogOpen} onClose={() => setActionDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {actionType === 'approve' ? 'Approve Question' : 'Reject Question'}
+          {actionType === 'approve' ? t('components.reviewQueue.approveTitle') : t('components.reviewQueue.rejectTitle')}
         </DialogTitle>
         <DialogContent>
           <TextField
@@ -429,21 +431,21 @@ const ReviewQueue: React.FC = () => {
             multiline
             rows={3}
             fullWidth
-            label="Reason (optional)"
+            label={t('components.reviewQueue.reasonLabel')}
             value={actionReason}
             onChange={(e) => setActionReason(e.target.value)}
             sx={{ mt: 1 }}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setActionDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setActionDialogOpen(false)}>{t('components.reviewQueue.cancelBtn')}</Button>
           <Button
             onClick={executeAction}
             variant="contained"
             color={actionType === 'approve' ? 'success' : 'error'}
             disabled={loading}
           >
-            {actionType === 'approve' ? 'Approve' : 'Reject'}
+            {actionType === 'approve' ? t('components.reviewQueue.approve') : t('components.reviewQueue.reject')}
           </Button>
         </DialogActions>
       </Dialog>

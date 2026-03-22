@@ -8,6 +8,7 @@
 import React from 'react';
 import * as Sentry from '@sentry/react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ErrorFallbackProps {
   error: Error | unknown;
@@ -18,6 +19,7 @@ interface ErrorFallbackProps {
  * Fallback UI displayed when an error occurs
  */
 function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
+  const { t } = useTranslation();
   const isDevelopment = process.env.REACT_APP_ENVIRONMENT === 'development';
 
   // Type guard to safely access error properties
@@ -32,15 +34,14 @@ function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             <AlertTriangle className="h-8 w-8 text-red-500" />
           </div>
           <h2 className="text-xl font-semibold text-gray-900">
-            Ein Fehler ist aufgetreten
+            {t('components.errorBoundary.title')}
           </h2>
         </div>
 
         {/* Error Message */}
         <div className="mb-6">
           <p className="text-gray-600 mb-2">
-            Entschuldigung, es ist ein unerwarteter Fehler aufgetreten.
-            Wir wurden automatisch benachrichtigt und werden das Problem beheben.
+            {t('components.errorBoundary.message')}
           </p>
 
           {/* Show error details in development */}
@@ -60,21 +61,21 @@ function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
           >
             <RefreshCw className="h-4 w-4" />
-            Erneut versuchen
+            {t('components.errorBoundary.retry')}
           </button>
           <button
             onClick={() => window.location.href = '/'}
             className="flex-1 flex items-center justify-center gap-2 bg-gray-200 text-gray-700 py-2 px-4 rounded hover:bg-gray-300 transition-colors"
           >
             <Home className="h-4 w-4" />
-            Zur Startseite
+            {t('components.errorBoundary.home')}
           </button>
         </div>
 
         {/* Support Info */}
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-sm text-gray-500 text-center">
-            Wenn das Problem weiterhin besteht, kontaktieren Sie bitte den Support.
+            {t('components.errorBoundary.support')}
           </p>
         </div>
       </div>

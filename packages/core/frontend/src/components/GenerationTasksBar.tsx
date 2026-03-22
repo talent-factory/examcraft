@@ -19,12 +19,14 @@ import WarningIcon from '@mui/icons-material/Warning';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CloseIcon from '@mui/icons-material/Close';
+import { useTranslation } from 'react-i18next';
 import { useGenerationTasks } from '../contexts/GenerationTasksContext';
 import type { GenerationTaskState } from '../types';
 
 const AUTO_HIDE_DELAY_MS = 30_000;
 
 const GenerationTasksBar: React.FC = () => {
+  const { t } = useTranslation();
   const { activeTasks, completedTasks, dismissTask } = useGenerationTasks();
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(true);
@@ -92,13 +94,13 @@ const GenerationTasksBar: React.FC = () => {
         }}
       >
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Generierungen ({activeTasks.length} aktiv)
+          {t('components.generationTasks.title', { count: activeTasks.length })}
         </Typography>
         <IconButton
           size="small"
           onClick={() => setExpanded((prev) => !prev)}
           sx={{ color: 'white', p: 0.5 }}
-          aria-label={expanded ? 'Einklappen' : 'Ausklappen'}
+          aria-label={expanded ? t('components.generationTasks.collapse') : t('components.generationTasks.expand')}
         >
           {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
         </IconButton>
@@ -149,7 +151,7 @@ const GenerationTasksBar: React.FC = () => {
                       mr: 1,
                     }}
                   >
-                    {task.topic || 'Generierung'}
+                    {task.topic || t('components.generationTasks.defaultTopic')}
                   </Typography>
 
                   {(isTerminal || isUnknown) && (
@@ -160,7 +162,7 @@ const GenerationTasksBar: React.FC = () => {
                         dismissTask(task.taskId);
                       }}
                       sx={{ p: 0.25 }}
-                      aria-label="Schliessen"
+                      aria-label={t('components.generationTasks.close')}
                     >
                       <CloseIcon fontSize="small" />
                     </IconButton>
@@ -172,7 +174,7 @@ const GenerationTasksBar: React.FC = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <WarningIcon fontSize="small" color="warning" />
                     <Typography variant="caption" color="warning.main">
-                      Verbindung verloren – Status unbekannt
+                      {t('components.generationTasks.connectionLost')}
                     </Typography>
                   </Box>
                 )}
@@ -197,7 +199,7 @@ const GenerationTasksBar: React.FC = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <CheckCircleIcon fontSize="small" color="success" />
                     <Typography variant="caption" color="success.main">
-                      Klicken zum Anzeigen
+                      {t('components.generationTasks.clickToView')}
                     </Typography>
                   </Box>
                 )}
@@ -215,7 +217,7 @@ const GenerationTasksBar: React.FC = () => {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {task.message || 'Fehler aufgetreten'}
+                      {task.message || t('components.generationTasks.errorOccurred')}
                     </Typography>
                   </Box>
                 )}

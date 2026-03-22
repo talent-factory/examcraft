@@ -32,6 +32,7 @@ import {
   Save,
   Cancel as CancelIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { QuestionReview, QuestionReviewUpdateRequest } from '../types/review';
 
 interface QuestionEditorProps {
@@ -49,6 +50,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
   onSave,
   loading = false,
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState<QuestionReviewUpdateRequest>({});
   const [options, setOptions] = useState<string[]>([]);
   const [newOption, setNewOption] = useState('');
@@ -109,18 +111,18 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
     const newErrors: Record<string, string> = {};
 
     if (!formData.question_text || formData.question_text.trim().length < 10) {
-      newErrors.question_text = 'Question text must be at least 10 characters';
+      newErrors.question_text = t('components.questionEditor.validationQuestionLength');
     }
 
     if (question.question_type === 'multiple_choice') {
       if (!options || options.length < 2) {
-        newErrors.options = 'Multiple choice questions need at least 2 options';
+        newErrors.options = t('components.questionEditor.validationMinOptions');
       }
       if (!formData.correct_answer) {
-        newErrors.correct_answer = 'Please select a correct answer';
+        newErrors.correct_answer = t('components.questionEditor.validationSelectAnswer');
       }
       if (formData.correct_answer && !options.includes(formData.correct_answer)) {
-        newErrors.correct_answer = 'Correct answer must be one of the options';
+        newErrors.correct_answer = t('components.questionEditor.validationAnswerInOptions');
       }
     }
 
@@ -168,7 +170,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
 
   const handleCancel = () => {
     if (hasChanges) {
-      if (window.confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+      if (window.confirm(t('components.questionEditor.unsavedConfirm'))) {
         onClose();
       }
     } else {
@@ -185,7 +187,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
     >
       <DialogTitle>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">Edit Question #{question.id}</Typography>
+          <Typography variant="h6">{t('components.questionEditor.title', { id: question.id })}</Typography>
           <IconButton onClick={handleCancel} size="small">
             <Close />
           </IconButton>
@@ -196,7 +198,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
         <Stack spacing={3}>
           {/* Question Text */}
           <TextField
-            label="Question Text"
+            label={t('components.questionEditor.questionText')}
             multiline
             rows={3}
             fullWidth
@@ -212,7 +214,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
           {question.question_type === 'multiple_choice' && (
             <Box>
               <Typography variant="subtitle2" gutterBottom>
-                Answer Options
+                {t('components.questionEditor.answerOptions')}
               </Typography>
               <List dense>
                 {options.map((option, index) => (
@@ -243,7 +245,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
                 <TextField
                   size="small"
                   fullWidth
-                  placeholder="Add new option"
+                  placeholder={t('components.questionEditor.addOptionPlaceholder')}
                   value={newOption}
                   onChange={(e) => setNewOption(e.target.value)}
                   onKeyPress={(e) => {
@@ -260,7 +262,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
                   onClick={handleAddOption}
                   disabled={loading || !newOption.trim()}
                 >
-                  Add
+                  {t('components.questionEditor.addOption')}
                 </Button>
               </Box>
               {errors.options && (
@@ -272,12 +274,12 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
           {/* Correct Answer */}
           {question.question_type === 'multiple_choice' ? (
             <FormControl fullWidth error={!!errors.correct_answer}>
-              <InputLabel>Correct Answer</InputLabel>
+              <InputLabel>{t('components.questionEditor.correctAnswer')}</InputLabel>
               <Select
                 value={formData.correct_answer || ''}
                 onChange={(e) => handleCorrectAnswerChange(e.target.value)}
                 disabled={loading}
-                label="Correct Answer"
+                label={t('components.questionEditor.correctAnswer')}
               >
                 {options.map((option, index) => (
                   <MenuItem key={index} value={option}>
@@ -293,7 +295,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
             </FormControl>
           ) : (
             <TextField
-              label="Correct Answer"
+              label={t('components.questionEditor.correctAnswer')}
               multiline
               rows={2}
               fullWidth
@@ -305,24 +307,24 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
 
           {/* Explanation */}
           <TextField
-            label="Explanation"
+            label={t('components.questionEditor.explanationLabel')}
             multiline
             rows={3}
             fullWidth
             value={formData.explanation || ''}
             onChange={(e) => handleFieldChange('explanation', e.target.value)}
             disabled={loading}
-            helperText="Optional: Provide an explanation for the answer"
+            helperText={t('components.questionEditor.explanationHint')}
           />
 
           {/* Difficulty */}
           <FormControl fullWidth>
-            <InputLabel>Difficulty</InputLabel>
+            <InputLabel>{t('components.questionEditor.difficulty')}</InputLabel>
             <Select
               value={formData.difficulty || 'medium'}
               onChange={(e) => handleFieldChange('difficulty', e.target.value)}
               disabled={loading}
-              label="Difficulty"
+              label={t('components.questionEditor.difficulty')}
             >
               <MenuItem value="easy">Easy</MenuItem>
               <MenuItem value="medium">Medium</MenuItem>
@@ -332,14 +334,14 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
 
           {/* Bloom Level */}
           <FormControl fullWidth>
-            <InputLabel>Bloom's Taxonomy Level</InputLabel>
+            <InputLabel>{t('components.questionEditor.bloomLevel')}</InputLabel>
             <Select
               value={formData.bloom_level || ''}
               onChange={(e) => handleFieldChange('bloom_level', e.target.value ? Number(e.target.value) : undefined)}
               disabled={loading}
-              label="Bloom's Taxonomy Level"
+              label={t('components.questionEditor.bloomLevel')}
             >
-              <MenuItem value="">Not specified</MenuItem>
+              <MenuItem value="">{t('components.questionEditor.bloomNotSpecified')}</MenuItem>
               <MenuItem value={1}>1 - Remember</MenuItem>
               <MenuItem value={2}>2 - Understand</MenuItem>
               <MenuItem value={3}>3 - Apply</MenuItem>
@@ -351,7 +353,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
 
           {/* Estimated Time */}
           <TextField
-            label="Estimated Time (minutes)"
+            label={t('components.questionEditor.estimatedTime')}
             type="number"
             fullWidth
             value={formData.estimated_time_minutes || ''}
@@ -363,7 +365,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
           {/* Change Indicator */}
           {hasChanges && (
             <Alert severity="info">
-              You have unsaved changes
+              {t('components.questionEditor.unsavedChanges')}
             </Alert>
           )}
         </Stack>
@@ -375,7 +377,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
           startIcon={<CancelIcon />}
           disabled={loading}
         >
-          Cancel
+          {t('components.questionEditor.cancel')}
         </Button>
         <Button
           onClick={handleSave}
@@ -383,7 +385,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
           startIcon={<Save />}
           disabled={loading || !hasChanges}
         >
-          Save Changes
+          {t('components.questionEditor.saveChanges')}
         </Button>
       </DialogActions>
     </Dialog>

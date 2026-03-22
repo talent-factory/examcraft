@@ -11,12 +11,14 @@ import {
   FormControl, InputLabel, Select, MenuItem, Divider,
 } from '@mui/material';
 import { ArrowBack, Save, CheckCircle, Cancel, Send } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { ReviewService } from '../services/ReviewService';
 import { useAuth } from '../contexts/AuthContext';
 import MarkdownRenderer from './MarkdownRenderer';
 import { QuestionReview, ReviewStatus } from '../types/review';
 
 const QuestionReviewDetail: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
@@ -82,7 +84,7 @@ const QuestionReviewDetail: React.FC = () => {
     try {
       const updated = await ReviewService.editQuestion(question.id, editData);
       setQuestion(updated);
-      setSuccess('Aenderungen gespeichert');
+      setSuccess(t('components.questionDetail.changesSaved'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Speichern');
     } finally {
@@ -98,7 +100,7 @@ const QuestionReviewDetail: React.FC = () => {
     try {
       const updated = await ReviewService.approveQuestion(question.id, {});
       setQuestion(updated);
-      setSuccess('Frage genehmigt');
+      setSuccess(t('components.questionDetail.approved'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Genehmigen');
     } finally {
@@ -114,7 +116,7 @@ const QuestionReviewDetail: React.FC = () => {
     try {
       const updated = await ReviewService.rejectQuestion(question.id, {});
       setQuestion(updated);
-      setSuccess('Frage abgelehnt');
+      setSuccess(t('components.questionDetail.rejected'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Ablehnen');
     } finally {
@@ -164,13 +166,13 @@ const QuestionReviewDetail: React.FC = () => {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error || 'Frage nicht gefunden'}
+          {error || t('components.questionDetail.questionNotFound')}
         </Alert>
         <Button
           startIcon={<ArrowBack />}
           onClick={() => navigate('/questions/review')}
         >
-          Zurueck zur Queue
+          {t('components.questionDetail.backToQueue')}
         </Button>
       </Box>
     );
@@ -191,7 +193,7 @@ const QuestionReviewDetail: React.FC = () => {
             startIcon={<ArrowBack />}
             onClick={() => navigate('/questions/review')}
           >
-            Zurueck
+            {t('components.questionDetail.back')}
           </Button>
           <Typography variant="h5">
             Question #{question.id} &middot; {formatQuestionType(question.question_type)}
@@ -207,7 +209,7 @@ const QuestionReviewDetail: React.FC = () => {
       {/* Reviewer info */}
       {question.reviewer_info && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Reviewer: {question.reviewer_info.first_name} {question.reviewer_info.last_name}
+          {t('components.questionCard.reviewer', { name: `${question.reviewer_info.first_name} ${question.reviewer_info.last_name}` })}
         </Typography>
       )}
 
@@ -228,14 +230,14 @@ const QuestionReviewDetail: React.FC = () => {
         {isReviewer ? (
           <>
             <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2 }}>
-              <Tab label="Bearbeiten" />
-              <Tab label="Vorschau" />
+              <Tab label={t('components.questionDetail.tabEdit')} />
+              <Tab label={t('components.questionDetail.tabPreview')} />
             </Tabs>
 
             {activeTab === 0 && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <TextField
-                  label="Fragetext"
+                  label={t('components.questionDetail.questionText')}
                   multiline
                   minRows={12}
                   fullWidth
@@ -245,7 +247,7 @@ const QuestionReviewDetail: React.FC = () => {
                   sx={{ '& textarea': { resize: 'vertical' } }}
                 />
                 <TextField
-                  label="Korrekte Antwort / Musterloesung"
+                  label={t('components.questionDetail.correctAnswer')}
                   multiline
                   minRows={8}
                   fullWidth
@@ -255,7 +257,7 @@ const QuestionReviewDetail: React.FC = () => {
                   sx={{ '& textarea': { resize: 'vertical' } }}
                 />
                 <TextField
-                  label="Erklaerung / Bewertungskriterien"
+                  label={t('components.questionDetail.explanation')}
                   multiline
                   minRows={6}
                   fullWidth
@@ -267,11 +269,11 @@ const QuestionReviewDetail: React.FC = () => {
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={4}>
                     <FormControl fullWidth size="small">
-                      <InputLabel>Schwierigkeit</InputLabel>
+                      <InputLabel>{t('components.questionDetail.difficulty')}</InputLabel>
                       <Select
                         value={editData.difficulty}
                         onChange={(e) => setEditData(prev => ({ ...prev, difficulty: e.target.value }))}
-                        label="Schwierigkeit"
+                        label={t('components.questionDetail.difficulty')}
                       >
                         <MenuItem value="easy">Easy</MenuItem>
                         <MenuItem value="medium">Medium</MenuItem>
@@ -281,7 +283,7 @@ const QuestionReviewDetail: React.FC = () => {
                   </Grid>
                   <Grid item xs={12} sm={4}>
                     <TextField
-                      label="Bloom Level"
+                      label={t('components.questionDetail.bloomLevel')}
                       type="number"
                       fullWidth
                       size="small"
@@ -295,7 +297,7 @@ const QuestionReviewDetail: React.FC = () => {
                   </Grid>
                   <Grid item xs={12} sm={4}>
                     <TextField
-                      label="Geschaetzte Zeit (Min.)"
+                      label={t('components.questionDetail.estimatedTime')}
                       type="number"
                       fullWidth
                       size="small"
@@ -313,32 +315,32 @@ const QuestionReviewDetail: React.FC = () => {
 
             {activeTab === 1 && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary">Fragetext:</Typography>
+                <Typography variant="subtitle2" color="text.secondary">{t('components.questionDetail.questionText')}:</Typography>
                 <MarkdownRenderer content={editData.question_text} variant="compact" />
                 <Divider />
-                <Typography variant="subtitle2" color="text.secondary">Korrekte Antwort:</Typography>
+                <Typography variant="subtitle2" color="text.secondary">{t('components.questionDetail.correctAnswer')}:</Typography>
                 <MarkdownRenderer content={editData.correct_answer} variant="compact" />
                 <Divider />
-                <Typography variant="subtitle2" color="text.secondary">Erklaerung:</Typography>
+                <Typography variant="subtitle2" color="text.secondary">{t('components.questionDetail.explanation')}:</Typography>
                 <MarkdownRenderer content={editData.explanation} variant="compact" />
               </Box>
             )}
           </>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="subtitle2" color="text.secondary">Fragetext:</Typography>
+            <Typography variant="subtitle2" color="text.secondary">{t('components.questionDetail.questionText')}:</Typography>
             <MarkdownRenderer content={question.question_text} variant="compact" />
             {question.correct_answer && (
               <>
                 <Divider />
-                <Typography variant="subtitle2" color="text.secondary">Korrekte Antwort:</Typography>
+                <Typography variant="subtitle2" color="text.secondary">{t('components.questionDetail.correctAnswer')}:</Typography>
                 <MarkdownRenderer content={question.correct_answer} variant="compact" />
               </>
             )}
             {question.explanation && (
               <>
                 <Divider />
-                <Typography variant="subtitle2" color="text.secondary">Erklaerung:</Typography>
+                <Typography variant="subtitle2" color="text.secondary">{t('components.questionDetail.explanation')}:</Typography>
                 <MarkdownRenderer content={question.explanation} variant="compact" />
               </>
             )}
@@ -355,7 +357,7 @@ const QuestionReviewDetail: React.FC = () => {
             onClick={handleSave}
             disabled={saving}
           >
-            Speichern
+            {t('components.questionDetail.save')}
           </Button>
           <Button
             variant="contained"
@@ -364,7 +366,7 @@ const QuestionReviewDetail: React.FC = () => {
             onClick={handleApprove}
             disabled={saving || question.review_status === ReviewStatus.APPROVED}
           >
-            Approve
+            {t('components.questionCard.approveBtn')}
           </Button>
           <Button
             variant="contained"
@@ -373,7 +375,7 @@ const QuestionReviewDetail: React.FC = () => {
             onClick={handleReject}
             disabled={saving || question.review_status === ReviewStatus.REJECTED}
           >
-            Reject
+            {t('components.questionCard.rejectBtn')}
           </Button>
         </Box>
       )}
@@ -381,13 +383,13 @@ const QuestionReviewDetail: React.FC = () => {
       {/* Comments */}
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>
-          Kommentare
+          {t('components.questionDetail.comments')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
           <TextField
             fullWidth
             size="small"
-            placeholder="Kommentar hinzufuegen..."
+            placeholder={t('components.questionDetail.addCommentPlaceholder')}
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             onKeyDown={(e) => {
@@ -403,12 +405,12 @@ const QuestionReviewDetail: React.FC = () => {
             disabled={!commentText.trim() || saving}
             startIcon={<Send />}
           >
-            Senden
+            {t('components.questionDetail.send')}
           </Button>
         </Box>
         {comments.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            Noch keine Kommentare vorhanden.
+            {t('components.questionDetail.noComments')}
           </Typography>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -417,7 +419,7 @@ const QuestionReviewDetail: React.FC = () => {
                 <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
                   <Typography variant="body2">{comment.comment_text}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {comment.author || 'Unbekannt'} &middot; {new Date(comment.created_at).toLocaleString()} &middot; {comment.comment_type}
+                    {comment.author || t('components.questionDetail.unknownAuthor')} &middot; {new Date(comment.created_at).toLocaleString(i18n.language)} &middot; {comment.comment_type}
                   </Typography>
                 </CardContent>
               </Card>
