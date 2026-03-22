@@ -5,6 +5,8 @@
 **Date:** 2026-03-22
 **Languages:** de (fallback), en, fr, it
 
+> **Path convention:** All file paths in this spec are relative to `packages/core/`.
+
 ## Context
 
 ExamCraft has no i18n infrastructure. The backend contains ~175 user-facing messages (95% EN, 5% DE, mixed inconsistently). The frontend has ~619 hardcoded strings across ~79 components (60% DE, 40% EN). This phase sets up the translation infrastructure end-to-end without extracting all strings — subsequent phases handle bulk extraction and translation.
@@ -19,6 +21,7 @@ ExamCraft has no i18n infrastructure. The backend contains ~175 user-facing mess
 | Backend library | `python-i18n` |
 | Frontend library | `react-i18next` + `i18next` + `i18next-browser-languagedetector` |
 | Frontend namespaces | Single namespace per language (one `translation.json`) |
+| Frontend JSON structure | Nested objects matching dot-separated keys |
 | Language switcher | Inside user dropdown menu in NavigationBar |
 | Live switch | Yes, without page reload (native react-i18next) |
 | Log language | Always English (not translated) |
@@ -68,7 +71,7 @@ Phase 1 includes only 5-10 demo keys per language (de + en filled, fr + it skele
 
 Starlette middleware that resolves the request locale:
 
-1. Check authenticated user's `preferred_language` (if available)
+1. Check `request.state.preferred_language` (set by RBAC middleware, if present)
 2. Parse `Accept-Language` header
 3. Fall back to `"de"`
 4. Store resolved locale in `request.state.locale`
@@ -86,9 +89,26 @@ class I18nMiddleware(BaseHTTPMiddleware):
 ```
 
 **Locale resolution order:**
-1. `request.state.user.preferred_language` (set by auth middleware, if present)
+
+1. `request.state.preferred_language` (set by RBAC middleware which already loads user data — extend it to also set this field)
 2. Best match from `Accept-Language` header against `SUPPORTED_LOCALES`
 3. `DEFAULT_LOCALE` ("de")
+
+**Accept-Language parsing:** Strip region subtags to match base language (e.g., `de-CH` maps to `de`, `fr-CH` maps to `fr`). Parse quality weights and select the highest-weighted match against `SUPPORTED_LOCALES`. Implement as a utility function in the middleware module — no external library needed for this simple matching.
+
+**Middleware registration order:** In `main.py`, register `I18nMiddleware` via `app.add_middleware(I18nMiddleware)` **before** the RBAC middleware registration (so it executes **after** RBAC in Starlette's reversed execution order). This ensures `request.state.preferred_language` is available when `I18nMiddleware.dispatch` runs.
+
+### RBAC Middleware Extension
+
+**File:** `backend/middleware/rbac_middleware.py`
+
+The existing RBAC middleware already loads user data and sets `request.state.user_id` and `request.state.institution_id`. Extend it to also set:
+
+```python
+request.state.preferred_language = user.preferred_language  # may be None
+```
+
+This allows the i18n middleware to access the user's language preference without an additional DB query.
 
 ### User Model Extension
 
@@ -97,21 +117,35 @@ class I18nMiddleware(BaseHTTPMiddleware):
 Add column to User model:
 
 ```python
-preferred_language = Column(String(5), nullable=True, default=None)
+preferred_language = Column(
+    String(5),
+    nullable=True,
+    default=None,
+)
+```
+
+Add a `CheckConstraint` to the model's `__table_args__`:
+
+```python
+CheckConstraint(
+    "preferred_language IN ('de', 'en', 'fr', 'it') OR preferred_language IS NULL",
+    name="ck_user_preferred_language",
+)
 ```
 
 - `NULL` means "use browser locale / Accept-Language"
 - Valid values: `"de"`, `"en"`, `"fr"`, `"it"`
 
-Alembic migration adds the column with no default (nullable).
+Alembic migration adds the column with no default (nullable) and the check constraint.
 
 ### Profile API Extension
 
 **File:** `backend/api/auth.py`
 
-Extend `PATCH /api/auth/profile` to accept and validate `preferred_language`:
+Extend `PATCH /api/auth/profile`:
 
-- Validate against `SUPPORTED_LOCALES`
+- Add `preferred_language: Optional[str] = None` to the `UserProfileUpdate` Pydantic model
+- Validate against `SUPPORTED_LOCALES` (reject invalid values with 422)
 - Store in User model
 - Return updated profile with language field
 
@@ -120,7 +154,7 @@ Extend `PATCH /api/auth/profile` to accept and validate `preferred_language`:
 **File:** `backend/main.py`
 
 - Call `init_translations()` at startup
-- Register `I18nMiddleware` (after auth middleware so user is available)
+- Register `I18nMiddleware` before RBAC middleware (executes after RBAC due to Starlette's reversed order)
 
 ### Usage Pattern (for subsequent phases)
 
@@ -172,22 +206,32 @@ i18n
 export default i18n;
 ```
 
+Note: `react-i18next` uses `"."` as `keySeparator` by default, so keys like `"nav.profile"` resolve to nested JSON paths `{ "nav": { "profile": "..." } }`. The translation files must use nested structure to match.
+
 ### Translation Files
 
 **Location:** `frontend/src/locales/{de,en,fr,it}/translation.json`
 
-Single flat namespace with dot-separated keys:
+Nested JSON structure matching dot-separated key convention:
 
 ```json
 {
-  "nav.profile": "Profil",
-  "nav.settings": "Einstellungen",
-  "nav.logout": "Abmelden",
-  "nav.language": "Sprache"
+  "nav": {
+    "profile": "Profil",
+    "settings": "Einstellungen",
+    "logout": "Abmelden",
+    "language": "Sprache"
+  },
+  "language": {
+    "de": "Deutsch",
+    "en": "English",
+    "fr": "Francais",
+    "it": "Italiano"
+  }
 }
 ```
 
-Phase 1: 5-10 demo keys (nav items, language switcher labels) in de + en. FR + IT skeleton.
+Phase 1: 5-10 demo keys (nav items, language switcher labels) in de + en. FR + IT with same structure, translated.
 
 ### App Entry Point
 
@@ -220,7 +264,9 @@ if (user.preferred_language) {
 
 This ensures the UI language matches the user's stored preference after login.
 
-### Type Extension
+**Note:** The `examcraft_language` localStorage key is a browser-level preference and must NOT be cleared on logout. Only session-related keys (`examcraft_access_token`, `examcraft_refresh_token`, `examcraft_user`) should be cleared.
+
+### Type Extensions
 
 **File:** `frontend/src/types/auth.ts`
 
@@ -230,14 +276,22 @@ Add to `User` interface:
 preferred_language?: string;
 ```
 
+Add to `UpdateProfileRequest` interface (or equivalent profile update type):
+
+```typescript
+preferred_language?: string;
+```
+
 ## Fallback Chain
 
 ```
-Authenticated user:  user.preferred_language → Accept-Language → "de"
-Anonymous user:      localStorage → navigator.language → "de"
+Authenticated user:  user.preferred_language -> Accept-Language -> "de"
+Anonymous user:      localStorage -> navigator.language -> "de"
 ```
 
 ## Files Changed (Phase 1)
+
+> All paths relative to `packages/core/`.
 
 | Action | File |
 |--------|------|
@@ -247,11 +301,12 @@ Anonymous user:      localStorage → navigator.language → "de"
 | Create | `backend/locales/it.json` |
 | Create | `backend/services/translation_service.py` |
 | Create | `backend/middleware/i18n_middleware.py` |
-| Modify | `backend/models/auth.py` — add `preferred_language` column |
-| Modify | `backend/api/auth.py` — accept `preferred_language` in profile update |
-| Modify | `backend/main.py` — register middleware, init translations |
+| Modify | `backend/middleware/rbac_middleware.py` — set `preferred_language` on request state |
+| Modify | `backend/models/auth.py` — add `preferred_language` column + CheckConstraint |
+| Modify | `backend/api/auth.py` — add `preferred_language` to `UserProfileUpdate`, accept in profile endpoint |
+| Modify | `backend/main.py` — register i18n middleware, init translations |
 | Create | `backend/alembic/versions/xxx_add_preferred_language.py` |
-| Modify | `pyproject.toml` — add `python-i18n[YAML]` dependency |
+| Modify | `pyproject.toml` (root) — add `python-i18n` dependency |
 | Create | `frontend/src/i18n.ts` |
 | Create | `frontend/src/locales/de/translation.json` |
 | Create | `frontend/src/locales/en/translation.json` |
@@ -260,8 +315,17 @@ Anonymous user:      localStorage → navigator.language → "de"
 | Modify | `frontend/src/index.tsx` — import i18n |
 | Modify | `frontend/src/components/layout/NavigationBar.tsx` — language switcher |
 | Modify | `frontend/src/contexts/AuthContext.tsx` — sync language on login |
-| Modify | `frontend/src/types/auth.ts` — add `preferred_language` |
+| Modify | `frontend/src/types/auth.ts` — add `preferred_language` to User + UpdateProfileRequest |
 | Modify | `frontend/package.json` — add i18next dependencies |
+
+## Phase 1 Tests
+
+Minimal test coverage to verify infrastructure works:
+
+1. **Translation service unit test** — `t("auth.email_taken", locale="de")` returns German string, `t("auth.email_taken", locale="en")` returns English, unknown key returns fallback
+2. **Middleware locale resolution test** — verify Accept-Language parsing (de-CH -> de, fr;q=0.9 -> fr), fallback to "de" when no match
+3. **Profile API test** — PATCH with valid `preferred_language` persists, PATCH with invalid value returns 422
+4. **Frontend language switcher test** — component renders, clicking a language option calls `i18n.changeLanguage`
 
 ## Out of Scope (Phase 1)
 
