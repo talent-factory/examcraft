@@ -14,7 +14,7 @@
     "document_upload_failed": "Dokument-Upload fehlgeschlagen",
     "document_processing_failed": "Dokumentverarbeitung fehlgeschlagen",
     "document_quota_exceeded": "Dokument-Kontingent erschöpft",
-    "question_generation_failed": "Fragengeenerierung fehlgeschlagen",
+    "question_generation_failed": "Fragengenerierung fehlgeschlagen",
     "question_quota_exceeded": "Fragen-Kontingent erschöpft",
     "validation_required_field": "Dieses Feld ist erforderlich",
     "validation_invalid_email": "Ungültige E-Mail-Adresse",

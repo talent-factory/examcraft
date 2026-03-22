@@ -86,6 +86,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Update localStorage with fresh user data
             localStorage.setItem(USER_KEY, JSON.stringify(profile));
 
+            if (profile.preferred_language) {
+              i18n.changeLanguage(profile.preferred_language);
+            }
+
             setState({
               user: profile,
               accessToken,
@@ -122,6 +126,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
               localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
               localStorage.setItem(USER_KEY, JSON.stringify(profile));
+
+              if (profile.preferred_language) {
+                i18n.changeLanguage(profile.preferred_language);
+              }
 
               console.log('[AuthContext] Token refreshed successfully for:', profile.email);
               setState({
