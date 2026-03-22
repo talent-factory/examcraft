@@ -153,6 +153,7 @@ class UserProfileResponse(BaseModel):
     institution_name: Optional[str]
     oauth_provider: Optional[str] = None  # OAuth provider (google, microsoft, etc.)
     avatar_url: Optional[str] = None  # Profile picture URL (from OAuth or uploaded)
+    preferred_language: Optional[str] = None
     roles: list[RoleResponse]
     created_at: str
 
@@ -167,6 +168,7 @@ class UserProfileUpdate(BaseModel):
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     bio: Optional[str] = Field(None, max_length=500)
     avatar_url: Optional[str] = None
+    preferred_language: Optional[str] = Field(None, pattern="^(de|en|fr|it)$")
 
 
 # ============================================================================
@@ -580,6 +582,9 @@ async def update_current_user_profile(
 
     if request.avatar_url is not None:
         current_user.avatar_url = request.avatar_url
+
+    if request.preferred_language is not None:
+        current_user.preferred_language = request.preferred_language
 
     db.commit()
     db.refresh(current_user)
