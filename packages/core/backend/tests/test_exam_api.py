@@ -1955,3 +1955,180 @@ class TestExamExportApi(
         """GET /export/md returns 404 for a non-existent exam."""
         response = exam_client.get("/api/v1/exams/999999/export/md")
         assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# 5g: Composition mode auto-fill
+# ---------------------------------------------------------------------------
+
+
+class TestAutoComposeQuestions(
+    _make_exam_test_class_fixtures("compose-uni", "compose@test.com")
+):
+    """Tests for POST /{exam_id}/auto-fill in composition mode."""
+
+    def _seed_diverse_questions(self, exam_db, institution_id, user_id):
+        """Create a diverse set of questions with metadata."""
+        questions = []
+        configs = [
+            ("multiple_choice", "easy", 1, 1),
+            ("multiple_choice", "medium", 2, 2),
+            ("multiple_choice", "hard", 3, 3),
+            ("open_ended", "easy", 1, 3),
+            ("open_ended", "medium", 2, 5),
+            ("open_ended", "hard", 3, 8),
+            ("true_false", "easy", 1, 1),
+            ("true_false", "medium", 2, 1),
+            ("true_false", "hard", 3, 2),
+        ]
+        for i, (qtype, diff, bloom, time) in enumerate(configs):
+            q = QuestionReview(
+                question_text=f"Compose question {i}",
+                question_type=qtype,
+                difficulty=diff,
+                topic="Compose Topic",
+                bloom_level=bloom,
+                estimated_time_minutes=time,
+                language="de",
+                review_status=ReviewStatus.APPROVED.value,
+                institution_id=institution_id,
+                created_by=user_id,
+            )
+            exam_db.add(q)
+            questions.append(q)
+        exam_db.flush()
+        return questions
+
+    def test_preview_returns_proposal_without_modifying(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        self._seed_diverse_questions(exam_db, exam_institution.id, exam_user.id)
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "Preview Test"})
+        exam_id = create_resp.json()["id"]
+
+        response = exam_client.post(
+            f"/api/v1/exams/{exam_id}/auto-fill",
+            json={"target_points": 20.0, "preview": True},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["mode"] == "preview"
+        assert "questions" in data
+        assert "constraint_report" in data
+        assert data["total_points"] <= 20.0
+
+        # Exam should be unchanged
+        exam_resp = exam_client.get(f"/api/v1/exams/{exam_id}")
+        assert len(exam_resp.json()["questions"]) == 0
+
+    def test_composition_adds_questions(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        self._seed_diverse_questions(exam_db, exam_institution.id, exam_user.id)
+        create_resp = exam_client.post(
+            "/api/v1/exams/", json={"title": "Compose Apply"}
+        )
+        exam_id = create_resp.json()["id"]
+
+        response = exam_client.post(
+            f"/api/v1/exams/{exam_id}/auto-fill",
+            json={"target_points": 20.0, "preview": False},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["questions"]) > 0
+        assert data["total_points"] > 0
+
+        # Verify questions are actually persisted by re-fetching the exam
+        get_resp = exam_client.get(f"/api/v1/exams/{exam_id}")
+        assert get_resp.status_code == 200
+        exam_data = get_resp.json()
+        assert len(exam_data["questions"]) == len(data["questions"])
+
+    def test_backward_compat_simple_mode(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        self._seed_diverse_questions(exam_db, exam_institution.id, exam_user.id)
+        create_resp = exam_client.post(
+            "/api/v1/exams/", json={"title": "Simple Compat"}
+        )
+        exam_id = create_resp.json()["id"]
+
+        response = exam_client.post(
+            f"/api/v1/exams/{exam_id}/auto-fill",
+            json={"count": 3},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["questions"]) <= 3
+
+    def test_distribution_validation_rejects_bad_sum(self, exam_client):
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "Bad Sum"})
+        exam_id = create_resp.json()["id"]
+
+        response = exam_client.post(
+            f"/api/v1/exams/{exam_id}/auto-fill",
+            json={
+                "target_points": 50.0,
+                "bloom_distribution": {"1": 50, "2": 20},
+            },
+        )
+        assert response.status_code == 422
+
+    def test_null_bloom_excluded_when_distribution_active(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """Questions with NULL bloom_level excluded when bloom_distribution is set."""
+        for i, bloom in enumerate([1, 2, None]):
+            q = QuestionReview(
+                question_text=f"Null test q{i}",
+                question_type="open_ended",
+                difficulty="medium",
+                topic="NullTest",
+                bloom_level=bloom,
+                estimated_time_minutes=5,
+                language="de",
+                review_status=ReviewStatus.APPROVED.value,
+                institution_id=exam_institution.id,
+                created_by=exam_user.id,
+            )
+            exam_db.add(q)
+        exam_db.flush()
+
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "Null Bloom"})
+        exam_id = create_resp.json()["id"]
+
+        response = exam_client.post(
+            f"/api/v1/exams/{exam_id}/auto-fill",
+            json={
+                "target_points": 50.0,
+                "bloom_distribution": {"1": 50, "2": 50},
+                "preview": True,
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        for q in data["questions"]:
+            assert q["bloom_level"] is not None
+
+    def test_constraint_report_in_preview(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        self._seed_diverse_questions(exam_db, exam_institution.id, exam_user.id)
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "Report Test"})
+        exam_id = create_resp.json()["id"]
+
+        response = exam_client.post(
+            f"/api/v1/exams/{exam_id}/auto-fill",
+            json={
+                "target_points": 30.0,
+                "bloom_distribution": {"1": 33, "2": 34, "3": 33},
+                "preview": True,
+            },
+        )
+        assert response.status_code == 200
+        report = response.json()["constraint_report"]
+        assert "points_target" in report
+        assert "bloom_distribution" in report
+        assert "overall_satisfaction" in report
+        assert report["points_achieved"] <= 30.0
