@@ -551,6 +551,7 @@ async def get_current_user_profile(
         else None,
         oauth_provider=current_user.oauth_provider,
         avatar_url=current_user.avatar_url,
+        preferred_language=current_user.preferred_language,
         roles=role_responses,
         created_at=current_user.created_at.isoformat(),
     )
@@ -648,6 +649,7 @@ async def update_current_user_profile(
         else None,
         oauth_provider=current_user.oauth_provider,
         avatar_url=current_user.avatar_url,
+        preferred_language=current_user.preferred_language,
         roles=role_responses,
         created_at=current_user.created_at.isoformat(),
     )

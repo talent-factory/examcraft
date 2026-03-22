@@ -6,8 +6,9 @@ Usage:
     init_translations()  # Call once at startup (idempotent)
     message = t("auth_email_taken", locale="de")
 
-Locale files live in packages/core/backend/locales/ and follow the
-python-i18n naming convention: t.{locale}.json with root key = locale code.
+Locale files live in packages/core/backend/locales/ using a project-specific
+naming convention: t.{locale}.json with root key = locale code. This overrides
+the python-i18n default ({locale}.{namespace}.{format}) via filename_format config.
 
 Log messages stay in English — only user-facing response strings are translated.
 """
@@ -52,8 +53,8 @@ def t(key: str, locale: str = DEFAULT_LOCALE, **kwargs) -> str:
     """Translate a key for the given locale.
 
     Falls back to DEFAULT_LOCALE ("de") for:
-    - Unsupported locales
-    - Keys missing in the requested locale
+    - Unsupported locales (enforced by this function)
+    - Keys missing in the requested locale (via python-i18n's fallback config)
 
     Returns the key (with namespace prefix) if the key is unknown in all locales.
 

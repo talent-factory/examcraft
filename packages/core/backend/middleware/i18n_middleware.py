@@ -1,8 +1,12 @@
 """i18n middleware for locale resolution from Accept-Language header.
 
 Resolves the request locale and stores it in request.state.locale.
-For authenticated endpoints, the caller can override with
-current_user.preferred_language when calling t().
+Sets the Content-Language response header.
+
+NOTE: As of Phase 1, no endpoint reads request.state.locale yet.
+The intended Phase 2 pattern is for authenticated endpoints to use
+current_user.preferred_language (if set) when calling t(), falling
+back to request.state.locale otherwise.
 
 Resolution order:
 1. Accept-Language header (best match against supported locales)

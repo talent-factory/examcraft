@@ -35,14 +35,17 @@ export const NavigationBar: React.FC = () => {
   };
 
   const handleLanguageChange = async (lng: string) => {
-    await i18n.changeLanguage(lng);
-    const token = localStorage.getItem('examcraft_access_token');
-    if (user && token) {
-      try {
+    const previousLanguage = i18n.language;
+    try {
+      await i18n.changeLanguage(lng);
+      const token = localStorage.getItem('examcraft_access_token');
+      if (user && token) {
         await AuthService.updateProfile(token, { preferred_language: lng });
-      } catch (error) {
-        console.error('Failed to save language preference:', error);
       }
+    } catch (error) {
+      console.error('[NavigationBar] Language change failed:', { requestedLanguage: lng, error });
+      // Revert UI language to stay in sync with persisted value
+      await i18n.changeLanguage(previousLanguage).catch(() => {});
     }
   };
 
