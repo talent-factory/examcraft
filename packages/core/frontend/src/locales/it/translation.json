@@ -1,0 +1,14 @@
+{
+  "nav": {
+    "profile": "Profilo",
+    "settings": "Impostazioni",
+    "logout": "Esci",
+    "language": "Lingua"
+  },
+  "language": {
+    "de": "Deutsch",
+    "en": "English",
+    "fr": "Français",
+    "it": "Italiano"
+  }
+}
