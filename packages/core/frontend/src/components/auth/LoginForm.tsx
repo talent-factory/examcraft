@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { OAuthProvider } from '../../types/auth';
 
@@ -18,6 +19,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   onSwitchToRegister,
   onForgotPassword,
 }) => {
+  const { t } = useTranslation();
   const { login, error, isLoading, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +33,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     setLocalError(null);
 
     if (!email || !password) {
-      setLocalError('Please enter both email and password');
+      setLocalError(t('auth.login.emailAndPasswordRequired'));
       return;
     }
 
@@ -68,8 +70,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     <div className="w-full">
       {/* Header */}
       <div className="mb-8 text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
-        <p className="text-gray-600">Sign in to your account</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('auth.login.title')}</h2>
+        <p className="text-gray-600">{t('auth.login.subtitle')}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -91,7 +93,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           {/* Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-1.5">
-              Email address
+              {t('auth.login.email')}
             </label>
             <input
               type="email"
@@ -108,7 +110,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           {/* Password */}
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-1.5">
-              Password
+              {t('auth.login.password')}
             </label>
             <div className="relative">
               <input
@@ -150,7 +152,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
               />
               <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 cursor-pointer select-none">
-                Remember me
+                {t('auth.login.rememberMe')}
               </label>
             </div>
 
@@ -160,7 +162,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 onClick={onForgotPassword}
                 className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
               >
-                Forgot password?
+                {t('auth.login.forgotPassword')}
               </button>
             )}
           </div>
@@ -181,10 +183,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Signing in...
+                {t('auth.login.signingIn')}
               </>
             ) : (
-              'Sign in'
+              t('auth.login.signIn')
             )}
           </button>
 
@@ -194,7 +196,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               <div className="w-full border-t border-gray-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-white text-gray-500">Or continue with</span>
+              <span className="px-3 bg-white text-gray-500">{t('auth.login.orContinueWith')}</span>
             </div>
           </div>
 
@@ -235,13 +237,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       {onSwitchToRegister && (
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{' '}
+            {t('auth.login.noAccount')}{' '}
             <button
               type="button"
               onClick={onSwitchToRegister}
               className="font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
             >
-              Sign up
+              {t('auth.login.signUp')}
             </button>
           </p>
         </div>

@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { LoginForm } from './LoginForm';
 import { RegisterForm } from './RegisterForm';
@@ -16,6 +17,7 @@ interface AuthPageProps {
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ defaultTab = 'login' }) => {
+  const { t } = useTranslation();
   const [view, setView] = useState<AuthView>(defaultTab);
   const navigate = useNavigate();
 
@@ -41,7 +43,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultTab = 'login' }) => {
             ExamCraft AI
           </h1>
           <p className="text-sm text-gray-600">
-            AI-Powered Exam Question Generation
+            {t('auth.authPage.tagline')}
           </p>
         </div>
 
@@ -54,7 +56,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultTab = 'login' }) => {
                 onClick={() => setView('login')}
                 className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
               >
-                ← Back to Login
+                {t('auth.authPage.backToLogin')}
               </button>
             </div>
           )}
@@ -86,13 +88,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultTab = 'login' }) => {
         {/* Footer */}
         <div className="mt-8 text-center text-xs text-gray-500">
           <p>
-            By continuing, you agree to our{' '}
+            {t('auth.authPage.footer')}{' '}
             <a href="/terms" className="text-gray-700 hover:text-gray-900 underline transition-colors">
-              Terms of Service
+              {t('auth.authPage.terms')}
             </a>{' '}
-            and{' '}
+            {t('auth.authPage.and')}{' '}
             <a href="/privacy" className="text-gray-700 hover:text-gray-900 underline transition-colors">
-              Privacy Policy
+              {t('auth.authPage.privacy')}
             </a>
           </p>
         </div>

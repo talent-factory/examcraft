@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button, Alert, CircularProgress, Box } from '@mui/material';
 import EmailIcon from '@mui/icons-material/Email';
 
@@ -15,6 +16,7 @@ const ResendVerificationButton: React.FC<ResendVerificationButtonProps> = ({
   variant = 'text',
   fullWidth = false,
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,12 +71,12 @@ const ResendVerificationButton: React.FC<ResendVerificationButtonProps> = ({
           }),
         }}
       >
-        {loading ? 'Sending...' : success ? 'Email Sent!' : 'Resend Verification Email'}
+        {loading ? t('auth.verification.sending') : success ? t('auth.verification.emailSent') : t('auth.verification.resendButton')}
       </Button>
 
       {success && (
         <Alert severity="success" sx={{ mt: 2 }}>
-          Verification email sent! Please check your inbox.
+          {t('auth.verification.successMessage')}
         </Alert>
       )}
 

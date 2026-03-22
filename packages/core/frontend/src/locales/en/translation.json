@@ -10,5 +10,93 @@
     "en": "English",
     "fr": "Français",
     "it": "Italiano"
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome back",
+      "subtitle": "Sign in to your account",
+      "email": "Email address",
+      "password": "Password",
+      "rememberMe": "Remember me",
+      "forgotPassword": "Forgot password?",
+      "signingIn": "Signing in...",
+      "signIn": "Sign in",
+      "orContinueWith": "Or continue with",
+      "noAccount": "Don't have an account?",
+      "signUp": "Sign up",
+      "emailAndPasswordRequired": "Please enter both email and password"
+    },
+    "register": {
+      "title": "Create Account",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "institutionCode": "Institution Code (Optional)",
+      "institutionCodeHint": "Enter your institution code if you have one",
+      "password": "Password",
+      "passwordHint": "Minimum 8 characters",
+      "confirmPassword": "Confirm Password",
+      "creatingAccount": "Creating account...",
+      "createAccount": "Create Account",
+      "hasAccount": "Already have an account?",
+      "loginHere": "Login here"
+    },
+    "authPage": {
+      "tagline": "AI-Powered Exam Question Generation",
+      "backToLogin": "← Back to Login",
+      "footer": "By continuing, you agree to our",
+      "terms": "Terms of Service",
+      "and": "and",
+      "privacy": "Privacy Policy",
+      "footerEnd": ""
+    },
+    "verification": {
+      "bannerTitle": "Email Verification Required",
+      "bannerText": "Please verify your email address to access all features. Check your inbox for the verification link.",
+      "resendButton": "Resend Verification Email",
+      "sending": "Sending...",
+      "emailSent": "Email Sent!",
+      "successMessage": "Verification email sent! Please check your inbox."
+    },
+    "oauth": {
+      "processing": "Processing OAuth callback...",
+      "errorTitle": "Authentication Error",
+      "returnToLogin": "Return to login",
+      "noCodeError": "No authorization code received",
+      "missingTokens": "Missing authentication tokens"
+    },
+    "resetRequest": {
+      "title": "Reset Password",
+      "subtitle": "Enter your email address and we'll send you a link to reset your password.",
+      "email": "Email Address",
+      "sending": "Sending...",
+      "sendResetLink": "Send Reset Link",
+      "cancel": "Cancel",
+      "checkEmail": "Check Your Email",
+      "sentTo": "We've sent a password reset link to <strong>{{email}}</strong>. Please check your inbox and follow the instructions.",
+      "redirecting": "Redirecting you back...",
+      "enterEmail": "Please enter your email address",
+      "invalidEmail": "Please enter a valid email address"
+    },
+    "resetConfirm": {
+      "title": "Set New Password",
+      "subtitle": "Please enter your new password below.",
+      "newPassword": "New Password",
+      "passwordHint": "Minimum 8 characters",
+      "confirmPassword": "Confirm New Password",
+      "resetting": "Resetting...",
+      "resetPassword": "Reset Password",
+      "cancel": "Cancel",
+      "successTitle": "Password Reset Successful",
+      "successMessage": "Your password has been successfully reset. You can now login with your new password.",
+      "redirectingToLogin": "Redirecting to login..."
+    },
+    "validation": {
+      "required": "Please fill in all required fields",
+      "passwordMismatch": "Passwords do not match",
+      "passwordMinLength": "Password must be at least 8 characters long",
+      "invalidEmail": "Please enter a valid email address",
+      "fillAllFields": "Please fill in all fields"
+    }
   }
 }

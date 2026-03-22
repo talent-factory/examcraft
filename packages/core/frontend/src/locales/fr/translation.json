@@ -10,5 +10,93 @@
     "en": "English",
     "fr": "Français",
     "it": "Italiano"
+  },
+  "auth": {
+    "login": {
+      "title": "Bon retour",
+      "subtitle": "Connectez-vous à votre compte",
+      "email": "Adresse e-mail",
+      "password": "Mot de passe",
+      "rememberMe": "Se souvenir de moi",
+      "forgotPassword": "Mot de passe oublié ?",
+      "signingIn": "Connexion en cours...",
+      "signIn": "Se connecter",
+      "orContinueWith": "Ou continuer avec",
+      "noAccount": "Vous n'avez pas de compte ?",
+      "signUp": "S'inscrire",
+      "emailAndPasswordRequired": "Veuillez saisir votre e-mail et votre mot de passe"
+    },
+    "register": {
+      "title": "Créer un compte",
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "email": "E-mail",
+      "institutionCode": "Code d'institution (Optionnel)",
+      "institutionCodeHint": "Entrez votre code d'institution si vous en avez un",
+      "password": "Mot de passe",
+      "passwordHint": "Minimum 8 caractères",
+      "confirmPassword": "Confirmer le mot de passe",
+      "creatingAccount": "Création du compte...",
+      "createAccount": "Créer un compte",
+      "hasAccount": "Vous avez déjà un compte ?",
+      "loginHere": "Connectez-vous ici"
+    },
+    "authPage": {
+      "tagline": "Génération de questions d'examen par IA",
+      "backToLogin": "← Retour à la connexion",
+      "footer": "En continuant, vous acceptez nos",
+      "terms": "Conditions d'utilisation",
+      "and": "et",
+      "privacy": "Politique de confidentialité",
+      "footerEnd": ""
+    },
+    "verification": {
+      "bannerTitle": "Vérification de l'e-mail requise",
+      "bannerText": "Veuillez vérifier votre adresse e-mail pour accéder à toutes les fonctionnalités. Consultez votre boîte de réception pour le lien de vérification.",
+      "resendButton": "Renvoyer l'e-mail de vérification",
+      "sending": "Envoi en cours...",
+      "emailSent": "E-mail envoyé !",
+      "successMessage": "E-mail de vérification envoyé ! Veuillez vérifier votre boîte de réception."
+    },
+    "oauth": {
+      "processing": "Traitement du rappel OAuth...",
+      "errorTitle": "Erreur d'authentification",
+      "returnToLogin": "Retour à la connexion",
+      "noCodeError": "Aucun code d'autorisation reçu",
+      "missingTokens": "Jetons d'authentification manquants"
+    },
+    "resetRequest": {
+      "title": "Réinitialiser le mot de passe",
+      "subtitle": "Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser votre mot de passe.",
+      "email": "Adresse e-mail",
+      "sending": "Envoi en cours...",
+      "sendResetLink": "Envoyer le lien",
+      "cancel": "Annuler",
+      "checkEmail": "Vérifiez votre e-mail",
+      "sentTo": "Nous avons envoyé un lien de réinitialisation à <strong>{{email}}</strong>. Veuillez vérifier votre boîte de réception et suivre les instructions.",
+      "redirecting": "Redirection en cours...",
+      "enterEmail": "Veuillez saisir votre adresse e-mail",
+      "invalidEmail": "Veuillez saisir une adresse e-mail valide"
+    },
+    "resetConfirm": {
+      "title": "Définir un nouveau mot de passe",
+      "subtitle": "Veuillez saisir votre nouveau mot de passe ci-dessous.",
+      "newPassword": "Nouveau mot de passe",
+      "passwordHint": "Minimum 8 caractères",
+      "confirmPassword": "Confirmer le nouveau mot de passe",
+      "resetting": "Réinitialisation...",
+      "resetPassword": "Réinitialiser le mot de passe",
+      "cancel": "Annuler",
+      "successTitle": "Mot de passe réinitialisé avec succès",
+      "successMessage": "Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.",
+      "redirectingToLogin": "Redirection vers la connexion..."
+    },
+    "validation": {
+      "required": "Veuillez remplir tous les champs obligatoires",
+      "passwordMismatch": "Les mots de passe ne correspondent pas",
+      "passwordMinLength": "Le mot de passe doit contenir au moins 8 caractères",
+      "invalidEmail": "Veuillez saisir une adresse e-mail valide",
+      "fillAllFields": "Veuillez remplir tous les champs"
+    }
   }
 }

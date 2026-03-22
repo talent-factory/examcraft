@@ -10,5 +10,93 @@
     "en": "English",
     "fr": "Français",
     "it": "Italiano"
+  },
+  "auth": {
+    "login": {
+      "title": "Bentornato",
+      "subtitle": "Accedi al tuo account",
+      "email": "Indirizzo e-mail",
+      "password": "Password",
+      "rememberMe": "Ricordami",
+      "forgotPassword": "Password dimenticata?",
+      "signingIn": "Accesso in corso...",
+      "signIn": "Accedi",
+      "orContinueWith": "Oppure continua con",
+      "noAccount": "Non hai un account?",
+      "signUp": "Registrati",
+      "emailAndPasswordRequired": "Inserisci sia l'e-mail che la password"
+    },
+    "register": {
+      "title": "Crea account",
+      "firstName": "Nome",
+      "lastName": "Cognome",
+      "email": "E-mail",
+      "institutionCode": "Codice istituzione (Opzionale)",
+      "institutionCodeHint": "Inserisci il codice della tua istituzione se ne hai uno",
+      "password": "Password",
+      "passwordHint": "Minimo 8 caratteri",
+      "confirmPassword": "Conferma password",
+      "creatingAccount": "Creazione account...",
+      "createAccount": "Crea account",
+      "hasAccount": "Hai già un account?",
+      "loginHere": "Accedi qui"
+    },
+    "authPage": {
+      "tagline": "Generazione di domande d'esame con IA",
+      "backToLogin": "← Torna al login",
+      "footer": "Continuando, accetti i nostri",
+      "terms": "Termini di servizio",
+      "and": "e",
+      "privacy": "Informativa sulla privacy",
+      "footerEnd": ""
+    },
+    "verification": {
+      "bannerTitle": "Verifica e-mail richiesta",
+      "bannerText": "Verifica il tuo indirizzo e-mail per accedere a tutte le funzionalità. Controlla la tua casella di posta per il link di verifica.",
+      "resendButton": "Invia di nuovo l'e-mail di verifica",
+      "sending": "Invio in corso...",
+      "emailSent": "E-mail inviata!",
+      "successMessage": "E-mail di verifica inviata! Controlla la tua casella di posta."
+    },
+    "oauth": {
+      "processing": "Elaborazione callback OAuth...",
+      "errorTitle": "Errore di autenticazione",
+      "returnToLogin": "Torna al login",
+      "noCodeError": "Nessun codice di autorizzazione ricevuto",
+      "missingTokens": "Token di autenticazione mancanti"
+    },
+    "resetRequest": {
+      "title": "Reimposta password",
+      "subtitle": "Inserisci il tuo indirizzo e-mail e ti invieremo un link per reimpostare la password.",
+      "email": "Indirizzo e-mail",
+      "sending": "Invio in corso...",
+      "sendResetLink": "Invia link",
+      "cancel": "Annulla",
+      "checkEmail": "Controlla la tua e-mail",
+      "sentTo": "Abbiamo inviato un link per reimpostare la password a <strong>{{email}}</strong>. Controlla la tua casella di posta e segui le istruzioni.",
+      "redirecting": "Reindirizzamento in corso...",
+      "enterEmail": "Inserisci il tuo indirizzo e-mail",
+      "invalidEmail": "Inserisci un indirizzo e-mail valido"
+    },
+    "resetConfirm": {
+      "title": "Imposta nuova password",
+      "subtitle": "Inserisci la tua nuova password qui sotto.",
+      "newPassword": "Nuova password",
+      "passwordHint": "Minimo 8 caratteri",
+      "confirmPassword": "Conferma nuova password",
+      "resetting": "Reimpostazione...",
+      "resetPassword": "Reimposta password",
+      "cancel": "Annulla",
+      "successTitle": "Password reimpostata con successo",
+      "successMessage": "La tua password è stata reimpostata con successo. Ora puoi accedere con la tua nuova password.",
+      "redirectingToLogin": "Reindirizzamento al login..."
+    },
+    "validation": {
+      "required": "Compila tutti i campi obbligatori",
+      "passwordMismatch": "Le password non corrispondono",
+      "passwordMinLength": "La password deve contenere almeno 8 caratteri",
+      "invalidEmail": "Inserisci un indirizzo e-mail valido",
+      "fillAllFields": "Compila tutti i campi"
+    }
   }
 }

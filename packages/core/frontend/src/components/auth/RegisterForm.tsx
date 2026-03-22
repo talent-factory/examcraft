@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { RegisterRequest } from '../../types/auth';
@@ -17,6 +18,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   onSuccess,
   onSwitchToLogin,
 }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { register, error, isLoading, clearError } = useAuth();
   const [formData, setFormData] = useState<RegisterRequest>({
@@ -37,23 +39,23 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
 
   const validateForm = (): boolean => {
     if (!formData.email || !formData.password || !formData.first_name || !formData.last_name) {
-      setLocalError('Please fill in all required fields');
+      setLocalError(t('auth.validation.required'));
       return false;
     }
 
     if (formData.password !== confirmPassword) {
-      setLocalError('Passwords do not match');
+      setLocalError(t('auth.validation.passwordMismatch'));
       return false;
     }
 
     if (formData.password.length < 8) {
-      setLocalError('Password must be at least 8 characters long');
+      setLocalError(t('auth.validation.passwordMinLength'));
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setLocalError('Please enter a valid email address');
+      setLocalError(t('auth.validation.invalidEmail'));
       return false;
     }
 
@@ -85,7 +87,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white shadow-md rounded-lg px-8 pt-6 pb-8 mb-4">
         <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
-          Create Account
+          {t('auth.register.title')}
         </h2>
 
         {displayError && (
@@ -101,7 +103,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               className="block text-gray-700 text-sm font-bold mb-2"
               htmlFor="first_name"
             >
-              First Name *
+              {t('auth.register.firstName')} *
             </label>
             <input
               id="first_name"
@@ -122,7 +124,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               className="block text-gray-700 text-sm font-bold mb-2"
               htmlFor="last_name"
             >
-              Last Name *
+              {t('auth.register.lastName')} *
             </label>
             <input
               id="last_name"
@@ -143,7 +145,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               className="block text-gray-700 text-sm font-bold mb-2"
               htmlFor="email"
             >
-              Email *
+              {t('auth.register.email')} *
             </label>
             <input
               id="email"
@@ -164,7 +166,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               className="block text-gray-700 text-sm font-bold mb-2"
               htmlFor="institution_slug"
             >
-              Institution Code (Optional)
+              {t('auth.register.institutionCode')}
             </label>
             <input
               id="institution_slug"
@@ -177,7 +179,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               disabled={isLoading}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Enter your institution code if you have one
+              {t('auth.register.institutionCodeHint')}
             </p>
           </div>
 
@@ -187,7 +189,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               className="block text-gray-700 text-sm font-bold mb-2"
               htmlFor="password"
             >
-              Password *
+              {t('auth.register.password')} *
             </label>
             <div className="relative">
               <input
@@ -211,7 +213,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Minimum 8 characters
+              {t('auth.register.passwordHint')}
             </p>
           </div>
 
@@ -221,7 +223,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               className="block text-gray-700 text-sm font-bold mb-2"
               htmlFor="confirm_password"
             >
-              Confirm Password *
+              {t('auth.register.confirmPassword')} *
             </label>
             <input
               id="confirm_password"
@@ -242,7 +244,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               disabled={isLoading}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Creating account...' : 'Create Account'}
+              {isLoading ? t('auth.register.creatingAccount') : t('auth.register.createAccount')}
             </button>
           </div>
         </form>
@@ -251,14 +253,14 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         {onSwitchToLogin && (
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              Already have an account?{' '}
+              {t('auth.register.hasAccount')}{' '}
               <button
                 type="button"
                 onClick={onSwitchToLogin}
                 className="text-blue-600 hover:text-blue-800 font-medium"
                 disabled={isLoading}
               >
-                Login here
+                {t('auth.register.loginHere')}
               </button>
             </p>
           </div>

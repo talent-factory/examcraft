@@ -1,10 +1,12 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Box, Typography } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ResendVerificationButton from './ResendVerificationButton';
 import { useAuth } from '../../contexts/AuthContext';
 
 const EmailVerificationBanner: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
 
   // Don't show banner if user is verified or not logged in
@@ -35,11 +37,10 @@ const EmailVerificationBanner: React.FC = () => {
       >
         <Box>
           <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-            Email Verification Required
+            {t('auth.verification.bannerTitle')}
           </Typography>
           <Typography variant="body2">
-            Please verify your email address to access all features. Check your inbox for the
-            verification link.
+            {t('auth.verification.bannerText')}
           </Typography>
         </Box>
         <Box sx={{ flexShrink: 0 }}>
