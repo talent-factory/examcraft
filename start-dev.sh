@@ -222,6 +222,23 @@ echo ""
 echo -e "${BLUE}⏳ Waiting for backend to be ready...${NC}"
 sleep 5
 
+# Run database migrations
+echo ""
+echo -e "${BLUE}🔄 Running database migrations...${NC}"
+for i in $(seq 1 3); do
+    if docker compose --env-file .env -f "$COMPOSE_FILE" exec -T backend alembic upgrade head 2>&1; then
+        echo -e "${GREEN}✅ Migrations completed successfully${NC}"
+        break
+    fi
+    if [ $i -eq 3 ]; then
+        echo -e "${RED}❌ Migrations failed after 3 attempts${NC}"
+        echo -e "${YELLOW}⚠️  Check database connection and migration files${NC}"
+        exit 1
+    fi
+    echo -e "${YELLOW}⚠️  Migration attempt $i failed, retrying in 3s...${NC}"
+    sleep 3
+done
+
 # Seed development data (Full mode only)
 if [ "$DEPLOYMENT_MODE" = "full" ]; then
     echo ""
