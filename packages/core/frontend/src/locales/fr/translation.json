@@ -98,5 +98,97 @@
       "invalidEmail": "Veuillez saisir une adresse e-mail valide",
       "fillAllFields": "Veuillez remplir tous les champs"
     }
+  },
+  "pages": {
+    "dashboard": {
+      "welcome": "Bienvenue ! \ud83d\udc4b",
+      "welcomeName": "Bienvenue, {{name}} ! \ud83d\udc4b",
+      "subtitle": "Cr\u00e9ez des questions d'examen intelligentes avec l'aide de l'IA",
+      "quickAccess": "Acc\u00e8s rapide",
+      "documents": "Documents",
+      "documentsDescription": "T\u00e9l\u00e9chargez des supports de cours et g\u00e9rez votre biblioth\u00e8que de documents",
+      "generateQuestions": "G\u00e9n\u00e9rer des questions",
+      "generateQuestionsDescription": "Cr\u00e9ez automatiquement des questions d'examen avec l'IA",
+      "reviewQueue": "File de r\u00e9vision",
+      "reviewQueueDescription": "R\u00e9visez et validez les questions g\u00e9n\u00e9r\u00e9es",
+      "exams": "Examens",
+      "examsDescription": "Composez et exportez des examens",
+      "statistics": "Statistiques",
+      "generatedQuestions": "Questions g\u00e9n\u00e9r\u00e9es",
+      "validatedQuestions": "Questions valid\u00e9es",
+      "recentActivity": "Activit\u00e9 r\u00e9cente",
+      "noActivity": "Aucune activit\u00e9 pour le moment. Commencez par t\u00e9l\u00e9charger des documents !"
+    },
+    "documents": {
+      "title": "Biblioth\u00e8que de documents",
+      "subtitle": "G\u00e9rez vos supports de cours et documents",
+      "uploadTitle": "T\u00e9l\u00e9charger un nouveau document",
+      "myDocuments": "Mes documents"
+    },
+    "review": {
+      "title": "R\u00e9vision des questions",
+      "subtitle": "R\u00e9visez et validez les questions d'examen g\u00e9n\u00e9r\u00e9es"
+    },
+    "exams": {
+      "title": "G\u00e9n\u00e9ration d'examens",
+      "subtitle": "Cr\u00e9ez des questions d'examen intelligentes avec l'aide de l'IA"
+    },
+    "admin": {
+      "title": "Panneau d'administration",
+      "subtitle": "G\u00e9rez les utilisateurs, les param\u00e8tres et la configuration syst\u00e8me",
+      "tabUsers": "Gestion des utilisateurs",
+      "tabInstitutions": "Institutions",
+      "tabRoles": "R\u00f4les et permissions",
+      "tabAudit": "Journaux d'audit",
+      "tabSubscription": "Abonnement",
+      "auditPlaceholder": "Journaux d'audit \u2014 Bient\u00f4t disponible"
+    },
+    "promptLibrary": {
+      "title": "Biblioth\u00e8que de prompts",
+      "subtitle": "G\u00e9rez les prompts syst\u00e8me et utilisateur pour les agents IA"
+    },
+    "billing": {
+      "title": "Plans tarifaires",
+      "subtitle": "Choisissez le plan qui vous convient.",
+      "perMonth": "/mois",
+      "freeDescription": "Parfait pour d\u00e9couvrir ExamCraft.",
+      "currentPlan": "Plan actuel",
+      "starterDescription": "Pour les cr\u00e9ateurs d'examens s\u00e9rieux.",
+      "professionalDescription": "Puissance illimit\u00e9e pour la cr\u00e9ation professionnelle d'examens.",
+      "processing": "Traitement...",
+      "subscribe": "S'abonner"
+    },
+    "registrationSuccess": {
+      "title": "Inscription r\u00e9ussie ! \ud83c\udf89",
+      "subtitle": "Bienvenue sur ExamCraft AI ! Nous avons envoy\u00e9 un e-mail de v\u00e9rification \u00e0 :",
+      "checkInbox": "Veuillez v\u00e9rifier votre bo\u00eete de r\u00e9ception et cliquer sur le lien de v\u00e9rification pour activer votre compte. Le lien expirera dans 24 heures.",
+      "didntReceive": "Vous n'avez pas re\u00e7u l'e-mail ?",
+      "continueToDashboard": "Continuer vers le tableau de bord",
+      "limitedAccess": "Vous pouvez toujours acc\u00e9der au tableau de bord, mais certaines fonctionnalit\u00e9s peuvent \u00eatre limit\u00e9es tant que vous n'avez pas v\u00e9rifi\u00e9 votre e-mail."
+    },
+    "verifyEmail": {
+      "verifying": "V\u00e9rification de votre e-mail...",
+      "pleaseWait": "Veuillez patienter pendant que nous v\u00e9rifions votre adresse e-mail.",
+      "success": "E-mail v\u00e9rifi\u00e9 ! \ud83c\udf89",
+      "welcomeUser": "Bienvenue, {{name}} ! Votre e-mail a \u00e9t\u00e9 v\u00e9rifi\u00e9 avec succ\u00e8s.",
+      "fullAccess": "Vous pouvez maintenant acc\u00e9der \u00e0 toutes les fonctionnalit\u00e9s d'ExamCraft AI.",
+      "goToDashboard": "Aller au tableau de bord",
+      "failed": "\u00c9chec de la v\u00e9rification",
+      "linkExpired": "Le lien de v\u00e9rification a peut-\u00eatre expir\u00e9 ou est invalide.",
+      "backToLogin": "Retour \u00e0 la connexion",
+      "noToken": "Lien de v\u00e9rification invalide. Aucun jeton fourni."
+    },
+    "paymentSuccess": {
+      "title": "Paiement r\u00e9ussi !",
+      "subtitle": "Merci pour votre abonnement. Votre compte a \u00e9t\u00e9 mis \u00e0 niveau.",
+      "redirecting": "Redirection vers la facturation...",
+      "returnToBilling": "Retour \u00e0 la facturation"
+    },
+    "paymentCancel": {
+      "title": "Paiement annul\u00e9",
+      "subtitle": "Le processus de paiement a \u00e9t\u00e9 annul\u00e9. Aucun frais n'a \u00e9t\u00e9 factur\u00e9.",
+      "tryAgain": "R\u00e9essayer",
+      "returnToDashboard": "Retour au tableau de bord"
+    }
   }
 }

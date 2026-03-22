@@ -98,5 +98,97 @@
       "invalidEmail": "Please enter a valid email address",
       "fillAllFields": "Please fill in all fields"
     }
+  },
+  "pages": {
+    "dashboard": {
+      "welcome": "Welcome! \ud83d\udc4b",
+      "welcomeName": "Welcome, {{name}}! \ud83d\udc4b",
+      "subtitle": "Create intelligent exam questions with AI support",
+      "quickAccess": "Quick Access",
+      "documents": "Documents",
+      "documentsDescription": "Upload teaching materials and manage your document library",
+      "generateQuestions": "Generate Questions",
+      "generateQuestionsDescription": "Automatically create exam questions with AI",
+      "reviewQueue": "Review Queue",
+      "reviewQueueDescription": "Review and validate generated questions",
+      "exams": "Exams",
+      "examsDescription": "Compose and export exams",
+      "statistics": "Statistics",
+      "generatedQuestions": "Generated Questions",
+      "validatedQuestions": "Validated Questions",
+      "recentActivity": "Recent Activity",
+      "noActivity": "No activity yet. Start by uploading documents!"
+    },
+    "documents": {
+      "title": "Document Library",
+      "subtitle": "Manage your teaching materials and documents",
+      "uploadTitle": "Upload New Document",
+      "myDocuments": "My Documents"
+    },
+    "review": {
+      "title": "Question Review",
+      "subtitle": "Review and validate generated exam questions"
+    },
+    "exams": {
+      "title": "Exam Generation",
+      "subtitle": "Create intelligent exam questions with AI support"
+    },
+    "admin": {
+      "title": "Admin Panel",
+      "subtitle": "Manage users, settings and system configuration",
+      "tabUsers": "User Management",
+      "tabInstitutions": "Institutions",
+      "tabRoles": "Roles & Permissions",
+      "tabAudit": "Audit Logs",
+      "tabSubscription": "Subscription",
+      "auditPlaceholder": "Audit Logs \u2014 Coming soon"
+    },
+    "promptLibrary": {
+      "title": "Prompt Library",
+      "subtitle": "Manage system and user prompts for AI agents"
+    },
+    "billing": {
+      "title": "Pricing Plans",
+      "subtitle": "Choose the plan that fits your needs.",
+      "perMonth": "/mo",
+      "freeDescription": "Perfect for trying out ExamCraft.",
+      "currentPlan": "Current Plan",
+      "starterDescription": "For serious exam creators.",
+      "professionalDescription": "Unlimited power for professional exam creation.",
+      "processing": "Processing...",
+      "subscribe": "Subscribe"
+    },
+    "registrationSuccess": {
+      "title": "Registration Successful! \ud83c\udf89",
+      "subtitle": "Welcome to ExamCraft AI! We've sent a verification email to:",
+      "checkInbox": "Please check your inbox and click the verification link to activate your account. The link will expire in 24 hours.",
+      "didntReceive": "Didn't receive the email?",
+      "continueToDashboard": "Continue to Dashboard",
+      "limitedAccess": "You can still access the dashboard, but some features may be limited until you verify your email."
+    },
+    "verifyEmail": {
+      "verifying": "Verifying your email...",
+      "pleaseWait": "Please wait while we verify your email address.",
+      "success": "Email Verified! \ud83c\udf89",
+      "welcomeUser": "Welcome, {{name}}! Your email has been successfully verified.",
+      "fullAccess": "You can now access all features of ExamCraft AI.",
+      "goToDashboard": "Go to Dashboard",
+      "failed": "Verification Failed",
+      "linkExpired": "The verification link may have expired or is invalid.",
+      "backToLogin": "Back to Login",
+      "noToken": "Invalid verification link. No token provided."
+    },
+    "paymentSuccess": {
+      "title": "Payment Successful!",
+      "subtitle": "Thank you for your subscription. Your account has been upgraded.",
+      "redirecting": "Redirecting you back to billing...",
+      "returnToBilling": "Return to Billing"
+    },
+    "paymentCancel": {
+      "title": "Payment Canceled",
+      "subtitle": "The payment process was canceled. No charges were made.",
+      "tryAgain": "Try Again",
+      "returnToDashboard": "Return to Dashboard"
+    }
   }
 }

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { paymentService } from '../services/paymentService';
 
 export const BillingPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { t } = useTranslation();
 
     const handleSubscribe = async (plan: string) => {
         setLoading(true);
@@ -24,10 +26,10 @@ export const BillingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-                    Pricing Plans
+                    {t('pages.billing.title')}
                 </h2>
                 <p className="mt-4 text-xl text-gray-600">
-                    Choose the plan that fits your needs.
+                    {t('pages.billing.subtitle')}
                 </p>
             </div>
 
@@ -45,16 +47,16 @@ export const BillingPage: React.FC = () => {
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Free</h2>
                         <p className="mt-4">
                             <span className="text-4xl font-extrabold text-gray-900">€0</span>
-                            <span className="text-base font-medium text-gray-500">/mo</span>
+                            <span className="text-base font-medium text-gray-500">{t('pages.billing.perMonth')}</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
-                            Perfect for trying out ExamCraft.
+                            {t('pages.billing.freeDescription')}
                         </p>
                         <button
                             disabled
                             className="mt-8 block w-full bg-gray-100 border border-transparent rounded-md py-2 text-sm font-semibold text-gray-400 text-center cursor-not-allowed"
                         >
-                            Current Plan
+                            {t('pages.billing.currentPlan')}
                         </button>
                     </div>
                 </div>
@@ -68,17 +70,17 @@ export const BillingPage: React.FC = () => {
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Starter</h2>
                         <p className="mt-4">
                             <span className="text-4xl font-extrabold text-gray-900">€19</span>
-                            <span className="text-base font-medium text-gray-500">/mo</span>
+                            <span className="text-base font-medium text-gray-500">{t('pages.billing.perMonth')}</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
-                            For serious exam creators.
+                            {t('pages.billing.starterDescription')}
                         </p>
                         <button
                             onClick={() => handleSubscribe('starter')}
                             disabled={loading}
                             className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
-                            {loading ? 'Processing...' : 'Subscribe'}
+                            {loading ? t('pages.billing.processing') : t('pages.billing.subscribe')}
                         </button>
                     </div>
                 </div>
@@ -89,17 +91,17 @@ export const BillingPage: React.FC = () => {
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Professional</h2>
                         <p className="mt-4">
                             <span className="text-4xl font-extrabold text-gray-900">€149</span>
-                            <span className="text-base font-medium text-gray-500">/mo</span>
+                            <span className="text-base font-medium text-gray-500">{t('pages.billing.perMonth')}</span>
                         </p>
                         <p className="mt-4 text-sm text-gray-500">
-                            Unlimited power for professional exam creation.
+                            {t('pages.billing.professionalDescription')}
                         </p>
                         <button
                             onClick={() => handleSubscribe('professional')}
                             disabled={loading}
                             className="mt-8 block w-full bg-blue-600 border border-transparent rounded-md py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
-                            {loading ? 'Processing...' : 'Subscribe'}
+                            {loading ? t('pages.billing.processing') : t('pages.billing.subscribe')}
                         </button>
                     </div>
                 </div>

@@ -98,5 +98,97 @@
       "invalidEmail": "Inserisci un indirizzo e-mail valido",
       "fillAllFields": "Compila tutti i campi"
     }
+  },
+  "pages": {
+    "dashboard": {
+      "welcome": "Benvenuto! \ud83d\udc4b",
+      "welcomeName": "Benvenuto, {{name}}! \ud83d\udc4b",
+      "subtitle": "Crea domande d'esame intelligenti con il supporto dell'IA",
+      "quickAccess": "Accesso rapido",
+      "documents": "Documenti",
+      "documentsDescription": "Carica materiali didattici e gestisci la tua libreria di documenti",
+      "generateQuestions": "Genera domande",
+      "generateQuestionsDescription": "Crea automaticamente domande d'esame con l'IA",
+      "reviewQueue": "Coda di revisione",
+      "reviewQueueDescription": "Rivedi e valida le domande generate",
+      "exams": "Esami",
+      "examsDescription": "Componi ed esporta esami",
+      "statistics": "Statistiche",
+      "generatedQuestions": "Domande generate",
+      "validatedQuestions": "Domande validate",
+      "recentActivity": "Attivit\u00e0 recente",
+      "noActivity": "Nessuna attivit\u00e0 presente. Inizia caricando dei documenti!"
+    },
+    "documents": {
+      "title": "Libreria documenti",
+      "subtitle": "Gestisci i tuoi materiali didattici e documenti",
+      "uploadTitle": "Carica nuovo documento",
+      "myDocuments": "I miei documenti"
+    },
+    "review": {
+      "title": "Revisione domande",
+      "subtitle": "Rivedi e valida le domande d'esame generate"
+    },
+    "exams": {
+      "title": "Generazione esami",
+      "subtitle": "Crea domande d'esame intelligenti con il supporto dell'IA"
+    },
+    "admin": {
+      "title": "Pannello di amministrazione",
+      "subtitle": "Gestisci utenti, impostazioni e configurazione di sistema",
+      "tabUsers": "Gestione utenti",
+      "tabInstitutions": "Istituzioni",
+      "tabRoles": "Ruoli e permessi",
+      "tabAudit": "Log di audit",
+      "tabSubscription": "Abbonamento",
+      "auditPlaceholder": "Log di audit \u2014 Prossimamente disponibile"
+    },
+    "promptLibrary": {
+      "title": "Libreria prompt",
+      "subtitle": "Gestisci i prompt di sistema e utente per gli agenti IA"
+    },
+    "billing": {
+      "title": "Piani tariffari",
+      "subtitle": "Scegli il piano pi\u00f9 adatto alle tue esigenze.",
+      "perMonth": "/mese",
+      "freeDescription": "Perfetto per provare ExamCraft.",
+      "currentPlan": "Piano attuale",
+      "starterDescription": "Per creatori di esami seri.",
+      "professionalDescription": "Potenza illimitata per la creazione professionale di esami.",
+      "processing": "Elaborazione...",
+      "subscribe": "Abbonati"
+    },
+    "registrationSuccess": {
+      "title": "Registrazione completata! \ud83c\udf89",
+      "subtitle": "Benvenuto su ExamCraft AI! Abbiamo inviato un'e-mail di verifica a:",
+      "checkInbox": "Controlla la tua casella di posta e clicca sul link di verifica per attivare il tuo account. Il link scadr\u00e0 tra 24 ore.",
+      "didntReceive": "Non hai ricevuto l'e-mail?",
+      "continueToDashboard": "Continua al dashboard",
+      "limitedAccess": "Puoi comunque accedere al dashboard, ma alcune funzionalit\u00e0 potrebbero essere limitate fino alla verifica della tua e-mail."
+    },
+    "verifyEmail": {
+      "verifying": "Verifica dell'e-mail in corso...",
+      "pleaseWait": "Attendi mentre verifichiamo il tuo indirizzo e-mail.",
+      "success": "E-mail verificata! \ud83c\udf89",
+      "welcomeUser": "Benvenuto, {{name}}! La tua e-mail \u00e8 stata verificata con successo.",
+      "fullAccess": "Ora puoi accedere a tutte le funzionalit\u00e0 di ExamCraft AI.",
+      "goToDashboard": "Vai al dashboard",
+      "failed": "Verifica fallita",
+      "linkExpired": "Il link di verifica potrebbe essere scaduto o non valido.",
+      "backToLogin": "Torna al login",
+      "noToken": "Link di verifica non valido. Nessun token fornito."
+    },
+    "paymentSuccess": {
+      "title": "Pagamento riuscito!",
+      "subtitle": "Grazie per il tuo abbonamento. Il tuo account \u00e8 stato aggiornato.",
+      "redirecting": "Reindirizzamento alla fatturazione...",
+      "returnToBilling": "Torna alla fatturazione"
+    },
+    "paymentCancel": {
+      "title": "Pagamento annullato",
+      "subtitle": "Il processo di pagamento \u00e8 stato annullato. Non \u00e8 stato addebitato alcun importo.",
+      "tryAgain": "Riprova",
+      "returnToDashboard": "Torna al dashboard"
+    }
   }
 }

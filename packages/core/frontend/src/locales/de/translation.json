@@ -98,5 +98,97 @@
       "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
       "fillAllFields": "Bitte füllen Sie alle Felder aus"
     }
+  },
+  "pages": {
+    "dashboard": {
+      "welcome": "Willkommen! \ud83d\udc4b",
+      "welcomeName": "Willkommen, {{name}}! \ud83d\udc4b",
+      "subtitle": "Erstelle intelligente Pr\u00fcfungsaufgaben mit KI-Unterst\u00fctzung",
+      "quickAccess": "Schnellzugriff",
+      "documents": "Dokumente",
+      "documentsDescription": "Lade Lehrmaterialien hoch und verwalte deine Dokumentenbibliothek",
+      "generateQuestions": "Fragen generieren",
+      "generateQuestionsDescription": "Erstelle automatisch Pr\u00fcfungsfragen mit KI",
+      "reviewQueue": "Review Queue",
+      "reviewQueueDescription": "\u00dcberpr\u00fcfe und validiere generierte Fragen",
+      "exams": "Pr\u00fcfungen",
+      "examsDescription": "Komponiere und exportiere Pr\u00fcfungen",
+      "statistics": "Statistiken",
+      "generatedQuestions": "Generierte Fragen",
+      "validatedQuestions": "Validierte Fragen",
+      "recentActivity": "Letzte Aktivit\u00e4ten",
+      "noActivity": "Keine Aktivit\u00e4ten vorhanden. Starten Sie mit dem Hochladen von Dokumenten!"
+    },
+    "documents": {
+      "title": "Dokumentenbibliothek",
+      "subtitle": "Verwalte deine Lehrmaterialien und Dokumente",
+      "uploadTitle": "Neues Dokument hochladen",
+      "myDocuments": "Meine Dokumente"
+    },
+    "review": {
+      "title": "Fragen-Review",
+      "subtitle": "\u00dcberpr\u00fcfe und validiere generierte Pr\u00fcfungsfragen"
+    },
+    "exams": {
+      "title": "Pr\u00fcfungsgenerierung",
+      "subtitle": "Erstelle intelligente Pr\u00fcfungsaufgaben mit KI-Unterst\u00fctzung"
+    },
+    "admin": {
+      "title": "Admin-Panel",
+      "subtitle": "Verwalte Benutzer, Einstellungen und Systemkonfiguration",
+      "tabUsers": "Benutzer-Verwaltung",
+      "tabInstitutions": "Institutionen",
+      "tabRoles": "Rollen & Berechtigungen",
+      "tabAudit": "Audit Logs",
+      "tabSubscription": "Abonnement",
+      "auditPlaceholder": "Audit Logs \u2014 Demn\u00e4chst verf\u00fcgbar"
+    },
+    "promptLibrary": {
+      "title": "Prompt Library",
+      "subtitle": "Verwalte System- und User-Prompts f\u00fcr KI-Agents"
+    },
+    "billing": {
+      "title": "Preispl\u00e4ne",
+      "subtitle": "W\u00e4hlen Sie den Plan, der zu Ihnen passt.",
+      "perMonth": "/Monat",
+      "freeDescription": "Perfekt zum Ausprobieren von ExamCraft.",
+      "currentPlan": "Aktueller Plan",
+      "starterDescription": "F\u00fcr engagierte Pr\u00fcfungsersteller.",
+      "professionalDescription": "Unbegrenzte M\u00f6glichkeiten f\u00fcr professionelle Pr\u00fcfungserstellung.",
+      "processing": "Verarbeitung...",
+      "subscribe": "Abonnieren"
+    },
+    "registrationSuccess": {
+      "title": "Registrierung erfolgreich! \ud83c\udf89",
+      "subtitle": "Willkommen bei ExamCraft AI! Wir haben eine Best\u00e4tigungs-E-Mail gesendet an:",
+      "checkInbox": "Bitte \u00fcberpr\u00fcfen Sie Ihren Posteingang und klicken Sie auf den Best\u00e4tigungslink, um Ihr Konto zu aktivieren. Der Link l\u00e4uft in 24 Stunden ab.",
+      "didntReceive": "E-Mail nicht erhalten?",
+      "continueToDashboard": "Weiter zum Dashboard",
+      "limitedAccess": "Sie k\u00f6nnen weiterhin auf das Dashboard zugreifen, aber einige Funktionen sind m\u00f6glicherweise eingeschr\u00e4nkt, bis Sie Ihre E-Mail best\u00e4tigt haben."
+    },
+    "verifyEmail": {
+      "verifying": "E-Mail wird verifiziert...",
+      "pleaseWait": "Bitte warten Sie, w\u00e4hrend wir Ihre E-Mail-Adresse verifizieren.",
+      "success": "E-Mail verifiziert! \ud83c\udf89",
+      "welcomeUser": "Willkommen, {{name}}! Ihre E-Mail wurde erfolgreich verifiziert.",
+      "fullAccess": "Sie k\u00f6nnen jetzt auf alle Funktionen von ExamCraft AI zugreifen.",
+      "goToDashboard": "Zum Dashboard",
+      "failed": "Verifizierung fehlgeschlagen",
+      "linkExpired": "Der Verifizierungslink ist m\u00f6glicherweise abgelaufen oder ung\u00fcltig.",
+      "backToLogin": "Zur\u00fcck zur Anmeldung",
+      "noToken": "Ung\u00fcltiger Verifizierungslink. Kein Token angegeben."
+    },
+    "paymentSuccess": {
+      "title": "Zahlung erfolgreich!",
+      "subtitle": "Vielen Dank f\u00fcr Ihr Abonnement. Ihr Konto wurde aktualisiert.",
+      "redirecting": "Sie werden zur\u00fcck zur Abrechnung weitergeleitet...",
+      "returnToBilling": "Zur\u00fcck zur Abrechnung"
+    },
+    "paymentCancel": {
+      "title": "Zahlung abgebrochen",
+      "subtitle": "Der Zahlungsvorgang wurde abgebrochen. Es wurden keine Kosten berechnet.",
+      "tryAgain": "Erneut versuchen",
+      "returnToDashboard": "Zur\u00fcck zum Dashboard"
+    }
   }
 }
