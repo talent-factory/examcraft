@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import AdminService, { UserListItem, ListUsersParams } from '../../services/AdminService';
 import { UserStatus } from '../../types/auth';
 
@@ -20,6 +21,7 @@ export const UserList: React.FC<UserListProps> = ({
   onRefresh,
   canEdit = false,
 }) => {
+  const { t, i18n } = useTranslation();
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export const UserList: React.FC<UserListProps> = ({
       setTotal(response.total);
       setTotalPages(response.total_pages);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load users');
+      setError(err instanceof Error ? err.message : t('admin.userList.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -87,13 +89,13 @@ export const UserList: React.FC<UserListProps> = ({
       await loadUsers();
       if (onRefresh) onRefresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update user status');
+      alert(err instanceof Error ? err.message : t('admin.userList.failedStatus'));
     }
   };
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Never';
-    return new Date(dateString).toLocaleDateString('de-DE', {
+    if (!dateString) return t('admin.userList.never');
+    return new Date(dateString).toLocaleDateString(i18n.language, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -133,13 +135,13 @@ export const UserList: React.FC<UserListProps> = ({
           {/* Search */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search
+              {t('admin.userList.searchLabel')}
             </label>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Email, name..."
+              placeholder={t('admin.userList.searchPlaceholder')}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -147,7 +149,7 @@ export const UserList: React.FC<UserListProps> = ({
           {/* Role Filter */}
           <div>
             <label htmlFor="role-filter" className="block text-sm font-medium text-gray-700 mb-1">
-              Role
+              {t('admin.userList.roleLabel')}
             </label>
             <select
               id="role-filter"
@@ -155,18 +157,18 @@ export const UserList: React.FC<UserListProps> = ({
               onChange={(e) => setRoleFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">All Roles</option>
-              <option value="admin">Admin</option>
-              <option value="dozent">Dozent</option>
-              <option value="assistant">Assistant</option>
-              <option value="viewer">Viewer</option>
+              <option value="">{t('admin.userList.allRoles')}</option>
+              <option value="admin">{t('admin.userList.roleAdmin')}</option>
+              <option value="dozent">{t('admin.userList.roleDozent')}</option>
+              <option value="assistant">{t('admin.userList.roleAssistant')}</option>
+              <option value="viewer">{t('admin.userList.roleViewer')}</option>
             </select>
           </div>
 
           {/* Status Filter */}
           <div>
             <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
-              Status
+              {t('admin.userList.statusLabel')}
             </label>
             <select
               id="status-filter"
@@ -174,11 +176,11 @@ export const UserList: React.FC<UserListProps> = ({
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="suspended">Suspended</option>
-              <option value="pending">Pending</option>
+              <option value="">{t('admin.userList.allStatus')}</option>
+              <option value="active">{t('admin.userList.statusActive')}</option>
+              <option value="inactive">{t('admin.userList.statusInactive')}</option>
+              <option value="suspended">{t('admin.userList.statusSuspended')}</option>
+              <option value="pending">{t('admin.userList.statusPending')}</option>
             </select>
           </div>
         </div>
@@ -198,23 +200,23 @@ export const UserList: React.FC<UserListProps> = ({
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User
+                  {t('admin.userList.colUser')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Institution
+                  {t('admin.userList.colInstitution')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Roles
+                  {t('admin.userList.colRoles')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                  {t('admin.userList.colStatus')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Last Login
+                  {t('admin.userList.colLastLogin')}
                 </th>
                 {canEdit && (
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                    {t('admin.userList.colActions')}
                   </th>
                 )}
               </tr>
@@ -229,7 +231,7 @@ export const UserList: React.FC<UserListProps> = ({
                           {user.first_name} {user.last_name}
                           {user.is_superuser && (
                             <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
-                              Superuser
+                              {t('admin.userList.superuser')}
                             </span>
                           )}
                         </div>
@@ -267,19 +269,19 @@ export const UserList: React.FC<UserListProps> = ({
                           onClick={() => onEditUser(user.id)}
                           className="text-blue-600 hover:text-blue-900"
                         >
-                          Edit
+                          {t('admin.userList.btnEdit')}
                         </button>
                         <button
                           onClick={() => onManageRoles(user.id)}
                           className="text-indigo-600 hover:text-indigo-900"
                         >
-                          Roles
+                          {t('admin.userList.btnRoles')}
                         </button>
                         <button
                           onClick={() => handleStatusToggle(user.id, user.status)}
                           className={user.status === UserStatus.ACTIVE ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}
                         >
-                          {user.status === UserStatus.ACTIVE ? 'Deactivate' : 'Activate'}
+                          {user.status === UserStatus.ACTIVE ? t('admin.userList.btnDeactivate') : t('admin.userList.btnActivate')}
                         </button>
                       </div>
                     </td>
@@ -298,22 +300,20 @@ export const UserList: React.FC<UserListProps> = ({
               disabled={page === 1}
               className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Previous
+              {t('admin.userList.paginationPrevious')}
             </button>
             <button
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page === totalPages}
               className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Next
+              {t('admin.userList.paginationNext')}
             </button>
           </div>
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">{(page - 1) * pageSize + 1}</span> to{' '}
-                <span className="font-medium">{Math.min(page * pageSize, total)}</span> of{' '}
-                <span className="font-medium">{total}</span> results
+                {t('admin.userList.paginationShowing', { from: (page - 1) * pageSize + 1, to: Math.min(page * pageSize, total), total })}
               </p>
             </div>
             <div>
@@ -323,17 +323,17 @@ export const UserList: React.FC<UserListProps> = ({
                   disabled={page === 1}
                   className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Previous
+                  {t('admin.userList.paginationPrevious')}
                 </button>
                 <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                  Page {page} of {totalPages}
+                  {t('admin.userList.paginationPage', { page, total: totalPages })}
                 </span>
                 <button
                   onClick={() => setPage(Math.min(totalPages, page + 1))}
                   disabled={page === totalPages}
                   className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Next
+                  {t('admin.userList.paginationNext')}
                 </button>
               </nav>
             </div>

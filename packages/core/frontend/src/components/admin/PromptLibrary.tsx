@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Container,
   Typography,
@@ -33,6 +34,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
   onCreateNew,
   onShowVersions
 }) => {
+  const { t } = useTranslation();
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
 
       setPrompts(filteredData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Laden der Prompts');
+      setError(err instanceof Error ? err.message : t('admin.promptLibrary.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -76,7 +78,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
   }, [loadPrompts]);
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Möchten Sie diesen Prompt wirklich löschen?')) {
+    if (!window.confirm(t('admin.promptLibrary.confirmDelete'))) {
       return;
     }
 
@@ -84,13 +86,15 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
       await promptsApi.deletePrompt(id);
       await loadPrompts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Löschen');
+      setError(err instanceof Error ? err.message : t('admin.promptLibrary.failedDelete'));
     }
   };
 
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
-    const action = currentStatus ? 'deaktivieren' : 'aktivieren';
-    if (!window.confirm(`Möchten Sie diesen Prompt wirklich ${action}?`)) {
+    const confirmMsg = currentStatus
+      ? t('admin.promptLibrary.confirmDeactivate')
+      : t('admin.promptLibrary.confirmActivate');
+    if (!window.confirm(confirmMsg)) {
       return;
     }
 
@@ -98,7 +102,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
       await promptsApi.toggleActive(id, !currentStatus);
       await loadPrompts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Fehler beim ${action}`);
+      setError(err instanceof Error ? err.message : t('admin.promptLibrary.failedToggle'));
     }
   };
 
@@ -134,10 +138,10 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h4" component="h1" gutterBottom>
-            Prompt Knowledge Base
+            {t('admin.promptLibrary.title')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Verwalte System- und User-Prompts für KI-Agents
+            {t('admin.promptLibrary.subtitle')}
           </Typography>
         </Box>
         <Button
@@ -146,7 +150,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
           onClick={onCreateNew}
           size="large"
         >
-          Neuer Prompt
+          {t('admin.promptLibrary.btnNew')}
         </Button>
       </Box>
 
@@ -156,7 +160,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              placeholder="Prompts durchsuchen..."
+              placeholder={t('admin.promptLibrary.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               InputProps={{
@@ -166,31 +170,31 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
           </Grid>
           <Grid item xs={12} md={3}>
             <FormControl fullWidth>
-              <InputLabel>Kategorie</InputLabel>
+              <InputLabel>{t('admin.promptLibrary.categoryLabel')}</InputLabel>
               <Select
                 value={categoryFilter}
-                label="Kategorie"
+                label={t('admin.promptLibrary.categoryLabel')}
                 onChange={(e: SelectChangeEvent) => setCategoryFilter(e.target.value)}
               >
-                <MenuItem value="all">Alle Kategorien</MenuItem>
-                <MenuItem value="system_prompt">System Prompts</MenuItem>
-                <MenuItem value="user_prompt">User Prompts</MenuItem>
-                <MenuItem value="few_shot_example">Few-Shot Examples</MenuItem>
-                <MenuItem value="template">Templates</MenuItem>
+                <MenuItem value="all">{t('admin.promptLibrary.categoryAll')}</MenuItem>
+                <MenuItem value="system_prompt">{t('admin.promptLibrary.categorySystem')}</MenuItem>
+                <MenuItem value="user_prompt">{t('admin.promptLibrary.categoryUser')}</MenuItem>
+                <MenuItem value="few_shot_example">{t('admin.promptLibrary.categoryFewShot')}</MenuItem>
+                <MenuItem value="template">{t('admin.promptLibrary.categoryTemplate')}</MenuItem>
               </Select>
             </FormControl>
           </Grid>
           <Grid item xs={12} md={3}>
             <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
+              <InputLabel>{t('admin.promptLibrary.statusLabel')}</InputLabel>
               <Select
                 value={statusFilter}
-                label="Status"
+                label={t('admin.promptLibrary.statusLabel')}
                 onChange={(e: SelectChangeEvent) => setStatusFilter(e.target.value)}
               >
-                <MenuItem value="all">Alle</MenuItem>
-                <MenuItem value="active">Aktiv</MenuItem>
-                <MenuItem value="inactive">Inaktiv (Review)</MenuItem>
+                <MenuItem value="all">{t('admin.promptLibrary.statusAll')}</MenuItem>
+                <MenuItem value="active">{t('admin.promptLibrary.statusActive')}</MenuItem>
+                <MenuItem value="inactive">{t('admin.promptLibrary.statusInactive')}</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -217,14 +221,14 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
           {filteredPrompts.length === 0 ? (
             <Paper elevation={1} sx={{ p: 8, textAlign: 'center' }}>
               <Typography variant="h6" color="text.secondary" gutterBottom>
-                Keine Prompts gefunden
+                {t('admin.promptLibrary.emptyTitle')}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                {searchQuery ? 'Versuchen Sie eine andere Suche' : 'Erstellen Sie Ihren ersten Prompt'}
+                {searchQuery ? t('admin.promptLibrary.emptySearch') : t('admin.promptLibrary.emptyCreate')}
               </Typography>
               {!searchQuery && (
                 <Button variant="contained" startIcon={<Add />} onClick={onCreateNew}>
-                  Ersten Prompt erstellen
+                  {t('admin.promptLibrary.btnCreateFirst')}
                 </Button>
               )}
             </Paper>
@@ -281,7 +285,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                         )}
                         {!prompt.is_active && (
                           <Chip
-                            label="Inaktiv (Review)"
+                            label={t('admin.promptLibrary.statusInactive')}
                             size="small"
                             color="warning"
                             sx={{ fontWeight: 600 }}
@@ -314,7 +318,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
 
                       {/* Usage Stats */}
                       <Typography variant="caption" color="text.secondary">
-                        Verwendet: {prompt.usage_count || 0} mal
+                        {t('admin.promptLibrary.usedCount', { count: prompt.usage_count || 0 })}
                       </Typography>
                     </CardContent>
 
@@ -325,14 +329,14 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                           startIcon={<Edit />}
                           onClick={() => onEditPrompt?.(prompt.id)}
                         >
-                          Bearbeiten
+                          {t('admin.promptLibrary.btnEdit')}
                         </Button>
                         <Button
                           size="small"
                           color={prompt.is_active ? 'warning' : 'success'}
                           onClick={() => handleToggleActive(prompt.id, prompt.is_active)}
                         >
-                          {prompt.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                          {prompt.is_active ? t('admin.promptLibrary.btnDeactivate') : t('admin.promptLibrary.btnActivate')}
                         </Button>
                       </Box>
                       <Box>
@@ -341,7 +345,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                           startIcon={<History />}
                           onClick={() => onShowVersions?.(prompt.name)}
                         >
-                          Versionen
+                          {t('admin.promptLibrary.btnVersions')}
                         </Button>
                         <Button
                           size="small"
@@ -349,7 +353,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                           startIcon={<Delete />}
                           onClick={() => handleDelete(prompt.id)}
                         >
-                          Löschen
+                          {t('admin.promptLibrary.btnDelete')}
                         </Button>
                       </Box>
                     </CardActions>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Paper,
@@ -22,6 +23,7 @@ import { Search, TrendingUp } from '@mui/icons-material';
 import { promptsApi, PromptSearchRequest, PromptSearchResult } from '../../api/promptsApi';
 
 export const SemanticSearchTester: React.FC = () => {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string>('');
   const [useCase, setUseCase] = useState('');
@@ -33,7 +35,7 @@ export const SemanticSearchTester: React.FC = () => {
 
   const handleSearch = async () => {
     if (!query.trim()) {
-      setError('Bitte geben Sie eine Suchanfrage ein');
+      setError(t('admin.semanticSearch.errorEmpty'));
       return;
     }
 
@@ -58,7 +60,7 @@ export const SemanticSearchTester: React.FC = () => {
       const data = await promptsApi.searchPrompts(searchRequest);
       setResults(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler bei der Suche');
+      setError(err instanceof Error ? err.message : t('admin.semanticSearch.failedSearch'));
     } finally {
       setLoading(false);
     }
@@ -80,10 +82,10 @@ export const SemanticSearchTester: React.FC = () => {
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h5" gutterBottom>
-        Semantic Search Tester
+        {t('admin.semanticSearch.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Testen Sie die semantische Suche in der Prompt Knowledge Base
+        {t('admin.semanticSearch.subtitle')}
       </Typography>
 
       {/* Search Form */}
@@ -93,11 +95,11 @@ export const SemanticSearchTester: React.FC = () => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Suchanfrage"
+              label={t('admin.semanticSearch.queryLabel')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="z.B. 'Generiere Multiple Choice Fragen für Informatik'"
+              placeholder={t('admin.semanticSearch.queryPlaceholder')}
               InputProps={{
                 startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
               }}
@@ -107,17 +109,17 @@ export const SemanticSearchTester: React.FC = () => {
           {/* Filters */}
           <Grid item xs={12} md={6}>
             <FormControl fullWidth>
-              <InputLabel>Kategorie (optional)</InputLabel>
+              <InputLabel>{t('admin.semanticSearch.categoryLabel')}</InputLabel>
               <Select
                 value={category}
-                label="Kategorie (optional)"
+                label={t('admin.semanticSearch.categoryLabel')}
                 onChange={(e: SelectChangeEvent) => setCategory(e.target.value)}
               >
-                <MenuItem value="">Alle</MenuItem>
-                <MenuItem value="system_prompt">System Prompt</MenuItem>
-                <MenuItem value="user_prompt">User Prompt</MenuItem>
-                <MenuItem value="few_shot_example">Few-Shot Example</MenuItem>
-                <MenuItem value="template">Template</MenuItem>
+                <MenuItem value="">{t('admin.semanticSearch.categoryAll')}</MenuItem>
+                <MenuItem value="system_prompt">{t('admin.semanticSearch.categorySystem')}</MenuItem>
+                <MenuItem value="user_prompt">{t('admin.semanticSearch.categoryUser')}</MenuItem>
+                <MenuItem value="few_shot_example">{t('admin.semanticSearch.categoryFewShot')}</MenuItem>
+                <MenuItem value="template">{t('admin.semanticSearch.categoryTemplate')}</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -125,17 +127,17 @@ export const SemanticSearchTester: React.FC = () => {
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              label="Use Case (optional)"
+              label={t('admin.semanticSearch.useCaseLabel')}
               value={useCase}
               onChange={(e) => setUseCase(e.target.value)}
-              placeholder="z.B. question_generation"
+              placeholder={t('admin.semanticSearch.useCasePlaceholder')}
             />
           </Grid>
 
           {/* Advanced Settings */}
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle2" gutterBottom>
-              Anzahl Ergebnisse: {limit}
+              {t('admin.semanticSearch.resultCount', { count: limit })}
             </Typography>
             <Slider
               value={limit}
@@ -149,7 +151,7 @@ export const SemanticSearchTester: React.FC = () => {
 
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle2" gutterBottom>
-              Similarity Threshold: {scoreThreshold.toFixed(2)}
+              {t('admin.semanticSearch.similarityThreshold', { value: scoreThreshold.toFixed(2) })}
             </Typography>
             <Slider
               value={scoreThreshold}
@@ -176,7 +178,7 @@ export const SemanticSearchTester: React.FC = () => {
               startIcon={loading ? <CircularProgress size={20} /> : <Search />}
               fullWidth
             >
-              {loading ? 'Suche läuft...' : 'Suchen'}
+              {loading ? t('admin.semanticSearch.btnSearching') : t('admin.semanticSearch.btnSearch')}
             </Button>
           </Grid>
         </Grid>
@@ -193,7 +195,7 @@ export const SemanticSearchTester: React.FC = () => {
       {results.length > 0 && (
         <Box>
           <Typography variant="h6" gutterBottom>
-            Suchergebnisse ({results.length})
+            {t('admin.semanticSearch.resultsTitle', { count: results.length })}
           </Typography>
 
           <Grid container spacing={2}>
@@ -261,10 +263,10 @@ export const SemanticSearchTester: React.FC = () => {
       {!loading && results.length === 0 && query && (
         <Paper elevation={1} sx={{ p: 8, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            Keine Ergebnisse gefunden
+            {t('admin.semanticSearch.emptyTitle')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Versuchen Sie eine andere Suchanfrage oder passen Sie die Filter an
+            {t('admin.semanticSearch.emptySubtitle')}
           </Typography>
         </Paper>
       )}

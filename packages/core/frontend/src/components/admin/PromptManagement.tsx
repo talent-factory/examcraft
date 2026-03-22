@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PromptLibrary } from './PromptLibrary';
 import { PromptEditor } from './PromptEditor';
 import { PromptVersionHistory } from './PromptVersionHistory';
@@ -10,6 +11,7 @@ import { LibraryBooks, Search } from '@mui/icons-material';
 type ViewMode = 'library' | 'editor' | 'versions' | 'analytics' | 'search';
 
 export const PromptManagement: React.FC = () => {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('library');
   const [selectedPromptId, setSelectedPromptId] = useState<string | undefined>();
   const [selectedPromptName, setSelectedPromptName] = useState<string>('');
@@ -52,9 +54,9 @@ export const PromptManagement: React.FC = () => {
         <Box>
           <Paper elevation={2} sx={{ mb: 3 }}>
             <Tabs value={0} variant="fullWidth">
-              <Tab label="Prompt Library" icon={<LibraryBooks />} />
+              <Tab label={t('admin.promptManagement.tabLibrary')} icon={<LibraryBooks />} />
               <Tab
-                label="Semantic Search"
+                label={t('admin.promptManagement.tabSearch')}
                 icon={<Search />}
                 onClick={() => setViewMode('search')}
               />
@@ -73,11 +75,11 @@ export const PromptManagement: React.FC = () => {
           <Paper elevation={2} sx={{ mb: 3 }}>
             <Tabs value={1} variant="fullWidth">
               <Tab
-                label="Prompt Library"
+                label={t('admin.promptManagement.tabLibrary')}
                 icon={<LibraryBooks />}
                 onClick={() => setViewMode('library')}
               />
-              <Tab label="Semantic Search" icon={<Search />} />
+              <Tab label={t('admin.promptManagement.tabSearch')} icon={<Search />} />
             </Tabs>
           </Paper>
           <SemanticSearchTester />
