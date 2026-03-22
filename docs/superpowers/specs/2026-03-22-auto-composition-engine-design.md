@@ -29,27 +29,29 @@ All new fields are optional for backward compatibility. Existing simple auto-fil
 ```python
 class AutoFillRequest(BaseModel):
     # Existing fields (simple mode)
-    count: int | None = None
+    count: int | None = Field(None, ge=1, le=20)
     topic: str | None = None
     difficulty: list[str] | None = None
-    bloom_level_min: int | None = None
+    bloom_level_min: int | None = Field(None, ge=1, le=6)
     question_types: list[str] | None = None
     exclude_question_ids: list[int] | None = None
 
     # New constraint fields (composition mode)
-    target_points: float | None = None
-    target_duration_minutes: int | None = None
+    target_points: float | None = Field(None, gt=0)
+    target_duration_minutes: int | None = Field(None, gt=0)
     bloom_distribution: dict[int, float] | None = None
     difficulty_distribution: dict[str, float] | None = None
     preview: bool = False
 ```
 
-**Mode detection:** If `target_points` or `target_duration_minutes` is set, composition mode activates. Otherwise, legacy count-driven behavior applies.
+**Mode detection:** If `target_points` or `target_duration_minutes` is set, composition mode activates. Otherwise, legacy count-driven behavior applies. In simple mode, `count` defaults to 5 if not provided (preserving current behavior).
 
 **Validation:**
-- `bloom_distribution` values must sum to 100 (keys: 1-6)
-- `difficulty_distribution` values must sum to 100 (keys: "easy", "medium", "hard")
+- `bloom_distribution` values must sum to 100 within a tolerance of +/-1.0 (keys: integers 1-6)
+- `difficulty_distribution` values must sum to 100 within a tolerance of +/-1.0 (keys: "easy", "medium", "hard")
 - At least one budget constraint (`target_points` or `target_duration_minutes`) required in composition mode
+
+**Exclusion logic:** Questions already in the exam are always automatically excluded. The `exclude_question_ids` field provides additional exclusions beyond those (e.g., questions the user previously rejected in a preview).
 
 ### Preview Response
 
@@ -68,14 +70,14 @@ class ProposedQuestionOut(BaseModel):
     topic: str
     bloom_level: int | None
     estimated_time_minutes: int | None
-    suggested_points: float
+    suggested_points: float  # computed at preview time via suggest_points(question_type, difficulty)
 
 class ConstraintReport(BaseModel):
     points_target: float | None
     points_achieved: float
     duration_target: int | None
     duration_achieved: int
-    bloom_distribution: dict[str, DistributionResult]
+    bloom_distribution: dict[int, DistributionResult]  # keys match input: integers 1-6
     difficulty_distribution: dict[str, DistributionResult]
     overall_satisfaction: float  # 0-100%
 
@@ -85,7 +87,13 @@ class DistributionResult(BaseModel):
     within_tolerance: bool  # +/-5%
 ```
 
-When `preview=False` (default), the endpoint behaves as before: questions are added to the exam and the updated `ExamDetailOut` is returned. When `preview=True`, the `AutoComposePreview` response is returned instead.
+**Response behavior:**
+- `preview=True`: Returns `AutoComposePreview` with proposed questions and constraint report. No modifications to the exam.
+- `preview=False` (default): In composition mode, questions are added to the exam and `ExamDetailOut` is returned. The constraint report is not included in this response -- users who need it should use preview mode first.
+
+### NULL Metadata Handling
+
+Questions with `NULL bloom_level` are excluded from the candidate pool when `bloom_distribution` constraints are specified, since they cannot be assigned to any Bloom category. Questions with `NULL estimated_time_minutes` are excluded when `target_duration_minutes` is specified, since their duration contribution is unknown. If neither constraint is specified, NULL-metadata questions remain in the pool.
 
 ## Composition Algorithm
 
@@ -93,31 +101,34 @@ Located in `services/auto_compose_service.py`.
 
 ### Steps
 
-1. **Filter candidates** -- Query approved questions matching topic, question_types, and exclude filters. Apply institution-level multi-tenancy. Exclude questions already in the exam.
+1. **Filter candidates** -- Query approved questions matching topic, question_types, and exclude filters. Apply institution-level multi-tenancy. Exclude questions already in the exam. Exclude questions with NULL metadata as described above.
 
-2. **Score each candidate** -- For each candidate question, calculate a composite score based on how much adding it would improve constraint satisfaction:
+2. **Assign points** -- For each candidate, compute `suggested_points` via the existing `suggest_points(question_type, difficulty)` function (uses `POINT_SUGGESTIONS` lookup table, default fallback: 4.0).
+
+3. **Score each candidate** -- For each candidate question, calculate a composite score based on how much adding it would improve constraint satisfaction:
    - Bloom distribution delta: how much closer the selection moves to Bloom targets
    - Difficulty distribution delta: how much closer to difficulty targets
    - Budget fit: whether the question's points/duration fit within remaining budget
 
-3. **Greedy selection loop:**
+4. **Greedy selection loop:**
    ```
    selected = []
    while budget_remaining(selected) > 0:
        score each remaining candidate
        pick highest-scoring candidate
-       if adding it would exceed both budgets: skip
+       if adding it would exceed EITHER remaining budget: skip
        add to selected
        if no candidate improves score: break
    ```
+   When only one budget is specified (points or duration), only that budget is checked for overflow.
 
-4. **Budget enforcement:**
+5. **Budget enforcement:**
    - Points: stop when total_points >= target_points
    - Duration: stop when total_duration >= target_duration_minutes
    - If both specified, stop when either is reached
-   - Points assigned via existing `POINT_SUGGESTIONS` lookup table
+   - A candidate is skipped if adding it would exceed either active budget
 
-5. **Generate constraint report** -- Calculate achieved distributions vs targets, flag deviations beyond +/-5% tolerance.
+6. **Generate constraint report** -- Calculate achieved distributions vs targets, flag deviations beyond +/-5% tolerance. `overall_satisfaction` is the average of all constraint satisfaction percentages (100% minus absolute deviation for each).
 
 ### Characteristics
 
@@ -146,7 +157,10 @@ In composition mode, clicking "Generate" triggers `preview=true`:
 
 - Dialog transitions to a preview panel showing proposed questions with points, bloom level, difficulty tags
 - Constraint satisfaction summary with target vs achieved, green/yellow color indicators
-- Three action buttons: "Accept" (adds questions), "Retry" (re-runs), "Cancel" (closes)
+- Three action buttons:
+  - **Accept** -- adds proposed questions to the exam (calls auto-fill with `preview=false` and same params)
+  - **Back** -- returns to the constraint parameter form for adjustment, then re-generates
+  - **Cancel** -- closes dialog without changes
 
 ### ComposerService.ts
 
@@ -183,12 +197,13 @@ ExamBuilderView, ExamQuestionsPanel, ExamMetadataBar, ExportDialog, database mod
 - Insufficient questions: best-effort with report
 - Edge cases: empty pool, single question, all constraints impossible
 - Budget overshoot prevention
+- NULL metadata exclusion when constraints active
 
 ### Backend Integration Tests (exam API)
 
 - Preview mode returns proposal without modifying exam
 - Composition mode adds questions correctly after preview accepted
-- Backward compatibility: existing simple auto-fill unchanged
+- Backward compatibility: existing simple auto-fill unchanged (count defaults to 5)
 - Constraint report accuracy
 - Validation errors: distribution not summing to 100, missing budget
 
