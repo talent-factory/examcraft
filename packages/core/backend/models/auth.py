@@ -26,6 +26,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import Base
 
 
+SUPPORTED_LANGUAGES = ("de", "en", "fr", "it")
+
+
 # Enums
 class UserRole(str, enum.Enum):
     """User Roles für RBAC (Python Enum für Type-Safety)"""
