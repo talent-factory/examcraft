@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogTitle,
@@ -41,6 +42,7 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
   onClose,
   onSave
 }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [description, setDescription] = useState('');
@@ -72,7 +74,7 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
       const features = await RBACService.listFeatures();
       setAllFeatures(features);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load features');
+      setError(err instanceof Error ? err.message : t('admin.roleEditor.failedLoad'));
     } finally {
       setLoadingFeatures(false);
     }
@@ -137,7 +139,7 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
       onSave();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save role');
+      setError(err instanceof Error ? err.message : t('admin.roleEditor.failedSave'));
     } finally {
       setLoading(false);
     }
@@ -163,7 +165,7 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
-        {isEditMode ? `Rolle bearbeiten: ${role?.display_name}` : 'Neue Rolle erstellen'}
+        {isEditMode ? t('admin.roleEditor.titleEdit', { name: role?.display_name }) : t('admin.roleEditor.titleCreate')}
       </DialogTitle>
       <DialogContent>
         {error && (
@@ -174,8 +176,7 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
 
         {role?.is_system_role && (
           <Alert severity="warning" sx={{ mb: 2 }}>
-            ⚠️ <strong>Achtung:</strong> Sie bearbeiten eine System-Rolle. Änderungen können die Funktionalität der Anwendung beeinträchtigen.
-            Bitte nur Features hinzufügen/entfernen, wenn Sie sicher sind, was Sie tun.
+            {t('admin.roleEditor.systemRoleWarning')}
           </Alert>
         )}
 
@@ -183,31 +184,31 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
           <Box mb={3}>
             <TextField
               fullWidth
-              label="Rollen-Name (technisch)"
+              label={t('admin.roleEditor.nameLabel')}
               value={name}
               onChange={(e) => setName(e.target.value.toLowerCase())}
-              placeholder="z.B. custom_reviewer"
-              helperText="Nur Kleinbuchstaben, Zahlen und Unterstriche"
+              placeholder={t('admin.roleEditor.namePlaceholder')}
+              helperText={t('admin.roleEditor.nameHint')}
               required
               disabled={loading}
               sx={{ mb: 2 }}
             />
             <TextField
               fullWidth
-              label="Anzeigename"
+              label={t('admin.roleEditor.displayNameLabel')}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="z.B. Custom Reviewer"
+              placeholder={t('admin.roleEditor.displayNamePlaceholder')}
               required
               disabled={loading}
               sx={{ mb: 2 }}
             />
             <TextField
               fullWidth
-              label="Beschreibung"
+              label={t('admin.roleEditor.descriptionLabel')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optionale Beschreibung der Rolle"
+              placeholder={t('admin.roleEditor.descriptionPlaceholder')}
               multiline
               rows={2}
               disabled={loading}
@@ -216,7 +217,7 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
         )}
 
         <Typography variant="h6" gutterBottom>
-          Features zuordnen ({selectedFeatures.length} ausgewählt)
+          {t('admin.roleEditor.featuresHeader', { count: selectedFeatures.length })}
         </Typography>
 
         {loadingFeatures ? (
@@ -248,7 +249,7 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
                         onClick={() => handleSelectAllInCategory(category)}
                         sx={{ mb: 1 }}
                       >
-                        {categorySelected === categoryTotal ? 'Alle abwählen' : 'Alle auswählen'}
+                        {categorySelected === categoryTotal ? t('admin.roleEditor.deselectAll') : t('admin.roleEditor.selectAll')}
                       </Button>
                       <FormGroup>
                         {features.map((feature) => (
@@ -284,7 +285,7 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={loading}>
-          Abbrechen
+          {t('admin.roleEditor.cancel')}
         </Button>
         <Button
           onClick={handleSubmit}
@@ -292,7 +293,7 @@ const RoleEditorDialog: React.FC<RoleEditorDialogProps> = ({
           color="primary"
           disabled={loading || !validateForm()}
         >
-          {loading ? <CircularProgress size={24} /> : isEditMode ? 'Speichern' : 'Erstellen'}
+          {loading ? <CircularProgress size={24} /> : isEditMode ? t('admin.roleEditor.save') : t('admin.roleEditor.create')}
         </Button>
       </DialogActions>
     </Dialog>

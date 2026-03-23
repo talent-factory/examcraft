@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 interface QuickActionCardProps {
   icon: string;
@@ -37,6 +38,7 @@ export const QuickActionCard: React.FC<QuickActionCardProps> = ({
   path,
   color = 'primary',
 }) => {
+  const { t } = useTranslation();
   return (
     <Link to={path} className="block h-full">
       <div
@@ -52,7 +54,7 @@ export const QuickActionCard: React.FC<QuickActionCardProps> = ({
           {description}
         </p>
         <div className="mt-4 text-sm font-medium text-primary-600 hover:text-primary-700">
-          Öffnen →
+          {t('components.cards.open')}
         </div>
       </div>
     </Link>

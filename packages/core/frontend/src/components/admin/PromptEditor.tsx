@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Container,
   Typography,
@@ -27,7 +28,11 @@ import { PromptCategory } from '../../types/prompt';
 import MarkdownRenderer from '../MarkdownRenderer';
 
 /** Extract a user-friendly error message from Axios/FastAPI errors. */
-function extractErrorMessage(err: unknown, fallback: string): string {
+function extractErrorMessage(
+  err: unknown,
+  fallback: string,
+  labels: { validationError: string; fieldDefault: string; invalidDefault: string }
+): string {
   if (axios.isAxiosError(err)) {
     const detail = err.response?.data?.detail;
     if (err.response?.status === 422 && detail) {
@@ -35,13 +40,13 @@ function extractErrorMessage(err: unknown, fallback: string): string {
       const messages = details.map((d: unknown) => {
         if (typeof d === 'object' && d !== null && 'msg' in d) {
           const entry = d as { loc?: unknown; msg?: unknown; message?: unknown };
-          const field = (Array.isArray(entry.loc) ? entry.loc.slice(1).join('.') : '') || 'Feld';
-          const msg = String(entry.msg || entry.message || 'Ungültig');
+          const field = (Array.isArray(entry.loc) ? entry.loc.slice(1).join('.') : '') || labels.fieldDefault;
+          const msg = String(entry.msg || entry.message || labels.invalidDefault);
           return `${field}: ${msg}`;
         }
         return String(d);
       });
-      return `Validierungsfehler: ${messages.join(', ')}`;
+      return `${labels.validationError}: ${messages.join(', ')}`;
     }
     if (detail) {
       return String(detail);
@@ -49,16 +54,6 @@ function extractErrorMessage(err: unknown, fallback: string): string {
   }
   return err instanceof Error ? err.message : fallback;
 }
-
-// Use Case Labels für UI — values must match the stored format (question_generation_<type>)
-const USE_CASE_LABELS: Record<string, string> = {
-  'question_generation': 'Fragengenerierung (allgemein)',
-  'question_generation_multiple_choice': 'Multiple Choice',
-  'question_generation_open_ended': 'Offene Frage',
-  'question_generation_true_false': 'Wahr/Falsch',
-  'chatbot': 'Chatbot',
-  'evaluation': 'Bewertung',
-};
 
 interface PromptEditorProps {
   promptId?: string;
@@ -73,6 +68,23 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
   onSave,
   onCancel
 }) => {
+  const { t } = useTranslation();
+
+  const USE_CASE_LABELS: Record<string, string> = {
+    'question_generation': t('admin.promptEditor.useCaseGeneral'),
+    'question_generation_multiple_choice': t('admin.promptEditor.useCaseMultipleChoice'),
+    'question_generation_open_ended': t('admin.promptEditor.useCaseOpenEnded'),
+    'question_generation_true_false': t('admin.promptEditor.useCaseTrueFalse'),
+    'chatbot': t('admin.promptEditor.useCaseChatbot'),
+    'evaluation': t('admin.promptEditor.useCaseEvaluation'),
+  };
+
+  const errorLabels = {
+    validationError: t('admin.promptEditor.validationError'),
+    fieldDefault: t('admin.promptEditor.fieldDefault'),
+    invalidDefault: t('admin.promptEditor.invalidDefault'),
+  };
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +111,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       const data = await promptsApi.getPrompt(promptId);
       setFormData(data);
     } catch (err: unknown) {
-      setError(extractErrorMessage(err, 'Fehler beim Laden des Prompts'));
+      setError(extractErrorMessage(err, t('admin.promptEditor.failedLoad'), errorLabels));
     } finally {
       setLoading(false);
     }
@@ -119,7 +131,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
 
   const handleSave = async () => {
     if (!formData.name || !formData.content || !formData.category) {
-      setError('Name, Content und Category sind Pflichtfelder');
+      setError(t('admin.promptEditor.validationRequired'));
       return;
     }
 
@@ -133,8 +145,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
         const versionBumped = result.version > (formData.version ?? 1);
         setFormData(result);
         setSuccess(versionBumped
-          ? `Neue Version v${result.version} erstellt`
-          : 'Prompt erfolgreich aktualisiert'
+          ? t('admin.promptEditor.successVersionCreated', { version: result.version })
+          : t('admin.promptEditor.successUpdated')
         );
       } else {
         // Type assertion after validation
@@ -149,14 +161,14 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
         } as Omit<Prompt, 'id' | 'version' | 'created_at' | 'updated_at' | 'usage_count'>;
 
         await promptsApi.createPrompt(newPrompt);
-        setSuccess('Prompt erfolgreich erstellt');
+        setSuccess(t('admin.promptEditor.successCreated'));
       }
 
       setTimeout(() => {
         onSave?.();
       }, 1500);
     } catch (err: unknown) {
-      setError(extractErrorMessage(err, 'Fehler beim Speichern'));
+      setError(extractErrorMessage(err, t('admin.promptEditor.failedSave'), errorLabels));
     } finally {
       setSaving(false);
     }
@@ -199,7 +211,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography variant="h4" component="h1">
-          {promptId ? 'Prompt bearbeiten' : 'Neuer Prompt'}
+          {promptId ? t('admin.promptEditor.titleEdit') : t('admin.promptEditor.titleCreate')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button
@@ -208,7 +220,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
             onClick={onCancel}
             disabled={saving}
           >
-            Abbrechen
+            {t('admin.promptEditor.btnCancel')}
           </Button>
           <Button
             variant="contained"
@@ -216,7 +228,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
             onClick={handleSave}
             disabled={saving}
           >
-            {saving ? 'Speichern...' : 'Speichern'}
+            {saving ? t('admin.promptEditor.btnSaving') : t('admin.promptEditor.btnSave')}
           </Button>
         </Box>
       </Box>
@@ -238,16 +250,16 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
         <Grid item xs={12} lg={8}>
           <Paper elevation={2} sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Prompt Details
+              {t('admin.promptEditor.sectionDetails')}
             </Typography>
 
             {/* Name */}
             <TextField
               fullWidth
-              label="Name"
+              label={t('admin.promptEditor.fieldName')}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="z.B. system_prompt_question_generation"
+              placeholder={t('admin.promptEditor.fieldNamePlaceholder')}
               sx={{ mb: 3 }}
               required
             />
@@ -255,18 +267,18 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
             {/* Description */}
             <TextField
               fullWidth
-              label="Beschreibung"
+              label={t('admin.promptEditor.fieldDescription')}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Kurze Beschreibung des Prompts"
+              placeholder={t('admin.promptEditor.fieldDescriptionPlaceholder')}
               sx={{ mb: 3 }}
             />
 
             {/* Content Editor with Tabs */}
             <Box sx={{ mb: 3 }}>
               <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
-                <Tab icon={<Code />} label="Bearbeiten" />
-                <Tab icon={<Preview />} label="Vorschau" />
+                <Tab icon={<Code />} label={t('admin.promptEditor.tabEdit')} />
+                <Tab icon={<Preview />} label={t('admin.promptEditor.tabPreview')} />
               </Tabs>
 
               <Box sx={{ mt: 2 }}>
@@ -277,7 +289,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                     rows={16}
                     value={formData.content}
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    placeholder="Prompt Content (unterstützt {variable} Syntax)"
+                    placeholder={t('admin.promptEditor.contentPlaceholder')}
                     sx={{
                       '& textarea': {
                         fontFamily: 'monospace',
@@ -300,7 +312,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                       <MarkdownRenderer content={formData.content} />
                     ) : (
                       <Typography color="text.secondary" fontStyle="italic">
-                        Keine Inhalte
+                        {t('admin.promptEditor.noContent')}
                       </Typography>
                     )}
                   </Paper>
@@ -315,40 +327,40 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
           {/* Kategorisierung */}
           <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Kategorisierung
+              {t('admin.promptEditor.sectionCategorization')}
             </Typography>
 
             {/* Category */}
             <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Kategorie</InputLabel>
+              <InputLabel>{t('admin.promptEditor.categoryLabel')}</InputLabel>
               <Select
                 value={formData.category}
-                label="Kategorie"
+                label={t('admin.promptEditor.categoryLabel')}
                 onChange={(e: SelectChangeEvent) =>
                   setFormData({ ...formData, category: e.target.value as any })
                 }
               >
-                <MenuItem value="system_prompt">System Prompt</MenuItem>
-                <MenuItem value="user_prompt">User Prompt</MenuItem>
-                <MenuItem value="few_shot_example">Few-Shot Example</MenuItem>
-                <MenuItem value="template">Template</MenuItem>
+                <MenuItem value="system_prompt">{t('admin.promptEditor.categorySystem')}</MenuItem>
+                <MenuItem value="user_prompt">{t('admin.promptEditor.categoryUser')}</MenuItem>
+                <MenuItem value="few_shot_example">{t('admin.promptEditor.categoryFewShot')}</MenuItem>
+                <MenuItem value="template">{t('admin.promptEditor.categoryTemplate')}</MenuItem>
               </Select>
             </FormControl>
 
             {/* Use Case - Fragetyp Dropdown */}
             <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel id="use-case-label">Use Case (Fragetyp)</InputLabel>
+              <InputLabel id="use-case-label">{t('admin.promptEditor.useCaseLabel')}</InputLabel>
               <Select
                 labelId="use-case-label"
                 id="use-case-select"
                 value={formData.use_case || ''}
-                label="Use Case (Fragetyp)"
+                label={t('admin.promptEditor.useCaseLabel')}
                 onChange={(e: SelectChangeEvent) =>
                   setFormData({ ...formData, use_case: e.target.value })
                 }
               >
                 <MenuItem value="">
-                  <em>Kein spezifischer Use Case</em>
+                  <em>{t('admin.promptEditor.useCaseNone')}</em>
                 </MenuItem>
                 {Object.entries(USE_CASE_LABELS).map(([value, label]) => (
                   <MenuItem key={value} value={value}>
@@ -361,7 +373,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
             {/* Tags */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle2" gutterBottom>
-                Tags
+                {t('admin.promptEditor.tagsLabel')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
                 <TextField
@@ -369,7 +381,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Neuer Tag"
+                  placeholder={t('admin.promptEditor.tagPlaceholder')}
                   sx={{ flexGrow: 1 }}
                 />
                 <Button onClick={addTag} variant="outlined" size="small">
@@ -398,7 +410,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                   onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                 />
               }
-              label="Aktiv"
+              label={t('admin.promptEditor.activeLabel')}
             />
           </Paper>
 
@@ -407,17 +419,17 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
             <Paper elevation={2} sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom>
                 <History sx={{ verticalAlign: 'middle', mr: 1 }} />
-                Version History
+                {t('admin.promptEditor.versionHistoryTitle')}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Aktuelle Version: v{formData.version}
+                {t('admin.promptEditor.currentVersion', { version: formData.version })}
               </Typography>
               <Button
                 variant="outlined"
                 fullWidth
                 onClick={() => console.log('Show versions', promptId)}
               >
-                Versionen anzeigen
+                {t('admin.promptEditor.btnShowVersions')}
               </Button>
             </Paper>
           )}

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import AdminService, { UserDetailResponse } from '../../services/AdminService';
 import { Role } from '../../types/auth';
 
@@ -20,6 +21,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const [user, setUser] = useState<UserDetailResponse | null>(null);
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,7 +44,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
       setUser(userData);
       setAllRoles(rolesData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      setError(err instanceof Error ? err.message : t('admin.roleAssignment.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
       await loadData();
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to assign role');
+      setError(err instanceof Error ? err.message : t('admin.roleAssignment.failedAssign'));
     } finally {
       setProcessing(false);
     }
@@ -80,7 +82,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
       await loadData();
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove role');
+      setError(err instanceof Error ? err.message : t('admin.roleAssignment.failedRemove'));
     } finally {
       setProcessing(false);
     }
@@ -108,7 +110,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
             <div className="sm:flex sm:items-start">
               <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
                 <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                  Manage User Roles
+                  {t('admin.roleAssignment.title')}
                 </h3>
 
                 {loading ? (
@@ -141,7 +143,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
 
                     {/* Current Roles */}
                     <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-3">Current Roles</h4>
+                      <h4 className="text-sm font-medium text-gray-900 mb-3">{t('admin.roleAssignment.currentRoles')}</h4>
                       {user && user.roles.length > 0 ? (
                         <div className="space-y-2">
                           {user.roles.map((role) => (
@@ -154,7 +156,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
                                   <span className="font-medium text-gray-900">{role.display_name}</span>
                                   {role.is_system_role && (
                                     <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                      System
+                                      {t('admin.roleAssignment.systemBadge')}
                                     </span>
                                   )}
                                 </div>
@@ -166,7 +168,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
                                     onClick={() => setSelectedRole(selectedRole?.id === role.id ? null : role)}
                                     className="text-xs text-blue-600 hover:text-blue-800"
                                   >
-                                    {selectedRole?.id === role.id ? 'Hide' : 'Show'} Permissions
+                                    {selectedRole?.id === role.id ? t('admin.roleAssignment.hidePermissions') : t('admin.roleAssignment.showPermissions')}
                                   </button>
                                 </div>
                                 {selectedRole?.id === role.id && (
@@ -188,21 +190,21 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
                                 onClick={() => handleRemoveRole(role.id)}
                                 disabled={processing || user.roles.length === 1}
                                 className="ml-4 text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                title={user.roles.length === 1 ? 'Cannot remove last role' : 'Remove role'}
+                                title={user.roles.length === 1 ? t('admin.roleAssignment.cantRemoveLast') : t('admin.roleAssignment.removeRoleTitle')}
                               >
-                                Remove
+                                {t('admin.roleAssignment.btnRemove')}
                               </button>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-500">No roles assigned</p>
+                        <p className="text-sm text-gray-500">{t('admin.roleAssignment.noRoles')}</p>
                       )}
                     </div>
 
                     {/* Available Roles */}
                     <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-3">Available Roles</h4>
+                      <h4 className="text-sm font-medium text-gray-900 mb-3">{t('admin.roleAssignment.availableRoles')}</h4>
                       {getAvailableRoles().length > 0 ? (
                         <div className="space-y-2">
                           {getAvailableRoles().map((role) => (
@@ -215,7 +217,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
                                   <span className="font-medium text-gray-900">{role.display_name}</span>
                                   {role.is_system_role && (
                                     <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                      System
+                                      {t('admin.roleAssignment.systemBadge')}
                                     </span>
                                   )}
                                 </div>
@@ -228,13 +230,13 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
                                 disabled={processing}
                                 className="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                Assign
+                                {t('admin.roleAssignment.btnAssign')}
                               </button>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-500">All roles assigned</p>
+                        <p className="text-sm text-gray-500">{t('admin.roleAssignment.allRolesAssigned')}</p>
                       )}
                     </div>
                   </div>
@@ -251,7 +253,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
               disabled={processing}
               className="w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Close
+              {t('admin.roleAssignment.close')}
             </button>
           </div>
         </div>

@@ -102,6 +102,12 @@ async def lifespan(app: FastAPI):
     else:
         print("ℹ️  Running in Core mode - Premium features disabled")
 
+    # Startup: Initialize i18n translations
+    from services.translation_service import init_translations
+
+    init_translations()
+    print("✅ i18n translations initialized")
+
     # Premium/Enterprise Features: Replace Core placeholders BEFORE loading routers
     if is_full_deployment:
         print("\n🌟 Loading Premium/Enterprise Features...")
@@ -414,6 +420,11 @@ app.add_middleware(
     requests_per_hour=requests_per_hour,
     enabled=rate_limit_enabled,
 )
+
+# i18n Middleware - resolves locale from Accept-Language header
+from middleware.i18n_middleware import I18nMiddleware  # noqa: E402
+
+app.add_middleware(I18nMiddleware)
 
 
 # Pydantic models

@@ -4,6 +4,7 @@
  */
 
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/auth';
 
@@ -19,66 +20,67 @@ export interface NavigationItem {
 
 export const useRoleBasedNavigation = () => {
   const { user, hasRole, hasPermission } = useAuth();
+  const { t } = useTranslation();
 
   const allNavigationItems: NavigationItem[] = useMemo(() => [
     {
-      label: 'Dashboard',
+      label: t('nav.sidebar.dashboard'),
       path: '/dashboard',
       icon: '📊',
     },
     {
-      label: 'Documents',
+      label: t('nav.sidebar.documents'),
       path: '/documents',
       icon: '📄',
       requiredPermissions: ['documents:read'],
     },
     {
-      label: 'Question Generation',
+      label: t('nav.sidebar.questionGeneration'),
       path: '/questions/generate',
       icon: '✨',
       requiredPermissions: ['questions:create'],
     },
     {
-      label: 'Review Queue',
+      label: t('nav.sidebar.reviewQueue'),
       path: '/questions/review',
       icon: '✅',
       requiredPermissions: ['questions:review'],
     },
     {
-      label: 'Exam Composer',
+      label: t('nav.sidebar.examComposer'),
       path: '/exams/compose',
       icon: '📝',
       requiredPermissions: ['exams:create'],
     },
     {
-      label: 'Document Chat',
+      label: t('nav.sidebar.documentChat'),
       path: '/chat',
       icon: '💬',
       requiredPermissions: ['document_chatbot'],
     },
     {
-      label: 'Prompt Library',
+      label: t('nav.sidebar.promptLibrary'),
       path: '/prompts',
       icon: '💬',
       requiredRoles: [UserRole.ADMIN, UserRole.DOZENT],
     },
     {
-      label: 'Admin',
+      label: t('nav.sidebar.admin'),
       path: '/admin',
       icon: '⚙️',
       requiredRoles: [UserRole.ADMIN],
     },
     {
-      label: 'Pricing',
+      label: t('nav.sidebar.pricing'),
       path: '/billing',
       icon: '💳',
     },
     {
-      label: 'Profile',
+      label: t('nav.sidebar.profile'),
       path: '/profile',
       icon: '👤',
     },
-  ], []);
+  ], [t]);
 
   const filterNavigationItems = (items: NavigationItem[]): NavigationItem[] => {
     return items.filter(item => {

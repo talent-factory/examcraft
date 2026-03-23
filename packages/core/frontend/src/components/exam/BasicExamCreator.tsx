@@ -18,6 +18,7 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface BasicExamCreatorProps {
@@ -32,6 +33,7 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
   onBack,
 }) => {
   const { accessToken } = useAuth();
+  const { t } = useTranslation();
   const [topic, setTopic] = useState('');
   const [questionCount, setQuestionCount] = useState(5);
   const [difficulty, setDifficulty] = useState('medium');
@@ -41,7 +43,7 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
-      setError('Bitte geben Sie ein Thema ein');
+      setError(t('components.basicExamCreator.topicRequired'));
       return;
     }
 
@@ -67,7 +69,7 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Fehler bei der Generierung');
+        throw new Error(errorData.detail || t('components.basicExamCreator.generationError'));
       }
 
       const data = await response.json();
@@ -77,7 +79,7 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
         onExamGenerated(data);
       }
     } catch (err: any) {
-      setError(err.message || 'Fehler bei der Generierung');
+      setError(err.message || t('components.basicExamCreator.generationError'));
     } finally {
       setLoading(false);
     }
@@ -87,11 +89,11 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
     <Container maxWidth="md">
       <Paper sx={{ p: 4 }}>
         <Typography variant="h5" gutterBottom>
-          Prüfungsfragen generieren
+          {t('components.basicExamCreator.title')}
         </Typography>
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Erstellen Sie Prüfungsfragen basierend auf einem Thema
+          {t('components.basicExamCreator.subtitle')}
         </Typography>
 
         {error && (
@@ -102,22 +104,22 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
 
         {success && (
           <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess(false)}>
-            Prüfungsfragen erfolgreich generiert!
+            {t('components.basicExamCreator.successMessage')}
           </Alert>
         )}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <TextField
-            label="Thema"
+            label={t('components.basicExamCreator.topicLabel')}
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="z.B. Algorithmen und Datenstrukturen"
+            placeholder={t('components.basicExamCreator.topicPlaceholder')}
             fullWidth
             required
           />
 
           <TextField
-            label="Anzahl Fragen"
+            label={t('components.basicExamCreator.questionCountLabel')}
             type="number"
             value={questionCount}
             onChange={(e) => setQuestionCount(parseInt(e.target.value, 10))}
@@ -126,22 +128,22 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
           />
 
           <FormControl fullWidth>
-            <InputLabel>Schwierigkeitsgrad</InputLabel>
+            <InputLabel>{t('components.basicExamCreator.difficultyLabel')}</InputLabel>
             <Select
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value)}
-              label="Schwierigkeitsgrad"
+              label={t('components.basicExamCreator.difficultyLabel')}
             >
-              <MenuItem value="easy">Einfach</MenuItem>
-              <MenuItem value="medium">Mittel</MenuItem>
-              <MenuItem value="hard">Schwer</MenuItem>
+              <MenuItem value="easy">{t('components.basicExamCreator.difficultyEasy')}</MenuItem>
+              <MenuItem value="medium">{t('components.basicExamCreator.difficultyMedium')}</MenuItem>
+              <MenuItem value="hard">{t('components.basicExamCreator.difficultyHard')}</MenuItem>
             </Select>
           </FormControl>
 
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
             {onBack && (
               <Button onClick={onBack} disabled={loading}>
-                Zurück
+                {t('components.basicExamCreator.back')}
               </Button>
             )}
             <Button
@@ -149,7 +151,7 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
               onClick={handleGenerate}
               disabled={loading || !topic.trim()}
             >
-              {loading ? <CircularProgress size={24} /> : 'Generieren'}
+              {loading ? <CircularProgress size={24} /> : t('components.basicExamCreator.generate')}
             </Button>
           </Box>
         </Box>

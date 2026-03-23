@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Card,
@@ -31,6 +32,7 @@ interface RoleListProps {
 }
 
 const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
+  const { t } = useTranslation();
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
       const data = await RBACService.listRoles(true, false);
       setRoles(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load roles');
+      setError(err instanceof Error ? err.message : t('admin.roleList.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -83,7 +85,7 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" component="h2">
-          Rollen-Verwaltung
+          {t('admin.roleList.title')}
         </Typography>
         <Button
           variant="contained"
@@ -91,7 +93,7 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
           startIcon={<AddIcon />}
           onClick={onCreateRole}
         >
-          Neue Rolle erstellen
+          {t('admin.roleList.btnCreate')}
         </Button>
       </Box>
 
@@ -115,7 +117,7 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
                     <Typography variant="h6" component="h3" gutterBottom>
                       {role.display_name}
                       {role.is_system_role && (
-                        <Tooltip title="System-Rolle (nicht editierbar)">
+                        <Tooltip title={t('admin.roleList.tooltipSystemRole')}>
                           <LockIcon
                             fontSize="small"
                             sx={{ ml: 1, verticalAlign: 'middle', color: 'text.secondary' }}
@@ -127,7 +129,7 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
                       {role.name}
                     </Typography>
                   </Box>
-                  <Tooltip title={role.is_system_role ? "System-Rolle (mit Vorsicht bearbeiten)" : "Rolle bearbeiten"}>
+                  <Tooltip title={role.is_system_role ? t('admin.roleList.tooltipEditSystemRole') : t('admin.roleList.tooltipEditRole')}>
                     <IconButton
                       size="small"
                       onClick={() => onEditRole(role)}
@@ -145,12 +147,12 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
 
                 <Box mt={2}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Features ({role.features.length})
+                    {t('admin.roleList.featuresCount', { count: role.features.length })}
                   </Typography>
                   <Box display="flex" flexWrap="wrap" gap={0.5}>
                     {role.features.length === 0 ? (
                       <Typography variant="body2" color="text.secondary">
-                        Keine Features zugeordnet
+                        {t('admin.roleList.noFeatures')}
                       </Typography>
                     ) : (
                       role.features.slice(0, 5).map((feature) => (
@@ -168,7 +170,7 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
                     )}
                     {role.features.length > 5 && (
                       <Chip
-                        label={`+${role.features.length - 5} mehr`}
+                        label={t('admin.roleList.moreFeatures', { count: role.features.length - 5 })}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.7rem' }}
@@ -180,9 +182,9 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
                 <Box mt={2}>
                   <Typography variant="caption" color="text.secondary">
                     {role.is_active ? (
-                      <Chip label="Aktiv" size="small" color="success" />
+                      <Chip label={t('admin.roleList.active')} size="small" color="success" />
                     ) : (
-                      <Chip label="Inaktiv" size="small" color="default" />
+                      <Chip label={t('admin.roleList.inactive')} size="small" color="default" />
                     )}
                   </Typography>
                 </Box>
@@ -195,10 +197,10 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
       {roles.length === 0 && (
         <Box textAlign="center" py={8}>
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            Keine Rollen gefunden
+            {t('admin.roleList.emptyTitle')}
           </Typography>
           <Typography variant="body2" color="text.secondary" paragraph>
-            Erstellen Sie eine neue Rolle, um zu beginnen.
+            {t('admin.roleList.emptySubtitle')}
           </Typography>
           <Button
             variant="contained"
@@ -206,7 +208,7 @@ const RoleList: React.FC<RoleListProps> = ({ onEditRole, onCreateRole }) => {
             startIcon={<AddIcon />}
             onClick={onCreateRole}
           >
-            Erste Rolle erstellen
+            {t('admin.roleList.btnCreateFirst')}
           </Button>
         </Box>
       )}

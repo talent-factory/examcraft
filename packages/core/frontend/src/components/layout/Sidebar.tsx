@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { useRoleBasedNavigation, NavigationItem } from '../../hooks/useRoleBasedNavigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -14,6 +15,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => {
+  const { t } = useTranslation();
   const { navigationItems } = useRoleBasedNavigation();
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -61,7 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
             <button
               onClick={() => toggleExpanded(item.path)}
               className="px-2 py-3 text-gray-500 hover:text-gray-700 transition-colors"
-              aria-label={isExpanded ? 'Collapse' : 'Expand'}
+              aria-label={isExpanded ? t('layout.sidebar.collapse') : t('layout.sidebar.expand')}
             >
               {isExpanded ? (
                 <ChevronDown className="w-4 h-4" />

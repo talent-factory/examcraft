@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export const PaymentSuccessPage: React.FC = () => {
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     useEffect(() => {
         // Automatically redirect to billing/dashboard after 3 seconds
@@ -22,19 +24,19 @@ export const PaymentSuccessPage: React.FC = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('pages.paymentSuccess.title')}</h2>
                     <p className="text-gray-600 mb-6">
-                        Thank you for your subscription. Your account has been upgraded.
+                        {t('pages.paymentSuccess.subtitle')}
                     </p>
                     <p className="text-sm text-gray-500">
-                        Redirecting you back to billing...
+                        {t('pages.paymentSuccess.redirecting')}
                     </p>
                     <div className="mt-6">
                         <button
                             onClick={() => navigate('/billing')}
                             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
-                            Return to Billing
+                            {t('pages.paymentSuccess.returnToBilling')}
                         </button>
                     </div>
                 </div>

@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UserManagementPage } from '../components/admin/UserManagementPage';
 import { InstitutionManagementPage } from '../components/admin/InstitutionManagementPage';
 import RoleManagementPage from '../components/admin/RoleManagementPage';
@@ -21,15 +22,16 @@ interface TabConfig {
 
 export const Admin: React.FC = () => {
   const { user, hasRole } = useAuth();
+  const { t } = useTranslation();
   const isSuperuser = user?.is_superuser ?? false;
   const isAdmin = isSuperuser || hasRole(UserRole.ADMIN);
 
   const tabs: TabConfig[] = [
-    { key: 'users', label: 'Benutzer-Verwaltung', visible: true },
-    { key: 'institutions', label: 'Institutionen', visible: isSuperuser },
-    { key: 'roles', label: 'Rollen & Berechtigungen', visible: isSuperuser },
-    { key: 'audit', label: 'Audit Logs', visible: isAdmin },
-    { key: 'subscription', label: 'Abonnement', visible: isAdmin },
+    { key: 'users', label: t('pages.admin.tabUsers'), visible: true },
+    { key: 'institutions', label: t('pages.admin.tabInstitutions'), visible: isSuperuser },
+    { key: 'roles', label: t('pages.admin.tabRoles'), visible: isSuperuser },
+    { key: 'audit', label: t('pages.admin.tabAudit'), visible: isAdmin },
+    { key: 'subscription', label: t('pages.admin.tabSubscription'), visible: isAdmin },
   ].filter((t): t is TabConfig => t.visible);
 
   const [activeTab, setActiveTab] = useState<AdminTab>(tabs[0]?.key ?? 'users');
@@ -38,9 +40,9 @@ export const Admin: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Admin-Panel</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{t('pages.admin.title')}</h1>
         <p className="text-gray-600 mt-2">
-          Verwalte Benutzer, Einstellungen und Systemkonfiguration
+          {t('pages.admin.subtitle')}
         </p>
       </div>
 
@@ -67,7 +69,7 @@ export const Admin: React.FC = () => {
         {effectiveTab === 'roles' && <RoleManagementPage />}
         {effectiveTab === 'audit' && (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">Audit Logs — Demnachst verfugbar</p>
+            <p className="text-gray-500 text-lg">{t('pages.admin.auditPlaceholder')}</p>
           </div>
         )}
         {effectiveTab === 'subscription' && <SubscriptionTierOverview />}

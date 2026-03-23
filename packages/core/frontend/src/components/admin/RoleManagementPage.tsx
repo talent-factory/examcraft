@@ -4,12 +4,14 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Container, Box, Typography } from '@mui/material';
 import { Role } from '../../types/rbac';
 import RoleList from './RoleList';
 import RoleEditorDialog from './RoleEditorDialog';
 
 const RoleManagementPage: React.FC = () => {
+  const { t } = useTranslation();
   const [editorOpen, setEditorOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -37,10 +39,10 @@ const RoleManagementPage: React.FC = () => {
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Rollen & Berechtigungen
+          {t('admin.roleManagement.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Verwalten Sie Rollen und deren Feature-Zuordnungen für Ihr Team.
+          {t('admin.roleManagement.subtitle')}
         </Typography>
       </Box>
 

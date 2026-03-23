@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import AdminService from '../../services/AdminService';
 import { Institution } from '../../types/auth';
 
@@ -14,11 +15,11 @@ interface InstitutionEditDialogProps {
   onSuccess: () => void;
 }
 
-const SUBSCRIPTION_TIERS = [
-  { value: 'free', label: 'Free', color: 'gray' },
-  { value: 'starter', label: 'Starter', color: 'blue' },
-  { value: 'professional', label: 'Professional', color: 'purple' },
-  { value: 'enterprise', label: 'Enterprise', color: 'orange' },
+const SUBSCRIPTION_TIER_VALUES = [
+  { value: 'free', color: 'gray' },
+  { value: 'starter', color: 'blue' },
+  { value: 'professional', color: 'purple' },
+  { value: 'enterprise', color: 'orange' },
 ];
 
 const TIER_QUOTAS: Record<string, { users: number; documents: number; questions: number }> = {
@@ -34,6 +35,15 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
+
+  const SUBSCRIPTION_TIERS = [
+    { value: 'free', label: t('admin.institutionList.tierFree'), color: 'gray' },
+    { value: 'starter', label: t('admin.institutionList.tierStarter'), color: 'blue' },
+    { value: 'professional', label: t('admin.institutionList.tierProfessional'), color: 'purple' },
+    { value: 'enterprise', label: t('admin.institutionList.tierEnterprise'), color: 'orange' },
+  ];
+
   const [institution, setInstitution] = useState<Institution | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -64,10 +74,10 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
           is_active: inst.is_active,
         });
       } else {
-        setError('Institution not found');
+        setError(t('admin.institutionEdit.notFound'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load institution');
+      setError(err instanceof Error ? err.message : t('admin.institutionEdit.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -90,14 +100,14 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update institution');
+      setError(err instanceof Error ? err.message : t('admin.institutionEdit.failedUpdate'));
     } finally {
       setSaving(false);
     }
   };
 
   const formatQuota = (value: number): string => {
-    return value === -1 ? 'Unlimited' : value.toString();
+    return value === -1 ? t('admin.institutionEdit.unlimited') : value.toString();
   };
 
   const getQuotasForTier = (tier: string) => {
@@ -112,7 +122,7 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-gray-900">
-            Edit Institution
+            {t('admin.institutionEdit.title')}
           </h2>
           <button
             onClick={onClose}
@@ -138,7 +148,7 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Institution Name
+                  {t('admin.institutionEdit.nameLabel')}
                 </label>
                 <input
                   type="text"
@@ -152,14 +162,14 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
               {/* Domain */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Domain
+                  {t('admin.institutionEdit.domainLabel')}
                 </label>
                 <input
                   type="text"
                   value={formData.domain}
                   onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  placeholder="example.com"
+                  placeholder={t('admin.institutionEdit.domainPlaceholder')}
                   required
                 />
               </div>
@@ -167,7 +177,7 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
               {/* Subscription Tier */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Subscription Tier
+                  {t('admin.institutionEdit.tierLabel')}
                 </label>
                 <select
                   value={formData.subscription_tier}
@@ -186,24 +196,24 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
                 {/* Quota Preview */}
                 <div className="mt-3 p-3 bg-gray-50 rounded-md">
                   <p className="text-xs font-medium text-gray-700 mb-2">
-                    Quotas for {SUBSCRIPTION_TIERS.find(t => t.value === formData.subscription_tier)?.label}:
+                    {t('admin.institutionEdit.quotasForTier', { tier: SUBSCRIPTION_TIERS.find(tier => tier.value === formData.subscription_tier)?.label })}
                   </p>
                   <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
                     <div>
-                      <span className="font-medium">👥 Users:</span>{' '}
+                      <span className="font-medium">{t('admin.institutionEdit.quotaUsers')}</span>{' '}
                       {formatQuota(getQuotasForTier(formData.subscription_tier).users)}
                     </div>
                     <div>
-                      <span className="font-medium">📄 Documents:</span>{' '}
+                      <span className="font-medium">{t('admin.institutionEdit.quotaDocs')}</span>{' '}
                       {formatQuota(getQuotasForTier(formData.subscription_tier).documents)}
                     </div>
                     <div>
-                      <span className="font-medium">❓ Questions/mo:</span>{' '}
+                      <span className="font-medium">{t('admin.institutionEdit.quotaQuestions')}</span>{' '}
                       {formatQuota(getQuotasForTier(formData.subscription_tier).questions)}
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
-                    ℹ️ Quotas will be automatically updated when you save
+                    {t('admin.institutionEdit.quotaNote')}
                   </p>
                 </div>
               </div>
@@ -220,25 +230,25 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
                   className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                 />
                 <label htmlFor="is_active" className="ml-2 block text-sm text-gray-700">
-                  Institution is active
+                  {t('admin.institutionEdit.isActiveLabel')}
                 </label>
               </div>
 
               {/* Current Values (Read-only) */}
               {institution && (
                 <div className="border-t border-gray-200 pt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Current Quotas:</p>
+                  <p className="text-sm font-medium text-gray-700 mb-2">{t('admin.institutionEdit.currentQuotas')}</p>
                   <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
                     <div>
-                      <span className="font-medium">👥 Users:</span>{' '}
+                      <span className="font-medium">{t('admin.institutionEdit.quotaUsers')}</span>{' '}
                       {formatQuota(institution.max_users)}
                     </div>
                     <div>
-                      <span className="font-medium">📄 Documents:</span>{' '}
+                      <span className="font-medium">{t('admin.institutionEdit.quotaDocs')}</span>{' '}
                       {formatQuota(institution.max_documents)}
                     </div>
                     <div>
-                      <span className="font-medium">❓ Questions/mo:</span>{' '}
+                      <span className="font-medium">{t('admin.institutionEdit.quotaQuestions')}</span>{' '}
                       {formatQuota(institution.max_questions_per_month)}
                     </div>
                   </div>
@@ -255,14 +265,14 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
             disabled={saving}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
           >
-            Cancel
+            {t('admin.institutionEdit.cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={saving || loading}
             className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
           >
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? t('admin.institutionEdit.saving') : t('admin.institutionEdit.saveChanges')}
           </button>
         </div>
       </div>

@@ -40,6 +40,8 @@ import {
   Visibility,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../utils/dateLocale';
 import { QuestionReview, ReviewStatus, ReviewComment } from '../types/review';
 import { ReviewService } from '../services/ReviewService';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -63,6 +65,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
   onComment,
   loading = false,
 }) => {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [showSources, setShowSources] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -116,6 +119,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
     }
   };
 
+  // Bloom taxonomy labels are standardized educational terms used internationally
   const getBloomLevelLabel = (level?: number): string => {
     if (!level) return 'N/A';
     const labels = ['', 'Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create'];
@@ -143,7 +147,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="caption" color="text.secondary">
-              Question #{question.id} • {formatQuestionType(question.question_type)}
+              {t('components.questionCard.questionNumber', { id: question.id })} • {formatQuestionType(question.question_type)}
             </Typography>
             <Box sx={{ mt: 0.5 }}>
               <MarkdownRenderer content={question.question_text} variant="compact" />
@@ -158,7 +162,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
 
         {question.reviewer_info && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Reviewer: {question.reviewer_info.first_name} {question.reviewer_info.last_name}
+            {t('components.questionCard.reviewer', { name: `${question.reviewer_info.first_name} ${question.reviewer_info.last_name}` })}
           </Typography>
         )}
 
@@ -166,7 +170,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
         {question.options && question.options.length > 0 && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Options:
+              {t('components.questionCard.options')}
             </Typography>
             <List dense>
               {question.options.map((option, index) => (
@@ -198,7 +202,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
         {question.correct_answer && !question.options && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Correct Answer:
+              {t('components.questionCard.correctAnswer')}
             </Typography>
             <Alert severity="success" icon={<CheckCircle />}>
               <MarkdownRenderer content={question.correct_answer} variant="compact" />
@@ -210,7 +214,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
         {question.explanation && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Explanation:
+              {t('components.questionCard.explanation')}
             </Typography>
             <MarkdownRenderer content={question.explanation} variant="compact" />
           </Box>
@@ -220,7 +224,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
 
         {/* Quality Indicators */}
         <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-          <Tooltip title="Difficulty Level">
+          <Tooltip title={t('components.questionCard.difficultyLevel')}>
             <Chip
               icon={<Grade />}
               label={question.difficulty.toUpperCase()}
@@ -230,10 +234,10 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             />
           </Tooltip>
 
-          <Tooltip title="AI Confidence Score">
+          <Tooltip title={t('components.questionCard.aiConfidence')}>
             <Chip
               icon={<Psychology />}
-              label={`${(question.confidence_score * 100).toFixed(0)}% Confidence`}
+              label={t('components.questionCard.confidenceLabel', { score: (question.confidence_score * 100).toFixed(0) })}
               size="small"
               variant="outlined"
               color={question.confidence_score >= 0.8 ? 'success' : 'warning'}
@@ -241,7 +245,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
           </Tooltip>
 
           {question.bloom_level && (
-            <Tooltip title="Bloom's Taxonomy Level">
+            <Tooltip title={t('components.questionCard.bloomLevel')}>
               <Chip
                 icon={<Lightbulb />}
                 label={getBloomLevelLabel(question.bloom_level)}
@@ -252,7 +256,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
           )}
 
           {question.estimated_time_minutes && (
-            <Tooltip title="Estimated Time">
+            <Tooltip title={t('components.questionCard.estimatedTime')}>
               <Chip
                 icon={<Timer />}
                 label={`${question.estimated_time_minutes} min`}
@@ -263,7 +267,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
           )}
 
           {question.quality_tier && (
-            <Tooltip title="Quality Tier">
+            <Tooltip title={t('components.questionCard.qualityTier')}>
               <Chip
                 label={`Tier ${question.quality_tier}`}
                 size="small"
@@ -273,7 +277,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             </Tooltip>
           )}
 
-          <Tooltip title="Topic">
+          <Tooltip title={t('components.questionCard.topic')}>
             <Chip
               label={question.topic}
               size="small"
@@ -291,12 +295,14 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               onClick={() => setShowSources(!showSources)}
               endIcon={<Source />}
             >
-              {showSources ? 'Hide' : 'Show'} Sources ({question.source_documents.length})
+              {showSources
+                ? t('components.questionCard.hideSources', { count: question.source_documents.length })
+                : t('components.questionCard.showSources', { count: question.source_documents.length })}
             </Button>
             <Collapse in={showSources}>
               <Box sx={{ mt: 1, pl: 2 }}>
                 <Typography variant="caption" color="text.secondary">
-                  Source Documents:
+                  {t('components.questionCard.sourceDocuments')}
                 </Typography>
                 <List dense>
                   {question.source_documents.map((doc, index) => (
@@ -321,7 +327,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             onClick={() => setShowComments(!showComments)}
             endIcon={<Comment />}
           >
-            {showComments ? 'Hide' : 'Show'} Comments
+            {showComments ? t('components.questionCard.hideComments') : t('components.questionCard.showComments')}
           </Button>
           <Collapse in={showComments}>
             <Box sx={{ mt: 1, pl: 2 }}>
@@ -331,7 +337,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
                 </Box>
               ) : comments.length === 0 ? (
                 <Typography variant="caption" color="text.secondary">
-                  No comments yet. Click the comment icon to add one.
+                  {t('components.questionCard.noComments')}
                 </Typography>
               ) : (
                 <List dense>
@@ -342,7 +348,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
                           {comment.comment_text}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {comment.author} • {new Date(comment.created_at).toLocaleString()} • {comment.comment_type}
+                          {comment.author} • {new Date(comment.created_at).toLocaleString(getDateLocale(i18n.language))} • {comment.comment_type}
                         </Typography>
                       </Box>
                       {comment !== comments[comments.length - 1] && <Divider sx={{ width: '100%', mt: 1 }} />}
@@ -358,7 +364,10 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
         {question.reviewed_by && (
           <Box sx={{ mt: 2 }}>
             <Typography variant="caption" color="text.secondary">
-              Reviewed by {question.reviewed_by} on {new Date(question.reviewed_at!).toLocaleString()}
+              {t('components.questionCard.reviewedBy', {
+                name: question.reviewed_by,
+                date: new Date(question.reviewed_at!).toLocaleString(getDateLocale(i18n.language))
+              })}
             </Typography>
           </Box>
         )}
@@ -368,7 +377,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
       <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
         <Box>
           {(question.review_status === ReviewStatus.PENDING || question.review_status === ReviewStatus.EDITED) && (
-            <Tooltip title="Review starten">
+            <Tooltip title={t('components.questionCard.startReview')}>
               <span>
                 <Button
                   variant="outlined"
@@ -378,12 +387,12 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
                   disabled={loading}
                   size="small"
                 >
-                  Review starten
+                  {t('components.questionCard.startReview')}
                 </Button>
               </span>
             </Tooltip>
           )}
-          <Tooltip title="Approve Question">
+          <Tooltip title={t('components.questionCard.approveBtn')}>
             <span>
               <Button
                 variant="contained"
@@ -393,11 +402,11 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
                 disabled={loading || question.review_status === ReviewStatus.APPROVED}
                 size="small"
               >
-                Approve
+                {t('components.questionCard.approveBtn')}
               </Button>
             </span>
           </Tooltip>
-          <Tooltip title="Reject Question">
+          <Tooltip title={t('components.questionCard.rejectBtn')}>
             <span>
               <Button
                 variant="contained"
@@ -408,13 +417,13 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
                 size="small"
                 sx={{ ml: 1 }}
               >
-                Reject
+                {t('components.questionCard.rejectBtn')}
               </Button>
             </span>
           </Tooltip>
         </Box>
         <Box>
-          <Tooltip title="Edit Question">
+          <Tooltip title={t('components.questionCard.editQuestion')}>
             <IconButton
               onClick={() => onEdit?.(question.id)}
               disabled={loading}
@@ -423,7 +432,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               <Edit />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Add Comment">
+          <Tooltip title={t('components.questionCard.addComment')}>
             <IconButton
               onClick={() => onComment?.(question.id)}
               disabled={loading}
@@ -432,7 +441,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               <Comment />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Details anzeigen">
+          <Tooltip title={t('components.questionCard.showDetails')}>
             <IconButton
               onClick={() => navigate(`/questions/review/${question.id}`)}
               size="small"

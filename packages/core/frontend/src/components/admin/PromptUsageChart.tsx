@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../../utils/dateLocale';
 import {
   Box,
   Paper,
@@ -17,6 +19,7 @@ interface PromptUsageChartProps {
 }
 
 export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) => {
+  const { t, i18n } = useTranslation();
   const [usageLogs, setUsageLogs] = useState<PromptUsageLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +31,7 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
       const data = await promptsApi.getUsageLogs(promptId, 100);
       setUsageLogs(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Laden der Analytics');
+      setError(err instanceof Error ? err.message : t('admin.promptUsageChart.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -69,7 +72,7 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Usage Analytics
+        {t('admin.promptUsageChart.title')}
       </Typography>
 
       <Grid container spacing={3}>
@@ -80,14 +83,14 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <TrendingUp sx={{ color: 'primary.main', mr: 1 }} />
                 <Typography variant="subtitle2" color="text.secondary">
-                  Verwendungen
+                  {t('admin.promptUsageChart.metricUsages')}
                 </Typography>
               </Box>
               <Typography variant="h4" component="div">
                 {totalUsages}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Gesamt
+                {t('admin.promptUsageChart.metricTotal')}
               </Typography>
             </CardContent>
           </Card>
@@ -105,14 +108,14 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
                   }}
                 />
                 <Typography variant="subtitle2" color="text.secondary">
-                  Erfolgsrate
+                  {t('admin.promptUsageChart.metricSuccessRate')}
                 </Typography>
               </Box>
               <Typography variant="h4" component="div">
                 {successRate.toFixed(1)}%
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {successfulUsages} / {totalUsages} erfolgreich
+                {t('admin.promptUsageChart.metricSuccessOf', { success: successfulUsages, total: totalUsages })}
               </Typography>
             </CardContent>
           </Card>
@@ -125,7 +128,7 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <AccessTime sx={{ color: 'info.main', mr: 1 }} />
                 <Typography variant="subtitle2" color="text.secondary">
-                  Ø Latenz
+                  {t('admin.promptUsageChart.metricLatency')}
                 </Typography>
               </Box>
               <Typography variant="h4" component="div">
@@ -135,7 +138,7 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
                 </Typography>
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Durchschnitt
+                {t('admin.promptUsageChart.metricAvg')}
               </Typography>
             </CardContent>
           </Card>
@@ -148,14 +151,14 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <Token sx={{ color: 'secondary.main', mr: 1 }} />
                 <Typography variant="subtitle2" color="text.secondary">
-                  Tokens Total
+                  {t('admin.promptUsageChart.metricTokens')}
                 </Typography>
               </Box>
               <Typography variant="h4" component="div">
                 {totalTokens.toLocaleString()}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Gesamt verwendet
+                {t('admin.promptUsageChart.metricTokensTotal')}
               </Typography>
             </CardContent>
           </Card>
@@ -166,7 +169,7 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
       {usageLogs.length > 0 && (
         <Paper elevation={2} sx={{ mt: 3, p: 2 }}>
           <Typography variant="subtitle1" gutterBottom>
-            Letzte Verwendungen
+            {t('admin.promptUsageChart.recentUsages')}
           </Typography>
           <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
             {usageLogs.slice(0, 10).map((log, index) => (
@@ -188,7 +191,7 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
                     {log.use_case}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {new Date(log.timestamp).toLocaleString('de-DE')}
+                    {new Date(log.timestamp).toLocaleString(getDateLocale(i18n.language))}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -218,7 +221,7 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
       {usageLogs.length === 0 && (
         <Paper elevation={1} sx={{ p: 4, textAlign: 'center', mt: 3 }}>
           <Typography variant="body1" color="text.secondary">
-            Noch keine Verwendungen aufgezeichnet
+            {t('admin.promptUsageChart.empty')}
           </Typography>
         </Paper>
       )}

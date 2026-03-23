@@ -13,6 +13,7 @@ import {
   ChangePasswordRequest,
 } from '../types/auth';
 import AuthService from '../services/AuthService';
+import i18n from '../i18n';
 import { SubscriptionTier, hasFeature as tierHasFeature, isFeatureName } from '../config/features';
 
 // ============================================================================
@@ -85,6 +86,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Update localStorage with fresh user data
             localStorage.setItem(USER_KEY, JSON.stringify(profile));
 
+            if (profile.preferred_language) {
+              await i18n.changeLanguage(profile.preferred_language).catch((e: unknown) =>
+                console.error('[AuthContext] Failed to apply preferred language:', e)
+              );
+            }
+
             setState({
               user: profile,
               accessToken,
@@ -121,6 +128,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
               localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
               localStorage.setItem(USER_KEY, JSON.stringify(profile));
+
+              if (profile.preferred_language) {
+                await i18n.changeLanguage(profile.preferred_language).catch((e: unknown) =>
+                  console.error('[AuthContext] Failed to apply preferred language:', e)
+                );
+              }
 
               console.log('[AuthContext] Token refreshed successfully for:', profile.email);
               setState({
@@ -178,6 +191,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[AuthContext] Login successful, fetching profile...');
       const user = await AuthService.getProfile(tokens.access_token);
 
+      if (user.preferred_language) {
+        await i18n.changeLanguage(user.preferred_language).catch((e: unknown) =>
+          console.error('[AuthContext] Failed to apply preferred language:', e)
+        );
+      }
+
       localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
       localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -212,6 +231,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const user = await AuthService.getProfile(accessToken);
 
+      if (user.preferred_language) {
+        await i18n.changeLanguage(user.preferred_language).catch((e: unknown) =>
+          console.error('[AuthContext] Failed to apply preferred language:', e)
+        );
+      }
+
       localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
       localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -244,6 +269,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const tokens = await AuthService.register(data);
       const user = await AuthService.getProfile(tokens.access_token);
+
+      if (user.preferred_language) {
+        await i18n.changeLanguage(user.preferred_language).catch((e: unknown) =>
+          console.error('[AuthContext] Failed to apply preferred language:', e)
+        );
+      }
 
       localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
       localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);

@@ -21,6 +21,7 @@ dependencies = [
     "python-jose>=3.5.0",
     "bcrypt>=5.0.0",
     "redis>=7.0.0",
+    "python-i18n>=0.3.9",
 ]
 
 [project.optional-dependencies]
@@ -34,7 +35,9 @@ docs = [
 
 [dependency-groups]
 dev = [
+    "authlib>=1.6.9",
     "pytest>=8.4.2",
+    "sentry-sdk>=2.55.0",
 ]
 
 [tool.uv.workspace]

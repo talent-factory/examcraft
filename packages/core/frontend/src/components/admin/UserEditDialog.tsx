@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import AdminService, { UserDetailResponse, UpdateUserRequest } from '../../services/AdminService';
 
 interface UserEditDialogProps {
@@ -19,6 +20,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const [user, setUser] = useState<UserDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -44,11 +46,11 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
         email: userData.email,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load user');
+      setError(err instanceof Error ? err.message : t('admin.userEditDialog.failedLoad'));
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, t]);
 
   useEffect(() => {
     if (isOpen && userId) {
@@ -86,7 +88,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update user');
+      setError(err instanceof Error ? err.message : t('admin.userEditDialog.failedUpdate'));
     } finally {
       setSaving(false);
     }
@@ -117,7 +119,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
               <div className="sm:flex sm:items-start">
                 <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
                   <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                    Edit User
+                    {t('admin.userEditDialog.title')}
                   </h3>
 
                   {loading ? (
@@ -136,7 +138,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
                       {/* First Name */}
                       <div>
                         <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-1">
-                          First Name
+                          {t('admin.userEditDialog.firstNameLabel')}
                         </label>
                         <input
                           type="text"
@@ -152,7 +154,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
                       {/* Last Name */}
                       <div>
                         <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-1">
-                          Last Name
+                          {t('admin.userEditDialog.lastNameLabel')}
                         </label>
                         <input
                           type="text"
@@ -168,7 +170,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
                       {/* Email */}
                       <div>
                         <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                          Email
+                          {t('admin.userEditDialog.emailLabel')}
                         </label>
                         <input
                           type="email"
@@ -186,15 +188,15 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
                         <div className="bg-gray-50 p-3 rounded-lg text-sm">
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <span className="text-gray-500">Institution:</span>
+                              <span className="text-gray-500">{t('admin.userEditDialog.institutionLabel')}:</span>
                               <span className="ml-2 font-medium">{user.institution_name}</span>
                             </div>
                             <div>
-                              <span className="text-gray-500">Status:</span>
+                              <span className="text-gray-500">{t('admin.userEditDialog.statusLabel')}:</span>
                               <span className="ml-2 font-medium">{user.status}</span>
                             </div>
                             <div className="col-span-2">
-                              <span className="text-gray-500">Roles:</span>
+                              <span className="text-gray-500">{t('admin.userEditDialog.rolesLabel')}:</span>
                               <span className="ml-2 font-medium">
                                 {user.roles.map(r => r.display_name).join(', ')}
                               </span>
@@ -215,7 +217,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
                 disabled={saving || loading}
                 className="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? t('admin.userEditDialog.saving') : t('admin.userEditDialog.saveChanges')}
               </button>
               <button
                 type="button"
@@ -223,7 +225,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
                 disabled={saving}
                 className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Cancel
+                {t('admin.userEditDialog.cancel')}
               </button>
             </div>
           </form>
