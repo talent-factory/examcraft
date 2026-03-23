@@ -7,7 +7,6 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
-import AuthService from '../../services/AuthService';
 import { PackageTierBadge } from './PackageTierBadge';
 
 export const NavigationBar: React.FC = () => {
@@ -34,30 +33,11 @@ export const NavigationBar: React.FC = () => {
     return `${API_BASE_URL}/api/auth/avatar/${userId}`;
   };
 
-  const handleLanguageChange = async (lng: string) => {
-    const previousLanguage = i18n.language;
-    try {
-      await i18n.changeLanguage(lng);
-      const token = localStorage.getItem('examcraft_access_token');
-      if (user && token) {
-        await AuthService.updateProfile(token, { preferred_language: lng });
-      }
-    } catch (error) {
-      console.error('[NavigationBar] Language change failed:', { requestedLanguage: lng, error });
-      // Revert UI language to stay in sync with persisted value
-      await i18n.changeLanguage(previousLanguage).catch((e: unknown) =>
-        console.error('[NavigationBar] Failed to revert language:', e)
-      );
-      localStorage.setItem('examcraft_language', previousLanguage);
-    }
+  const LANGUAGE_LABELS: Record<string, string> = {
+    de: 'Deutsch', en: 'English', fr: 'Français', it: 'Italiano',
   };
 
-  const LANGUAGE_OPTIONS = [
-    { code: 'de', label: 'Deutsch' },
-    { code: 'en', label: 'English' },
-    { code: 'fr', label: 'Français' },
-    { code: 'it', label: 'Italiano' },
-  ];
+  const currentLanguageLabel = LANGUAGE_LABELS[i18n.language?.substring(0, 2)] || i18n.language;
 
   return (
     <nav className="bg-white shadow-lg">
@@ -127,26 +107,13 @@ export const NavigationBar: React.FC = () => {
                       ⚙️ {t('nav.settings')}
                     </Link>
                     <div className="border-t border-gray-100 my-1"></div>
-                    <div className="px-4 py-1 text-xs text-gray-500">
-                      {t('nav.language')}
-                    </div>
-                    {LANGUAGE_OPTIONS.map((lang) => (
-                      <button
-                        key={lang.code}
-                        type="button"
-                        onClick={() => {
-                          handleLanguageChange(lang.code);
-                          setShowUserMenu(false);
-                        }}
-                        className={`block w-full text-left px-4 py-1.5 text-sm hover:bg-gray-100 ${
-                          i18n.language?.startsWith(lang.code)
-                            ? 'text-primary-600 font-medium bg-primary-50'
-                            : 'text-gray-700'
-                        }`}
-                      >
-                        {lang.label}
-                      </button>
-                    ))}
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      🌐 {t('nav.language')}: {currentLanguageLabel}
+                    </Link>
                     <button
                       type="button"
                       onClick={handleLogout}

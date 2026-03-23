@@ -1005,7 +1005,10 @@
       "superuser": "Superutente",
       "lastLogin": "Ultimo accesso",
       "memberSince": "Membro dal",
-      "permissions": "Permessi"
+      "permissions": "Permessi",
+      "settings": "Impostazioni",
+      "language": "Lingua",
+      "languageHint": "Cambia la lingua dell'intera applicazione"
     },
     "profileEdit": {
       "header": "Modifica profilo",
