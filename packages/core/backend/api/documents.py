@@ -22,6 +22,7 @@ import io
 
 from services.document_service import DocumentService
 from services.storage_service import storage_service
+from services.translation_service import t, get_request_locale
 from services.vector_service_factory import vector_service
 from models.document import Document, DocumentStatus
 from models.auth import User
@@ -86,6 +87,7 @@ async def upload_document(
 
     **Note:** Document wird asynchron verarbeitet. Status kann via GET /documents/{id} abgerufen werden.
     """
+    locale = get_request_locale(http_request, current_user)
     try:
         # Check document limit for institution
         from utils.tenant_utils import SubscriptionLimits
@@ -137,13 +139,14 @@ async def upload_document(
     except Exception as e:
         logger.error(f"Upload failed for user {current_user.id}: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail="Upload fehlgeschlagen. Bitte erneut versuchen."
+            status_code=500, detail=t("documents_upload_failed", locale=locale)
         )
 
 
 @router.get("/", response_model=DocumentListResponse)
 async def list_documents(
     status: Optional[str] = Query(None, description="Filter by status"),
+    request: Request = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -157,6 +160,7 @@ async def list_documents(
     Returns:
         Liste aller Dokumente mit Metadaten
     """
+    locale = get_request_locale(request, current_user)
     try:
         # Convert status string to enum if provided
         status_filter = None
@@ -166,7 +170,7 @@ async def list_documents(
             except ValueError:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid status. Valid options: {[s.value for s in DocumentStatus]}",
+                    detail=t("documents_invalid_status", locale=locale),
                 )
 
         # Tenant-aware query: Filter by institution_id
@@ -200,7 +204,7 @@ async def list_documents(
         )
         raise HTTPException(
             status_code=500,
-            detail="Dokumente konnten nicht geladen werden. Bitte erneut versuchen.",
+            detail=t("documents_list_failed", locale=locale),
         )
 
 
@@ -219,6 +223,7 @@ async def health_check():
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: int,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -232,11 +237,14 @@ async def get_document(
     Returns:
         Document Details mit Metadaten
     """
+    locale = get_request_locale(request, current_user)
     try:
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise HTTPException(
+                status_code=404, detail=t("documents_not_found", locale=locale)
+            )
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -256,13 +264,14 @@ async def get_document(
         )
         raise HTTPException(
             status_code=500,
-            detail="Dokument konnte nicht geladen werden. Bitte erneut versuchen.",
+            detail=t("documents_load_failed", locale=locale),
         )
 
 
 @router.get("/{document_id}/download")
 async def download_document(
     document_id: int,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -278,11 +287,14 @@ async def download_document(
 
     **Note:** Supports both physical files and virtual files (e.g., chat exports)
     """
+    locale = get_request_locale(request, current_user)
     try:
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise HTTPException(
+                status_code=404, detail=t("documents_not_found", locale=locale)
+            )
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -299,7 +311,8 @@ async def download_document(
             content = document.doc_metadata.get("full_content", "")
             if not content:
                 raise HTTPException(
-                    status_code=404, detail="Document content not available"
+                    status_code=404,
+                    detail=t("documents_content_not_available", locale=locale),
                 )
 
             # Return content as downloadable file
@@ -330,19 +343,21 @@ async def download_document(
                     )
                 except FileNotFoundError:
                     raise HTTPException(
-                        status_code=404, detail="Document file not found in storage"
+                        status_code=404,
+                        detail=t("documents_file_not_found_storage", locale=locale),
                     )
                 except Exception as e:
                     logger.error(f"Failed to download from S3: {e}")
                     raise HTTPException(
                         status_code=500,
-                        detail="Failed to download document from storage",
+                        detail=t("documents_download_storage_failed", locale=locale),
                     )
             else:
                 # Local Storage: Check if file exists on disk
                 if not os.path.exists(document.file_path):
                     raise HTTPException(
-                        status_code=404, detail="Document file not found on disk"
+                        status_code=404,
+                        detail=t("documents_file_not_found_disk", locale=locale),
                     )
 
                 # Return file with original filename
@@ -361,13 +376,14 @@ async def download_document(
         )
         raise HTTPException(
             status_code=500,
-            detail="Dokument-Download fehlgeschlagen. Bitte erneut versuchen.",
+            detail=t("documents_download_failed", locale=locale),
         )
 
 
 @router.get("/{document_id}/status")
 async def get_document_status(
     document_id: int,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -381,11 +397,14 @@ async def get_document_status(
     Returns:
         Document status, task ID, and processing info
     """
+    locale = get_request_locale(request, current_user)
     try:
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise HTTPException(
+                status_code=404, detail=t("documents_not_found", locale=locale)
+            )
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -433,14 +452,14 @@ async def get_document_status(
         )
         raise HTTPException(
             status_code=500,
-            detail="Dokumentstatus konnte nicht abgerufen werden. Bitte erneut versuchen.",
+            detail=t("documents_status_failed", locale=locale),
         )
 
 
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: int,
-    http_request: Request = None,
+    http_request: Request,
     current_user: User = Depends(require_permission("delete_documents")),
     db: Session = Depends(get_db),
 ):
@@ -454,12 +473,15 @@ async def delete_document(
     Returns:
         Bestätigung der Löschung
     """
+    locale = get_request_locale(http_request, current_user)
     try:
         # Check if document exists and user owns it (or is superuser)
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise HTTPException(
+                status_code=404, detail=t("documents_not_found", locale=locale)
+            )
 
         # Only allow deletion if:
         # 1. User is superuser (can delete any document)
@@ -472,7 +494,10 @@ async def delete_document(
                     current_user.has_role("admin")
                     and document.institution_id == current_user.institution_id
                 ):
-                    raise HTTPException(status_code=403, detail="Access denied")
+                    raise HTTPException(
+                        status_code=403,
+                        detail=t("documents_access_denied", locale=locale),
+                    )
 
         # Store filename for audit log
         filename = document.filename
@@ -481,7 +506,9 @@ async def delete_document(
         success = document_service.delete_document(document_id, db)
 
         if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete document")
+            raise HTTPException(
+                status_code=500, detail=t("documents_delete_failed", locale=locale)
+            )
 
         # Audit log: Document deleted
         from services.audit_service import AuditService
@@ -512,7 +539,7 @@ async def delete_document(
         )
         raise HTTPException(
             status_code=500,
-            detail="Dokument konnte nicht gelöscht werden. Bitte erneut versuchen.",
+            detail=t("documents_delete_failed", locale=locale),
         )
 
 
@@ -521,6 +548,7 @@ async def process_document(
     document_id: int,
     create_vectors: bool = Query(True, description="Erstelle auch Vector Embeddings"),
     background_tasks: BackgroundTasks = None,
+    request: Request = None,
     current_user: User = Depends(require_permission("create_documents")),
     db: Session = Depends(get_db),
 ):
@@ -535,14 +563,19 @@ async def process_document(
     - **document_id**: ID des zu verarbeitenden Dokuments
     - **create_vectors**: Ob Vector Embeddings erstellt werden sollen (default: True)
     """
+    locale = get_request_locale(request, current_user)
     # Prüfe ob Dokument existiert
     document = document_service.get_document_by_id(document_id, db)
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(
+            status_code=404, detail=t("documents_not_found", locale=locale)
+        )
 
     # Prüfe User-Berechtigung
     if document.user_id and document.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(
+            status_code=403, detail=t("documents_access_denied", locale=locale)
+        )
 
     try:
         # Starte Verarbeitung im Hintergrund
@@ -570,13 +603,14 @@ async def process_document(
         )
         raise HTTPException(
             status_code=500,
-            detail="Dokumentverarbeitung fehlgeschlagen. Bitte erneut versuchen.",
+            detail=t("documents_processing_failed", locale=locale),
         )
 
 
 @router.get("/{document_id}/content")
 async def get_document_content(
     document_id: int,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -590,11 +624,14 @@ async def get_document_content(
     Returns:
         Vollständiger Dokumenteninhalt als Text
     """
+    locale = get_request_locale(request, current_user)
     try:
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise HTTPException(
+                status_code=404, detail=t("documents_not_found", locale=locale)
+            )
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -611,7 +648,8 @@ async def get_document_content(
                 content = document.content_preview
             else:
                 raise HTTPException(
-                    status_code=404, detail="Document content not available"
+                    status_code=404,
+                    detail=t("documents_content_not_available", locale=locale),
                 )
 
         return {
@@ -632,13 +670,14 @@ async def get_document_content(
         )
         raise HTTPException(
             status_code=500,
-            detail="Dokumentinhalt konnte nicht geladen werden. Bitte erneut versuchen.",
+            detail=t("documents_content_load_failed", locale=locale),
         )
 
 
 @router.get("/{document_id}/chunks")
 async def get_document_chunks(
     document_id: int,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -652,11 +691,14 @@ async def get_document_chunks(
     Returns:
         Liste der Text-Chunks mit Metadaten
     """
+    locale = get_request_locale(request, current_user)
     try:
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise HTTPException(
+                status_code=404, detail=t("documents_not_found", locale=locale)
+            )
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -667,7 +709,7 @@ async def get_document_chunks(
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(
                 status_code=400,
-                detail=f"Document not processed yet. Current status: {document.status.value}",
+                detail=t("documents_not_processed", locale=locale),
             )
 
         # Hole Chunks
@@ -675,7 +717,8 @@ async def get_document_chunks(
 
         if chunks is None:
             raise HTTPException(
-                status_code=500, detail="Failed to retrieve document chunks"
+                status_code=500,
+                detail=t("documents_chunks_load_failed", locale=locale),
             )
 
         return {
@@ -692,7 +735,7 @@ async def get_document_chunks(
         )
         raise HTTPException(
             status_code=500,
-            detail="Dokument-Chunks konnten nicht geladen werden. Bitte erneut versuchen.",
+            detail=t("documents_chunks_load_failed", locale=locale),
         )
 
 
@@ -701,6 +744,7 @@ async def get_document_chunks_paginated(
     document_id: int,
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(10, ge=1, le=100, description="Number of chunks per page"),
+    request: Request = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -716,11 +760,14 @@ async def get_document_chunks_paginated(
     Returns:
         Paginierte Liste der Text-Chunks mit Metadaten
     """
+    locale = get_request_locale(request, current_user)
     try:
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise HTTPException(
+                status_code=404, detail=t("documents_not_found", locale=locale)
+            )
 
         # Tenant-aware access control
         from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -731,7 +778,7 @@ async def get_document_chunks_paginated(
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(
                 status_code=400,
-                detail=f"Document not processed yet. Current status: {document.status.value}",
+                detail=t("documents_not_processed", locale=locale),
             )
 
         # Hole Chunks aus Vector Database (schneller als Neuverarbeitung!)
@@ -740,7 +787,7 @@ async def get_document_chunks_paginated(
         if not search_results:
             raise HTTPException(
                 status_code=500,
-                detail="Failed to retrieve document chunks from vector database",
+                detail=t("documents_chunks_load_failed", locale=locale),
             )
 
         # Konvertiere SearchResult zu Dictionary Format
@@ -765,7 +812,7 @@ async def get_document_chunks_paginated(
         if page > total_pages and total_chunks > 0:
             raise HTTPException(
                 status_code=400,
-                detail=f"Page {page} out of range. Total pages: {total_pages}",
+                detail=t("documents_page_out_of_range", locale=locale),
             )
 
         # Berechne Start- und End-Index
@@ -793,5 +840,5 @@ async def get_document_chunks_paginated(
         )
         raise HTTPException(
             status_code=500,
-            detail="Dokument-Chunks konnten nicht geladen werden. Bitte erneut versuchen.",
+            detail=t("documents_chunks_load_failed", locale=locale),
         )

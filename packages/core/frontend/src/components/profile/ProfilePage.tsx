@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ProfileView } from './ProfileView';
 import { ProfileEdit } from './ProfileEdit';
 import { PasswordChange } from './PasswordChange';
@@ -11,6 +12,7 @@ import { PasswordChange } from './PasswordChange';
 type ProfileTab = 'view' | 'edit' | 'password';
 
 export const ProfilePage: React.FC = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<ProfileTab>('view');
 
   const handleEditSuccess = () => {
@@ -25,9 +27,9 @@ export const ProfilePage: React.FC = () => {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{t('profile.profilePage.title')}</h1>
         <p className="mt-2 text-gray-600">
-          Manage your account settings and preferences
+          {t('profile.profilePage.subtitle')}
         </p>
       </div>
 
@@ -43,7 +45,7 @@ export const ProfilePage: React.FC = () => {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              👤 Profile
+              👤 {t('profile.profilePage.tabProfile')}
             </button>
             <button
               onClick={() => setActiveTab('edit')}
@@ -53,7 +55,7 @@ export const ProfilePage: React.FC = () => {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              ✏️ Edit Profile
+              ✏️ {t('profile.profilePage.tabEdit')}
             </button>
             <button
               onClick={() => setActiveTab('password')}
@@ -63,7 +65,7 @@ export const ProfilePage: React.FC = () => {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              🔒 Change Password
+              🔒 {t('profile.profilePage.tabPassword')}
             </button>
           </nav>
         </div>

@@ -13,6 +13,7 @@ import React from 'react';
 import { Box, Typography, Alert, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { InfoOutlined } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 
 interface RAGExamCreatorProps {
   selectedDocuments?: number[];
@@ -21,6 +22,7 @@ interface RAGExamCreatorProps {
 }
 
 const RAGExamCreator: React.FC<RAGExamCreatorProps> = (props) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   // This is the Core (Free) version - always shows upgrade prompt
@@ -43,14 +45,13 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = (props) => {
         sx={{ maxWidth: 600 }}
       >
         <Typography variant="h6" sx={{ mb: 1 }}>
-          RAG Exam Creator - Premium Feature
+          {t('components.ragExamCreator.premiumTitle')}
         </Typography>
         <Typography variant="body2" sx={{ mb: 2 }}>
-          The RAG Exam Creator feature is available in the Premium package.
-          This feature allows you to automatically generate exam questions from your documents using AI-powered RAG (Retrieval-Augmented Generation).
+          {t('components.ragExamCreator.premiumDescription')}
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          To access this feature, please upgrade to the Starter, Professional, or Enterprise plan.
+          {t('components.ragExamCreator.premiumUpgrade')}
         </Typography>
       </Alert>
 
@@ -60,7 +61,7 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = (props) => {
           color="primary"
           onClick={() => props.onBack ? props.onBack() : navigate('/exams')}
         >
-          Back
+          {t('components.ragExamCreator.back')}
         </Button>
         <Button
           variant="outlined"
@@ -68,7 +69,7 @@ const RAGExamCreator: React.FC<RAGExamCreatorProps> = (props) => {
           href="https://examcraft.ai/pricing"
           target="_blank"
         >
-          View Premium Plans
+          {t('components.ragExamCreator.viewPlans')}
         </Button>
       </Box>
     </Box>

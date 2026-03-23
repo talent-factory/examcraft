@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { PackageTierBadge } from './PackageTierBadge';
 
 export const NavigationBar: React.FC = () => {
@@ -13,6 +14,7 @@ export const NavigationBar: React.FC = () => {
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
+  const { t, i18n } = useTranslation();
 
   const handleLogout = async () => {
     await logout();
@@ -30,6 +32,12 @@ export const NavigationBar: React.FC = () => {
 
     return `${API_BASE_URL}/api/auth/avatar/${userId}`;
   };
+
+  const LANGUAGE_LABELS: Record<string, string> = {
+    de: 'Deutsch', en: 'English', fr: 'Français', it: 'Italiano',
+  };
+
+  const currentLanguageLabel = LANGUAGE_LABELS[i18n.language?.substring(0, 2)] || i18n.language;
 
   return (
     <nav className="bg-white shadow-lg">
@@ -70,7 +78,7 @@ export const NavigationBar: React.FC = () => {
                 <span className="text-gray-700 font-medium">
                   {user?.first_name && user?.last_name
                     ? `${user.first_name} ${user.last_name}`
-                    : user?.email || 'User'}
+                    : user?.email || t('layout.navigationBar.userFallback')}
                 </span>
                 <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -89,21 +97,29 @@ export const NavigationBar: React.FC = () => {
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => setShowUserMenu(false)}
                     >
-                      👤 Profile
+                      👤 {t('nav.profile')}
                     </Link>
                     <Link
                       to="/settings"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => setShowUserMenu(false)}
                     >
-                      ⚙️ Settings
+                      ⚙️ {t('nav.settings')}
+                    </Link>
+                    <div className="border-t border-gray-100 my-1"></div>
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      🌐 {t('nav.language')}: {currentLanguageLabel}
                     </Link>
                     <button
                       type="button"
                       onClick={handleLogout}
                       className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
                     >
-                      🚪 Logout
+                      🚪 {t('nav.logout')}
                     </button>
                   </div>
                 </div>

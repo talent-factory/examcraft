@@ -4,7 +4,7 @@ Implementiert Review-Workflow für generierte Prüfungsfragen
 """
 
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -17,6 +17,7 @@ from models.question_review import (
     ReviewStatus,
 )
 from models.auth import User
+from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_active_user, require_permission
 import logging
 
@@ -248,6 +249,7 @@ async def get_review_queue(
     exam_id: Optional[str] = None,
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    request: Request = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -263,6 +265,7 @@ async def get_review_queue(
     - **limit**: Maximale Anzahl Ergebnisse
     - **offset**: Offset für Pagination
     """
+    locale = get_request_locale(request, current_user)
     try:
         # Base Query
         query = db.query(QuestionReview)
@@ -345,13 +348,14 @@ async def get_review_queue(
     except Exception as e:
         logger.error(f"Error fetching review queue: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch review queue: {str(e)}"
+            status_code=500, detail=t("review_fetch_queue_failed", locale=locale)
         )
 
 
 @router.get("/{question_id}/review", response_model=QuestionReviewDetailResponse)
 async def get_question_review(
     question_id: int,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -360,6 +364,7 @@ async def get_question_review(
 
     **Required:** Authenticated user
     """
+    locale = get_request_locale(request, current_user)
     try:
         question = (
             db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
@@ -367,7 +372,7 @@ async def get_question_review(
 
         if not question:
             raise HTTPException(
-                status_code=404, detail=f"Question {question_id} not found"
+                status_code=404, detail=t("review_question_not_found", locale=locale)
             )
 
         data = _attach_reviewer_info(question, db)
@@ -380,13 +385,14 @@ async def get_question_review(
     except Exception as e:
         logger.error(f"Error fetching question review {question_id}: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch question review: {str(e)}"
+            status_code=500, detail=t("review_fetch_question_failed", locale=locale)
         )
 
 
 @router.post("/review", response_model=QuestionReviewResponse, status_code=201)
 async def create_question_review(
     request: QuestionReviewCreate,
+    http_request: Request,
     current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db),
 ):
@@ -395,6 +401,7 @@ async def create_question_review(
 
     **Required Permission:** `create_questions` (Dozent, Assistant, Admin)
     """
+    locale = get_request_locale(http_request, current_user)
     try:
         # Check question generation limit for institution
         from utils.tenant_utils import SubscriptionLimits
@@ -459,7 +466,7 @@ async def create_question_review(
         db.rollback()
         logger.error(f"Error creating question review: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to create question review: {str(e)}"
+            status_code=500, detail=t("review_create_failed", locale=locale)
         )
 
 
@@ -467,6 +474,7 @@ async def create_question_review(
 async def edit_question(
     question_id: int,
     request: QuestionReviewUpdate,
+    http_request: Request,
     current_user: User = Depends(require_permission("edit_questions")),
     db: Session = Depends(get_db),
 ):
@@ -475,6 +483,7 @@ async def edit_question(
 
     **Required Permission:** `edit_questions` (Dozent, Assistant, Admin)
     """
+    locale = get_request_locale(http_request, current_user)
     try:
         question = (
             db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
@@ -482,7 +491,7 @@ async def edit_question(
 
         if not question:
             raise HTTPException(
-                status_code=404, detail=f"Question {question_id} not found"
+                status_code=404, detail=t("review_question_not_found", locale=locale)
             )
 
         # Track changes
@@ -590,13 +599,14 @@ async def edit_question(
         db.rollback()
         logger.error(f"Error editing question {question_id}: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to edit question: {str(e)}"
+            status_code=500, detail=t("review_edit_failed", locale=locale)
         )
 
 
 @router.post("/{question_id}/start-review", response_model=QuestionReviewResponse)
 async def start_review(
     question_id: int,
+    request: Request,
     current_user: User = Depends(require_permission("approve_questions")),
     db: Session = Depends(get_db),
 ):
@@ -607,6 +617,7 @@ async def start_review(
 
     **Required Permission:** `approve_questions` (Dozent, Admin)
     """
+    locale = get_request_locale(request, current_user)
     try:
         question = (
             db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
@@ -614,7 +625,7 @@ async def start_review(
 
         if not question:
             raise HTTPException(
-                status_code=404, detail=f"Question {question_id} not found"
+                status_code=404, detail=t("review_question_not_found", locale=locale)
             )
 
         if question.review_status not in (
@@ -623,7 +634,7 @@ async def start_review(
         ):
             raise HTTPException(
                 status_code=400,
-                detail=f"Frage kann nur aus Status 'pending' oder 'edited' in Review genommen werden (aktuell: {question.review_status}).",
+                detail=t("review_invalid_status_for_review", locale=locale),
             )
 
         old_status = question.review_status
@@ -658,7 +669,7 @@ async def start_review(
         )
         raise HTTPException(
             status_code=500,
-            detail="Fehler beim Starten des Reviews. Bitte versuchen Sie es erneut.",
+            detail=t("review_start_failed", locale=locale),
         )
 
 
@@ -666,6 +677,7 @@ async def start_review(
 async def approve_question(
     question_id: int,
     request: ReviewActionRequest,
+    http_request: Request,
     current_user: User = Depends(require_permission("approve_questions")),
     db: Session = Depends(get_db),
 ):
@@ -674,6 +686,7 @@ async def approve_question(
 
     **Required Permission:** `approve_questions` (Dozent, Admin)
     """
+    locale = get_request_locale(http_request, current_user)
     try:
         question = (
             db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
@@ -681,7 +694,7 @@ async def approve_question(
 
         if not question:
             raise HTTPException(
-                status_code=404, detail=f"Question {question_id} not found"
+                status_code=404, detail=t("review_question_not_found", locale=locale)
             )
 
         # Vier-Augen-Prinzip Check
@@ -703,7 +716,7 @@ async def approve_question(
                 if is_reviewer or is_creator:
                     raise HTTPException(
                         status_code=403,
-                        detail="Vier-Augen-Prinzip: Ein anderer Reviewer muss diese Frage genehmigen.",
+                        detail=t("review_four_eyes_principle", locale=locale),
                     )
 
         old_status = question.review_status
@@ -762,7 +775,7 @@ async def approve_question(
         logger.error(f"Error approving question {question_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Fehler beim Genehmigen der Frage. Bitte versuchen Sie es erneut.",
+            detail=t("review_approve_failed", locale=locale),
         )
 
 
@@ -770,6 +783,7 @@ async def approve_question(
 async def reject_question(
     question_id: int,
     request: ReviewActionRequest,
+    http_request: Request,
     current_user: User = Depends(require_permission("approve_questions")),
     db: Session = Depends(get_db),
 ):
@@ -778,6 +792,7 @@ async def reject_question(
 
     **Required Permission:** `approve_questions` (Dozent, Admin)
     """
+    locale = get_request_locale(http_request, current_user)
     try:
         question = (
             db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
@@ -785,7 +800,7 @@ async def reject_question(
 
         if not question:
             raise HTTPException(
-                status_code=404, detail=f"Question {question_id} not found"
+                status_code=404, detail=t("review_question_not_found", locale=locale)
             )
 
         old_status = question.review_status
@@ -842,13 +857,14 @@ async def reject_question(
         logger.error(f"Error rejecting question {question_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Fehler beim Ablehnen der Frage. Bitte versuchen Sie es erneut.",
+            detail=t("review_reject_failed", locale=locale),
         )
 
 
 @router.get("/{question_id}/comments", response_model=List[CommentResponse])
 async def get_comments(
     question_id: int,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -857,6 +873,7 @@ async def get_comments(
 
     **Required:** Authenticated user
     """
+    locale = get_request_locale(request, current_user)
     try:
         # Check if question exists
         question = (
@@ -865,7 +882,7 @@ async def get_comments(
 
         if not question:
             raise HTTPException(
-                status_code=404, detail=f"Question {question_id} not found"
+                status_code=404, detail=t("review_question_not_found", locale=locale)
             )
 
         # Get Comments
@@ -883,7 +900,7 @@ async def get_comments(
     except Exception as e:
         logger.error(f"Error fetching comments for question {question_id}: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch comments: {str(e)}"
+            status_code=500, detail=t("review_fetch_comments_failed", locale=locale)
         )
 
 
@@ -891,6 +908,7 @@ async def get_comments(
 async def add_comment(
     question_id: int,
     request: CommentCreate,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -899,6 +917,7 @@ async def add_comment(
 
     **Required:** Authenticated user
     """
+    locale = get_request_locale(http_request, current_user)
     try:
         # Check if question exists
         question = (
@@ -907,7 +926,7 @@ async def add_comment(
 
         if not question:
             raise HTTPException(
-                status_code=404, detail=f"Question {question_id} not found"
+                status_code=404, detail=t("review_question_not_found", locale=locale)
             )
 
         # Create Comment
@@ -933,14 +952,24 @@ async def add_comment(
     except Exception as e:
         db.rollback()
         logger.error(f"Error adding comment to question {question_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to add comment: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=t("review_add_comment_failed", locale=locale)
+        )
 
 
 @router.get("/{question_id}/history", response_model=List[HistoryResponse])
-async def get_question_history(question_id: int, db: Session = Depends(get_db)):
+async def get_question_history(
+    question_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
     """
     Hole History für Question
+
+    **Required:** Authenticated user
     """
+    locale = get_request_locale(request, current_user)
     try:
         # Check if question exists
         question = (
@@ -949,7 +978,8 @@ async def get_question_history(question_id: int, db: Session = Depends(get_db)):
 
         if not question:
             raise HTTPException(
-                status_code=404, detail=f"Question {question_id} not found"
+                status_code=404,
+                detail=t("review_question_not_found", locale=locale),
             )
 
         # Get History
@@ -967,5 +997,6 @@ async def get_question_history(question_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error fetching history for question {question_id}: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch history: {str(e)}"
+            status_code=500,
+            detail=t("review_fetch_history_failed", locale=locale),
         )

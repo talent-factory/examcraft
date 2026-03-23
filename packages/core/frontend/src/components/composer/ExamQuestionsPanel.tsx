@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   DndContext,
   closestCenter,
@@ -38,6 +39,7 @@ const ExamQuestionsPanel: React.FC<ExamQuestionsPanelProps> = ({
   onUpdatePoints,
   onReorder,
 }) => {
+  const { t } = useTranslation();
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor)
@@ -60,18 +62,18 @@ const ExamQuestionsPanel: React.FC<ExamQuestionsPanelProps> = ({
   return (
     <div className="card p-4 bg-white rounded-lg border border-gray-200 h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-900">Prüfungsfragen</h3>
-        <span className="text-sm text-gray-500">{questions.length} Fragen</span>
+        <h3 className="font-semibold text-gray-900">{t('composer.examQuestions.panelTitle')}</h3>
+        <span className="text-sm text-gray-500">{t('composer.examQuestions.questionCount', { count: questions.length })}</span>
       </div>
 
       {questions.length === 0 ? (
         <div className="flex-1 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-lg">
           <div className="text-center p-8">
             <p className="text-gray-400 text-sm">
-              Noch keine Fragen hinzugefügt.
+              {t('composer.examQuestions.emptyLine1')}
             </p>
             <p className="text-gray-400 text-sm mt-1">
-              Wähle Fragen aus dem Pool links aus.
+              {t('composer.examQuestions.emptyLine2')}
             </p>
           </div>
         </div>
@@ -103,9 +105,9 @@ const ExamQuestionsPanel: React.FC<ExamQuestionsPanelProps> = ({
 
       {questions.length > 0 && (
         <div className="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-600 flex justify-between">
-          <span>Gesamt</span>
+          <span>{t('composer.examQuestions.total')}</span>
           <span className="font-semibold">
-            {questions.reduce((sum, q) => sum + q.points, 0)} Punkte
+            {questions.reduce((sum, q) => sum + q.points, 0)} {t('composer.examQuestions.points')}
           </span>
         </div>
       )}
@@ -128,6 +130,7 @@ const SortableExamQuestionItem: React.FC<SortableExamQuestionItemProps> = ({
   onRemove,
   onUpdatePoints,
 }) => {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: question.id,
     disabled,
@@ -158,7 +161,7 @@ const SortableExamQuestionItem: React.FC<SortableExamQuestionItemProps> = ({
             {...attributes}
             {...listeners}
             className="mt-0.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing flex-shrink-0 focus:outline-none"
-            aria-label="Verschieben"
+            aria-label={t('composer.examQuestions.dragHandle')}
           >
             <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
               <circle cx="4" cy="3" r="1.5" />
@@ -180,7 +183,7 @@ const SortableExamQuestionItem: React.FC<SortableExamQuestionItemProps> = ({
         <div className="flex-1 min-w-0">
           {question.review_status !== 'approved' && (
             <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded mb-1">
-              &#9888; Nicht genehmigt
+              &#9888; {t('composer.examQuestions.notApproved')}
             </span>
           )}
           <p className="text-sm text-gray-800 line-clamp-2">{question.question_text}</p>
@@ -210,17 +213,17 @@ const SortableExamQuestionItem: React.FC<SortableExamQuestionItemProps> = ({
             }
           }}
           className="w-14 text-sm text-center border border-gray-300 rounded px-1 py-0.5 disabled:bg-gray-50 disabled:text-gray-400 flex-shrink-0"
-          aria-label="Punkte"
-          title="Punkte"
+          aria-label={t('composer.examQuestions.pointsLabel')}
+          title={t('composer.examQuestions.pointsLabel')}
         />
-        <span className="text-xs text-gray-400 flex-shrink-0">Pkt</span>
+        <span className="text-xs text-gray-400 flex-shrink-0">{t('composer.examQuestions.pkt')}</span>
 
         {/* Remove button */}
         {!disabled && (
           <button
             onClick={() => onRemove(question.id)}
             className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0 text-lg leading-none"
-            aria-label="Frage entfernen"
+            aria-label={t('composer.examQuestions.removeQuestion')}
           >
             &times;
           </button>

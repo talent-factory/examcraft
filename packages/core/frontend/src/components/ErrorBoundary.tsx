@@ -8,6 +8,7 @@
 import React from 'react';
 import * as Sentry from '@sentry/react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ErrorFallbackProps {
   error: Error | unknown;
@@ -17,10 +18,43 @@ interface ErrorFallbackProps {
 /**
  * Fallback UI displayed when an error occurs
  */
-function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
+const FALLBACK_STRINGS = {
+  title: 'An error occurred',
+  message: 'An unexpected error occurred. We have been notified.',
+  retry: 'Try again',
+  home: 'Go to home',
+  support: 'If the problem persists, please contact support.',
+};
+
+function TranslatedErrorFallback(props: ErrorFallbackProps) {
+  const { t } = useTranslation();
+  return (
+    <ErrorFallbackInner
+      {...props}
+      strings={{
+        title: t('components.errorBoundary.title'),
+        message: t('components.errorBoundary.message'),
+        retry: t('components.errorBoundary.retry'),
+        home: t('components.errorBoundary.home'),
+        support: t('components.errorBoundary.support'),
+      }}
+    />
+  );
+}
+
+function ErrorFallback(props: ErrorFallbackProps) {
+  return (
+    <Sentry.ErrorBoundary fallback={<ErrorFallbackInner {...props} strings={FALLBACK_STRINGS} />}>
+      <TranslatedErrorFallback {...props} />
+    </Sentry.ErrorBoundary>
+  );
+}
+
+function ErrorFallbackInner({ error, resetError, strings }: ErrorFallbackProps & { strings: typeof FALLBACK_STRINGS }) {
+  const { title, message, retry, home, support } = strings;
+
   const isDevelopment = process.env.REACT_APP_ENVIRONMENT === 'development';
 
-  // Type guard to safely access error properties
   const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
 
   return (
@@ -32,15 +66,14 @@ function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             <AlertTriangle className="h-8 w-8 text-red-500" />
           </div>
           <h2 className="text-xl font-semibold text-gray-900">
-            Ein Fehler ist aufgetreten
+            {title}
           </h2>
         </div>
 
         {/* Error Message */}
         <div className="mb-6">
           <p className="text-gray-600 mb-2">
-            Entschuldigung, es ist ein unerwarteter Fehler aufgetreten.
-            Wir wurden automatisch benachrichtigt und werden das Problem beheben.
+            {message}
           </p>
 
           {/* Show error details in development */}
@@ -60,21 +93,21 @@ function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
           >
             <RefreshCw className="h-4 w-4" />
-            Erneut versuchen
+            {retry}
           </button>
           <button
             onClick={() => window.location.href = '/'}
             className="flex-1 flex items-center justify-center gap-2 bg-gray-200 text-gray-700 py-2 px-4 rounded hover:bg-gray-300 transition-colors"
           >
             <Home className="h-4 w-4" />
-            Zur Startseite
+            {home}
           </button>
         </div>
 
         {/* Support Info */}
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-sm text-gray-500 text-center">
-            Wenn das Problem weiterhin besteht, kontaktieren Sie bitte den Support.
+            {support}
           </p>
         </div>
       </div>

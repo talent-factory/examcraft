@@ -4,12 +4,14 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Typography, Alert } from '@mui/material';
 import AuthService from '../../services/AuthService';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const OAuthCallback: React.FC = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { loginWithTokens } = useAuth();
@@ -43,7 +45,7 @@ export const OAuthCallback: React.FC = () => {
 
         if (!code) {
           console.error('[OAuthCallback] No authorization code or tokens received');
-          setError('No authorization code received');
+          setError(t('auth.oauth.noCodeError'));
           setIsProcessing(false);
           return;
         }
@@ -56,7 +58,7 @@ export const OAuthCallback: React.FC = () => {
 
         if (!newAccessToken || !newRefreshToken) {
           console.error('[OAuthCallback] Missing tokens!');
-          setError('Missing authentication tokens');
+          setError(t('auth.oauth.missingTokens'));
           setIsProcessing(false);
           return;
         }
@@ -90,7 +92,7 @@ export const OAuthCallback: React.FC = () => {
       >
         <CircularProgress />
         <Typography variant="body1" color="textSecondary">
-          Processing OAuth callback...
+          {t('auth.oauth.processing')}
         </Typography>
       </Box>
     );
@@ -110,7 +112,7 @@ export const OAuthCallback: React.FC = () => {
         }}
       >
         <Alert severity="error" sx={{ maxWidth: 500 }}>
-          <Typography variant="h6">Authentication Error</Typography>
+          <Typography variant="h6">{t('auth.oauth.errorTitle')}</Typography>
           <Typography variant="body2">{error}</Typography>
         </Alert>
         <Typography
@@ -119,7 +121,7 @@ export const OAuthCallback: React.FC = () => {
           sx={{ cursor: 'pointer', textDecoration: 'underline' }}
           onClick={() => navigate('/login')}
         >
-          Return to login
+          {t('auth.oauth.returnToLogin')}
         </Typography>
       </Box>
     );

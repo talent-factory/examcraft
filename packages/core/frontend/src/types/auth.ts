@@ -4,6 +4,12 @@
  */
 
 // ============================================================================
+// Language Type
+// ============================================================================
+
+export type SupportedLanguage = 'de' | 'en' | 'fr' | 'it';
+
+// ============================================================================
 // Enums
 // ============================================================================
 
@@ -77,6 +83,7 @@ export interface User {
   last_login?: string;
   created_at: string;
   updated_at?: string;
+  preferred_language?: SupportedLanguage;
 }
 
 export interface OAuthAccount {
@@ -163,6 +170,7 @@ export interface UpdateProfileRequest {
   first_name?: string;
   last_name?: string;
   email?: string;
+  preferred_language?: SupportedLanguage;
 }
 
 export interface UserResponse {
@@ -180,6 +188,7 @@ export interface UserResponse {
   avatar_url?: string;  // Profile picture URL (from OAuth or uploaded)
   last_login?: string;
   created_at: string;
+  preferred_language?: SupportedLanguage;
 }
 
 // ============================================================================

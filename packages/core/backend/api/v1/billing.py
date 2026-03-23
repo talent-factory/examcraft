@@ -1,8 +1,9 @@
 import os
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from services.payment_service import PaymentService
+from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_active_user
 from models.auth import User
 from database import get_db
@@ -26,6 +27,7 @@ class CheckoutRequest(BaseModel):
 @router.post("/create-checkout-session")
 async def create_checkout_session(
     request: CheckoutRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -36,33 +38,34 @@ async def create_checkout_session(
     The plan parameter must be one of: starter, professional, enterprise.
     Redirect URLs are controlled server-side to prevent open redirects.
     """
+    locale = get_request_locale(http_request, current_user)
     payment_service = PaymentService()
 
     if not payment_service.is_available():
         raise HTTPException(
             status_code=503,
-            detail="Payment service is not configured (missing STRIPE_SECRET_KEY)",
+            detail=t("billing_service_unavailable", locale=locale),
         )
 
     # Validate plan against allowed plans
     if request.plan not in PLAN_PRICE_MAPPING:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid plan. Allowed plans: {', '.join(PLAN_PRICE_MAPPING.keys())}",
+            detail=t("billing_invalid_plan", locale=locale),
         )
 
     price_id = PLAN_PRICE_MAPPING[request.plan]
     if not price_id:
         raise HTTPException(
             status_code=400,
-            detail=f"Plan '{request.plan}' is not configured (missing Stripe Price ID)",
+            detail=t("billing_plan_not_configured", locale=locale),
         )
 
     # Check if user has an institution
     if not current_user.institution_id:
         raise HTTPException(
             status_code=400,
-            detail="User must be associated with an institution to subscribe",
+            detail=t("billing_no_institution", locale=locale),
         )
 
     # Redirect URLs serverseitig definiert (kein Open Redirect möglich)

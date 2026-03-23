@@ -28,6 +28,7 @@ import {
   Cancel
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
+import { useTranslation } from 'react-i18next';
 import { DocumentService } from '../services/DocumentService';
 import { DocumentUploadResponse, DocumentProcessingResponse } from '../types/document';
 
@@ -60,6 +61,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   maxFiles = 10,
   acceptedFileTypes = ['.pdf', '.doc', '.docx', '.txt', '.md']
 }) => {
+  const { t } = useTranslation();
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -110,33 +112,33 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     const hours = Math.floor(minutes / 60);
 
     if (hours > 0) {
-      return `~${hours}h ${minutes % 60}m verbleibend`;
+      return t('components.documentUpload.timeHours', { h: hours, m: minutes % 60 });
     } else if (minutes > 0) {
-      return `~${minutes}m ${seconds % 60}s verbleibend`;
+      return t('components.documentUpload.timeMinutes', { m: minutes, s: seconds % 60 });
     } else {
-      return `~${seconds}s verbleibend`;
+      return t('components.documentUpload.timeSeconds', { s: seconds });
     }
   };
 
   const getStatusChip = (file: UploadFile) => {
     switch (file.status) {
       case 'pending':
-        return <Chip label="Wartend" color="default" size="small" />;
+        return <Chip label={t('components.documentUpload.statusPending')} color="default" size="small" />;
       case 'uploading':
-        return <Chip label="Upload..." color="info" size="small" />;
+        return <Chip label={t('components.documentUpload.statusUploading')} color="info" size="small" />;
       case 'processing':
         const timeLabel = file.estimatedTimeRemaining
-          ? `Verarbeitung... (${formatTimeRemaining(file.estimatedTimeRemaining)})`
-          : 'Verarbeitung...';
+          ? t('components.documentUpload.statusProcessingTime', { time: formatTimeRemaining(file.estimatedTimeRemaining) })
+          : t('components.documentUpload.statusProcessing');
         return <Chip label={timeLabel} color="warning" size="small" />;
       case 'completed':
-        return <Chip label="Abgeschlossen" color="success" size="small" />;
+        return <Chip label={t('components.documentUpload.statusCompleted')} color="success" size="small" />;
       case 'cancelled':
-        return <Chip label="Abgebrochen" color="default" size="small" />;
+        return <Chip label={t('components.documentUpload.statusCancelled')} color="default" size="small" />;
       case 'error':
-        return <Chip label="Fehler" color="error" size="small" />;
+        return <Chip label={t('components.documentUpload.statusError')} color="error" size="small" />;
       default:
-        return <Chip label="Unbekannt" color="default" size="small" />;
+        return <Chip label={t('components.documentUpload.statusUnknown')} color="default" size="small" />;
     }
   };
 
@@ -215,7 +217,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         throw new Error('Processing cancelled');
       }
 
-      // ✅ SOFORT als "completed" markieren - Processing läuft im Hintergrund!
+      // SOFORT als "completed" markieren - Processing läuft im Hintergrund!
       // User kann sofort weiterarbeiten, während das Dokument verarbeitet wird
       setUploadFiles(prev => prev.map(f =>
         f.id === fileId
@@ -257,76 +259,6 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       onUploadError?.(file.name, errorMessage);
     }
   };
-
-  // Commented out - not currently used but may be needed for future features
-  // const waitForDocumentProcessing = async (
-  //   documentId: number,
-  //   fileId: string,
-  //   abortController: AbortController,
-  //   maxWaitTime: number = 1800000 // 30 Minuten für große Dokumente (300+ Seiten)
-  // ) => {
-  //   /**
-  //    * Warte auf Dokumentenverarbeitung durch Polling des Status
-  //    * maxWaitTime: Maximale Wartezeit in ms (default: 30 Minuten)
-  //    */
-  //   const startTime = Date.now();
-  //   const pollInterval = 3000; // Poll alle 3 Sekunden
-  //   const warningThreshold = maxWaitTime * 0.8; // Warnung bei 80% der Zeit
-
-  //   while (Date.now() - startTime < maxWaitTime) {
-  //     // Check if cancelled
-  //     if (abortController.signal.aborted) {
-  //       throw new Error('Processing cancelled by user');
-  //     }
-
-  //     try {
-  //       const status = await DocumentService.getProcessingStatus(documentId);
-  //       const elapsedTime = Date.now() - startTime;
-  //       const estimatedTimeRemaining = Math.max(0, maxWaitTime - elapsedTime);
-
-  //       // Calculate progress (50% → 95%)
-  //       const processingProgress = Math.min(95, 50 + (elapsedTime / maxWaitTime) * 45);
-
-  //       // Update progress with estimated time
-  //       setUploadFiles(prev => prev.map(f =>
-  //         f.id === fileId
-  //           ? {
-  //               ...f,
-  //               progress: processingProgress,
-  //               estimatedTimeRemaining: estimatedTimeRemaining
-  //             }
-  //           : f
-  //       ));
-
-  //       // Show warning if approaching timeout
-  //       if (elapsedTime > warningThreshold && elapsedTime < warningThreshold + pollInterval) {
-  //         console.warn(`Document processing taking longer than expected. ${Math.round(estimatedTimeRemaining / 1000)}s remaining.`);
-  //       }
-
-  //       if (status.status === 'Verarbeitet' || status.status === 'processed') {
-  //         return; // Verarbeitung abgeschlossen
-  //       }
-
-  //       if (status.status === 'Fehler' || status.status === 'error') {
-  //         throw new Error(`Document processing failed: ${status.status}`);
-  //       }
-
-  //       // Warte vor nächstem Poll
-  //       await new Promise(resolve => setTimeout(resolve, pollInterval));
-  //     } catch (error) {
-  //       // Check if cancelled
-  //       if (abortController.signal.aborted) {
-  //         throw new Error('Processing cancelled by user');
-  //       }
-
-  //       console.error('Error checking document status:', error);
-  //       // Weiter versuchen
-  //       await new Promise(resolve => setTimeout(resolve, pollInterval));
-  //     }
-  //   }
-
-  //   throw new Error(`Document processing timeout after ${maxWaitTime / 60000} minutes. Please try again or contact support for large documents.`);
-  // };
 
   const startUpload = async () => {
     if (uploadFiles.length === 0) return;
@@ -384,13 +316,13 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         <input {...getInputProps()} />
         <CloudUpload sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
         <Typography variant="h6" gutterBottom>
-          {isDragActive ? 'Dateien hier ablegen...' : 'Dokumente hochladen'}
+          {isDragActive ? t('components.documentUpload.dropActive') : t('components.documentUpload.dropTitle')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Ziehen Sie Dateien hierher oder klicken Sie zum Auswählen
+          {t('components.documentUpload.dropHint')}
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          Unterstützte Formate: {acceptedFileTypes.join(', ')} • Max. {maxFiles} Dateien
+          {t('components.documentUpload.dropFormats', { formats: acceptedFileTypes.join(', '), max: maxFiles })}
         </Typography>
       </Paper>
 
@@ -400,7 +332,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6">
-                Upload-Warteschlange ({uploadFiles.length})
+                {t('components.documentUpload.queueTitle', { count: uploadFiles.length })}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button
@@ -409,14 +341,14 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                   disabled={isUploading || uploadFiles.every(f => f.status === 'completed')}
                   startIcon={<CloudUpload />}
                 >
-                  {isUploading ? 'Uploading...' : 'Upload starten'}
+                  {isUploading ? t('components.documentUpload.uploading') : t('components.documentUpload.startUpload')}
                 </Button>
                 <Button
                   variant="outlined"
                   onClick={clearAll}
                   disabled={isUploading}
                 >
-                  Alle entfernen
+                  {t('components.documentUpload.removeAll')}
                 </Button>
               </Box>
             </Box>
@@ -456,7 +388,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                         <IconButton
                           size="small"
                           onClick={() => cancelFile(uploadFile.id)}
-                          title="Upload abbrechen"
+                          title={t('components.documentUpload.cancelUpload')}
                           color="warning"
                         >
                           <Cancel />
@@ -467,7 +399,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                           size="small"
                           onClick={() => retryFile(uploadFile.id)}
                           disabled={isUploading}
-                          title="Erneut versuchen"
+                          title={t('components.documentUpload.retry')}
                         >
                           <Refresh />
                         </IconButton>
@@ -477,7 +409,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                           size="small"
                           onClick={() => removeFile(uploadFile.id)}
                           disabled={isUploading}
-                          title="Entfernen"
+                          title={t('components.documentUpload.remove')}
                         >
                           <Delete />
                         </IconButton>
@@ -499,11 +431,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           onClose={() => setShowResults(false)}
         >
           <Typography variant="subtitle2">
-            Upload abgeschlossen
+            {t('components.documentUpload.uploadComplete')}
           </Typography>
           <Typography variant="body2">
-            {completedCount} von {totalCount} Dateien erfolgreich hochgeladen und verarbeitet
-            {errorCount > 0 && ` • ${errorCount} Fehler`}
+            {t('components.documentUpload.uploadSummary', { completed: completedCount, total: totalCount })}
+            {errorCount > 0 && ` • ${t('components.documentUpload.errorCount', { count: errorCount })}`}
           </Typography>
         </Alert>
       )}
@@ -513,8 +445,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         <Alert severity="info" sx={{ mt: 2 }}>
           <Typography variant="body2">
             <Schedule sx={{ verticalAlign: 'middle', mr: 1 }} />
-            Dokumente werden verarbeitet und für RAG-Prüfungen vorbereitet.
-            Dies kann je nach Dateigröße einige Minuten dauern.
+            {t('components.documentUpload.processingInfo')}
           </Typography>
         </Alert>
       )}
@@ -524,7 +455,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         <Card sx={{ mt: 2 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Upload-Statistiken
+              {t('components.documentUpload.statsTitle')}
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={3}>
@@ -533,7 +464,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     {totalCount}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Gesamt
+                    {t('components.documentUpload.statsTotal')}
                   </Typography>
                 </Box>
               </Grid>
@@ -543,7 +474,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     {completedCount}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Erfolgreich
+                    {t('components.documentUpload.statsSuccess')}
                   </Typography>
                 </Box>
               </Grid>
@@ -553,7 +484,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     {uploadFiles.filter(f => f.status === 'processing').length}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Verarbeitung
+                    {t('components.documentUpload.statsProcessing')}
                   </Typography>
                 </Box>
               </Grid>
@@ -563,7 +494,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     {errorCount}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Fehler
+                    {t('components.documentUpload.statsErrors')}
                   </Typography>
                 </Box>
               </Grid>

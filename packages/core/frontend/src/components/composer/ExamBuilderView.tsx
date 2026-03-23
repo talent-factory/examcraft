@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
 import { ExamStatus } from '../../types/composer';
 import ExamMetadataBar from './ExamMetadataBar';
@@ -13,6 +14,7 @@ interface ExamBuilderViewProps {
 }
 
 const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [exportOpen, setExportOpen] = useState(false);
   const [builderError, setBuilderError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
     mutationFn: (qIds: number[]) => ComposerService.addQuestions(examId, qIds),
     onSuccess: invalidateExam,
     onError: (err) => {
-      setBuilderError(getErrorMessage(err, 'Fragen konnten nicht hinzugefügt werden.'));
+      setBuilderError(getErrorMessage(err, t('composer.examBuilder.errorAddQuestions')));
     },
   });
 
@@ -39,7 +41,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
     mutationFn: (eqId: number) => ComposerService.removeExamQuestion(examId, eqId),
     onSuccess: invalidateExam,
     onError: (err) => {
-      setBuilderError(getErrorMessage(err, 'Frage konnte nicht entfernt werden.'));
+      setBuilderError(getErrorMessage(err, t('composer.examBuilder.errorRemoveQuestion')));
     },
   });
 
@@ -48,7 +50,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
       ComposerService.updateExamQuestion(examId, eqId, { points }),
     onSuccess: invalidateExam,
     onError: (err) => {
-      setBuilderError(getErrorMessage(err, 'Punktzahl konnte nicht aktualisiert werden.'));
+      setBuilderError(getErrorMessage(err, t('composer.examBuilder.errorUpdatePoints')));
     },
   });
 
@@ -57,23 +59,23 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
       ComposerService.reorderQuestions(examId, order),
     onSuccess: invalidateExam,
     onError: (err) => {
-      setBuilderError(getErrorMessage(err, 'Reihenfolge konnte nicht gespeichert werden.'));
+      setBuilderError(getErrorMessage(err, t('composer.examBuilder.errorReorder')));
     },
   });
 
   if (isLoading) {
-    return <div className="text-center py-12 text-gray-500">Lade Prüfung...</div>;
+    return <div className="text-center py-12 text-gray-500">{t('composer.examBuilder.loading')}</div>;
   }
 
   if (isError || !exam) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-500">Fehler beim Laden der Prüfung.</p>
+        <p className="text-red-500">{t('composer.examBuilder.loadError')}</p>
         <button
           onClick={onBack}
           className="mt-4 text-sm text-gray-500 hover:text-gray-700 underline"
         >
-          Zurück zur Übersicht
+          {t('composer.examBuilder.backToOverview')}
         </button>
       </div>
     );
@@ -89,7 +91,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
         onClick={onBack}
         className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 transition-colors"
       >
-        <span aria-hidden="true">&larr;</span> Zurück zur Übersicht
+        <span aria-hidden="true">&larr;</span> {t('composer.examBuilder.backToOverview')}
       </button>
 
       {/* Error banner */}
@@ -99,7 +101,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
           <button
             onClick={() => setBuilderError(null)}
             className="ml-4 text-red-500 hover:text-red-700 font-bold text-lg leading-none"
-            aria-label="Fehlermeldung schliessen"
+            aria-label={t('composer.examBuilder.closeError')}
           >
             &times;
           </button>

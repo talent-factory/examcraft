@@ -7,11 +7,14 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { PromptManagement } from '../components/admin/PromptManagement';
 import { loadPromptLibraryWithUpload } from '../utils/componentLoader';
 import { isFullDeployment } from '../utils/deploymentMode';
 
 export const PromptLibrary: React.FC = () => {
+  const { t } = useTranslation();
+
   // Try to load Premium version with upload functionality
   if (isFullDeployment()) {
     const PremiumPromptLibrary = loadPromptLibraryWithUpload();
@@ -24,10 +27,10 @@ export const PromptLibrary: React.FC = () => {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">
-          Prompt Library
+          {t('pages.promptLibrary.title')}
         </h1>
         <p className="text-gray-600 mt-2">
-          Verwalte System- und User-Prompts für KI-Agents
+          {t('pages.promptLibrary.subtitle')}
         </p>
       </div>
 

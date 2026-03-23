@@ -4,10 +4,12 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import AuthService from '../../services/AuthService';
 
 export const PasswordResetConfirm: React.FC = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token') || '';
@@ -21,17 +23,17 @@ export const PasswordResetConfirm: React.FC = () => {
 
   const validateForm = (): boolean => {
     if (!newPassword || !confirmPassword) {
-      setError('Please fill in all fields');
+      setError(t('auth.validation.fillAllFields'));
       return false;
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.validation.passwordMismatch'));
       return false;
     }
 
     if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters long');
+      setError(t('auth.validation.passwordMinLength'));
       return false;
     }
 
@@ -67,13 +69,13 @@ export const PasswordResetConfirm: React.FC = () => {
           <div className="text-center">
             <div className="mb-4 text-green-600 text-5xl">✓</div>
             <h2 className="text-2xl font-bold mb-4 text-gray-800">
-              Password Reset Successful
+              {t('auth.resetConfirm.successTitle')}
             </h2>
             <p className="text-gray-600 mb-6">
-              Your password has been successfully reset. You can now login with your new password.
+              {t('auth.resetConfirm.successMessage')}
             </p>
             <p className="text-sm text-gray-500">
-              Redirecting to login...
+              {t('auth.resetConfirm.redirectingToLogin')}
             </p>
           </div>
         </div>
@@ -85,10 +87,10 @@ export const PasswordResetConfirm: React.FC = () => {
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white shadow-md rounded-lg px-8 pt-6 pb-8 mb-4">
         <h2 className="text-2xl font-bold text-center mb-2 text-gray-800">
-          Set New Password
+          {t('auth.resetConfirm.title')}
         </h2>
         <p className="text-center text-gray-600 mb-6 text-sm">
-          Please enter your new password below.
+          {t('auth.resetConfirm.subtitle')}
         </p>
 
         {error && (
@@ -104,7 +106,7 @@ export const PasswordResetConfirm: React.FC = () => {
               className="block text-gray-700 text-sm font-bold mb-2"
               htmlFor="new_password"
             >
-              New Password
+              {t('auth.resetConfirm.newPassword')}
             </label>
             <div className="relative">
               <input
@@ -128,7 +130,7 @@ export const PasswordResetConfirm: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Minimum 8 characters
+              {t('auth.resetConfirm.passwordHint')}
             </p>
           </div>
 
@@ -138,7 +140,7 @@ export const PasswordResetConfirm: React.FC = () => {
               className="block text-gray-700 text-sm font-bold mb-2"
               htmlFor="confirm_password"
             >
-              Confirm New Password
+              {t('auth.resetConfirm.confirmPassword')}
             </label>
             <input
               id="confirm_password"
@@ -159,7 +161,7 @@ export const PasswordResetConfirm: React.FC = () => {
               disabled={isLoading}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Resetting...' : 'Reset Password'}
+              {isLoading ? t('auth.resetConfirm.resetting') : t('auth.resetConfirm.resetPassword')}
             </button>
             <button
               type="button"
@@ -167,7 +169,7 @@ export const PasswordResetConfirm: React.FC = () => {
               disabled={isLoading}
               className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Cancel
+              {t('auth.resetConfirm.cancel')}
             </button>
           </div>
         </form>
