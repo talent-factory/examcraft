@@ -130,7 +130,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               localStorage.setItem(USER_KEY, JSON.stringify(profile));
 
               if (profile.preferred_language) {
-                i18n.changeLanguage(profile.preferred_language);
+                await i18n.changeLanguage(profile.preferred_language).catch((e: unknown) =>
+                  console.error('[AuthContext] Failed to apply preferred language:', e)
+                );
               }
 
               console.log('[AuthContext] Token refreshed successfully for:', profile.email);

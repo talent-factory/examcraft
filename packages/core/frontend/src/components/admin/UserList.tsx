@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../../utils/dateLocale';
 import AdminService, { UserListItem, ListUsersParams } from '../../services/AdminService';
 import { UserStatus } from '../../types/auth';
 
@@ -95,7 +96,7 @@ export const UserList: React.FC<UserListProps> = ({
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return t('admin.userList.never');
-    return new Date(dateString).toLocaleDateString(i18n.language, {
+    return new Date(dateString).toLocaleDateString(getDateLocale(i18n.language), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

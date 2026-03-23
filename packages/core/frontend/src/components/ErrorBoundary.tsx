@@ -19,10 +19,25 @@ interface ErrorFallbackProps {
  * Fallback UI displayed when an error occurs
  */
 function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
-  const { t } = useTranslation();
+  let title = 'An error occurred';
+  let message = 'An unexpected error occurred. We have been notified.';
+  let retry = 'Try again';
+  let home = 'Go to home';
+  let support = 'If the problem persists, please contact support.';
+
+  try {
+    const { t } = useTranslation();
+    title = t('components.errorBoundary.title');
+    message = t('components.errorBoundary.message');
+    retry = t('components.errorBoundary.retry');
+    home = t('components.errorBoundary.home');
+    support = t('components.errorBoundary.support');
+  } catch {
+    // i18n unavailable — use hardcoded fallback strings
+  }
+
   const isDevelopment = process.env.REACT_APP_ENVIRONMENT === 'development';
 
-  // Type guard to safely access error properties
   const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
 
   return (
@@ -34,14 +49,14 @@ function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             <AlertTriangle className="h-8 w-8 text-red-500" />
           </div>
           <h2 className="text-xl font-semibold text-gray-900">
-            {t('components.errorBoundary.title')}
+            {title}
           </h2>
         </div>
 
         {/* Error Message */}
         <div className="mb-6">
           <p className="text-gray-600 mb-2">
-            {t('components.errorBoundary.message')}
+            {message}
           </p>
 
           {/* Show error details in development */}
@@ -61,21 +76,21 @@ function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
           >
             <RefreshCw className="h-4 w-4" />
-            {t('components.errorBoundary.retry')}
+            {retry}
           </button>
           <button
             onClick={() => window.location.href = '/'}
             className="flex-1 flex items-center justify-center gap-2 bg-gray-200 text-gray-700 py-2 px-4 rounded hover:bg-gray-300 transition-colors"
           >
             <Home className="h-4 w-4" />
-            {t('components.errorBoundary.home')}
+            {home}
           </button>
         </div>
 
         {/* Support Info */}
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-sm text-gray-500 text-center">
-            {t('components.errorBoundary.support')}
+            {support}
           </p>
         </div>
       </div>

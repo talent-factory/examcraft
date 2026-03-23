@@ -45,7 +45,10 @@ export const NavigationBar: React.FC = () => {
     } catch (error) {
       console.error('[NavigationBar] Language change failed:', { requestedLanguage: lng, error });
       // Revert UI language to stay in sync with persisted value
-      await i18n.changeLanguage(previousLanguage).catch(() => {});
+      await i18n.changeLanguage(previousLanguage).catch((e: unknown) =>
+        console.error('[NavigationBar] Failed to revert language:', e)
+      );
+      localStorage.setItem('examcraft_language', previousLanguage);
     }
   };
 

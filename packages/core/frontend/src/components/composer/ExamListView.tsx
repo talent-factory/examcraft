@@ -10,6 +10,7 @@ import {
   Button,
 } from '@mui/material';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
+import { getDateLocale } from '../../utils/dateLocale';
 import type { CreateExamRequest } from '../../types/composer';
 
 interface ExamListViewProps {
@@ -159,7 +160,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
               <div className="flex gap-4 mt-3 text-sm text-gray-600">
                 <span>{t('composer.examList.questionCount', { count: exam.question_count })}</span>
                 <span>{t('composer.examList.pointsCount', { count: exam.total_points })}</span>
-                {exam.exam_date && <span>{new Date(exam.exam_date).toLocaleDateString(i18n.language === 'de' ? 'de-CH' : i18n.language, { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>}
+                {exam.exam_date && <span>{new Date(exam.exam_date).toLocaleDateString(getDateLocale(i18n.language), { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>}
               </div>
               {exam.status === 'draft' && (
                 <button

@@ -134,7 +134,7 @@ async def list_features(
 @router.get("/features/{feature_id}", response_model=FeatureResponse)
 async def get_feature(
     feature_id: str,
-    request: Request = None,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -184,7 +184,7 @@ async def list_roles(
 @router.get("/roles/{role_id}", response_model=RoleResponse)
 async def get_role(
     role_id: str,
-    request: Request = None,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -286,7 +286,7 @@ async def list_subscription_tiers(
 
 
 @router.get("/tiers/current", response_model=SubscriptionTierResponse)
-async def get_current_tier(request: Request = None, db: Session = Depends(get_db)):
+async def get_current_tier(request: Request, db: Session = Depends(get_db)):
     """
     Gibt den aktuellen/Standard Subscription Tier zurück.
     Basiert auf der DEFAULT_SUBSCRIPTION_TIER Environment Variable.
@@ -322,7 +322,7 @@ async def get_current_tier(request: Request = None, db: Session = Depends(get_db
 
 @router.get("/tiers/my", response_model=SubscriptionTierResponse)
 async def get_my_tier(
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):

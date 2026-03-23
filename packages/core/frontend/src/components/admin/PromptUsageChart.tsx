@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../../utils/dateLocale';
 import {
   Box,
   Paper,
@@ -190,7 +191,7 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
                     {log.use_case}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {new Date(log.timestamp).toLocaleString(i18n.language)}
+                    {new Date(log.timestamp).toLocaleString(getDateLocale(i18n.language))}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>

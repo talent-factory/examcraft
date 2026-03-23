@@ -781,7 +781,9 @@ async def request_password_reset(
 
 @router.post("/password-reset/confirm", status_code=status.HTTP_204_NO_CONTENT)
 async def confirm_password_reset(
-    request: PasswordResetConfirm, db: Session = Depends(get_db)
+    request: PasswordResetConfirm,
+    http_request: Request,
+    db: Session = Depends(get_db),
 ):
     """
     Confirm password reset with token
@@ -790,18 +792,19 @@ async def confirm_password_reset(
     - Updates password
     - Revokes all sessions
     """
+    locale = get_request_locale(http_request)
     # TODO: Implement token validation
     # For now, just return error
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail=t("auth_password_reset_not_implemented"),
+        detail=t("auth_password_reset_not_implemented", locale=locale),
     )
 
     return None
 
 
 @router.post("/verify-email", status_code=status.HTTP_200_OK)
-async def verify_email(token: str, db: Session = Depends(get_db)):
+async def verify_email(token: str, request: Request, db: Session = Depends(get_db)):
     """
     Verify user email with token
 
@@ -810,6 +813,7 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
     - Activates user account
     - Sends welcome email
     """
+    locale = get_request_locale(request)
     from models.auth import EmailVerificationToken
     from services.email_service import EmailService
     from datetime import datetime, timezone
@@ -824,28 +828,29 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
     if not email_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_verification_token_invalid"),
+            detail=t("auth_verification_token_invalid", locale=locale),
         )
 
     # Check if already used
     if email_token.is_used:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_verification_token_used"),
+            detail=t("auth_verification_token_used", locale=locale),
         )
 
     # Check if expired
     if email_token.expires_at < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_verification_token_expired"),
+            detail=t("auth_verification_token_expired", locale=locale),
         )
 
     # Get user
     user = db.query(User).filter(User.id == email_token.user_id).first()
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=t("auth_user_not_found")
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("auth_user_not_found", locale=locale),
         )
 
     # Mark email as verified
@@ -897,13 +902,16 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
 
 
 @router.post("/resend-verification", status_code=status.HTTP_200_OK)
-async def resend_verification_email(email: EmailStr, db: Session = Depends(get_db)):
+async def resend_verification_email(
+    email: EmailStr, request: Request, db: Session = Depends(get_db)
+):
     """
     Resend verification email
 
     - Generates new verification token
     - Sends new verification email
     """
+    locale = get_request_locale(request)
     from models.auth import EmailVerificationToken
     from services.email_service import EmailService
     from datetime import datetime, timedelta, timezone
@@ -921,7 +929,7 @@ async def resend_verification_email(email: EmailStr, db: Session = Depends(get_d
     if user.is_email_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_email_already_verified"),
+            detail=t("auth_email_already_verified", locale=locale),
         )
 
     # Invalidate old tokens
@@ -963,7 +971,7 @@ async def resend_verification_email(email: EmailStr, db: Session = Depends(get_d
         logger.error(f"Failed to resend verification email to {user.email}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=t("auth_verification_email_failed"),
+            detail=t("auth_verification_email_failed", locale=locale),
         )
 
     return {"success": True, "message": "Verification email sent"}
@@ -990,10 +998,11 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
 
     Redirects user directly to OAuth provider (Google, Microsoft, etc.)
     """
+    locale = get_request_locale(request)
     if provider not in ["google", "microsoft"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_oauth_provider_unsupported"),
+            detail=t("auth_oauth_provider_unsupported", locale=locale),
         )
 
     oauth_service = OAuthService(db)
@@ -1016,7 +1025,7 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
             logger.error(f"Redis unavailable for OAuth state storage: {redis_err}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=t("auth_service_unavailable"),
+                detail=t("auth_service_unavailable", locale=locale),
             )
 
         authorization_url = oauth_service.get_authorization_url(
@@ -1030,7 +1039,7 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
         logger.error(f"OAuth login failed for {provider}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=t("auth_oauth_login_failed"),
+            detail=t("auth_oauth_login_failed", locale=locale),
         )
 
 
@@ -1045,10 +1054,11 @@ async def oauth_callback(
 
     Exchanges authorization code for access token and creates/logs in user
     """
+    locale = get_request_locale(request)
     if provider not in ["google", "microsoft"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_oauth_provider_unsupported"),
+            detail=t("auth_oauth_provider_unsupported", locale=locale),
         )
 
     # Verify CSRF state parameter (required)
@@ -1056,7 +1066,7 @@ async def oauth_callback(
     if not state:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_oauth_state_missing"),
+            detail=t("auth_oauth_state_missing", locale=locale),
         )
     try:
         redis_client = RedisService.get_session_client()
@@ -1071,7 +1081,7 @@ async def oauth_callback(
         if not stored:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=t("auth_oauth_state_invalid"),
+                detail=t("auth_oauth_state_invalid", locale=locale),
             )
     except HTTPException:
         raise
@@ -1079,7 +1089,7 @@ async def oauth_callback(
         logger.error(f"Redis unavailable for OAuth state verification: {redis_err}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=t("auth_service_unavailable"),
+            detail=t("auth_service_unavailable", locale=locale),
         )
 
     oauth_service = OAuthService(db)
@@ -1144,7 +1154,7 @@ async def oauth_callback(
             )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=t("auth_service_unavailable"),
+                detail=t("auth_service_unavailable", locale=locale),
             )
         return RedirectResponse(url=redirect_url)
 
@@ -1152,13 +1162,13 @@ async def oauth_callback(
         logger.error(f"OAuth callback failed for {provider}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_oauth_login_failed"),
+            detail=t("auth_oauth_login_failed", locale=locale),
         )
     except Exception as e:
         logger.error(f"OAuth callback error for {provider}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=t("auth_oauth_login_failed"),
+            detail=t("auth_oauth_login_failed", locale=locale),
         )
 
 
@@ -1169,15 +1179,16 @@ class OAuthCodeExchangeRequest(BaseModel):
 
 
 @router.post("/oauth/exchange")
-async def exchange_oauth_code(request: OAuthCodeExchangeRequest):
+async def exchange_oauth_code(request: OAuthCodeExchangeRequest, http_request: Request):
     """Exchange a short-lived OAuth code for tokens."""
+    locale = get_request_locale(http_request)
     try:
         redis_client = RedisService.get_session_client()
     except Exception as e:
         logger.error(f"Redis unavailable for OAuth code exchange: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=t("auth_service_unavailable"),
+            detail=t("auth_service_unavailable", locale=locale),
         )
 
     key = f"oauth_code:{request.code}"
@@ -1197,18 +1208,18 @@ async def exchange_oauth_code(request: OAuthCodeExchangeRequest):
             )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=t("auth_service_unavailable"),
+                detail=t("auth_service_unavailable", locale=locale),
             )
     except Exception as e:
         logger.error(f"Redis error during OAuth code exchange: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=t("auth_service_unavailable"),
+            detail=t("auth_service_unavailable", locale=locale),
         )
     if not token_data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_oauth_code_invalid"),
+            detail=t("auth_oauth_code_invalid", locale=locale),
         )
 
     try:
@@ -1220,7 +1231,7 @@ async def exchange_oauth_code(request: OAuthCodeExchangeRequest):
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=t("auth_oauth_token_read_failed"),
+            detail=t("auth_oauth_token_read_failed", locale=locale),
         )
 
     return tokens
@@ -1234,6 +1245,7 @@ async def exchange_oauth_code(request: OAuthCodeExchangeRequest):
 @router.get("/avatar/{user_id}")
 async def get_user_avatar(
     user_id: int,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """
@@ -1251,17 +1263,20 @@ async def get_user_avatar(
     - Original: `https://lh3.googleusercontent.com/a-/ALV-UjUtfwF7...` (429 error)
     - Proxied: `http://localhost:8000/api/auth/avatar/1` (cached, no rate limit)
     """
+    locale = get_request_locale(request)
     # Get user from database
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=t("auth_user_not_found")
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("auth_user_not_found", locale=locale),
         )
 
     if not user.avatar_url:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=t("auth_avatar_not_found")
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("auth_avatar_not_found", locale=locale),
         )
 
     # Download and cache avatar
@@ -1271,7 +1286,7 @@ async def get_user_avatar(
     if not avatar_bytes:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=t("auth_avatar_download_failed"),
+            detail=t("auth_avatar_download_failed", locale=locale),
         )
 
     # Return image with appropriate content type

@@ -27,6 +27,7 @@ import {
   Refresh
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../utils/dateLocale';
 import { ExamResponse, Question } from '../types/exam';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -194,7 +195,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
           </Box>
           <Box sx={{ textAlign: 'right' }}>
             <Typography variant="body2" color="text.secondary">
-              {t('components.examDisplay.created', { date: new Date(exam.created_at).toLocaleDateString(i18n.language) })}
+              {t('components.examDisplay.created', { date: new Date(exam.created_at).toLocaleDateString(getDateLocale(i18n.language)) })}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {t('components.examDisplay.questionCount', { count: exam.questions.length, difficulty: exam.metadata.difficulty })}

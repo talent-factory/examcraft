@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { ArrowBack, Save, CheckCircle, Cancel, Send } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../utils/dateLocale';
 import { ReviewService } from '../services/ReviewService';
 import { useAuth } from '../contexts/AuthContext';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -419,7 +420,7 @@ const QuestionReviewDetail: React.FC = () => {
                 <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
                   <Typography variant="body2">{comment.comment_text}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {comment.author || t('components.questionDetail.unknownAuthor')} &middot; {new Date(comment.created_at).toLocaleString(i18n.language)} &middot; {comment.comment_type}
+                    {comment.author || t('components.questionDetail.unknownAuthor')} &middot; {new Date(comment.created_at).toLocaleString(getDateLocale(i18n.language))} &middot; {comment.comment_type}
                   </Typography>
                 </CardContent>
               </Card>

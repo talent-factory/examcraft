@@ -10,6 +10,7 @@ import {
   Button,
 } from '@mui/material';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
+import { getDateLocale } from '../../utils/dateLocale';
 import type { ExamDetail, UpdateExamRequest } from '../../types/composer';
 import { ExamStatus } from '../../types/composer';
 
@@ -150,7 +151,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
               </span>
             )}
             {exam.exam_date && (
-              <span>{t('composer.examMetadata.date')}: <strong>{new Date(exam.exam_date).toLocaleDateString(i18n.language === 'de' ? 'de-CH' : i18n.language, { day: '2-digit', month: '2-digit', year: 'numeric' })}</strong></span>
+              <span>{t('composer.examMetadata.date')}: <strong>{new Date(exam.exam_date).toLocaleDateString(getDateLocale(i18n.language), { day: '2-digit', month: '2-digit', year: 'numeric' })}</strong></span>
             )}
           </div>
         </div>

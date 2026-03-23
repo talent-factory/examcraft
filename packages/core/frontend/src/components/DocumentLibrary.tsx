@@ -43,6 +43,7 @@ import {
   PlayArrow
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../utils/dateLocale';
 import { DocumentService } from '../services/DocumentService';
 import { Document, DocumentStatus } from '../types/document';
 
@@ -160,7 +161,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   };
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString(i18n.language, {
+    return new Date(dateString).toLocaleDateString(getDateLocale(i18n.language), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

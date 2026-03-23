@@ -26,6 +26,13 @@ i18n
       caches: ['localStorage'],
       lookupLocalStorage: 'examcraft_language',
     },
+    saveMissing: process.env.NODE_ENV === 'development',
+    missingKeyHandler: (lngs: readonly string[], ns: string, key: string) => {
+      console.warn(`[i18n] Missing translation key: "${key}" [${lngs}]`);
+    },
+  })
+  .catch((err: unknown) => {
+    console.error('[i18n] Initialization failed:', err);
   });
 
 export default i18n;

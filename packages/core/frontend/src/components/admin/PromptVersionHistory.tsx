@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../../utils/dateLocale';
 import {
   Container,
   Typography,
@@ -66,7 +67,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString(i18n.language, {
+    return new Date(dateString).toLocaleString(getDateLocale(i18n.language), {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',

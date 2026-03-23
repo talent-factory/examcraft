@@ -223,7 +223,7 @@ async def health_check():
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: int,
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -271,7 +271,7 @@ async def get_document(
 @router.get("/{document_id}/download")
 async def download_document(
     document_id: int,
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -383,7 +383,7 @@ async def download_document(
 @router.get("/{document_id}/status")
 async def get_document_status(
     document_id: int,
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -459,7 +459,7 @@ async def get_document_status(
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: int,
-    http_request: Request = None,
+    http_request: Request,
     current_user: User = Depends(require_permission("delete_documents")),
     db: Session = Depends(get_db),
 ):
@@ -610,7 +610,7 @@ async def process_document(
 @router.get("/{document_id}/content")
 async def get_document_content(
     document_id: int,
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -677,7 +677,7 @@ async def get_document_content(
 @router.get("/{document_id}/chunks")
 async def get_document_chunks(
     document_id: int,
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):

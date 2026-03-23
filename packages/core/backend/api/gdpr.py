@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/v1/gdpr", tags=["GDPR"])
 
 @router.get("/export-data")
 async def export_user_data(
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     audit_service: AuditService = Depends(),
@@ -151,7 +151,7 @@ async def export_user_data(
 @router.post("/request-deletion")
 async def request_account_deletion(
     background_tasks: BackgroundTasks,
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     audit_service: AuditService = Depends(),
@@ -226,7 +226,7 @@ async def request_account_deletion(
 
 @router.post("/cancel-deletion")
 async def cancel_account_deletion(
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     audit_service: AuditService = Depends(),
@@ -282,7 +282,7 @@ async def cancel_account_deletion(
 @router.delete("/delete-account-now")
 async def delete_account_immediately(
     password: str,
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     auth_service: AuthService = Depends(),

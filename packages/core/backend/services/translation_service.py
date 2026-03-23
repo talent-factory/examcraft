@@ -84,7 +84,12 @@ def t(key: str, locale: str = DEFAULT_LOCALE, **kwargs) -> str:
     effective_locale = locale if locale in SUPPORTED_LOCALES else DEFAULT_LOCALE
     namespaced_key = f"t.{key}"
 
-    return i18n.t(namespaced_key, locale=effective_locale, **kwargs)
+    result = i18n.t(namespaced_key, locale=effective_locale, **kwargs)
+    if result == namespaced_key:
+        logger.warning(
+            "Missing translation key '%s' for locale '%s'", key, effective_locale
+        )
+    return result
 
 
 def get_request_locale(

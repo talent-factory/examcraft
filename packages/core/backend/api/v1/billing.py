@@ -27,7 +27,7 @@ class CheckoutRequest(BaseModel):
 @router.post("/create-checkout-session")
 async def create_checkout_session(
     request: CheckoutRequest,
-    http_request: Request = None,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):

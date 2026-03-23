@@ -355,7 +355,7 @@ async def get_review_queue(
 @router.get("/{question_id}/review", response_model=QuestionReviewDetailResponse)
 async def get_question_review(
     question_id: int,
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -392,7 +392,7 @@ async def get_question_review(
 @router.post("/review", response_model=QuestionReviewResponse, status_code=201)
 async def create_question_review(
     request: QuestionReviewCreate,
-    http_request: Request = None,
+    http_request: Request,
     current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db),
 ):
@@ -474,7 +474,7 @@ async def create_question_review(
 async def edit_question(
     question_id: int,
     request: QuestionReviewUpdate,
-    http_request: Request = None,
+    http_request: Request,
     current_user: User = Depends(require_permission("edit_questions")),
     db: Session = Depends(get_db),
 ):
@@ -606,7 +606,7 @@ async def edit_question(
 @router.post("/{question_id}/start-review", response_model=QuestionReviewResponse)
 async def start_review(
     question_id: int,
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(require_permission("approve_questions")),
     db: Session = Depends(get_db),
 ):
@@ -677,7 +677,7 @@ async def start_review(
 async def approve_question(
     question_id: int,
     request: ReviewActionRequest,
-    http_request: Request = None,
+    http_request: Request,
     current_user: User = Depends(require_permission("approve_questions")),
     db: Session = Depends(get_db),
 ):
@@ -783,7 +783,7 @@ async def approve_question(
 async def reject_question(
     question_id: int,
     request: ReviewActionRequest,
-    http_request: Request = None,
+    http_request: Request,
     current_user: User = Depends(require_permission("approve_questions")),
     db: Session = Depends(get_db),
 ):
@@ -864,7 +864,7 @@ async def reject_question(
 @router.get("/{question_id}/comments", response_model=List[CommentResponse])
 async def get_comments(
     question_id: int,
-    request: Request = None,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -908,7 +908,7 @@ async def get_comments(
 async def add_comment(
     question_id: int,
     request: CommentCreate,
-    http_request: Request = None,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -958,10 +958,13 @@ async def add_comment(
 
 
 @router.get("/{question_id}/history", response_model=List[HistoryResponse])
-async def get_question_history(question_id: int, db: Session = Depends(get_db)):
+async def get_question_history(
+    question_id: int, request: Request, db: Session = Depends(get_db)
+):
     """
     Hole History für Question
     """
+    locale = get_request_locale(request)
     try:
         # Check if question exists
         question = (
@@ -969,7 +972,10 @@ async def get_question_history(question_id: int, db: Session = Depends(get_db)):
         )
 
         if not question:
-            raise HTTPException(status_code=404, detail=t("review_question_not_found"))
+            raise HTTPException(
+                status_code=404,
+                detail=t("review_question_not_found", locale=locale),
+            )
 
         # Get History
         history = (
@@ -985,4 +991,7 @@ async def get_question_history(question_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Error fetching history for question {question_id}: {e}")
-        raise HTTPException(status_code=500, detail=t("review_fetch_history_failed"))
+        raise HTTPException(
+            status_code=500,
+            detail=t("review_fetch_history_failed", locale=locale),
+        )

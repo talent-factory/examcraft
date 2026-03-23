@@ -130,7 +130,7 @@ class ContextRetrievalRequest(BaseModel):
 @router.post("/generate-exam", response_model=GenerateExamTaskResponse)
 async def generate_rag_exam(
     request: RAGExamRequestModel,
-    http_request: Request = None,
+    http_request: Request,
     current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db),
 ):
@@ -268,7 +268,7 @@ async def generate_rag_exam(
 @router.post("/retrieve-context", response_model=RAGContextResponse)
 async def retrieve_context(
     request: ContextRetrievalRequest,
-    http_request: Request = None,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):

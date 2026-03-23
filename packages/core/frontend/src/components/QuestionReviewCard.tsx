@@ -41,6 +41,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../utils/dateLocale';
 import { QuestionReview, ReviewStatus, ReviewComment } from '../types/review';
 import { ReviewService } from '../services/ReviewService';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -347,7 +348,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
                           {comment.comment_text}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {comment.author} • {new Date(comment.created_at).toLocaleString(i18n.language)} • {comment.comment_type}
+                          {comment.author} • {new Date(comment.created_at).toLocaleString(getDateLocale(i18n.language))} • {comment.comment_type}
                         </Typography>
                       </Box>
                       {comment !== comments[comments.length - 1] && <Divider sx={{ width: '100%', mt: 1 }} />}
@@ -365,7 +366,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             <Typography variant="caption" color="text.secondary">
               {t('components.questionCard.reviewedBy', {
                 name: question.reviewed_by,
-                date: new Date(question.reviewed_at!).toLocaleString(i18n.language)
+                date: new Date(question.reviewed_at!).toLocaleString(getDateLocale(i18n.language))
               })}
             </Typography>
           </Box>

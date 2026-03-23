@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../../utils/dateLocale';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ProfileViewProps {
@@ -166,7 +167,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
                 {t('profile.profileView.lastLogin')}
               </label>
               <p className="text-gray-900">
-                {new Date(user.last_login).toLocaleString(i18n.language === 'de' ? 'de-CH' : i18n.language)}
+                {new Date(user.last_login).toLocaleString(getDateLocale(i18n.language))}
               </p>
             </div>
           )}
@@ -177,7 +178,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
               {t('profile.profileView.memberSince')}
             </label>
             <p className="text-gray-900">
-              {new Date(user.created_at).toLocaleDateString(i18n.language === 'de' ? 'de-CH' : i18n.language)}
+              {new Date(user.created_at).toLocaleDateString(getDateLocale(i18n.language))}
             </p>
           </div>
         </div>
