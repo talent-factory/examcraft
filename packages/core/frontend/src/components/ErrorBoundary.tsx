@@ -18,23 +18,40 @@ interface ErrorFallbackProps {
 /**
  * Fallback UI displayed when an error occurs
  */
-function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
-  let title = 'An error occurred';
-  let message = 'An unexpected error occurred. We have been notified.';
-  let retry = 'Try again';
-  let home = 'Go to home';
-  let support = 'If the problem persists, please contact support.';
+const FALLBACK_STRINGS = {
+  title: 'An error occurred',
+  message: 'An unexpected error occurred. We have been notified.',
+  retry: 'Try again',
+  home: 'Go to home',
+  support: 'If the problem persists, please contact support.',
+};
 
-  try {
-    const { t } = useTranslation();
-    title = t('components.errorBoundary.title');
-    message = t('components.errorBoundary.message');
-    retry = t('components.errorBoundary.retry');
-    home = t('components.errorBoundary.home');
-    support = t('components.errorBoundary.support');
-  } catch {
-    // i18n unavailable — use hardcoded fallback strings
-  }
+function TranslatedErrorFallback(props: ErrorFallbackProps) {
+  const { t } = useTranslation();
+  return (
+    <ErrorFallbackInner
+      {...props}
+      strings={{
+        title: t('components.errorBoundary.title'),
+        message: t('components.errorBoundary.message'),
+        retry: t('components.errorBoundary.retry'),
+        home: t('components.errorBoundary.home'),
+        support: t('components.errorBoundary.support'),
+      }}
+    />
+  );
+}
+
+function ErrorFallback(props: ErrorFallbackProps) {
+  return (
+    <Sentry.ErrorBoundary fallback={<ErrorFallbackInner {...props} strings={FALLBACK_STRINGS} />}>
+      <TranslatedErrorFallback {...props} />
+    </Sentry.ErrorBoundary>
+  );
+}
+
+function ErrorFallbackInner({ error, resetError, strings }: ErrorFallbackProps & { strings: typeof FALLBACK_STRINGS }) {
+  const { title, message, retry, home, support } = strings;
 
   const isDevelopment = process.env.REACT_APP_ENVIRONMENT === 'development';
 
