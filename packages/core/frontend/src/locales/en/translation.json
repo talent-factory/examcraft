@@ -886,5 +886,139 @@
       "cancel": "Cancel",
       "errorAutoFill": "Auto-Fill failed. Not enough matching questions?"
     }
+  },
+  "profile": {
+    "profilePage": {
+      "title": "My Profile",
+      "subtitle": "Manage your account settings and preferences",
+      "tabProfile": "Profile",
+      "tabEdit": "Edit Profile",
+      "tabPassword": "Change Password"
+    },
+    "profileView": {
+      "noUserData": "No user data available",
+      "sectionHeader": "Profile Information",
+      "editButton": "Edit Profile",
+      "unnamedUser": "Unnamed User",
+      "connectedVia": "Connected via",
+      "emailAddress": "Email Address",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "accountStatus": "Account Status",
+      "institution": "Institution",
+      "roles": "Roles",
+      "superuser": "Superuser",
+      "lastLogin": "Last Login",
+      "memberSince": "Member Since",
+      "permissions": "Permissions"
+    },
+    "profileEdit": {
+      "header": "Edit Profile",
+      "firstName": "First Name *",
+      "lastName": "Last Name *",
+      "emailAddress": "Email Address *",
+      "emailHint": "Changing your email may require verification",
+      "readOnlyHeader": "Account Information (Read-only)",
+      "institution": "Institution",
+      "accountStatus": "Account Status",
+      "na": "N/A",
+      "validationRequired": "Please fill in all required fields",
+      "validationEmail": "Please enter a valid email address",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "saveChanges": "Save Changes"
+    },
+    "passwordChange": {
+      "headerSet": "Set Password",
+      "headerChange": "Change Password",
+      "oauthInfo": "You're currently logged in via {{provider}}. Set a password to enable email/password login.",
+      "validationFillAll": "Please fill in all fields",
+      "validationMismatch": "New passwords do not match",
+      "validationMinLength": "New password must be at least 8 characters long",
+      "validationSamePassword": "New password must be different from current password",
+      "successSetTitle": "Password Set Successfully",
+      "successChangeTitle": "Password Changed Successfully",
+      "successSetMessage": "Your password has been set. You can now login with your email and password.",
+      "successChangeMessage": "Your password has been updated. You can now use your new password to login.",
+      "currentPassword": "Current Password *",
+      "newPassword": "New Password *",
+      "passwordHint": "Minimum 8 characters",
+      "confirmPassword": "Confirm New Password *",
+      "showPasswords": "Show passwords",
+      "securityTipsTitle": "Password Security Tips",
+      "tip1": "Use at least 8 characters",
+      "tip2": "Mix uppercase and lowercase letters",
+      "tip3": "Include numbers and special characters",
+      "tip4": "Avoid common words and patterns",
+      "cancel": "Cancel",
+      "setting": "Setting...",
+      "changing": "Changing...",
+      "setPassword": "Set Password",
+      "changePassword": "Change Password"
+    }
+  },
+  "guards": {
+    "loading": "Loading...",
+    "unauthorized": {
+      "title": "Access Denied",
+      "message": "You don't have permission to access this page.",
+      "attemptedAccess": "Attempted to access:",
+      "currentUser": "Current User:",
+      "roles": "Roles:",
+      "goBack": "Go Back",
+      "goToDashboard": "Go to Dashboard",
+      "helpText": "If you believe this is an error, please contact your administrator."
+    }
+  },
+  "layout": {
+    "sidebar": {
+      "collapse": "Collapse",
+      "expand": "Expand"
+    },
+    "packageTier": {
+      "tooltipTitle": "{{package}} Package - {{displayName}} Tier",
+      "featuresLabel": "Features:",
+      "displayName": {
+        "free": "Free",
+        "starter": "Starter",
+        "professional": "Professional",
+        "enterprise": "Enterprise"
+      },
+      "features": {
+        "free": {
+          "documentUpload": "Document Upload",
+          "basicQuestionGeneration": "Basic Question Generation",
+          "documentLibrary": "Document Library",
+          "fiveDocuments": "5 Documents",
+          "twentyQuestionsMonth": "20 Questions/Month"
+        },
+        "starter": {
+          "allFreeFeatures": "All Free Features",
+          "ragGeneration": "RAG Generation",
+          "promptTemplates": "Prompt Templates",
+          "batchProcessing": "Batch Processing",
+          "fiftyDocuments": "50 Documents",
+          "twoHundredQuestionsMonth": "200 Questions/Month"
+        },
+        "professional": {
+          "allStarterFeatures": "All Starter Features",
+          "documentChatBot": "Document ChatBot",
+          "advancedPromptManagement": "Advanced Prompt Management",
+          "analyticsDashboard": "Analytics Dashboard",
+          "unlimitedDocuments": "Unlimited Documents",
+          "thousandQuestionsMonth": "1000 Questions/Month"
+        },
+        "enterprise": {
+          "allProfessionalFeatures": "All Professional Features",
+          "ssoIntegration": "SSO Integration",
+          "customBranding": "Custom Branding",
+          "apiAccess": "API Access",
+          "advancedAnalytics": "Advanced Analytics",
+          "prioritySupport": "Priority Support",
+          "ldapIntegration": "LDAP Integration",
+          "auditLogs": "Audit Logs"
+        }
+      }
+    }
   }
 }

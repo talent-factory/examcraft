@@ -886,5 +886,139 @@
       "cancel": "Annuler",
       "errorAutoFill": "Le remplissage auto a échoué. Pas assez de questions correspondantes ?"
     }
+  },
+  "profile": {
+    "profilePage": {
+      "title": "Mon profil",
+      "subtitle": "Gérez les paramètres et préférences de votre compte",
+      "tabProfile": "Profil",
+      "tabEdit": "Modifier le profil",
+      "tabPassword": "Changer le mot de passe"
+    },
+    "profileView": {
+      "noUserData": "Aucune donnée utilisateur disponible",
+      "sectionHeader": "Informations du profil",
+      "editButton": "Modifier le profil",
+      "unnamedUser": "Utilisateur sans nom",
+      "connectedVia": "Connecté via",
+      "emailAddress": "Adresse e-mail",
+      "firstName": "Prénom",
+      "lastName": "Nom de famille",
+      "accountStatus": "Statut du compte",
+      "institution": "Institution",
+      "roles": "Rôles",
+      "superuser": "Superutilisateur",
+      "lastLogin": "Dernière connexion",
+      "memberSince": "Membre depuis",
+      "permissions": "Permissions"
+    },
+    "profileEdit": {
+      "header": "Modifier le profil",
+      "firstName": "Prénom *",
+      "lastName": "Nom de famille *",
+      "emailAddress": "Adresse e-mail *",
+      "emailHint": "Changer votre e-mail peut nécessiter une vérification",
+      "readOnlyHeader": "Informations du compte (lecture seule)",
+      "institution": "Institution",
+      "accountStatus": "Statut du compte",
+      "na": "N/D",
+      "validationRequired": "Veuillez remplir tous les champs obligatoires",
+      "validationEmail": "Veuillez saisir une adresse e-mail valide",
+      "cancel": "Annuler",
+      "saving": "Enregistrement...",
+      "saveChanges": "Enregistrer les modifications"
+    },
+    "passwordChange": {
+      "headerSet": "Définir un mot de passe",
+      "headerChange": "Changer le mot de passe",
+      "oauthInfo": "Vous êtes actuellement connecté via {{provider}}. Définissez un mot de passe pour activer la connexion par e-mail/mot de passe.",
+      "validationFillAll": "Veuillez remplir tous les champs",
+      "validationMismatch": "Les nouveaux mots de passe ne correspondent pas",
+      "validationMinLength": "Le nouveau mot de passe doit contenir au moins 8 caractères",
+      "validationSamePassword": "Le nouveau mot de passe doit être différent du mot de passe actuel",
+      "successSetTitle": "Mot de passe défini avec succès",
+      "successChangeTitle": "Mot de passe changé avec succès",
+      "successSetMessage": "Votre mot de passe a été défini. Vous pouvez maintenant vous connecter avec votre e-mail et votre mot de passe.",
+      "successChangeMessage": "Votre mot de passe a été mis à jour. Vous pouvez maintenant utiliser votre nouveau mot de passe pour vous connecter.",
+      "currentPassword": "Mot de passe actuel *",
+      "newPassword": "Nouveau mot de passe *",
+      "passwordHint": "Minimum 8 caractères",
+      "confirmPassword": "Confirmer le nouveau mot de passe *",
+      "showPasswords": "Afficher les mots de passe",
+      "securityTipsTitle": "Conseils de sécurité pour le mot de passe",
+      "tip1": "Utiliser au moins 8 caractères",
+      "tip2": "Mélanger majuscules et minuscules",
+      "tip3": "Inclure des chiffres et des caractères spéciaux",
+      "tip4": "Éviter les mots et motifs courants",
+      "cancel": "Annuler",
+      "setting": "Définition...",
+      "changing": "Modification...",
+      "setPassword": "Définir le mot de passe",
+      "changePassword": "Changer le mot de passe"
+    }
+  },
+  "guards": {
+    "loading": "Chargement...",
+    "unauthorized": {
+      "title": "Accès refusé",
+      "message": "Vous n'avez pas l'autorisation d'accéder à cette page.",
+      "attemptedAccess": "Tentative d'accès à :",
+      "currentUser": "Utilisateur actuel :",
+      "roles": "Rôles :",
+      "goBack": "Retour",
+      "goToDashboard": "Aller au tableau de bord",
+      "helpText": "Si vous pensez qu'il s'agit d'une erreur, veuillez contacter votre administrateur."
+    }
+  },
+  "layout": {
+    "sidebar": {
+      "collapse": "Réduire",
+      "expand": "Développer"
+    },
+    "packageTier": {
+      "tooltipTitle": "Forfait {{package}} - Niveau {{displayName}}",
+      "featuresLabel": "Fonctionnalités :",
+      "displayName": {
+        "free": "Gratuit",
+        "starter": "Starter",
+        "professional": "Professional",
+        "enterprise": "Enterprise"
+      },
+      "features": {
+        "free": {
+          "documentUpload": "Téléchargement de documents",
+          "basicQuestionGeneration": "Génération de questions de base",
+          "documentLibrary": "Bibliothèque de documents",
+          "fiveDocuments": "5 documents",
+          "twentyQuestionsMonth": "20 questions/mois"
+        },
+        "starter": {
+          "allFreeFeatures": "Toutes les fonctionnalités gratuites",
+          "ragGeneration": "Génération RAG",
+          "promptTemplates": "Modèles de prompts",
+          "batchProcessing": "Traitement par lots",
+          "fiftyDocuments": "50 documents",
+          "twoHundredQuestionsMonth": "200 questions/mois"
+        },
+        "professional": {
+          "allStarterFeatures": "Toutes les fonctionnalités Starter",
+          "documentChatBot": "Chatbot de documents",
+          "advancedPromptManagement": "Gestion avancée des prompts",
+          "analyticsDashboard": "Tableau de bord analytique",
+          "unlimitedDocuments": "Documents illimités",
+          "thousandQuestionsMonth": "1000 questions/mois"
+        },
+        "enterprise": {
+          "allProfessionalFeatures": "Toutes les fonctionnalités Professional",
+          "ssoIntegration": "Intégration SSO",
+          "customBranding": "Image de marque personnalisée",
+          "apiAccess": "Accès API",
+          "advancedAnalytics": "Analyses avancées",
+          "prioritySupport": "Support prioritaire",
+          "ldapIntegration": "Intégration LDAP",
+          "auditLogs": "Journaux d'audit"
+        }
+      }
+    }
   }
 }

@@ -886,5 +886,139 @@
       "cancel": "Annulla",
       "errorAutoFill": "Riempimento auto fallito. Non ci sono abbastanza domande corrispondenti?"
     }
+  },
+  "profile": {
+    "profilePage": {
+      "title": "Il mio profilo",
+      "subtitle": "Gestisci le impostazioni e le preferenze del tuo account",
+      "tabProfile": "Profilo",
+      "tabEdit": "Modifica profilo",
+      "tabPassword": "Cambia password"
+    },
+    "profileView": {
+      "noUserData": "Nessun dato utente disponibile",
+      "sectionHeader": "Informazioni del profilo",
+      "editButton": "Modifica profilo",
+      "unnamedUser": "Utente senza nome",
+      "connectedVia": "Connesso tramite",
+      "emailAddress": "Indirizzo e-mail",
+      "firstName": "Nome",
+      "lastName": "Cognome",
+      "accountStatus": "Stato dell'account",
+      "institution": "Istituzione",
+      "roles": "Ruoli",
+      "superuser": "Superutente",
+      "lastLogin": "Ultimo accesso",
+      "memberSince": "Membro dal",
+      "permissions": "Permessi"
+    },
+    "profileEdit": {
+      "header": "Modifica profilo",
+      "firstName": "Nome *",
+      "lastName": "Cognome *",
+      "emailAddress": "Indirizzo e-mail *",
+      "emailHint": "La modifica dell'e-mail potrebbe richiedere una verifica",
+      "readOnlyHeader": "Informazioni account (sola lettura)",
+      "institution": "Istituzione",
+      "accountStatus": "Stato dell'account",
+      "na": "N/D",
+      "validationRequired": "Compila tutti i campi obbligatori",
+      "validationEmail": "Inserisci un indirizzo e-mail valido",
+      "cancel": "Annulla",
+      "saving": "Salvataggio...",
+      "saveChanges": "Salva modifiche"
+    },
+    "passwordChange": {
+      "headerSet": "Imposta password",
+      "headerChange": "Cambia password",
+      "oauthInfo": "Sei attualmente connesso tramite {{provider}}. Imposta una password per abilitare l'accesso con e-mail/password.",
+      "validationFillAll": "Compila tutti i campi",
+      "validationMismatch": "Le nuove password non corrispondono",
+      "validationMinLength": "La nuova password deve contenere almeno 8 caratteri",
+      "validationSamePassword": "La nuova password deve essere diversa dalla password attuale",
+      "successSetTitle": "Password impostata con successo",
+      "successChangeTitle": "Password cambiata con successo",
+      "successSetMessage": "La tua password è stata impostata. Ora puoi accedere con la tua e-mail e password.",
+      "successChangeMessage": "La tua password è stata aggiornata. Ora puoi utilizzare la tua nuova password per accedere.",
+      "currentPassword": "Password attuale *",
+      "newPassword": "Nuova password *",
+      "passwordHint": "Minimo 8 caratteri",
+      "confirmPassword": "Conferma nuova password *",
+      "showPasswords": "Mostra password",
+      "securityTipsTitle": "Consigli per la sicurezza della password",
+      "tip1": "Usa almeno 8 caratteri",
+      "tip2": "Mescola lettere maiuscole e minuscole",
+      "tip3": "Includi numeri e caratteri speciali",
+      "tip4": "Evita parole e schemi comuni",
+      "cancel": "Annulla",
+      "setting": "Impostazione...",
+      "changing": "Modifica...",
+      "setPassword": "Imposta password",
+      "changePassword": "Cambia password"
+    }
+  },
+  "guards": {
+    "loading": "Caricamento...",
+    "unauthorized": {
+      "title": "Accesso negato",
+      "message": "Non hai il permesso di accedere a questa pagina.",
+      "attemptedAccess": "Tentativo di accesso a:",
+      "currentUser": "Utente corrente:",
+      "roles": "Ruoli:",
+      "goBack": "Indietro",
+      "goToDashboard": "Vai al dashboard",
+      "helpText": "Se ritieni che si tratti di un errore, contatta il tuo amministratore."
+    }
+  },
+  "layout": {
+    "sidebar": {
+      "collapse": "Comprimi",
+      "expand": "Espandi"
+    },
+    "packageTier": {
+      "tooltipTitle": "Pacchetto {{package}} - Livello {{displayName}}",
+      "featuresLabel": "Funzionalità:",
+      "displayName": {
+        "free": "Free",
+        "starter": "Starter",
+        "professional": "Professional",
+        "enterprise": "Enterprise"
+      },
+      "features": {
+        "free": {
+          "documentUpload": "Caricamento documenti",
+          "basicQuestionGeneration": "Generazione domande di base",
+          "documentLibrary": "Libreria documenti",
+          "fiveDocuments": "5 documenti",
+          "twentyQuestionsMonth": "20 domande/mese"
+        },
+        "starter": {
+          "allFreeFeatures": "Tutte le funzionalità Free",
+          "ragGeneration": "Generazione RAG",
+          "promptTemplates": "Modelli di prompt",
+          "batchProcessing": "Elaborazione batch",
+          "fiftyDocuments": "50 documenti",
+          "twoHundredQuestionsMonth": "200 domande/mese"
+        },
+        "professional": {
+          "allStarterFeatures": "Tutte le funzionalità Starter",
+          "documentChatBot": "Chatbot documenti",
+          "advancedPromptManagement": "Gestione prompt avanzata",
+          "analyticsDashboard": "Dashboard analitica",
+          "unlimitedDocuments": "Documenti illimitati",
+          "thousandQuestionsMonth": "1000 domande/mese"
+        },
+        "enterprise": {
+          "allProfessionalFeatures": "Tutte le funzionalità Professional",
+          "ssoIntegration": "Integrazione SSO",
+          "customBranding": "Branding personalizzato",
+          "apiAccess": "Accesso API",
+          "advancedAnalytics": "Analisi avanzate",
+          "prioritySupport": "Supporto prioritario",
+          "ldapIntegration": "Integrazione LDAP",
+          "auditLogs": "Log di audit"
+        }
+      }
+    }
   }
 }

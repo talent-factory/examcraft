@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ProfileViewProps {
@@ -11,13 +12,14 @@ interface ProfileViewProps {
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [avatarError, setAvatarError] = useState(false);
 
   if (!user) {
     return (
       <div className="text-center py-8 text-gray-500">
-        No user data available
+        {t('profile.profileView.noUserData')}
       </div>
     );
   }
@@ -38,14 +40,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
     <div className="bg-white shadow rounded-lg">
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-800">Profile Information</h2>
+        <h2 className="text-xl font-semibold text-gray-800">{t('profile.profileView.sectionHeader')}</h2>
         {onEdit && (
           <button
             type="button"
             onClick={onEdit}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            Edit Profile
+            {t('profile.profileView.editButton')}
           </button>
         )}
       </div>
@@ -71,12 +73,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
             <h3 className="text-2xl font-bold text-gray-900">
               {user.first_name && user.last_name
                 ? `${user.first_name} ${user.last_name}`
-                : user.email || 'Unnamed User'}
+                : user.email || t('profile.profileView.unnamedUser')}
             </h3>
             <p className="text-gray-600">{user.email}</p>
             {user.oauth_provider && (
               <p className="text-sm text-gray-500 mt-1">
-                🔗 Connected via {user.oauth_provider.charAt(0).toUpperCase() + user.oauth_provider.slice(1)}
+                🔗 {t('profile.profileView.connectedVia')} {user.oauth_provider.charAt(0).toUpperCase() + user.oauth_provider.slice(1)}
               </p>
             )}
           </div>
@@ -87,7 +89,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
           {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address
+              {t('profile.profileView.emailAddress')}
             </label>
             <p className="text-gray-900">{user.email}</p>
           </div>
@@ -95,7 +97,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
           {/* First Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              First Name
+              {t('profile.profileView.firstName')}
             </label>
             <p className="text-gray-900">{user.first_name}</p>
           </div>
@@ -103,7 +105,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
           {/* Last Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Last Name
+              {t('profile.profileView.lastName')}
             </label>
             <p className="text-gray-900">{user.last_name}</p>
           </div>
@@ -111,7 +113,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
           {/* Status */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Account Status
+              {t('profile.profileView.accountStatus')}
             </label>
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
               user.status === 'active'
@@ -126,7 +128,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
           {user.institution && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Institution
+                {t('profile.profileView.institution')}
               </label>
               <p className="text-gray-900">{user.institution.name}</p>
               <p className="text-sm text-gray-500">
@@ -138,7 +140,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
           {/* Roles */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Roles
+              {t('profile.profileView.roles')}
             </label>
             <div className="flex flex-wrap gap-2">
               {user.roles.map((role) => (
@@ -151,7 +153,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
               ))}
               {user.is_superuser && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
-                  Superuser
+                  {t('profile.profileView.superuser')}
                 </span>
               )}
             </div>
@@ -161,10 +163,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
           {user.last_login && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Login
+                {t('profile.profileView.lastLogin')}
               </label>
               <p className="text-gray-900">
-                {new Date(user.last_login).toLocaleString()}
+                {new Date(user.last_login).toLocaleString(i18n.language === 'de' ? 'de-CH' : i18n.language)}
               </p>
             </div>
           )}
@@ -172,10 +174,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
           {/* Account Created */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Member Since
+              {t('profile.profileView.memberSince')}
             </label>
             <p className="text-gray-900">
-              {new Date(user.created_at).toLocaleDateString()}
+              {new Date(user.created_at).toLocaleDateString(i18n.language === 'de' ? 'de-CH' : i18n.language)}
             </p>
           </div>
         </div>
@@ -184,7 +186,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
         {user.roles.length > 0 && (
           <div className="pt-6 border-t border-gray-200">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Permissions
+              {t('profile.profileView.permissions')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {Array.from(new Set(user.roles.flatMap(role => role.permissions))).map((permission) => (

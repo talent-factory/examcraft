@@ -886,5 +886,139 @@
       "cancel": "Abbrechen",
       "errorAutoFill": "Auto-Fill fehlgeschlagen. Nicht genug passende Fragen?"
     }
+  },
+  "profile": {
+    "profilePage": {
+      "title": "Mein Profil",
+      "subtitle": "Verwalten Sie Ihre Kontoeinstellungen und Präferenzen",
+      "tabProfile": "Profil",
+      "tabEdit": "Profil bearbeiten",
+      "tabPassword": "Passwort ändern"
+    },
+    "profileView": {
+      "noUserData": "Keine Benutzerdaten verfügbar",
+      "sectionHeader": "Profilinformationen",
+      "editButton": "Profil bearbeiten",
+      "unnamedUser": "Unbenannter Benutzer",
+      "connectedVia": "Verbunden über",
+      "emailAddress": "E-Mail-Adresse",
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "accountStatus": "Kontostatus",
+      "institution": "Institution",
+      "roles": "Rollen",
+      "superuser": "Superuser",
+      "lastLogin": "Letzte Anmeldung",
+      "memberSince": "Mitglied seit",
+      "permissions": "Berechtigungen"
+    },
+    "profileEdit": {
+      "header": "Profil bearbeiten",
+      "firstName": "Vorname *",
+      "lastName": "Nachname *",
+      "emailAddress": "E-Mail-Adresse *",
+      "emailHint": "Eine Änderung der E-Mail-Adresse erfordert möglicherweise eine Verifizierung",
+      "readOnlyHeader": "Kontoinformationen (schreibgeschützt)",
+      "institution": "Institution",
+      "accountStatus": "Kontostatus",
+      "na": "N/A",
+      "validationRequired": "Bitte füllen Sie alle Pflichtfelder aus",
+      "validationEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
+      "cancel": "Abbrechen",
+      "saving": "Speichern...",
+      "saveChanges": "Änderungen speichern"
+    },
+    "passwordChange": {
+      "headerSet": "Passwort festlegen",
+      "headerChange": "Passwort ändern",
+      "oauthInfo": "Sie sind derzeit über {{provider}} angemeldet. Legen Sie ein Passwort fest, um die E-Mail/Passwort-Anmeldung zu aktivieren.",
+      "validationFillAll": "Bitte füllen Sie alle Felder aus",
+      "validationMismatch": "Die neuen Passwörter stimmen nicht überein",
+      "validationMinLength": "Das neue Passwort muss mindestens 8 Zeichen lang sein",
+      "validationSamePassword": "Das neue Passwort muss sich vom aktuellen Passwort unterscheiden",
+      "successSetTitle": "Passwort erfolgreich festgelegt",
+      "successChangeTitle": "Passwort erfolgreich geändert",
+      "successSetMessage": "Ihr Passwort wurde festgelegt. Sie können sich jetzt mit Ihrer E-Mail und Ihrem Passwort anmelden.",
+      "successChangeMessage": "Ihr Passwort wurde aktualisiert. Sie können sich jetzt mit Ihrem neuen Passwort anmelden.",
+      "currentPassword": "Aktuelles Passwort *",
+      "newPassword": "Neues Passwort *",
+      "passwordHint": "Mindestens 8 Zeichen",
+      "confirmPassword": "Neues Passwort bestätigen *",
+      "showPasswords": "Passwörter anzeigen",
+      "securityTipsTitle": "Passwort-Sicherheitstipps",
+      "tip1": "Mindestens 8 Zeichen verwenden",
+      "tip2": "Gross- und Kleinbuchstaben mischen",
+      "tip3": "Zahlen und Sonderzeichen einschliessen",
+      "tip4": "Gängige Wörter und Muster vermeiden",
+      "cancel": "Abbrechen",
+      "setting": "Festlegen...",
+      "changing": "Ändern...",
+      "setPassword": "Passwort festlegen",
+      "changePassword": "Passwort ändern"
+    }
+  },
+  "guards": {
+    "loading": "Laden...",
+    "unauthorized": {
+      "title": "Zugriff verweigert",
+      "message": "Sie haben keine Berechtigung, auf diese Seite zuzugreifen.",
+      "attemptedAccess": "Zugriffsversuch auf:",
+      "currentUser": "Aktueller Benutzer:",
+      "roles": "Rollen:",
+      "goBack": "Zurück",
+      "goToDashboard": "Zum Dashboard",
+      "helpText": "Wenn Sie glauben, dass dies ein Fehler ist, wenden Sie sich bitte an Ihren Administrator."
+    }
+  },
+  "layout": {
+    "sidebar": {
+      "collapse": "Einklappen",
+      "expand": "Ausklappen"
+    },
+    "packageTier": {
+      "tooltipTitle": "{{package}} Paket - {{displayName}} Stufe",
+      "featuresLabel": "Funktionen:",
+      "displayName": {
+        "free": "Free",
+        "starter": "Starter",
+        "professional": "Professional",
+        "enterprise": "Enterprise"
+      },
+      "features": {
+        "free": {
+          "documentUpload": "Dokumenten-Upload",
+          "basicQuestionGeneration": "Einfache Fragengenerierung",
+          "documentLibrary": "Dokumentenbibliothek",
+          "fiveDocuments": "5 Dokumente",
+          "twentyQuestionsMonth": "20 Fragen/Monat"
+        },
+        "starter": {
+          "allFreeFeatures": "Alle Free-Funktionen",
+          "ragGeneration": "RAG-Generierung",
+          "promptTemplates": "Prompt-Vorlagen",
+          "batchProcessing": "Stapelverarbeitung",
+          "fiftyDocuments": "50 Dokumente",
+          "twoHundredQuestionsMonth": "200 Fragen/Monat"
+        },
+        "professional": {
+          "allStarterFeatures": "Alle Starter-Funktionen",
+          "documentChatBot": "Dokument-Chatbot",
+          "advancedPromptManagement": "Erweitertes Prompt-Management",
+          "analyticsDashboard": "Analyse-Dashboard",
+          "unlimitedDocuments": "Unbegrenzte Dokumente",
+          "thousandQuestionsMonth": "1000 Fragen/Monat"
+        },
+        "enterprise": {
+          "allProfessionalFeatures": "Alle Professional-Funktionen",
+          "ssoIntegration": "SSO-Integration",
+          "customBranding": "Individuelles Branding",
+          "apiAccess": "API-Zugang",
+          "advancedAnalytics": "Erweiterte Analysen",
+          "prioritySupport": "Priority-Support",
+          "ldapIntegration": "LDAP-Integration",
+          "auditLogs": "Audit-Logs"
+        }
+      }
+    }
   }
 }
