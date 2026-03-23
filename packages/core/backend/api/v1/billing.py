@@ -23,10 +23,6 @@ class CheckoutRequest(BaseModel):
     price_id: str
 
 
-class PortalRequest(BaseModel):
-    return_url: str
-
-
 class SubscriptionResponse(BaseModel):
     id: str
     status: str
@@ -98,7 +94,12 @@ def _get_tier_from_price_id(price_id: str) -> str:
     elif "enterprise" in price_id_lower:
         return "enterprise"
 
-    return "free"
+    logger.error(
+        "Could not map price_id '%s' to any tier. Configured: %s. Defaulting to 'starter'.",
+        price_id,
+        price_to_tier,
+    )
+    return "starter"
 
 
 def _is_billing_owner(user: User, subscription: Subscription) -> bool:
@@ -287,8 +288,14 @@ async def get_invoices(
             subscription.stripe_customer_id, limit=limit
         )
         return invoices
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error fetching invoices: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while fetching invoices. Please try again.",
+        )
 
 
 @router.get("/payment-methods", response_model=List[PaymentMethodResponse])
@@ -330,13 +337,18 @@ async def get_payment_methods(
             subscription.stripe_customer_id
         )
         return payment_methods
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error fetching payment methods: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while fetching payment methods. Please try again.",
+        )
 
 
 @router.post("/customer-portal")
 async def create_customer_portal(
-    request: PortalRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -378,13 +390,20 @@ async def create_customer_portal(
         )
 
     try:
+        return_url = f"{FRONTEND_URL}/subscription"
         session = await payment_service.create_customer_portal_session(
             stripe_customer_id=subscription.stripe_customer_id,
-            return_url=request.return_url,
+            return_url=return_url,
         )
         return session
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error creating customer portal session: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while creating the portal session. Please try again.",
+        )
 
 
 @router.post("/create-checkout-session")
@@ -414,9 +433,17 @@ async def create_checkout_session(
             detail="User must be associated with an institution to subscribe",
         )
 
-    # Validate price_id against allowed prices
+    # Validate price_id against allowed prices (fail-closed)
     allowed_prices = _get_allowed_price_ids()
-    if allowed_prices and request.price_id not in allowed_prices:
+    if not allowed_prices:
+        logger.error(
+            "No allowed Stripe price IDs configured - STRIPE_PRICE_* env vars missing"
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Subscription plans are not configured. Please contact support.",
+        )
+    if request.price_id not in allowed_prices:
         raise HTTPException(
             status_code=400,
             detail="Invalid price ID. Please select a valid subscription plan.",
@@ -439,8 +466,14 @@ async def create_checkout_session(
             },
         )
         return session
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error creating checkout session: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while creating the checkout session. Please try again.",
+        )
 
 
 @router.post("/sync-subscription")
@@ -534,8 +567,19 @@ async def sync_subscription_from_stripe(
             )
             existing_sub.cancel_at_period_end = stripe_sub.cancel_at_period_end
             # Set billing_owner_id if not already set
+            # Only allow if user's email matches the Stripe customer or user is admin
             if not existing_sub.billing_owner_id:
-                existing_sub.billing_owner_id = current_user.id
+                stripe_customer_email = customer.get("email", "").lower()
+                if (
+                    current_user.has_role("admin")
+                    or current_user.email.lower() == stripe_customer_email
+                ):
+                    existing_sub.billing_owner_id = current_user.id
+                else:
+                    logger.warning(
+                        f"User {current_user.id} ({current_user.email}) attempted to claim billing ownership "
+                        f"but Stripe customer email is {stripe_customer_email}"
+                    )
             logger.info(f"Updated subscription {stripe_sub.id}")
         else:
             # Create new subscription record
@@ -580,9 +624,17 @@ async def sync_subscription_from_stripe(
             "price_id": price_id,
         }
 
+    except HTTPException:
+        raise
     except stripe.error.StripeError as e:
         logger.error(f"Stripe error during sync: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(
+            status_code=400,
+            detail="A payment provider error occurred. Please try again.",
+        )
     except Exception as e:
         logger.error(f"Error syncing subscription: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while syncing subscription data. Please try again.",
+        )

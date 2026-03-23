@@ -47,6 +47,8 @@ export const SubscriptionManagementPage: React.FC = () => {
     const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [invoiceError, setInvoiceError] = useState<string | null>(null);
+    const [paymentMethodError, setPaymentMethodError] = useState<string | null>(null);
     const [portalLoading, setPortalLoading] = useState(false);
 
     useEffect(() => {
@@ -58,15 +60,28 @@ export const SubscriptionManagementPage: React.FC = () => {
             setLoading(true);
             setError(null);
 
-            const [subscriptionData, invoicesData, paymentMethodsData] = await Promise.all([
-                paymentService.getSubscription(),
-                paymentService.getInvoices().catch(() => []),
-                paymentService.getPaymentMethods().catch(() => []),
-            ]);
-
+            const subscriptionData = await paymentService.getSubscription();
             setSubscription(subscriptionData);
-            setInvoices(invoicesData);
-            setPaymentMethods(paymentMethodsData);
+
+            try {
+                const invoicesData = await paymentService.getInvoices();
+                setInvoices(invoicesData);
+                setInvoiceError(null);
+            } catch (err) {
+                console.error('Error loading invoices:', err);
+                setInvoiceError('Rechnungen konnten nicht geladen werden.');
+                setInvoices([]);
+            }
+
+            try {
+                const paymentMethodsData = await paymentService.getPaymentMethods();
+                setPaymentMethods(paymentMethodsData);
+                setPaymentMethodError(null);
+            } catch (err) {
+                console.error('Error loading payment methods:', err);
+                setPaymentMethodError('Zahlungsmethoden konnten nicht geladen werden.');
+                setPaymentMethods([]);
+            }
         } catch (err: any) {
             console.error('Error loading subscription data:', err);
             setError(err.response?.data?.detail || 'Failed to load subscription data');
@@ -212,6 +227,12 @@ export const SubscriptionManagementPage: React.FC = () => {
                         )}
                     </div>
 
+                    {paymentMethodError && (
+                        <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded">
+                            {paymentMethodError}
+                        </div>
+                    )}
+
                     {paymentMethods.length > 0 ? (
                         <div className="space-y-3">
                             {paymentMethods.map((pm) => (
@@ -245,6 +266,12 @@ export const SubscriptionManagementPage: React.FC = () => {
             {subscription?.is_billing_owner && (
                 <div className="bg-white shadow rounded-lg p-6">
                     <h2 className="text-xl font-semibold text-gray-900 mb-4">Billing History</h2>
+
+                    {invoiceError && (
+                        <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded">
+                            {invoiceError}
+                        </div>
+                    )}
 
                     {invoices.length > 0 ? (
                         <div className="overflow-x-auto">

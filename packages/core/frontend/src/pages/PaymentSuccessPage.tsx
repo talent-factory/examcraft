@@ -39,7 +39,12 @@ export const PaymentSuccessPage: React.FC = () => {
                 setSyncing(false);
 
                 // Still try to refresh profile even on error
-                try { await refreshProfile(); } catch { /* ignore */ }
+                try {
+                    await refreshProfile();
+                } catch (err) {
+                    console.error('[PaymentSuccessPage] Failed to refresh profile:', err);
+                    // Profile will be refreshed on next page load
+                }
 
                 // Still redirect after error, user can refresh subscription page
                 const timer = setTimeout(() => {

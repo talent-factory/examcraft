@@ -75,7 +75,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
 
     if not institution_id:
         logger.error("No institution_id in session metadata")
-        return
+        raise ValueError("No institution_id in session metadata")
 
     # functionality depends on subscription_mode (payment vs subscription)
     session_mode = session.get("mode")
@@ -92,7 +92,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         )
         if not institution:
             logger.error(f"Institution {institution_id} not found")
-            return
+            raise ValueError(f"Institution {institution_id} not found")
 
         logger.info(f"Institution found: {institution.name} (ID: {institution.id})")
 
@@ -254,13 +254,22 @@ async def handle_subscription_updated(subscription: dict, db: Session):
             f"period_end={subscription.get('current_period_end')}"
         )
 
-        # Sync Institution Status
-        if (
-            local_sub.status != SubscriptionStatus.ACTIVE
-            and local_sub.status != SubscriptionStatus.TRIALING
-        ):
-            # For now, just keep status synced. Gating logic can check subscription status.
-            pass
+        # Sync tier from price_id
+        from api.v1.billing import _get_tier_from_price_id
+
+        items_data = subscription.get("items", {}).get("data", [])
+        if items_data:
+            price_id = items_data[0].get("price", {}).get("id")
+            if price_id:
+                new_tier = _get_tier_from_price_id(price_id)
+                institution = local_sub.institution
+                if institution:
+                    old_tier = institution.subscription_tier
+                    institution.subscription_tier = new_tier
+                    logger.info(
+                        f"Subscription updated: institution {institution.id} tier {old_tier} -> {new_tier} "
+                        f"(price_id: {price_id})"
+                    )
 
         db.commit()
     else:

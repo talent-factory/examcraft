@@ -2,7 +2,7 @@ import stripe
 import os
 import logging
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -81,14 +81,14 @@ class PaymentService:
                 and subscription.current_period_start
             ):
                 current_period_start = datetime.fromtimestamp(
-                    subscription.current_period_start
+                    subscription.current_period_start, tz=timezone.utc
                 ).isoformat()
             if (
                 hasattr(subscription, "current_period_end")
                 and subscription.current_period_end
             ):
                 current_period_end = datetime.fromtimestamp(
-                    subscription.current_period_end
+                    subscription.current_period_end, tz=timezone.utc
                 ).isoformat()
 
             return {
@@ -100,7 +100,7 @@ class PaymentService:
                 if hasattr(subscription, "cancel_at_period_end")
                 else False,
                 "canceled_at": datetime.fromtimestamp(
-                    subscription.canceled_at
+                    subscription.canceled_at, tz=timezone.utc
                 ).isoformat()
                 if subscription.canceled_at
                 else None,
@@ -153,12 +153,16 @@ class PaymentService:
                     "amount_due": invoice.amount_due / 100,
                     "amount_paid": invoice.amount_paid / 100,
                     "currency": invoice.currency.upper(),
-                    "created": datetime.fromtimestamp(invoice.created).isoformat(),
-                    "due_date": datetime.fromtimestamp(invoice.due_date).isoformat()
+                    "created": datetime.fromtimestamp(
+                        invoice.created, tz=timezone.utc
+                    ).isoformat(),
+                    "due_date": datetime.fromtimestamp(
+                        invoice.due_date, tz=timezone.utc
+                    ).isoformat()
                     if invoice.due_date
                     else None,
                     "paid_at": datetime.fromtimestamp(
-                        invoice.status_transitions.paid_at
+                        invoice.status_transitions.paid_at, tz=timezone.utc
                     ).isoformat()
                     if invoice.status_transitions and invoice.status_transitions.paid_at
                     else None,
