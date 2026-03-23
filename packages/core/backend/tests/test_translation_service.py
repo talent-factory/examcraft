@@ -31,12 +31,14 @@ class TestTranslationService:
         assert result_de == "Nicht gefunden"
         assert result_en == "Not found"
 
-    def test_translate_unknown_key_returns_key(self):
+    def test_translate_unknown_key_returns_fallback(self):
         from services.translation_service import init_translations, t
 
         init_translations()
         result = t("nonexistent_key", locale="de")
-        assert "nonexistent_key" in result
+        assert result == "Ein Fehler ist aufgetreten"
+        result_en = t("nonexistent_key", locale="en")
+        assert result_en == "An error occurred"
 
     def test_translate_fr(self):
         from services.translation_service import init_translations, t

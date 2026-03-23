@@ -78,6 +78,27 @@ class CompositionConstraints:
         None  # Difficulty -> target %, should sum to 100
     )
 
+    def __post_init__(self):
+        if self.target_points is not None and self.target_points <= 0:
+            raise ValueError("target_points must be positive")
+        if (
+            self.target_duration_minutes is not None
+            and self.target_duration_minutes <= 0
+        ):
+            raise ValueError("target_duration_minutes must be positive")
+        if self.bloom_distribution is not None:
+            total = sum(self.bloom_distribution.values())
+            if abs(total - 100) > 1.0:
+                raise ValueError(
+                    f"bloom_distribution values must sum to approximately 100 (got {total})"
+                )
+        if self.difficulty_distribution is not None:
+            total = sum(self.difficulty_distribution.values())
+            if abs(total - 100) > 1.0:
+                raise ValueError(
+                    f"difficulty_distribution values must sum to approximately 100 (got {total})"
+                )
+
 
 def compose_questions(
     candidates: list[QuestionCandidate],

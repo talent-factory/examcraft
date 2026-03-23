@@ -749,25 +749,34 @@ async def auto_fill_questions(
     _require_draft(exam, locale)
 
     if request.is_composition_mode:
-        return _auto_compose(exam, request, current_user, db)
+        return _auto_compose(exam, request, current_user, db, locale=locale)
     else:
-        return _auto_fill_simple(exam, request, current_user, db)
+        return _auto_fill_simple(exam, request, current_user, db, locale=locale)
 
 
-def _validate_distribution(dist: dict, name: str, valid_keys: set | None = None):
+def _validate_distribution(
+    dist: dict, name: str, valid_keys: set | None = None, locale: str = "de"
+):
     """Validate that distribution percentage values sum to ~100 (+/-1) and optionally check keys against a valid set."""
     total = sum(dist.values())
     if abs(total - 100) > 1.0:
         raise HTTPException(
             status_code=422,
-            detail=f"{name} must sum to 100 (got {total})",
+            detail=t(
+                "exams_distribution_sum_invalid", locale=locale, name=name, total=total
+            ),
         )
     if valid_keys:
         invalid = set(dist.keys()) - valid_keys
         if invalid:
             raise HTTPException(
                 status_code=422,
-                detail=f"Invalid {name} keys: {invalid}",
+                detail=t(
+                    "exams_distribution_invalid_keys",
+                    locale=locale,
+                    name=name,
+                    keys=str(invalid),
+                ),
             )
 
 
@@ -800,7 +809,9 @@ def _build_candidate_query(
     return query
 
 
-def _commit_exam_changes(exam: Exam, db: Session, operation_name: str):
+def _commit_exam_changes(
+    exam: Exam, db: Session, operation_name: str, locale: str = "de"
+):
     """Flush, recalculate points, and commit exam changes with error handling."""
     try:
         db.flush()
@@ -813,19 +824,21 @@ def _commit_exam_changes(exam: Exam, db: Session, operation_name: str):
         logger.error(
             "IntegrityError in %s for exam %s: %s", operation_name, exam.id, exc
         )
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
+        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error(
             "Database error in %s for exam %s: %s", operation_name, exam.id, exc
         )
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
 
 
 def _auto_compose(
-    exam: Exam, request: AutoFillRequest, current_user: User, db: Session
+    exam: Exam,
+    request: AutoFillRequest,
+    current_user: User,
+    db: Session,
+    locale: str = "de",
 ):
     """Composition mode: constraint-based greedy optimization."""
     from services.auto_compose_service import (
@@ -840,12 +853,14 @@ def _auto_compose(
             request.bloom_distribution,
             "bloom_distribution",
             valid_keys={1, 2, 3, 4, 5, 6},
+            locale=locale,
         )
     if request.difficulty_distribution:
         _validate_distribution(
             request.difficulty_distribution,
             "difficulty_distribution",
             valid_keys={"easy", "medium", "hard"},
+            locale=locale,
         )
 
     query = _build_candidate_query(exam, request, current_user, db)
@@ -858,7 +873,9 @@ def _auto_compose(
 
     all_candidates = query.all()
     if not all_candidates:
-        raise HTTPException(status_code=404, detail="No matching questions found")
+        raise HTTPException(
+            status_code=404, detail=t("exams_no_matching_questions", locale=locale)
+        )
 
     candidates = [
         QuestionCandidate(
@@ -880,12 +897,19 @@ def _auto_compose(
         difficulty_distribution=request.difficulty_distribution,
     )
 
-    result = compose_questions(candidates, constraints)
+    try:
+        result = compose_questions(candidates, constraints)
+    except ValueError as exc:
+        logger.warning("Composition constraint error for exam %s: %s", exam.id, exc)
+        raise HTTPException(
+            status_code=422,
+            detail=t("exams_composition_constraint_error", locale=locale),
+        )
 
     if not result.questions:
         raise HTTPException(
             status_code=404,
-            detail="No questions fit within the specified constraints",
+            detail=t("exams_no_questions_fit_constraints", locale=locale),
         )
 
     # Preview mode: return proposal without modifying exam
@@ -926,12 +950,16 @@ def _auto_compose(
         )
         db.add(eq)
 
-    _commit_exam_changes(exam, db, "auto_compose")
+    _commit_exam_changes(exam, db, "auto_compose", locale=locale)
     return _exam_detail_to_out(exam)
 
 
 def _auto_fill_simple(
-    exam: Exam, request: AutoFillRequest, current_user: User, db: Session
+    exam: Exam,
+    request: AutoFillRequest,
+    current_user: User,
+    db: Session,
+    locale: str = "de",
 ):
     """Simple mode: random selection by count."""
     count = request.count or 5
@@ -939,7 +967,9 @@ def _auto_fill_simple(
     query = _build_candidate_query(exam, request, current_user, db)
     candidates = query.order_by(sa_func.random()).limit(count).all()
     if not candidates:
-        raise HTTPException(status_code=404, detail="No matching questions found.")
+        raise HTTPException(
+            status_code=404, detail=t("exams_no_matching_questions", locale=locale)
+        )
 
     max_pos = max((eq.position for eq in exam.questions), default=0)
     for q in candidates:
@@ -952,7 +982,7 @@ def _auto_fill_simple(
         )
         db.add(eq)
 
-    _commit_exam_changes(exam, db, "auto_fill")
+    _commit_exam_changes(exam, db, "auto_fill", locale=locale)
     return _exam_detail_to_out(exam)
 
 

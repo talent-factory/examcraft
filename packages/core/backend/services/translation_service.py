@@ -34,6 +34,13 @@ logger = logging.getLogger(__name__)
 DEFAULT_LOCALE = "de"
 SUPPORTED_LOCALES = ["de", "en", "fr", "it"]
 
+_FALLBACK_MESSAGES: dict[str, str] = {
+    "de": "Ein Fehler ist aufgetreten",
+    "en": "An error occurred",
+    "fr": "Une erreur est survenue",
+    "it": "Si è verificato un errore",
+}
+
 _initialized = False
 
 _LOCALES_DIR = os.path.join(os.path.dirname(__file__), "..", "locales")
@@ -76,7 +83,7 @@ def t(key: str, locale: str = DEFAULT_LOCALE, **kwargs) -> str:
         **kwargs: Optional interpolation variables passed to python-i18n.
 
     Returns:
-        Translated string, or the namespaced key if not found.
+        Translated string, or a generic fallback message if not found.
     """
     if not _initialized:
         init_translations()
@@ -88,6 +95,9 @@ def t(key: str, locale: str = DEFAULT_LOCALE, **kwargs) -> str:
     if result == namespaced_key:
         logger.warning(
             "Missing translation key '%s' for locale '%s'", key, effective_locale
+        )
+        return _FALLBACK_MESSAGES.get(
+            effective_locale, _FALLBACK_MESSAGES[DEFAULT_LOCALE]
         )
     return result
 

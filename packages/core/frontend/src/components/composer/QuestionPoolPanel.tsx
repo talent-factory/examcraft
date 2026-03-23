@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
@@ -57,32 +57,32 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
 }) => {
   const { t } = useTranslation();
 
-  const DIFFICULTY_LABELS: Record<string, string> = {
+  const DIFFICULTY_LABELS = useMemo<Record<string, string>>(() => ({
     easy: t('composer.questionPool.difficultyEasy'),
     medium: t('composer.questionPool.difficultyMedium'),
     hard: t('composer.questionPool.difficultyHard'),
-  };
+  }), [t]);
 
-  const TYPE_ABBREV: Record<string, string> = {
+  const TYPE_ABBREV = useMemo<Record<string, string>>(() => ({
     multiple_choice: t('composer.questionPool.typeMultipleChoice'),
     true_false: t('composer.questionPool.typeTrueFalse'),
     open_ended: t('composer.questionPool.typeOpenEnded'),
-  };
+  }), [t]);
 
-  const BLOOM_LABELS: Record<number, string> = {
+  const BLOOM_LABELS = useMemo<Record<number, string>>(() => ({
     1: t('composer.questionPool.bloomRemember'),
     2: t('composer.questionPool.bloomUnderstand'),
     3: t('composer.questionPool.bloomApply'),
     4: t('composer.questionPool.bloomAnalyze'),
     5: t('composer.questionPool.bloomEvaluate'),
     6: t('composer.questionPool.bloomCreate'),
-  };
+  }), [t]);
 
-  const PRESETS: Record<string, {
+  const PRESETS = useMemo<Record<string, {
     bloom: Record<number, number>;
     difficulty: Record<string, number>;
     label: string;
-  }> = {
+  }>>(() => ({
     balanced: {
       label: t('composer.questionPool.presetBalanced'),
       bloom: { 1: 15, 2: 25, 3: 25, 4: 20, 5: 10, 6: 5 },
@@ -93,7 +93,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       bloom: { 1: 10, 2: 15, 3: 35, 4: 25, 5: 10, 6: 5 },
       difficulty: { easy: 20, medium: 40, hard: 40 },
     },
-  };
+  }), [t]);
 
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -602,17 +602,17 @@ const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({
 }) => {
   const { t } = useTranslation();
 
-  const DIFFICULTY_LABELS: Record<string, string> = {
+  const DIFFICULTY_LABELS = useMemo<Record<string, string>>(() => ({
     easy: t('composer.questionPool.difficultyEasy'),
     medium: t('composer.questionPool.difficultyMedium'),
     hard: t('composer.questionPool.difficultyHard'),
-  };
+  }), [t]);
 
-  const TYPE_ABBREV: Record<string, string> = {
+  const TYPE_ABBREV = useMemo<Record<string, string>>(() => ({
     multiple_choice: t('composer.questionPool.typeMultipleChoice'),
     true_false: t('composer.questionPool.typeTrueFalse'),
     open_ended: t('composer.questionPool.typeOpenEnded'),
-  };
+  }), [t]);
 
   return (
     <div

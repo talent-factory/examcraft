@@ -959,12 +959,17 @@ async def add_comment(
 
 @router.get("/{question_id}/history", response_model=List[HistoryResponse])
 async def get_question_history(
-    question_id: int, request: Request, db: Session = Depends(get_db)
+    question_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """
     Hole History für Question
+
+    **Required:** Authenticated user
     """
-    locale = get_request_locale(request)
+    locale = get_request_locale(request, current_user)
     try:
         # Check if question exists
         question = (
