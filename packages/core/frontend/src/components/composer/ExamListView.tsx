@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogTitle,
@@ -15,12 +16,6 @@ interface ExamListViewProps {
   onSelectExam: (id: number) => void;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Entwurf',
-  finalized: 'Finalisiert',
-  exported: 'Exportiert',
-};
-
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-yellow-100 text-yellow-800',
   finalized: 'bg-green-100 text-green-800',
@@ -28,11 +23,18 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<CreateExamRequest>({ title: '', language: 'de' });
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const STATUS_LABELS: Record<string, string> = {
+    draft: t('composer.examList.statusDraft'),
+    finalized: t('composer.examList.statusFinalized'),
+    exported: t('composer.examList.statusExported'),
+  };
 
   const { data, isLoading, isError: isQueryError } = useQuery({
     queryKey: ['exams', searchQuery],
@@ -48,7 +50,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
       onSelectExam(exam.id);
     },
     onError: (err) => {
-      setError(getErrorMessage(err, 'Prüfung konnte nicht erstellt werden. Bitte versuche es erneut.'));
+      setError(getErrorMessage(err, t('composer.examList.errorCreate')));
     },
   });
 
@@ -56,7 +58,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
     mutationFn: ComposerService.deleteExam,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exams'] }),
     onError: (err) => {
-      setError(getErrorMessage(err, 'Prüfung konnte nicht gelöscht werden. Bitte versuche es erneut.'));
+      setError(getErrorMessage(err, t('composer.examList.errorDelete')));
     },
   });
 
@@ -78,16 +80,16 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Exam Composer</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('composer.examList.title')}</h1>
           <p className="text-gray-600 mt-2">
-            Stelle Prüfungen aus genehmigten Fragen zusammen
+            {t('composer.examList.subtitle')}
           </p>
         </div>
         <button
           onClick={() => setDialogOpen(true)}
           className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
         >
-          + Neue Prüfung
+          {t('composer.examList.newExam')}
         </button>
       </div>
 
@@ -98,7 +100,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
           <button
             onClick={() => setError(null)}
             className="ml-4 text-red-500 hover:text-red-700 font-bold text-lg leading-none"
-            aria-label="Fehlermeldung schliessen"
+            aria-label={t('composer.examList.closeError')}
           >
             &times;
           </button>
@@ -109,7 +111,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
       <div>
         <input
           type="text"
-          placeholder="Prüfungen durchsuchen..."
+          placeholder={t('composer.examList.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -118,17 +120,17 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
 
       {/* Exam Grid */}
       {isLoading ? (
-        <div className="text-center py-12 text-gray-500">Lade Prüfungen...</div>
+        <div className="text-center py-12 text-gray-500">{t('composer.examList.loading')}</div>
       ) : isQueryError ? (
         <div className="card p-12 text-center">
           <p className="text-red-500 text-lg">
-            Fehler beim Laden der Prüfungen. Bitte lade die Seite neu.
+            {t('composer.examList.loadError')}
           </p>
         </div>
       ) : !data?.exams.length ? (
         <div className="card p-12 text-center">
           <p className="text-gray-500 text-lg">
-            Noch keine Prüfungen erstellt. Klicke auf "Neue Prüfung" um zu starten.
+            {t('composer.examList.empty')}
           </p>
         </div>
       ) : (
@@ -155,21 +157,21 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
                 <p className="text-sm text-gray-500 mt-1">{exam.course}</p>
               )}
               <div className="flex gap-4 mt-3 text-sm text-gray-600">
-                <span>{exam.question_count} Fragen</span>
-                <span>{exam.total_points} Punkte</span>
-                {exam.exam_date && <span>{new Date(exam.exam_date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>}
+                <span>{t('composer.examList.questionCount', { count: exam.question_count })}</span>
+                <span>{t('composer.examList.pointsCount', { count: exam.total_points })}</span>
+                {exam.exam_date && <span>{new Date(exam.exam_date).toLocaleDateString(i18n.language === 'de' ? 'de-CH' : i18n.language, { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>}
               </div>
               {exam.status === 'draft' && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm('Prüfung wirklich löschen?')) {
+                    if (window.confirm(t('composer.examList.confirmDelete'))) {
                       deleteMutation.mutate(exam.id);
                     }
                   }}
                   className="mt-2 text-xs text-red-500 hover:text-red-700"
                 >
-                  Löschen
+                  {t('composer.examList.delete')}
                 </button>
               )}
             </div>
@@ -179,24 +181,24 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
 
       {/* Create Dialog */}
       <Dialog open={dialogOpen} onClose={handleDialogClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Neue Prüfung erstellen</DialogTitle>
+        <DialogTitle>{t('composer.examList.dialogTitle')}</DialogTitle>
         <DialogContent>
           <div className="space-y-4 mt-2">
             <TextField
-              label="Titel"
+              label={t('composer.examList.fieldTitle')}
               fullWidth
               required
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
             <TextField
-              label="Kurs / Modul"
+              label={t('composer.examList.fieldCourse')}
               fullWidth
               value={form.course || ''}
               onChange={(e) => setForm({ ...form, course: e.target.value })}
             />
             <TextField
-              label="Prüfungsdatum"
+              label={t('composer.examList.fieldExamDate')}
               type="date"
               fullWidth
               InputLabelProps={{ shrink: true }}
@@ -204,7 +206,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
               onChange={(e) => setForm({ ...form, exam_date: e.target.value })}
             />
             <TextField
-              label="Zeitlimit (Minuten)"
+              label={t('composer.examList.fieldTimeLimit')}
               type="number"
               fullWidth
               value={form.time_limit_minutes || ''}
@@ -213,7 +215,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
               }
             />
             <TextField
-              label="Erlaubte Hilfsmittel"
+              label={t('composer.examList.fieldAllowedAids')}
               fullWidth
               multiline
               rows={2}
@@ -224,14 +226,14 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDialogClose} disabled={createMutation.isPending}>
-            Abbrechen
+            {t('composer.examList.cancel')}
           </Button>
           <Button
             onClick={handleCreate}
             variant="contained"
             disabled={!form.title.trim() || createMutation.isPending}
           >
-            {createMutation.isPending ? 'Erstelle...' : 'Erstellen'}
+            {createMutation.isPending ? t('composer.examList.creating') : t('composer.examList.create')}
           </Button>
         </DialogActions>
       </Dialog>

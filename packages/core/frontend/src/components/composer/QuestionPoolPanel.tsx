@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogTitle,
@@ -25,18 +26,6 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   hard: 'bg-red-100 text-red-700',
 };
 
-const DIFFICULTY_LABELS: Record<string, string> = {
-  easy: 'Einfach',
-  medium: 'Mittel',
-  hard: 'Schwer',
-};
-
-const TYPE_ABBREV: Record<string, string> = {
-  multiple_choice: 'MC',
-  true_false: 'W/F',
-  open_ended: 'Offen',
-};
-
 interface AutoFillForm {
   count: string;
   topic: string;
@@ -52,6 +41,20 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   disabled,
   onInvalidate,
 }) => {
+  const { t } = useTranslation();
+
+  const DIFFICULTY_LABELS: Record<string, string> = {
+    easy: t('composer.questionPool.difficultyEasy'),
+    medium: t('composer.questionPool.difficultyMedium'),
+    hard: t('composer.questionPool.difficultyHard'),
+  };
+
+  const TYPE_ABBREV: Record<string, string> = {
+    multiple_choice: t('composer.questionPool.typeMultipleChoice'),
+    true_false: t('composer.questionPool.typeTrueFalse'),
+    open_ended: t('composer.questionPool.typeOpenEnded'),
+  };
+
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState('');
@@ -85,7 +88,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       onInvalidate();
     },
     onError: (err) => {
-      setAutoFillError(getErrorMessage(err, 'Auto-Fill fehlgeschlagen. Nicht genug passende Fragen?'));
+      setAutoFillError(getErrorMessage(err, t('composer.questionPool.errorAutoFill')));
     },
   });
 
@@ -125,13 +128,13 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   return (
     <div className="card p-4 bg-white rounded-lg border border-gray-200 h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-900">Fragenpool</h3>
+        <h3 className="font-semibold text-gray-900">{t('composer.questionPool.panelTitle')}</h3>
         {!disabled && (
           <button
             onClick={() => setAutoFillOpen(true)}
             className="text-sm px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
-            Auto-Fill
+            {t('composer.questionPool.autoFill')}
           </button>
         )}
       </div>
@@ -139,7 +142,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       {/* Search */}
       <input
         type="text"
-        placeholder="Fragen durchsuchen..."
+        placeholder={t('composer.questionPool.searchPlaceholder')}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent mb-2"
@@ -181,10 +184,10 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       {/* Question list */}
       <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
         {isLoading ? (
-          <div className="text-center py-8 text-gray-500 text-sm">Lade Fragen...</div>
+          <div className="text-center py-8 text-gray-500 text-sm">{t('composer.questionPool.loading')}</div>
         ) : !data?.questions.length ? (
           <div className="text-center py-8 text-gray-400 text-sm">
-            Keine genehmigten Fragen gefunden.
+            {t('composer.questionPool.empty')}
           </div>
         ) : (
           data.questions.map((q) => (
@@ -201,17 +204,17 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
 
       {data && (
         <p className="text-xs text-gray-400 mt-2 text-right">
-          {data.total} Fragen verfügbar
+          {t('composer.questionPool.available', { count: data.total })}
         </p>
       )}
 
       {/* Auto-Fill Dialog */}
       <Dialog open={autoFillOpen} onClose={() => { setAutoFillOpen(false); setAutoFillError(null); }} maxWidth="xs" fullWidth>
-        <DialogTitle>Auto-Fill Kriterien</DialogTitle>
+        <DialogTitle>{t('composer.questionPool.autoFillDialogTitle')}</DialogTitle>
         <DialogContent>
           <div className="space-y-4 mt-2">
             <TextField
-              label="Anzahl Fragen"
+              label={t('composer.questionPool.autoFillCount')}
               type="number"
               fullWidth
               inputProps={{ min: 1, max: 20 }}
@@ -219,13 +222,13 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
               onChange={(e) => setAutoFillForm({ ...autoFillForm, count: e.target.value })}
             />
             <TextField
-              label="Thema (optional)"
+              label={t('composer.questionPool.autoFillTopic')}
               fullWidth
               value={autoFillForm.topic}
               onChange={(e) => setAutoFillForm({ ...autoFillForm, topic: e.target.value })}
             />
             <div>
-              <p className="text-sm text-gray-600 mb-1">Schwierigkeitsgrad</p>
+              <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.autoFillDifficulty')}</p>
               <div className="flex gap-2">
                 {(['easy', 'medium', 'hard'] as const).map((d) => (
                   <button
@@ -244,26 +247,26 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-600 mb-1">Fragetypen</p>
+              <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.autoFillTypes')}</p>
               <div className="flex gap-2 flex-wrap">
-                {(['multiple_choice', 'true_false', 'open_ended'] as const).map((t) => (
+                {(['multiple_choice', 'true_false', 'open_ended'] as const).map((qt) => (
                   <button
-                    key={t}
+                    key={qt}
                     type="button"
-                    onClick={() => toggleAutoFillType(t)}
+                    onClick={() => toggleAutoFillType(qt)}
                     className={`text-xs px-2 py-1 rounded-full border transition-colors ${
-                      autoFillForm.question_types.includes(t)
+                      autoFillForm.question_types.includes(qt)
                         ? 'bg-indigo-600 text-white border-indigo-600'
                         : 'bg-white text-gray-600 border-gray-300'
                     }`}
                   >
-                    {TYPE_ABBREV[t]}
+                    {TYPE_ABBREV[qt]}
                   </button>
                 ))}
               </div>
             </div>
             <TextField
-              label="Min. Bloom-Level (1-6, optional)"
+              label={t('composer.questionPool.autoFillBloomLevel')}
               type="number"
               fullWidth
               inputProps={{ min: 1, max: 6 }}
@@ -279,14 +282,14 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setAutoFillOpen(false); setAutoFillError(null); }} disabled={autoFillMutation.isPending}>
-            Abbrechen
+            {t('composer.questionPool.cancel')}
           </Button>
           <Button
             onClick={handleAutoFill}
             variant="contained"
             disabled={autoFillMutation.isPending}
           >
-            {autoFillMutation.isPending ? 'Fülle...' : 'Auto-Fill starten'}
+            {autoFillMutation.isPending ? t('composer.questionPool.autoFillRunning') : t('composer.questionPool.autoFillStart')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -307,6 +310,20 @@ const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({
   disabled,
   onAdd,
 }) => {
+  const { t } = useTranslation();
+
+  const DIFFICULTY_LABELS: Record<string, string> = {
+    easy: t('composer.questionPool.difficultyEasy'),
+    medium: t('composer.questionPool.difficultyMedium'),
+    hard: t('composer.questionPool.difficultyHard'),
+  };
+
+  const TYPE_ABBREV: Record<string, string> = {
+    multiple_choice: t('composer.questionPool.typeMultipleChoice'),
+    true_false: t('composer.questionPool.typeTrueFalse'),
+    open_ended: t('composer.questionPool.typeOpenEnded'),
+  };
+
   return (
     <div
       className={`p-3 rounded-lg border transition-colors ${
@@ -335,14 +352,14 @@ const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({
           )}
         </div>
         {isAdded ? (
-          <span className="text-xs text-green-600 font-medium flex-shrink-0">&#10003; Hinzugefügt</span>
+          <span className="text-xs text-green-600 font-medium flex-shrink-0">&#10003; {t('composer.questionPool.added')}</span>
         ) : (
           <button
             onClick={onAdd}
             disabled={disabled}
             className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
-            + Hinzufügen
+            {t('composer.questionPool.addQuestion')}
           </button>
         )}
       </div>

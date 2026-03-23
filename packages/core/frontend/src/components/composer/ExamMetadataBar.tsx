@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogTitle,
@@ -18,12 +19,6 @@ interface ExamMetadataBarProps {
   onInvalidate: () => void;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Entwurf',
-  finalized: 'Finalisiert',
-  exported: 'Exportiert',
-};
-
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-yellow-100 text-yellow-800',
   finalized: 'bg-green-100 text-green-800',
@@ -41,6 +36,14 @@ interface EditForm {
 }
 
 const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInvalidate }) => {
+  const { t, i18n } = useTranslation();
+
+  const STATUS_LABELS: Record<string, string> = {
+    draft: t('composer.examMetadata.statusDraft'),
+    finalized: t('composer.examMetadata.statusFinalized'),
+    exported: t('composer.examMetadata.statusExported'),
+  };
+
   const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState<EditForm>({
     title: '',
@@ -73,7 +76,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       onInvalidate();
     },
     onError: (err) => {
-      setFinalizeError(getErrorMessage(err, 'Fehler beim Speichern. Bitte lade die Seite neu und versuche es erneut.'));
+      setFinalizeError(getErrorMessage(err, t('composer.examMetadata.errorSave')));
     },
   });
 
@@ -84,7 +87,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       onInvalidate();
     },
     onError: (err) => {
-      setFinalizeError(getErrorMessage(err, 'Finalisierung fehlgeschlagen. Bitte versuche es erneut.'));
+      setFinalizeError(getErrorMessage(err, t('composer.examMetadata.errorFinalize')));
     },
   });
 
@@ -95,7 +98,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       onInvalidate();
     },
     onError: (err) => {
-      setFinalizeError(getErrorMessage(err, 'Zurücksetzen fehlgeschlagen. Bitte versuche es erneut.'));
+      setFinalizeError(getErrorMessage(err, t('composer.examMetadata.errorUnfinalize')));
     },
   });
 
@@ -136,18 +139,18 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
           )}
           <div className="flex gap-4 mt-2 text-sm text-gray-600 flex-wrap">
             <span>
-              <strong>{exam.question_count}</strong> Fragen
+              <strong>{exam.question_count}</strong> {t('composer.examMetadata.questions')}
             </span>
             <span>
-              <strong>{exam.total_points}</strong> Punkte
+              <strong>{exam.total_points}</strong> {t('composer.examMetadata.points')}
             </span>
             {exam.time_limit_minutes && (
               <span>
-                <strong>{exam.time_limit_minutes}</strong> Min.
+                <strong>{exam.time_limit_minutes}</strong> {t('composer.examMetadata.minutes')}
               </span>
             )}
             {exam.exam_date && (
-              <span>Datum: <strong>{new Date(exam.exam_date).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })}</strong></span>
+              <span>{t('composer.examMetadata.date')}: <strong>{new Date(exam.exam_date).toLocaleDateString(i18n.language === 'de' ? 'de-CH' : i18n.language, { day: '2-digit', month: '2-digit', year: 'numeric' })}</strong></span>
             )}
           </div>
         </div>
@@ -160,7 +163,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
                 onClick={openEdit}
                 className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                Metadaten bearbeiten
+                {t('composer.examMetadata.editMetadata')}
               </button>
             )}
 
@@ -170,7 +173,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
                 disabled={finalizeMutation.isPending}
                 className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
               >
-                {finalizeMutation.isPending ? 'Finalisiere...' : 'Finalisieren'}
+                {finalizeMutation.isPending ? t('composer.examMetadata.finalizing') : t('composer.examMetadata.finalize')}
               </button>
             )}
 
@@ -180,7 +183,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
                 disabled={unfinalizeMutation.isPending}
                 className="px-3 py-1.5 text-sm border border-yellow-500 text-yellow-700 rounded-lg hover:bg-yellow-50 transition-colors disabled:opacity-50"
               >
-                {unfinalizeMutation.isPending ? 'Zurücksetzen...' : 'Als Entwurf markieren'}
+                {unfinalizeMutation.isPending ? t('composer.examMetadata.unfinalizingPending') : t('composer.examMetadata.markAsDraft')}
               </button>
             )}
 
@@ -189,7 +192,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
               disabled={exam.question_count === 0}
               className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Exportieren
+              {t('composer.examMetadata.export')}
             </button>
           </div>
 
@@ -201,24 +204,24 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Prüfung bearbeiten</DialogTitle>
+        <DialogTitle>{t('composer.examMetadata.editDialogTitle')}</DialogTitle>
         <DialogContent>
           <div className="space-y-4 mt-2">
             <TextField
-              label="Titel"
+              label={t('composer.examMetadata.fieldTitle')}
               fullWidth
               required
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
             <TextField
-              label="Kurs / Modul"
+              label={t('composer.examMetadata.fieldCourse')}
               fullWidth
               value={form.course}
               onChange={(e) => setForm({ ...form, course: e.target.value })}
             />
             <TextField
-              label="Prüfungsdatum"
+              label={t('composer.examMetadata.fieldExamDate')}
               type="date"
               fullWidth
               InputLabelProps={{ shrink: true }}
@@ -226,14 +229,14 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
               onChange={(e) => setForm({ ...form, exam_date: e.target.value })}
             />
             <TextField
-              label="Zeitlimit (Minuten)"
+              label={t('composer.examMetadata.fieldTimeLimit')}
               type="number"
               fullWidth
               value={form.time_limit_minutes}
               onChange={(e) => setForm({ ...form, time_limit_minutes: e.target.value })}
             />
             <TextField
-              label="Erlaubte Hilfsmittel"
+              label={t('composer.examMetadata.fieldAllowedAids')}
               fullWidth
               multiline
               rows={2}
@@ -241,7 +244,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
               onChange={(e) => setForm({ ...form, allowed_aids: e.target.value })}
             />
             <TextField
-              label="Hinweise / Anweisungen"
+              label={t('composer.examMetadata.fieldInstructions')}
               fullWidth
               multiline
               rows={3}
@@ -249,7 +252,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
               onChange={(e) => setForm({ ...form, instructions: e.target.value })}
             />
             <TextField
-              label="Bestehensprozentsatz (%)"
+              label={t('composer.examMetadata.fieldPassingPercentage')}
               type="number"
               fullWidth
               inputProps={{ min: 0, max: 100, step: 1 }}
@@ -263,14 +266,14 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditOpen(false)} disabled={updateMutation.isPending}>
-            Abbrechen
+            {t('composer.examMetadata.cancel')}
           </Button>
           <Button
             onClick={handleSave}
             variant="contained"
             disabled={!form.title.trim() || updateMutation.isPending}
           >
-            {updateMutation.isPending ? 'Speichere...' : 'Speichern'}
+            {updateMutation.isPending ? t('composer.examMetadata.saving') : t('composer.examMetadata.save')}
           </Button>
         </DialogActions>
       </Dialog>
