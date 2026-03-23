@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../../utils/dateLocale';
 import { useAuth } from '../../contexts/AuthContext';
+import AuthService from '../../services/AuthService';
 
 interface ProfileViewProps {
   onEdit?: () => void;
@@ -35,6 +36,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
     }
 
     return `${API_BASE_URL}/api/auth/avatar/${userId}`;
+  };
+
+  const LANGUAGE_OPTIONS = [
+    { code: 'de', label: 'Deutsch' },
+    { code: 'en', label: 'English' },
+    { code: 'fr', label: 'Français' },
+    { code: 'it', label: 'Italiano' },
+  ];
+
+  const handleLanguageChange = async (lng: string) => {
+    const previousLanguage = i18n.language;
+    try {
+      await i18n.changeLanguage(lng);
+      const token = localStorage.getItem('examcraft_access_token');
+      if (user && token) {
+        await AuthService.updateProfile(token, { preferred_language: lng });
+      }
+    } catch (error) {
+      console.error('[ProfileView] Language change failed:', error);
+      await i18n.changeLanguage(previousLanguage).catch((e: unknown) =>
+        console.error('[ProfileView] Failed to revert language:', e)
+      );
+      localStorage.setItem('examcraft_language', previousLanguage);
+    }
   };
 
   return (
@@ -204,6 +229,32 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
             </div>
           </div>
         )}
+        {/* Settings Section */}
+        <div className="pt-6 border-t border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            {t('profile.profileView.settings')}
+          </h3>
+          <div>
+            <label htmlFor="language-select" className="block text-sm font-medium text-gray-700 mb-2">
+              {t('profile.profileView.language')}
+            </label>
+            <select
+              id="language-select"
+              value={i18n.language?.substring(0, 2)}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+              className="block w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            >
+              {LANGUAGE_OPTIONS.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-sm text-gray-500">
+              {t('profile.profileView.languageHint')}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
