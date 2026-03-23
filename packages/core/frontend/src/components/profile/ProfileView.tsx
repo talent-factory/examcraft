@@ -39,10 +39,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
   };
 
   const LANGUAGE_OPTIONS = [
-    { code: 'de', label: 'Deutsch' },
-    { code: 'en', label: 'English' },
-    { code: 'fr', label: 'Français' },
-    { code: 'it', label: 'Italiano' },
+    { code: 'de', label: '🇩🇪 Deutsch' },
+    { code: 'en', label: '🇬🇧 English' },
+    { code: 'fr', label: '🇫🇷 Français' },
+    { code: 'it', label: '🇮🇹 Italiano' },
   ];
 
   const handleLanguageChange = async (lng: string) => {
