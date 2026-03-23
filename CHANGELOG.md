@@ -15,35 +15,35 @@ and this project adheres to
 
 ### Added
 
-- **Exam Composer (TF-56)**: Vollstaendige Pruefungszusammenstellung mit Drag-and-Drop, Auto-Fill, Export (Markdown/JSON/Moodle XML), Finalisierung und Zwei-Panel-Layout
-- **Auto-Composition Engine (TF-299)**: Constraint-basierte automatische Pruefungszusammenstellung mit Schwierigkeitsgrad- und Themenverteilung
-- **KI-gefuehrter Prompt Wizard (TF-297)**: Interaktiver Chat-Assistent zur Template-Erstellung mit Quick-Options, Live-Vorschau und Session-Management
-- **Internationalisierung i18n (TF-295)**: Vollstaendige Mehrsprachigkeit (DE/EN/FR/IT) fuer Backend-Fehlermeldungen und Frontend-UI
-- **Sprachauswahl auf Profilseite**: Sprachwechsel von NavBar auf Profilseite verschoben mit Laenderflaggen-Emojis
+- **Exam Composer (TF-56)**: Vollständige Prüfungszusammenstellung mit Drag-and-Drop, Auto-Fill, Export (Markdown/JSON/Moodle XML), Finalisierung und Zwei-Panel-Layout
+- **Auto-Composition Engine (TF-299)**: Constraint-basierte automatische Prüfungszusammenstellung mit Schwierigkeitsgrad- und Themenverteilung
+- **KI-geführter Prompt Wizard (TF-297)**: Interaktiver Chat-Assistent zur Template-Erstellung mit Quick-Options, Live-Vorschau und Session-Management
+- **Internationalisierung i18n (TF-295)**: Vollständige Mehrsprachigkeit (DE/EN/FR/IT) für Backend-Fehlermeldungen und Frontend-UI
+- **Sprachauswahl auf Profilseite**: Sprachwechsel von NavBar auf Profilseite verschoben mit Länderflaggen-Emojis
 - **Parallele Fragengenerierung (TF-208)**: Async Celery Tasks mit persistenter Fortschrittsanzeige, WebSocket-Updates und Progress-Callback
-- **Question Metadata Enrichment (TF-300)**: Bloom-Level und geschaetzte Bearbeitungszeit werden automatisch bei Container-Start berechnet und persistiert
-- **Admin-Vereinfachung**: Sidebar-Menu auf einzelnen Admin-Link mit 5 RBAC-Tabs reduziert (Users, Audit, Subscription, Institutions, Roles)
+- **Question Metadata Enrichment (TF-300)**: Bloom-Level und geschätzte Bearbeitungszeit werden automatisch bei Container-Start berechnet und persistiert
+- **Admin-Vereinfachung**: Sidebar-Menü auf einzelnen Admin-Link mit 5 RBAC-Tabs reduziert (Users, Audit, Subscription, Institutions, Roles)
 
 ### Fixed
 
 - Text-Overflow in MarkdownRenderer und Wizard Template-Preview Layout (word-break, pre-wrap, wrapLongLines)
-- Frontend-Tests: i18n-Mock laedt echte deutsche Uebersetzungen statt Translation-Keys zurueckzugeben
+- Frontend-Tests: i18n-Mock lädt echte deutsche Übersetzungen statt Translation-Keys zurückzugeben
 - Google OAuth Login funktioniert jetzt beim ersten Versuch (Exchange-Endpoint repariert)
-- CORS: Content-Disposition Header korrekt exponiert fuer Datei-Downloads
-- Export-Dateinamen enthalten Pruefungsname (lowercase) und Timestamp
-- Exam-Liste aktualisiert sich nach Statusaenderung (Query Invalidation)
+- CORS: Content-Disposition Header korrekt exponiert für Datei-Downloads
+- Export-Dateinamen enthalten Prüfungsname (lowercase) und Timestamp
+- Exam-Liste aktualisiert sich nach Statusänderung (Query Invalidation)
 - Datum wird zweistellig formatiert (21.03.2026 statt 21.3.2026)
-- Prompt-Erstellung: 'created_by' Fehler behoben
-- SyntaxHighlighter Mock fuer Tests erweitert (vscDarkPlus Export)
+- Prompt-Erstellung: `created_by`-Fehler behoben
+- SyntaxHighlighter Mock für Tests erweitert (vscDarkPlus Export)
 
 ### Changed
 
 - Deployment: 2-Tier-Architektur (Core/Full) statt separater Premium/Enterprise Compose-Files
-- Feature-Kontrolle zu 100% ueber RBAC statt Environment-Feature-Flags
+- Feature-Kontrolle zu 100 % über RBAC statt Environment-Feature-Flags
 - CI/CD: Migration von GitLab zu GitHub Actions mit Fly.io Deployment
-- MarkdownRenderer: wrapLongLines und word-break fuer bessere Code-Darstellung
+- MarkdownRenderer: wrapLongLines und word-break für bessere Code-Darstellung
 
----
+## [1.0.0] - 2026-03-18
 
 ### Added - TF-57: Authentication UI Modernization & Tailwind CSS Integration (2025-01-20)
 
@@ -251,10 +251,6 @@ features
 - Fixed import paths in document processors
 - Handled docling-core API changes with fallback imports
 - Resolved dependency conflicts (python-docx, numpy)
-
----
-
-## [1.0.0] - 2025-01-05
 
 ### Added - TF-108: Production Deployment (2025-01-05)
 
