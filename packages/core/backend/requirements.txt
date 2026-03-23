@@ -29,6 +29,9 @@ httpx>=0.28.1
 # SubscribeFlow SDK (Newsletter Subscription)
 subscribeflow>=1.0.5
 
+# Internationalization
+python-i18n[YAML]>=0.3.9            # i18n Translation Support
+
 # Configuration
 pyyaml>=6.0.2                       # YAML Configuration
 # Template Engine (required for Premium features)
