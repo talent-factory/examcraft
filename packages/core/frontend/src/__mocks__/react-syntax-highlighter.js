@@ -4,4 +4,8 @@ function SyntaxHighlighter({ children }) {
   return React.createElement('pre', { 'data-testid': 'syntax-highlighter' }, children);
 }
 
-module.exports = { Prism: SyntaxHighlighter, default: SyntaxHighlighter };
+module.exports = {
+  Prism: SyntaxHighlighter,
+  default: SyntaxHighlighter,
+  vscDarkPlus: {},
+};

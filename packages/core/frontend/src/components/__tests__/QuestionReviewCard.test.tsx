@@ -139,9 +139,9 @@ describe('QuestionReviewCard', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /reject/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Genehmigen/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Ablehnen/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Frage bearbeiten/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /comment/i })).toBeInTheDocument();
     });
 
@@ -155,7 +155,7 @@ describe('QuestionReviewCard', () => {
         </TestWrapper>
       );
 
-      const approveButton = screen.getByRole('button', { name: /approve/i });
+      const approveButton = screen.getByRole('button', { name: /Genehmigen/i });
       fireEvent.click(approveButton);
 
       expect(mockOnApprove).toHaveBeenCalledWith(1);
@@ -171,7 +171,7 @@ describe('QuestionReviewCard', () => {
         </TestWrapper>
       );
 
-      const rejectButton = screen.getByRole('button', { name: /reject/i });
+      const rejectButton = screen.getByRole('button', { name: /Ablehnen/i });
       fireEvent.click(rejectButton);
 
       expect(mockOnReject).toHaveBeenCalledWith(1);
@@ -187,7 +187,7 @@ describe('QuestionReviewCard', () => {
         </TestWrapper>
       );
 
-      const editButton = screen.getByRole('button', { name: /edit/i });
+      const editButton = screen.getByRole('button', { name: /Frage bearbeiten/i });
       fireEvent.click(editButton);
 
       expect(mockOnEdit).toHaveBeenCalledWith(1);
@@ -225,9 +225,9 @@ describe('QuestionReviewCard', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByRole('button', { name: /approve/i })).toBeDisabled();
-      expect(screen.getByRole('button', { name: /reject/i })).toBeDisabled();
-      expect(screen.getByRole('button', { name: /edit/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /Genehmigen/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /Ablehnen/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /Frage bearbeiten/i })).toBeDisabled();
       expect(screen.getByRole('button', { name: /comment/i })).toBeDisabled();
     });
   });

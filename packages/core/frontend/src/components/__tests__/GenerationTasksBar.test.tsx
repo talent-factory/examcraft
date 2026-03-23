@@ -149,7 +149,7 @@ describe('GenerationTasksBar', () => {
 
     render(<GenerationTasksBar />, { wrapper: Wrapper });
 
-    fireEvent.click(screen.getByLabelText('Schliessen'));
+    fireEvent.click(screen.getByLabelText('Schließen'));
     expect(mockDismissTask).toHaveBeenCalledWith('task-dismiss');
   });
 
