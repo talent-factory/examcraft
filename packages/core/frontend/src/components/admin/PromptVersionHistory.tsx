@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../../utils/dateLocale';
 import {
   Container,
   Typography,
@@ -32,6 +34,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
   promptName,
   onBack
 }) => {
+  const { t, i18n } = useTranslation();
   const [versions, setVersions] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +47,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
       const data = await promptsApi.getVersionHistory(promptName);
       setVersions(data.sort((a, b) => b.version - a.version));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Laden der Versionen');
+      setError(err instanceof Error ? err.message : t('admin.promptVersionHistory.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -59,12 +62,12 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
       await promptsApi.toggleActive(version.id, true);
       await loadVersions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Aktivieren');
+      setError(err instanceof Error ? err.message : t('admin.promptVersionHistory.failedActivate'));
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('de-DE', {
+    return new Date(dateString).toLocaleString(getDateLocale(i18n.language), {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -90,11 +93,11 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
           onClick={onBack}
           sx={{ mr: 2 }}
         >
-          Zurück
+          {t('admin.promptVersionHistory.btnBack')}
         </Button>
         <Box>
           <Typography variant="h4" component="h1">
-            Version History
+            {t('admin.promptVersionHistory.title')}
           </Typography>
           <Typography variant="body1" color="text.secondary">
             {promptName}
@@ -113,12 +116,12 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Version</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Beschreibung</TableCell>
-              <TableCell>Erstellt am</TableCell>
-              <TableCell>Aktualisiert am</TableCell>
-              <TableCell align="right">Aktionen</TableCell>
+              <TableCell>{t('admin.promptVersionHistory.colVersion')}</TableCell>
+              <TableCell>{t('admin.promptVersionHistory.colStatus')}</TableCell>
+              <TableCell>{t('admin.promptVersionHistory.colDescription')}</TableCell>
+              <TableCell>{t('admin.promptVersionHistory.colCreatedAt')}</TableCell>
+              <TableCell>{t('admin.promptVersionHistory.colUpdatedAt')}</TableCell>
+              <TableCell align="right">{t('admin.promptVersionHistory.colActions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -141,12 +144,12 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
                   {version.is_active ? (
                     <Chip
                       icon={<CheckCircle />}
-                      label="Aktiv"
+                      label={t('admin.promptVersionHistory.statusActive')}
                       color="success"
                       size="small"
                     />
                   ) : (
-                    <Chip label="Inaktiv" size="small" />
+                    <Chip label={t('admin.promptVersionHistory.statusInactive')} size="small" />
                   )}
                 </TableCell>
                 <TableCell>
@@ -165,7 +168,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
                       startIcon={<Visibility />}
                       onClick={() => setPreviewVersion(version)}
                     >
-                      Vorschau
+                      {t('admin.promptVersionHistory.btnPreview')}
                     </Button>
                     {!version.is_active && (
                       <Button
@@ -174,7 +177,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
                         onClick={() => handleActivate(version)}
                         color="primary"
                       >
-                        Aktivieren
+                        {t('admin.promptVersionHistory.btnActivate')}
                       </Button>
                     )}
                   </Box>
@@ -188,7 +191,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
       {versions.length === 0 && (
         <Paper elevation={1} sx={{ p: 8, textAlign: 'center', mt: 3 }}>
           <Typography variant="h6" color="text.secondary">
-            Keine Versionen gefunden
+            {t('admin.promptVersionHistory.empty')}
           </Typography>
         </Paper>
       )}
@@ -201,20 +204,20 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
         fullWidth
       >
         <DialogTitle>
-          Vorschau: {previewVersion?.name} v{previewVersion?.version}
+          {t('admin.promptVersionHistory.previewTitle', { name: previewVersion?.name, version: previewVersion?.version })}
         </DialogTitle>
         <DialogContent dividers>
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary">
-              Beschreibung:
+              {t('admin.promptVersionHistory.previewDescriptionLabel')}
             </Typography>
             <Typography variant="body2">
-              {previewVersion?.description || 'Keine Beschreibung'}
+              {previewVersion?.description || t('admin.promptVersionHistory.previewNoDescription')}
             </Typography>
           </Box>
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Content:
+              {t('admin.promptVersionHistory.previewContentLabel')}
             </Typography>
             <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
               <MarkdownRenderer content={previewVersion?.content || ''} />
@@ -222,7 +225,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Tags:
+              {t('admin.promptVersionHistory.previewTagsLabel')}
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
               {previewVersion?.tags.map(tag => (
@@ -232,7 +235,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPreviewVersion(null)}>Schließen</Button>
+          <Button onClick={() => setPreviewVersion(null)}>{t('admin.promptVersionHistory.btnClose')}</Button>
           {previewVersion && !previewVersion.is_active && (
             <Button
               onClick={() => {
@@ -241,7 +244,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
               }}
               variant="contained"
             >
-              Diese Version aktivieren
+              {t('admin.promptVersionHistory.btnActivateVersion')}
             </Button>
           )}
         </DialogActions>

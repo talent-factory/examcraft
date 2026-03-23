@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Chip, Tooltip, Box } from '@mui/material';
 import {
   Layers as CoreIcon,
@@ -18,61 +19,6 @@ interface PackageTierInfo {
   features: string[];
 }
 
-const TIER_CONFIG: Record<string, PackageTierInfo> = {
-  free: {
-    tier: 'free',
-    displayName: 'Free',
-    package: 'Core',
-    features: [
-      'Document Upload',
-      'Basic Question Generation',
-      'Document Library',
-      '5 Documents',
-      '20 Questions/Month'
-    ]
-  },
-  starter: {
-    tier: 'starter',
-    displayName: 'Starter',
-    package: 'Premium',
-    features: [
-      'All Free Features',
-      'RAG Generation',
-      'Prompt Templates',
-      'Batch Processing',
-      '50 Documents',
-      '200 Questions/Month'
-    ]
-  },
-  professional: {
-    tier: 'professional',
-    displayName: 'Professional',
-    package: 'Premium',
-    features: [
-      'All Starter Features',
-      'Document ChatBot',
-      'Advanced Prompt Management',
-      'Analytics Dashboard',
-      'Unlimited Documents',
-      '1000 Questions/Month'
-    ]
-  },
-  enterprise: {
-    tier: 'enterprise',
-    displayName: 'Enterprise',
-    package: 'Enterprise',
-    features: [
-      'All Professional Features',
-      'SSO Integration',
-      'Custom Branding',
-      'API Access',
-      'Advanced Analytics',
-      'Priority Support',
-      'LDAP Integration',
-      'Audit Logs'
-    ]
-  }
-};
 
 const TIER_COLORS: Record<string, string> = {
   free: '#9E9E9E',      // Gray
@@ -89,12 +35,65 @@ const TIER_ICONS: Record<string, React.ReactElement> = {
 };
 
 export const PackageTierBadge: React.FC = () => {
+  const { t } = useTranslation();
   const [tierInfo, setTierInfo] = useState<PackageTierInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    detectPackageTier();
-  }, []);
+  const TIER_CONFIG: Record<string, PackageTierInfo> = {
+    free: {
+      tier: 'free',
+      displayName: t('layout.packageTier.displayName.free'),
+      package: 'Core',
+      features: [
+        t('layout.packageTier.features.free.documentUpload'),
+        t('layout.packageTier.features.free.basicQuestionGeneration'),
+        t('layout.packageTier.features.free.documentLibrary'),
+        t('layout.packageTier.features.free.fiveDocuments'),
+        t('layout.packageTier.features.free.twentyQuestionsMonth'),
+      ]
+    },
+    starter: {
+      tier: 'starter',
+      displayName: t('layout.packageTier.displayName.starter'),
+      package: 'Premium',
+      features: [
+        t('layout.packageTier.features.starter.allFreeFeatures'),
+        t('layout.packageTier.features.starter.ragGeneration'),
+        t('layout.packageTier.features.starter.promptTemplates'),
+        t('layout.packageTier.features.starter.batchProcessing'),
+        t('layout.packageTier.features.starter.fiftyDocuments'),
+        t('layout.packageTier.features.starter.twoHundredQuestionsMonth'),
+      ]
+    },
+    professional: {
+      tier: 'professional',
+      displayName: t('layout.packageTier.displayName.professional'),
+      package: 'Premium',
+      features: [
+        t('layout.packageTier.features.professional.allStarterFeatures'),
+        t('layout.packageTier.features.professional.documentChatBot'),
+        t('layout.packageTier.features.professional.advancedPromptManagement'),
+        t('layout.packageTier.features.professional.analyticsDashboard'),
+        t('layout.packageTier.features.professional.unlimitedDocuments'),
+        t('layout.packageTier.features.professional.thousandQuestionsMonth'),
+      ]
+    },
+    enterprise: {
+      tier: 'enterprise',
+      displayName: t('layout.packageTier.displayName.enterprise'),
+      package: 'Enterprise',
+      features: [
+        t('layout.packageTier.features.enterprise.allProfessionalFeatures'),
+        t('layout.packageTier.features.enterprise.ssoIntegration'),
+        t('layout.packageTier.features.enterprise.customBranding'),
+        t('layout.packageTier.features.enterprise.apiAccess'),
+        t('layout.packageTier.features.enterprise.advancedAnalytics'),
+        t('layout.packageTier.features.enterprise.prioritySupport'),
+        t('layout.packageTier.features.enterprise.ldapIntegration'),
+        t('layout.packageTier.features.enterprise.auditLogs'),
+      ]
+    }
+  };
 
   const detectPackageTier = async () => {
     try {
@@ -145,6 +144,11 @@ export const PackageTierBadge: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    detectPackageTier();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (loading || !tierInfo) {
     return null;
   }
@@ -152,10 +156,10 @@ export const PackageTierBadge: React.FC = () => {
   const tooltipContent = (
     <Box sx={{ p: 1 }}>
       <Box sx={{ fontWeight: 'bold', mb: 1 }}>
-        {tierInfo.package} Package - {tierInfo.displayName} Tier
+        {t('layout.packageTier.tooltipTitle', { package: tierInfo.package, displayName: tierInfo.displayName })}
       </Box>
       <Box sx={{ fontSize: '0.875rem' }}>
-        <strong>Features:</strong>
+        <strong>{t('layout.packageTier.featuresLabel')}</strong>
         <Box
           component="ul"
           sx={{ margin: '4px 0', paddingLeft: '20px' }}

@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { UpdateProfileRequest } from '../../types/auth';
 
@@ -13,6 +14,7 @@ interface ProfileEditProps {
 }
 
 export const ProfileEdit: React.FC<ProfileEditProps> = ({ onCancel, onSuccess }) => {
+  const { t } = useTranslation();
   const { user, updateProfile, isLoading, error, clearError } = useAuth();
   const [formData, setFormData] = useState<UpdateProfileRequest>({
     first_name: user?.first_name || '',
@@ -28,13 +30,13 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ onCancel, onSuccess })
 
   const validateForm = (): boolean => {
     if (!formData.first_name || !formData.last_name || !formData.email) {
-      setLocalError('Please fill in all required fields');
+      setLocalError(t('profile.profileEdit.validationRequired'));
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setLocalError('Please enter a valid email address');
+      setLocalError(t('profile.profileEdit.validationEmail'));
       return false;
     }
 
@@ -64,7 +66,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ onCancel, onSuccess })
     <div className="bg-white shadow rounded-lg">
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800">Edit Profile</h2>
+        <h2 className="text-xl font-semibold text-gray-800">{t('profile.profileEdit.header')}</h2>
       </div>
 
       {/* Form */}
@@ -82,7 +84,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ onCancel, onSuccess })
               htmlFor="first_name"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              First Name *
+              {t('profile.profileEdit.firstName')}
             </label>
             <input
               type="text"
@@ -102,7 +104,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ onCancel, onSuccess })
               htmlFor="last_name"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Last Name *
+              {t('profile.profileEdit.lastName')}
             </label>
             <input
               type="text"
@@ -122,7 +124,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ onCancel, onSuccess })
               htmlFor="email"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Email Address *
+              {t('profile.profileEdit.emailAddress')}
             </label>
             <input
               type="email"
@@ -135,25 +137,25 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ onCancel, onSuccess })
               required
             />
             <p className="mt-1 text-sm text-gray-500">
-              Changing your email may require verification
+              {t('profile.profileEdit.emailHint')}
             </p>
           </div>
 
           {/* Read-only fields */}
           <div className="pt-6 border-t border-gray-200">
             <h3 className="text-sm font-medium text-gray-700 mb-4">
-              Account Information (Read-only)
+              {t('profile.profileEdit.readOnlyHeader')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-1">
-                  Institution
+                  {t('profile.profileEdit.institution')}
                 </label>
-                <p className="text-gray-900">{user?.institution?.name || 'N/A'}</p>
+                <p className="text-gray-900">{user?.institution?.name || t('profile.profileEdit.na')}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-1">
-                  Account Status
+                  {t('profile.profileEdit.accountStatus')}
                 </label>
                 <p className="text-gray-900">{user?.status}</p>
               </div>
@@ -170,7 +172,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ onCancel, onSuccess })
               disabled={isLoading}
               className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Cancel
+              {t('profile.profileEdit.cancel')}
             </button>
           )}
           <button
@@ -178,7 +180,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ onCancel, onSuccess })
             disabled={isLoading}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Saving...' : 'Save Changes'}
+            {isLoading ? t('profile.profileEdit.saving') : t('profile.profileEdit.saveChanges')}
           </button>
         </div>
       </form>

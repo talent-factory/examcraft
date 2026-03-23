@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Typography,
@@ -27,6 +28,7 @@ import { Role, Feature, FEATURE_CATEGORIES } from '../../types/rbac';
 import RBACService from '../../services/RBACService';
 
 const FeaturePermissionsMatrix: React.FC = () => {
+  const { t } = useTranslation();
   const [roles, setRoles] = useState<Role[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +51,7 @@ const FeaturePermissionsMatrix: React.FC = () => {
       setRoles(rolesData);
       setFeatures(featuresData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      setError(err instanceof Error ? err.message : t('admin.featureMatrix.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -98,10 +100,10 @@ const FeaturePermissionsMatrix: React.FC = () => {
   return (
     <Box>
       <Typography variant="h5" component="h2" gutterBottom>
-        Feature-Permissions-Matrix
+        {t('admin.featureMatrix.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" paragraph>
-        Übersicht über alle Feature-Zuordnungen zu Rollen.
+        {t('admin.featureMatrix.subtitle')}
       </Typography>
 
       <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
@@ -115,7 +117,7 @@ const FeaturePermissionsMatrix: React.FC = () => {
                   backgroundColor: 'background.paper'
                 }}
               >
-                Feature
+                {t('admin.featureMatrix.colFeature')}
               </TableCell>
               {roles.map((role) => (
                 <TableCell
@@ -132,7 +134,7 @@ const FeaturePermissionsMatrix: React.FC = () => {
                       {role.display_name}
                       {role.is_system_role && (
                         <Chip
-                          label="System"
+                          label={t('admin.featureMatrix.systemBadge')}
                           size="small"
                           sx={{ ml: 0.5, fontSize: '0.6rem' }}
                         />
@@ -201,8 +203,8 @@ const FeaturePermissionsMatrix: React.FC = () => {
       <Box mt={2}>
         <Alert severity="info">
           <Typography variant="body2">
-            <strong>Legende:</strong> <CheckIcon fontSize="small" sx={{ verticalAlign: 'middle', color: 'success.main' }} /> = Zugriff erlaubt,{' '}
-            <CancelIcon fontSize="small" sx={{ verticalAlign: 'middle', color: 'text.disabled' }} /> = Kein Zugriff
+            <strong>{t('admin.featureMatrix.legend')}</strong> <CheckIcon fontSize="small" sx={{ verticalAlign: 'middle', color: 'success.main' }} /> = {t('admin.featureMatrix.legendAccess')}{' '}
+            <CancelIcon fontSize="small" sx={{ verticalAlign: 'middle', color: 'text.disabled' }} /> = {t('admin.featureMatrix.legendNoAccess')}
           </Typography>
         </Alert>
       </Box>

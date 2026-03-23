@@ -26,6 +26,8 @@ import {
   Print,
   Refresh
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../utils/dateLocale';
 import { ExamResponse, Question } from '../types/exam';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -40,6 +42,7 @@ interface UserAnswer {
 }
 
 const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
+  const { t, i18n } = useTranslation();
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [showResults, setShowResults] = useState(false);
 
@@ -83,7 +86,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
             <Chip
-              label={`Frage ${index + 1}`}
+              label={t('components.examDisplay.questionNumber', { number: index + 1 })}
               color="primary"
               size="small"
               sx={{ mr: 2, mt: 0.5 }}
@@ -93,7 +96,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
                 <MarkdownRenderer content={question.question} variant="compact" />
               </Box>
               <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <Chip label={question.type === 'multiple_choice' ? 'Multiple Choice' : 'Offene Frage'} size="small" />
+                <Chip label={question.type === 'multiple_choice' ? t('components.examDisplay.multipleChoice') : t('components.examDisplay.openQuestion')} size="small" />
                 <Chip label={question.difficulty} size="small" color="secondary" />
               </Box>
             </Box>
@@ -149,7 +152,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
               fullWidth
               multiline
               rows={4}
-              placeholder="Ihre Antwort hier eingeben..."
+              placeholder={t('components.examDisplay.answerPlaceholder')}
               value={userAnswer}
               onChange={(e) => handleAnswerChange(String(question.id), e.target.value)}
               disabled={showResults}
@@ -162,7 +165,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
               <AccordionSummary expandIcon={<ExpandMore />}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Lightbulb sx={{ mr: 1, color: 'warning.main' }} />
-                  <Typography variant="subtitle2">Erklärung</Typography>
+                  <Typography variant="subtitle2">{t('components.examDisplay.explanation')}</Typography>
                 </Box>
               </AccordionSummary>
               <AccordionDetails>
@@ -187,15 +190,15 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
               {exam.topic}
             </Typography>
             <Typography variant="subtitle1" color="text.secondary">
-              Prüfung ID: {exam.exam_id}
+              {t('components.examDisplay.examId', { id: exam.exam_id })}
             </Typography>
           </Box>
           <Box sx={{ textAlign: 'right' }}>
             <Typography variant="body2" color="text.secondary">
-              Erstellt: {new Date(exam.created_at).toLocaleDateString('de-DE')}
+              {t('components.examDisplay.created', { date: new Date(exam.created_at).toLocaleDateString(getDateLocale(i18n.language)) })}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {exam.questions.length} Fragen • {exam.metadata.difficulty}
+              {t('components.examDisplay.questionCount', { count: exam.questions.length, difficulty: exam.metadata.difficulty })}
             </Typography>
           </Box>
         </Box>
@@ -206,7 +209,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
             sx={{ mb: 2 }}
           >
             <Typography variant="h6">
-              Ergebnis: {score.correct} von {score.total} Fragen richtig ({score.percentage}%)
+              {t('components.examDisplay.result', { correct: score.correct, total: score.total, percentage: score.percentage })}
             </Typography>
           </Alert>
         )}
@@ -219,7 +222,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
               startIcon={<CheckCircle />}
               disabled={userAnswers.length === 0}
             >
-              Prüfung auswerten
+              {t('components.examDisplay.evaluate')}
             </Button>
           ) : (
             <>
@@ -228,14 +231,14 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
                 onClick={() => setShowResults(false)}
                 startIcon={<Refresh />}
               >
-                Erneut versuchen
+                {t('components.examDisplay.retry')}
               </Button>
               <Button
                 variant="outlined"
                 startIcon={<Print />}
                 onClick={() => window.print()}
               >
-                Drucken
+                {t('components.examDisplay.print')}
               </Button>
             </>
           )}
@@ -245,7 +248,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
             onClick={onNewExam}
             startIcon={<Quiz />}
           >
-            Neue Prüfung
+            {t('components.examDisplay.newExam')}
           </Button>
         </Box>
       </Paper>
@@ -259,7 +262,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
       {!showResults && (
         <Paper elevation={2} sx={{ p: 3, mt: 4, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Beantwortet: {userAnswers.length} von {exam.questions.length} Fragen
+            {t('components.examDisplay.answered', { answered: userAnswers.length, total: exam.questions.length })}
           </Typography>
           <Button
             variant="contained"
@@ -268,7 +271,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
             startIcon={<CheckCircle />}
             disabled={userAnswers.length === 0}
           >
-            Prüfung auswerten
+            {t('components.examDisplay.evaluate')}
           </Button>
         </Paper>
       )}

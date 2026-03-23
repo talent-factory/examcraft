@@ -5,7 +5,7 @@ CRUD, question management, auto-fill, finalize, and export.
 
 from typing import List, Optional, Union
 from datetime import date, datetime, timezone
-from fastapi import APIRouter, HTTPException, Depends, Query, Response
+from fastapi import APIRouter, HTTPException, Depends, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func as sa_func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -15,6 +15,7 @@ from database import get_db
 from models.exam import Exam, ExamQuestion, ExamStatus
 from models.auth import User
 from models.question_review import QuestionReview, ReviewStatus
+from services.translation_service import t, get_request_locale
 from utils.auth_utils import require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
 from services.point_utils import suggest_points
@@ -115,7 +116,9 @@ class ExamListOut(BaseModel):
 # --- Helpers ---
 
 
-def _get_exam_or_404(exam_id: int, db: Session, current_user: User) -> Exam:
+def _get_exam_or_404(
+    exam_id: int, db: Session, current_user: User, locale: str = "de"
+) -> Exam:
     exam = (
         db.query(Exam)
         .options(joinedload(Exam.questions).joinedload(ExamQuestion.question))
@@ -123,17 +126,17 @@ def _get_exam_or_404(exam_id: int, db: Session, current_user: User) -> Exam:
         .first()
     )
     if not exam:
-        raise HTTPException(status_code=404, detail=f"Exam {exam_id} not found")
+        raise HTTPException(status_code=404, detail=t("exams_not_found", locale=locale))
     tenant_context = get_tenant_context(current_user)
     TenantFilter.verify_tenant_access(exam, tenant_context)
     return exam
 
 
-def _require_draft(exam: Exam):
+def _require_draft(exam: Exam, locale: str = "de"):
     if exam.status != ExamStatus.DRAFT.value:
         raise HTTPException(
             status_code=400,
-            detail=f"Exam must be in 'draft' status (current: {exam.status}). Use unfinalize first.",
+            detail=t("exams_must_be_draft", locale=locale),
         )
 
 
@@ -186,10 +189,12 @@ def _exam_detail_to_out(exam: Exam) -> dict:
 @router.post("/", response_model=ExamOut, status_code=201)
 async def create_exam(
     request: ExamCreate,
+    http_request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Create a new exam (draft status)."""
+    locale = get_request_locale(http_request, current_user)
     exam = Exam(
         title=request.title,
         course=request.course,
@@ -209,13 +214,11 @@ async def create_exam(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in create_exam: %s", exc)
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
+        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in create_exam: %s", exc)
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     logger.info(f"Created exam {exam.id} by user {current_user.id}")
     return _exam_to_out(exam)
 
@@ -341,11 +344,13 @@ async def list_approved_questions(
 @router.get("/{exam_id}", response_model=ExamDetailOut)
 async def get_exam(
     exam_id: int,
+    request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Get exam with all questions."""
-    exam = _get_exam_or_404(exam_id, db, current_user)
+    locale = get_request_locale(request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
     return _exam_detail_to_out(exam)
 
 
@@ -353,19 +358,21 @@ async def get_exam(
 async def update_exam(
     exam_id: int,
     request: ExamUpdate,
+    http_request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Update exam metadata. Requires updated_at for optimistic locking."""
-    exam = _get_exam_or_404(exam_id, db, current_user)
-    _require_draft(exam)
+    locale = get_request_locale(http_request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    _require_draft(exam, locale)
 
     # Optimistic locking — compare at microsecond precision with UTC normalisation
     if exam.updated_at and request.updated_at:
         if _to_utc(exam.updated_at) != _to_utc(request.updated_at):
             raise HTTPException(
                 status_code=409,
-                detail="Conflict: exam was modified by another user. Please reload.",
+                detail=t("exams_conflict", locale=locale),
             )
 
     update_data = request.model_dump(exclude_unset=True, exclude={"updated_at"})
@@ -378,13 +385,11 @@ async def update_exam(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in update_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
+        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in update_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     logger.info(f"Updated exam {exam_id} by user {current_user.id}")
     return _exam_to_out(exam)
 
@@ -392,25 +397,25 @@ async def update_exam(
 @router.delete("/{exam_id}", status_code=204)
 async def delete_exam(
     exam_id: int,
+    request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Delete a draft exam."""
-    exam = _get_exam_or_404(exam_id, db, current_user)
-    _require_draft(exam)
+    locale = get_request_locale(request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    _require_draft(exam, locale)
     db.delete(exam)
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in delete_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
+        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in delete_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     logger.info(f"Deleted exam {exam_id} by user {current_user.id}")
 
 
@@ -442,12 +447,14 @@ class ReorderRequest(BaseModel):
 async def add_questions(
     exam_id: int,
     request: AddQuestionsRequest,
+    http_request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Add approved questions to exam with auto-suggested points."""
-    exam = _get_exam_or_404(exam_id, db, current_user)
-    _require_draft(exam)
+    locale = get_request_locale(http_request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    _require_draft(exam, locale)
 
     max_pos = max((eq.position for eq in exam.questions), default=0)
     existing_qids = {eq.question_id for eq in exam.questions}
@@ -459,14 +466,16 @@ async def add_questions(
 
         question = db.query(QuestionReview).filter(QuestionReview.id == qid).first()
         if not question:
-            raise HTTPException(status_code=404, detail=f"Question {qid} not found")
+            raise HTTPException(
+                status_code=404, detail=t("exams_question_not_found", locale=locale)
+            )
 
         TenantFilter.verify_tenant_access(question, tenant_context)
 
         if question.review_status != ReviewStatus.APPROVED.value:
             raise HTTPException(
                 status_code=400,
-                detail=f"Question {qid} is not approved (status: {question.review_status})",
+                detail=t("exams_question_not_approved", locale=locale),
             )
 
         max_pos += 1
@@ -489,13 +498,11 @@ async def add_questions(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in add_questions for exam %s: %s", exam_id, exc)
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
+        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in add_questions for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
 
     return _exam_detail_to_out(exam)
 
@@ -505,12 +512,14 @@ async def update_exam_question(
     exam_id: int,
     eq_id: int,
     request: UpdateExamQuestionRequest,
+    http_request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Update points or section of a question in the exam."""
-    exam = _get_exam_or_404(exam_id, db, current_user)
-    _require_draft(exam)
+    locale = get_request_locale(http_request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    _require_draft(exam, locale)
 
     eq = (
         db.query(ExamQuestion)
@@ -518,7 +527,9 @@ async def update_exam_question(
         .first()
     )
     if not eq:
-        raise HTTPException(status_code=404, detail=f"Exam question {eq_id} not found")
+        raise HTTPException(
+            status_code=404, detail=t("exams_exam_question_not_found", locale=locale)
+        )
 
     if request.points is not None:
         eq.points = request.points
@@ -536,15 +547,13 @@ async def update_exam_question(
         logger.error(
             "IntegrityError in update_exam_question for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
+        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error(
             "Database error in update_exam_question for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
 
     return _exam_detail_to_out(exam)
 
@@ -553,12 +562,14 @@ async def update_exam_question(
 async def remove_exam_question(
     exam_id: int,
     eq_id: int,
+    request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Remove a question from the exam and re-number remaining positions."""
-    exam = _get_exam_or_404(exam_id, db, current_user)
-    _require_draft(exam)
+    locale = get_request_locale(request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    _require_draft(exam, locale)
 
     eq = (
         db.query(ExamQuestion)
@@ -566,7 +577,9 @@ async def remove_exam_question(
         .first()
     )
     if not eq:
-        raise HTTPException(status_code=404, detail=f"Exam question {eq_id} not found")
+        raise HTTPException(
+            status_code=404, detail=t("exams_exam_question_not_found", locale=locale)
+        )
 
     db.delete(eq)
 
@@ -591,15 +604,13 @@ async def remove_exam_question(
         logger.error(
             "IntegrityError in remove_exam_question for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
+        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error(
             "Database error in remove_exam_question for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
 
     return _exam_detail_to_out(exam)
 
@@ -608,12 +619,14 @@ async def remove_exam_question(
 async def reorder_questions(
     exam_id: int,
     request: ReorderRequest,
+    http_request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Batch reorder questions in the exam."""
-    exam = _get_exam_or_404(exam_id, db, current_user)
-    _require_draft(exam)
+    locale = get_request_locale(http_request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    _require_draft(exam, locale)
 
     eq_map = {eq.id: eq for eq in exam.questions}
 
@@ -621,7 +634,8 @@ async def reorder_questions(
     for item in request.order:
         if item.id not in eq_map:
             raise HTTPException(
-                status_code=404, detail=f"Exam question {item.id} not found"
+                status_code=404,
+                detail=t("exams_exam_question_not_found", locale=locale),
             )
 
     # Temporarily set positions negative to avoid unique constraint violations
@@ -640,15 +654,13 @@ async def reorder_questions(
         logger.error(
             "IntegrityError in reorder_questions for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
+        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error(
             "Database error in reorder_questions for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     return _exam_detail_to_out(exam)
 
 
@@ -723,6 +735,7 @@ class AutoComposePreview(BaseModel):
 async def auto_fill_questions(
     exam_id: int,
     request: AutoFillRequest,
+    http_request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
@@ -731,8 +744,9 @@ async def auto_fill_questions(
     Simple mode: random selection by count (default when no composition constraints set).
     Composition mode: constraint-based greedy optimization with optional preview.
     """
-    exam = _get_exam_or_404(exam_id, db, current_user)
-    _require_draft(exam)
+    locale = get_request_locale(http_request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    _require_draft(exam, locale)
 
     if request.is_composition_mode:
         return _auto_compose(exam, request, current_user, db)
@@ -925,7 +939,7 @@ def _auto_fill_simple(
     query = _build_candidate_query(exam, request, current_user, db)
     candidates = query.order_by(sa_func.random()).limit(count).all()
     if not candidates:
-        raise HTTPException(status_code=404, detail="No matching questions found")
+        raise HTTPException(status_code=404, detail="No matching questions found.")
 
     max_pos = max((eq.position for eq in exam.questions), default=0)
     for q in candidates:
@@ -948,15 +962,19 @@ def _auto_fill_simple(
 @router.post("/{exam_id}/finalize", response_model=ExamOut)
 async def finalize_exam(
     exam_id: int,
+    request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Finalize exam. Validates all questions are still approved."""
-    exam = _get_exam_or_404(exam_id, db, current_user)
-    _require_draft(exam)
+    locale = get_request_locale(request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    _require_draft(exam, locale)
 
     if not exam.questions:
-        raise HTTPException(status_code=400, detail="Cannot finalize an empty exam")
+        raise HTTPException(
+            status_code=400, detail=t("exams_cannot_finalize_empty", locale=locale)
+        )
 
     # Check all questions are still approved
     non_approved = [
@@ -965,10 +983,9 @@ async def finalize_exam(
         if eq.question.review_status != ReviewStatus.APPROVED.value
     ]
     if non_approved:
-        ids = [eq.question_id for eq in non_approved]
         raise HTTPException(
             status_code=400,
-            detail=f"Questions no longer approved: {ids}. Remove them before finalizing.",
+            detail=t("exams_questions_not_approved", locale=locale),
         )
 
     exam.status = ExamStatus.FINALIZED.value
@@ -978,26 +995,28 @@ async def finalize_exam(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in finalize_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
+        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in finalize_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     return _exam_to_out(exam)
 
 
 @router.post("/{exam_id}/unfinalize", response_model=ExamOut)
 async def unfinalize_exam(
     exam_id: int,
+    request: Request,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Revert exam from finalized/exported to draft."""
-    exam = _get_exam_or_404(exam_id, db, current_user)
+    locale = get_request_locale(request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
     if exam.status not in (ExamStatus.FINALIZED.value, ExamStatus.EXPORTED.value):
-        raise HTTPException(status_code=400, detail="Exam is already a draft")
+        raise HTTPException(
+            status_code=400, detail=t("exams_already_draft", locale=locale)
+        )
 
     exam.status = ExamStatus.DRAFT.value
     try:
@@ -1006,13 +1025,11 @@ async def unfinalize_exam(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in unfinalize_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(
-            status_code=409, detail="Conflict. Please reload and try again."
-        )
+        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in unfinalize_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=500, detail="Database error. Please try again.")
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     return _exam_to_out(exam)
 
 
@@ -1024,20 +1041,24 @@ async def export_exam(
     exam_id: int,
     format: str,
     include_solutions: bool = Query(False),
+    request: Request = None,
     current_user: User = Depends(require_permission("exams:create")),
     db: Session = Depends(get_db),
 ):
     """Export exam in specified format (md, json, moodle)."""
-    exam = _get_exam_or_404(exam_id, db, current_user)
+    locale = get_request_locale(request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
 
     if exam.status == ExamStatus.DRAFT.value:
         raise HTTPException(
             status_code=400,
-            detail="Prüfung muss vor dem Export finalisiert werden.",
+            detail=t("exams_must_finalize_before_export", locale=locale),
         )
 
     if not exam.questions:
-        raise HTTPException(status_code=400, detail="Cannot export an empty exam")
+        raise HTTPException(
+            status_code=400, detail=t("exams_cannot_export_empty", locale=locale)
+        )
 
     exam_data = _exam_detail_to_out(exam)
     # Convert date to string for export
@@ -1065,7 +1086,7 @@ async def export_exam(
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported format: {format}. Use md, json, or moodle.",
+            detail=t("exams_unsupported_format", locale=locale),
         )
 
     # Update status to exported if currently finalized

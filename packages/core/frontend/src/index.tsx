@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import { AppWithAuth } from './AppWithAuth';
 import { initSentry } from './config/sentry';
+import './i18n';
 
 // Initialize Sentry before rendering the app
 initSentry();

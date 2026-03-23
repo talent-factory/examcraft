@@ -4,11 +4,13 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { InstitutionList } from './InstitutionList';
 import { InstitutionEditDialog } from './InstitutionEditDialog';
 import { InstitutionCreateDialog } from './InstitutionCreateDialog';
 
 export const InstitutionManagementPage: React.FC = () => {
+  const { t } = useTranslation();
   const [editInstitutionId, setEditInstitutionId] = useState<number | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -38,9 +40,9 @@ export const InstitutionManagementPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Institution Management</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('admin.institutionManagement.title')}</h1>
           <p className="mt-2 text-sm text-gray-600">
-            Manage institutions and subscription tiers
+            {t('admin.institutionManagement.subtitle')}
           </p>
         </div>
 

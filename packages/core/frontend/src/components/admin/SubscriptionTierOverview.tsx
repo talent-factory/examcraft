@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Card,
@@ -29,6 +30,7 @@ import { SubscriptionTier, TierQuota, TIER_COLORS, RESOURCE_TYPE_LABELS } from '
 import RBACService from '../../services/RBACService';
 
 const SubscriptionTierOverview: React.FC = () => {
+  const { t } = useTranslation();
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
   const [quotas, setQuotas] = useState<Record<string, TierQuota[]>>({});
   const [loading, setLoading] = useState(true);
@@ -57,14 +59,14 @@ const SubscriptionTierOverview: React.FC = () => {
       );
       setQuotas(quotasData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load subscription tiers');
+      setError(err instanceof Error ? err.message : t('admin.subscriptionTier.failedLoad'));
     } finally {
       setLoading(false);
     }
   };
 
   const formatQuotaValue = (value: number): string => {
-    if (value === -1) return 'Unlimited';
+    if (value === -1) return t('admin.subscriptionTier.unlimited');
     if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
     return value.toString();
   };
@@ -95,10 +97,10 @@ const SubscriptionTierOverview: React.FC = () => {
   return (
     <Box>
       <Typography variant="h5" component="h2" gutterBottom>
-        Subscription Tiers
+        {t('admin.subscriptionTier.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" paragraph>
-        Übersicht über alle verfügbaren Subscription-Stufen mit Preisen und Ressourcen-Limits.
+        {t('admin.subscriptionTier.subtitle')}
       </Typography>
 
       <Grid container spacing={3} mb={4}>
@@ -126,26 +128,26 @@ const SubscriptionTierOverview: React.FC = () => {
                     {formatPrice(tier.price_monthly)}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    pro Monat
+                    {t('admin.subscriptionTier.perMonth')}
                   </Typography>
                 </Box>
 
                 {tier.price_yearly > 0 && (
                   <Box mb={2}>
                     <Typography variant="body2" color="text.secondary">
-                      {formatPrice(tier.price_yearly)} / Jahr
+                      {formatPrice(tier.price_yearly)} {t('admin.subscriptionTier.perYear')}
                     </Typography>
                     <Typography variant="caption" color="success.main">
-                      Spare {formatPrice(tier.price_monthly * 12 - tier.price_yearly)}
+                      {t('admin.subscriptionTier.save', { amount: formatPrice(tier.price_monthly * 12 - tier.price_yearly) })}
                     </Typography>
                   </Box>
                 )}
 
                 <Box mt={2}>
                   {tier.is_active ? (
-                    <Chip label="Verfügbar" size="small" color="success" />
+                    <Chip label={t('admin.subscriptionTier.available')} size="small" color="success" />
                   ) : (
-                    <Chip label="Nicht verfügbar" size="small" color="default" />
+                    <Chip label={t('admin.subscriptionTier.notAvailable')} size="small" color="default" />
                   )}
                 </Box>
               </CardContent>
@@ -155,14 +157,14 @@ const SubscriptionTierOverview: React.FC = () => {
       </Grid>
 
       <Typography variant="h6" component="h3" gutterBottom>
-        Ressourcen-Limits pro Tier
+        {t('admin.subscriptionTier.resourceLimitsTitle')}
       </Typography>
 
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Ressource</TableCell>
+              <TableCell>{t('admin.subscriptionTier.resourceCol')}</TableCell>
               {tiers.map((tier) => (
                 <TableCell key={tier.id} align="center">
                   <Box
@@ -192,7 +194,7 @@ const SubscriptionTierOverview: React.FC = () => {
                       {value === -1 ? (
                         <Box display="flex" alignItems="center" justifyContent="center">
                           <InfinityIcon sx={{ mr: 0.5 }} />
-                          <Typography variant="body2">Unlimited</Typography>
+                          <Typography variant="body2">{t('admin.subscriptionTier.unlimited')}</Typography>
                         </Box>
                       ) : value > 0 ? (
                         <Typography variant="body2" fontWeight="medium">
@@ -213,8 +215,7 @@ const SubscriptionTierOverview: React.FC = () => {
       <Box mt={4}>
         <Alert severity="info">
           <Typography variant="body2">
-            <strong>Hinweis:</strong> Ressourcen-Limits werden monatlich zurückgesetzt.
-            Unlimited bedeutet keine Beschränkung.
+            {t('admin.subscriptionTier.infoNote')}
           </Typography>
         </Alert>
       </Box>

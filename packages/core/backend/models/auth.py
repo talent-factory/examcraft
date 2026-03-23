@@ -294,6 +294,9 @@ class User(Base):
     # Preferences (JSON)
     preferences = Column(Text, nullable=True)  # JSON string für User Preferences
 
+    # Language Preference (i18n)
+    preferred_language = Column(String(5), nullable=True, default=None)
+
     # GDPR Compliance
     deletion_requested_at = Column(
         DateTime(timezone=True), nullable=True
@@ -332,6 +335,10 @@ class User(Base):
         CheckConstraint(
             "status IN ('active', 'inactive', 'suspended', 'pending')",
             name="check_user_status",
+        ),
+        CheckConstraint(
+            "preferred_language IN ('de', 'en', 'fr', 'it') OR preferred_language IS NULL",
+            name="ck_user_preferred_language",
         ),
     )
 

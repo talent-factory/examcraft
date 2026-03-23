@@ -4,12 +4,14 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UserList } from './UserList';
 import { UserEditDialog } from './UserEditDialog';
 import { RoleAssignmentDialog } from './RoleAssignmentDialog';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const UserManagementPage: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isAdmin = user?.is_superuser || user?.roles?.some(r => r.name === 'admin') || false;
   const [editUserId, setEditUserId] = useState<number | null>(null);
@@ -43,9 +45,9 @@ export const UserManagementPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('admin.userManagement.title')}</h1>
           <p className="mt-2 text-sm text-gray-600">
-            Manage users, assign roles, and control access permissions
+            {t('admin.userManagement.subtitle')}
           </p>
         </div>
 

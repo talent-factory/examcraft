@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Box, Container, Paper, Typography, Button, Alert } from '@mui/material';
 import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import ResendVerificationButton from '../components/auth/ResendVerificationButton';
@@ -7,6 +8,7 @@ import ResendVerificationButton from '../components/auth/ResendVerificationButto
 const RegistrationSuccessPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const email = (location.state as any)?.email || '';
 
   const handleGoToDashboard = () => {
@@ -35,10 +37,10 @@ const RegistrationSuccessPage: React.FC = () => {
             sx={{ fontSize: 80, color: 'primary.main', mb: 2 }}
           />
           <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
-            Registration Successful! 🎉
+            {t('pages.registrationSuccess.title')}
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Welcome to ExamCraft AI! We've sent a verification email to:
+            {t('pages.registrationSuccess.subtitle')}
           </Typography>
           <Alert severity="info" sx={{ mb: 3 }}>
             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
@@ -46,13 +48,12 @@ const RegistrationSuccessPage: React.FC = () => {
             </Typography>
           </Alert>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Please check your inbox and click the verification link to activate your account.
-            The link will expire in 24 hours.
+            {t('pages.registrationSuccess.checkInbox')}
           </Typography>
 
           <Box sx={{ mb: 3 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Didn't receive the email?
+              {t('pages.registrationSuccess.didntReceive')}
             </Typography>
             {email && <ResendVerificationButton email={email} variant="outlined" fullWidth />}
           </Box>
@@ -69,12 +70,11 @@ const RegistrationSuccessPage: React.FC = () => {
               },
             }}
           >
-            Continue to Dashboard
+            {t('pages.registrationSuccess.continueToDashboard')}
           </Button>
 
           <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-            You can still access the dashboard, but some features may be limited until you verify
-            your email.
+            {t('pages.registrationSuccess.limitedAccess')}
           </Typography>
         </Paper>
       </Box>

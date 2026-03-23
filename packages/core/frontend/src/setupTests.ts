@@ -140,6 +140,19 @@ export const waitForLoadingToFinish = () => {
   return new Promise(resolve => setTimeout(resolve, 0));
 };
 
+// Mock react-i18next
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: {
+      changeLanguage: jest.fn().mockResolvedValue(undefined),
+      language: 'de',
+    },
+  }),
+  Trans: ({ children }: { children: React.ReactNode }) => children,
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
+}));
+
 // Mock environment variables
 process.env.REACT_APP_API_URL = 'http://localhost:8000';
 

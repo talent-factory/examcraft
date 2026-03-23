@@ -3,7 +3,7 @@ Admin API Endpoints
 User Management, Role Assignment, Institution Management
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pydantic import BaseModel, EmailStr, Field
@@ -13,6 +13,7 @@ import json
 
 from database import get_db
 from models.auth import User, Role, Institution, UserStatus
+from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_superuser, get_current_user
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,9 @@ def _is_admin_role(user: User) -> bool:
     return any(role.name == "admin" for role in user.roles)
 
 
-def _require_same_institution(current_user: User, target_user: User) -> None:
+def _require_same_institution(
+    current_user: User, target_user: User, locale: str = "de"
+) -> None:
     """Raise 403 if non-superuser tries to access user from different institution."""
     if (
         not current_user.is_superuser
@@ -32,11 +35,13 @@ def _require_same_institution(current_user: User, target_user: User) -> None:
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot access users from other institutions",
+            detail=t("admin_cross_institution_access_denied", locale=locale),
         )
 
 
-def _require_write_access(current_user: User, target_user: User) -> None:
+def _require_write_access(
+    current_user: User, target_user: User, locale: str = "de"
+) -> None:
     """Raise 403 if user cannot edit the target user.
     Superuser can edit anyone. Admin can edit users in own institution.
     """
@@ -49,7 +54,7 @@ def _require_write_access(current_user: User, target_user: User) -> None:
         return
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Not enough permissions to edit this user",
+        detail=t("admin_insufficient_permissions", locale=locale),
     )
 
 
@@ -257,6 +262,7 @@ async def list_users(
 @router.get("/users/{user_id}", response_model=UserDetailResponse)
 async def get_user(
     user_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -266,14 +272,16 @@ async def get_user(
     - Superuser: can view any user
     - Others: can only view users in own institution
     """
+    locale = get_request_locale(request, current_user)
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("admin_user_not_found", locale=locale),
         )
 
-    _require_same_institution(current_user, user)
+    _require_same_institution(current_user, user, locale)
 
     # Build role responses with parsed permissions
     role_responses = []
@@ -319,6 +327,7 @@ async def get_user(
 async def update_user(
     user_id: int,
     request: UpdateUserRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -329,14 +338,16 @@ async def update_user(
     - Admin: can edit users in own institution
     - Others: 403
     """
+    locale = get_request_locale(http_request, current_user)
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("admin_user_not_found", locale=locale),
         )
 
-    _require_write_access(current_user, user)
+    _require_write_access(current_user, user, locale)
 
     # Update fields
     if request.first_name is not None:
@@ -354,7 +365,8 @@ async def update_user(
         )
         if existing_user:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Email already in use"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=t("admin_email_already_in_use", locale=locale),
             )
         user.email = request.email
 
@@ -407,6 +419,7 @@ async def update_user(
 async def update_user_status(
     user_id: int,
     request: UpdateUserStatusRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -417,20 +430,22 @@ async def update_user_status(
     - Admin: can change status of users in own institution
     - Others: 403
     """
+    locale = get_request_locale(http_request, current_user)
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("admin_user_not_found", locale=locale),
         )
 
-    _require_write_access(current_user, user)
+    _require_write_access(current_user, user, locale)
 
     # Prevent admin from deactivating themselves
     if user.id == current_user.id and request.status != UserStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot deactivate your own account",
+            detail=t("admin_cannot_deactivate_self", locale=locale),
         )
 
     user.status = request.status.value
@@ -483,6 +498,7 @@ async def update_user_status(
 async def assign_role_to_user(
     user_id: int,
     request: AssignRoleRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -493,26 +509,30 @@ async def assign_role_to_user(
     - Admin: can assign roles to users in own institution
     - Others: 403
     """
+    locale = get_request_locale(http_request, current_user)
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("admin_user_not_found", locale=locale),
         )
 
-    _require_write_access(current_user, user)
+    _require_write_access(current_user, user, locale)
 
     role = db.query(Role).filter(Role.id == request.role_id).first()
 
     if not role:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Role not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("admin_role_not_found", locale=locale),
         )
 
     # Check if user already has this role
     if role in user.roles:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="User already has this role"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=t("admin_user_already_has_role", locale=locale),
         )
 
     user.roles.append(role)
@@ -565,6 +585,7 @@ async def assign_role_to_user(
 async def remove_role_from_user(
     user_id: int,
     role_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -575,34 +596,37 @@ async def remove_role_from_user(
     - Admin: can remove roles from users in own institution
     - Others: 403
     """
+    locale = get_request_locale(request, current_user)
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("admin_user_not_found", locale=locale),
         )
 
-    _require_write_access(current_user, user)
+    _require_write_access(current_user, user, locale)
 
     role = db.query(Role).filter(Role.id == role_id).first()
 
     if not role:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Role not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("admin_role_not_found", locale=locale),
         )
 
     # Check if user has this role
     if role not in user.roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User does not have this role",
+            detail=t("admin_user_does_not_have_role", locale=locale),
         )
 
     # Prevent removing last role
     if len(user.roles) == 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot remove last role from user",
+            detail=t("admin_cannot_remove_last_role", locale=locale),
         )
 
     user.roles.remove(role)
@@ -735,6 +759,7 @@ class UpdateInstitutionRequest(BaseModel):
 async def update_institution(
     institution_id: int,
     update_data: UpdateInstitutionRequest,
+    request: Request,
     current_user: User = Depends(get_current_superuser),
     db: Session = Depends(get_db),
 ):
@@ -745,12 +770,15 @@ async def update_institution(
     - Automatically updates quotas when subscription_tier changes
     - Requires 'manage_users' permission
     """
+    locale = get_request_locale(request, current_user)
     from config.features import SubscriptionTier, TIER_QUOTAS
 
     # Get institution
     institution = db.query(Institution).filter(Institution.id == institution_id).first()
     if not institution:
-        raise HTTPException(status_code=404, detail="Institution not found")
+        raise HTTPException(
+            status_code=404, detail=t("admin_institution_not_found", locale=locale)
+        )
 
     # Update fields
     if update_data.name is not None:
@@ -775,7 +803,7 @@ async def update_institution(
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid subscription tier. Must be one of: {', '.join([t.value for t in SubscriptionTier])}",
+                detail=t("admin_invalid_subscription_tier", locale=locale),
             )
 
         institution.subscription_tier = tier.value
@@ -815,6 +843,7 @@ class CreateInstitutionRequest(BaseModel):
 @router.post("/institutions", response_model=InstitutionResponse, status_code=201)
 async def create_institution(
     institution_data: CreateInstitutionRequest,
+    request: Request,
     current_user: User = Depends(get_current_superuser),
     db: Session = Depends(get_db),
 ):
@@ -825,6 +854,7 @@ async def create_institution(
     - Automatically sets quotas based on tier
     - Requires 'manage_users' permission
     """
+    locale = get_request_locale(request, current_user)
     from config.features import SubscriptionTier, TIER_QUOTAS
 
     # Validate tier
@@ -833,7 +863,7 @@ async def create_institution(
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid subscription tier. Must be one of: {', '.join([t.value for t in SubscriptionTier])}",
+            detail=t("admin_invalid_subscription_tier", locale=locale),
         )
 
     # Check if domain already exists
@@ -844,7 +874,8 @@ async def create_institution(
     )
     if existing:
         raise HTTPException(
-            status_code=400, detail="Institution with this domain already exists"
+            status_code=400,
+            detail=t("admin_institution_domain_exists", locale=locale),
         )
 
     # Get quotas for tier

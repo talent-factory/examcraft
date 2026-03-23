@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogTitle,
@@ -24,12 +25,6 @@ interface ExportDialogProps {
 
 type ExportFormat = 'md' | 'json' | 'moodle';
 
-const FORMAT_LABELS: Record<ExportFormat, string> = {
-  md: 'Markdown (.md)',
-  json: 'JSON (.json)',
-  moodle: 'Moodle XML (.xml)',
-};
-
 const ExportDialog: React.FC<ExportDialogProps> = ({
   open,
   onClose,
@@ -37,10 +32,17 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   examTitle,
   hasQuestions,
 }) => {
+  const { t } = useTranslation();
   const [format, setFormat] = useState<ExportFormat>('md');
   const [includeSolutions, setIncludeSolutions] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const FORMAT_LABELS: Record<ExportFormat, string> = {
+    md: t('composer.exportDialog.formatMd'),
+    json: t('composer.exportDialog.formatJson'),
+    moodle: t('composer.exportDialog.formatMoodle'),
+  };
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -55,7 +57,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
     } catch (err) {
       console.error('Export failed:', err);
       // Try to extract detail from blob response for better error messages
-      let message = 'Export fehlgeschlagen. Bitte versuche es erneut.';
+      let message = t('composer.exportDialog.errorExport');
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosError = err as { response?: { data?: Blob | { detail?: string }; headers?: Record<string, string> } };
         const responseData = axiosError.response?.data;
@@ -88,7 +90,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Prüfung exportieren</DialogTitle>
+      <DialogTitle>{t('composer.exportDialog.title')}</DialogTitle>
       <DialogContent>
         <p className="text-sm text-gray-600 mb-4">
           <strong>{examTitle}</strong>
@@ -96,7 +98,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
 
         <FormControl component="fieldset" fullWidth>
           <FormLabel component="legend" className="text-sm font-medium text-gray-700 mb-2">
-            Format
+            {t('composer.exportDialog.formatLabel')}
           </FormLabel>
           <RadioGroup
             value={format}
@@ -123,14 +125,14 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                   onChange={(e) => setIncludeSolutions(e.target.checked)}
                 />
               }
-              label="Loesungen einschliessen"
+              label={t('composer.exportDialog.includeSolutions')}
             />
           </div>
         )}
 
         {!hasQuestions && (
           <p className="text-amber-600 text-sm mt-3">
-            Die Prüfung hat noch keine Fragen. Füge zuerst Fragen hinzu.
+            {t('composer.exportDialog.noQuestionsWarning')}
           </p>
         )}
 
@@ -140,14 +142,14 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} disabled={isDownloading}>
-          Abbrechen
+          {t('composer.exportDialog.cancel')}
         </Button>
         <Button
           onClick={handleDownload}
           variant="contained"
           disabled={!hasQuestions || isDownloading}
         >
-          {isDownloading ? 'Exportiere...' : 'Herunterladen'}
+          {isDownloading ? t('composer.exportDialog.exporting') : t('composer.exportDialog.download')}
         </Button>
       </DialogActions>
     </Dialog>

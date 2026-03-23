@@ -7,6 +7,7 @@ import React, {
   useCallback,
 } from 'react';
 import { useAuth } from './AuthContext';
+import i18n from '../i18n';
 import type {
   GenerationTaskState,
   GenerationTasksContextType,
@@ -81,7 +82,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
             ...prev[taskId],
             status: 'SUCCESS',
             progress: 100,
-            message: data.message || 'Fertig',
+            message: data.message || i18n.t('contexts.generationTasks.done'),
             result: data.result,
           },
         }));
@@ -93,7 +94,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
             ...prev[taskId],
             status: data.status,
             progress: prev[taskId]?.progress ?? 0,
-            message: data.error || 'Fehler aufgetreten',
+            message: data.error || i18n.t('contexts.generationTasks.errorOccurred'),
             result: null,
           },
         }));
@@ -183,7 +184,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
         taskId: task_id,
         status: 'PENDING',
         progress: 0,
-        message: 'Gestartet...',
+        message: i18n.t('contexts.generationTasks.started'),
         topic: request.topic,
         questionCount: request.question_count,
         createdAt: new Date().toISOString(),

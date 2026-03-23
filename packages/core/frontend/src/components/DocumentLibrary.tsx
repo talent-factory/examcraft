@@ -42,6 +42,8 @@ import {
   CloudUpload,
   PlayArrow
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '../utils/dateLocale';
 import { DocumentService } from '../services/DocumentService';
 import { Document, DocumentStatus } from '../types/document';
 
@@ -54,6 +56,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   onCreateRAGExam,
   refreshTrigger
 }) => {
+  const { t, i18n } = useTranslation();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -91,7 +94,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       const docs = await DocumentService.getDocuments();
       setDocuments(docs);
     } catch (err) {
-      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Laden der Dokumente');
+      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.loadError'));
     } finally {
       // ALWAYS set loading to false after load completes
       setLoading(false);
@@ -100,7 +103,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         setHasLoadedOnce(true);
       }
     }
-  }, [hasLoadedOnce]);
+  }, [hasLoadedOnce, t]);
 
   // Initial load and refresh trigger
   useEffect(() => {
@@ -137,15 +140,15 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const getStatusChip = (status: DocumentStatus) => {
     switch (status) {
       case DocumentStatus.UPLOADED:
-        return <Chip icon={<CloudUpload />} label="Hochgeladen" color="default" size="small" />;
+        return <Chip icon={<CloudUpload />} label={t('components.documentLibrary.statusUploaded')} color="default" size="small" />;
       case DocumentStatus.PROCESSING:
-        return <Chip icon={<Schedule />} label="Verarbeitung..." color="warning" size="small" />;
+        return <Chip icon={<Schedule />} label={t('components.documentLibrary.statusProcessing')} color="warning" size="small" />;
       case DocumentStatus.PROCESSED:
-        return <Chip icon={<CheckCircle />} label="Verarbeitet" color="success" size="small" />;
+        return <Chip icon={<CheckCircle />} label={t('components.documentLibrary.statusProcessed')} color="success" size="small" />;
       case DocumentStatus.ERROR:
-        return <Chip icon={<ErrorIcon />} label="Fehler" color="error" size="small" />;
+        return <Chip icon={<ErrorIcon />} label={t('components.documentLibrary.statusError')} color="error" size="small" />;
       default:
-        return <Chip label="Unbekannt" color="default" size="small" />;
+        return <Chip label={t('components.documentLibrary.statusUnknown')} color="default" size="small" />;
     }
   };
 
@@ -158,7 +161,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   };
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('de-DE', {
+    return new Date(dateString).toLocaleDateString(getDateLocale(i18n.language), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -233,7 +236,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       setSelectedDocuments(prev => prev.filter(id => id !== deleteDialog.document!.id));
       setDeleteDialog({ open: false, document: null });
     } catch (err) {
-      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Löschen');
+      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.deleteError'));
     }
   };
 
@@ -243,7 +246,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       await DocumentService.downloadDocument(document.id, document.original_filename);
       handleMenuClose();
     } catch (err) {
-      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Download');
+      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.downloadError'));
     }
   };
 
@@ -255,13 +258,13 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       // Start processing (asynchron im Backend) - NICHT WARTEN!
       await DocumentService.processDocument(document.id, true);
 
-      // ✅ SOFORT Dokumente neu laden - Processing läuft im Hintergrund!
+      // SOFORT Dokumente neu laden - Processing läuft im Hintergrund!
       await loadDocuments();
 
       setError(null);
 
     } catch (err) {
-      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : 'Fehler beim Verarbeiten des Dokuments');
+      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.processError'));
     } finally {
       setProcessingDocumentId(null);
     }
@@ -334,13 +337,13 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h6">
-          Dokumentenbibliothek ({documents.length} Dokumente)
+          {t('components.documentLibrary.title', { count: documents.length })}
         </Typography>
 
         {selectedDocuments.length > 0 && (
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <Typography variant="body2" color="text.secondary">
-              {selectedDocuments.length} ausgewählt
+              {t('components.documentLibrary.selected', { count: selectedDocuments.length })}
             </Typography>
             <Button
               variant="contained"
@@ -349,7 +352,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
               disabled={!canCreateRAGExam}
               size="small"
             >
-              RAG-Prüfung erstellen
+              {t('components.documentLibrary.createRAGExam')}
             </Button>
           </Box>
         )}
@@ -372,7 +375,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                   {documents.length}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Gesamt
+                  {t('components.documentLibrary.statsTotal')}
                 </Typography>
               </CardContent>
             </Card>
@@ -384,7 +387,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                   {processedDocuments.length}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Verarbeitet
+                  {t('components.documentLibrary.statsProcessed')}
                 </Typography>
               </CardContent>
             </Card>
@@ -396,7 +399,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                   {documents.filter(doc => doc.has_vectors).length}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Mit Vektoren
+                  {t('components.documentLibrary.statsWithVectors')}
                 </Typography>
               </CardContent>
             </Card>
@@ -408,7 +411,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                   {documents.filter(doc => doc.status === DocumentStatus.PROCESSING).length}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  In Bearbeitung
+                  {t('components.documentLibrary.statsInProgress')}
                 </Typography>
               </CardContent>
             </Card>
@@ -422,10 +425,10 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           <CardContent sx={{ textAlign: 'center', py: 6 }}>
             <Description sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
             <Typography variant="h6" color="text.secondary" gutterBottom>
-              Keine Dokumente vorhanden
+              {t('components.documentLibrary.noDocuments')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Laden Sie Dokumente hoch, um mit der RAG-basierten Prüfungserstellung zu beginnen.
+              {t('components.documentLibrary.noDocumentsHint')}
             </Typography>
           </CardContent>
         </Card>
@@ -451,7 +454,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {getFileIcon(document.mime_type)}
                       {document.has_vectors && (
-                        <Tooltip title="Vector Embeddings verfügbar">
+                        <Tooltip title={t('components.documentLibrary.vectorsAvailable')}>
                           <Timeline color="success" fontSize="small" />
                         </Tooltip>
                       )}
@@ -490,7 +493,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     <Box sx={{ mb: 2 }}>
                       <LinearProgress />
                       <Typography variant="caption" color="text.secondary">
-                        Verarbeitung läuft...
+                        {t('components.documentLibrary.processingRunning')}
                       </Typography>
                     </Box>
                   )}
@@ -498,19 +501,19 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                   {/* Metadata */}
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                     <Typography variant="caption" color="text.secondary">
-                      Größe: {formatFileSize(document.file_size || 0)}
+                      {t('components.documentLibrary.sizeLabel', { size: formatFileSize(document.file_size || 0) })}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Hochgeladen: {formatDate(document.created_at)}
+                      {t('components.documentLibrary.uploadedLabel', { date: formatDate(document.created_at) })}
                     </Typography>
                     {document.processed_at && (
                       <Typography variant="caption" color="text.secondary">
-                        Verarbeitet: {formatDate(document.processed_at)}
+                        {t('components.documentLibrary.processedLabel', { date: formatDate(document.processed_at) })}
                       </Typography>
                     )}
                     {document.metadata?.total_chunks && (
                       <Typography variant="caption" color="text.secondary">
-                        Chunks: {document.metadata.total_chunks}
+                        {t('components.documentLibrary.chunksLabel', { count: document.metadata.total_chunks })}
                       </Typography>
                     )}
                   </Box>
@@ -534,7 +537,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           <ListItemIcon>
             <Visibility fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Vorschau</ListItemText>
+          <ListItemText>{t('components.documentLibrary.menuPreview')}</ListItemText>
         </MenuItem>
 
         <MenuItem onClick={() => {
@@ -544,7 +547,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           <ListItemIcon>
             <Download fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Download</ListItemText>
+          <ListItemText>{t('components.documentLibrary.menuDownload')}</ListItemText>
         </MenuItem>
 
         {/* Process button - only show for UPLOADED documents */}
@@ -566,7 +569,9 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                 )}
               </ListItemIcon>
               <ListItemText>
-                {processingDocumentId === menuAnchor.documentId ? 'Verarbeitung läuft...' : 'Verarbeiten'}
+                {processingDocumentId === menuAnchor.documentId
+                  ? t('components.documentLibrary.menuProcessing')
+                  : t('components.documentLibrary.menuProcess')}
               </ListItemText>
             </MenuItem>
           </>
@@ -584,7 +589,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           <ListItemIcon>
             <Delete fontSize="small" color="error" />
           </ListItemIcon>
-          <ListItemText>Löschen</ListItemText>
+          <ListItemText>{t('components.documentLibrary.menuDelete')}</ListItemText>
         </MenuItem>
       </Menu>
 
@@ -593,19 +598,18 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         open={deleteDialog.open}
         onClose={() => setDeleteDialog({ open: false, document: null })}
       >
-        <DialogTitle>Dokument löschen</DialogTitle>
+        <DialogTitle>{t('components.documentLibrary.deleteTitle')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Möchten Sie das Dokument "{deleteDialog.document?.title}" wirklich löschen?
-            Diese Aktion kann nicht rückgängig gemacht werden.
+            {t('components.documentLibrary.deleteConfirm', { title: deleteDialog.document?.title })}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialog({ open: false, document: null })}>
-            Abbrechen
+            {t('components.documentLibrary.cancel')}
           </Button>
           <Button onClick={confirmDelete} color="error" variant="contained">
-            Löschen
+            {t('components.documentLibrary.delete')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -618,7 +622,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         fullWidth
       >
         <DialogTitle>
-          Dokument-Vorschau: {previewDialog.document?.title}
+          {t('components.documentLibrary.previewTitle', { title: previewDialog.document?.title })}
         </DialogTitle>
         <DialogContent sx={{ p: 0 }}>
           {previewDialog.document && (
@@ -629,9 +633,9 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                 onChange={(_, newValue) => setPreviewTab(newValue)}
                 sx={{ borderBottom: 1, borderColor: 'divider', px: 3 }}
               >
-                <Tab label="Metadaten" />
+                <Tab label={t('components.documentLibrary.tabMetadata')} />
                 <Tab
-                  label="Inhalt"
+                  label={t('components.documentLibrary.tabContent')}
                   disabled={previewDialog.document.status !== 'processed'}
                 />
               </Tabs>
@@ -641,43 +645,43 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                 {previewTab === 0 && (
                   <Box>
                     <Typography variant="h6" gutterBottom>
-                      Dokument-Informationen
+                      {t('components.documentLibrary.docInfo')}
                     </Typography>
                     <Grid container spacing={2} sx={{ mb: 3 }}>
                       <Grid item xs={6}>
                         <Typography variant="body2">
-                          <strong>Originaldatei:</strong> {previewDialog.document.original_filename}
+                          <strong>{t('components.documentLibrary.originalFile')}</strong> {previewDialog.document.original_filename}
                         </Typography>
                       </Grid>
                       <Grid item xs={6}>
                         <Typography variant="body2">
-                          <strong>Dateigröße:</strong> {formatFileSize(previewDialog.document.file_size || 0)}
+                          <strong>{t('components.documentLibrary.fileSize')}</strong> {formatFileSize(previewDialog.document.file_size || 0)}
                         </Typography>
                       </Grid>
                       <Grid item xs={6}>
                         <Typography variant="body2">
-                          <strong>MIME-Type:</strong> {previewDialog.document.mime_type}
+                          <strong>{t('components.documentLibrary.mimeType')}</strong> {previewDialog.document.mime_type}
                         </Typography>
                       </Grid>
                       <Grid item xs={6}>
                         <Typography variant="body2">
-                          <strong>Status:</strong> {previewDialog.document.status}
+                          <strong>{t('components.documentLibrary.status')}</strong> {previewDialog.document.status}
                         </Typography>
                       </Grid>
                       <Grid item xs={6}>
                         <Typography variant="body2">
-                          <strong>Vektoren:</strong> {previewDialog.document.has_vectors ? 'Ja' : 'Nein'}
+                          <strong>{t('components.documentLibrary.vectors')}</strong> {previewDialog.document.has_vectors ? t('components.documentLibrary.yes') : t('components.documentLibrary.no')}
                         </Typography>
                       </Grid>
                       <Grid item xs={6}>
                         <Typography variant="body2">
-                          <strong>Hochgeladen:</strong> {formatDate(previewDialog.document.created_at)}
+                          <strong>{t('components.documentLibrary.uploaded')}</strong> {formatDate(previewDialog.document.created_at)}
                         </Typography>
                       </Grid>
                       {previewDialog.document.processed_at && (
                         <Grid item xs={6}>
                           <Typography variant="body2">
-                            <strong>Verarbeitet:</strong> {formatDate(previewDialog.document.processed_at)}
+                            <strong>{t('components.documentLibrary.processed')}</strong> {formatDate(previewDialog.document.processed_at)}
                           </Typography>
                         </Grid>
                       )}
@@ -686,7 +690,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     {previewDialog.document.content_preview && (
                       <Box sx={{ mb: 3 }}>
                         <Typography variant="h6" gutterBottom>
-                          Inhaltsvorschau
+                          {t('components.documentLibrary.contentPreview')}
                         </Typography>
                         <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
                           <Typography variant="body2" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
@@ -699,14 +703,14 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     {previewDialog.document.metadata && (
                       <Box>
                         <Typography variant="h6" gutterBottom>
-                          Verarbeitungsdetails
+                          {t('components.documentLibrary.processingDetails')}
                         </Typography>
 
                         {/* Sections mit Hierarchie */}
                         {previewDialog.document.metadata.sections_hierarchy && previewDialog.document.metadata.sections_hierarchy.length > 0 && (
                           <Box sx={{ mb: 3 }}>
                             <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-                              Dokumentstruktur ({previewDialog.document.metadata.section_count} Abschnitte)
+                              {t('components.documentLibrary.documentStructure', { count: previewDialog.document.metadata.section_count })}
                             </Typography>
                             <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', maxHeight: 300, overflow: 'auto' }}>
                               <Box sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
@@ -739,7 +743,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
                         {/* Fallback: Alle Metadaten als JSON */}
                         <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600, mt: 2 }}>
-                          Alle Metadaten
+                          {t('components.documentLibrary.allMetadata')}
                         </Typography>
                         <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50', maxHeight: 300, overflow: 'auto' }}>
                           <pre style={{ fontSize: '0.75rem', margin: 0, fontFamily: 'monospace' }}>
@@ -757,7 +761,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     {previewDialog.document.metadata?.full_content ? (
                       <Box>
                         <Typography variant="h6" gutterBottom>
-                          Dokumentinhalt
+                          {t('components.documentLibrary.documentContent')}
                         </Typography>
                         <Paper
                           variant="outlined"
@@ -780,11 +784,11 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                       <>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                           <Typography variant="h6">
-                            Dokumentinhalt ({totalChunks} Chunks)
+                            {t('components.documentLibrary.documentContentChunks', { count: totalChunks })}
                           </Typography>
                           {totalPages > 1 && (
                             <Typography variant="body2" color="text.secondary">
-                              Seite {currentPage} von {totalPages}
+                              {t('components.documentLibrary.pageOf', { current: currentPage, total: totalPages })}
                             </Typography>
                           )}
                         </Box>
@@ -810,8 +814,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                               }}
                             >
                               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                                Chunk {chunk.chunk_index + 1}
-                                {chunk.page_number && ` • Seite ${chunk.page_number}`}
+                                {t('components.documentLibrary.chunkLabel', { number: chunk.chunk_index + 1 })}
+                                {chunk.page_number && ` • ${t('components.documentLibrary.chunkPage', { number: chunk.page_number })}`}
                               </Typography>
                               <Typography
                                 variant="body2"
@@ -838,7 +842,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                               disabled={currentPage === 1 || chunksLoading}
                               onClick={() => loadDocumentChunksPaginated(previewDialog.document!.id, currentPage - 1)}
                             >
-                              Zurück
+                              {t('components.documentLibrary.prevPage')}
                             </Button>
 
                             {/* Page numbers */}
@@ -872,7 +876,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                               disabled={currentPage === totalPages || chunksLoading}
                               onClick={() => loadDocumentChunksPaginated(previewDialog.document!.id, currentPage + 1)}
                             >
-                              Weiter
+                              {t('components.documentLibrary.nextPage')}
                             </Button>
                           </Box>
                         )}
@@ -880,8 +884,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     ) : (
                       <Alert severity="info">
                         {previewDialog.document.status !== 'processed'
-                          ? 'Dokument muss erst verarbeitet werden, um den Inhalt anzuzeigen.'
-                          : 'Kein Inhalt verfügbar.'
+                          ? t('components.documentLibrary.needsProcessing')
+                          : t('components.documentLibrary.noContent')
                         }
                       </Alert>
                     )}
@@ -895,7 +899,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPreviewDialog({ open: false, document: null })}>
-            Schließen
+            {t('components.documentLibrary.close')}
           </Button>
         </DialogActions>
       </Dialog>

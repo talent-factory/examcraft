@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Container,
@@ -27,6 +28,7 @@ interface VerificationResponse {
 const VerifyEmailPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const token = searchParams.get('token');
 
   const [loading, setLoading] = useState(true);
@@ -46,7 +48,7 @@ const VerifyEmailPage: React.FC = () => {
       verificationAttempted.current = true;
 
       if (!token) {
-        setError('Invalid verification link. No token provided.');
+        setError(t('pages.verifyEmail.noToken'));
         setLoading(false);
         return;
       }
@@ -64,7 +66,7 @@ const VerifyEmailPage: React.FC = () => {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.detail || 'Verification failed');
+          throw new Error(errorData.detail || t('pages.verifyEmail.verificationFailed'));
         }
 
         const data: VerificationResponse = await response.json();
@@ -80,18 +82,18 @@ const VerifyEmailPage: React.FC = () => {
           }, 2000);
         } else {
           setSuccess(false); // Clear success state
-          setError(data.message || 'Verification failed');
+          setError(data.message || t('pages.verifyEmail.verificationFailed'));
         }
       } catch (err: any) {
         setSuccess(false); // Clear success state
-        setError(err.message || 'Failed to verify email. Please try again.');
+        setError(err.message || t('pages.verifyEmail.verifyEmailError'));
       } finally {
         setLoading(false);
       }
     };
 
     verifyEmail();
-  }, [token, navigate]);
+  }, [token, navigate, t]);
 
   const handleGoToDashboard = () => {
     navigate('/dashboard');
@@ -123,10 +125,10 @@ const VerifyEmailPage: React.FC = () => {
             <>
               <CircularProgress size={60} sx={{ mb: 3 }} />
               <Typography variant="h5" gutterBottom>
-                Verifying your email...
+                {t('pages.verifyEmail.verifying')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Please wait while we verify your email address.
+                {t('pages.verifyEmail.pleaseWait')}
               </Typography>
             </>
           )}
@@ -137,13 +139,13 @@ const VerifyEmailPage: React.FC = () => {
                 sx={{ fontSize: 80, color: 'success.main', mb: 2 }}
               />
               <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
-                Email Verified! 🎉
+                {t('pages.verifyEmail.success')}
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Welcome, {userData?.first_name}! Your email has been successfully verified.
+                {t('pages.verifyEmail.welcomeUser', { name: userData?.first_name })}
               </Typography>
               <Alert severity="success" sx={{ mb: 3 }}>
-                You can now access all features of ExamCraft AI.
+                {t('pages.verifyEmail.fullAccess')}
               </Alert>
               <Button
                 variant="contained"
@@ -157,7 +159,7 @@ const VerifyEmailPage: React.FC = () => {
                   },
                 }}
               >
-                Go to Dashboard
+                {t('pages.verifyEmail.goToDashboard')}
               </Button>
             </>
           )}
@@ -166,13 +168,13 @@ const VerifyEmailPage: React.FC = () => {
             <>
               <ErrorIcon sx={{ fontSize: 80, color: 'error.main', mb: 2 }} />
               <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
-                Verification Failed
+                {t('pages.verifyEmail.failed')}
               </Typography>
               <Alert severity="error" sx={{ mb: 3 }}>
                 {error}
               </Alert>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                The verification link may have expired or is invalid.
+                {t('pages.verifyEmail.linkExpired')}
               </Typography>
               <Button
                 variant="outlined"
@@ -180,7 +182,7 @@ const VerifyEmailPage: React.FC = () => {
                 onClick={handleGoToLogin}
                 fullWidth
               >
-                Back to Login
+                {t('pages.verifyEmail.backToLogin')}
               </Button>
             </>
           )}
