@@ -7,6 +7,7 @@ import type {
   UpdateExamRequest,
   ApprovedQuestionsResponse,
   AutoFillRequest,
+  AutoComposePreview,
 } from '../types/composer';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -98,7 +99,10 @@ export class ComposerService {
     return response.data;
   }
 
-  static async autoFill(examId: number, request: AutoFillRequest): Promise<ExamDetail> {
+  static async autoFill(
+    examId: number,
+    request: AutoFillRequest
+  ): Promise<ExamDetail | AutoComposePreview> {
     const response = await apiClient.post(`/api/v1/exams/${examId}/auto-fill`, request);
     return response.data;
   }

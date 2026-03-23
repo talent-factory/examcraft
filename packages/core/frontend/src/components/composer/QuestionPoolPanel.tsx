@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Dialog,
   DialogTitle,
@@ -10,7 +10,8 @@ import {
   Button,
 } from '@mui/material';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
-import type { ApprovedQuestion, AutoFillRequest } from '../../types/composer';
+import type { ApprovedQuestion, AutoFillRequest, AutoComposePreview, ProposedQuestion } from '../../types/composer';
+import { isAutoComposePreview } from '../../types/composer';
 
 interface QuestionPoolPanelProps {
   addedQuestionIds: Set<number>;
@@ -26,6 +27,8 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   hard: 'bg-red-100 text-red-700',
 };
 
+// DIFFICULTY_LABELS, TYPE_ABBREV moved inside components for i18n access
+
 interface AutoFillForm {
   count: string;
   topic: string;
@@ -33,6 +36,17 @@ interface AutoFillForm {
   bloom_level_min: string;
   question_types: string[];
 }
+
+interface CompositionForm {
+  target_points: string;
+  target_duration_minutes: string;
+  bloom_distribution: Record<number, string>;
+  difficulty_distribution: Record<string, string>;
+  topic: string;
+  question_types: string[];
+}
+
+// BLOOM_LABELS, PRESETS moved inside component for i18n access
 
 const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   addedQuestionIds,
@@ -55,6 +69,32 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
     open_ended: t('composer.questionPool.typeOpenEnded'),
   };
 
+  const BLOOM_LABELS: Record<number, string> = {
+    1: t('composer.questionPool.bloomRemember'),
+    2: t('composer.questionPool.bloomUnderstand'),
+    3: t('composer.questionPool.bloomApply'),
+    4: t('composer.questionPool.bloomAnalyze'),
+    5: t('composer.questionPool.bloomEvaluate'),
+    6: t('composer.questionPool.bloomCreate'),
+  };
+
+  const PRESETS: Record<string, {
+    bloom: Record<number, number>;
+    difficulty: Record<string, number>;
+    label: string;
+  }> = {
+    balanced: {
+      label: t('composer.questionPool.presetBalanced'),
+      bloom: { 1: 15, 2: 25, 3: 25, 4: 20, 5: 10, 6: 5 },
+      difficulty: { easy: 30, medium: 40, hard: 30 },
+    },
+    application: {
+      label: t('composer.questionPool.presetApplication'),
+      bloom: { 1: 10, 2: 15, 3: 35, 4: 25, 5: 10, 6: 5 },
+      difficulty: { easy: 20, medium: 40, hard: 40 },
+    },
+  };
+
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState('');
@@ -67,6 +107,17 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
     bloom_level_min: '',
     question_types: [],
   });
+  const [compositionMode, setCompositionMode] = useState(false);
+  const [compositionForm, setCompositionForm] = useState<CompositionForm>({
+    target_points: '',
+    target_duration_minutes: '',
+    bloom_distribution: { 1: '', 2: '', 3: '', 4: '', 5: '', 6: '' },
+    difficulty_distribution: { easy: '', medium: '', hard: '' },
+    topic: '',
+    question_types: [],
+  });
+  const [preview, setPreview] = useState<AutoComposePreview | null>(null);
+  const [lastPreviewRequest, setLastPreviewRequest] = useState<AutoFillRequest | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['approved-questions', search, filterType, filterDifficulty],
@@ -88,7 +139,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       onInvalidate();
     },
     onError: (err) => {
-      setAutoFillError(getErrorMessage(err, t('composer.questionPool.errorAutoFill')));
+      setAutoFillError(getErrorMessage(err, t('composer.questionPool.autoFillFailed')));
     },
   });
 
@@ -125,16 +176,108 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
     }));
   };
 
+  const composeMutation = useMutation({
+    mutationFn: (req: AutoFillRequest) => ComposerService.autoFill(examId, req),
+    onSuccess: (data) => {
+      if (isAutoComposePreview(data)) {
+        setPreview(data);
+        setAutoFillError(null);
+      } else {
+        setPreview(null);
+        setAutoFillOpen(false);
+        setAutoFillError(null);
+        onInvalidate();
+      }
+    },
+    onError: (err) => {
+      setAutoFillError(getErrorMessage(err, t('composer.questionPool.compositionFailed')));
+    },
+  });
+
+  const handleCompose = () => {
+    const targetPoints = compositionForm.target_points.trim() !== ''
+      ? parseFloat(compositionForm.target_points) : undefined;
+    const targetDuration = compositionForm.target_duration_minutes.trim() !== ''
+      ? parseInt(compositionForm.target_duration_minutes) : undefined;
+
+    if (targetPoints !== undefined && (isNaN(targetPoints) || targetPoints <= 0)) {
+      setAutoFillError(t('composer.questionPool.targetPointsRequired'));
+      return;
+    }
+    if (targetDuration !== undefined && (isNaN(targetDuration) || targetDuration <= 0)) {
+      setAutoFillError(t('composer.questionPool.targetDurationRequired'));
+      return;
+    }
+
+    const bloomDist: Record<number, number> = {};
+    let hasBloom = false;
+    for (const [k, v] of Object.entries(compositionForm.bloom_distribution)) {
+      const num = parseFloat(v);
+      if (num > 0) {
+        bloomDist[parseInt(k)] = num;
+        hasBloom = true;
+      }
+    }
+
+    const diffDist: Record<string, number> = {};
+    let hasDiff = false;
+    for (const [k, v] of Object.entries(compositionForm.difficulty_distribution)) {
+      const num = parseFloat(v);
+      if (num > 0) {
+        diffDist[k] = num;
+        hasDiff = true;
+      }
+    }
+
+    if (targetPoints === undefined && targetDuration === undefined && !hasBloom && !hasDiff) {
+      setAutoFillError(t('composer.questionPool.noConstraints'));
+      return;
+    }
+
+    setAutoFillError(null);
+    const req: AutoFillRequest = {
+      target_points: targetPoints,
+      target_duration_minutes: targetDuration,
+      bloom_distribution: hasBloom ? bloomDist : undefined,
+      difficulty_distribution: hasDiff ? diffDist : undefined,
+      topic: compositionForm.topic || undefined,
+      question_types: compositionForm.question_types.length > 0 ? compositionForm.question_types : undefined,
+      exclude_question_ids: Array.from(addedQuestionIds),
+      preview: true,
+    };
+    setLastPreviewRequest(req);
+    composeMutation.mutate(req);
+  };
+
+  const handleAcceptPreview = () => {
+    if (!lastPreviewRequest) return;
+    composeMutation.mutate({ ...lastPreviewRequest, preview: false });
+  };
+
+  const applyPreset = (presetKey: string) => {
+    const preset = PRESETS[presetKey];
+    if (!preset) return;
+    const bloomDist: Record<number, string> = { 1: '', 2: '', 3: '', 4: '', 5: '', 6: '' };
+    for (const [k, v] of Object.entries(preset.bloom)) {
+      bloomDist[parseInt(k)] = v.toString();
+    }
+    const diffDist: Record<string, string> = { easy: '', medium: '', hard: '' };
+    for (const [k, v] of Object.entries(preset.difficulty)) {
+      diffDist[k] = v.toString();
+    }
+    setCompositionForm((f) => ({ ...f, bloom_distribution: bloomDist, difficulty_distribution: diffDist }));
+  };
+
   return (
     <div className="card p-4 bg-white rounded-lg border border-gray-200 h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-900">{t('composer.questionPool.panelTitle')}</h3>
+        <h3 className="font-semibold text-gray-900">{t('composer.questionPool.title')}</h3>
         {!disabled && (
           <button
             onClick={() => setAutoFillOpen(true)}
             className="text-sm px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
-            {t('composer.questionPool.autoFill')}
+            Auto-Fill
           </button>
         )}
       </div>
@@ -187,7 +330,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
           <div className="text-center py-8 text-gray-500 text-sm">{t('composer.questionPool.loading')}</div>
         ) : !data?.questions.length ? (
           <div className="text-center py-8 text-gray-400 text-sm">
-            {t('composer.questionPool.empty')}
+            {t('composer.questionPool.noQuestions')}
           </div>
         ) : (
           data.questions.map((q) => (
@@ -209,88 +352,235 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       )}
 
       {/* Auto-Fill Dialog */}
-      <Dialog open={autoFillOpen} onClose={() => { setAutoFillOpen(false); setAutoFillError(null); }} maxWidth="xs" fullWidth>
-        <DialogTitle>{t('composer.questionPool.autoFillDialogTitle')}</DialogTitle>
-        <DialogContent>
-          <div className="space-y-4 mt-2">
-            <TextField
-              label={t('composer.questionPool.autoFillCount')}
-              type="number"
-              fullWidth
-              inputProps={{ min: 1, max: 20 }}
-              value={autoFillForm.count}
-              onChange={(e) => setAutoFillForm({ ...autoFillForm, count: e.target.value })}
-            />
-            <TextField
-              label={t('composer.questionPool.autoFillTopic')}
-              fullWidth
-              value={autoFillForm.topic}
-              onChange={(e) => setAutoFillForm({ ...autoFillForm, topic: e.target.value })}
-            />
-            <div>
-              <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.autoFillDifficulty')}</p>
-              <div className="flex gap-2">
-                {(['easy', 'medium', 'hard'] as const).map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => toggleAutoFillDifficulty(d)}
-                    className={`text-xs px-2 py-1 rounded-full border transition-colors ${
-                      autoFillForm.difficulty.includes(d)
-                        ? DIFFICULTY_COLORS[d] + ' border-current font-semibold'
-                        : 'bg-white text-gray-600 border-gray-300'
-                    }`}
-                  >
-                    {DIFFICULTY_LABELS[d]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.autoFillTypes')}</p>
-              <div className="flex gap-2 flex-wrap">
-                {(['multiple_choice', 'true_false', 'open_ended'] as const).map((qt) => (
-                  <button
-                    key={qt}
-                    type="button"
-                    onClick={() => toggleAutoFillType(qt)}
-                    className={`text-xs px-2 py-1 rounded-full border transition-colors ${
-                      autoFillForm.question_types.includes(qt)
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-white text-gray-600 border-gray-300'
-                    }`}
-                  >
-                    {TYPE_ABBREV[qt]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <TextField
-              label={t('composer.questionPool.autoFillBloomLevel')}
-              type="number"
-              fullWidth
-              inputProps={{ min: 1, max: 6 }}
-              value={autoFillForm.bloom_level_min}
-              onChange={(e) =>
-                setAutoFillForm({ ...autoFillForm, bloom_level_min: e.target.value })
-              }
-            />
+      <Dialog
+        open={autoFillOpen}
+        onClose={() => { setAutoFillOpen(false); setAutoFillError(null); setPreview(null); }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setCompositionMode(false); setPreview(null); }}
+              className={`px-3 py-1 rounded-lg text-sm ${!compositionMode ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+            >
+              {t('composer.questionPool.modeSimple')}
+            </button>
+            <button
+              onClick={() => { setCompositionMode(true); setPreview(null); }}
+              className={`px-3 py-1 rounded-lg text-sm ${compositionMode ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+            >
+              {t('composer.questionPool.modeComposition')}
+            </button>
           </div>
-          {autoFillError && (
-            <p className="text-red-500 text-sm mt-2">{autoFillError}</p>
+        </DialogTitle>
+        <DialogContent>
+          {!compositionMode ? (
+            /* --- Simple mode (existing) --- */
+            <div className="space-y-4 mt-2">
+              <TextField label={t('composer.questionPool.autoFillCount')} type="number" fullWidth
+                inputProps={{ min: 1, max: 20 }} value={autoFillForm.count}
+                onChange={(e) => setAutoFillForm({ ...autoFillForm, count: e.target.value })} />
+              <TextField label={t('composer.questionPool.autoFillTopic')} fullWidth value={autoFillForm.topic}
+                onChange={(e) => setAutoFillForm({ ...autoFillForm, topic: e.target.value })} />
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.autoFillDifficulty')}</p>
+                <div className="flex gap-2">
+                  {(['easy', 'medium', 'hard'] as const).map((d) => (
+                    <button key={d} type="button" onClick={() => toggleAutoFillDifficulty(d)}
+                      className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                        autoFillForm.difficulty.includes(d) ? DIFFICULTY_COLORS[d] + ' border-current font-semibold' : 'bg-white text-gray-600 border-gray-300'
+                      }`}>{DIFFICULTY_LABELS[d]}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.autoFillTypes')}</p>
+                <div className="flex gap-2 flex-wrap">
+                  {(['multiple_choice', 'true_false', 'open_ended'] as const).map((qt) => (
+                    <button key={qt} type="button" onClick={() => toggleAutoFillType(qt)}
+                      className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                        autoFillForm.question_types.includes(qt) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300'
+                      }`}>{TYPE_ABBREV[qt]}</button>
+                  ))}
+                </div>
+              </div>
+              <TextField label={t('composer.questionPool.autoFillBloomLevel')} type="number" fullWidth
+                inputProps={{ min: 1, max: 6 }} value={autoFillForm.bloom_level_min}
+                onChange={(e) => setAutoFillForm({ ...autoFillForm, bloom_level_min: e.target.value })} />
+            </div>
+          ) : preview ? (
+            /* --- Preview panel --- */
+            <div className="space-y-4 mt-2">
+              <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                <div className="p-2 bg-gray-50 rounded">
+                  <div className="text-gray-500">{t('composer.questionPool.points')}</div>
+                  <div className="font-semibold">{preview.total_points} / {preview.constraint_report.points_target ?? '–'}</div>
+                </div>
+                <div className="p-2 bg-gray-50 rounded">
+                  <div className="text-gray-500">{t('composer.questionPool.duration')}</div>
+                  <div className="font-semibold">{preview.total_duration_minutes} / {preview.constraint_report.duration_target ?? '–'} min</div>
+                </div>
+                <div className="p-2 bg-gray-50 rounded">
+                  <div className="text-gray-500">{t('composer.questionPool.satisfaction')}</div>
+                  <div className={`font-semibold ${preview.constraint_report.overall_satisfaction >= 80 ? 'text-green-600' : 'text-yellow-600'}`}>
+                    {preview.constraint_report.overall_satisfaction}%
+                  </div>
+                </div>
+              </div>
+              {/* Distribution reports */}
+              {Object.keys(preview.constraint_report.bloom_distribution).length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">{t('composer.questionPool.bloomDistribution')}</p>
+                  <div className="space-y-1">
+                    {Object.entries(preview.constraint_report.bloom_distribution).map(([level, dr]) => (
+                      <div key={level} className="flex items-center gap-2 text-xs">
+                        <span className="w-24 text-gray-600">B{level} {BLOOM_LABELS[parseInt(level)] || ''}</span>
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${dr.within_tolerance ? 'bg-green-500' : 'bg-yellow-500'}`}
+                            style={{ width: `${Math.min(dr.achieved_pct, 100)}%` }} />
+                        </div>
+                        <span className="w-20 text-right">{dr.achieved_pct}% / {dr.target_pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {Object.keys(preview.constraint_report.difficulty_distribution).length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">{t('composer.questionPool.difficultyDistribution')}</p>
+                  <div className="space-y-1">
+                    {Object.entries(preview.constraint_report.difficulty_distribution).map(([diff, dr]) => (
+                      <div key={diff} className="flex items-center gap-2 text-xs">
+                        <span className="w-24 text-gray-600">{DIFFICULTY_LABELS[diff] || diff}</span>
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${dr.within_tolerance ? 'bg-green-500' : 'bg-yellow-500'}`}
+                            style={{ width: `${Math.min(dr.achieved_pct, 100)}%` }} />
+                        </div>
+                        <span className="w-20 text-right">{dr.achieved_pct}% / {dr.target_pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Proposed questions */}
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">{t('composer.questionPool.questionsProposed', { count: preview.questions.length })}</p>
+                <div className="max-h-48 overflow-y-auto space-y-1">
+                  {preview.questions.map((q) => (
+                    <div key={q.id} className="p-2 bg-gray-50 rounded text-xs flex items-center justify-between">
+                      <span className="line-clamp-1 flex-1 mr-2">{q.question_text}</span>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <span className={`px-1.5 py-0.5 rounded-full ${DIFFICULTY_COLORS[q.difficulty] || 'bg-gray-100'}`}>
+                          {DIFFICULTY_LABELS[q.difficulty] || q.difficulty}
+                        </span>
+                        {q.bloom_level && <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">B{q.bloom_level}</span>}
+                        <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">{q.suggested_points}P</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* --- Composition form --- */
+            <div className="space-y-4 mt-2">
+              <div className="grid grid-cols-2 gap-3">
+                <TextField label={t('composer.questionPool.targetPoints')} type="number" fullWidth
+                  inputProps={{ min: 1 }} value={compositionForm.target_points}
+                  onChange={(e) => setCompositionForm({ ...compositionForm, target_points: e.target.value })} />
+                <TextField label={t('composer.questionPool.targetDuration')} type="number" fullWidth
+                  inputProps={{ min: 1 }} value={compositionForm.target_duration_minutes}
+                  onChange={(e) => setCompositionForm({ ...compositionForm, target_duration_minutes: e.target.value })} />
+              </div>
+              <TextField label={t('composer.questionPool.autoFillTopic')} fullWidth value={compositionForm.topic}
+                onChange={(e) => setCompositionForm({ ...compositionForm, topic: e.target.value })} />
+              {/* Presets */}
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.presets')}</p>
+                <div className="flex gap-2">
+                  {Object.entries(PRESETS).map(([key, preset]) => (
+                    <button key={key} type="button" onClick={() => applyPreset(key)}
+                      className="text-xs px-3 py-1 rounded-full border border-indigo-300 text-indigo-700 hover:bg-indigo-50">
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Bloom distribution */}
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.bloomDistributionPct')}</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {([1, 2, 3, 4, 5, 6] as const).map((level) => (
+                    <TextField key={level} label={`B${level} ${BLOOM_LABELS[level]}`} type="number"
+                      size="small" inputProps={{ min: 0, max: 100 }}
+                      value={compositionForm.bloom_distribution[level]}
+                      onChange={(e) => setCompositionForm((f) => ({
+                        ...f, bloom_distribution: { ...f.bloom_distribution, [level]: e.target.value },
+                      }))} />
+                  ))}
+                </div>
+              </div>
+              {/* Difficulty distribution */}
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.difficultyDistributionPct')}</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['easy', 'medium', 'hard'] as const).map((d) => (
+                    <TextField key={d} label={DIFFICULTY_LABELS[d]} type="number"
+                      size="small" inputProps={{ min: 0, max: 100 }}
+                      value={compositionForm.difficulty_distribution[d]}
+                      onChange={(e) => setCompositionForm((f) => ({
+                        ...f, difficulty_distribution: { ...f.difficulty_distribution, [d]: e.target.value },
+                      }))} />
+                  ))}
+                </div>
+              </div>
+              {/* Question type filter */}
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.autoFillTypes')}</p>
+                <div className="flex gap-2 flex-wrap">
+                  {(['multiple_choice', 'true_false', 'open_ended'] as const).map((qt) => (
+                    <button key={qt} type="button"
+                      onClick={() => setCompositionForm((f) => ({
+                        ...f, question_types: f.question_types.includes(qt)
+                          ? f.question_types.filter((x) => x !== qt)
+                          : [...f.question_types, qt],
+                      }))}
+                      className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                        compositionForm.question_types.includes(qt) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300'
+                      }`}>{TYPE_ABBREV[qt]}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
+          {autoFillError && <p className="text-red-500 text-sm mt-2">{autoFillError}</p>}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setAutoFillOpen(false); setAutoFillError(null); }} disabled={autoFillMutation.isPending}>
-            {t('composer.questionPool.cancel')}
-          </Button>
-          <Button
-            onClick={handleAutoFill}
-            variant="contained"
-            disabled={autoFillMutation.isPending}
-          >
-            {autoFillMutation.isPending ? t('composer.questionPool.autoFillRunning') : t('composer.questionPool.autoFillStart')}
-          </Button>
+          {compositionMode && preview ? (
+            <>
+              <Button onClick={() => { setAutoFillOpen(false); setAutoFillError(null); setPreview(null); }}>{t('composer.questionPool.cancel')}</Button>
+              <Button onClick={() => setPreview(null)}>{t('composer.questionPool.back')}</Button>
+              <Button onClick={handleAcceptPreview} variant="contained"
+                disabled={composeMutation.isPending}>
+                {composeMutation.isPending ? t('composer.questionPool.accepting') : t('composer.questionPool.accept')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button onClick={() => { setAutoFillOpen(false); setAutoFillError(null); setPreview(null); }}
+                disabled={compositionMode ? composeMutation.isPending : autoFillMutation.isPending}>
+                {t('composer.questionPool.cancel')}
+              </Button>
+              <Button variant="contained"
+                onClick={compositionMode ? handleCompose : handleAutoFill}
+                disabled={compositionMode ? composeMutation.isPending : autoFillMutation.isPending}>
+                {compositionMode
+                  ? (composeMutation.isPending ? t('composer.questionPool.generating') : t('composer.questionPool.generatePreview'))
+                  : (autoFillMutation.isPending ? t('composer.questionPool.autoFillRunning') : t('composer.questionPool.autoFillStart'))}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
     </div>
@@ -359,7 +649,7 @@ const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({
             disabled={disabled}
             className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
-            {t('composer.questionPool.addQuestion')}
+            + {t('composer.questionPool.add')}
           </button>
         )}
       </div>
