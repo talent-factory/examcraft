@@ -1146,6 +1146,164 @@
       "pendingReviewInfo": "The questions are in Pending status and need to be reviewed and approved in the review workflow.",
       "goToReview": "Go to Review Workflow",
       "createNewExam": "Create New Exam"
+    },
+    "ragExamDisplay": {
+      "questions": "{{count}} Questions",
+      "generatedIn": "Generated in {{seconds}}s",
+      "sourceDocuments": "{{count}} source documents",
+      "quality": "Quality:",
+      "confidence": "Confidence",
+      "sourceCoverage": "Source Coverage",
+      "chunksUsed": "Text chunks used",
+      "questionNumber": "Question {{number}}",
+      "modelAnswer": "Model Answer:",
+      "back": "Back",
+      "exportJson": "Export as JSON",
+      "exportMarkdown": "Export as Markdown"
+    },
+    "documentChat": {
+      "title": "Document ChatBot",
+      "subtitle": "Ask questions about your uploaded documents",
+      "yourSessions": "Your Chat Sessions",
+      "noSessions": "No chat sessions yet. Create a new session to chat with your documents.",
+      "newSession": "New Session",
+      "minutesAgo": "{{count}} min ago",
+      "hoursAgo": "{{count}} hours ago",
+      "messages": "{{count}} messages",
+      "errorCreatingSession": "Error creating session",
+      "errorLoadingSession": "Error loading session",
+      "errorLoadingSessions": "Error loading sessions",
+      "confirmDeleteSession": "Are you sure you want to delete this chat session?"
+    },
+    "chatInterface": {
+      "errorSending": "Error sending message. Please try again.",
+      "errorExporting": "Error exporting",
+      "exportChat": "Export Chat",
+      "exportAsMarkdown": "Export as Markdown",
+      "exportAsJson": "Export as JSON",
+      "cancel": "Cancel",
+      "thinking": "Thinking...",
+      "placeholder": "Ask a question about your documents...",
+      "sources": "Sources",
+      "confidence": "Confidence",
+      "errorNoToken": "Session expired. Please log in again.",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
+    "documentSelector": {
+      "heading": "Select documents for chat",
+      "label": "Select documents",
+      "placeholder": "Search documents...",
+      "defaultTitle": "Untitled Document",
+      "startChat": "Start Chat"
+    },
+    "promptWizard": {
+      "tab": {
+        "errorLoadingSessions": "Error loading sessions",
+        "errorLoadingSession": "Error loading session",
+        "errorCreatingSession": "Error creating session",
+        "errorDeleting": "Error deleting",
+        "confirmDelete": "Are you sure you want to delete this wizard session?",
+        "selectOrCreateSession": "Select a session or create a new one."
+      },
+      "chat": {
+        "sessionExpired": "Session expired. Please log in again.",
+        "errorSending": "Error sending message",
+        "errorGenerating": "Error generating template",
+        "generateTemplate": "Generate Template",
+        "generating": "Generating template...",
+        "placeholder": "Describe what your prompt should do..."
+      },
+      "sessionList": {
+        "newSession": "New Session",
+        "statusActive": "In Progress",
+        "statusCompleted": "Saved",
+        "statusCancelled": "Cancelled",
+        "minutesAgo": "{{count}} min ago",
+        "hoursAgo": "{{count}} hours ago",
+        "messages": "{{count}} messages",
+        "activeSessions": "Active Sessions",
+        "completed": "Completed",
+        "noSessions": "No wizard sessions yet."
+      },
+      "newSession": {
+        "title": "New Wizard Session",
+        "description": "Start a new AI-assisted prompt creation. Optionally select an existing template as a reference.",
+        "referenceLabel": "Reference Template (optional)",
+        "noReference": "Start without reference",
+        "cancel": "Cancel",
+        "start": "Start Session"
+      },
+      "templatePreview": {
+        "generatedTemplate": "Generated Template",
+        "templateName": "Template Name",
+        "enterName": "Please enter a name",
+        "generatedViaAI": "Generated via AI Assistant",
+        "addTag": "Add tag...",
+        "editInEditor": "Edit in Editor",
+        "saveAsIs": "Save as is",
+        "errorSaving": "Error saving"
+      }
+    },
+    "prompts": {
+      "library": {
+        "title": "Prompt Library",
+        "description": "Manage your prompt templates and upload new prompts.",
+        "tabPromptList": "Prompt List",
+        "tabFileUpload": "File Upload",
+        "tabAIAssistant": "AI Assistant"
+      },
+      "preview": {
+        "noPromptSelected": "No prompt selected",
+        "errorLoading": "Error loading prompt: {{message}}",
+        "notFound": "Prompt not found",
+        "usageCount": "{{count}} uses",
+        "promptContent": "Prompt Content:",
+        "estimatedTokens": "Estimated Tokens: ~{{count}}"
+      },
+      "templateSelector": {
+        "typeMultipleChoice": "Multiple Choice",
+        "typeOpenEnded": "Open-ended Question",
+        "typeTrueFalse": "True/False",
+        "loadingPrompts": "Loading prompts for {{type}}...",
+        "errorLoading": "Error loading prompts: {{message}}",
+        "noPromptsAvailable": "No prompts available for {{type}}. Please create a prompt in the Prompt Library first.",
+        "promptTemplateFor": "Prompt template for {{type}}",
+        "useDefault": "Use default prompt",
+        "errorRendering": "Error rendering preview",
+        "livePreview": "Live Preview (rendered)",
+        "previewHint": "This preview shows the prompt with the entered variables.",
+        "promptPreview": "Prompt Preview",
+        "noPromptSelectedHint": "No prompt selected - the default prompt will be used."
+      },
+      "uploadZone": {
+        "title": "Upload Prompt Templates",
+        "description": "Upload prompt files with YAML frontmatter (.md or .txt). Multiple selection possible (max. 50 files).",
+        "dropHere": "Drop files here...",
+        "dragOrClick": "Drag files here or click to select",
+        "supportedFormats": "Supported formats: .md, .txt",
+        "uploading": "Uploading... {{progress}}%",
+        "uploadResult": "{{successful}} of {{total}} files successfully uploaded",
+        "alreadyExistCount": "{{count}} already exist",
+        "successful": "Successful ({{count}})",
+        "inactiveReviewRequired": "Inactive (review required)",
+        "alreadyExist": "Already exist ({{count}})",
+        "failed": "Failed ({{count}})",
+        "duplicateDialogTitle": "Templates already exist",
+        "duplicateWarning": "The following templates already exist:",
+        "currentVersion": "Current version: {{version}} — File: {{filename}}",
+        "duplicateQuestion": "Would you like to update the existing templates as a new version?",
+        "cancel": "Cancel",
+        "saveAsNewVersion": "Save as new version",
+        "hideExample": "Hide example",
+        "showExample": "Show file format example",
+        "exampleTitle": "Example: my_prompt.md",
+        "uploadFailed": "Upload failed. Please try again.",
+        "maxFilesExceeded": "Maximum 50 files allowed"
+      },
+      "variablesEditor": {
+        "additionalVariables": "Additional Template Variables"
+      }
     }
   }
 }

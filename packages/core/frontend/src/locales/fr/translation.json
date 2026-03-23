@@ -1146,6 +1146,164 @@
       "pendingReviewInfo": "Les questions sont en statut En attente et doivent être vérifiées et approuvées dans le workflow de révision.",
       "goToReview": "Aller au workflow de révision",
       "createNewExam": "Créer un nouvel examen"
+    },
+    "ragExamDisplay": {
+      "questions": "{{count}} Questions",
+      "generatedIn": "Généré en {{seconds}}s",
+      "sourceDocuments": "{{count}} documents sources",
+      "quality": "Qualité :",
+      "confidence": "Confiance",
+      "sourceCoverage": "Couverture des sources",
+      "chunksUsed": "Extraits de texte utilisés",
+      "questionNumber": "Question {{number}}",
+      "modelAnswer": "Réponse modèle :",
+      "back": "Retour",
+      "exportJson": "Exporter en JSON",
+      "exportMarkdown": "Exporter en Markdown"
+    },
+    "documentChat": {
+      "title": "ChatBot Documents",
+      "subtitle": "Posez des questions sur vos documents téléchargés",
+      "yourSessions": "Vos sessions de chat",
+      "noSessions": "Aucune session de chat. Créez une nouvelle session pour discuter avec vos documents.",
+      "newSession": "Nouvelle session",
+      "minutesAgo": "Il y a {{count}} min",
+      "hoursAgo": "Il y a {{count}} h",
+      "messages": "{{count}} messages",
+      "errorCreatingSession": "Erreur lors de la création de la session",
+      "errorLoadingSession": "Erreur lors du chargement de la session",
+      "errorLoadingSessions": "Erreur lors du chargement des sessions",
+      "confirmDeleteSession": "Voulez-vous vraiment supprimer cette session de chat ?"
+    },
+    "chatInterface": {
+      "errorSending": "Erreur lors de l'envoi du message. Veuillez réessayer.",
+      "errorExporting": "Erreur lors de l'exportation",
+      "exportChat": "Exporter le chat",
+      "exportAsMarkdown": "Exporter en Markdown",
+      "exportAsJson": "Exporter en JSON",
+      "cancel": "Annuler",
+      "thinking": "Réflexion en cours...",
+      "placeholder": "Posez une question sur vos documents...",
+      "sources": "Sources",
+      "confidence": "Confiance",
+      "errorNoToken": "Session expirée. Veuillez vous reconnecter.",
+      "copy": "Copier",
+      "copied": "Copié !"
+    },
+    "documentSelector": {
+      "heading": "Sélectionner les documents pour le chat",
+      "label": "Sélectionner les documents",
+      "placeholder": "Rechercher des documents...",
+      "defaultTitle": "Document sans titre",
+      "startChat": "Démarrer le chat"
+    },
+    "promptWizard": {
+      "tab": {
+        "errorLoadingSessions": "Erreur lors du chargement des sessions",
+        "errorLoadingSession": "Erreur lors du chargement de la session",
+        "errorCreatingSession": "Erreur lors de la création de la session",
+        "errorDeleting": "Erreur lors de la suppression",
+        "confirmDelete": "Voulez-vous vraiment supprimer cette session de l'assistant ?",
+        "selectOrCreateSession": "Sélectionnez une session ou créez-en une nouvelle."
+      },
+      "chat": {
+        "sessionExpired": "Session expirée. Veuillez vous reconnecter.",
+        "errorSending": "Erreur lors de l'envoi du message",
+        "errorGenerating": "Erreur lors de la génération du template",
+        "generateTemplate": "Générer le template",
+        "generating": "Génération du template...",
+        "placeholder": "Décrivez ce que votre prompt doit faire..."
+      },
+      "sessionList": {
+        "newSession": "Nouvelle session",
+        "statusActive": "En cours",
+        "statusCompleted": "Enregistré",
+        "statusCancelled": "Annulé",
+        "minutesAgo": "Il y a {{count}} min",
+        "hoursAgo": "Il y a {{count}} h",
+        "messages": "{{count}} messages",
+        "activeSessions": "Sessions actives",
+        "completed": "Terminées",
+        "noSessions": "Aucune session de l'assistant pour le moment."
+      },
+      "newSession": {
+        "title": "Nouvelle session de l'assistant",
+        "description": "Démarrez une nouvelle création de prompt assistée par IA. Vous pouvez optionnellement sélectionner un template existant comme référence.",
+        "referenceLabel": "Template de référence (optionnel)",
+        "noReference": "Démarrer sans référence",
+        "cancel": "Annuler",
+        "start": "Démarrer la session"
+      },
+      "templatePreview": {
+        "generatedTemplate": "Template généré",
+        "templateName": "Nom du template",
+        "enterName": "Veuillez entrer un nom",
+        "generatedViaAI": "Généré via l'assistant IA",
+        "addTag": "Ajouter un tag...",
+        "editInEditor": "Modifier dans l'éditeur",
+        "saveAsIs": "Enregistrer tel quel",
+        "errorSaving": "Erreur lors de l'enregistrement"
+      }
+    },
+    "prompts": {
+      "library": {
+        "title": "Bibliothèque de prompts",
+        "description": "Gérez vos modèles de prompts et téléchargez de nouveaux prompts.",
+        "tabPromptList": "Liste des prompts",
+        "tabFileUpload": "Téléchargement de fichiers",
+        "tabAIAssistant": "Assistant IA"
+      },
+      "preview": {
+        "noPromptSelected": "Aucun prompt sélectionné",
+        "errorLoading": "Erreur lors du chargement du prompt : {{message}}",
+        "notFound": "Prompt introuvable",
+        "usageCount": "{{count}} utilisations",
+        "promptContent": "Contenu du prompt :",
+        "estimatedTokens": "Tokens estimés : ~{{count}}"
+      },
+      "templateSelector": {
+        "typeMultipleChoice": "Choix multiple",
+        "typeOpenEnded": "Question ouverte",
+        "typeTrueFalse": "Vrai/Faux",
+        "loadingPrompts": "Chargement des prompts pour {{type}}...",
+        "errorLoading": "Erreur lors du chargement des prompts : {{message}}",
+        "noPromptsAvailable": "Aucun prompt disponible pour {{type}}. Veuillez d'abord créer un prompt dans la bibliothèque.",
+        "promptTemplateFor": "Template de prompt pour {{type}}",
+        "useDefault": "Utiliser le prompt par défaut",
+        "errorRendering": "Erreur lors du rendu de l'aperçu",
+        "livePreview": "Aperçu en direct (rendu)",
+        "previewHint": "Cet aperçu montre le prompt avec les variables saisies.",
+        "promptPreview": "Aperçu du prompt",
+        "noPromptSelectedHint": "Aucun prompt sélectionné - le prompt par défaut sera utilisé."
+      },
+      "uploadZone": {
+        "title": "Télécharger des modèles de prompts",
+        "description": "Téléchargez des fichiers de prompts avec un frontmatter YAML (.md ou .txt). Sélection multiple possible (max. 50 fichiers).",
+        "dropHere": "Déposez les fichiers ici...",
+        "dragOrClick": "Glissez les fichiers ici ou cliquez pour sélectionner",
+        "supportedFormats": "Formats supportés : .md, .txt",
+        "uploading": "Téléchargement en cours... {{progress}}%",
+        "uploadResult": "{{successful}} sur {{total}} fichiers téléchargés avec succès",
+        "alreadyExistCount": "{{count}} existent déjà",
+        "successful": "Réussi ({{count}})",
+        "inactiveReviewRequired": "Inactif (révision requise)",
+        "alreadyExist": "Existent déjà ({{count}})",
+        "failed": "Échoué ({{count}})",
+        "duplicateDialogTitle": "Les modèles existent déjà",
+        "duplicateWarning": "Les modèles suivants existent déjà :",
+        "currentVersion": "Version actuelle : {{version}} — Fichier : {{filename}}",
+        "duplicateQuestion": "Souhaitez-vous mettre à jour les modèles existants comme nouvelle version ?",
+        "cancel": "Annuler",
+        "saveAsNewVersion": "Enregistrer comme nouvelle version",
+        "hideExample": "Masquer l'exemple",
+        "showExample": "Afficher l'exemple de format de fichier",
+        "exampleTitle": "Exemple : my_prompt.md",
+        "uploadFailed": "Échec du téléchargement. Veuillez réessayer.",
+        "maxFilesExceeded": "Maximum 50 fichiers autorisés"
+      },
+      "variablesEditor": {
+        "additionalVariables": "Variables de template supplémentaires"
+      }
     }
   }
 }

@@ -1146,6 +1146,164 @@
       "pendingReviewInfo": "Le domande sono in stato In attesa e devono essere verificate e approvate nel workflow di revisione.",
       "goToReview": "Vai al workflow di revisione",
       "createNewExam": "Crea nuovo esame"
+    },
+    "ragExamDisplay": {
+      "questions": "{{count}} Domande",
+      "generatedIn": "Generato in {{seconds}}s",
+      "sourceDocuments": "{{count}} documenti sorgente",
+      "quality": "Qualità:",
+      "confidence": "Confidenza",
+      "sourceCoverage": "Copertura delle fonti",
+      "chunksUsed": "Estratti di testo utilizzati",
+      "questionNumber": "Domanda {{number}}",
+      "modelAnswer": "Risposta modello:",
+      "back": "Indietro",
+      "exportJson": "Esporta come JSON",
+      "exportMarkdown": "Esporta come Markdown"
+    },
+    "documentChat": {
+      "title": "ChatBot Documenti",
+      "subtitle": "Fai domande sui tuoi documenti caricati",
+      "yourSessions": "Le tue sessioni di chat",
+      "noSessions": "Nessuna sessione di chat. Crea una nuova sessione per chattare con i tuoi documenti.",
+      "newSession": "Nuova sessione",
+      "minutesAgo": "{{count}} min fa",
+      "hoursAgo": "{{count}} ore fa",
+      "messages": "{{count}} messaggi",
+      "errorCreatingSession": "Errore nella creazione della sessione",
+      "errorLoadingSession": "Errore nel caricamento della sessione",
+      "errorLoadingSessions": "Errore nel caricamento delle sessioni",
+      "confirmDeleteSession": "Vuoi davvero eliminare questa sessione di chat?"
+    },
+    "chatInterface": {
+      "errorSending": "Errore nell'invio del messaggio. Riprova.",
+      "errorExporting": "Errore nell'esportazione",
+      "exportChat": "Esporta chat",
+      "exportAsMarkdown": "Esporta come Markdown",
+      "exportAsJson": "Esporta come JSON",
+      "cancel": "Annulla",
+      "thinking": "Sto pensando...",
+      "placeholder": "Fai una domanda sui tuoi documenti...",
+      "sources": "Fonti",
+      "confidence": "Confidenza",
+      "errorNoToken": "Sessione scaduta. Accedi nuovamente.",
+      "copy": "Copia",
+      "copied": "Copiato!"
+    },
+    "documentSelector": {
+      "heading": "Seleziona documenti per la chat",
+      "label": "Seleziona documenti",
+      "placeholder": "Cerca documenti...",
+      "defaultTitle": "Documento senza titolo",
+      "startChat": "Avvia chat"
+    },
+    "promptWizard": {
+      "tab": {
+        "errorLoadingSessions": "Errore nel caricamento delle sessioni",
+        "errorLoadingSession": "Errore nel caricamento della sessione",
+        "errorCreatingSession": "Errore nella creazione della sessione",
+        "errorDeleting": "Errore nell'eliminazione",
+        "confirmDelete": "Vuoi davvero eliminare questa sessione dell'assistente?",
+        "selectOrCreateSession": "Seleziona una sessione o creane una nuova."
+      },
+      "chat": {
+        "sessionExpired": "Sessione scaduta. Accedi nuovamente.",
+        "errorSending": "Errore nell'invio del messaggio",
+        "errorGenerating": "Errore nella generazione del template",
+        "generateTemplate": "Genera template",
+        "generating": "Generazione del template...",
+        "placeholder": "Descrivi cosa deve fare il tuo prompt..."
+      },
+      "sessionList": {
+        "newSession": "Nuova sessione",
+        "statusActive": "In corso",
+        "statusCompleted": "Salvato",
+        "statusCancelled": "Annullato",
+        "minutesAgo": "{{count}} min fa",
+        "hoursAgo": "{{count}} ore fa",
+        "messages": "{{count}} messaggi",
+        "activeSessions": "Sessioni attive",
+        "completed": "Completate",
+        "noSessions": "Nessuna sessione dell'assistente per il momento."
+      },
+      "newSession": {
+        "title": "Nuova sessione dell'assistente",
+        "description": "Avvia una nuova creazione di prompt assistita dall'IA. Puoi opzionalmente selezionare un template esistente come riferimento.",
+        "referenceLabel": "Template di riferimento (opzionale)",
+        "noReference": "Avvia senza riferimento",
+        "cancel": "Annulla",
+        "start": "Avvia sessione"
+      },
+      "templatePreview": {
+        "generatedTemplate": "Template generato",
+        "templateName": "Nome del template",
+        "enterName": "Inserisci un nome",
+        "generatedViaAI": "Generato tramite assistente IA",
+        "addTag": "Aggiungi tag...",
+        "editInEditor": "Modifica nell'editor",
+        "saveAsIs": "Salva così",
+        "errorSaving": "Errore nel salvataggio"
+      }
+    },
+    "prompts": {
+      "library": {
+        "title": "Libreria dei prompt",
+        "description": "Gestisci i tuoi modelli di prompt e carica nuovi prompt.",
+        "tabPromptList": "Lista prompt",
+        "tabFileUpload": "Caricamento file",
+        "tabAIAssistant": "Assistente IA"
+      },
+      "preview": {
+        "noPromptSelected": "Nessun prompt selezionato",
+        "errorLoading": "Errore nel caricamento del prompt: {{message}}",
+        "notFound": "Prompt non trovato",
+        "usageCount": "{{count}} utilizzi",
+        "promptContent": "Contenuto del prompt:",
+        "estimatedTokens": "Token stimati: ~{{count}}"
+      },
+      "templateSelector": {
+        "typeMultipleChoice": "Scelta multipla",
+        "typeOpenEnded": "Domanda aperta",
+        "typeTrueFalse": "Vero/Falso",
+        "loadingPrompts": "Caricamento prompt per {{type}}...",
+        "errorLoading": "Errore nel caricamento dei prompt: {{message}}",
+        "noPromptsAvailable": "Nessun prompt disponibile per {{type}}. Crea prima un prompt nella libreria.",
+        "promptTemplateFor": "Template prompt per {{type}}",
+        "useDefault": "Usa prompt predefinito",
+        "errorRendering": "Errore nel rendering dell'anteprima",
+        "livePreview": "Anteprima live (renderizzata)",
+        "previewHint": "Questa anteprima mostra il prompt con le variabili inserite.",
+        "promptPreview": "Anteprima prompt",
+        "noPromptSelectedHint": "Nessun prompt selezionato - verrà utilizzato il prompt predefinito."
+      },
+      "uploadZone": {
+        "title": "Carica modelli di prompt",
+        "description": "Carica file di prompt con frontmatter YAML (.md o .txt). Selezione multipla possibile (max. 50 file).",
+        "dropHere": "Rilascia i file qui...",
+        "dragOrClick": "Trascina i file qui o clicca per selezionare",
+        "supportedFormats": "Formati supportati: .md, .txt",
+        "uploading": "Caricamento in corso... {{progress}}%",
+        "uploadResult": "{{successful}} di {{total}} file caricati con successo",
+        "alreadyExistCount": "{{count}} già esistenti",
+        "successful": "Riusciti ({{count}})",
+        "inactiveReviewRequired": "Inattivo (revisione richiesta)",
+        "alreadyExist": "Già esistenti ({{count}})",
+        "failed": "Falliti ({{count}})",
+        "duplicateDialogTitle": "I modelli esistono già",
+        "duplicateWarning": "I seguenti modelli esistono già:",
+        "currentVersion": "Versione attuale: {{version}} — File: {{filename}}",
+        "duplicateQuestion": "Desideri aggiornare i modelli esistenti come nuova versione?",
+        "cancel": "Annulla",
+        "saveAsNewVersion": "Salva come nuova versione",
+        "hideExample": "Nascondi esempio",
+        "showExample": "Mostra esempio formato file",
+        "exampleTitle": "Esempio: my_prompt.md",
+        "uploadFailed": "Caricamento fallito. Riprova.",
+        "maxFilesExceeded": "Massimo 50 file consentiti"
+      },
+      "variablesEditor": {
+        "additionalVariables": "Variabili template aggiuntive"
+      }
     }
   }
 }

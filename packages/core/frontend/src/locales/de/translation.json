@@ -1146,6 +1146,164 @@
       "pendingReviewInfo": "Die Fragen befinden sich im Status Pending und müssen im Review-Workflow überprüft und genehmigt werden.",
       "goToReview": "Zum Review-Workflow",
       "createNewExam": "Neue Prüfung erstellen"
+    },
+    "ragExamDisplay": {
+      "questions": "{{count}} Fragen",
+      "generatedIn": "Generiert in {{seconds}}s",
+      "sourceDocuments": "{{count}} Quelldokumente",
+      "quality": "Qualität:",
+      "confidence": "Konfidenz",
+      "sourceCoverage": "Quellenabdeckung",
+      "chunksUsed": "Textabschnitte verwendet",
+      "questionNumber": "Frage {{number}}",
+      "modelAnswer": "Musterlösung:",
+      "back": "Zurück",
+      "exportJson": "Als JSON exportieren",
+      "exportMarkdown": "Als Markdown exportieren"
+    },
+    "documentChat": {
+      "title": "Dokument-ChatBot",
+      "subtitle": "Stellen Sie Fragen zu Ihren hochgeladenen Dokumenten",
+      "yourSessions": "Ihre Chat-Sessions",
+      "noSessions": "Noch keine Chat-Sessions. Erstellen Sie eine neue Session, um mit Ihren Dokumenten zu chatten.",
+      "newSession": "Neue Session",
+      "minutesAgo": "Vor {{count}} Min.",
+      "hoursAgo": "Vor {{count}} Std.",
+      "messages": "{{count}} Nachrichten",
+      "errorCreatingSession": "Fehler beim Erstellen der Session",
+      "errorLoadingSession": "Fehler beim Laden der Session",
+      "errorLoadingSessions": "Fehler beim Laden der Sessions",
+      "confirmDeleteSession": "Möchten Sie diese Chat-Session wirklich löschen?"
+    },
+    "chatInterface": {
+      "errorSending": "Fehler beim Senden der Nachricht. Bitte versuchen Sie es erneut.",
+      "errorExporting": "Fehler beim Exportieren",
+      "exportChat": "Chat exportieren",
+      "exportAsMarkdown": "Als Markdown exportieren",
+      "exportAsJson": "Als JSON exportieren",
+      "cancel": "Abbrechen",
+      "thinking": "Denkt nach...",
+      "placeholder": "Stellen Sie eine Frage zu Ihren Dokumenten...",
+      "sources": "Quellen",
+      "confidence": "Konfidenz",
+      "errorNoToken": "Sitzung abgelaufen. Bitte melde dich erneut an.",
+      "copy": "Kopieren",
+      "copied": "Kopiert!"
+    },
+    "documentSelector": {
+      "heading": "Dokumente für den Chat auswählen",
+      "label": "Dokumente auswählen",
+      "placeholder": "Dokumente suchen...",
+      "defaultTitle": "Unbenanntes Dokument",
+      "startChat": "Chat starten"
+    },
+    "promptWizard": {
+      "tab": {
+        "errorLoadingSessions": "Fehler beim Laden der Sessions",
+        "errorLoadingSession": "Fehler beim Laden der Session",
+        "errorCreatingSession": "Fehler beim Erstellen der Session",
+        "errorDeleting": "Fehler beim Löschen",
+        "confirmDelete": "Möchten Sie diese Wizard-Session wirklich löschen?",
+        "selectOrCreateSession": "Wählen Sie eine Session aus oder erstellen Sie eine neue."
+      },
+      "chat": {
+        "sessionExpired": "Sitzung abgelaufen. Bitte melde dich erneut an.",
+        "errorSending": "Fehler beim Senden der Nachricht",
+        "errorGenerating": "Fehler beim Generieren des Templates",
+        "generateTemplate": "Template generieren",
+        "generating": "Generiere Template...",
+        "placeholder": "Beschreiben Sie, was Ihr Prompt tun soll..."
+      },
+      "sessionList": {
+        "newSession": "Neue Session",
+        "statusActive": "In Bearbeitung",
+        "statusCompleted": "Gespeichert",
+        "statusCancelled": "Abgebrochen",
+        "minutesAgo": "Vor {{count}} Min.",
+        "hoursAgo": "Vor {{count}} Std.",
+        "messages": "{{count}} Nachrichten",
+        "activeSessions": "Aktive Sessions",
+        "completed": "Abgeschlossen",
+        "noSessions": "Noch keine Wizard-Sessions vorhanden."
+      },
+      "newSession": {
+        "title": "Neue Wizard-Session",
+        "description": "Starten Sie eine neue KI-unterstützte Prompt-Erstellung. Optional können Sie ein bestehendes Template als Referenz auswählen.",
+        "referenceLabel": "Referenz-Template (optional)",
+        "noReference": "Ohne Referenz starten",
+        "cancel": "Abbrechen",
+        "start": "Session starten"
+      },
+      "templatePreview": {
+        "generatedTemplate": "Generiertes Template",
+        "templateName": "Template Name",
+        "enterName": "Bitte geben Sie einen Namen ein",
+        "generatedViaAI": "Generiert via KI-Assistent",
+        "addTag": "Tag hinzufügen...",
+        "editInEditor": "Im Editor bearbeiten",
+        "saveAsIs": "So speichern",
+        "errorSaving": "Fehler beim Speichern"
+      }
+    },
+    "prompts": {
+      "library": {
+        "title": "Prompt-Bibliothek",
+        "description": "Verwalten Sie Ihre Prompt-Vorlagen und laden Sie neue Prompts hoch.",
+        "tabPromptList": "Prompt-Liste",
+        "tabFileUpload": "Datei-Upload",
+        "tabAIAssistant": "KI-Assistent"
+      },
+      "preview": {
+        "noPromptSelected": "Kein Prompt ausgewählt",
+        "errorLoading": "Fehler beim Laden des Prompts: {{message}}",
+        "notFound": "Prompt nicht gefunden",
+        "usageCount": "{{count}} Verwendungen",
+        "promptContent": "Prompt-Inhalt:",
+        "estimatedTokens": "Geschätzte Tokens: ~{{count}}"
+      },
+      "templateSelector": {
+        "typeMultipleChoice": "Multiple Choice",
+        "typeOpenEnded": "Offene Frage",
+        "typeTrueFalse": "Richtig/Falsch",
+        "loadingPrompts": "Lade Prompts für {{type}}...",
+        "errorLoading": "Fehler beim Laden der Prompts: {{message}}",
+        "noPromptsAvailable": "Keine Prompts für {{type}} verfügbar. Bitte erstellen Sie zuerst einen Prompt in der Prompt Library.",
+        "promptTemplateFor": "Prompt-Template für {{type}}",
+        "useDefault": "Standard-Prompt verwenden",
+        "errorRendering": "Fehler beim Rendern der Vorschau",
+        "livePreview": "Live-Vorschau (gerendert)",
+        "previewHint": "Diese Vorschau zeigt den Prompt mit den eingegebenen Variablen.",
+        "promptPreview": "Prompt-Vorschau",
+        "noPromptSelectedHint": "Kein Prompt ausgewählt - es wird der Standard-Prompt verwendet."
+      },
+      "uploadZone": {
+        "title": "Prompt-Vorlagen hochladen",
+        "description": "Laden Sie Prompt-Dateien mit YAML-Frontmatter hoch (.md oder .txt). Mehrfachauswahl möglich (max. 50 Dateien).",
+        "dropHere": "Dateien hier ablegen...",
+        "dragOrClick": "Dateien hierher ziehen oder klicken zum Auswählen",
+        "supportedFormats": "Unterstützte Formate: .md, .txt",
+        "uploading": "Upload läuft... {{progress}}%",
+        "uploadResult": "{{successful}} von {{total}} Dateien erfolgreich hochgeladen",
+        "alreadyExistCount": "{{count}} bereits vorhanden",
+        "successful": "Erfolgreich ({{count}})",
+        "inactiveReviewRequired": "Inaktiv (Review erforderlich)",
+        "alreadyExist": "Bereits vorhanden ({{count}})",
+        "failed": "Fehlgeschlagen ({{count}})",
+        "duplicateDialogTitle": "Vorlagen bereits vorhanden",
+        "duplicateWarning": "Folgende Vorlagen existieren bereits:",
+        "currentVersion": "Aktuelle Version: {{version}} — Datei: {{filename}}",
+        "duplicateQuestion": "Möchten Sie die bestehenden Vorlagen als neue Version aktualisieren?",
+        "cancel": "Abbrechen",
+        "saveAsNewVersion": "Als neue Version speichern",
+        "hideExample": "Beispiel ausblenden",
+        "showExample": "Dateiformat-Beispiel anzeigen",
+        "exampleTitle": "Beispiel: my_prompt.md",
+        "uploadFailed": "Upload fehlgeschlagen. Bitte versuchen Sie es erneut.",
+        "maxFilesExceeded": "Maximal 50 Dateien erlaubt"
+      },
+      "variablesEditor": {
+        "additionalVariables": "Zusätzliche Template-Variablen"
+      }
     }
   }
 }
