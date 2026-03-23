@@ -12,7 +12,7 @@ Implement five ExamCraft-specific MCP tools as an extension of the existing MCP 
 ## Goals
 
 - Enable ExamCraft users to manage documents, generate questions, and search the knowledge base via MCP
-- Enforce the same RBAC/subscription-tier permissions as the web app
+- Enforce the same RBAC/subscription-tier permissions and quota limits as the web app
 - Follow the established `BaseTool` pattern from TF-289
 
 ## Non-Goals
@@ -27,7 +27,7 @@ Implement five ExamCraft-specific MCP tools as an extension of the existing MCP 
 |------|------|------------|-------|
 | `documents-list` | `examcraft_documents.py` | `view_documents` | Paginated, user-scoped |
 | `documents-upload` | `examcraft_documents.py` | `create_documents` | URL-based download |
-| `questions-generate` | `examcraft_questions.py` | `generate_questions` | Via RAG service |
+| `questions-generate` | `examcraft_questions.py` | `generate_questions` | Via RAG service + quota check |
 | `questions-list` | `examcraft_questions.py` | `view_questions` | Paginated, user-scoped |
 | `knowledge-search` | `examcraft_search.py` | `view_documents` | Full deployment only |
 
@@ -40,9 +40,9 @@ Tools import backend services directly (same process), consistent with the exist
 ```
 MCP Request
     └── Tool.execute(arguments, context)
-            ├── _resolve_user(context, session)   # email → User
-            ├── _check_permission(user, perm, db)  # RBAC check
-            └── service.method(...)                # Business logic
+            ├── _resolve_user(context, session)        # email → User (with roles eager-loaded)
+            ├── _check_permission(user, perm)           # user.has_permission()
+            └── service.method(...)                     # Business logic
 ```
 
 ### File Structure
@@ -63,27 +63,40 @@ tools/__init__.py            # Register new tools; conditional for knowledge-sea
 
 ### Auth Helper Pattern
 
-All ExamCraft tools use a shared helper at the top of each file:
+All ExamCraft tools use shared helpers defined once per file:
 
 ```python
+from sqlalchemy.orm import joinedload
+from models.auth import User
+
 def _resolve_user(context: dict, session) -> User:
-    """Load User from DB by email in MCP context. Raises PermissionError if not found."""
+    """Load User (with roles eager-loaded) from DB by email in MCP context.
+    Raises PermissionError if not authenticated or user not found.
+    """
     email = context.get("email") if context else None
     if not email:
         raise PermissionError("Authentication required")
-    user = session.query(User).filter(User.email == email).first()
+    user = (
+        session.query(User)
+        .options(joinedload(User.roles))
+        .filter(User.email == email)
+        .first()
+    )
     if not user:
         raise PermissionError(f"User not found: {email}")
     return user
 
-def _check_permission(user: User, permission: str, session) -> None:
-    """Check RBAC permission. Raises PermissionError if denied."""
-    from utils.auth_utils import check_user_permission
-    if not check_user_permission(user, permission, session):
+def _check_permission(user: User, permission: str) -> None:
+    """Check RBAC permission via User.has_permission().
+    Raises PermissionError if denied.
+    """
+    if not user.has_permission(permission):
         raise PermissionError(
-            f"Permission denied: '{permission}' requires a higher subscription tier"
+            f"Permission denied: '{permission}' is not available on your current plan"
         )
 ```
+
+**Note:** `User.has_permission()` iterates `user.roles`. The `joinedload(User.roles)` in `_resolve_user` ensures roles are loaded within the same session query, avoiding N+1 queries and `DetachedInstanceError`.
 
 ## Tool Specifications
 
@@ -102,10 +115,13 @@ input_schema = {
 ```
 
 **Implementation:**
-1. Resolve user from context
+1. Open `SessionLocal()`, resolve user (with `joinedload(User.roles)`)
 2. Check `view_documents` permission
-3. Query `Document` model filtered by `user_id`, apply `limit`/`offset`
-4. Return list of `{id, title, filename, status, file_size, created_at}`
+3. Query `Document` model filtered by `user_id=user.id`, apply `limit`/`offset`
+4. Access `document.title` (computed Python property from `doc_metadata`, not a DB column — requires ORM-level access)
+5. Return list of `{id, title, filename, status, file_size, created_at}`
+
+**Scoping:** Intentionally user-scoped only (by `user_id`), not institution-scoped. This matches the self-service nature of the MCP interface. Institution-wide views are out of scope for this issue.
 
 ### `documents-upload`
 
@@ -123,18 +139,17 @@ input_schema = {
 ```
 
 **Implementation:**
-1. Resolve user from context
+1. Open `SessionLocal()`, resolve user
 2. Check `create_documents` permission
-3. Download file with `httpx.AsyncClient` (timeout 60s, follow redirects)
-4. Derive filename from URL or `filename` argument
-5. Wrap content in a minimal `UploadFile`-compatible object
+3. Download file with `httpx.AsyncClient` (timeout 60s, `follow_redirects=True`)
+   - On any HTTP/connection error: raise `ValueError(f"Could not download file from URL: {reason}")`
+4. Derive filename: use `filename` argument if provided, otherwise extract from URL using `urllib.parse.urlparse` + `os.path.basename`. If the result has no file extension (e.g. presigned S3 URLs), raise `ValueError("Could not determine filename from URL — provide an explicit filename")`
+5. Wrap content in a minimal `UploadFile`-compatible object (`SpooledTemporaryFile` or `io.BytesIO`)
 6. Call `document_service.upload_document(file, user_id=user.id, db=session)`
+   - `document_service` raises `HTTPException` for unsupported MIME type or file too large. Catch `HTTPException` and re-raise as `ValueError(exc.detail)` to keep the MCP error surface consistent
 7. Return `{document_id, filename, status, message}`
 
-**Error cases:**
-- URL not reachable → `ValueError: "Could not download file from URL: <reason>"`
-- Unsupported MIME type → propagated from `document_service`
-- File too large (>50 MB) → propagated from `document_service`
+**Post-upload note:** `upload_document` creates a DB record with status `UPLOADED`. The actual content processing (Docling text extraction, vector embedding via Celery) runs asynchronously. The document will not appear in `knowledge-search` results until processing completes. Callers should poll `documents-list` until `status == "processed"`.
 
 ### `questions-generate`
 
@@ -155,11 +170,13 @@ input_schema = {
 ```
 
 **Implementation:**
-1. Resolve user from context
+1. Open `SessionLocal()`, resolve user
 2. Check `generate_questions` permission
-3. Build `RAGExamRequest` from arguments
-4. Call `rag_service.generate_exam(request, user_id=str(user.id))`
-5. Return list of `{question_text, question_type, options, correct_answer, difficulty, explanation}`
+3. Check monthly quota via `RBACService(db=session).check_resource_quota(institution_id=user.institution_id, resource_type="questions", requested_amount=1)` — same enforcement as the web API. If `result["allowed"]` is `False`, raise `ValueError` with the quota detail message. **Note:** Confirm with the DB seed that the `resource_type` key is `"questions"` (the service docs also mention `"questions_per_month"` as an example — use whichever matches the seeded `TierQuota` rows).
+4. Build `RAGExamRequest(topic=..., document_ids=..., question_count=..., difficulty=..., language=...)`
+5. `await rag_service.generate_rag_exam(request)` (premium method — **not** `generate_exam`; it is `async`, so `execute()` must also be `async` and must `await` this call)
+6. On successful generation, call `RBACService(db=session).increment_resource_usage(institution_id=user.institution_id, resource_type="questions", amount=len(questions))` to update the usage counter. Without this step the quota check will always pass regardless of prior usage.
+7. Return list of `{question_text, question_type, options, correct_answer, difficulty, explanation, source_documents, confidence_score}`. Source attribution fields (`source_documents`, `confidence_score`) are included as they help users trace question origins.
 
 ### `questions-list`
 
@@ -171,16 +188,22 @@ input_schema = {
     "properties": {
         "limit":  {"type": "integer", "default": 20, "maximum": 100},
         "offset": {"type": "integer", "default": 0},
-        "status": {"type": "string", "enum": ["pending", "approved", "rejected"], "description": "Optional status filter"},
+        "status": {
+            "type": "string",
+            "enum": ["pending", "approved", "rejected", "edited", "in_review"],
+            "description": "Optional status filter"
+        },
     },
 }
 ```
 
 **Implementation:**
-1. Resolve user from context
+1. Open `SessionLocal()`, resolve user
 2. Check `view_questions` permission
-3. Query `QuestionReview` filtered by `user_id`, optional `review_status`, apply pagination
-4. Return list of `{id, question_text, question_type, difficulty, review_status, created_at}`
+3. Query `QuestionReview` filtered by `created_by=user.id` (**not** `user_id` — the correct FK column is `created_by`)
+4. If `status` argument provided, add filter `review_status == status`
+5. Apply `limit`/`offset`
+6. Return list of `{id, question_text, question_type, difficulty, review_status, created_at}`
 
 ### `knowledge-search`
 
@@ -199,13 +222,15 @@ input_schema = {
 ```
 
 **Implementation:**
-1. Resolve user from context
+1. Open `SessionLocal()`, resolve user
 2. Check `view_documents` permission
-3. Call `vector_service.search(query, n_results, document_ids)`
-4. Return list of `{content, similarity_score, filename, chunk_index}`
+3. Call `vector_service.similarity_search(query, n_results, document_ids)` (**not** `search` — the correct method on `QdrantVectorService` is `similarity_search`)
+4. Return list of `{content, similarity_score, filename, chunk_index}`. Note: `filename` must be sourced from `result.metadata["filename"]`, not a direct `SearchResult` attribute (which has no `.filename` field).
 
-**Deployment guard** — in `tools/__init__.py`:
+**Deployment guard** — evaluated lazily inside `get_tool_registry()` (not at module import time, to ensure correct behavior in tests when `DEPLOYMENT_MODE` is patched via `monkeypatch.setenv`):
+
 ```python
+# Inside get_tool_registry(), after other registrations:
 import os
 if os.getenv("DEPLOYMENT_MODE", "core") == "full":
     from .examcraft_search import ExamcraftKnowledgeSearchTool
@@ -220,13 +245,14 @@ if os.getenv("DEPLOYMENT_MODE", "core") == "full":
 from .examcraft_documents import ExamcraftDocumentsListTool, ExamcraftDocumentsUploadTool
 from .examcraft_questions import ExamcraftQuestionsGenerateTool, ExamcraftQuestionsListTool
 
-# In get_tool_registry():
+# In get_tool_registry(), inside the `if not _initialized:` block:
 _register(ExamcraftDocumentsListTool())
 _register(ExamcraftDocumentsUploadTool())
 _register(ExamcraftQuestionsGenerateTool())
 _register(ExamcraftQuestionsListTool())
 
-# Conditional — Full deployment only:
+# knowledge-search: conditional, evaluated at registry-init time (not import time)
+import os
 if os.getenv("DEPLOYMENT_MODE", "core") == "full":
     from .examcraft_search import ExamcraftKnowledgeSearchTool
     _register(ExamcraftKnowledgeSearchTool())
@@ -236,11 +262,12 @@ if os.getenv("DEPLOYMENT_MODE", "core") == "full":
 
 | Exception | Meaning | Handling |
 |-----------|---------|----------|
-| `PermissionError` | Not authenticated or no permission | Re-raise (MCP protocol surfaces as error) |
-| `ValueError` | Invalid arguments (bad URL, unsupported format) | Re-raise with descriptive message |
+| `PermissionError` | Not authenticated, user not found, or no RBAC permission | Re-raise (MCP protocol surfaces as error) |
+| `ValueError` | Invalid arguments (bad URL, no extension, unsupported format, quota exceeded) | Re-raise with descriptive message |
+| `HTTPException` (from `document_service`) | Unsupported MIME type, file too large | Catch and re-raise as `ValueError(exc.detail)` |
 | All others | Unexpected service/DB errors | Log with `logger.error(..., exc_info=True)`, re-raise |
 
-DB sessions are always closed in a `finally` block.
+DB sessions are always opened at the start of `execute()` and closed in a `finally` block.
 
 ## Testing
 
@@ -248,12 +275,18 @@ New file: `packages/premium/backend/mcp/tests/test_examcraft_tools.py`
 
 | Test | What it checks |
 |------|----------------|
-| `test_documents_list_returns_user_scoped_results` | Only returns documents belonging to the authenticated user |
+| `test_documents_list_returns_user_scoped_results` | Only returns documents belonging to the authenticated user (`user_id`) |
 | `test_documents_list_pagination` | `limit` and `offset` are applied correctly |
 | `test_documents_list_no_auth` | Raises `PermissionError` when context is empty |
 | `test_documents_upload_downloads_and_saves` | `httpx` download + `document_service.upload_document` called correctly |
 | `test_documents_upload_bad_url` | Raises `ValueError` on unreachable URL |
-| `test_questions_generate_calls_rag_service` | `rag_service.generate_exam` called with correct `RAGExamRequest` |
+| `test_documents_upload_no_extension` | Raises `ValueError` when filename cannot be derived (no extension in URL, no `filename` arg) |
+| `test_documents_upload_http_exception_converted` | `HTTPException` from `document_service` is converted to `ValueError` |
+| `test_questions_generate_calls_rag_service` | `rag_service.generate_rag_exam` called with correct `RAGExamRequest` |
+| `test_questions_generate_quota_enforced` | `RBACService.check_resource_quota` called before generation; mock asserts `institution_id=user.institution_id, resource_type="questions"` |
+| `test_questions_list_filters_by_created_by` | Query uses `created_by`, not `user_id` |
 | `test_questions_list_status_filter` | `status` argument filters `review_status` correctly |
-| `test_knowledge_search_calls_vector_service` | `vector_service.search` called with correct arguments |
-| `test_knowledge_search_not_registered_in_core_mode` | Tool absent from registry when `DEPLOYMENT_MODE=core` |
+| `test_questions_list_all_statuses_valid` | All five status enum values (`pending`, `approved`, `rejected`, `edited`, `in_review`) are accepted |
+| `test_knowledge_search_calls_similarity_search` | `vector_service.similarity_search` called with correct arguments |
+| `test_knowledge_search_not_registered_in_core_mode` | Tool absent from registry when `DEPLOYMENT_MODE=core` (env var patched before `get_tool_registry()` call) |
+| `test_knowledge_search_registered_in_full_mode` | Tool present in registry when `DEPLOYMENT_MODE=full` |
