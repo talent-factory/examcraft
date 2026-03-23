@@ -78,7 +78,7 @@ describe('Admin Page', () => {
 
       fireEvent.click(screen.getByText('Audit Logs'));
 
-      expect(screen.getByText('Audit Logs — Demnachst verfugbar')).toBeInTheDocument();
+      expect(screen.getByText('Audit Logs — Demnächst verfügbar')).toBeInTheDocument();
       expect(screen.queryByTestId('user-management')).not.toBeInTheDocument();
     });
 

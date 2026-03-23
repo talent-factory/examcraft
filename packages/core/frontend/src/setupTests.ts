@@ -140,18 +140,40 @@ export const waitForLoadingToFinish = () => {
   return new Promise(resolve => setTimeout(resolve, 0));
 };
 
-// Mock react-i18next
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-    i18n: {
-      changeLanguage: jest.fn().mockResolvedValue(undefined),
-      language: 'de',
-    },
-  }),
-  Trans: ({ children }: { children: React.ReactNode }) => children,
-  initReactI18next: { type: '3rdParty', init: jest.fn() },
-}));
+// Mock react-i18next with real German translations
+jest.mock('react-i18next', () => {
+  const mockTranslations = require('./locales/de/translation.json');
+
+  function mockResolveKey(obj: Record<string, any>, key: string): string {
+    const parts = key.split('.');
+    let current: any = obj;
+    for (const part of parts) {
+      if (current == null || typeof current !== 'object') return key;
+      current = current[part];
+    }
+    return typeof current === 'string' ? current : key;
+  }
+
+  return {
+    useTranslation: () => ({
+      t: (key: string, params?: Record<string, any>) => {
+        let value = mockResolveKey(mockTranslations, key);
+        if (params && typeof value === 'string') {
+          Object.entries(params).forEach(([k, v]) => {
+            value = (value as string).replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v));
+          });
+        }
+        return value;
+      },
+      i18n: {
+        changeLanguage: jest.fn().mockResolvedValue(undefined),
+        language: 'de',
+      },
+    }),
+    Trans: ({ children }: { children: React.ReactNode }) => children,
+    initReactI18next: { type: '3rdParty', init: jest.fn() },
+  };
+});
 
 // Mock environment variables
 process.env.REACT_APP_API_URL = 'http://localhost:8000';
