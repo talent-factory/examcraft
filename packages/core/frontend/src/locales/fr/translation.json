@@ -1159,7 +1159,8 @@
       "modelAnswer": "Réponse modèle :",
       "back": "Retour",
       "exportJson": "Exporter en JSON",
-      "exportMarkdown": "Exporter en Markdown"
+      "exportMarkdown": "Exporter en Markdown",
+      "sampleSolution": "Solution type"
     },
     "documentChat": {
       "title": "ChatBot Documents",
@@ -1173,7 +1174,11 @@
       "errorCreatingSession": "Erreur lors de la création de la session",
       "errorLoadingSession": "Erreur lors du chargement de la session",
       "errorLoadingSessions": "Erreur lors du chargement des sessions",
-      "confirmDeleteSession": "Voulez-vous vraiment supprimer cette session de chat ?"
+      "confirmDeleteSession": "Voulez-vous vraiment supprimer cette session de chat ?",
+      "deleteChat": "Supprimer le chat",
+      "errorDeletingSession": "Erreur lors de la suppression de la session",
+      "newChat": "Nouveau chat",
+      "noSessionsHint": "Commencez un nouveau chat pour interagir avec vos documents."
     },
     "chatInterface": {
       "errorSending": "Erreur lors de l'envoi du message. Veuillez réessayer.",
@@ -1188,14 +1193,26 @@
       "confidence": "Confiance",
       "errorNoToken": "Session expirée. Veuillez vous reconnecter.",
       "copy": "Copier",
-      "copied": "Copié !"
+      "copied": "Copié !",
+      "document": "Document",
+      "download": "Télécharger",
+      "errorSendingMessage": "Erreur lors de l'envoi du message",
+      "exportFileNamePlaceholder": "p.ex. chat-export",
+      "exportFileNamePrompt": "Nom du fichier pour l'exportation",
+      "exportMarkdown": "Exporter en Markdown",
+      "newDocument": "Nouveau document",
+      "saveAsDocument": "Enregistrer comme document",
+      "title": "Interface de chat",
+      "unknownError": "Une erreur inconnue est survenue"
     },
     "documentSelector": {
       "heading": "Sélectionner les documents pour le chat",
       "label": "Sélectionner les documents",
       "placeholder": "Rechercher des documents...",
       "defaultTitle": "Document sans titre",
-      "startChat": "Démarrer le chat"
+      "startChat": "Démarrer le chat",
+      "chatTitleLabel": "Titre du chat",
+      "chatTitlePlaceholder": "Saisissez un titre pour le chat..."
     },
     "promptWizard": {
       "tab": {

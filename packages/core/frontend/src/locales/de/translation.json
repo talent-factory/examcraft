@@ -1159,7 +1159,8 @@
       "modelAnswer": "Musterlösung:",
       "back": "Zurück",
       "exportJson": "Als JSON exportieren",
-      "exportMarkdown": "Als Markdown exportieren"
+      "exportMarkdown": "Als Markdown exportieren",
+      "sampleSolution": "Musterlösung"
     },
     "documentChat": {
       "title": "Dokument-ChatBot",
@@ -1173,7 +1174,11 @@
       "errorCreatingSession": "Fehler beim Erstellen der Session",
       "errorLoadingSession": "Fehler beim Laden der Session",
       "errorLoadingSessions": "Fehler beim Laden der Sessions",
-      "confirmDeleteSession": "Möchten Sie diese Chat-Session wirklich löschen?"
+      "confirmDeleteSession": "Möchten Sie diese Chat-Session wirklich löschen?",
+      "deleteChat": "Chat löschen",
+      "errorDeletingSession": "Fehler beim Löschen der Session",
+      "newChat": "Neuer Chat",
+      "noSessionsHint": "Starten Sie einen neuen Chat, um mit Ihren Dokumenten zu interagieren."
     },
     "chatInterface": {
       "errorSending": "Fehler beim Senden der Nachricht. Bitte versuchen Sie es erneut.",
@@ -1188,14 +1193,26 @@
       "confidence": "Konfidenz",
       "errorNoToken": "Sitzung abgelaufen. Bitte melde dich erneut an.",
       "copy": "Kopieren",
-      "copied": "Kopiert!"
+      "copied": "Kopiert!",
+      "document": "Dokument",
+      "download": "Herunterladen",
+      "errorSendingMessage": "Fehler beim Senden der Nachricht",
+      "exportFileNamePlaceholder": "z.B. chat-export",
+      "exportFileNamePrompt": "Dateiname für den Export",
+      "exportMarkdown": "Als Markdown exportieren",
+      "newDocument": "Neues Dokument",
+      "saveAsDocument": "Als Dokument speichern",
+      "title": "Chat-Schnittstelle",
+      "unknownError": "Ein unbekannter Fehler ist aufgetreten"
     },
     "documentSelector": {
       "heading": "Dokumente für den Chat auswählen",
       "label": "Dokumente auswählen",
       "placeholder": "Dokumente suchen...",
       "defaultTitle": "Unbenanntes Dokument",
-      "startChat": "Chat starten"
+      "startChat": "Chat starten",
+      "chatTitleLabel": "Chat-Titel",
+      "chatTitlePlaceholder": "Geben Sie einen Titel für den Chat ein..."
     },
     "promptWizard": {
       "tab": {

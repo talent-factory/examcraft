@@ -1159,7 +1159,8 @@
       "modelAnswer": "Risposta modello:",
       "back": "Indietro",
       "exportJson": "Esporta come JSON",
-      "exportMarkdown": "Esporta come Markdown"
+      "exportMarkdown": "Esporta come Markdown",
+      "sampleSolution": "Soluzione tipo"
     },
     "documentChat": {
       "title": "ChatBot Documenti",
@@ -1173,7 +1174,11 @@
       "errorCreatingSession": "Errore nella creazione della sessione",
       "errorLoadingSession": "Errore nel caricamento della sessione",
       "errorLoadingSessions": "Errore nel caricamento delle sessioni",
-      "confirmDeleteSession": "Vuoi davvero eliminare questa sessione di chat?"
+      "confirmDeleteSession": "Vuoi davvero eliminare questa sessione di chat?",
+      "deleteChat": "Elimina chat",
+      "errorDeletingSession": "Errore nell'eliminazione della sessione",
+      "newChat": "Nuova chat",
+      "noSessionsHint": "Avvia una nuova chat per interagire con i tuoi documenti."
     },
     "chatInterface": {
       "errorSending": "Errore nell'invio del messaggio. Riprova.",
@@ -1188,14 +1193,26 @@
       "confidence": "Confidenza",
       "errorNoToken": "Sessione scaduta. Accedi nuovamente.",
       "copy": "Copia",
-      "copied": "Copiato!"
+      "copied": "Copiato!",
+      "document": "Documento",
+      "download": "Scarica",
+      "errorSendingMessage": "Errore nell'invio del messaggio",
+      "exportFileNamePlaceholder": "es. chat-export",
+      "exportFileNamePrompt": "Nome del file per l'esportazione",
+      "exportMarkdown": "Esporta come Markdown",
+      "newDocument": "Nuovo documento",
+      "saveAsDocument": "Salva come documento",
+      "title": "Interfaccia chat",
+      "unknownError": "Si è verificato un errore sconosciuto"
     },
     "documentSelector": {
       "heading": "Seleziona documenti per la chat",
       "label": "Seleziona documenti",
       "placeholder": "Cerca documenti...",
       "defaultTitle": "Documento senza titolo",
-      "startChat": "Avvia chat"
+      "startChat": "Avvia chat",
+      "chatTitleLabel": "Titolo della chat",
+      "chatTitlePlaceholder": "Inserisci un titolo per la chat..."
     },
     "promptWizard": {
       "tab": {

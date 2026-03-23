@@ -1159,7 +1159,8 @@
       "modelAnswer": "Model Answer:",
       "back": "Back",
       "exportJson": "Export as JSON",
-      "exportMarkdown": "Export as Markdown"
+      "exportMarkdown": "Export as Markdown",
+      "sampleSolution": "Sample Solution"
     },
     "documentChat": {
       "title": "Document ChatBot",
@@ -1173,7 +1174,11 @@
       "errorCreatingSession": "Error creating session",
       "errorLoadingSession": "Error loading session",
       "errorLoadingSessions": "Error loading sessions",
-      "confirmDeleteSession": "Are you sure you want to delete this chat session?"
+      "confirmDeleteSession": "Are you sure you want to delete this chat session?",
+      "deleteChat": "Delete Chat",
+      "errorDeletingSession": "Error deleting session",
+      "newChat": "New Chat",
+      "noSessionsHint": "Start a new chat to interact with your documents."
     },
     "chatInterface": {
       "errorSending": "Error sending message. Please try again.",
@@ -1188,14 +1193,26 @@
       "confidence": "Confidence",
       "errorNoToken": "Session expired. Please log in again.",
       "copy": "Copy",
-      "copied": "Copied!"
+      "copied": "Copied!",
+      "document": "Document",
+      "download": "Download",
+      "errorSendingMessage": "Error sending message",
+      "exportFileNamePlaceholder": "e.g. chat-export",
+      "exportFileNamePrompt": "File name for export",
+      "exportMarkdown": "Export as Markdown",
+      "newDocument": "New Document",
+      "saveAsDocument": "Save as Document",
+      "title": "Chat Interface",
+      "unknownError": "An unknown error occurred"
     },
     "documentSelector": {
       "heading": "Select documents for chat",
       "label": "Select documents",
       "placeholder": "Search documents...",
       "defaultTitle": "Untitled Document",
-      "startChat": "Start Chat"
+      "startChat": "Start Chat",
+      "chatTitleLabel": "Chat Title",
+      "chatTitlePlaceholder": "Enter a title for the chat..."
     },
     "promptWizard": {
       "tab": {
