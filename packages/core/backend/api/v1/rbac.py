@@ -3,7 +3,7 @@ RBAC API Endpoints für ExamCraft AI
 REST API für RBAC Management (Roles, Features, Permissions, Quotas)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel, Field
@@ -11,6 +11,7 @@ from datetime import datetime
 
 from database import get_db
 from services.rbac_service import RBACService
+from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_user, get_current_active_user
 from models.auth import User
 from models.rbac import Feature, RBACRole, SubscriptionTier, TierQuota
@@ -133,15 +134,19 @@ async def list_features(
 @router.get("/features/{feature_id}", response_model=FeatureResponse)
 async def get_feature(
     feature_id: str,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Gibt Details zu einem spezifischen Feature zurück.
     """
+    locale = get_request_locale(request, current_user)
     feature = db.query(Feature).filter(Feature.id == feature_id).first()
     if not feature:
-        raise HTTPException(status_code=404, detail="Feature not found")
+        raise HTTPException(
+            status_code=404, detail=t("rbac_feature_not_found", locale=locale)
+        )
     return feature
 
 
@@ -179,15 +184,19 @@ async def list_roles(
 @router.get("/roles/{role_id}", response_model=RoleResponse)
 async def get_role(
     role_id: str,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Gibt Details zu einer spezifischen Rolle zurück.
     """
+    locale = get_request_locale(request, current_user)
     role = db.query(RBACRole).filter(RBACRole.id == role_id).first()
     if not role:
-        raise HTTPException(status_code=404, detail="Role not found")
+        raise HTTPException(
+            status_code=404, detail=t("rbac_role_not_found", locale=locale)
+        )
 
     rbac_service = RBACService(db)
     features = rbac_service.get_role_features(role.id)
@@ -277,7 +286,7 @@ async def list_subscription_tiers(
 
 
 @router.get("/tiers/current", response_model=SubscriptionTierResponse)
-async def get_current_tier(db: Session = Depends(get_db)):
+async def get_current_tier(request: Request = None, db: Session = Depends(get_db)):
     """
     Gibt den aktuellen/Standard Subscription Tier zurück.
     Basiert auf der DEFAULT_SUBSCRIPTION_TIER Environment Variable.
@@ -287,6 +296,7 @@ async def get_current_tier(db: Session = Depends(get_db)):
     """
     import os
 
+    locale = get_request_locale(request)
     default_tier_name = os.getenv("DEFAULT_SUBSCRIPTION_TIER", "free")
 
     tier = (
@@ -304,7 +314,7 @@ async def get_current_tier(db: Session = Depends(get_db)):
     if not tier:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Subscription tier '{default_tier_name}' not found",
+            detail=t("rbac_tier_not_found", locale=locale),
         )
 
     return tier
@@ -312,7 +322,9 @@ async def get_current_tier(db: Session = Depends(get_db)):
 
 @router.get("/tiers/my", response_model=SubscriptionTierResponse)
 async def get_my_tier(
-    current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """
     Gibt den Subscription Tier der Institution des eingeloggten Users zurück.
@@ -321,6 +333,7 @@ async def get_my_tier(
     Returns:
         SubscriptionTierResponse: Subscription tier of the user's institution
     """
+    locale = get_request_locale(request, current_user)
     from models.auth import Institution
 
     # Get user's institution
@@ -332,7 +345,8 @@ async def get_my_tier(
 
     if not institution:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User's institution not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("rbac_institution_not_found", locale=locale),
         )
 
     # Get subscription tier
@@ -351,7 +365,7 @@ async def get_my_tier(
     if not tier:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Subscription tier '{institution.subscription_tier}' not found",
+            detail=t("rbac_tier_not_found", locale=locale),
         )
 
     return tier
@@ -393,14 +407,18 @@ async def check_feature_permission(
 async def check_resource_quota(
     resource_type: str,
     requested_amount: int = 1,
+    request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Prüft ob die Institution des Users noch Quota verfügbar hat.
     """
+    locale = get_request_locale(request, current_user)
     if not current_user.institution_id:
-        raise HTTPException(status_code=400, detail="User has no institution")
+        raise HTTPException(
+            status_code=400, detail=t("rbac_no_institution", locale=locale)
+        )
 
     rbac_service = RBACService(db)
     quota_check = rbac_service.check_resource_quota(

@@ -6,7 +6,7 @@ Implementiert dokumentenbasierte Fragenerstellung mit Retrieval-Augmented Genera
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Literal, Optional, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,7 @@ from models.question_generation_job import QuestionGenerationJob
 from tasks.question_tasks import generate_questions_task
 from schemas.task import GenerateExamTaskResponse
 from schemas.active_tasks import ActiveTaskInfo, ActiveTasksResponse
+from services.translation_service import t, get_request_locale
 from utils.auth_utils import (
     get_current_active_user,
     require_permission,
@@ -129,6 +130,7 @@ class ContextRetrievalRequest(BaseModel):
 @router.post("/generate-exam", response_model=GenerateExamTaskResponse)
 async def generate_rag_exam(
     request: RAGExamRequestModel,
+    http_request: Request = None,
     current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db),
 ):
@@ -146,6 +148,7 @@ async def generate_rag_exam(
     - **language**: Sprache (de, en)
     - **context_chunks_per_question**: Context Chunks pro Frage (1-10)
     """
+    locale = get_request_locale(http_request, current_user)
     try:
         # Validiere Document IDs falls angegeben
         if request.document_ids:
@@ -154,7 +157,8 @@ async def generate_rag_exam(
                 document = document_service.get_document_by_id(doc_id, db)
                 if not document:
                     raise HTTPException(
-                        status_code=404, detail=f"Document with ID {doc_id} not found"
+                        status_code=404,
+                        detail=t("rag_document_not_found", locale=locale),
                     )
 
                 # Tenant-Check: Dokument muss zur Institution des Users gehoeren
@@ -164,7 +168,7 @@ async def generate_rag_exam(
                 if document.status != DocumentStatus.PROCESSED:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Document {doc_id} is not processed yet. Please process it first.",
+                        detail=t("rag_document_not_processed", locale=locale),
                     )
 
         # Validiere Question Types
@@ -174,7 +178,7 @@ async def generate_rag_exam(
                 if qtype not in valid_types:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Invalid question type: {qtype}. Valid types: {valid_types}",
+                        detail=t("rag_invalid_question_type", locale=locale),
                     )
 
         # Request serialisieren
@@ -193,7 +197,7 @@ async def generate_rag_exam(
         if not current_user.institution:
             raise HTTPException(
                 status_code=403,
-                detail="You must be associated with an institution to generate exams.",
+                detail=t("rag_no_institution", locale=locale),
             )
         SubscriptionLimits.check_question_limit(
             current_user.institution, db, additional_count=request.question_count
@@ -236,7 +240,7 @@ async def generate_rag_exam(
             logger.error(f"Celery Broker nicht erreichbar: {broker_error}")
             raise HTTPException(
                 status_code=503,
-                detail="Task-Queue nicht verfügbar. Bitte später erneut versuchen.",
+                detail=t("rag_task_queue_unavailable", locale=locale),
             )
 
         logger.info(
@@ -257,13 +261,14 @@ async def generate_rag_exam(
         logger.error(f"RAG exam generation failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Exam generation failed. Please try again or contact support.",
+            detail=t("rag_generation_failed", locale=locale),
         )
 
 
 @router.post("/retrieve-context", response_model=RAGContextResponse)
 async def retrieve_context(
     request: ContextRetrievalRequest,
+    http_request: Request = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -277,6 +282,7 @@ async def retrieve_context(
     - **max_chunks**: Maximale Anzahl Chunks (1-20)
     - **min_similarity**: Mindest-Similarity Score (0.0-1.0)
     """
+    locale = get_request_locale(http_request, current_user)
     try:
         # Validiere Document IDs falls angegeben
         if request.document_ids:
@@ -285,7 +291,8 @@ async def retrieve_context(
                 document = document_service.get_document_by_id(doc_id, db)
                 if not document:
                     raise HTTPException(
-                        status_code=404, detail=f"Document with ID {doc_id} not found"
+                        status_code=404,
+                        detail=t("rag_document_not_found", locale=locale),
                     )
 
                 # Tenant-Check: Dokument muss zur Institution des Users gehoeren
@@ -318,13 +325,14 @@ async def retrieve_context(
     except Exception as e:
         logger.error(f"Context retrieval failed: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail="Context retrieval failed. Please try again."
+            status_code=500, detail=t("rag_context_retrieval_failed", locale=locale)
         )
 
 
 @router.get("/available-documents")
 async def get_available_documents(
     processed_only: bool = Query(True, description="Nur verarbeitete Dokumente"),
+    request: Request = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -335,11 +343,12 @@ async def get_available_documents(
 
     - **processed_only**: Nur verarbeitete Dokumente anzeigen (empfohlen)
     """
+    locale = get_request_locale(request, current_user)
     try:
         if not current_user.institution:
             raise HTTPException(
                 status_code=403,
-                detail="You must be associated with an institution to view documents.",
+                detail=t("rag_no_institution", locale=locale),
             )
 
         # Tenant-aware: Alle Dokumente der Institution (konsistent mit list_documents)
@@ -394,7 +403,7 @@ async def get_available_documents(
     except Exception as e:
         logger.error(f"Failed to get available documents: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail="Failed to get documents. Please try again."
+            status_code=500, detail=t("rag_get_documents_failed", locale=locale)
         )
 
 

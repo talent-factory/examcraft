@@ -3,7 +3,7 @@ GDPR Compliance API Endpoints
 Provides data export and account deletion functionality
 """
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 import json
@@ -14,6 +14,7 @@ from database import get_db
 from models.auth import User
 from services.auth_service import AuthService
 from services.audit_service import AuditService
+from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/api/v1/gdpr", tags=["GDPR"])
 
 @router.get("/export-data")
 async def export_user_data(
+    request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     audit_service: AuditService = Depends(),
@@ -38,6 +40,7 @@ async def export_user_data(
         - Exams
         - Activity logs
     """
+    locale = get_request_locale(request, current_user)
     try:
         logger.info(f"Data export requested by user: {current_user.email}")
 
@@ -141,13 +144,14 @@ async def export_user_data(
         )
         raise HTTPException(
             status_code=500,
-            detail="Datenexport fehlgeschlagen. Bitte erneut versuchen.",
+            detail=t("gdpr_export_failed", locale=locale),
         )
 
 
 @router.post("/request-deletion")
 async def request_account_deletion(
     background_tasks: BackgroundTasks,
+    request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     audit_service: AuditService = Depends(),
@@ -161,6 +165,7 @@ async def request_account_deletion(
     Returns:
         Confirmation message with deletion date
     """
+    locale = get_request_locale(request, current_user)
     try:
         logger.info(f"Account deletion requested by user: {current_user.email}")
 
@@ -170,7 +175,8 @@ async def request_account_deletion(
             and current_user.deletion_requested_at
         ):
             raise HTTPException(
-                status_code=400, detail="Account deletion already pending"
+                status_code=400,
+                detail=t("gdpr_deletion_already_pending", locale=locale),
             )
 
         # Mark account for deletion (30-day grace period)
@@ -214,12 +220,13 @@ async def request_account_deletion(
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail="Löschanfrage fehlgeschlagen. Bitte erneut versuchen.",
+            detail=t("gdpr_deletion_request_failed", locale=locale),
         )
 
 
 @router.post("/cancel-deletion")
 async def cancel_account_deletion(
+    request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     audit_service: AuditService = Depends(),
@@ -230,6 +237,7 @@ async def cancel_account_deletion(
     Returns:
         Confirmation message
     """
+    locale = get_request_locale(request, current_user)
     try:
         logger.info(
             f"Account deletion cancellation requested by user: {current_user.email}"
@@ -241,7 +249,8 @@ async def cancel_account_deletion(
             or not current_user.deletion_requested_at
         ):
             raise HTTPException(
-                status_code=400, detail="No pending deletion request found"
+                status_code=400,
+                detail=t("gdpr_no_pending_deletion", locale=locale),
             )
 
         # Cancel deletion
@@ -266,13 +275,14 @@ async def cancel_account_deletion(
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail="Abbruch der Löschanfrage fehlgeschlagen. Bitte erneut versuchen.",
+            detail=t("gdpr_cancellation_failed", locale=locale),
         )
 
 
 @router.delete("/delete-account-now")
 async def delete_account_immediately(
     password: str,
+    request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     auth_service: AuthService = Depends(),
@@ -289,6 +299,7 @@ async def delete_account_immediately(
     Returns:
         Confirmation message
     """
+    locale = get_request_locale(request, current_user)
     try:
         logger.warning(
             f"Immediate account deletion requested by user: {current_user.email}"
@@ -296,7 +307,9 @@ async def delete_account_immediately(
 
         # Verify password
         if not auth_service.verify_password(password, current_user.hashed_password):
-            raise HTTPException(status_code=401, detail="Invalid password")
+            raise HTTPException(
+                status_code=401, detail=t("gdpr_invalid_password", locale=locale)
+            )
 
         # Log the deletion (before deleting the user)
         await audit_service.log_action(
@@ -344,5 +357,5 @@ async def delete_account_immediately(
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail="Kontolöschung fehlgeschlagen. Bitte erneut versuchen.",
+            detail=t("gdpr_deletion_failed", locale=locale),
         )
