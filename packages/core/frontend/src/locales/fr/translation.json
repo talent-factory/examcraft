@@ -719,6 +719,22 @@
       "noComments": "Aucun commentaire pour l'instant.",
       "unknownAuthor": "Inconnu"
     },
+    "examDisplay": {
+      "questionNumber": "Question {{number}}",
+      "multipleChoice": "Choix multiple",
+      "openQuestion": "Question ouverte",
+      "answerPlaceholder": "Saisissez votre réponse ici...",
+      "explanation": "Explication",
+      "examId": "ID de l'examen : {{id}}",
+      "created": "Créé : {{date}}",
+      "questionCount": "{{count}} questions • {{difficulty}}",
+      "result": "Résultat : {{correct}} sur {{total}} questions correctes ({{percentage}}%)",
+      "evaluate": "Évaluer l'examen",
+      "retry": "Réessayer",
+      "print": "Imprimer",
+      "newExam": "Nouvel examen",
+      "answered": "Répondu : {{answered}} sur {{total}} questions"
+    },
     "generationTasks": {
       "title": "Générations ({{count}} actives)",
       "collapse": "Réduire",
@@ -1019,6 +1035,13 @@
           "auditLogs": "Journaux d'audit"
         }
       }
+    }
+  },
+  "contexts": {
+    "generationTasks": {
+      "done": "Terminé",
+      "errorOccurred": "Une erreur s'est produite",
+      "started": "Démarré..."
     }
   }
 }

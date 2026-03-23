@@ -719,6 +719,22 @@
       "noComments": "No comments yet.",
       "unknownAuthor": "Unknown"
     },
+    "examDisplay": {
+      "questionNumber": "Question {{number}}",
+      "multipleChoice": "Multiple Choice",
+      "openQuestion": "Open Question",
+      "answerPlaceholder": "Enter your answer here...",
+      "explanation": "Explanation",
+      "examId": "Exam ID: {{id}}",
+      "created": "Created: {{date}}",
+      "questionCount": "{{count}} Questions • {{difficulty}}",
+      "result": "Result: {{correct}} of {{total}} questions correct ({{percentage}}%)",
+      "evaluate": "Evaluate Exam",
+      "retry": "Try Again",
+      "print": "Print",
+      "newExam": "New Exam",
+      "answered": "Answered: {{answered}} of {{total}} questions"
+    },
     "generationTasks": {
       "title": "Generations ({{count}} active)",
       "collapse": "Collapse",
@@ -1019,6 +1035,13 @@
           "auditLogs": "Audit Logs"
         }
       }
+    }
+  },
+  "contexts": {
+    "generationTasks": {
+      "done": "Done",
+      "errorOccurred": "Error occurred",
+      "started": "Started..."
     }
   }
 }

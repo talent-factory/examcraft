@@ -719,6 +719,22 @@
       "noComments": "Ancora nessun commento.",
       "unknownAuthor": "Sconosciuto"
     },
+    "examDisplay": {
+      "questionNumber": "Domanda {{number}}",
+      "multipleChoice": "Scelta multipla",
+      "openQuestion": "Domanda aperta",
+      "answerPlaceholder": "Inserisci qui la tua risposta...",
+      "explanation": "Spiegazione",
+      "examId": "ID esame: {{id}}",
+      "created": "Creato: {{date}}",
+      "questionCount": "{{count}} domande • {{difficulty}}",
+      "result": "Risultato: {{correct}} su {{total}} domande corrette ({{percentage}}%)",
+      "evaluate": "Valuta l'esame",
+      "retry": "Riprova",
+      "print": "Stampa",
+      "newExam": "Nuovo esame",
+      "answered": "Risposto: {{answered}} su {{total}} domande"
+    },
     "generationTasks": {
       "title": "Generazioni ({{count}} attive)",
       "collapse": "Comprimi",
@@ -1019,6 +1035,13 @@
           "auditLogs": "Log di audit"
         }
       }
+    }
+  },
+  "contexts": {
+    "generationTasks": {
+      "done": "Completato",
+      "errorOccurred": "Si è verificato un errore",
+      "started": "Avviato..."
     }
   }
 }
