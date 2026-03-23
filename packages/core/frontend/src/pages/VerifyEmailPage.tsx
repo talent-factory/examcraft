@@ -66,7 +66,7 @@ const VerifyEmailPage: React.FC = () => {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.detail || 'Verification failed');
+          throw new Error(errorData.detail || t('pages.verifyEmail.verificationFailed'));
         }
 
         const data: VerificationResponse = await response.json();
@@ -82,11 +82,11 @@ const VerifyEmailPage: React.FC = () => {
           }, 2000);
         } else {
           setSuccess(false); // Clear success state
-          setError(data.message || 'Verification failed');
+          setError(data.message || t('pages.verifyEmail.verificationFailed'));
         }
       } catch (err: any) {
         setSuccess(false); // Clear success state
-        setError(err.message || 'Failed to verify email. Please try again.');
+        setError(err.message || t('pages.verifyEmail.verifyEmailError'));
       } finally {
         setLoading(false);
       }

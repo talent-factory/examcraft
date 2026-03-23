@@ -3,7 +3,19 @@
     "profile": "Profil",
     "settings": "Paramètres",
     "logout": "Déconnexion",
-    "language": "Langue"
+    "language": "Langue",
+    "sidebar": {
+      "dashboard": "Tableau de bord",
+      "documents": "Documents",
+      "questionGeneration": "Génération de questions",
+      "reviewQueue": "File de révision",
+      "examComposer": "Compositeur d'examen",
+      "documentChat": "Chat de documents",
+      "promptLibrary": "Bibliothèque de prompts",
+      "admin": "Admin",
+      "pricing": "Tarifs",
+      "profile": "Profil"
+    }
   },
   "language": {
     "de": "Deutsch",
@@ -156,7 +168,8 @@
       "starterDescription": "Pour les créateurs d'examens sérieux.",
       "professionalDescription": "Puissance illimitée pour la création professionnelle d'examens.",
       "processing": "Traitement...",
-      "subscribe": "S'abonner"
+      "subscribe": "S'abonner",
+      "subscriptionError": "Impossible de démarrer le processus d'abonnement. Veuillez réessayer."
     },
     "registrationSuccess": {
       "title": "Inscription réussie ! 🎉",
@@ -176,7 +189,9 @@
       "failed": "Échec de la vérification",
       "linkExpired": "Le lien de vérification a peut-être expiré ou est invalide.",
       "backToLogin": "Retour à la connexion",
-      "noToken": "Lien de vérification invalide. Aucun jeton fourni."
+      "noToken": "Lien de vérification invalide. Aucun jeton fourni.",
+      "verificationFailed": "Échec de la vérification",
+      "verifyEmailError": "Impossible de vérifier l'e-mail. Veuillez réessayer."
     },
     "paymentSuccess": {
       "title": "Paiement réussi !",
@@ -668,7 +683,8 @@
       "rejectTitle": "Rejeter la question",
       "reasonLabel": "Motif (optionnel)",
       "approve": "Approuver",
-      "reject": "Rejeter"
+      "reject": "Rejeter",
+      "errorStartReview": "Erreur lors du démarrage de la révision"
     },
     "questionCard": {
       "questionNumber": "Question n°{{id}}",
@@ -773,6 +789,35 @@
       "retry": "Réessayer",
       "home": "Aller à l'accueil",
       "support": "Si le problème persiste, veuillez contacter le support."
+    },
+    "cards": {
+      "open": "Ouvrir →"
+    },
+    "basicExamCreator": {
+      "title": "Générer des questions d'examen",
+      "subtitle": "Créez des questions d'examen basées sur un sujet",
+      "topicRequired": "Veuillez saisir un sujet",
+      "generationError": "Erreur lors de la génération",
+      "successMessage": "Questions d'examen générées avec succès !",
+      "topicLabel": "Sujet",
+      "topicPlaceholder": "ex. Algorithmes et structures de données",
+      "questionCountLabel": "Nombre de questions",
+      "difficultyLabel": "Niveau de difficulté",
+      "difficultyEasy": "Facile",
+      "difficultyMedium": "Moyen",
+      "difficultyHard": "Difficile",
+      "back": "Retour",
+      "generate": "Générer"
+    },
+    "questionReviewDetail": {
+      "errorLoad": "Erreur lors du chargement de la question",
+      "errorSave": "Erreur lors de l'enregistrement",
+      "errorApprove": "Erreur lors de l'approbation",
+      "errorReject": "Erreur lors du rejet",
+      "errorComment": "Erreur lors de l'ajout du commentaire",
+      "difficultyEasy": "Facile",
+      "difficultyMedium": "Moyen",
+      "difficultyHard": "Difficile"
     },
     "ragExamCreator": {
       "premiumTitle": "RAG Exam Creator - Fonctionnalité Premium",
@@ -990,6 +1035,9 @@
     "sidebar": {
       "collapse": "Réduire",
       "expand": "Développer"
+    },
+    "navigationBar": {
+      "userFallback": "Utilisateur"
     },
     "packageTier": {
       "tooltipTitle": "Forfait {{package}} - Niveau {{displayName}}",

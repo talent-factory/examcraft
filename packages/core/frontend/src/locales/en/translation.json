@@ -3,7 +3,19 @@
     "profile": "Profile",
     "settings": "Settings",
     "logout": "Logout",
-    "language": "Language"
+    "language": "Language",
+    "sidebar": {
+      "dashboard": "Dashboard",
+      "documents": "Documents",
+      "questionGeneration": "Question Generation",
+      "reviewQueue": "Review Queue",
+      "examComposer": "Exam Composer",
+      "documentChat": "Document Chat",
+      "promptLibrary": "Prompt Library",
+      "admin": "Admin",
+      "pricing": "Pricing",
+      "profile": "Profile"
+    }
   },
   "language": {
     "de": "Deutsch",
@@ -156,7 +168,8 @@
       "starterDescription": "For serious exam creators.",
       "professionalDescription": "Unlimited power for professional exam creation.",
       "processing": "Processing...",
-      "subscribe": "Subscribe"
+      "subscribe": "Subscribe",
+      "subscriptionError": "Failed to start subscription process. Please try again."
     },
     "registrationSuccess": {
       "title": "Registration Successful! 🎉",
@@ -176,7 +189,9 @@
       "failed": "Verification Failed",
       "linkExpired": "The verification link may have expired or is invalid.",
       "backToLogin": "Back to Login",
-      "noToken": "Invalid verification link. No token provided."
+      "noToken": "Invalid verification link. No token provided.",
+      "verificationFailed": "Verification failed",
+      "verifyEmailError": "Failed to verify email. Please try again."
     },
     "paymentSuccess": {
       "title": "Payment Successful!",
@@ -668,7 +683,8 @@
       "rejectTitle": "Reject Question",
       "reasonLabel": "Reason (optional)",
       "approve": "Approve",
-      "reject": "Reject"
+      "reject": "Reject",
+      "errorStartReview": "Error starting review"
     },
     "questionCard": {
       "questionNumber": "Question #{{id}}",
@@ -773,6 +789,35 @@
       "retry": "Try again",
       "home": "Go to Home",
       "support": "If the problem persists, please contact support."
+    },
+    "cards": {
+      "open": "Open →"
+    },
+    "basicExamCreator": {
+      "title": "Generate Exam Questions",
+      "subtitle": "Create exam questions based on a topic",
+      "topicRequired": "Please enter a topic",
+      "generationError": "Error during generation",
+      "successMessage": "Exam questions successfully generated!",
+      "topicLabel": "Topic",
+      "topicPlaceholder": "e.g. Algorithms and Data Structures",
+      "questionCountLabel": "Number of Questions",
+      "difficultyLabel": "Difficulty",
+      "difficultyEasy": "Easy",
+      "difficultyMedium": "Medium",
+      "difficultyHard": "Hard",
+      "back": "Back",
+      "generate": "Generate"
+    },
+    "questionReviewDetail": {
+      "errorLoad": "Error loading question",
+      "errorSave": "Error saving",
+      "errorApprove": "Error approving",
+      "errorReject": "Error rejecting",
+      "errorComment": "Error adding comment",
+      "difficultyEasy": "Easy",
+      "difficultyMedium": "Medium",
+      "difficultyHard": "Hard"
     },
     "ragExamCreator": {
       "premiumTitle": "RAG Exam Creator - Premium Feature",
@@ -990,6 +1035,9 @@
     "sidebar": {
       "collapse": "Collapse",
       "expand": "Expand"
+    },
+    "navigationBar": {
+      "userFallback": "User"
     },
     "packageTier": {
       "tooltipTitle": "{{package}} Package - {{displayName}} Tier",

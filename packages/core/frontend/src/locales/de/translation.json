@@ -3,7 +3,19 @@
     "profile": "Profil",
     "settings": "Einstellungen",
     "logout": "Abmelden",
-    "language": "Sprache"
+    "language": "Sprache",
+    "sidebar": {
+      "dashboard": "Dashboard",
+      "documents": "Dokumente",
+      "questionGeneration": "Fragengenerierung",
+      "reviewQueue": "Review Queue",
+      "examComposer": "Prüfungskomponist",
+      "documentChat": "Dokument-Chat",
+      "promptLibrary": "Prompt-Bibliothek",
+      "admin": "Admin",
+      "pricing": "Preise",
+      "profile": "Profil"
+    }
   },
   "language": {
     "de": "Deutsch",
@@ -156,7 +168,8 @@
       "starterDescription": "Für engagierte Prüfungsersteller.",
       "professionalDescription": "Unbegrenzte Möglichkeiten für professionelle Prüfungserstellung.",
       "processing": "Verarbeitung...",
-      "subscribe": "Abonnieren"
+      "subscribe": "Abonnieren",
+      "subscriptionError": "Abonnementprozess konnte nicht gestartet werden. Bitte versuchen Sie es erneut."
     },
     "registrationSuccess": {
       "title": "Registrierung erfolgreich! 🎉",
@@ -176,7 +189,9 @@
       "failed": "Verifizierung fehlgeschlagen",
       "linkExpired": "Der Verifizierungslink ist möglicherweise abgelaufen oder ungültig.",
       "backToLogin": "Zurück zur Anmeldung",
-      "noToken": "Ungültiger Verifizierungslink. Kein Token angegeben."
+      "noToken": "Ungültiger Verifizierungslink. Kein Token angegeben.",
+      "verificationFailed": "Verifizierung fehlgeschlagen",
+      "verifyEmailError": "E-Mail konnte nicht verifiziert werden. Bitte versuchen Sie es erneut."
     },
     "paymentSuccess": {
       "title": "Zahlung erfolgreich!",
@@ -668,7 +683,8 @@
       "rejectTitle": "Frage ablehnen",
       "reasonLabel": "Begründung (optional)",
       "approve": "Genehmigen",
-      "reject": "Ablehnen"
+      "reject": "Ablehnen",
+      "errorStartReview": "Fehler beim Starten des Reviews"
     },
     "questionCard": {
       "questionNumber": "Frage #{{id}}",
@@ -773,6 +789,35 @@
       "retry": "Erneut versuchen",
       "home": "Zur Startseite",
       "support": "Wenn das Problem weiterhin besteht, kontaktieren Sie bitte den Support."
+    },
+    "cards": {
+      "open": "Öffnen →"
+    },
+    "basicExamCreator": {
+      "title": "Prüfungsfragen generieren",
+      "subtitle": "Erstellen Sie Prüfungsfragen basierend auf einem Thema",
+      "topicRequired": "Bitte geben Sie ein Thema ein",
+      "generationError": "Fehler bei der Generierung",
+      "successMessage": "Prüfungsfragen erfolgreich generiert!",
+      "topicLabel": "Thema",
+      "topicPlaceholder": "z.B. Algorithmen und Datenstrukturen",
+      "questionCountLabel": "Anzahl Fragen",
+      "difficultyLabel": "Schwierigkeitsgrad",
+      "difficultyEasy": "Einfach",
+      "difficultyMedium": "Mittel",
+      "difficultyHard": "Schwer",
+      "back": "Zurück",
+      "generate": "Generieren"
+    },
+    "questionReviewDetail": {
+      "errorLoad": "Fehler beim Laden der Frage",
+      "errorSave": "Fehler beim Speichern",
+      "errorApprove": "Fehler beim Genehmigen",
+      "errorReject": "Fehler beim Ablehnen",
+      "errorComment": "Fehler beim Kommentieren",
+      "difficultyEasy": "Einfach",
+      "difficultyMedium": "Mittel",
+      "difficultyHard": "Schwer"
     },
     "ragExamCreator": {
       "premiumTitle": "RAG Exam Creator - Premium Feature",
@@ -990,6 +1035,9 @@
     "sidebar": {
       "collapse": "Einklappen",
       "expand": "Ausklappen"
+    },
+    "navigationBar": {
+      "userFallback": "Benutzer"
     },
     "packageTier": {
       "tooltipTitle": "{{package}} Paket - {{displayName}} Stufe",

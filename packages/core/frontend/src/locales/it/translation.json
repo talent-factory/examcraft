@@ -3,7 +3,19 @@
     "profile": "Profilo",
     "settings": "Impostazioni",
     "logout": "Esci",
-    "language": "Lingua"
+    "language": "Lingua",
+    "sidebar": {
+      "dashboard": "Dashboard",
+      "documents": "Documenti",
+      "questionGeneration": "Generazione domande",
+      "reviewQueue": "Coda di revisione",
+      "examComposer": "Compositore esami",
+      "documentChat": "Chat documenti",
+      "promptLibrary": "Libreria prompt",
+      "admin": "Admin",
+      "pricing": "Prezzi",
+      "profile": "Profilo"
+    }
   },
   "language": {
     "de": "Deutsch",
@@ -156,7 +168,8 @@
       "starterDescription": "Per creatori di esami seri.",
       "professionalDescription": "Potenza illimitata per la creazione professionale di esami.",
       "processing": "Elaborazione...",
-      "subscribe": "Abbonati"
+      "subscribe": "Abbonati",
+      "subscriptionError": "Impossibile avviare il processo di abbonamento. Riprova."
     },
     "registrationSuccess": {
       "title": "Registrazione completata! 🎉",
@@ -176,7 +189,9 @@
       "failed": "Verifica fallita",
       "linkExpired": "Il link di verifica potrebbe essere scaduto o non valido.",
       "backToLogin": "Torna al login",
-      "noToken": "Link di verifica non valido. Nessun token fornito."
+      "noToken": "Link di verifica non valido. Nessun token fornito.",
+      "verificationFailed": "Verifica fallita",
+      "verifyEmailError": "Impossibile verificare l'e-mail. Riprova."
     },
     "paymentSuccess": {
       "title": "Pagamento riuscito!",
@@ -668,7 +683,8 @@
       "rejectTitle": "Rifiuta domanda",
       "reasonLabel": "Motivo (opzionale)",
       "approve": "Approva",
-      "reject": "Rifiuta"
+      "reject": "Rifiuta",
+      "errorStartReview": "Errore nell'avvio della revisione"
     },
     "questionCard": {
       "questionNumber": "Domanda #{{id}}",
@@ -773,6 +789,35 @@
       "retry": "Riprova",
       "home": "Vai alla home",
       "support": "Se il problema persiste, contatta il supporto."
+    },
+    "cards": {
+      "open": "Apri →"
+    },
+    "basicExamCreator": {
+      "title": "Genera domande d'esame",
+      "subtitle": "Crea domande d'esame basate su un argomento",
+      "topicRequired": "Inserisci un argomento",
+      "generationError": "Errore durante la generazione",
+      "successMessage": "Domande d'esame generate con successo!",
+      "topicLabel": "Argomento",
+      "topicPlaceholder": "es. Algoritmi e strutture dati",
+      "questionCountLabel": "Numero di domande",
+      "difficultyLabel": "Livello di difficoltà",
+      "difficultyEasy": "Facile",
+      "difficultyMedium": "Medio",
+      "difficultyHard": "Difficile",
+      "back": "Indietro",
+      "generate": "Genera"
+    },
+    "questionReviewDetail": {
+      "errorLoad": "Errore nel caricamento della domanda",
+      "errorSave": "Errore nel salvataggio",
+      "errorApprove": "Errore nell'approvazione",
+      "errorReject": "Errore nel rifiuto",
+      "errorComment": "Errore nell'aggiunta del commento",
+      "difficultyEasy": "Facile",
+      "difficultyMedium": "Medio",
+      "difficultyHard": "Difficile"
     },
     "ragExamCreator": {
       "premiumTitle": "RAG Exam Creator - Funzionalità Premium",
@@ -990,6 +1035,9 @@
     "sidebar": {
       "collapse": "Comprimi",
       "expand": "Espandi"
+    },
+    "navigationBar": {
+      "userFallback": "Utente"
     },
     "packageTier": {
       "tooltipTitle": "Pacchetto {{package}} - Livello {{displayName}}",

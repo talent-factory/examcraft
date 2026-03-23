@@ -66,11 +66,11 @@ const QuestionReviewDetail: React.FC = () => {
         // Comments may not be available
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Laden der Frage');
+      setError(err instanceof Error ? err.message : t('components.questionReviewDetail.errorLoad'));
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     loadQuestion();
@@ -86,7 +86,7 @@ const QuestionReviewDetail: React.FC = () => {
       setQuestion(updated);
       setSuccess(t('components.questionDetail.changesSaved'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Speichern');
+      setError(err instanceof Error ? err.message : t('components.questionReviewDetail.errorSave'));
     } finally {
       setSaving(false);
     }
@@ -102,7 +102,7 @@ const QuestionReviewDetail: React.FC = () => {
       setQuestion(updated);
       setSuccess(t('components.questionDetail.approved'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Genehmigen');
+      setError(err instanceof Error ? err.message : t('components.questionReviewDetail.errorApprove'));
     } finally {
       setSaving(false);
     }
@@ -118,7 +118,7 @@ const QuestionReviewDetail: React.FC = () => {
       setQuestion(updated);
       setSuccess(t('components.questionDetail.rejected'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Ablehnen');
+      setError(err instanceof Error ? err.message : t('components.questionReviewDetail.errorReject'));
     } finally {
       setSaving(false);
     }
@@ -136,7 +136,7 @@ const QuestionReviewDetail: React.FC = () => {
       setComments(prev => [...prev, newComment]);
       setCommentText('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Kommentieren');
+      setError(err instanceof Error ? err.message : t('components.questionReviewDetail.errorComment'));
     } finally {
       setSaving(false);
     }
@@ -275,9 +275,9 @@ const QuestionReviewDetail: React.FC = () => {
                         onChange={(e) => setEditData(prev => ({ ...prev, difficulty: e.target.value }))}
                         label={t('components.questionDetail.difficulty')}
                       >
-                        <MenuItem value="easy">Easy</MenuItem>
-                        <MenuItem value="medium">Medium</MenuItem>
-                        <MenuItem value="hard">Hard</MenuItem>
+                        <MenuItem value="easy">{t('components.questionReviewDetail.difficultyEasy')}</MenuItem>
+                        <MenuItem value="medium">{t('components.questionReviewDetail.difficultyMedium')}</MenuItem>
+                        <MenuItem value="hard">{t('components.questionReviewDetail.difficultyHard')}</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>

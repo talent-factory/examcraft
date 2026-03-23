@@ -132,7 +132,7 @@ const ReviewQueue: React.FC = () => {
       await ReviewService.startReview(questionId);
       navigate(`/questions/review/${questionId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Starten des Reviews');
+      setError(err instanceof Error ? err.message : t('components.reviewQueue.errorStartReview'));
     } finally {
       setLoading(false);
     }

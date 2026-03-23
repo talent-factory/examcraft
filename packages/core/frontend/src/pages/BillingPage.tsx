@@ -16,7 +16,7 @@ export const BillingPage: React.FC = () => {
             window.location.href = session.url;
         } catch (err: any) {
             console.error('Subscription error:', err);
-            const errorMessage = err.response?.data?.detail || 'Failed to start subscription process. Please try again.';
+            const errorMessage = err.response?.data?.detail || t('pages.billing.subscriptionError');
             setError(errorMessage);
             setLoading(false);
         }
