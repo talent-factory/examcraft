@@ -26,6 +26,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   return (
     <Box
       sx={{
+        wordBreak: 'break-word',
+        overflowWrap: 'break-word',
         '& p': {
           mt: variant === 'compact' ? 0 : 1,
           mb: variant === 'compact' ? 1 : 2
@@ -110,12 +112,17 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         '& pre': {
           my: 2,
           borderRadius: 1,
-          overflow: 'auto'
+          overflow: 'auto',
+          maxWidth: '100%',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
         },
         '& pre code': {
           bgcolor: 'transparent',
           color: 'inherit',
-          p: 0
+          p: 0,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
         }
       }}
     >
@@ -133,10 +140,13 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   style={vscDarkPlus as any}
                   language={language}
                   PreTag="div"
+                  wrapLongLines={true}
                   customStyle={{
                     margin: 0,
                     borderRadius: '4px',
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
                   }}
                 >
                   {String(children).replace(/\n$/, '')}
