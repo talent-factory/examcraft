@@ -236,7 +236,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
           </h3>
           <div>
             <label htmlFor="language-select" className="block text-sm font-medium text-gray-700 mb-2">
-              {t('profile.profileView.language')}
+              🌐 {t('profile.profileView.language')}
             </label>
             <select
               id="language-select"
