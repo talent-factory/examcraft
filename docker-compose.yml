@@ -61,6 +61,8 @@ services:
       dockerfile: ./backend/Dockerfile
     restart: unless-stopped
     env_file:
+      - path: ../.env
+        required: false
       - path: ./.env
         required: false
     environment:
@@ -93,6 +95,8 @@ services:
       dockerfile: ./backend/Dockerfile
     restart: unless-stopped
     env_file:
+      - path: ../.env
+        required: false
       - path: ./.env
         required: false
     environment:
