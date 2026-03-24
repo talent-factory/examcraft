@@ -45,7 +45,7 @@ examcraft/
 - **[🚀 Deployment Guide](DEPLOYMENT.md)** - Production deployment on Fly.io
 - **[📖 API Documentation](http://localhost:8000/docs)** - Interactive API docs (local)
 - **[🔧 Development Setup](#-quick-start)** - Local development environment (see below)
-- **[⚙️ Async Document Processing](docs/ASYNC_DOCUMENT_PROCESSING.md)** - RabbitMQ & Celery setup
+- **[⚙️ Async Document Processing](https://docs.examcraft.ch/guides/async-processing)** - RabbitMQ & Celery setup
 
 ### 🗺️ Public Roadmap
 
@@ -308,7 +308,7 @@ cd packages/core/backend && ruff check . --fix && ruff format .
 cd packages/core/frontend && bun run lint:fix
 ```
 
-**Siehe [docs/LINT_CHECKS.md](docs/LINT_CHECKS.md) für detaillierte Informationen.**
+**Siehe [Lint Checks](https://docs.examcraft.ch/guides/lint-checks) für detaillierte Informationen.**
 
 ### Nützliche Befehle
 

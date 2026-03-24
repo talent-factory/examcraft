@@ -270,7 +270,7 @@ docker compose -f docker-compose.full.yml up -d
 **Submodule-Commits IMMER vor oder mit dem Parent-Repo pushen!**
 
 Das Repository verwendet Git Submodules (`packages/premium`,
-`packages/enterprise`, `docs-mintlify`). Wenn Submodule-Commits nicht
+`packages/enterprise`). Wenn Submodule-Commits nicht
 gepusht werden, schlägt CI fehl, weil GitHub den referenzierten Commit
 nicht finden kann.
 
