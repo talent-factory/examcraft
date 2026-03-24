@@ -15,6 +15,7 @@ export const PromptLibraryWithUpload = {};
 export const PromptTemplateSelector = {};
 export const CustomBranding = {};
 export const SSOConfiguration = {};
+export const RAGService = {};
 
 // Default export (in case someone imports the whole module)
 const emptyModule = {};

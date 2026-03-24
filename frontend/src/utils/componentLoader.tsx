@@ -302,7 +302,7 @@ export const loadRAGService = async (): Promise<any> => {
   try {
     const module = await import(
       /* webpackChunkName: "rag-service" */
-      '@examcraft/premium/services/RAGService'
+      '@examcraft/premium'
     );
     return module.RAGService || module.default;
   } catch (err) {

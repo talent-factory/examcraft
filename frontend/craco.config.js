@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 
 module.exports = {
   typescript: {
@@ -37,12 +38,17 @@ module.exports = {
       // Docker: Premium/Enterprise mounted at /premium and /enterprise (see docker-compose.full.yml)
       // Render.com: Use relative paths from monorepo root
       const isProd = process.env.NODE_ENV === 'production';
-      const premiumPath = isProd
+      const emptyModulePath = path.resolve(__dirname, 'src/utils/emptyModule.ts');
+
+      const premiumCandidate = isProd
         ? path.resolve(__dirname, '../../premium/frontend/src')
         : path.resolve('/premium/frontend/src');
-      const enterprisePath = isProd
+      const enterpriseCandidate = isProd
         ? path.resolve(__dirname, '../../enterprise/frontend/src')
         : path.resolve('/enterprise/frontend/src');
+
+      const premiumPath = fs.existsSync(premiumCandidate) ? premiumCandidate : emptyModulePath;
+      const enterprisePath = fs.existsSync(enterpriseCandidate) ? enterpriseCandidate : emptyModulePath;
 
       webpackConfig.resolve.alias = {
         ...webpackConfig.resolve.alias,
