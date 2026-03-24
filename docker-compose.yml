@@ -1,0 +1,141 @@
+name: examcraft-core
+
+# ExamCraft AI - Core Deployment (Open Source)
+# Limited features, access controlled via RBAC Free Tier
+#
+# Usage:
+#   docker compose up
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: examcraft
+      POSTGRES_USER: examcraft
+      POSTGRES_PASSWORD: examcraft_dev  # pragma: allowlist secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U examcraft"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: examcraft
+      RABBITMQ_DEFAULT_PASS: examcraft_dev  # pragma: allowlist secret
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  api:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      DEPLOYMENT_MODE: core
+      DATABASE_URL: postgresql://examcraft:examcraft_dev@db:5432/examcraft  # pragma: allowlist secret
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev@rabbitmq:5672/  # pragma: allowlist secret
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8000
+      DEFAULT_SUBSCRIPTION_TIER: free
+      ENVIRONMENT: development
+      DEBUG: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend_storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      DEPLOYMENT_MODE: core
+      DATABASE_URL: postgresql://examcraft:examcraft_dev@db:5432/examcraft  # pragma: allowlist secret
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev@rabbitmq:5672/  # pragma: allowlist secret
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ENVIRONMENT: development
+      DEBUG: "false"
+    volumes:
+      - ./backend:/app
+      - backend_storage:/app/storage
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    command: celery -A celery_app worker --loglevel=info --concurrency=3 --queues=document_processing,rag_embedding,question_generation,notifications
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./frontend/Dockerfile
+    restart: unless-stopped
+    environment:
+      REACT_APP_DEPLOYMENT_MODE: core
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_ENVIRONMENT: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - /app/node_modules
+    depends_on:
+      - api
+    command: bun start
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  backend_storage:

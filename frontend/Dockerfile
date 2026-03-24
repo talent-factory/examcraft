@@ -4,19 +4,19 @@ FROM oven/bun:1-alpine
 WORKDIR /app
 
 # Copy package files (bun.lock is at repo root)
-COPY bun.lock packages/core/frontend/package.json ./
+COPY bun.lock frontend/package.json ./
 
 # Install dependencies
 RUN bun install
 
 # Copy source code
-COPY packages/core/frontend/ ./
+COPY frontend/ ./
 
 # Set working directory for running the app
 WORKDIR /app
 
 # Copy entrypoint script (from build context root)
-COPY packages/core/frontend/docker-entrypoint.sh /usr/local/bin/
+COPY frontend/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Expose port

@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y \
 RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 
 # Copy requirements and pyproject.toml first for better caching
-COPY packages/core/backend/requirements.txt .
+COPY backend/requirements.txt .
 COPY pyproject.toml /app/pyproject.toml
 
 # Install Python dependencies (SSH mount for private git repos)
@@ -33,7 +33,7 @@ RUN --mount=type=ssh pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -e .
 
 # Copy application code
-COPY packages/core/backend/ .
+COPY backend/ .
 
 # Expose port
 EXPOSE 8000

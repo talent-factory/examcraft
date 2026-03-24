@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir \
     amqp==5.2.0
 
 # Copy Flower-specific celery config (no task imports)
-COPY packages/core/backend/celery_app_flower.py ./celery_app.py
+COPY core/backend/celery_app_flower.py ./celery_app.py
 
 RUN chown -R appuser:appgroup /app
 

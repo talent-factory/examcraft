@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy requirements first (for better layer caching)
-COPY packages/core/backend/requirements.txt ./
+COPY core/backend/requirements.txt ./
 
 # Install Python dependencies
 # Use build secret for private GitHub repo access (subscribeflow SDK)
@@ -63,17 +63,17 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY packages/core/backend/ ./
+COPY core/backend/ ./
 
 # Copy Premium package (for Full deployment mode)
 # Directory is created by CI if submodule checkout fails, so COPY always succeeds
-COPY packages/premium/backend/ ./premium/
+COPY premium/backend/ ./premium/
 
 # Copy utils directory (RAG, extraction modules)
 COPY utils/ ./utils/
 
 # Copy entrypoint script
-COPY packages/core/backend/docker-entrypoint.sh ./docker-entrypoint.sh
+COPY core/backend/docker-entrypoint.sh ./docker-entrypoint.sh
 
 # Create necessary directories
 RUN mkdir -p storage/uploads mock_vector_db
