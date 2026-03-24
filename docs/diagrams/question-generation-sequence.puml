@@ -1,0 +1,57 @@
+@startuml Question_Generation_Sequence
+!theme plain
+title RAG-based Question Generation Sequence
+
+actor User
+participant Frontend
+participant "FastAPI Backend" as API
+participant "RAG Service" as RAG
+participant "Vector Service" as Vector
+participant "Claude Service" as Claude
+participant ChromaDB
+participant "Claude API" as ClaudeAPI
+
+User -> Frontend: Request question generation
+Frontend -> API: POST /api/v1/generate-questions\n{topic, document_ids, count}
+
+API -> RAG: generate_questions_from_documents()
+RAG -> Vector: search_similar_content(topic, document_ids)
+
+Vector -> ChromaDB: Query similar vectors
+ChromaDB --> Vector: Relevant document chunks
+
+Vector --> RAG: Context chunks with metadata
+RAG -> RAG: Build RAG prompt with context
+
+RAG -> Claude: generate_questions_with_context(prompt)
+Claude -> ClaudeAPI: API request with context
+ClaudeAPI --> Claude: Generated questions JSON
+
+Claude -> Claude: Parse and validate response
+Claude --> RAG: Structured questions
+
+RAG -> RAG: Add source attribution
+RAG --> API: Generated questions with sources
+
+API --> Frontend: Questions with metadata
+Frontend --> User: Display generated questions
+
+note right of Vector
+  Similarity search finds
+  most relevant content
+  for the given topic
+end note
+
+note right of Claude
+  Rate limiting and
+  retry logic ensure
+  reliable generation
+end note
+
+note left of ClaudeAPI
+  Costs are tracked
+  and optimized per
+  request
+end note
+
+@enduml

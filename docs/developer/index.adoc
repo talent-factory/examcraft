@@ -1,0 +1,511 @@
+= Developer Documentation
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+:imagesdir: ../images
+:plantuml-server-url: https://www.plantuml.com/plantuml
+
+[.lead]
+Technical documentation for ExamCraft AI developers covering architecture, setup, APIs, and contribution guidelines.
+
+== Quick Links
+
+[cols="1,3"]
+|===
+|Section |Description
+
+|link:quick-start.adoc[🚀 Quick Start]
+|Get development environment running in 5 minutes
+
+|link:architecture.adoc[🏗️ Architecture]
+|System overview, components, and data flow
+
+|link:api-reference.adoc[📡 API Reference]
+|Complete backend API documentation
+
+|link:deployment.adoc[🐳 Deployment]
+|Production deployment and infrastructure
+
+|link:contributing.adoc[🤝 Contributing]
+|Development guidelines and best practices
+|===
+
+== Development Environment
+
+=== System Requirements
+
+* **Docker**: >= 20.10
+* **Docker Compose**: >= 2.0
+* **Node.js**: >= 18 (for local frontend development)
+* **Python**: >= 3.13 (for local backend development)
+* **Git**: >= 2.30
+
+=== Local Development Setup
+
+==== 1. Clone and Setup
+
+[source,bash]
+----
+# Clone repository
+git clone <repository-url>
+cd ExamCraft
+
+# Copy environment template
+cp .env.example .env
+
+# Edit .env and add your Claude API key
+nano .env
+----
+
+==== 2. Start Development Environment
+
+[source,bash]
+----
+# Start all services
+./start-dev.sh
+
+# Or manually with docker-compose
+docker-compose up --build -d
+----
+
+==== 3. Verify Installation
+
+[source,bash]
+----
+# Check services status
+docker-compose ps
+
+# Test API health
+curl http://localhost:8000/health
+
+# Access applications
+# Frontend: http://localhost:3000
+# Backend: http://localhost:8000
+# API Docs: http://localhost:8000/docs
+----
+
+=== Development Workflow
+
+==== 1. Code Changes
+
+[source,bash]
+----
+# Frontend changes (auto-reload)
+cd frontend
+bun start
+
+# Backend changes (auto-reload with uvicorn)
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+----
+
+==== 2. Testing
+
+[source,bash]
+----
+# Backend tests
+cd backend
+pytest
+
+# Frontend tests
+cd frontend
+bun test
+
+# Integration tests
+docker-compose -f docker-compose.test.yml up --build
+----
+
+==== 3. Database Operations
+
+[source,bash]
+----
+# Access PostgreSQL
+docker exec -it examcraft_postgres psql -U examcraft -d examcraft_dev
+
+# Run migrations (when implemented)
+docker exec examcraft_backend alembic upgrade head
+
+# Reset database
+docker-compose down -v
+docker-compose up -d postgres
+----
+
+== Project Structure
+
+=== Backend (FastAPI + Python)
+
+[source,text]
+----
+backend/
+├── main.py                  # FastAPI application entry point
+├── requirements.txt         # Python dependencies
+├── Dockerfile               # Container configuration
+├── api/                     # API endpoints
+│   ├── __init__.py
+│   ├── documents.py         # Document upload/management
+│   ├── questions.py         # Question generation
+│   └── health.py            # Health checks
+├── services/                # Business logic
+│   ├── document_service.py  # Document processing
+│   ├── docling_service.py   # Docling integration
+│   ├── qdrant_vector_service.py  # Qdrant operations
+│   ├── rag_service.py       # RAG-based generation
+│   └── claude_service.py    # Claude API integration
+├── models/                  # Database models
+│   ├── document.py
+│   ├── question.py
+│   └── user.py
+├── storage/                 # File storage
+│   └── uploads/             # Uploaded documents
+└── tests/                   # Test suite
+    ├── test_api/
+    ├── test_services/
+    └── test_models/
+----
+
+=== Frontend (React + TypeScript)
+
+[source,text]
+----
+frontend/
+├── public/                  # Static assets
+├── src/
+│   ├── components/          # React components
+│   │   ├── DocumentUpload.tsx
+│   │   ├── QuestionGenerator.tsx
+│   │   ├── DocumentManager.tsx
+│   │   └── ExamViewer.tsx
+│   ├── services/            # API clients
+│   │   ├── DocumentService.ts
+│   │   ├── QuestionService.ts
+│   │   └── ApiClient.ts
+│   ├── types/               # TypeScript interfaces
+│   │   ├── document.ts
+│   │   ├── question.ts
+│   │   └── api.ts
+│   ├── pages/               # Route components
+│   │   ├── Dashboard.tsx
+│   │   ├── Documents.tsx
+│   │   └── Generate.tsx
+│   ├── hooks/               # Custom React hooks
+│   │   ├── useDocuments.ts
+│   │   └── useQuestions.ts
+│   └── utils/               # Helper functions
+│       ├── formatters.ts
+│       └── validators.ts
+├── package.json
+├── Dockerfile
+└── tsconfig.json
+----
+
+== Technology Deep Dive
+
+=== Backend Technologies
+
+==== FastAPI Framework
+
+[source,python]
+----
+# main.py - Application setup
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from api import documents, questions, health
+
+app = FastAPI(
+    title="ExamCraft AI API",
+    description="AI-powered exam generation",
+    version="0.1.0"
+)
+
+# CORS middleware for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(health.router)
+app.include_router(documents.router, prefix="/api/v1")
+app.include_router(questions.router, prefix="/api/v1")
+----
+
+==== Document Processing Pipeline
+
+[source,python]
+----
+# services/document_service.py
+class DocumentService:
+    async def process_document(self, file_path: str) -> ProcessedDocument:
+        # 1. Extract content with Docling
+        content = await self.docling_service.process(file_path)
+
+        # 2. Create semantic chunks
+        chunks = self.create_chunks(content.text)
+
+        # 3. Generate embeddings
+        embeddings = self.embedding_model.encode(chunks)
+
+        # 4. Store in vector database
+        await self.vector_service.store_chunks(
+            document_id=content.id,
+            chunks=chunks,
+            embeddings=embeddings
+        )
+
+        return ProcessedDocument(
+            id=content.id,
+            title=content.title,
+            chunks_count=len(chunks),
+            status="processed"
+        )
+----
+
+==== RAG Question Generation
+
+[source,python]
+----
+# services/rag_service.py
+class RAGService:
+    async def generate_questions(
+        self,
+        topic: str,
+        document_ids: List[str],
+        count: int = 5
+    ) -> List[Question]:
+        # 1. Retrieve relevant context
+        context = await self.vector_service.search_similar(
+            query=topic,
+            document_ids=document_ids,
+            top_k=10
+        )
+
+        # 2. Build RAG prompt
+        prompt = self.build_rag_prompt(topic, context, count)
+
+        # 3. Generate with Claude
+        response = await self.claude_service.generate(prompt)
+
+        # 4. Parse and validate questions
+        questions = self.parse_questions(response)
+
+        return questions
+----
+
+=== Frontend Technologies
+
+==== React Architecture
+
+[source,typescript]
+----
+// components/DocumentUpload.tsx
+import React, { useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { DocumentService } from '../services/DocumentService';
+
+interface DocumentUploadProps {
+  onUploadComplete: (documentId: string) => void;
+}
+
+export const DocumentUpload: React.FC<DocumentUploadProps> = ({
+  onUploadComplete
+}) => {
+  const onDrop = useCallback(async (files: File[]) => {
+    for (const file of files) {
+      try {
+        const result = await DocumentService.upload(file);
+        onUploadComplete(result.documentId);
+      } catch (error) {
+        console.error('Upload failed:', error);
+      }
+    }
+  }, [onUploadComplete]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'text/plain': ['.txt'],
+      'text/markdown': ['.md']
+    }
+  });
+
+  return (
+    <div {...getRootProps()} className="dropzone">
+      <input {...getInputProps()} />
+      {isDragActive ? (
+        <p>Drop files here...</p>
+      ) : (
+        <p>Drag & drop files, or click to select</p>
+      )}
+    </div>
+  );
+};
+----
+
+==== TypeScript Interfaces
+
+[source,typescript]
+----
+// types/document.ts
+export interface Document {
+  id: string;
+  filename: string;
+  fileSize: number;
+  mimeType: string;
+  uploadedAt: string;
+  status: 'uploading' | 'processing' | 'processed' | 'error';
+  metadata?: {
+    title?: string;
+    pages?: number;
+    chunks?: number;
+  };
+}
+
+// types/question.ts
+export interface Question {
+  id: string;
+  type: 'multiple_choice' | 'open_question';
+  question: string;
+  options?: string[];
+  correctAnswer: string | number;
+  explanation: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  bloomLevel: string;
+  sourceDocuments: string[];
+}
+
+// types/api.ts
+export interface ApiResponse<T> {
+  data: T;
+  message?: string;
+  success: boolean;
+}
+
+export interface GenerateQuestionsRequest {
+  topic: string;
+  documentIds: string[];
+  questionCount: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  questionTypes: ('multiple_choice' | 'open_question')[];
+}
+----
+
+== Development Tools
+
+=== Useful Commands
+
+[source,bash]
+----
+# Development
+./start-dev.sh                    # Start development environment
+docker-compose logs -f backend    # View backend logs
+docker-compose logs -f frontend   # View frontend logs
+docker-compose restart <service>  # Restart specific service
+
+# Testing
+docker-compose -f docker-compose.test.yml up   # Run test suite
+pytest backend/tests/                          # Backend unit tests
+bun test --prefix frontend                     # Frontend tests
+
+# Database
+docker exec -it examcraft_postgres psql -U examcraft -d examcraft_dev
+docker-compose down -v            # Reset database
+docker exec examcraft_backend alembic upgrade head  # Run migrations
+
+# Cleanup
+docker system prune -f            # Clean up Docker resources
+docker volume prune -f            # Remove unused volumes
+----
+
+=== Claude Code Commands
+
+ExamCraft AI includes custom Claude Code commands for development:
+
+[source,bash]
+----
+/check-services    # Check status of all development services
+/restart-dev       # Intelligent restart of development environment
+/check-tasks       # View Linear tasks with recommendations
+----
+
+== Debugging & Troubleshooting
+
+=== Common Issues
+
+==== Port Conflicts
+
+[source,bash]
+----
+# Check what's using port 3000/8000
+lsof -i :3000
+lsof -i :8000
+
+# Kill processes using ports
+sudo kill -9 $(lsof -t -i:3000)
+sudo kill -9 $(lsof -t -i:8000)
+----
+
+==== Container Issues
+
+[source,bash]
+----
+# View container logs
+docker-compose logs <service-name>
+
+# Restart specific container
+docker-compose restart <service-name>
+
+# Rebuild container
+docker-compose build --no-cache <service-name>
+
+# Shell into container
+docker exec -it <container-name> /bin/bash
+----
+
+==== Database Connection Issues
+
+[source,bash]
+----
+# Check PostgreSQL status
+docker exec examcraft_postgres pg_isready -U examcraft
+
+# Connect to database
+docker exec -it examcraft_postgres psql -U examcraft -d examcraft_dev
+
+# Reset database
+docker-compose down -v
+docker-compose up -d postgres
+----
+
+=== Performance Monitoring
+
+[source,bash]
+----
+# Monitor container resources
+docker stats
+
+# Check disk usage
+docker system df
+
+# Monitor API performance
+curl -w "@curl-format.txt" -o /dev/null -s http://localhost:8000/health
+----
+
+== Next Steps
+
+* Read the link:architecture.adoc[Architecture Guide] for system design details
+* Check the link:api-reference.adoc[API Reference] for endpoint documentation
+* Review link:contributing.adoc[Contributing Guidelines] before making changes
+* See link:deployment.adoc[Deployment Guide] for production setup
+
+---
+
+Need help? Check our link:../user/faq.adoc[FAQ] or create an issue in the GitHub repository.

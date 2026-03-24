@@ -1,0 +1,158 @@
+= ExamCraft AI Documentation
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+:imagesdir: images
+:plantuml-server-url: https://www.plantuml.com/plantuml
+
+[.lead]
+Comprehensive documentation for ExamCraft AI - KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben.
+
+== Quick Navigation
+
+[cols="1,3,1"]
+|===
+|Documentation Type |Description |Link
+
+|🔧 **Developer Guide**
+|Technical documentation, architecture, setup, and API reference
+|link:developer/index.adoc[Developer Documentation]
+
+|👤 **User Guide**
+|Workshop demo guide, user manual, and tutorials
+|link:user/index.adoc[User Documentation]
+
+|📊 **Architecture**
+|System diagrams, data flow, and deployment guides
+|link:developer/architecture.adoc[Architecture Overview]
+
+|🚀 **Quick Start**
+|Get up and running in 5 minutes
+|link:developer/quick-start.adoc[Quick Start Guide]
+|===
+
+== Project Overview
+
+ExamCraft AI is a modern web application that helps educators automatically generate high-quality exam questions using artificial intelligence.
+
+=== Key Features
+
+* 🤖 **AI-powered Question Generation** with Claude API
+* 📄 **Document-based RAG System** for contextual questions
+* 📝 **Multiple Question Types**: Multiple Choice, Open Questions
+* 🎚️ **Difficulty Levels**: Easy, Medium, Hard with Bloom Taxonomy
+* 🌐 **Multilingual Support**: German and English
+* 📊 **Immediate Evaluation** with detailed feedback
+* 🐳 **Docker-based Development** for easy setup
+
+=== Technology Stack
+
+[cols="1,2,3"]
+|===
+|Layer |Technology |Purpose
+
+|**Frontend**
+|React 18 + TypeScript + Material-UI
+|Modern, responsive user interface
+
+|**Backend**
+|FastAPI + Python + PydanticAI
+|High-performance API with AI integration
+
+|**Database**
+|PostgreSQL + Redis
+|Persistent storage and caching
+
+|**AI/ML**
+|Claude API + ChromaDB + sentence-transformers
+|Question generation and vector search
+
+|**DevOps**
+|Docker Compose + nginx
+|Containerization and deployment
+|===
+
+== Getting Started
+
+=== Prerequisites
+
+* Docker & Docker Compose
+* Git
+* Claude API Key (optional for demo mode)
+
+=== Quick Setup
+
+[source,bash]
+----
+# Clone repository
+git clone <repository-url>
+cd ExamCraft
+
+# Start development environment
+./start-dev.sh
+
+# Access application
+# Frontend: http://localhost:3000
+# Backend: http://localhost:8000/docs
+----
+
+== Documentation Structure
+
+[source]
+----
+docs/
+├── index.adoc                 # This overview
+├── developer/                 # Technical documentation
+│   ├── index.adoc
+│   ├── architecture.adoc
+│   ├── api-reference.adoc
+│   ├── deployment.adoc
+│   └── contributing.adoc
+├── user/                      # User guides
+│   ├── index.adoc
+│   ├── workshop-demo.adoc
+│   ├── tutorial.adoc
+│   └── faq.adoc
+├── diagrams/                  # PlantUML source files
+│   ├── architecture.puml
+│   ├── deployment.puml
+│   └── sequence-diagrams.puml
+└── images/                    # Generated diagrams and screenshots
+----
+
+== Recent Updates
+
+[%header,cols="1,2,3"]
+|===
+|Date |Component |Changes
+
+|2025-09-23
+|Core Features
+|✅ Document processing, Vector search, Claude API, React Frontend completed
+
+|2025-09-22
+|RAG Integration
+|✅ ChromaDB setup, Docling integration, Document upload system
+
+|2025-09-21
+|Infrastructure
+|✅ Docker environment, FastAPI backend, PostgreSQL setup
+|===
+
+== Contributing
+
+See link:developer/contributing.adoc[Contributing Guide] for development guidelines, coding standards, and submission process.
+
+== Support
+
+* **Issues**: Create GitHub issues for bugs and feature requests
+* **Documentation**: Check link:user/faq.adoc[FAQ] for common questions
+* **API Reference**: Available at http://localhost:8000/docs during development
+
+'''
+
+💡 **Tip**: Use the table of contents on the left to navigate quickly through sections.
+
+🚀 **Ready to start?** Jump to the link:developer/quick-start.adoc[Quick Start Guide] or link:user/workshop-demo.adoc[Workshop Demo Guide].

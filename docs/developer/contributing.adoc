@@ -1,0 +1,708 @@
+= Contributing Guide
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+:imagesdir: ../images
+
+[.lead]
+Welcome to the ExamCraft AI contributor community! This guide covers everything you need to know to contribute effectively to the project.
+
+== Getting Started
+
+=== Prerequisites
+
+Before contributing, ensure you have:
+
+* **Development Environment**: Working local setup (see link:quick-start.adoc[Quick Start Guide])
+* **Git Knowledge**: Basic understanding of Git workflows
+* **Code Editor**: VS Code, IntelliJ, or your preferred editor
+* **GitHub Account**: For submitting pull requests
+
+=== Code of Conduct
+
+We are committed to providing a welcoming and inclusive environment for all contributors. Please:
+
+* **Be respectful** in all interactions
+* **Focus on constructive feedback** in code reviews
+* **Help newcomers** get up to speed
+* **Report inappropriate behavior** to maintainers
+* **Follow professional standards** in all communications
+
+== Development Workflow
+
+=== 1. Setting Up Your Fork
+
+[source,bash]
+----
+# Fork the repository on GitHub, then clone your fork
+git clone https://github.com/your-username/ExamCraft.git
+cd ExamCraft
+
+# Add upstream remote
+git remote add upstream https://github.com/original-org/ExamCraft.git
+
+# Verify remotes
+git remote -v
+----
+
+=== 2. Creating a Feature Branch
+
+[source,bash]
+----
+# Always start from the latest main branch
+git checkout main
+git pull upstream main
+
+# Create a feature branch with descriptive name
+git checkout -b feature/document-batch-processing
+# or
+git checkout -b fix/memory-leak-in-vector-service
+# or
+git checkout -b docs/improve-api-examples
+----
+
+**Branch Naming Conventions**:
+
+* `feature/description` - New features
+* `fix/description` - Bug fixes
+* `docs/description` - Documentation changes
+* `refactor/description` - Code refactoring
+* `test/description` - Test improvements
+* `chore/description` - Maintenance tasks
+
+=== 3. Making Changes
+
+==== Code Quality Standards
+
+**Python (Backend)**:
+[source,python]
+----
+# Use type hints
+def process_document(file_path: str, user_id: str) -> ProcessedDocument:
+    """Process uploaded document and extract content.
+
+    Args:
+        file_path: Path to the uploaded file
+        user_id: ID of the user uploading the document
+
+    Returns:
+        ProcessedDocument with extraction results
+
+    Raises:
+        DocumentProcessingError: If processing fails
+    """
+    pass
+
+# Follow PEP 8 standards
+# Use descriptive variable names
+# Keep functions focused and small
+----
+
+**TypeScript (Frontend)**:
+[source,typescript]
+----
+// Use proper TypeScript interfaces
+interface DocumentUploadProps {
+  onUploadComplete: (documentId: string) => void;
+  maxFileSize?: number;
+  allowedTypes?: string[];
+}
+
+// Use proper error handling
+const uploadDocument = async (file: File): Promise<Document> => {
+  try {
+    const result = await DocumentService.upload(file);
+    return result.data;
+  } catch (error) {
+    console.error('Upload failed:', error);
+    throw new DocumentUploadError('Failed to upload document');
+  }
+};
+
+// Use React best practices
+export const DocumentUpload: React.FC<DocumentUploadProps> = ({
+  onUploadComplete,
+  maxFileSize = 50 * 1024 * 1024, // 50MB
+  allowedTypes = ['application/pdf', 'application/msword']
+}) => {
+  // Component implementation
+};
+----
+
+==== Testing Requirements
+
+**All contributions must include tests**:
+
+[source,bash]
+----
+# Backend tests
+cd backend
+pytest tests/ -v --cov=. --cov-report=html
+
+# Frontend tests
+cd frontend
+bun test -- --coverage --watchAll=false
+
+# Integration tests
+docker-compose -f docker-compose.test.yml up --build
+----
+
+**Test Coverage Requirements**:
+
+* **New features**: Minimum 80% coverage
+* **Bug fixes**: Test that reproduces the bug + fix verification
+* **Refactoring**: Maintain existing coverage
+
+=== 4. Committing Changes
+
+==== Commit Message Format
+
+Follow the Conventional Commits specification:
+
+[source]
+----
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+----
+
+**Examples**:
+[source]
+----
+feat(api): add batch document processing endpoint
+
+Implements bulk upload functionality for processing multiple
+documents simultaneously. Includes rate limiting and progress tracking.
+
+Closes #123
+
+fix(frontend): resolve memory leak in document preview
+
+The document preview component was not properly cleaning up
+event listeners, causing memory leaks during navigation.
+
+refactor(vector): optimize similarity search algorithm
+
+Improves query performance by 40% using more efficient
+indexing strategy and caching frequently accessed vectors.
+
+docs(api): add examples for question generation endpoints
+
+Adds comprehensive examples showing different question types,
+difficulty levels, and response formats.
+----
+
+**Commit Types**:
+
+* `feat` - New features
+* `fix` - Bug fixes
+* `docs` - Documentation changes
+* `style` - Code style changes (formatting, etc.)
+* `refactor` - Code refactoring
+* `test` - Adding or modifying tests
+* `chore` - Maintenance tasks
+* `perf` - Performance improvements
+* `ci` - CI/CD changes
+
+=== 5. Submitting Pull Requests
+
+==== Before Submitting
+
+[source,bash]
+----
+# Run all tests
+./scripts/run-tests.sh
+
+# Check code style
+./scripts/lint-code.sh
+
+# Update documentation if needed
+# Make sure all examples work
+# Test the feature manually
+----
+
+==== Pull Request Template
+
+When creating a PR, include:
+
+[source,markdown]
+----
+## Description
+Brief description of what this PR does and why.
+
+## Type of Change
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+
+## Testing
+- [ ] All existing tests pass
+- [ ] New tests added for new functionality
+- [ ] Manual testing completed
+- [ ] Integration tests pass
+
+## Checklist
+- [ ] Code follows project style guidelines
+- [ ] Self-review completed
+- [ ] Code is well-commented
+- [ ] Documentation updated where necessary
+- [ ] No new warnings or errors introduced
+
+## Screenshots (if applicable)
+Add screenshots for UI changes.
+
+## Related Issues
+Closes #issue_number
+----
+
+==== Review Process
+
+1. **Automated Checks**: CI/CD pipeline runs automatically
+2. **Code Review**: Maintainers review your code
+3. **Feedback**: Address any requested changes
+4. **Approval**: Once approved, your PR will be merged
+
+== Coding Standards
+
+=== Python Guidelines
+
+**File Organization**:
+[source,python]
+----
+# imports order: standard library, third-party, local
+import os
+import sys
+from typing import List, Optional
+
+import fastapi
+from sqlalchemy import create_engine
+
+from .models import Document
+from .services import DocumentService
+----
+
+**Error Handling**:
+[source,python]
+----
+# Use custom exceptions
+class DocumentProcessingError(Exception):
+    """Raised when document processing fails."""
+    pass
+
+# Proper exception handling
+async def process_document(file_path: str) -> ProcessedDocument:
+    try:
+        content = await extract_content(file_path)
+        return ProcessedDocument(content=content)
+    except FileNotFoundError:
+        raise DocumentProcessingError(f"File not found: {file_path}")
+    except Exception as e:
+        logger.error(f"Unexpected error processing {file_path}: {e}")
+        raise DocumentProcessingError("Processing failed")
+----
+
+**Async/Await Usage**:
+[source,python]
+----
+# Use async for I/O operations
+async def upload_to_storage(file_data: bytes) -> str:
+    """Upload file and return storage path."""
+    async with aiofiles.open(storage_path, 'wb') as f:
+        await f.write(file_data)
+    return storage_path
+
+# Use sync for CPU-bound operations
+def calculate_embeddings(text_chunks: List[str]) -> List[List[float]]:
+    """Generate embeddings for text chunks."""
+    return embedding_model.encode(text_chunks)
+----
+
+=== TypeScript Guidelines
+
+**Component Structure**:
+[source,typescript]
+----
+// Props interface first
+interface DocumentCardProps {
+  document: Document;
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+  className?: string;
+}
+
+// Component with proper typing
+export const DocumentCard: React.FC<DocumentCardProps> = ({
+  document,
+  onEdit,
+  onDelete,
+  className = ''
+}) => {
+  // Hooks
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Event handlers
+  const handleEdit = useCallback(() => {
+    onEdit(document.id);
+  }, [document.id, onEdit]);
+
+  // Render
+  return (
+    <div className={`document-card ${className}`}>
+      {/* Component JSX */}
+    </div>
+  );
+};
+----
+
+**API Integration**:
+[source,typescript]
+----
+// Use proper error types
+interface ApiError {
+  message: string;
+  code: string;
+  details?: Record<string, any>;
+}
+
+// Service with error handling
+export class DocumentService {
+  static async upload(file: File): Promise<Document> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.post<Document>('/documents/upload', formData);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const apiError: ApiError = error.response?.data || {
+          message: 'Upload failed',
+          code: 'UPLOAD_ERROR'
+        };
+        throw new Error(apiError.message);
+      }
+      throw error;
+    }
+  }
+}
+----
+
+=== Database Guidelines
+
+**Migration Files**:
+[source,python]
+----
+# Always include both upgrade and downgrade
+def upgrade():
+    """Add document metadata column."""
+    op.add_column('documents',
+        sa.Column('metadata', sa.JSON(), nullable=True)
+    )
+    op.create_index('idx_documents_metadata', 'documents', ['metadata'])
+
+def downgrade():
+    """Remove document metadata column."""
+    op.drop_index('idx_documents_metadata')
+    op.drop_column('documents', 'metadata')
+----
+
+**Model Definitions**:
+[source,python]
+----
+class Document(Base):
+    """Document model with proper relationships."""
+    __tablename__ = 'documents'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    filename = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    questions = relationship("Question", back_populates="source_document")
+
+    def __repr__(self) -> str:
+        return f"<Document(id={self.id}, filename='{self.filename}')>"
+----
+
+## Testing Guidelines
+
+=== Test Structure
+
+**Backend Tests**:
+[source,python]
+----
+# test_document_service.py
+import pytest
+from unittest.mock import AsyncMock, patch
+
+class TestDocumentService:
+    """Test cases for DocumentService."""
+
+    @pytest.fixture
+    def document_service(self):
+        """Create DocumentService instance for testing."""
+        return DocumentService()
+
+    @pytest.mark.asyncio
+    async def test_upload_document_success(self, document_service):
+        """Test successful document upload."""
+        # Arrange
+        mock_file = AsyncMock()
+        mock_file.filename = "test.pdf"
+
+        # Act
+        result = await document_service.upload_document(mock_file, "user123")
+
+        # Assert
+        assert result.filename == "test.pdf"
+        assert result.user_id == "user123"
+
+    @pytest.mark.asyncio
+    async def test_upload_document_invalid_file(self, document_service):
+        """Test upload with invalid file type."""
+        mock_file = AsyncMock()
+        mock_file.filename = "test.exe"
+
+        with pytest.raises(ValidationError):
+            await document_service.upload_document(mock_file, "user123")
+----
+
+**Frontend Tests**:
+[source,typescript]
+----
+// DocumentUpload.test.tsx
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { DocumentUpload } from './DocumentUpload';
+
+describe('DocumentUpload', () => {
+  const mockOnUploadComplete = jest.fn();
+
+  beforeEach(() => {
+    mockOnUploadComplete.mockClear();
+  });
+
+  it('renders upload area', () => {
+    render(<DocumentUpload onUploadComplete={mockOnUploadComplete} />);
+
+    expect(screen.getByText(/drag.*drop.*files/i)).toBeInTheDocument();
+  });
+
+  it('handles file drop', async () => {
+    const mockUpload = jest.spyOn(DocumentService, 'upload')
+      .mockResolvedValue({ id: 'doc123', filename: 'test.pdf' });
+
+    render(<DocumentUpload onUploadComplete={mockOnUploadComplete} />);
+
+    const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+    const dropzone = screen.getByText(/drag.*drop/i);
+
+    fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => {
+      expect(mockUpload).toHaveBeenCalledWith(file);
+      expect(mockOnUploadComplete).toHaveBeenCalledWith('doc123');
+    });
+  });
+});
+----
+
+=== Test Data
+
+**Use realistic test data**:
+[source,python]
+----
+# tests/fixtures/documents.py
+@pytest.fixture
+def sample_pdf_content():
+    """Sample PDF content for testing."""
+    return {
+        "text": "This is a sample document about Python programming...",
+        "metadata": {
+            "title": "Python Basics",
+            "pages": 10,
+            "author": "Test Author"
+        },
+        "chunks": [
+            {
+                "text": "Variables in Python are dynamically typed...",
+                "page": 1,
+                "section": "Introduction"
+            }
+        ]
+    }
+----
+
+== Documentation Standards
+
+=== AsciiDoc Guidelines
+
+**Document Structure**:
+
+[source,asciidoc]
+----
+= Document Title
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+
+[.lead]
+Brief description of what this document covers.
+
+== Section Title
+
+=== Subsection
+
+Content with proper formatting.
+
+ [source,python]
+ ----
+ def example_function():
+    pass
+ ----
+
+[NOTE]
+====
+Important notes in callout boxes.
+====
+----
+
+**Code Examples**:
+* Always include working, tested examples
+* Explain what the code does
+* Show expected output where relevant
+* Use realistic variable names and data
+
+**API Documentation**:
+
+[source,asciidoc]
+----
+=== POST /api/v1/documents/upload
+
+Upload a new document for processing.
+
+**Request**:
+
+ [source,json]
+ ----
+ {
+   "file": "multipart/form-data",
+   "user_id": "string"
+ }
+ ----
+
+**Response**:
+
+ [source,json]
+ ----
+ {
+   "id": "550e8400-e29b-41d4-a716-446655440000",
+   "filename": "document.pdf",
+   "status": "processing",
+   "created_at": "2025-09-23T10:00:00Z"
+ }
+ ----
+
+**Error Codes**:
+* `400` - Invalid file format
+* `413` - File too large
+* `500` - Processing error
+----
+
+== Release Process
+
+=== Version Numbering
+
+We use Semantic Versioning (SemVer):
+
+* **Major** (1.0.0): Breaking changes
+* **Minor** (0.1.0): New features, backward compatible
+* **Patch** (0.0.1): Bug fixes, backward compatible
+
+=== Release Checklist
+
+**Before Release**:
+
+- [ ] All tests pass
+- [ ] Documentation updated
+- [ ] Changelog updated
+- [ ] Version numbers bumped
+- [ ] Breaking changes documented
+
+**Release Steps**:
+[source,bash]
+----
+# Update version
+git checkout main
+git pull upstream main
+
+# Create release branch
+git checkout -b release/v1.2.0
+
+# Update version files
+# Update CHANGELOG.md
+# Update documentation
+
+# Create release commit
+git commit -m "chore: prepare release v1.2.0"
+
+# Create pull request for release
+# After approval and merge, tag the release
+git tag -a v1.2.0 -m "Release v1.2.0"
+git push upstream v1.2.0
+----
+
+== Getting Help
+
+=== Communication Channels
+
+* **GitHub Issues**: Bug reports and feature requests
+* **GitHub Discussions**: General questions and ideas
+* **Pull Request Reviews**: Code-specific discussions
+* **Email**: Direct contact for sensitive issues
+
+=== Maintainer Response Times
+
+* **Critical bugs**: Within 24 hours
+* **Feature requests**: Within 1 week
+* **Documentation**: Within 3 days
+* **General questions**: Within 1 week
+
+=== Becoming a Maintainer
+
+Regular contributors can become maintainers by:
+
+1. **Consistent contributions** over 3+ months
+2. **High-quality code** and documentation
+3. **Helpful code reviews** for other contributors
+4. **Community involvement** in discussions and issues
+
+== Legal
+
+=== License
+
+By contributing to ExamCraft AI, you agree that your contributions will be licensed under the same license as the project.
+
+=== Copyright
+
+* Contributors retain copyright to their contributions
+* Project maintains right to distribute contributions under project license
+* All contributions must be original work or properly attributed
+
+=== Contributor License Agreement
+
+For significant contributions, we may require a Contributor License Agreement (CLA) to ensure the project can continue to be freely distributed.
+
+---
+
+**Thank you for contributing to ExamCraft AI!** 🎉
+
+Your contributions help make education technology more accessible and effective for educators worldwide.
+
+**Questions?** Check the link:../user/faq.adoc[FAQ] or create an issue in the GitHub repository.

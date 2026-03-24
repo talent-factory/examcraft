@@ -1,0 +1,88 @@
+# FastAPI and ASGI server
+fastapi>=0.117.1
+uvicorn[standard]==0.24.0
+
+# Database
+sqlalchemy>=2.0.43
+alembic>=1.17.0
+psycopg2-binary==2.9.7
+
+# Redis
+redis==5.0.1
+
+# S3 Storage
+boto3>=1.28.0
+
+# Payment
+stripe>=14.2.0
+
+
+# Message Queue & Task Processing
+celery[redis]==5.4.0                    # Celery Task Queue with Redis Backend
+flower==2.0.1                           # Celery Monitoring Dashboard
+kombu==5.4.0                            # Messaging Library for Celery
+amqp==5.2.0                             # AMQP Protocol Implementation
+
+# HTTP client for Claude API
+httpx>=0.28.1
+
+# SubscribeFlow SDK (Newsletter Subscription)
+subscribeflow>=1.0.5
+
+# Internationalization
+python-i18n[YAML]>=0.3.9            # i18n Translation Support
+
+# Configuration
+pyyaml>=6.0.2                       # YAML Configuration
+# Template Engine (required for Premium features)
+Jinja2>=3.1.0
+
+# Environment and configuration
+python-dotenv==1.0.0
+pydantic==2.10.3
+pydantic-settings==2.7.0
+pydantic-ai==0.0.16                 # PydanticAI for ChatBot (fixed griffe issue)
+email-validator>=2.3.0              # Email validation for Pydantic EmailStr
+
+# Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+authlib==1.3.0                      # OAuth2 Client Library
+itsdangerous==2.1.2                 # Secure Token Generation for OAuth State
+
+# Error Tracking & Monitoring
+sentry-sdk[fastapi]==2.42.1         # Sentry SDK with FastAPI Integration
+
+# CORS (built into FastAPI)
+# No additional package needed
+
+# Development & Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0                   # Coverage Reports
+pytest-mock==3.12.0                 # Mock Utilities
+
+# Document Processing & Upload
+aiofiles==23.2.1                    # Async File Operations
+python-magic==0.4.27                # File Type Detection
+
+# PyMuPDF - Fast PDF Processing (Default)
+PyMuPDF==1.24.14                    # Fast PDF Processing with fitz
+
+# Document Processing
+python-docx==1.1.2                  # DOCX Processing
+markdown==3.5.1                     # Markdown Processing
+
+# Legacy/Alternative Processors (Optional)
+pypdf>=6.1.0                        # PDF Processing Fallback
+# docling==2.23.0                   # IBM Docling (deprecated - too slow)
+# docling-core==2.48.4              # Docling Core (deprecated)
+# docling-ibm-models==3.9.1         # IBM Models (deprecated)
+
+# Vector Database & Embeddings (Premium Features)
+qdrant-client==1.16.2             # Qdrant Vector Database Client (Premium)
+openai==1.59.5                    # OpenAI API for Embeddings (Premium)
+# sentence-transformers==2.7.0      # Sentence Embeddings (Premium)
+
+numpy==1.26.4                       # Numerische Operations (für Embeddings, Docling compatible)

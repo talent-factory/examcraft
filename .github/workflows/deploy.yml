@@ -1,0 +1,192 @@
+# =============================================================================
+# ExamCraft AI - Fly.io Production Deployment
+# Triggered on push to main branch (after PR merge)
+# =============================================================================
+
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Allow manual trigger
+    inputs:
+      deploy_backend:
+        description: 'Deploy Backend'
+        type: boolean
+        default: true
+      deploy_frontend:
+        description: 'Deploy Frontend'
+        type: boolean
+        default: true
+      deploy_infrastructure:
+        description: 'Deploy Infrastructure (Qdrant, RabbitMQ, Celery)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false  # Don't cancel ongoing deployments
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+jobs:
+  # =============================================================================
+  # Deploy Backend API
+  # =============================================================================
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.deploy_backend == 'true'
+    environment: production
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Checkout Submodules
+        run: |
+          git config --global url."https://${{ secrets.SUBMODULE_TOKEN }}@github.com/".insteadOf "git@github.com:"
+          git submodule update --init packages/premium
+          git submodule update --init packages/enterprise
+
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy Backend
+        run: flyctl deploy --config fly.toml --remote-only
+
+      - name: Deploy Celery Worker
+        run: flyctl deploy --config fly.celery.toml --remote-only
+
+      - name: Verify Backend Health
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 20
+          echo "Checking health endpoint..."
+          for i in {1..5}; do
+            if curl -sf https://examcraft-api.fly.dev/api/v1/health; then
+              echo "Backend is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "Backend health check failed after 5 attempts"
+          exit 1
+
+  # =============================================================================
+  # Deploy Frontend
+  # =============================================================================
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: [deploy-backend]  # Wait for backend to be ready
+    if: github.event_name == 'push' || github.event.inputs.deploy_frontend == 'true'
+    environment: production
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Checkout Submodules
+        run: |
+          git config --global url."https://${{ secrets.SUBMODULE_TOKEN }}@github.com/".insteadOf "git@github.com:"
+          git submodule update --init packages/premium
+          git submodule update --init packages/enterprise
+
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy Frontend
+        run: flyctl deploy --config fly.frontend.toml --remote-only
+
+      - name: Verify Frontend Health
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 15
+          echo "Checking frontend..."
+          curl -sf https://examcraft-web.fly.dev/ > /dev/null && echo "Frontend is healthy!"
+
+  # =============================================================================
+  # Deploy Infrastructure (Optional - Manual trigger only)
+  # =============================================================================
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_infrastructure == 'true'
+    environment: production
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: Qdrant
+            config: fly.qdrant.toml
+          - name: RabbitMQ
+            config: fly.rabbitmq.toml
+          - name: Celery
+            config: fly.celery.toml
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy ${{ matrix.service.name }}
+        run: flyctl deploy --config ${{ matrix.service.config }} --remote-only
+
+  # =============================================================================
+  # Post-Deployment Summary
+  # =============================================================================
+  deployment-summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    if: always()
+
+    steps:
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Generate Summary
+        run: |
+          echo "# Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Services" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Check Backend
+          if curl -sf https://examcraft-api.fly.dev/api/v1/health > /dev/null 2>&1; then
+            echo "| Backend | https://examcraft-api.fly.dev | ✅ Healthy |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Backend | https://examcraft-api.fly.dev | ⚠️ Check needed |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check Celery Worker
+          CELERY_STATUS=$(flyctl status -a examcraft-celery --json 2>/dev/null | jq -r '.Machines[0].state // "unknown"')
+          if [ "$CELERY_STATUS" = "started" ]; then
+            echo "| Celery Worker | examcraft-celery.internal | ✅ Running |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Celery Worker | examcraft-celery.internal | ⚠️ $CELERY_STATUS |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check Frontend
+          if curl -sf https://examcraft-web.fly.dev/ > /dev/null 2>&1; then
+            echo "| Frontend | https://examcraft-web.fly.dev | ✅ Healthy |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Frontend | https://examcraft-web.fly.dev | ⚠️ Check needed |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- [Application](https://examcraft-web.fly.dev)" >> $GITHUB_STEP_SUMMARY
+          echo "- [API Documentation](https://examcraft-api.fly.dev/docs)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Fly.io Dashboard](https://fly.io/dashboard)" >> $GITHUB_STEP_SUMMARY
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

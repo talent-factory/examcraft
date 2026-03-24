@@ -1,0 +1,73 @@
+# Pre-Commit Hooks für ExamCraft AI
+# Automatische Code-Qualitätsprüfung vor jedem Commit
+
+repos:
+  # Python Code Quality (Ruff replaces black + isort + flake8)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.3
+    hooks:
+      - id: ruff
+        name: Ruff Linter
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^packages/core/(backend|utils)/.*\.py$
+        language_version: python3
+      - id: ruff-format
+        name: Ruff Formatter
+        files: ^packages/core/(backend|utils)/.*\.py$
+        language_version: python3
+
+  # YAML Validation
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+        args: ['--unsafe']
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Commit Message Linting (Disabled to allow emoji prefixes)
+  # TODO: Re-enable with custom regex support for emoji prefixes
+  # - repo: https://github.com/commitizen-tools/commitizen
+  #   rev: v4.9.1
+  #   hooks:
+  #     - id: commitizen
+  #       stages: [commit-msg]
+  #       language_version: python3
+
+  # Security Scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        language_version: python3
+
+  # Pre-Push Hook: Comprehensive Lint Check
+  - repo: local
+    hooks:
+      - id: pre-push-lint-check
+        name: Pre-Push Lint Check
+        entry: bash scripts/pre-push-lint-check.sh
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
+
+# Configuration
+default_stages: [pre-commit]
+fail_fast: false
+
+exclude: |
+  (?x)^(
+    packages/premium/|
+    packages/enterprise/|
+    node_modules/|
+    venv/|
+    \.venv/
+  )

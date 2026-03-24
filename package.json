@@ -1,0 +1,39 @@
+{
+  "name": "examcraft-monorepo",
+  "version": "1.1.0",
+  "private": true,
+  "description": "ExamCraft AI - Bun Workspace Monorepo",
+  "workspaces": [
+    "packages/core/frontend",
+    "packages/premium/frontend",
+    "packages/enterprise/frontend"
+  ],
+  "scripts": {
+    "install:all": "bun install",
+    "build:core": "bun run build --filter=@examcraft/core",
+    "build:premium": "bun run build --filter=@examcraft/premium",
+    "build:enterprise": "bun run build --filter=@examcraft/enterprise",
+    "build:all": "bun run build:core && bun run build:premium && bun run build:enterprise",
+    "test:core": "bun test --filter=@examcraft/core",
+    "test:premium": "bun test --filter=@examcraft/premium",
+    "test:enterprise": "bun test --filter=@examcraft/enterprise",
+    "test:all": "bun test",
+    "dev:core": "bun run dev --filter=@examcraft/core",
+    "dev:premium": "bun run dev --filter=@examcraft/premium",
+    "dev:enterprise": "bun run dev --filter=@examcraft/enterprise",
+    "lint": "bun run lint",
+    "clean": "bun run clean && rm -rf node_modules",
+    "clean:cache": "bash scripts/clean-frontend-cache.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.0",
+    "turbo": "^1.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  }
+}

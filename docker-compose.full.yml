@@ -1,0 +1,377 @@
+name: examcraft-full
+
+# ExamCraft AI - Full Deployment (Core + Premium + Enterprise)
+# All features included, access controlled via RBAC
+#
+# Usage:
+#   ./start-dev.sh --full
+#   OR
+#   docker compose --env-file .env -f docker-compose.full.yml up -d
+
+services:
+  # PostgreSQL Database
+  postgres:
+    container_name: examcraft-postgres
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: examcraft
+      POSTGRES_PASSWORD: examcraft_dev # pragma: allowlist secret
+      POSTGRES_DB: examcraft
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U examcraft"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - examcraft_network
+
+  # Redis Cache & Session Store
+  redis:
+    container_name: examcraft-redis
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - examcraft_network
+
+  # RabbitMQ Message Broker (for async document processing)
+  rabbitmq:
+    container_name: examcraft-rabbitmq
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: examcraft
+      RABBITMQ_DEFAULT_PASS: examcraft_dev # pragma: allowlist secret
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks:
+      - examcraft_network
+
+  # Qdrant Vector Database (Premium Feature)
+  qdrant:
+    container_name: examcraft-qdrant
+    image: qdrant/qdrant:v1.16.3
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - examcraft_network
+
+  # Backend (Full Version: Core + Premium + Enterprise)
+  backend:
+    build:
+      context: .
+      dockerfile: ./packages/core/backend/Dockerfile
+    environment:
+      # Deployment Mode
+      DEPLOYMENT_MODE: full
+
+      # Database
+      DATABASE_URL: postgresql://examcraft:examcraft_dev@postgres:5432/examcraft # pragma: allowlist secret
+
+      # Redis (internal port 6379, external port 6380)
+      REDIS_URL: redis://redis:6379/0
+
+      # RabbitMQ & Celery (for async document processing)
+      RABBITMQ_USER: examcraft
+      RABBITMQ_PASSWORD: examcraft_dev # pragma: allowlist secret
+      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev@rabbitmq:5672/ # pragma: allowlist secret
+      CELERY_RESULT_BACKEND: redis://redis:6379/3
+
+      # Qdrant
+      QDRANT_URL: http://qdrant:6333
+      VECTOR_SERVICE_TYPE: qdrant
+
+      # JWT
+      JWT_SECRET_KEY: dev_secret_key_change_in_production # pragma: allowlist secret
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+
+      # CORS
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8000
+
+      # Default Subscription Tier (Professional for development)
+      DEFAULT_SUBSCRIPTION_TIER: professional
+
+      # AI APIs
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-3-5-sonnet-20241022}
+
+      # OAuth Configuration
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET}
+
+      # Stripe Payment Integration
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
+      STRIPE_PRICE_PROFESSIONAL: ${STRIPE_PRICE_PROFESSIONAL:-}
+      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
+
+      # Resend Email Configuration
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@examcraft.ai}
+      RESEND_FROM_NAME: ${RESEND_FROM_NAME:-ExamCraft AI}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      # SubscribeFlow Newsletter Integration
+      SUBSCRIBEFLOW_API_KEY: ${SUBSCRIBEFLOW_API_KEY:-}
+      SUBSCRIBEFLOW_BASE_URL: ${SUBSCRIBEFLOW_BASE_URL:-https://api.subscribeflow.net}
+
+      # Environment
+      ENVIRONMENT: development
+
+      # Auto-Migration (nur Development, NICHT Production!)
+      AUTO_MIGRATE: "true"
+
+      # Sentry Configuration
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      ENABLE_SENTRY: ${ENABLE_SENTRY:-false}
+      APP_VERSION: ${APP_VERSION:-1.0.0-dev}
+      DEBUG: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      # Core Backend
+      - ./packages/core/backend:/app
+
+      # Premium Backend (mounted at /app/premium)
+      - ./packages/premium/backend:/app/premium
+
+      # Enterprise Backend (mounted at /app/enterprise)
+      - ./packages/enterprise/backend:/app/enterprise
+
+      # Storage
+      - backend_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    networks:
+      - examcraft_network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker (for async document processing)
+  celery-worker:
+    build:
+      context: .
+      dockerfile: ./packages/core/backend/Dockerfile
+    container_name: examcraft-celery-worker
+    environment:
+      # Deployment Mode
+      DEPLOYMENT_MODE: full
+
+      # Database
+      DATABASE_URL: postgresql://examcraft:examcraft_dev@postgres:5432/examcraft # pragma: allowlist secret
+
+      # Redis (internal port 6379, external port 6380)
+      REDIS_URL: redis://redis:6379/0
+
+      # RabbitMQ & Celery (for async document processing)
+      RABBITMQ_USER: examcraft
+      RABBITMQ_PASSWORD: examcraft_dev # pragma: allowlist secret
+      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev@rabbitmq:5672/ # pragma: allowlist secret
+      CELERY_RESULT_BACKEND: redis://redis:6379/3
+
+      # Qdrant
+      QDRANT_URL: http://qdrant:6333
+      VECTOR_SERVICE_TYPE: qdrant
+
+      # JWT
+      JWT_SECRET_KEY: dev_secret_key_change_in_production # pragma: allowlist secret
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+
+      # CORS
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8000
+
+      # Default Subscription Tier (Professional for development)
+      DEFAULT_SUBSCRIPTION_TIER: professional
+
+      # AI APIs
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-3-5-sonnet-20241022}
+
+      # OAuth Configuration
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET}
+
+      # Stripe Payment Integration
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
+      STRIPE_PRICE_PROFESSIONAL: ${STRIPE_PRICE_PROFESSIONAL:-}
+      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
+
+      # Resend Email Configuration
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@examcraft.ai}
+      RESEND_FROM_NAME: ${RESEND_FROM_NAME:-ExamCraft AI}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      # SubscribeFlow Newsletter Integration
+      SUBSCRIBEFLOW_API_KEY: ${SUBSCRIBEFLOW_API_KEY:-}
+      SUBSCRIBEFLOW_BASE_URL: ${SUBSCRIBEFLOW_BASE_URL:-https://api.subscribeflow.net}
+
+      # Environment
+      ENVIRONMENT: development
+
+      # Sentry Configuration
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      ENABLE_SENTRY: ${ENABLE_SENTRY:-false}
+      APP_VERSION: ${APP_VERSION:-1.0.0-dev}
+      DEBUG: "true"
+    volumes:
+      # Core Backend
+      - ./packages/core/backend:/app
+
+      # Premium Backend (mounted at /app/premium)
+      - ./packages/premium/backend:/app/premium
+
+      # Enterprise Backend (mounted at /app/enterprise)
+      - ./packages/enterprise/backend:/app/enterprise
+
+      # Storage
+      - backend_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    networks:
+      - examcraft_network
+    command: celery -A celery_app worker --loglevel=info --concurrency=3
+
+  # Flower Monitoring Dashboard (Celery Task Monitoring)
+  flower:
+    build:
+      context: .
+      dockerfile: ./packages/core/backend/Dockerfile
+    container_name: examcraft-flower
+    environment:
+      CELERY_BROKER_URL: amqp://examcraft:examcraft_dev@rabbitmq:5672/ # pragma: allowlist secret
+      CELERY_RESULT_BACKEND: redis://redis:6379/3
+      FLOWER_BASIC_AUTH: "${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-examcraft_flower_2026}"
+    ports:
+      - "5555:5555"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - examcraft_network
+    command: celery -A celery_app flower --port=5555 --broker_api=http://examcraft:examcraft_dev@rabbitmq:15672/api/ --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-examcraft_flower_2026} # pragma: allowlist secret
+
+  # Frontend (Full Version: Core + Premium + Enterprise)
+  frontend:
+    build:
+      context: .
+      dockerfile: ./packages/core/frontend/Dockerfile
+    environment:
+      # Deployment Mode
+      REACT_APP_DEPLOYMENT_MODE: full
+
+      # API Configuration
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_ENVIRONMENT: development
+
+      # Sentry Configuration
+      REACT_APP_SENTRY_DSN: ${REACT_APP_SENTRY_DSN:-}
+      REACT_APP_ENABLE_SENTRY: ${REACT_APP_ENABLE_SENTRY:-false}
+      REACT_APP_VERSION: ${REACT_APP_VERSION:-1.0.0-dev}
+
+      # Stripe Configuration
+      REACT_APP_STRIPE_PRICE_STARTER: ${REACT_APP_STRIPE_PRICE_STARTER:-}
+      REACT_APP_STRIPE_PRICE_PROFESSIONAL: ${REACT_APP_STRIPE_PRICE_PROFESSIONAL:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      # Core Frontend Source (working directory is /app)
+      - ./packages/core/frontend/src:/app/src
+      - ./packages/core/frontend/public:/app/public
+      - ./packages/core/frontend/.env.local:/app/.env.local
+
+      # Premium Frontend (mounted relative to /app for Webpack alias resolution)
+      # Webpack alias: path.resolve(__dirname, '../../premium/frontend/src')
+      # __dirname = /app, so ../../premium/frontend/src = /premium/frontend/src
+      - ./packages/premium/frontend/src:/premium/frontend/src
+
+      # Enterprise Frontend (mounted relative to /app for Webpack alias resolution)
+      # Webpack alias: path.resolve(__dirname, '../../enterprise/frontend/src')
+      # __dirname = /app, so ../../enterprise/frontend/src = /enterprise/frontend/src
+      - ./packages/enterprise/frontend/src:/enterprise/frontend/src
+
+      # Don't override node_modules
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - examcraft_network
+    command: bun start
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  backend_storage:
+    driver: local
+
+networks:
+  examcraft_network:
+    driver: bridge

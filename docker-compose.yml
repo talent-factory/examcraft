@@ -1,0 +1,219 @@
+name: examcraft-core
+
+# ExamCraft AI - Core Deployment (OpenSource)
+# Limited features, access controlled via RBAC Free Tier
+#
+# Usage:
+#   ./start-dev.sh --core
+#   OR
+#   docker compose --env-file .env -f docker-compose.yml up -d
+
+services:
+  # PostgreSQL Database
+  postgres:
+    container_name: examcraft-postgres
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: examcraft
+      POSTGRES_PASSWORD: examcraft_dev  # pragma: allowlist secret
+      POSTGRES_DB: examcraft
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U examcraft" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - examcraft_network
+
+  # Redis Cache & Session Store
+  redis:
+    container_name: examcraft-redis
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - examcraft_network
+
+  # RabbitMQ Message Queue
+  rabbitmq:
+    container_name: examcraft-rabbitmq
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-examcraft}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-secure_password_here}
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672" # AMQP Port
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - examcraft_network
+
+  # Core Backend (Open Source)
+  backend:
+    build:
+      context: .
+      dockerfile: ./packages/core/backend/Dockerfile
+    environment:
+      # Deployment Mode
+      DEPLOYMENT_MODE: core
+
+      # Database
+      DATABASE_URL: postgresql://examcraft:examcraft_dev@postgres:5432/examcraft  # pragma: allowlist secret
+
+      # Redis (internal port 6379, external port 6380)
+      REDIS_URL: redis://redis:6379/0
+
+      # Celery Configuration
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-examcraft}:${RABBITMQ_PASSWORD:-secure_password_here}@rabbitmq:5672/
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+
+      # JWT
+      JWT_SECRET_KEY: dev_secret_key_change_in_production
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+
+      # CORS
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8000
+
+      # Default Subscription Tier (Free for Core/OpenSource)
+      DEFAULT_SUBSCRIPTION_TIER: free
+
+      # AI APIs (optional in Core mode)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-3-5-sonnet-20241022}
+
+      # OAuth Configuration
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET}
+
+      # Environment
+      ENVIRONMENT: development
+
+      # Sentry Configuration
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      ENABLE_SENTRY: ${ENABLE_SENTRY:-false}
+      APP_VERSION: ${APP_VERSION:-1.0.0-dev}
+      DEBUG: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./packages/core/backend:/app
+      - backend_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - examcraft_network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker for Async Document Processing
+  celery_worker:
+    build:
+      context: .
+      dockerfile: ./packages/core/backend/Dockerfile
+    container_name: examcraft-celery-worker
+    command: celery -A celery_app worker --loglevel=info --concurrency=3 --queues=document_processing,rag_embedding,question_generation,notifications
+    environment:
+      # Deployment Mode
+      DEPLOYMENT_MODE: core
+
+      # Database
+      DATABASE_URL: postgresql://examcraft:examcraft_dev@postgres:5432/examcraft  # pragma: allowlist secret
+
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+
+      # Celery Configuration
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-examcraft}:${RABBITMQ_PASSWORD:-secure_password_here}@rabbitmq:5672/
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+
+      # AI APIs
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-3-5-sonnet-20241022}
+
+      # Environment
+      ENVIRONMENT: development
+      DEBUG: "false"
+    volumes:
+      - ./packages/core/backend:/app
+      - backend_storage:/app/storage
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - examcraft_network
+
+  # Core Frontend (Open Source)
+  frontend:
+    build:
+      context: .
+      dockerfile: ./packages/core/frontend/Dockerfile
+    environment:
+      # Deployment Mode
+      REACT_APP_DEPLOYMENT_MODE: core
+
+      # API Configuration
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_ENVIRONMENT: development
+
+      # Sentry Configuration
+      REACT_APP_SENTRY_DSN: ${REACT_APP_SENTRY_DSN:-}
+      REACT_APP_ENABLE_SENTRY: ${REACT_APP_ENABLE_SENTRY:-false}
+      REACT_APP_VERSION: ${REACT_APP_VERSION:-1.0.0-dev}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./packages/core/frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - examcraft_network
+    command: bun start
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  backend_storage:
+    driver: local
+
+networks:
+  examcraft_network:
+    driver: bridge

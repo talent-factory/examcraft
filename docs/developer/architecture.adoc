@@ -1,0 +1,713 @@
+= Architecture Documentation
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+:imagesdir: ../images
+:plantuml-server-url: https://www.plantuml.com/plantuml
+
+[.lead]
+Comprehensive architectural overview of ExamCraft AI, covering system design, data flow, security, and scalability considerations.
+
+== System Overview
+
+ExamCraft AI is built as a modern, microservices-oriented web application with a clear separation between frontend, backend, data, and AI services. The architecture prioritizes scalability, maintainability, and performance.
+
+.Architecture Diagram
+[mermaid,architecture,svg]
+....
+include::../diagrams/architecture.mmd[]
+....
+
+=== Core Principles
+
+[cols="1,3"]
+|===
+|Principle |Implementation
+
+|**Separation of Concerns**
+|Clear boundaries between UI, API, business logic, and data layers
+
+|**Scalability**
+|Stateless services, horizontal scaling capability, efficient caching
+
+|**Security**
+|Input validation, secure data handling, API authentication
+
+|**Performance**
+|Async operations, vector search optimization, intelligent caching
+
+|**Maintainability**
+|Clean code, comprehensive testing, detailed documentation
+
+|**Extensibility**
+|Plugin architecture for new question types and export formats
+|===
+
+== System Components
+
+=== Frontend Layer
+
+==== React Application
+
+**Technology Stack**:
+* React 18 with TypeScript
+* Material-UI for components
+* React Router for navigation
+* Axios for API communication
+
+**Key Features**:
+* Responsive design for all devices
+* Real-time file upload with progress
+* Drag & drop document interface
+* Interactive question review
+* Live status updates
+
+**Component Architecture**:
+
+[source,text]
+----
+src/
+├── components/          # Reusable UI components
+│   ├── DocumentUpload/  # File upload with drag & drop
+│   ├── QuestionCard/    # Question display and editing
+│   ├── DocumentList/    # Document management
+│   └── ExamBuilder/     # Exam composition
+├── pages/               # Route-level components
+│   ├── Dashboard/       # Main overview
+│   ├── Documents/       # Document management
+│   ├── Generate/        # Question generation
+│   └── Library/         # Question library
+├── services/            # API integration
+│   ├── DocumentService  # Document operations
+│   ├── QuestionService  # Question operations
+│   └── ApiClient        # HTTP client setup
+└── hooks/               # Custom React hooks
+    ├── useDocuments     # Document state management
+    └── useQuestions     # Question state management
+----
+
+==== State Management
+
+**Local State**: React hooks for component-specific state
+**Server State**: TanStack Query for API data caching
+**Form State**: React Hook Form with Zod validation
+
+=== API Layer
+
+==== FastAPI Backend
+
+**Technology Stack**:
+* FastAPI framework for high-performance APIs
+* Pydantic for data validation
+* SQLAlchemy for database ORM
+* Uvicorn ASGI server
+
+**API Design**:
+* RESTful endpoints with OpenAPI documentation
+* Async/await for non-blocking operations
+* Structured error handling
+* Request/response validation
+
+**Endpoint Categories**:
+[cols="1,2,3"]
+|===
+|Category |Endpoints |Purpose
+
+|**Health**
+|`GET /health`, `GET /ready`
+|Service monitoring and readiness checks
+
+|**Documents**
+|`POST /api/v1/documents/upload`
+`GET /api/v1/documents`
+`GET /api/v1/documents/{id}`
+|Document lifecycle management
+
+|**Questions**
+|`POST /api/v1/questions/generate`
+`GET /api/v1/questions`
+`PUT /api/v1/questions/{id}`
+|Question generation and management
+
+|**Exams**
+|`POST /api/v1/exams`
+`GET /api/v1/exams/{id}/export`
+|Exam creation and export
+|===
+
+=== Service Layer
+
+==== Document Service
+
+**Responsibilities**:
+* File upload and validation
+* Document metadata management
+* Processing status tracking
+* File storage coordination
+
+**Key Operations**:
+[source,python]
+----
+class DocumentService:
+    async def upload_document(self, file: UploadFile, user_id: str) -> Document
+    async def get_document(self, document_id: str) -> Document
+    async def list_documents(self, user_id: str) -> List[Document]
+    async def delete_document(self, document_id: str) -> bool
+----
+
+==== Docling Service
+
+**Responsibilities**:
+* Multi-format document processing (PDF, DOC, DOCX, TXT, MD)
+* Content extraction and structuring
+* Metadata extraction
+* Text chunking for vector storage
+
+**Processing Pipeline**:
+
+[source,text]
+----
+Raw Document → Content Extraction → Structure Analysis → Chunk Creation → Vector Preparation
+----
+
+==== Vector Service
+
+**Responsibilities**:
+* Embedding generation using sentence-transformers
+* ChromaDB collection management
+* Similarity search operations
+* Vector storage optimization
+
+**Key Features**:
+* Local deployment for data privacy
+* Persistent storage with collections
+* Optimized similarity search algorithms
+* Metadata filtering capabilities
+
+==== RAG Service
+
+**Responsibilities**:
+* Context retrieval from vector database
+* Prompt engineering for question generation
+* Claude API integration
+* Response validation and parsing
+
+**Generation Pipeline**:
+
+[source,text]
+----
+Topic Input → Context Retrieval → Prompt Construction → AI Generation → Validation → Structured Output
+----
+
+==== Claude Service
+
+**Responsibilities**:
+* Claude API communication
+* Rate limiting and cost optimization
+* Error handling and retries
+* Response parsing and validation
+
+**Features**:
+* Intelligent retry logic
+* Cost tracking per request
+* Fallback to demo mode
+* Response quality validation
+
+=== Data Layer
+
+==== PostgreSQL Database
+
+**Schema Design**:
+[source,sql]
+----
+-- Core entities
+CREATE TABLE documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    filename VARCHAR(255) NOT NULL,
+    file_path VARCHAR(512) NOT NULL,
+    file_size BIGINT NOT NULL,
+    mime_type VARCHAR(100),
+    status VARCHAR(50) DEFAULT 'uploading',
+    metadata JSONB,
+    user_id UUID NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE questions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type VARCHAR(50) NOT NULL,
+    question TEXT NOT NULL,
+    options JSONB,
+    correct_answer TEXT NOT NULL,
+    explanation TEXT,
+    difficulty VARCHAR(20),
+    bloom_level VARCHAR(50),
+    source_documents UUID[] DEFAULT '{}',
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    approved_at TIMESTAMP
+);
+
+CREATE TABLE exams (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    question_ids UUID[] NOT NULL,
+    settings JSONB,
+    created_by UUID NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+----
+
+==== Redis Cache
+
+**Caching Strategy**:
+* API response caching for frequently accessed data
+* Session management
+* Rate limiting counters
+* Temporary data storage
+
+**Cache Keys**:
+
+[source,text]
+----
+documents:user:{user_id}       # User's documents
+questions:document:{doc_id}    # Questions per document
+api:rate_limit:{user_id}       # Rate limiting
+session:{session_id}           # User sessions
+----
+
+==== ChromaDB Vector Storage
+
+**Collection Strategy**:
+* One collection per document for isolation
+* Metadata-rich storage for filtering
+* Persistent local storage
+* Efficient similarity search indexing
+
+**Vector Schema**:
+
+[source,json]
+----
+{
+  "id": "doc_{document_id}_chunk_{chunk_index}",
+  "embedding": [0.1, -0.2, 0.8, ...],  // 384-dimensional vector
+  "metadata": {
+    "document_id": "uuid",
+    "chunk_index": 0,
+    "page_number": 1,
+    "section_title": "Introduction",
+    "chunk_type": "paragraph"
+  },
+  "document": "The actual text content..."
+}
+----
+
+== Data Flow
+
+.Document Processing Flow
+[plantuml,document-flow,svg]
+....
+@startuml Document_Processing_Flow
+start
+
+:User uploads document;
+:Validate file format and size;
+
+if (Valid?) then (yes)
+  :Save to file storage;
+  :Create database record;
+  :Queue for processing;
+
+  fork
+    :Extract content with Docling;
+  fork again
+    :Generate metadata;
+  end fork
+
+  :Create semantic chunks;
+  :Generate embeddings;
+  :Store in ChromaDB;
+  :Update document status to "processed";
+  :Notify frontend;
+else (no)
+  :Return validation error;
+endif
+
+stop
+@enduml
+....
+
+=== Question Generation Flow
+
+.Document Upload and Processing Sequence
+[plantuml,question-flow,svg]
+....
+include::../diagrams/document-upload-and-processing-sequence.puml[]
+....
+
+.Question Generation Sequence
+[plantuml,question-flow,svg]
+....
+include::../diagrams/question-generation-sequence.puml[]
+....
+
+.User Workflow Sequence
+[plantuml,question-flow,svg]
+....
+include::../diagrams/user-workflow-sequence.puml[]
+....
+
+
+== Security Architecture
+
+=== Data Protection
+
+[cols="1,2,3"]
+|===
+|Layer |Protection Method |Implementation
+
+|**Transport**
+|HTTPS/TLS encryption
+|SSL certificates, secure headers
+
+|**Application**
+|Input validation, sanitization
+|Pydantic models, SQL injection prevention
+
+|**Data**
+|Encryption at rest
+|Database encryption, secure file storage
+
+|**Access**
+|Authentication & authorization
+|JWT tokens, role-based access control
+|===
+
+=== Security Measures
+
+==== Input Validation
+
+[source,python]
+----
+# Pydantic models for request validation
+class DocumentUploadRequest(BaseModel):
+    filename: str = Field(..., min_length=1, max_length=255)
+    file_size: int = Field(..., gt=0, le=50_000_000)  # Max 50MB
+    mime_type: str = Field(..., regex=r'^(application|text)/')
+
+class QuestionGenerationRequest(BaseModel):
+    topic: str = Field(..., min_length=3, max_length=200)
+    document_ids: List[UUID] = Field(..., min_items=1, max_items=10)
+    question_count: int = Field(default=5, ge=1, le=20)
+    difficulty: Literal['easy', 'medium', 'hard'] = 'medium'
+----
+
+==== File Security
+
+* File type validation beyond MIME type
+* Virus scanning integration points
+* Secure file storage with access controls
+* Temporary file cleanup
+
+==== API Security
+
+* Rate limiting per user/IP
+* Request size limits
+* CORS configuration
+* API key management for external services
+
+=== Privacy Considerations
+
+* **Data Residency**: Local processing option available
+* **Content Privacy**: Documents never shared externally
+* **User Data**: Minimal collection, secure storage
+* **Audit Logging**: Comprehensive activity tracking
+
+== Performance & Scalability
+
+=== Performance Optimizations
+
+==== Database Level
+
+* Indexed foreign keys and search columns
+* Connection pooling
+* Query optimization
+* Prepared statements
+
+==== Application Level
+
+* Async/await for I/O operations
+* Efficient chunking algorithms
+* Response caching
+* Background task processing
+
+==== Frontend Level
+
+* Component lazy loading
+* Optimistic UI updates
+* Efficient re-rendering
+* Asset optimization
+
+=== Scalability Strategy
+
+==== Horizontal Scaling
+
+[plantuml,scaling,svg]
+....
+@startuml Horizontal_Scaling
+!theme plain
+
+node "Load Balancer" as lb
+node "App Server 1" as app1
+node "App Server 2" as app2
+node "App Server N" as appn
+
+database "Primary DB" as db_primary
+database "Read Replica 1" as db_read1
+database "Read Replica 2" as db_read2
+
+cloud "Redis Cluster" as redis_cluster
+cloud "Vector DB Cluster" as vector_cluster
+
+lb --> app1
+lb --> app2
+lb --> appn
+
+app1 --> db_primary : writes
+app1 --> db_read1 : reads
+app2 --> db_primary : writes
+app2 --> db_read2 : reads
+appn --> db_primary : writes
+appn --> db_read1 : reads
+
+app1 --> redis_cluster
+app2 --> redis_cluster
+appn --> redis_cluster
+
+app1 --> vector_cluster
+app2 --> vector_cluster
+appn --> vector_cluster
+
+@enduml
+....
+
+==== Resource Planning
+
+[cols="1,2,3"]
+|===
+|Component |Scaling Factor |Resource Requirements
+
+|**Frontend**
+|CDN + multiple instances
+|Low CPU, minimal memory
+
+|**API Server**
+|Stateless horizontal scaling
+|Medium CPU, moderate memory
+
+|**Database**
+|Read replicas + sharding
+|High I/O, substantial memory
+
+|**Vector DB**
+|Clustering + partitioning
+|High memory, fast storage
+
+|**File Storage**
+|Distributed object storage
+|High storage, moderate I/O
+|===
+
+== Deployment Architecture
+
+=== Development Environment
+
+[plantuml,development-deployment,svg]
+....
+include::../diagrams/deployment.puml[]
+....
+
+=== Production Deployment
+
+==== Container Strategy
+
+[source,dockerfile]
+----
+# Multi-stage build for optimization
+FROM node:18-alpine AS frontend-builder
+COPY frontend/ .
+RUN bun install --frozen-lockfile && bun run build
+
+FROM python:3.13-slim AS backend-builder
+COPY backend/ .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Final runtime image
+FROM python:3.13-slim
+COPY --from=backend-builder /app /app
+COPY --from=frontend-builder /app/build /app/static
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+----
+
+==== Infrastructure as Code
+
+[source,yaml]
+----
+# docker-compose.prod.yml
+name: examcraft
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/ssl/certs
+
+  backend:
+    build: ./backend
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: examcraft_prod
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+----
+
+== Monitoring & Observability
+
+=== Health Checks
+
+[source,python]
+----
+@router.get("/health")
+async def health_check():
+    """Comprehensive health check"""
+    checks = {
+        "database": await check_database_connection(),
+        "redis": await check_redis_connection(),
+        "vector_db": await check_vector_db_connection(),
+        "file_storage": await check_file_storage(),
+        "claude_api": await check_claude_api_status()
+    }
+
+    all_healthy = all(checks.values())
+    status_code = 200 if all_healthy else 503
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "healthy" if all_healthy else "unhealthy",
+            "checks": checks,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
+----
+
+=== Metrics Collection
+
+* **Application Metrics**: Request rates, response times, error rates
+* **Business Metrics**: Documents processed, questions generated
+* **Infrastructure Metrics**: CPU, memory, disk usage
+* **Custom Metrics**: AI API costs, processing times
+
+=== Logging Strategy
+
+[source,log]
+----
+Level: INFO  | Component: DocumentService | Action: upload_complete | DocumentId: uuid | Duration: 2.3s
+Level: WARN  | Component: ClaudeService   | Action: rate_limit_hit  | RetryAfter: 60s
+Level: ERROR | Component: VectorService   | Action: search_failed   | Error: connection_timeout
+----
+
+== Testing Strategy
+
+.Testing Pyramid
+[plantuml,testing-pyramid,svg]
+....
+@startuml Testing_Pyramid
+!theme plain
+
+rectangle "E2E Tests\n• Full user workflows\n• Browser automation\n• Critical path testing" as e2e #lightblue
+rectangle "Integration Tests\n• API endpoint testing\n• Service integration\n• Database operations" as integration #lightgreen
+rectangle "Unit Tests\n• Component testing\n• Function testing\n• Mock dependencies" as unit #lightyellow
+
+unit --> integration
+integration --> e2e
+@enduml
+....
+
+=== Test Coverage
+
+[cols="1,2,3"]
+|===
+|Test Type |Coverage |Tools
+
+|**Unit Tests**
+|> 80% code coverage
+|pytest, Jest, React Testing Library
+
+|**Integration Tests**
+|All API endpoints
+|FastAPI TestClient, Supertest
+
+|**E2E Tests**
+|Critical user journeys
+|Playwright, Cypress
+
+|**Performance Tests**
+|Load and stress testing
+|Locust, Artillery
+
+|**Security Tests**
+|Vulnerability scanning
+|OWASP ZAP, Bandit
+|===
+
+== Future Architecture Considerations
+
+=== Planned Enhancements
+
+* **Microservices Split**: Separate document and question services
+* **Event-Driven Architecture**: Async processing with message queues
+* **Multi-tenancy**: Organization-level data isolation
+* **API Gateway**: Centralized routing and authentication
+* **Service Mesh**: Advanced service communication
+
+=== Technology Evolution
+
+* **AI Model Flexibility**: Support for multiple AI providers
+* **Advanced Vector Search**: Hybrid search capabilities
+* **Real-time Collaboration**: WebSocket-based features
+* **Mobile Applications**: Native iOS/Android apps
+* **Edge Computing**: CDN-based processing
+
+---
+
+This architecture provides a solid foundation for ExamCraft AI while maintaining flexibility for future growth and enhancement.

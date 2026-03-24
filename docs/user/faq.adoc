@@ -1,0 +1,375 @@
+= Frequently Asked Questions
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+:imagesdir: ../images
+
+[.lead]
+Common questions and answers about ExamCraft AI, troubleshooting tips, and best practices.
+
+== General Questions
+
+=== What is ExamCraft AI?
+
+ExamCraft AI is an intelligent platform that helps educators automatically generate high-quality exam questions using artificial intelligence. It reads your course materials and creates contextual, pedagogically sound questions in minutes instead of hours.
+
+=== How does it work?
+
+. **Upload** your course documents (PDFs, Word files, etc.)
+. **Select** topics you want questions about
+. **Choose** difficulty level and question types
+. **Generate** questions using AI based on your content
+. **Review** and edit questions as needed
+. **Export** to your preferred format
+
+=== What file formats are supported?
+
+* **PDF** - Text-based PDFs (not scanned images)
+* **Word Documents** - DOC and DOCX files
+* **Text Files** - Plain text (.txt)
+* **Markdown** - Structured markdown files (.md)
+
+Maximum file size: 50 MB per document.
+
+=== How accurate are the generated questions?
+
+Questions are generated directly from your uploaded content, ensuring high accuracy and relevance. The AI doesn't invent information - it creates questions based on what you've provided. Additionally, you review every question before use, maintaining complete quality control.
+
+== Technical Questions
+
+=== Do I need to install any software?
+
+No! ExamCraft AI is a web-based application. You only need:
+
+* A modern web browser (Chrome, Firefox, Safari, Edge)
+* Stable internet connection
+* Your course documents
+
+=== How secure is my content?
+
+Your content security is our priority:
+
+* **Encrypted transmission** via HTTPS
+* **Local processing** options available
+* **No content sharing** with third parties
+* **Secure storage** with access controls
+* **Privacy compliance** with educational standards
+
+=== Can I use it offline?
+
+The core application requires internet access for AI processing. However, we're developing offline capabilities for:
+
+* Document upload and preparation
+* Question review and editing
+* Export functionality
+
+=== What browsers are supported?
+
+**Recommended browsers**:
+* Chrome 90+ (best performance)
+* Firefox 88+
+* Safari 14+
+* Edge 90+
+
+**Note**: Internet Explorer is not supported.
+
+== Usage Questions
+
+=== How many questions can I generate?
+
+There are no hard limits on question generation. Practical limits depend on:
+
+* Document content quality and length
+* Your subscription plan
+* AI service capacity
+
+Typical usage: 10-50 questions per document, hundreds per course.
+
+=== Can I edit generated questions?
+
+Yes! You have complete editorial control:
+
+* **Modify question text** and wording
+* **Change answer options** for multiple choice
+* **Adjust difficulty level** assignments
+* **Add or edit explanations**
+* **Approve or reject** any question
+
+=== What question types are available?
+
+**Currently available**:
+* Multiple choice (4 options)
+* Open-ended questions
+
+**Coming soon**:
+* True/False with explanations
+* Fill-in-the-blank
+* Matching exercises
+* Code completion (for programming courses)
+
+=== How do I control question difficulty?
+
+Questions are generated at three levels:
+
+* **Easy**: Basic recall and recognition
+* **Medium**: Application and analysis
+* **Hard**: Synthesis and evaluation
+
+The AI uses Bloom's Taxonomy principles to ensure appropriate cognitive levels.
+
+== Account & Billing
+
+=== How much does it cost?
+
+Pricing varies by usage and deployment option:
+
+* **Cloud hosted**: Per-question or monthly subscription
+* **On-premises**: Annual license
+* **Educational discounts**: Available for schools and universities
+
+Contact us for specific pricing based on your needs.
+
+=== Is there a free trial?
+
+Yes! We offer:
+
+* **14-day free trial** with full features
+* **Demo environment** for testing
+* **Pilot programs** for institutions
+* **Workshop demonstrations** available
+
+=== What payment methods are accepted?
+
+* Credit cards (Visa, MasterCard, American Express)
+* Purchase orders for institutions
+* Wire transfers for large accounts
+* Educational procurement systems
+
+== Troubleshooting
+
+=== Document upload fails
+
+**Common causes and solutions**:
+
+. **File too large**: Reduce file size or split large documents
+. **Unsupported format**: Convert to PDF or Word format
+. **Poor internet**: Check connection stability
+. **Browser issues**: Clear cache or try different browser
+
+**Steps to resolve**:
+[source]
+----
+1. Check file size (max 50 MB)
+2. Verify file format is supported
+3. Try uploading a smaller test file
+4. Contact support if issue persists
+----
+
+=== Questions aren't relevant to my content
+
+**Possible causes**:
+* Document content is unclear or poorly structured
+* Topic selection is too broad or vague
+* Document contains mostly images or tables
+
+**Solutions**:
+* Provide clearer, more detailed topic descriptions
+* Upload better-structured documents
+* Use documents with substantial text content
+* Try different sections of your materials
+
+=== Application is slow or unresponsive
+
+**Immediate steps**:
+. Refresh your browser page
+. Clear browser cache and cookies
+. Check internet connection speed
+. Try a different browser
+
+**If problems persist**:
+* Contact support with details about your experience
+* Include browser type and version
+* Describe specific actions that are slow
+
+=== Generated questions have errors
+
+**Quality control steps**:
+
+. Review the source content for accuracy
+. Check if the topic description was clear
+. Verify the AI understood the context correctly
+. Edit questions to fix any issues
+
+**Remember**: You approve every question before use!
+
+== Best Practices
+
+=== Preparing documents for best results
+
+**Document quality tips**:
+
+* Use clear, well-structured content
+* Include proper headings and sections
+* Ensure text is not embedded in images
+* Provide complete explanations and examples
+* Remove irrelevant appendices or references
+
+**Content organization**:
+
+* One main topic per document works best
+* Include learning objectives when possible
+* Provide clear definitions of key terms
+* Use consistent terminology throughout
+
+=== Writing effective topic descriptions
+
+**Good topic descriptions**:
+
+* "Python variable types and scope rules"
+* "Marketing mix: product, price, place, promotion"
+* "Causes and consequences of World War I"
+
+**Avoid vague descriptions**:
+
+* "Python" (too broad)
+* "Marketing" (too general)
+* "History" (not specific enough)
+
+=== Reviewing generated questions
+
+**Quality checklist**:
+
+* ✅ Question is clear and unambiguous
+* ✅ Correct answer is indisputable
+* ✅ Wrong answers are plausible but clearly incorrect
+* ✅ Language level is appropriate for students
+* ✅ Content aligns with learning objectives
+
+=== Managing your question library
+
+**Organization tips**:
+
+* Use descriptive tags and categories
+* Mark questions by difficulty and topic
+* Track which questions have been used
+* Regular review and updates
+* Backup important question sets
+
+== Integration Questions
+
+=== Can I export to my LMS?
+
+Yes! We support multiple export formats:
+
+* **Moodle XML** - Direct import to Moodle
+* **Canvas QTI** - Canvas Learning Management System
+* **Blackboard** - Compatible format available
+* **PDF/Word** - Universal formats
+* **Custom formats** - Available on request
+
+=== Does it integrate with my existing tools?
+
+Current integrations:
+
+* **Learning Management Systems**: Moodle, Canvas, Blackboard
+* **Assessment platforms**: Multiple formats supported
+* **Google Classroom**: Export and sharing capabilities
+* **Microsoft Teams Education**: Integration planned
+
+**API access**: Available for custom integrations
+
+=== Can multiple instructors use the same account?
+
+Yes! We support:
+
+* **Team accounts** with shared question libraries
+* **Role-based access** (admin, editor, viewer)
+* **Institution-wide deployment**
+* **Collaborative question development**
+
+== Getting Help
+
+=== How do I contact support?
+
+**Support channels**:
+
+* **Email**: daniel.senften@talent-factory.ch
+* **Help desk**: Available in the application
+* **Documentation**: Comprehensive guides available
+* **Video tutorials**: Step-by-step walkthroughs
+
+**Response times**:
+
+* Standard support: 24 hours
+* Premium support: 4 hours
+* Critical issues: 1 hour
+
+=== What information should I include in support requests?
+
+**Helpful details**:
+
+* Your account email
+* Browser type and version
+* Steps that led to the problem
+* Error messages (screenshots helpful)
+* Expected vs. actual behavior
+
+=== Are training sessions available?
+
+Yes! We offer:
+
+* **Live webinars** for new users
+* **One-on-one training** sessions
+* **Institution-wide training** programs
+* **Video library** for self-paced learning
+* **Documentation** and user guides
+
+=== Where can I see new features and updates?
+
+**Stay informed**:
+* **Release notes** in the application
+* **Email newsletters** for major updates
+* **Feature requests** through support portal
+* **User community** for discussions and tips
+
+== Advanced Usage
+
+=== Can I customize the AI prompts?
+
+For enterprise customers, we offer:
+
+* **Custom prompt templates**
+* **Institution-specific instructions**
+* **Subject-area optimizations**
+* **Quality control parameters**
+
+Contact our enterprise team for details.
+
+=== How do I scale for large courses?
+
+**Scaling strategies**:
+
+* **Batch processing** for multiple documents
+* **Template questions** for similar content
+* **Team collaboration** features
+* **API integration** for automated workflows
+
+=== Can I analyze question performance?
+
+**Analytics features** (coming soon):
+
+* Student performance data
+* Question difficulty analysis
+* Content coverage reports
+* Usage statistics
+
+---
+
+**Still have questions?**
+
+* Check our link:tutorial.adoc[Tutorial] for step-by-step guidance
+* Browse the link:user-manual.adoc[User Manual] for complete features
+* Contact support for personalized assistance
+* Join our user community for tips and discussions

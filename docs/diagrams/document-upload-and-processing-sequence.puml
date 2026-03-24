@@ -1,0 +1,52 @@
+@startuml Document_Upload_Sequence
+!theme plain
+title Document Upload and Processing Sequence
+
+actor User
+participant Frontend
+participant "FastAPI Backend" as API
+participant "Document Service" as DocSvc
+participant "Docling Service" as Docling
+participant "Vector Service" as Vector
+participant PostgreSQL
+participant ChromaDB
+participant "File Storage" as Storage
+
+User -> Frontend: Upload document (PDF/DOC)
+Frontend -> API: POST /api/v1/documents/upload
+API -> DocSvc: upload_document(file, user_id)
+
+DocSvc -> Storage: Save file to uploads/
+Storage --> DocSvc: file_path
+
+DocSvc -> PostgreSQL: Insert document record
+PostgreSQL --> DocSvc: document_id
+
+DocSvc -> Docling: process_document(file_path)
+Docling -> Docling: Extract text and metadata
+Docling -> Docling: Create semantic chunks
+Docling --> DocSvc: ProcessedContent
+
+DocSvc -> Vector: add_document_chunks(chunks, embeddings)
+Vector -> Vector: Generate embeddings
+Vector -> ChromaDB: Store vectors with metadata
+ChromaDB --> Vector: Success
+
+Vector --> DocSvc: Stored successfully
+DocSvc -> PostgreSQL: Update document status = "processed"
+DocSvc --> API: ProcessedDocument
+
+API --> Frontend: {document_id, status: "processed"}
+Frontend --> User: Upload complete notification
+
+note right of Docling
+  Handles multiple formats:
+  PDF, DOC, DOCX, TXT, MD
+end note
+
+note right of Vector
+  Uses sentence-transformers
+  for embedding generation
+end note
+
+@enduml

@@ -1,0 +1,28 @@
+# =============================================================================
+# ExamCraft AI Celery Worker - Fly.io Configuration
+# Async Task Processing
+# =============================================================================
+
+app = "examcraft-celery"
+primary_region = "fra"  # Frankfurt
+
+[build]
+  dockerfile = "packages/core/backend/Dockerfile.fly"
+
+[env]
+  PYTHONUNBUFFERED = "1"
+  DEPLOYMENT_MODE = "full"
+  # Celery verbindet sich zu RabbitMQ via Fly Private Network
+  # CELERY_BROKER_URL wird als Secret gesetzt
+
+# Celery Worker ist kein HTTP Service
+[processes]
+  worker = "celery -A celery_app worker --loglevel=info --concurrency=1"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+# Kein auto_stop für Worker - muss Tasks verarbeiten können
+# Worker skaliert basierend auf Queue-Länge (manuell oder via Autoscaler)
