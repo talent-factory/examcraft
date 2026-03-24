@@ -1,20 +1,30 @@
 # Contributing to ExamCraft AI
 
-We welcome contributions to ExamCraft AI! This document provides guidelines
-for contributing to our OpenSource educational technology project.
+> **Note:** This repository is automatically mirrored from our private
+> development monorepo. It contains the open-source core of ExamCraft AI
+> (MIT License). Pull requests opened here cannot be merged directly.
 
-## Quick Start for Contributors
+## How to Contribute
+
+1. **Open an issue** describing your proposed change
+2. Our team will review and, if approved, implement it in our internal repo
+3. The change will appear in this mirror on the next release
+
+For bug reports, please use the bug report issue template.
+
+## Quick Start for Local Development
 
 1. **Fork** the repository on GitHub
 2. **Clone** your fork locally:
-   `git clone https://github.com/yourusername/examcraft-ai.git`
-3. **Setup** development environment: `./start-dev.sh`
-4. **Create** a feature branch: `git checkout -b feature/amazing-feature`
-5. **Make** your changes and **test** thoroughly
-6. **Commit** using conventional commits:
+   `git clone https://github.com/yourusername/examcraft.git`
+3. **Setup** environment variables: `cp backend/.env.example backend/.env`
+4. **Start** development stack: `docker compose up`
+5. **Create** a feature branch: `git checkout -b feature/amazing-feature`
+6. **Make** your changes and **test** thoroughly
+7. **Commit** using conventional commits:
    `git commit -m 'feat: Add amazing feature'`
-7. **Push** to your fork: `git push origin feature/amazing-feature`
-8. **Create** a Pull Request with a clear description
+8. **Push** to your fork: `git push origin feature/amazing-feature`
+9. **Create** a Pull Request with a clear description
 
 ## Development Environment
 
