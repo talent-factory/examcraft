@@ -14,7 +14,6 @@ from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from main import app
 from services.document_service import document_service as actual_document_service
 from models.document import Document, DocumentStatus
-from models.question_review import QuestionReview, ReviewHistory
 from utils.tenant_utils import TenantFilter
 
 
