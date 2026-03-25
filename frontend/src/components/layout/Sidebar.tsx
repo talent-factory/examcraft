@@ -91,11 +91,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
       }`}
     >
       {/* Sidebar Content */}
-      <nav className="h-full overflow-y-auto py-4 px-2">
-        <div className="space-y-1">
-          {navigationItems.map((item) => renderNavItem(item))}
-        </div>
-      </nav>
+      <div className="h-full flex flex-col py-4 px-2">
+        <nav className="flex-1 overflow-y-auto">
+          <div className="space-y-1">
+            {navigationItems.map((item) => renderNavItem(item))}
+          </div>
+        </nav>
+
+        {/* Version Footer */}
+        {isOpen && (
+          <div className="mt-auto pt-4 pb-2 px-2 text-center">
+            <a
+              href="https://github.com/talent-factory/ExamCraft/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              {process.env.REACT_APP_VERSION || 'dev'}
+            </a>
+          </div>
+        )}
+      </div>
     </aside>
   );
 };
