@@ -69,8 +69,8 @@ export const BillingPage: React.FC = () => {
 
             <div className="mt-12 space-y-4 sm:mt-16 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:max-w-5xl lg:mx-auto xl:max-w-none xl:mx-0 xl:grid-cols-4">
                 {/* Free Tier */}
-                <div className="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200 bg-white">
-                    <div className="p-6">
+                <div className="border border-gray-200 rounded-lg shadow-sm bg-white flex flex-col">
+                    <div className="p-6 flex flex-col flex-grow">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Free</h2>
                         <p className="mt-4">
                             <span className="text-4xl font-extrabold text-gray-900">CHF 0</span>
@@ -81,7 +81,7 @@ export const BillingPage: React.FC = () => {
                         </p>
                         <button
                             disabled
-                            className="mt-8 block w-full bg-gray-100 border border-transparent rounded-md py-2 text-sm font-semibold text-gray-400 text-center cursor-not-allowed"
+                            className="mt-auto pt-6 block w-full bg-gray-100 border border-transparent rounded-md py-2 text-sm font-semibold text-gray-400 text-center cursor-not-allowed"
                         >
                             {currentTier === 'free' ? t('pages.billing.currentPlan') : 'Free Plan'}
                         </button>
@@ -89,8 +89,8 @@ export const BillingPage: React.FC = () => {
                 </div>
 
                 {/* Starter Tier */}
-                <div className="border border-blue-200 rounded-lg shadow-sm divide-y divide-gray-200 bg-white relative">
-                    <div className="p-6">
+                <div className="border border-blue-200 rounded-lg shadow-sm bg-white relative flex flex-col">
+                    <div className="p-6 flex flex-col flex-grow">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Starter</h2>
                         <p className="mt-4">
                             <span className="text-4xl font-extrabold text-gray-900">CHF 9</span>
@@ -103,7 +103,7 @@ export const BillingPage: React.FC = () => {
                         <button
                             onClick={() => handleSubscribe(STRIPE_PRICES.starter)}
                             disabled={loading || !stripeConfigStatus.configured || currentTier === 'starter'}
-                            className={`mt-8 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-center ${
+                            className={`mt-auto pt-6 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-center ${
                                 currentTier === 'starter'
                                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                     : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
@@ -115,8 +115,8 @@ export const BillingPage: React.FC = () => {
                 </div>
 
                 {/* Professional Tier */}
-                <div className="border border-gray-200 rounded-lg shadow-sm divide-y divide-gray-200 bg-white">
-                    <div className="p-6">
+                <div className="border border-gray-200 rounded-lg shadow-sm bg-white flex flex-col">
+                    <div className="p-6 flex flex-col flex-grow">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Professional</h2>
                         <p className="mt-4">
                             <span className="text-4xl font-extrabold text-gray-900">CHF 49</span>
@@ -129,7 +129,7 @@ export const BillingPage: React.FC = () => {
                         <button
                             onClick={() => handleSubscribe(STRIPE_PRICES.professional)}
                             disabled={loading || !stripeConfigStatus.configured || currentTier === 'professional'}
-                            className={`mt-8 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-center ${
+                            className={`mt-auto pt-6 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-center ${
                                 currentTier === 'professional'
                                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                     : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
@@ -141,8 +141,8 @@ export const BillingPage: React.FC = () => {
                 </div>
 
                 {/* Enterprise Tier */}
-                <div className="border border-yellow-200 rounded-lg shadow-sm divide-y divide-gray-200 bg-white">
-                    <div className="p-6">
+                <div className="border border-yellow-200 rounded-lg shadow-sm bg-white flex flex-col">
+                    <div className="p-6 flex flex-col flex-grow">
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Enterprise</h2>
                         <p className="mt-4">
                             <span className="text-4xl font-extrabold text-gray-900">{t('pages.billing.enterprisePrice')}</span>
@@ -155,7 +155,7 @@ export const BillingPage: React.FC = () => {
                         <button
                             onClick={handleRequestQuote}
                             disabled={currentTier === 'enterprise'}
-                            className={`mt-8 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-center ${
+                            className={`mt-auto pt-6 block w-full border border-transparent rounded-md py-2 text-sm font-semibold text-center ${
                                 currentTier === 'enterprise'
                                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                     : 'bg-yellow-500 text-white hover:bg-yellow-600'
