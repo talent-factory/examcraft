@@ -1,0 +1,51 @@
+# Node modules
+**/node_modules
+**/build
+**/.cache
+
+# Git
+.git
+.gitignore
+.gitmodules
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun.lockb
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+
+# IDE
+.vscode
+.idea
+
+# Test coverage
+**/coverage
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Python
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
