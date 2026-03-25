@@ -2,17 +2,17 @@
 
 ## Anmeldeoptionen
 
-ExamCraft AI unterstuetzt folgende Anmeldemethoden:
+ExamCraft AI unterstützt folgende Anmeldemethoden:
 
-- **Google OAuth** -- Anmeldung mit Google-Konto (empfohlen)
-- **E-Mail/Passwort** -- Klassische Registrierung
+- **Google OAuth** – Anmeldung mit Google-Konto (empfohlen)
+- **E-Mail/Passwort** – Klassische Registrierung
 
 ## Registrierung
 
-1. Oeffnen Sie ExamCraft AI
+1. Öffnen Sie ExamCraft AI
 2. Klicken Sie auf **Registrieren**
-3. Waehlen Sie Ihre bevorzugte Anmeldemethode
-4. Vervollstaendigen Sie Ihr Profil
+3. Wählen Sie Ihre bevorzugte Anmeldemethode
+4. Vervollständigen Sie Ihr Profil
 
 !!! info "Hinweis"
     Detaillierte Anleitung folgt.

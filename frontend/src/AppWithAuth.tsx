@@ -26,6 +26,7 @@ import { BillingPage } from './pages/BillingPage';
 import { ExamComposer } from './pages/ExamComposer';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
+import { SubscriptionManagementPage } from './pages/SubscriptionManagementPage';
 import { UserRole } from './types/auth';
 import { AppErrorBoundary } from './components/ErrorBoundary';
 import QuestionReviewDetail from './components/QuestionReviewDetail';
@@ -220,6 +221,17 @@ export const AppWithAuth: React.FC = () => {
 
               <Route path="/billing/success" element={<PaymentSuccessPage />} />
               <Route path="/billing/cancel" element={<PaymentCancelPage />} />
+
+              <Route
+                path="/subscription"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <SubscriptionManagementPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Redirect root to dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -49,6 +49,14 @@ class Subscription(Base):
         index=True,
     )
 
+    # Billing Owner - the user who purchased the subscription
+    billing_owner_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Stripe Identifiers
     stripe_subscription_id = Column(
         String(255), unique=True, nullable=False, index=True
@@ -79,8 +87,9 @@ class Subscription(Base):
         nullable=False,
     )
 
-    # Relationship to Institution
+    # Relationships
     institution = relationship("Institution", back_populates="subscriptions")
+    billing_owner = relationship("User", foreign_keys=[billing_owner_id])
 
     def __repr__(self):
         return f"<Subscription(id={self.id}, status='{self.status}', institution_id={self.institution_id})>"

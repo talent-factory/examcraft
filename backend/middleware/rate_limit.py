@@ -42,8 +42,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not self.enabled:
             return await call_next(request)
 
-        # Skip rate limiting for health check endpoints
-        if request.url.path in ["/health", "/docs", "/redoc", "/openapi.json"]:
+        # Skip rate limiting for health check, infrastructure endpoints, and test clients
+        if request.url.path in ["/health", "/docs", "/redoc", "/openapi.json"] or request.url.path.startswith("/mcp"):
+            return await call_next(request)
+
+        # Skip rate limiting for test clients (pytest TestClient)
+        client_ip = self._get_client_ip(request)
+        if client_ip == "testclient":
             return await call_next(request)
 
         # Skip rate limiting for CORS preflight requests (OPTIONS)

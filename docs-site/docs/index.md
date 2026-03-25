@@ -5,17 +5,17 @@ hide:
 
 # Willkommen bei ExamCraft AI
 
-ExamCraft AI ist eine KI-gesteuerte Plattform zur automatischen Generierung von Pruefungsaufgaben aus Ihren Kursmaterialien.
+ExamCraft AI ist eine KI-gesteuerte Plattform zur automatischen Generierung von Prüfungsaufgaben aus Ihren Kursmaterialien.
 
-## Fuer wen ist diese Dokumentation?
+## Für wen ist diese Dokumentation?
 
 <div class="grid cards" markdown>
 
-- :material-school: **Dozenten und Lehrkraefte**
+- :material-school: **Dozenten und Lehrkräfte**
 
     ---
 
-    Lernen Sie, wie Sie mit ExamCraft AI hochwertige Pruefungsfragen aus Ihren eigenen Materialien erstellen.
+    Lernen Sie, wie Sie mit ExamCraft AI hochwertige Prüfungsfragen aus Ihren eigenen Materialien erstellen.
 
     [:octicons-arrow-right-24: Benutzerhandbuch](user-guide/documents.md)
 
@@ -31,11 +31,11 @@ ExamCraft AI ist eine KI-gesteuerte Plattform zur automatischen Generierung von 
 
 ## Schnellstart
 
-Erstellen Sie Ihre erste KI-Pruefung in 5 Minuten:
+Erstellen Sie Ihre erste KI-Prüfung in 5 Minuten:
 
-1. **Dokument hochladen** -- Laden Sie ein PDF oder Word-Dokument hoch
-2. **Pruefung konfigurieren** -- Waehlen Sie Fragetyp, Schwierigkeitsgrad und Anzahl
-3. **Generieren** -- Die KI erstellt Fragen basierend auf Ihren Materialien
-4. **Reviewen und Exportieren** -- Pruefen und exportieren Sie die Ergebnisse
+1. **Dokument hochladen** – Laden Sie ein PDF oder Word-Dokument hoch
+2. **Prüfung konfigurieren** – Wählen Sie Fragetyp, Schwierigkeitsgrad und Anzahl
+3. **Generieren** – Die KI erstellt Fragen basierend auf Ihren Materialien
+4. **Reviewen und Exportieren** – Prüfen und exportieren Sie die Ergebnisse
 
 [:octicons-arrow-right-24: Zur Schnellstart-Anleitung](getting-started/quickstart.md)
