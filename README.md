@@ -36,16 +36,16 @@ examcraft/
 
 ### 📖 User Documentation
 
-- **[📚 User Guide](https://docs.examcraft.ch/guides/user-guide)** - Comprehensive guide for educators
-- **[🎛️ Admin Guide](https://docs.examcraft.ch/guides/admin-guide)** - Prompt management and administration
-- **[🚀 Quick Start](https://docs.examcraft.ch/quickstart)** - Get started in 5 minutes
+- **[📚 User Guide](https://docs.examcraft.ch/user-guide/documents/)** - Comprehensive guide for educators
+- **[🎛️ Admin Guide](https://docs.examcraft.ch/admin-guide/prompts/)** - Prompt management and administration
+- **[🚀 Quick Start](https://docs.examcraft.ch/getting-started/quickstart/)** - Get started in 5 minutes
 
 ### 🔧 Developer Documentation
 
 - **[🚀 Deployment Guide](DEPLOYMENT.md)** - Production deployment on Fly.io
 - **[📖 API Documentation](http://localhost:8000/docs)** - Interactive API docs (local)
 - **[🔧 Development Setup](#-quick-start)** - Local development environment (see below)
-- **[⚙️ Async Document Processing](https://docs.examcraft.ch/guides/async-processing)** - RabbitMQ & Celery setup
+- **[⚙️ Async Document Processing](docs/ASYNC_DOCUMENT_PROCESSING.md)** - RabbitMQ & Celery setup
 
 ### 🗺️ Public Roadmap
 
@@ -308,7 +308,7 @@ cd packages/core/backend && ruff check . --fix && ruff format .
 cd packages/core/frontend && bun run lint:fix
 ```
 
-**Siehe [Lint Checks](https://docs.examcraft.ch/guides/lint-checks) für detaillierte Informationen.**
+**Siehe [Lint Checks](docs/LINT_CHECKS.md) für detaillierte Informationen.**
 
 ### Nützliche Befehle
 
