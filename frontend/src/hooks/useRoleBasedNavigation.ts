@@ -70,16 +70,6 @@ export const useRoleBasedNavigation = () => {
       icon: '⚙️',
       requiredRoles: [UserRole.ADMIN],
     },
-    {
-      label: t('nav.sidebar.pricing'),
-      path: '/billing',
-      icon: '💳',
-    },
-    {
-      label: t('nav.sidebar.profile'),
-      path: '/profile',
-      icon: '👤',
-    },
   ], [t]);
 
   const filterNavigationItems = (items: NavigationItem[]): NavigationItem[] => {
