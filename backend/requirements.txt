@@ -85,4 +85,4 @@ qdrant-client==1.16.2             # Qdrant Vector Database Client (Premium)
 openai==1.59.5                    # OpenAI API for Embeddings (Premium)
 # sentence-transformers==2.7.0      # Sentence Embeddings (Premium)
 
-numpy==1.26.4                       # Numerische Operations (für Embeddings, Docling compatible)
+numpy>=2.1.0                        # Numerische Operations (für Embeddings)
