@@ -12,39 +12,39 @@ from services.oauth_service import OAuthService
 
 
 @pytest.fixture
-def test_institution(db_session: Session):
+def test_institution(test_db: Session):
     """Create a test institution"""
     institution = Institution(
         name="Test Institution",
         slug="test-institution",
         subscription_tier="free",
     )
-    db_session.add(institution)
-    db_session.commit()
-    db_session.refresh(institution)
+    test_db.add(institution)
+    test_db.commit()
+    test_db.refresh(institution)
     return institution
 
 
 @pytest.fixture
-def oauth_service(db_session: Session):
+def oauth_service(test_db: Session):
     """Create OAuth service instance"""
-    return OAuthService(db_session)
+    return OAuthService(test_db)
 
 
 def test_oauth_updates_existing_user_with_null_fields(
-    db_session: Session, test_institution: Institution, oauth_service: OAuthService
+    test_db: Session, test_institution: Institution, oauth_service: OAuthService
 ):
     """Test that OAuth login updates existing user with NULL fields"""
     # 1. Create user with email only (NULL first_name, last_name, avatar_url)
     user = User(
         email="test@example.com",
-        first_name=None,  # NULL
-        last_name=None,  # NULL
+        first_name="",  # Empty placeholder (NOT NULL column)
+        last_name="",  # Empty placeholder (NOT NULL column)
         avatar_url=None,  # NULL
         institution_id=test_institution.id,
     )
-    db_session.add(user)
-    db_session.commit()
+    test_db.add(user)
+    test_db.commit()
     user_id = user.id
 
     # 2. Simulate OAuth login with Google
@@ -73,7 +73,7 @@ def test_oauth_updates_existing_user_with_null_fields(
 
     # 4. Assert OAuth account was created
     oauth_account = (
-        db_session.query(OAuthAccount).filter(OAuthAccount.user_id == user_id).first()
+        test_db.query(OAuthAccount).filter(OAuthAccount.user_id == user_id).first()
     )
     assert oauth_account is not None
     assert oauth_account.provider == "google"
@@ -81,7 +81,7 @@ def test_oauth_updates_existing_user_with_null_fields(
 
 
 def test_oauth_refreshes_profile_data_on_subsequent_login(
-    db_session: Session, test_institution: Institution, oauth_service: OAuthService
+    test_db: Session, test_institution: Institution, oauth_service: OAuthService
 ):
     """Test that OAuth login refreshes profile data (e.g., changed avatar)"""
     # 1. Create user with OAuth account
@@ -94,8 +94,8 @@ def test_oauth_refreshes_profile_data_on_subsequent_login(
         institution_id=test_institution.id,
         oauth_provider="google",
     )
-    db_session.add(user)
-    db_session.flush()
+    test_db.add(user)
+    test_db.flush()
 
     oauth_account = OAuthAccount(
         user_id=user.id,
@@ -106,8 +106,8 @@ def test_oauth_refreshes_profile_data_on_subsequent_login(
         name="John Doe",
         picture="https://old-avatar.jpg",
     )
-    db_session.add(oauth_account)
-    db_session.commit()
+    test_db.add(oauth_account)
+    test_db.commit()
     user_id = user.id
 
     # 2. Simulate second OAuth login with updated avatar
@@ -133,7 +133,7 @@ def test_oauth_refreshes_profile_data_on_subsequent_login(
 
     # 4. Assert OAuth account token was refreshed
     refreshed_oauth = (
-        db_session.query(OAuthAccount).filter(OAuthAccount.user_id == user_id).first()
+        test_db.query(OAuthAccount).filter(OAuthAccount.user_id == user_id).first()
     )
     assert refreshed_oauth.access_token == "new_token"
     assert refreshed_oauth.picture == "https://new-avatar.jpg"

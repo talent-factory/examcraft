@@ -162,14 +162,20 @@
     "billing": {
       "title": "Pricing Plans",
       "subtitle": "Choose the plan that fits your needs.",
-      "perMonth": "/mo",
+      "perMonth": "/month",
       "freeDescription": "Perfect for trying out ExamCraft.",
       "currentPlan": "Current Plan",
-      "starterDescription": "For serious exam creators.",
-      "professionalDescription": "Unlimited power for professional exam creation.",
+      "starterDescription": "For individual instructors.",
+      "starterUsers": "1 user",
+      "professionalDescription": "For departments and small schools.",
+      "professionalUsers": "up to 10 users",
+      "enterpriseDescription": "For institutions with SSO, branding, API, and priority support.",
+      "enterprisePrice": "from CHF 149",
+      "enterpriseSeats": "10-100 seats",
+      "requestQuote": "Request a Quote",
       "processing": "Processing...",
       "subscribe": "Subscribe",
-      "subscriptionError": "Failed to start subscription process. Please try again."
+      "subscriptionError": "Could not start the subscription process. Please try again."
     },
     "registrationSuccess": {
       "title": "Registration Successful! 🎉",
@@ -196,14 +202,41 @@
     "paymentSuccess": {
       "title": "Payment Successful!",
       "subtitle": "Thank you for your subscription. Your account has been upgraded.",
-      "redirecting": "Redirecting you back to billing...",
-      "returnToBilling": "Return to Billing"
+      "syncing": "Syncing subscription...",
+      "syncError": "Subscription sync delayed. Please refresh the page in a moment.",
+      "redirecting": "Redirecting to your subscription...",
+      "viewSubscription": "View Subscription"
     },
     "paymentCancel": {
       "title": "Payment Canceled",
       "subtitle": "The payment process was canceled. No charges were made.",
       "tryAgain": "Try Again",
       "returnToDashboard": "Return to Dashboard"
+    },
+    "subscription": {
+      "title": "Subscription Management",
+      "currentPlan": "Current Plan",
+      "period": "Current Period",
+      "price": "Price",
+      "cancelWarning": "Your subscription will be cancelled at the end of the current period.",
+      "freePlanMessage": "You are currently on the Free plan. Upgrade to unlock more features!",
+      "upgradePlan": "Upgrade Plan",
+      "changePlan": "Change Plan",
+      "manageSubscription": "Manage Subscription",
+      "loading": "Loading...",
+      "paymentMethods": "Payment Methods",
+      "updatePaymentMethod": "Update Payment Method",
+      "noPaymentMethods": "No payment methods on file.",
+      "billingHistory": "Billing History",
+      "invoiceCol": "Invoice",
+      "dateCol": "Date",
+      "amountCol": "Amount",
+      "statusCol": "Status",
+      "downloadCol": "Download",
+      "noInvoices": "No invoices yet.",
+      "invoicesLoadError": "Invoices could not be loaded.",
+      "paymentMethodsLoadError": "Payment methods could not be loaded.",
+      "loadError": "Failed to load subscription data."
     }
   },
   "admin": {

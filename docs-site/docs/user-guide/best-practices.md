@@ -4,14 +4,14 @@
 
 ### Optimale Vorbereitung
 
-1. Strukturieren Sie Dokumente mit klaren Ueberschriften
+1. Strukturieren Sie Dokumente mit klaren Überschriften
 2. Verwenden Sie konsistente Formatierung
-3. Fuegen Sie Metadaten hinzu (Titel, Autor, Datum)
+3. Fügen Sie Metadaten hinzu (Titel, Autor, Datum)
 4. Vermeiden Sie Wasserzeichen und Hintergrundbilder
 
 ### Batch-Upload
 
-Laden Sie zusammengehoerige Dokumente gemeinsam hoch (z.B. alle Kapitel eines Lehrbuchs). Das erleichtert spaetere RAG-Pruefungen.
+Laden Sie zusammengehörige Dokumente gemeinsam hoch (z.B. alle Kapitel eines Lehrbuchs). Das erleichtert spätere RAG-Prüfungen.
 
 ## Fragenerstellung
 
@@ -24,38 +24,38 @@ Laden Sie zusammengehoerige Dokumente gemeinsam hoch (z.B. alle Kapitel eines Le
 !!! example "Beispiele"
     **Gut:**
 
-    - "Python Listen -- Methoden append(), extend(), insert()"
-    - "Algorithmen -- Zeitkomplexitaet von Sortierverfahren"
+    - "Python Listen – Methoden append(), extend(), insert()"
+    - "Algorithmen – Zeitkomplexität von Sortierverfahren"
 
     **Schlecht:**
 
     - "Python" (zu breit)
     - "Programmierung" (zu allgemein)
 
-### Qualitaetskontrolle
+### Qualitätskontrolle
 
-- Ueberpruefen Sie generierte Fragen immer
+- Überprüfen Sie generierte Fragen immer
 - Achten Sie auf Confidence Scores
 - Passen Sie den Schwierigkeitsgrad an
 - Nutzen Sie Quellenangaben zur Verifikation
 
-## RAG-Pruefungen
+## RAG-Prüfungen
 
-- Waehlen Sie 3--5 relevante Dokumente (optimal)
+- Wählen Sie 3–5 relevante Dokumente (optimal)
 - Geben Sie einen spezifischen Fokus an
-- Zu viele Dokumente fuehren zu niedrigerer Qualitaet
+- Zu viele Dokumente führen zu niedrigerer Qualität
 
 ## ChatBot-Nutzung
 
-Beginnen Sie mit Ueberblicksfragen und vertiefen Sie schrittweise:
+Beginnen Sie mit Überblicksfragen und vertiefen Sie schrittweise:
 
 ```text
 Benutzer: "Was ist Heapsort?"
-Bot: [Erklaert Heapsort]
+Bot: [Erklärt Heapsort]
 
 Benutzer: "Wie unterscheidet sich das von Quicksort?"
 Bot: [Vergleicht beide Algorithmen]
 
-Benutzer: "Welcher ist effizienter fuer grosse Datenmengen?"
-Bot: [Analysiert Komplexitaet]
+Benutzer: "Welcher ist effizienter für grosse Datenmengen?"
+Bot: [Analysiert Komplexität]
 ```

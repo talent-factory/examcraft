@@ -27,7 +27,7 @@ You have two options:
 During upload you will see:
 
 - File name and size
-- Progress bar (0--100%)
+- Progress bar (0–100%)
 - Status: "Processing..." then "Processed"
 
 ### 4. Wait for Processing

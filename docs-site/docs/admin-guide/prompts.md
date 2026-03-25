@@ -1,48 +1,48 @@
 # Prompt Management
 
-Das Prompt Management System ermoeglicht die zentrale Verwaltung aller AI-Prompts ohne Code-Aenderungen.
+Das Prompt Management System ermöglicht die zentrale Verwaltung aller AI-Prompts ohne Code-Änderungen.
 
-## Uebersicht
+## Übersicht
 
-- **Versionierung** -- Alle Aenderungen werden getrackt
-- **Rollback** -- Zurueck zu frueheren Versionen
-- **Semantic Search** -- Finde Prompts nach Bedeutung
-- **Analytics** -- Ueberwache Performance und Kosten
-- **Template System** -- Wiederverwendbare Prompts mit Variablen
-- **Web-Interface** -- Keine Code-Aenderungen noetig
+- **Versionierung** – Alle Änderungen werden getrackt
+- **Rollback** – Zurück zu früheren Versionen
+- **Semantic Search** – Finde Prompts nach Bedeutung
+- **Analytics** – Überwache Performance und Kosten
+- **Template System** – Wiederverwendbare Prompts mit Variablen
+- **Web-Interface** – Keine Code-Änderungen nötig
 
 ## Prompt Library
 
 ### Ansicht
 
-Die Prompt Library zeigt alle verfuegbaren Prompts in einem Grid-Layout mit:
+Die Prompt Library zeigt alle verfügbaren Prompts in einem Grid-Layout mit:
 
 - Prompt-Name und Beschreibung
 - Kategorie (System / User / Template)
 - Use Case, Version, Status
-- Tags und Verwendungszaehler
+- Tags und Verwendungszähler
 
 ### Aktionen
 
-- **Bearbeiten** -- Prompt im Editor oeffnen
-- **Versionen** -- Version History anzeigen
-- **Loeschen** -- Prompt entfernen
+- **Bearbeiten** – Prompt im Editor öffnen
+- **Versionen** – Version History anzeigen
+- **Löschen** – Prompt entfernen
 
 ## Prompt Editor
 
 ### Neuen Prompt erstellen
 
 1. Klicken Sie **Neuer Prompt**
-2. Fuellen Sie die folgenden Felder aus:
+2. Füllen Sie die folgenden Felder aus:
 
 | Feld | Beschreibung |
-|------|-------------|
+|---|-------|
 | Name | Eindeutiger Identifier (z.B. `system_prompt_question_generation`) |
-| Beschreibung | Kurze Erklaerung |
+| Beschreibung | Kurze Erklärung |
 | Kategorie | System Prompt / User Prompt / Few-Shot Example / Template |
 | Use Case | Verwendungszweck (z.B. `question_generation`) |
-| Content | Prompt-Text (Markdown unterstuetzt) |
-| Tags | Schlagwoerter fuer Suche |
+| Content | Prompt-Text (Markdown unterstützt) |
+| Tags | Schlagwörter für Suche |
 | Aktiv | Sofort aktivieren? |
 
 ### Template-Variablen
@@ -51,7 +51,7 @@ Syntax: `{variable_name}`
 
 Beispiel: `Generiere {count} Fragen zum Thema {topic}`
 
-Variablen werden zur Laufzeit ersetzt. Bei RAG-Pruefungen stehen folgende Variablen automatisch zur Verfuegung: `topic`, `difficulty`, `language`, `context`.
+Variablen werden zur Laufzeit ersetzt. Bei RAG-Prüfungen stehen folgende Variablen automatisch zur Verfügung: `topic`, `difficulty`, `language`, `context`.
 
 ## Version Control
 
@@ -61,15 +61,15 @@ Variablen werden zur Laufzeit ersetzt. Bei RAG-Pruefungen stehen folgende Variab
 
 ### Rollback
 
-1. Oeffnen Sie die Version History
-2. Waehlen Sie die gewuenschte Version
+1. Öffnen Sie die Version History
+2. Wählen Sie die gewünschte Version
 3. Klicken Sie **Aktivieren**
-4. Bestaetigen Sie
+4. Bestätigen Sie
 
 ## Usage Analytics
 
 | Metrik | Beschreibung |
-|--------|-------------|
+|----|-------|
 | Verwendungen | Anzahl Aufrufe |
 | Erfolgsrate | % erfolgreiche Generierungen |
 | Durchschn. Latenz | Durchschnittliche Antwortzeit |

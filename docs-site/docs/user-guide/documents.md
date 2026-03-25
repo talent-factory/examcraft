@@ -1,33 +1,33 @@
 # Dokumente hochladen und verwalten
 
-## Unterstuetzte Dateiformate
+## Unterstützte Dateiformate
 
-| Format | Erweiterung | Max. Groesse | Besonderheiten |
-|--------|-------------|------------|----------------|
+| Format | Erweiterung | Max. Grösse | Besonderheiten |
+|----|-------|------|--------|
 | PDF | `.pdf` | 50 MB | Tabellen, Formeln, Bilder |
 | Word | `.doc`, `.docx` | 25 MB | Formatierung erhalten |
-| Markdown | `.md` | 10 MB | Code-Bloecke, LaTeX |
+| Markdown | `.md` | 10 MB | Code-Blöcke, LaTeX |
 | Text | `.txt` | 5 MB | Plain Text |
 
 ## Dokumente hochladen
 
-### 1. Tab "Dokumente hochladen" oeffnen
+### 1. Tab "Dokumente hochladen" öffnen
 
 Klicken Sie auf den Tab **Dokumente hochladen** in der Navigation.
 
-### 2. Dateien auswaehlen
+### 2. Dateien auswählen
 
-Sie haben zwei Moeglichkeiten:
+Sie haben zwei Möglichkeiten:
 
 - **Drag & Drop**: Ziehen Sie Dateien in den Upload-Bereich
-- **Datei-Browser**: Klicken Sie auf **Dateien auswaehlen**
+- **Datei-Browser**: Klicken Sie auf **Dateien auswählen**
 
-### 3. Upload-Fortschritt ueberwachen
+### 3. Upload-Fortschritt überwachen
 
-Waehrend des Uploads sehen Sie:
+Während des Uploads sehen Sie:
 
-- Dateiname und Groesse
-- Fortschrittsbalken (0--100%)
+- Dateiname und Grösse
+- Fortschrittsbalken (0–100%)
 - Status: "Wird verarbeitet..." dann "Verarbeitet"
 
 ### 4. Verarbeitung abwarten
@@ -37,28 +37,28 @@ Nach dem Upload werden die Dokumente automatisch:
 1. Text extrahiert
 2. In semantische Chunks aufgeteilt
 3. In der Vektordatenbank indexiert
-4. Fuer RAG-Suche vorbereitet
+4. Für RAG-Suche vorbereitet
 
 | Dokumenttyp | Typische Verarbeitungszeit |
-|------------|---------------------------|
+|------|--------------|
 | PDF (10 Seiten) | ~30 Sekunden |
 | Word (20 Seiten) | ~45 Sekunden |
 | Markdown (5 Seiten) | ~15 Sekunden |
 
-!!! tip "Best Practices fuer Uploads"
+!!! tip "Best Practices für Uploads"
     - Verwenden Sie klare Dateinamen (z.B. `Algorithmen_Kapitel_3.pdf`)
-    - Strukturierte Dokumente mit Ueberschriften liefern bessere Ergebnisse
-    - Laden Sie zusammengehoerige Dokumente im Batch hoch
+    - Strukturierte Dokumente mit Überschriften liefern bessere Ergebnisse
+    - Laden Sie zusammengehörige Dokumente im Batch hoch
 
 !!! warning "Vermeiden"
     - Gescannte PDFs ohne OCR
-    - Passwortgeschuetzte Dateien
-    - Dateien groesser als 50 MB
+    - Passwortgeschützte Dateien
+    - Dateien grösser als 50 MB
     - Duplikate
 
 ## Dokumentenbibliothek
 
-Die Dokumentenbibliothek zeigt alle hochgeladenen Dokumente in einer uebersichtlichen Liste mit Dateiname, Upload-Datum, Dateigroesse, Seitenanzahl und Verarbeitungsstatus.
+Die Dokumentenbibliothek zeigt alle hochgeladenen Dokumente in einer übersichtlichen Liste mit Dateiname, Upload-Datum, Dateigrösse, Seitenanzahl und Verarbeitungsstatus.
 
 ### Dokumente durchsuchen
 
@@ -71,17 +71,17 @@ Geben Sie Suchbegriffe in das Suchfeld ein. Ergebnisse werden in Echtzeit gefilt
 - Nur Word
 - Nur Markdown
 
-### Dokumente fuer Pruefungen auswaehlen
+### Dokumente für Prüfungen auswählen
 
-1. Aktivieren Sie die Checkboxen neben den gewuenschten Dokumenten
-2. Klicken Sie auf **Pruefung aus Auswahl erstellen**
-3. Sie werden zum RAG-Pruefungs-Creator weitergeleitet
+1. Aktivieren Sie die Checkboxen neben den gewünschten Dokumenten
+2. Klicken Sie auf **Prüfung aus Auswahl erstellen**
+3. Sie werden zum RAG-Prüfungs-Creator weitergeleitet
 
-### Dokumente loeschen
+### Dokumente löschen
 
-1. Klicken Sie auf das Loeschen-Symbol
-2. Bestaetigen Sie die Sicherheitsabfrage
+1. Klicken Sie auf das Löschen-Symbol
+2. Bestätigen Sie die Sicherheitsabfrage
 3. Dokument wird aus Bibliothek und Vektordatenbank entfernt
 
 !!! warning "Achtung"
-    Geloeschte Dokumente koennen nicht wiederhergestellt werden.
+    Gelöschte Dokumente können nicht wiederhergestellt werden.

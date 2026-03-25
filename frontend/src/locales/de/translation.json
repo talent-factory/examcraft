@@ -165,8 +165,14 @@
       "perMonth": "/Monat",
       "freeDescription": "Perfekt zum Ausprobieren von ExamCraft.",
       "currentPlan": "Aktueller Plan",
-      "starterDescription": "Für engagierte Prüfungsersteller.",
-      "professionalDescription": "Unbegrenzte Möglichkeiten für professionelle Prüfungserstellung.",
+      "starterDescription": "Für den einzelnen Dozenten.",
+      "starterUsers": "1 Benutzer",
+      "professionalDescription": "Für Fachgruppen und kleine Schulen.",
+      "professionalUsers": "bis zu 10 Benutzer",
+      "enterpriseDescription": "Für Institutionen mit SSO, Branding, API und Priority Support.",
+      "enterprisePrice": "ab CHF 149",
+      "enterpriseSeats": "10-100 Seats",
+      "requestQuote": "Offerte anfordern",
       "processing": "Verarbeitung...",
       "subscribe": "Abonnieren",
       "subscriptionError": "Abonnementprozess konnte nicht gestartet werden. Bitte versuchen Sie es erneut."
@@ -196,14 +202,41 @@
     "paymentSuccess": {
       "title": "Zahlung erfolgreich!",
       "subtitle": "Vielen Dank für Ihr Abonnement. Ihr Konto wurde aktualisiert.",
-      "redirecting": "Sie werden zurück zur Abrechnung weitergeleitet...",
-      "returnToBilling": "Zurück zur Abrechnung"
+      "syncing": "Abonnement wird synchronisiert...",
+      "syncError": "Synchronisierung verzögert. Bitte laden Sie die Seite in einem Moment neu.",
+      "redirecting": "Weiterleitung zum Abonnement...",
+      "viewSubscription": "Abonnement anzeigen"
     },
     "paymentCancel": {
       "title": "Zahlung abgebrochen",
       "subtitle": "Der Zahlungsvorgang wurde abgebrochen. Es wurden keine Kosten berechnet.",
       "tryAgain": "Erneut versuchen",
       "returnToDashboard": "Zurück zum Dashboard"
+    },
+    "subscription": {
+      "title": "Abonnement-Verwaltung",
+      "currentPlan": "Aktueller Plan",
+      "period": "Aktuelle Periode",
+      "price": "Preis",
+      "cancelWarning": "Ihr Abonnement wird am Ende der aktuellen Periode gekündigt.",
+      "freePlanMessage": "Sie nutzen derzeit den Free-Plan. Upgraden Sie für mehr Funktionen!",
+      "upgradePlan": "Plan upgraden",
+      "changePlan": "Plan wechseln",
+      "manageSubscription": "Abonnement verwalten",
+      "loading": "Laden...",
+      "paymentMethods": "Zahlungsmethoden",
+      "updatePaymentMethod": "Zahlungsmethode aktualisieren",
+      "noPaymentMethods": "Keine Zahlungsmethoden hinterlegt.",
+      "billingHistory": "Abrechnungsverlauf",
+      "invoiceCol": "Rechnung",
+      "dateCol": "Datum",
+      "amountCol": "Betrag",
+      "statusCol": "Status",
+      "downloadCol": "Download",
+      "noInvoices": "Noch keine Rechnungen.",
+      "invoicesLoadError": "Rechnungen konnten nicht geladen werden.",
+      "paymentMethodsLoadError": "Zahlungsmethoden konnten nicht geladen werden.",
+      "loadError": "Abonnement-Daten konnten nicht geladen werden."
     }
   },
   "admin": {

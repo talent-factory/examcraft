@@ -169,7 +169,8 @@ def test_register_duplicate_email(test_client, test_user):
     )
 
     assert response.status_code == 400
-    assert "already registered" in response.json()["detail"].lower()
+    detail = response.json()["detail"].lower()
+    assert "bereits registriert" in detail or "already registered" in detail
 
 
 def test_register_invalid_email(test_client):
@@ -215,7 +216,8 @@ def test_login_wrong_password(test_client, test_user):
     )
 
     assert response.status_code == 401
-    assert "incorrect" in response.json()["detail"].lower()
+    detail = response.json()["detail"].lower()
+    assert "ungültige" in detail or "incorrect" in detail or "invalid" in detail
 
 
 def test_login_nonexistent_user(test_client):
@@ -226,7 +228,8 @@ def test_login_nonexistent_user(test_client):
     )
 
     assert response.status_code == 401
-    assert "incorrect" in response.json()["detail"].lower()
+    detail = response.json()["detail"].lower()
+    assert "ungültige" in detail or "incorrect" in detail or "invalid" in detail
 
 
 def test_login_inactive_user(test_client, db, test_user):
@@ -240,7 +243,8 @@ def test_login_inactive_user(test_client, db, test_user):
     )
 
     assert response.status_code == 403
-    assert "inactive" in response.json()["detail"].lower()
+    detail = response.json()["detail"].lower()
+    assert "deaktiviert" in detail or "disabled" in detail or "inactive" in detail
 
 
 # ============================================================================
@@ -386,7 +390,8 @@ def test_change_password_wrong_current(test_client, test_user):
     )
 
     assert response.status_code == 400
-    assert "incorrect" in response.json()["detail"].lower()
+    detail = response.json()["detail"].lower()
+    assert "falsch" in detail or "incorrect" in detail
 
 
 def test_change_password_without_auth(test_client):

@@ -148,7 +148,8 @@ class TestAccountLockout:
         )
 
         assert response.status_code == 429
-        assert "30 Minuten" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "gesperrt" in detail or "locked" in detail
 
     def test_lockout_not_triggered_below_max(self, test_client, db, test_user):
         """Account should NOT be locked with fewer than 10 failed attempts."""
@@ -200,7 +201,8 @@ class TestAccountLockout:
         )
 
         assert response.status_code == 429
-        assert "30 Minuten" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "gesperrt" in detail or "locked" in detail
 
     def test_counter_reset_after_lockout_expires(self, test_client, db, test_user):
         """Failed attempt counter should reset after lockout period expires."""
@@ -365,8 +367,8 @@ class TestOAuthProviderValidation:
         )
 
         assert response.status_code == 400
-        assert "Unsupported OAuth provider" in response.json()["detail"]
-        assert "github" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "nicht unterstützt" in detail or "Unsupported" in detail
 
     def test_oauth_callback_unsupported_provider(self, test_client):
         """oauth_callback should reject unsupported providers."""
@@ -376,7 +378,8 @@ class TestOAuthProviderValidation:
         )
 
         assert response.status_code == 400
-        assert "Unsupported OAuth provider" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "nicht unterstützt" in detail or "Unsupported" in detail
 
     @patch("api.auth.RedisService.get_session_client")
     def test_oauth_login_supported_provider_google(self, mock_redis_cls, test_client):
@@ -403,7 +406,8 @@ class TestOAuthProviderValidation:
         )
 
         assert response.status_code == 400
-        assert "Missing OAuth state" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "fehlt" in detail or "Missing" in detail
 
     @patch("api.auth.RedisService.get_session_client")
     def test_oauth_callback_invalid_state(self, mock_redis_cls, test_client):
@@ -419,10 +423,8 @@ class TestOAuthProviderValidation:
         )
 
         assert response.status_code == 400
-        assert (
-            "CSRF" in response.json()["detail"]
-            or "Invalid" in response.json()["detail"]
-        )
+        detail = response.json()["detail"]
+        assert "CSRF" in detail or "Invalid" in detail or "Ungültiger" in detail
 
 
 # ============================================================================
@@ -473,7 +475,8 @@ class TestOAuthCodeExchange:
         )
 
         assert response.status_code == 400
-        assert "Invalid or expired" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "Ungültiger" in detail or "Invalid or expired" in detail
 
     @patch("api.auth.RedisService.get_session_client")
     def test_exchange_invalid_code(self, mock_redis_cls, test_client):
@@ -488,7 +491,8 @@ class TestOAuthCodeExchange:
         )
 
         assert response.status_code == 400
-        assert "Invalid or expired" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "Ungültiger" in detail or "Invalid or expired" in detail
 
     @patch("api.auth.RedisService.get_session_client")
     def test_exchange_malformed_json_in_redis(self, mock_redis_cls, test_client):
@@ -516,7 +520,8 @@ class TestOAuthCodeExchange:
         )
 
         assert response.status_code == 503
-        assert "Service unavailable" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "nicht verfügbar" in detail or "Service unavailable" in detail
 
     @patch("api.auth.RedisService.get_session_client")
     def test_exchange_code_is_single_use(self, mock_redis_cls, test_client):

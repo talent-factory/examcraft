@@ -1,16 +1,16 @@
-# Pruefungen exportieren
+# Prüfungen exportieren
 
-## Aktuell verfuegbar
+## Aktuell verfügbar
 
-Generierte Pruefungen koennen derzeit manuell kopiert werden.
+Generierte Prüfungen können derzeit manuell kopiert werden.
 
 ## Geplante Export-Formate
 
 Folgende Formate sind in Entwicklung:
 
-- **PDF** -- Druckfertige Pruefung mit Deckblatt
-- **JSON** -- Maschinenlesbares Format fuer Integration
-- **Moodle XML** -- Import in Moodle LMS
+- **PDF** – Druckfertige Prüfung mit Deckblatt
+- **JSON** – Maschinenlesbares Format für Integration
+- **Moodle XML** – Import in Moodle LMS
 
 !!! info "Hinweis"
-    Die Export-Funktionen werden in einem zukuenftigen Release verfuegbar sein.
+    Die Export-Funktionen werden in einem zukünftigen Release verfügbar sein.

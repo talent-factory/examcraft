@@ -18,7 +18,7 @@ Create your first AI exam in 5 minutes.
 
 1. Click **Upload Documents** in the navigation
 2. Drag a PDF or Word document into the upload area (or click **Choose Files**)
-3. Wait for processing to complete (10--45 seconds)
+3. Wait for processing to complete (10–45 seconds)
 
 !!! tip
     Structured documents with clear headings produce better exam questions.
@@ -29,14 +29,14 @@ Create your first AI exam in 5 minutes.
 2. Select your uploaded documents
 3. Configure:
     - **Topic/Focus**: e.g., "Sorting algorithms"
-    - **Number of questions**: 5--10 recommended
+    - **Number of questions**: 5–10 recommended
     - **Question types**: Multiple choice and/or open questions
     - **Difficulty**: Easy / Medium / Hard
 4. Click **Generate RAG Exam**
 
 ## Step 4: Review Results
 
-After 20--60 seconds, you will see your generated questions with:
+After 20–60 seconds, you will see your generated questions with:
 
 - Question text and answer options
 - Correct answer with explanation

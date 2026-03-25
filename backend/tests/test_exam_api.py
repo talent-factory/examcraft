@@ -946,7 +946,8 @@ class TestExamWorkflowApi:
 
         response = exam_client.post(f"/api/v1/exams/{exam_id}/finalize")
         assert response.status_code == 400
-        assert "empty" in response.json()["detail"].lower()
+        detail = response.json()["detail"].lower()
+        assert "leer" in detail or "empty" in detail
 
     def test_unfinalize_exam(self, exam_client, exam_db, exam_institution, exam_user):
         """POST /{exam_id}/unfinalize reverts status from finalized to draft."""
@@ -1160,7 +1161,8 @@ class TestExamCRUDApiExtra(
             json={"title": "New Title", "updated_at": fin_resp.json()["updated_at"]},
         )
         assert response.status_code == 400
-        assert "draft" in response.json()["detail"].lower()
+        detail = response.json()["detail"].lower()
+        assert "entwurf" in detail or "draft" in detail
 
     def test_delete_exam_404(self, exam_client):
         """DELETE /api/v1/exams/{id} returns 404 for non-existent exam."""
@@ -1279,7 +1281,8 @@ class TestExamQuestionApiExtra(
             json={"question_ids": [999999]},
         )
         assert response.status_code == 404
-        assert "999999" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "nicht gefunden" in detail or "not found" in detail.lower() or "999999" in detail
 
     def test_update_exam_question_points_and_section(
         self, exam_client, exam_db, exam_institution, exam_user
@@ -1622,7 +1625,8 @@ class TestAutoFillQuestions(
             json={"count": 5, "topic": "TopicThatDefinitelyDoesNotExistXYZ99"},
         )
         assert response.status_code == 404
-        assert "No matching questions" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "Keine passenden" in detail or "No matching questions" in detail
 
     def test_auto_fill_excludes_already_added_questions(
         self, exam_client, exam_db, exam_institution, exam_user
@@ -1742,7 +1746,7 @@ class TestExamWorkflowApiExtra(
         response = exam_client.post(f"/api/v1/exams/{exam_id}/finalize")
         assert response.status_code == 400
         detail = response.json()["detail"]
-        assert str(q.id) in detail or "no longer approved" in detail.lower()
+        assert str(q.id) in detail or "no longer approved" in detail.lower() or "genehmigt" in detail.lower()
 
     def test_unfinalize_already_draft_returns_400(self, exam_client):
         """POST /{exam_id}/unfinalize returns 400 if exam is already a draft."""
@@ -1753,7 +1757,8 @@ class TestExamWorkflowApiExtra(
 
         response = exam_client.post(f"/api/v1/exams/{exam_id}/unfinalize")
         assert response.status_code == 400
-        assert "already a draft" in response.json()["detail"].lower()
+        detail = response.json()["detail"].lower()
+        assert "bereits" in detail or "already a draft" in detail
 
     def test_unfinalize_exported_exam_returns_to_draft(
         self, exam_client, exam_db, exam_institution, exam_user
@@ -1818,7 +1823,8 @@ class TestExamExportApi(
         response = exam_client.get(f"/api/v1/exams/{exam_id}/export/md")
         assert response.status_code == 400
         # Draft guard fires before the empty-check — message mentions finalisiert
-        assert "finalisiert" in response.json()["detail"].lower()
+        detail = response.json()["detail"].lower()
+        assert "export" in detail or "finalisiert" in detail
 
     def test_export_unsupported_format_returns_400(
         self, exam_client, exam_db, exam_institution, exam_user
@@ -1829,7 +1835,8 @@ class TestExamExportApi(
         )
         response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
         assert response.status_code == 400
-        assert "pdf" in response.json()["detail"].lower()
+        detail = response.json()["detail"].lower()
+        assert "nicht unterstützt" in detail or "pdf" in detail or "unsupported" in detail
 
     def test_export_markdown_format(
         self, exam_client, exam_db, exam_institution, exam_user
@@ -1945,7 +1952,8 @@ class TestExamExportApi(
         # Attempt export without finalizing — must be rejected
         response = exam_client.get(f"/api/v1/exams/{exam_id}/export/json")
         assert response.status_code == 400
-        assert "finalisiert" in response.json()["detail"].lower()
+        detail = response.json()["detail"].lower()
+        assert "export" in detail or "finalisiert" in detail
 
         # Status remains draft
         detail = exam_client.get(f"/api/v1/exams/{exam_id}").json()

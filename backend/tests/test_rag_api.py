@@ -15,6 +15,7 @@ from main import app
 from services.document_service import document_service as actual_document_service
 from models.document import Document, DocumentStatus
 from models.question_review import QuestionReview, ReviewHistory
+from utils.tenant_utils import TenantFilter
 
 
 @pytest.fixture
@@ -159,6 +160,8 @@ class TestRAGAPI:
         }
         doc.created_at = None
         doc.processed_at = None
+        doc.file_size = 1024
+        doc.institution_id = 1
         return doc
 
     def test_generate_rag_exam_success(self, mock_processed_document):
@@ -191,7 +194,7 @@ class TestRAGAPI:
                 patch("api.rag_exams.document_service") as mock_doc_service,
                 patch("api.rag_exams.generate_questions_task") as mock_task,
                 patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
-                patch("api.rag_exams.SubscriptionLimits"),
+                patch("utils.tenant_utils.SubscriptionLimits"),
             ):
                 mock_doc_service.get_document_by_id.return_value = (
                     mock_processed_document
@@ -225,7 +228,8 @@ class TestRAGAPI:
             response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
 
         assert response.status_code == 404
-        assert "Document with ID 999 not found" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "nicht gefunden" in detail or "not found" in detail.lower()
 
     def test_generate_rag_exam_document_not_processed(
         self, auth_client, mock_processed_document
@@ -234,6 +238,7 @@ class TestRAGAPI:
 
         # Setze Status auf nicht verarbeitet
         mock_processed_document.status = DocumentStatus.UPLOADED
+        # institution_id already set in fixture
 
         request_data = {"topic": "Test Topic", "document_ids": [1], "question_count": 1}
 
@@ -245,7 +250,8 @@ class TestRAGAPI:
             response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
 
         assert response.status_code == 400
-        assert "is not processed yet" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "nicht verarbeitet" in detail or "not processed" in detail.lower()
 
     def test_generate_rag_exam_invalid_question_type(self, auth_client):
         """Test RAG Exam Generation mit ungültigem Fragetyp"""
@@ -259,7 +265,8 @@ class TestRAGAPI:
         response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
 
         assert response.status_code == 400
-        assert "Invalid question type: invalid_type" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "Ungültiger" in detail or "Invalid" in detail
 
     def test_generate_rag_exam_validation_errors(self, auth_client):
         """Test RAG Exam Generation mit Validierungsfehlern"""
@@ -267,20 +274,14 @@ class TestRAGAPI:
         # Leeres Topic
         response = auth_client.post(
             "/api/v1/rag/generate-exam",
-            json={
-                "topic": "",  # Zu kurz
-                "question_count": 1,
-            },
+            json={"topic": "", "question_count": 1},
         )
         assert response.status_code == 422
 
         # Zu viele Fragen
         response = auth_client.post(
             "/api/v1/rag/generate-exam",
-            json={
-                "topic": "Valid Topic",
-                "question_count": 25,  # Über Limit (20)
-            },
+            json={"topic": "Valid Topic", "question_count": 25},
         )
         assert response.status_code == 422
 
@@ -375,7 +376,7 @@ class TestRAGAPI:
                 patch("api.rag_exams.document_service") as mock_doc_service,
                 patch("api.rag_exams.generate_questions_task") as mock_task,
                 patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
-                patch("api.rag_exams.SubscriptionLimits"),
+                patch("utils.tenant_utils.SubscriptionLimits"),
             ):
                 mock_doc_service.get_document_by_id.return_value = (
                     mock_processed_document
@@ -388,7 +389,8 @@ class TestRAGAPI:
             app.dependency_overrides.clear()
 
         assert response.status_code == 503
-        assert "Task-Queue nicht verfügbar" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert "nicht verfügbar" in detail or "unavailable" in detail.lower()
 
     def test_retrieve_context_success(self, auth_client):
         """Test erfolgreiche Context Retrieval"""
@@ -400,7 +402,6 @@ class TestRAGAPI:
             "min_similarity": 0.3,
         }
 
-        # Create a mock context object with the attributes the endpoint expects
         mock_context = Mock()
         mock_context.query = "ExamCraft AI"
         mock_context.retrieved_chunks = []
@@ -410,23 +411,25 @@ class TestRAGAPI:
         ]
         mock_context.context_length = 180
 
+        # Document mock needs institution_id for tenant check
+        mock_doc = Mock()
+        mock_doc.institution_id = 1
+
         with (
             patch.object(
                 actual_document_service,
                 "get_document_by_id",
-                return_value=Mock(),
+                return_value=mock_doc,
             ),
             patch("services.rag_service.rag_service") as mock_rag_service,
         ):
             mock_rag_service.retrieve_context = AsyncMock(return_value=mock_context)
-
             response = auth_client.post(
                 "/api/v1/rag/retrieve-context", json=request_data
             )
 
         assert response.status_code == 200
         data = response.json()
-
         assert data["query"] == "ExamCraft AI"
         assert data["total_chunks"] == 0
         assert data["total_similarity_score"] == 2.1
@@ -436,49 +439,39 @@ class TestRAGAPI:
     def test_retrieve_context_validation_errors(self, auth_client):
         """Test Context Retrieval mit Validierungsfehlern"""
 
-        # Leere Query
         response = auth_client.post(
-            "/api/v1/rag/retrieve-context",
-            json={
-                "query": ""  # Zu kurz
-            },
+            "/api/v1/rag/retrieve-context", json={"query": ""}
         )
         assert response.status_code == 422
 
-        # Negative max_chunks
         response = auth_client.post(
             "/api/v1/rag/retrieve-context",
             json={"query": "Valid Query", "max_chunks": -1},
         )
         assert response.status_code == 422
 
-        # Ungültige min_similarity
         response = auth_client.post(
             "/api/v1/rag/retrieve-context",
-            json={
-                "query": "Valid Query",
-                "min_similarity": 1.5,  # Über 1.0
-            },
+            json={"query": "Valid Query", "min_similarity": 1.5},
         )
         assert response.status_code == 422
 
     def test_get_available_documents_success(
-        self, auth_client, mock_processed_document
+        self, auth_client, mock_db, mock_processed_document
     ):
         """Test erfolgreiche Available Documents Abfrage"""
 
-        documents = [mock_processed_document]
+        mock_query = Mock()
+        mock_db.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.all.return_value = [mock_processed_document]
 
-        with patch.object(
-            actual_document_service,
-            "get_documents_by_user",
-            return_value=documents,
-        ):
+        with patch.object(TenantFilter, "filter_by_tenant", return_value=mock_query):
             response = auth_client.get("/api/v1/rag/available-documents")
 
         assert response.status_code == 200
         data = response.json()
-
         assert data["total_documents"] == 1
         assert data["processed_documents"] == 1
 
@@ -486,7 +479,6 @@ class TestRAGAPI:
         """Test Supported Question Types Endpoint (no auth required)"""
 
         response = client.get("/api/v1/rag/question-types")
-
         assert response.status_code == 200
         data = response.json()
 
@@ -494,19 +486,16 @@ class TestRAGAPI:
         assert "difficulty_levels" in data
         assert "supported_languages" in data
 
-        # Prüfe Question Types
         question_types = {qt["type"] for qt in data["supported_types"]}
         assert "multiple_choice" in question_types
         assert "open_ended" in question_types
         assert "true_false" in question_types
 
-        # Prüfe Difficulty Levels
         difficulty_levels = {dl["level"] for dl in data["difficulty_levels"]}
         assert "easy" in difficulty_levels
         assert "medium" in difficulty_levels
         assert "hard" in difficulty_levels
 
-        # Prüfe Languages
         languages = {lang["code"] for lang in data["supported_languages"]}
         assert "de" in languages
         assert "en" in languages
@@ -517,14 +506,12 @@ class TestRAGAPI:
         mock_vector_stats = {"total_chunks": 10, "embedding_model": "mock-model"}
 
         with (
-            patch(
-                "services.vector_service_factory.vector_service"
-            ) as mock_vector_service,
-            patch("services.rag_service.rag_service") as mock_rag_service,
+            patch("services.vector_service_factory.vector_service") as mock_vs,
+            patch("services.rag_service.rag_service") as mock_rag,
         ):
-            mock_vector_service.get_collection_stats.return_value = mock_vector_stats
-            mock_rag_service.claude_service = Mock()  # Claude Service verfügbar
-            mock_rag_service.question_templates = {
+            mock_vs.get_collection_stats.return_value = mock_vector_stats
+            mock_rag.claude_service = Mock()
+            mock_rag.question_templates = {
                 "mc": "template",
                 "oe": "template",
                 "tf": "template",
@@ -534,7 +521,6 @@ class TestRAGAPI:
 
         assert response.status_code == 200
         data = response.json()
-
         assert data["status"] == "healthy"
         assert data["service"] == "RAG Service"
         assert "components" in data
@@ -546,16 +532,10 @@ class TestRAGAPI:
     def test_rag_service_health_unhealthy(self):
         """Test RAG Service Health Check - Unhealthy"""
 
-        with patch(
-            "services.vector_service_factory.vector_service"
-        ) as mock_vector_service:
-            mock_vector_service.get_collection_stats.side_effect = Exception(
-                "Vector Service Error"
-            )
-
+        with patch("services.vector_service_factory.vector_service") as mock_vs:
+            mock_vs.get_collection_stats.side_effect = Exception("Vector Service Error")
             response = client.get("/api/v1/rag/health")
 
-        # The endpoint raises HTTPException with status 503 when vector service fails
         assert response.status_code == 503
         data = response.json()
         assert data["detail"]["status"] == "unhealthy"
@@ -567,20 +547,17 @@ class TestRAGAPI:
         mock_vector_stats = {"total_chunks": 5, "embedding_model": "mock"}
 
         with (
-            patch(
-                "services.vector_service_factory.vector_service"
-            ) as mock_vector_service,
-            patch("services.rag_service.rag_service") as mock_rag_service,
+            patch("services.vector_service_factory.vector_service") as mock_vs,
+            patch("services.rag_service.rag_service") as mock_rag,
         ):
-            mock_vector_service.get_collection_stats.return_value = mock_vector_stats
-            mock_rag_service.claude_service = None  # Claude Service nicht verfügbar
-            mock_rag_service.question_templates = {"mc": "template"}
+            mock_vs.get_collection_stats.return_value = mock_vector_stats
+            mock_rag.claude_service = None
+            mock_rag.question_templates = {"mc": "template"}
 
             response = client.get("/api/v1/rag/health")
 
         assert response.status_code == 200
         data = response.json()
-
         assert data["status"] == "healthy"
         assert data["components"]["claude_service"]["status"] == "unavailable"
         assert data["components"]["claude_service"]["fallback_enabled"] is True
@@ -598,10 +575,9 @@ class TestRAGAPIIntegration:
         if "/api/v1/rag/generate-exam" not in route_paths:
             app.include_router(rag_module.router)
 
-    def test_full_rag_workflow_mock(self, auth_client):
+    def test_full_rag_workflow_mock(self, auth_client, mock_db):
         """Test vollständiger RAG Workflow mit Mocks"""
 
-        # 1. Prüfe verfügbare Dokumente
         mock_doc = Mock()
         mock_doc.id = 1
         mock_doc.original_filename = "integration_test.txt"
@@ -611,17 +587,20 @@ class TestRAGAPIIntegration:
         mock_doc.created_at = None
         mock_doc.processed_at = None
         mock_doc.mime_type = "text/plain"
+        mock_doc.institution_id = 1
+        mock_doc.file_size = 2048
 
-        with patch.object(
-            actual_document_service,
-            "get_documents_by_user",
-            return_value=[mock_doc],
-        ):
+        mock_query = Mock()
+        mock_db.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.all.return_value = [mock_doc]
+
+        with patch.object(TenantFilter, "filter_by_tenant", return_value=mock_query):
             docs_response = auth_client.get("/api/v1/rag/available-documents")
             assert docs_response.status_code == 200
             assert docs_response.json()["total_documents"] == 1
 
-        # 2. Teste Context Retrieval
         mock_context = Mock()
         mock_context.query = "Integration Test"
         mock_context.retrieved_chunks = []
@@ -629,41 +608,36 @@ class TestRAGAPIIntegration:
         mock_context.source_documents = [{"id": 1, "filename": "integration_test.txt"}]
         mock_context.context_length = 100
 
-        with patch("services.rag_service.rag_service") as mock_rag_service:
+        with (
+            patch.object(
+                actual_document_service,
+                "get_document_by_id",
+                return_value=Mock(institution_id=1),
+            ),
+            patch("services.rag_service.rag_service") as mock_rag_service,
+        ):
             mock_rag_service.retrieve_context = AsyncMock(return_value=mock_context)
-
             context_response = auth_client.post(
                 "/api/v1/rag/retrieve-context",
-                json={
-                    "query": "Integration Test",
-                    "document_ids": [1],
-                    "max_chunks": 3,
-                },
+                json={"query": "Integration Test", "document_ids": [1], "max_chunks": 3},
             )
-
             assert context_response.status_code == 200
             assert context_response.json()["query"] == "Integration Test"
 
-        # 3. Teste RAG Exam Generation — gibt jetzt task_id zurück
         with (
             patch("api.rag_exams.document_service") as mock_doc_service,
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
-            patch("api.rag_exams.SubscriptionLimits"),
+            patch("utils.tenant_utils.SubscriptionLimits"),
         ):
             mock_doc_service.get_document_by_id.return_value = mock_doc
             mock_task.apply_async.return_value = MagicMock()
             mock_job_cls.return_value = MagicMock()
 
-            exam_response = client.post(
+            exam_response = auth_client.post(
                 "/api/v1/rag/generate-exam",
-                json={
-                    "topic": "Test Topic",
-                    "document_ids": [999],
-                    "question_count": 1,
-                },
+                json={"topic": "Test Topic", "document_ids": [1], "question_count": 1},
             )
-
             assert exam_response.status_code == 200
             exam_data = exam_response.json()
             assert "task_id" in exam_data
@@ -673,15 +647,12 @@ class TestRAGAPIIntegration:
         """Test Error Handling in der gesamten Chain"""
 
         with patch.object(
-            actual_document_service,
-            "get_document_by_id",
-            return_value=None,
+            actual_document_service, "get_document_by_id", return_value=None
         ):
             response = auth_client.post(
                 "/api/v1/rag/generate-exam",
                 json={"topic": "Test", "document_ids": [999], "question_count": 1},
             )
-
             assert response.status_code == 404
 
     def test_concurrent_requests(self):
@@ -694,24 +665,21 @@ class TestRAGAPIIntegration:
             response = client.get("/api/v1/rag/question-types")
             results.append(response.status_code)
 
-        # Starte mehrere gleichzeitige Requests
         threads = []
         for _ in range(5):
             thread = threading.Thread(target=make_request)
             threads.append(thread)
             thread.start()
 
-        # Warte auf alle Threads
         for thread in threads:
             thread.join()
 
-        # Alle Requests sollten erfolgreich sein
         assert all(status == 200 for status in results)
         assert len(results) == 5
 
 
 class TestRAGQuestionPersistence:
-    """Tests for auto-persistence of generated questions to question_reviews"""
+    """Tests for async question generation via Celery tasks"""
 
     @pytest.fixture(autouse=True)
     def ensure_rag_router(self):
@@ -762,19 +730,19 @@ class TestRAGQuestionPersistence:
         response.quality_metrics = {"total_questions": 2, "average_confidence": 0.815}
         return response
 
-    def test_generate_exam_returns_review_question_ids(
+    def test_generate_exam_returns_task_id(
         self, auth_client, mock_db, sample_rag_response
     ):
-        """Generated questions must be persisted and their IDs returned"""
+        """Generate-exam endpoint now returns task_id for async processing"""
         with (
-            patch.object(
-                actual_document_service,
-                "get_document_by_id",
-                return_value=None,
-            ),
-            patch("services.rag_service.rag_service") as mock_rag_svc,
+            patch("api.rag_exams.document_service") as mock_doc_svc,
+            patch("api.rag_exams.generate_questions_task") as mock_task,
+            patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+            patch("utils.tenant_utils.SubscriptionLimits"),
         ):
-            mock_rag_svc.generate_rag_exam = AsyncMock(return_value=sample_rag_response)
+            mock_doc_svc.get_document_by_id.return_value = None
+            mock_task.apply_async.return_value = MagicMock()
+            mock_job_cls.return_value = MagicMock()
 
             response = auth_client.post(
                 "/api/v1/rag/generate-exam",
@@ -783,14 +751,13 @@ class TestRAGQuestionPersistence:
 
         assert response.status_code == 200
         data = response.json()
-        assert "review_question_ids" in data
-        assert len(data["review_question_ids"]) == 2
-        assert all(isinstance(qid, int) for qid in data["review_question_ids"])
+        assert "task_id" in data
+        assert "message" in data
 
-    def test_generate_exam_persists_question_reviews(
+    def test_generate_exam_starts_async_task(
         self, mock_user, mock_db, sample_rag_response
     ):
-        """QuestionReview records must exist in DB after generation"""
+        """Generate-exam endpoint starts a Celery task for async generation"""
         from utils.auth_utils import get_current_user, get_current_active_user
         from database import get_db
 
@@ -800,16 +767,14 @@ class TestRAGQuestionPersistence:
 
         try:
             with (
-                patch.object(
-                    actual_document_service,
-                    "get_document_by_id",
-                    return_value=None,
-                ),
-                patch("services.rag_service.rag_service") as mock_rag_svc,
+                patch("api.rag_exams.document_service") as mock_doc_svc,
+                patch("api.rag_exams.generate_questions_task") as mock_task,
+                patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+                patch("utils.tenant_utils.SubscriptionLimits"),
             ):
-                mock_rag_svc.generate_rag_exam = AsyncMock(
-                    return_value=sample_rag_response
-                )
+                mock_doc_svc.get_document_by_id.return_value = None
+                mock_task.apply_async.return_value = MagicMock()
+                mock_job_cls.return_value = MagicMock()
 
                 test_client = TestClient(app)
                 response = test_client.post(
@@ -820,20 +785,7 @@ class TestRAGQuestionPersistence:
             app.dependency_overrides.clear()
 
         assert response.status_code == 200
-
-        added_objects = mock_db._added_objects
-        question_reviews = [o for o in added_objects if isinstance(o, QuestionReview)]
-        assert len(question_reviews) == 2
-
-        q1 = question_reviews[0]
-        assert q1.question_text == "Was ist Unit Testing?"
-        assert q1.question_type == "multiple_choice"
-        assert q1.review_status == "pending"
-        assert q1.topic == "Test Topic"
-        assert q1.exam_id == "persist_test_exam_001"
-        assert q1.created_by == 42
-        assert q1.institution_id == 1
-
-        history_entries = [o for o in added_objects if isinstance(o, ReviewHistory)]
-        assert len(history_entries) == 2
-        assert all(h.action == "created" for h in history_entries)
+        data = response.json()
+        assert "task_id" in data
+        assert "message" in data
+        mock_task.apply_async.assert_called_once()

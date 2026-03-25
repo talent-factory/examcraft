@@ -1,18 +1,25 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 export const PaymentSuccessPage: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useTranslation();
+    const [countdown, setCountdown] = useState(3);
 
     useEffect(() => {
-        // Automatically redirect to billing/dashboard after 3 seconds
-        const timer = setTimeout(() => {
-            navigate('/billing');
-        }, 3000);
+        const interval = setInterval(() => {
+            setCountdown(prev => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    navigate('/subscription');
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
 
-        return () => clearTimeout(timer);
+        return () => clearInterval(interval);
     }, [navigate]);
 
     return (
@@ -25,18 +32,21 @@ export const PaymentSuccessPage: React.FC = () => {
                         </svg>
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('pages.paymentSuccess.title')}</h2>
-                    <p className="text-gray-600 mb-6">
+                    <p className="text-gray-600 mb-4">
                         {t('pages.paymentSuccess.subtitle')}
                     </p>
-                    <p className="text-sm text-gray-500">
-                        {t('pages.paymentSuccess.redirecting')}
+
+                    <p className="text-sm text-gray-500 mb-4">
+                        {t('pages.paymentSuccess.redirecting')} ({countdown}s)
                     </p>
+
                     <div className="mt-6">
                         <button
-                            onClick={() => navigate('/billing')}
+                            type="button"
+                            onClick={() => navigate('/subscription')}
                             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
-                            {t('pages.paymentSuccess.returnToBilling')}
+                            {t('pages.paymentSuccess.viewSubscription')}
                         </button>
                     </div>
                 </div>

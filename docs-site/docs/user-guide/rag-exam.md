@@ -1,4 +1,4 @@
-# RAG-basierte Pruefungen
+# RAG-basierte Prüfungen
 
 ## Was ist RAG?
 
@@ -12,46 +12,46 @@ Der Vorteil: Fragen sind direkt aus Ihren Kursmaterialien abgeleitet und enthalt
 ## Voraussetzungen
 
 - Mindestens 1 Dokument hochgeladen und verarbeitet
-- Dokument in der Bibliothek ausgewaehlt
+- Dokument in der Bibliothek ausgewählt
 
-## Schritt-fuer-Schritt
+## Schritt-für-Schritt
 
-### 1. Dokumente auswaehlen
+### 1. Dokumente auswählen
 
 In der Dokumentenbibliothek:
 
-1. Waehlen Sie 1--10 Dokumente aus
-2. Klicken Sie **Pruefung aus Auswahl erstellen**
+1. Wählen Sie 1–10 Dokumente aus
+2. Klicken Sie **Prüfung aus Auswahl erstellen**
 
 !!! tip "Optimale Dokumentenanzahl"
-    3--5 Dokumente liefern die beste Qualitaet. Zu viele Dokumente koennen die Ergebnisse verwaessern.
+    3–5 Dokumente liefern die beste Qualität. Zu viele Dokumente können die Ergebnisse verwässern.
 
 ### 2. RAG-Konfiguration
 
-- **Thema/Fokus**: Spezifischer Fokus (z.B. "Sortieralgorithmen Komplexitaet"). Leer lassen fuer allgemeine Fragen.
-- **Anzahl Fragen**: 1--20, empfohlen 5--10
+- **Thema/Fokus**: Spezifischer Fokus (z.B. "Sortieralgorithmen Komplexität"). Leer lassen für allgemeine Fragen.
+- **Anzahl Fragen**: 1–20, empfohlen 5–10
 - **Fragetypen**: Multiple Choice, Offene Fragen, True/False
 - **Schwierigkeitsgrad**: Einfach / Mittel / Schwer
-- **Prompt-Vorlage**: Waehlen Sie ein Prompt-Template mit Live-Vorschau
+- **Prompt-Vorlage**: Wählen Sie ein Prompt-Template mit Live-Vorschau
 
 ### 3. Generierung starten
 
-Klicken Sie **RAG-Pruefung generieren**. Wartezeit: 20--60 Sekunden.
+Klicken Sie **RAG-Prüfung generieren**. Wartezeit: 20–60 Sekunden.
 
-### 4. Ergebnis pruefen
+### 4. Ergebnis prüfen
 
-Jede Frage enthaelt:
+Jede Frage enthält:
 
 - Fragentext und Antwortoptionen
-- Korrekte Antwort mit Erklaerung
+- Korrekte Antwort mit Erklärung
 - **Quelldokumente** (mit Seitenzahl)
-- **Confidence Score** (0--1)
+- **Confidence Score** (0–1)
 
-## Qualitaetsindikatoren
+## Qualitätsindikatoren
 
 | Confidence Score | Bewertung |
-|-----------------|-----------|
-| 0.9--1.0 | Sehr hohe Qualitaet |
-| 0.7--0.9 | Gute Qualitaet |
-| 0.5--0.7 | Akzeptabel -- Ueberpruefen |
-| < 0.5 | Ueberarbeitung empfohlen |
+|---------|------|
+| 0.9–1.0 | Sehr hohe Qualität |
+| 0.7–0.9 | Gute Qualität |
+| 0.5–0.7 | Akzeptabel – Überprüfen |
+| < 0.5 | Überarbeitung empfohlen |
