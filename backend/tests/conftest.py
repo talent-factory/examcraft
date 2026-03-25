@@ -5,6 +5,10 @@ Pytest Configuration und Fixtures für ExamCraft AI Tests
 import pytest
 import tempfile
 import os
+
+# Disable rate limiting for tests before importing the app
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
