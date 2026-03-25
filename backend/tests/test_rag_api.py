@@ -438,9 +438,7 @@ class TestRAGAPI:
     def test_retrieve_context_validation_errors(self, auth_client):
         """Test Context Retrieval mit Validierungsfehlern"""
 
-        response = auth_client.post(
-            "/api/v1/rag/retrieve-context", json={"query": ""}
-        )
+        response = auth_client.post("/api/v1/rag/retrieve-context", json={"query": ""})
         assert response.status_code == 422
 
         response = auth_client.post(
@@ -618,7 +616,11 @@ class TestRAGAPIIntegration:
             mock_rag_service.retrieve_context = AsyncMock(return_value=mock_context)
             context_response = auth_client.post(
                 "/api/v1/rag/retrieve-context",
-                json={"query": "Integration Test", "document_ids": [1], "max_chunks": 3},
+                json={
+                    "query": "Integration Test",
+                    "document_ids": [1],
+                    "max_chunks": 3,
+                },
             )
             assert context_response.status_code == 200
             assert context_response.json()["query"] == "Integration Test"

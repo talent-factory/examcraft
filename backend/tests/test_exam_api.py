@@ -1282,7 +1282,11 @@ class TestExamQuestionApiExtra(
         )
         assert response.status_code == 404
         detail = response.json()["detail"]
-        assert "nicht gefunden" in detail or "not found" in detail.lower() or "999999" in detail
+        assert (
+            "nicht gefunden" in detail
+            or "not found" in detail.lower()
+            or "999999" in detail
+        )
 
     def test_update_exam_question_points_and_section(
         self, exam_client, exam_db, exam_institution, exam_user
@@ -1746,7 +1750,11 @@ class TestExamWorkflowApiExtra(
         response = exam_client.post(f"/api/v1/exams/{exam_id}/finalize")
         assert response.status_code == 400
         detail = response.json()["detail"]
-        assert str(q.id) in detail or "no longer approved" in detail.lower() or "genehmigt" in detail.lower()
+        assert (
+            str(q.id) in detail
+            or "no longer approved" in detail.lower()
+            or "genehmigt" in detail.lower()
+        )
 
     def test_unfinalize_already_draft_returns_400(self, exam_client):
         """POST /{exam_id}/unfinalize returns 400 if exam is already a draft."""
@@ -1836,7 +1844,9 @@ class TestExamExportApi(
         response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
         assert response.status_code == 400
         detail = response.json()["detail"].lower()
-        assert "nicht unterstützt" in detail or "pdf" in detail or "unsupported" in detail
+        assert (
+            "nicht unterstützt" in detail or "pdf" in detail or "unsupported" in detail
+        )
 
     def test_export_markdown_format(
         self, exam_client, exam_db, exam_institution, exam_user

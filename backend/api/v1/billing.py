@@ -615,7 +615,9 @@ async def sync_subscription_from_stripe(
     except HTTPException:
         raise
     except ValueError as e:
-        logger.error("Tier mapping failed during subscription sync: %s", e, exc_info=True)
+        logger.error(
+            "Tier mapping failed during subscription sync: %s", e, exc_info=True
+        )
         raise HTTPException(
             status_code=503,
             detail="Subscription plan configuration error. Please contact support.",
