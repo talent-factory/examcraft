@@ -180,6 +180,8 @@ class TestRAGAPI:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
+            patch("api.rag_exams.TenantFilter"),
+            patch("api.rag_exams.get_tenant_context"),
         ):
             mock_doc_service.get_document_by_id.return_value = mock_processed_document
             mock_task.apply_async.return_value = MagicMock()
@@ -295,6 +297,8 @@ class TestRAGAPI:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
+            patch("api.rag_exams.TenantFilter"),
+            patch("api.rag_exams.get_tenant_context"),
         ):
             mock_doc_service.get_document_by_id.return_value = mock_processed_document
             mock_task.apply_async.return_value = MagicMock()
@@ -595,6 +599,8 @@ class TestRAGAPIIntegration:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
+            patch("api.rag_exams.TenantFilter"),
+            patch("api.rag_exams.get_tenant_context"),
         ):
             mock_doc_service.get_document_by_id.return_value = mock_doc
             mock_task.apply_async.return_value = MagicMock()
@@ -705,6 +711,8 @@ class TestRAGQuestionPersistence:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
+            patch("api.rag_exams.TenantFilter"),
+            patch("api.rag_exams.get_tenant_context"),
         ):
             mock_doc_svc.get_document_by_id.return_value = None
             mock_task.apply_async.return_value = MagicMock()
@@ -715,7 +723,9 @@ class TestRAGQuestionPersistence:
                 json={"topic": "Test Topic", "question_count": 2},
             )
 
-        assert response.status_code == 200
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.json()}"
+        )
         data = response.json()
         assert "task_id" in data
         assert "message" in data
@@ -727,6 +737,8 @@ class TestRAGQuestionPersistence:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
+            patch("api.rag_exams.TenantFilter"),
+            patch("api.rag_exams.get_tenant_context"),
         ):
             mock_doc_svc.get_document_by_id.return_value = None
             mock_task.apply_async.return_value = MagicMock()
@@ -737,7 +749,9 @@ class TestRAGQuestionPersistence:
                 json={"topic": "Test Topic", "question_count": 2},
             )
 
-        assert response.status_code == 200
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.json()}"
+        )
         data = response.json()
         assert "task_id" in data
         assert "message" in data

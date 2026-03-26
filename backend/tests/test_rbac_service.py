@@ -148,25 +148,24 @@ def rbac_db(test_db):
     test_db.merge(TierFeature(tier_id=tier_pro.id, feature_id="feat_test_gen"))
     test_db.merge(TierFeature(tier_id=tier_pro.id, feature_id="feat_test_mgmt"))
 
-    # Create old-style roles for user mapping
-    old_roles = [
-        Role(
-            name="admin",
-            display_name="Admin",
-            description="Admin role",
-            permissions=["*"],
-            is_system_role=True,
-        ),
-        Role(
-            name="user",
-            display_name="User",
-            description="User role",
-            permissions=["view"],
-            is_system_role=True,
-        ),
-    ]
-    for role in old_roles:
-        test_db.merge(role)
+    # Get or create old-style roles for user mapping (may exist from seed)
+    for role_data in [
+        {
+            "name": "admin",
+            "display_name": "Admin",
+            "description": "Admin role",
+            "permissions": ["*"],
+        },
+        {
+            "name": "user",
+            "display_name": "User",
+            "description": "User role",
+            "permissions": ["view"],
+        },
+    ]:
+        existing = test_db.query(Role).filter_by(name=role_data["name"]).first()
+        if not existing:
+            test_db.add(Role(**role_data, is_system_role=True))
 
     test_db.flush()
     yield test_db
