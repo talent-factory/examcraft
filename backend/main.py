@@ -519,7 +519,7 @@ async def api_health_check():
 
     health_status = {
         "status": "healthy",
-        "version": "1.0.0",
+        "version": os.getenv("APP_VERSION", "1.1.0"),
         "environment": os.getenv("ENVIRONMENT", "development"),
         "services": {},
     }

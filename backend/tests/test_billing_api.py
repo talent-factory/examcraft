@@ -82,7 +82,9 @@ class TestAllowedPriceIds:
         env = {"STRIPE_PRICE_STARTER": "price_legacy"}
         # Remove REACT_APP_ variant so legacy fallback is used
         for key in list(os.environ.keys()):
-            if key.startswith("REACT_APP_STRIPE_PRICE_") or key.startswith("STRIPE_PRICE_"):
+            if key.startswith("REACT_APP_STRIPE_PRICE_") or key.startswith(
+                "STRIPE_PRICE_"
+            ):
                 env[key] = ""
         env["STRIPE_PRICE_STARTER"] = "price_legacy"
         with patch.dict("os.environ", env):
