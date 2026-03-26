@@ -20,18 +20,20 @@ from models.auth import User, Role, Institution, UserStatus
 @pytest.fixture(scope="function")
 def rbac_db(test_db):
     """Setup RBAC test data"""
-    # Create institution
-    institution = Institution(
-        name="Test University",
-        slug="test-university",
-        domain="test.edu",
-        subscription_tier="free",
-        max_users=10,
-        max_documents=100,
-        max_questions_per_month=500,
-    )
-    test_db.add(institution)
-    test_db.flush()
+    # Get or create institution
+    institution = test_db.query(Institution).filter_by(slug="test-university").first()
+    if not institution:
+        institution = Institution(
+            name="Test University",
+            slug="test-university",
+            domain="test.edu",
+            subscription_tier="free",
+            max_users=10,
+            max_documents=100,
+            max_questions_per_month=500,
+        )
+        test_db.add(institution)
+        test_db.flush()
 
     # Create features
     features = [
@@ -86,14 +88,20 @@ def rbac_db(test_db):
         test_db.merge(role)
     test_db.flush()
 
-    # Assign features to roles
-    # Admin: all features
-    for feature in features:
-        test_db.merge(RoleFeature(role_id="role_admin", feature_id=feature.id))
-
-    # User: only generation and management
-    test_db.merge(RoleFeature(role_id="role_user", feature_id="feat_test_gen"))
-    test_db.merge(RoleFeature(role_id="role_user", feature_id="feat_test_mgmt"))
+    # Assign features to roles (skip if already assigned)
+    role_feature_specs = [
+        ("role_admin", [f.id for f in features]),
+        ("role_user", ["feat_test_gen", "feat_test_mgmt"]),
+    ]
+    for role_id, feature_ids in role_feature_specs:
+        for fid in feature_ids:
+            existing = (
+                test_db.query(RoleFeature)
+                .filter_by(role_id=role_id, feature_id=fid)
+                .first()
+            )
+            if not existing:
+                test_db.add(RoleFeature(role_id=role_id, feature_id=fid))
 
     # Get or create subscription tiers (may already exist from seed data)
     tier_free = test_db.query(SubscriptionTier).filter_by(name="free").first()
@@ -125,28 +133,40 @@ def rbac_db(test_db):
         test_db.add(tier_pro)
     test_db.flush()
 
-    # Create tier quotas
-    quotas = [
-        TierQuota(tier_id=tier_free.id, resource_type="documents", quota_limit=5),
-        TierQuota(
-            tier_id=tier_free.id, resource_type="questions_per_month", quota_limit=20
-        ),
-        TierQuota(
-            tier_id=tier_pro.id, resource_type="documents", quota_limit=-1
-        ),  # Unlimited
-        TierQuota(
-            tier_id=tier_pro.id, resource_type="questions_per_month", quota_limit=1000
-        ),
+    # Get or create tier quotas (may exist from seed data)
+    quota_specs = [
+        (tier_free.id, "documents", 5),
+        (tier_free.id, "questions_per_month", 20),
+        (tier_pro.id, "documents", -1),
+        (tier_pro.id, "questions_per_month", 1000),
     ]
-    for quota in quotas:
-        test_db.merge(quota)
+    for tier_id, resource_type, limit in quota_specs:
+        existing = (
+            test_db.query(TierQuota)
+            .filter_by(tier_id=tier_id, resource_type=resource_type)
+            .first()
+        )
+        if not existing:
+            test_db.add(
+                TierQuota(
+                    tier_id=tier_id,
+                    resource_type=resource_type,
+                    quota_limit=limit,
+                )
+            )
 
-    # Assign features to tiers
-    # Free: only generation
-    test_db.merge(TierFeature(tier_id=tier_free.id, feature_id="feat_test_gen"))
-    # Pro: generation + management
-    test_db.merge(TierFeature(tier_id=tier_pro.id, feature_id="feat_test_gen"))
-    test_db.merge(TierFeature(tier_id=tier_pro.id, feature_id="feat_test_mgmt"))
+    # Assign features to tiers (skip if already assigned)
+    tier_feature_specs = [
+        (tier_free.id, "feat_test_gen"),
+        (tier_pro.id, "feat_test_gen"),
+        (tier_pro.id, "feat_test_mgmt"),
+    ]
+    for tid, fid in tier_feature_specs:
+        existing = (
+            test_db.query(TierFeature).filter_by(tier_id=tid, feature_id=fid).first()
+        )
+        if not existing:
+            test_db.add(TierFeature(tier_id=tid, feature_id=fid))
 
     # Get or create old-style roles for user mapping (may exist from seed)
     for role_data in [
