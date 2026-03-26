@@ -165,7 +165,7 @@ def rbac_db(test_db):
     for role in old_roles:
         test_db.add(role)
 
-    test_db.commit()
+    test_db.flush()
     yield test_db
 
 

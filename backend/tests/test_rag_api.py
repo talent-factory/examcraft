@@ -201,7 +201,10 @@ class TestRAGAPI:
                 mock_task.apply_async.return_value = MagicMock()
                 mock_job_cls.return_value = MagicMock()
 
-                response = client.post("/api/v1/rag/generate-exam", json=request_data)
+                test_client = TestClient(app)
+                response = test_client.post(
+                    "/api/v1/rag/generate-exam", json=request_data
+                )
         finally:
             app.dependency_overrides.clear()
 
@@ -342,7 +345,10 @@ class TestRAGAPI:
 
                 mock_job_cls.side_effect = capture_job
 
-                response = client.post("/api/v1/rag/generate-exam", json=request_data)
+                test_client = TestClient(app)
+                response = test_client.post(
+                    "/api/v1/rag/generate-exam", json=request_data
+                )
         finally:
             app.dependency_overrides.clear()
 

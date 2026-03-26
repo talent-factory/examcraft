@@ -181,7 +181,7 @@ class TestDocumentService:
         mock_db = Mock()
 
         with patch.object(
-            document_service, "_detect_mime_type", return_value="text/plain"
+            document_service, "_detect_mime_type_from_bytes", return_value="text/plain"
         ):
             # Test
             document = await document_service.upload_document(
