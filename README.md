@@ -1,176 +1,169 @@
-# ExamCraft AI 🚀
+# ExamCraft AI
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Core Package](https://img.shields.io/badge/Core-Open%20Source-green.svg)]()
-[![Premium Package](https://img.shields.io/badge/Premium-Closed%20Source-orange.svg)]()
-[![Enterprise Package](https://img.shields.io/badge/Enterprise-Closed%20Source-red.svg)]()
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![React 18](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Latest-green.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 
-**KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben für OpenBook-Prüfungen mit Claude API Integration und RAG-basierter Dokumentenanalyse.**
+**KI-gestuetzte Plattform zur automatischen Generierung von Pruefungsaufgaben fuer OpenBook-Pruefungen mit Claude API Integration und RAG-basierter Dokumentenanalyse.**
 
-> **Monorepo-Architektur:** ExamCraft AI verwendet eine Monorepo-Struktur mit Git Submodules für Premium und Enterprise Features. Das Core Package ist Open Source (MIT), während Premium und Enterprise Features proprietär sind.
+> **Hinweis:** Dieses Repository ist der Open-Source-Core (MIT) von ExamCraft AI. Es wird automatisch aus dem privaten Monorepo gespiegelt. Premium- und Enterprise-Features sind proprietaer und in separaten Repositories verwaltet.
 
-## 🎯 Projektübersicht
+## Projektuebersicht
 
-ExamCraft AI ist eine vollständig implementierte, **produktionsreife** Webanwendung, die Dozierenden dabei hilft, qualitativ hochwertige Prüfungsaufgaben automatisch aus beliebigen Dokumenten zu generieren. Die Plattform kombiniert moderne KI (Claude API) mit RAG-Technologie (Retrieval-Augmented Generation) für kontextuelle, durchdachte Fragenerstellung.
+ExamCraft AI ist eine produktionsreife Webanwendung, die Dozierenden hilft, qualitativ hochwertige Pruefungsaufgaben automatisch aus Dokumenten zu generieren. Die Plattform kombiniert Claude API mit RAG-Technologie (Retrieval-Augmented Generation) fuer kontextuelle Fragenerstellung.
 
-### 📦 Package-Struktur
+### Subscription Tiers
 
-```text
-examcraft/
-├── packages/
-│   ├── core/          # ✅ Open Source (MIT) - Free Tier
-│   ├── premium/       # 🔒 Closed Source - Starter/Professional Tier
-│   └── enterprise/    # 🔒 Closed Source - Enterprise Tier
-├── docker-compose.yml              # Core Services (OpenSource)
-├── docker-compose.full.yml         # Full Services (Premium + Enterprise)
-└── MONOREPO_SETUP.md               # Detailed Setup Guide
-```
+| Feature | Free (Core) | Starter | Professional | Enterprise |
+|---------|-------------|---------|--------------|------------|
+| **Dokumente** | 5 | 50 | Unbegrenzt | Unbegrenzt |
+| **Fragen/Monat** | 20 | 200 | 1000 | Unbegrenzt |
+| **Benutzer** | 1 | 3 | 10 | Unbegrenzt |
+| **Dokumenten-Upload** | Ja | Ja | Ja | Ja |
+| **Fragengenerierung** | Ja | Ja | Ja | Ja |
+| **Question Review** | Ja | Ja | Ja | Ja |
+| **RBAC** | Ja | Ja | Ja | Ja |
+| **RAG-Generierung** | - | Ja | Ja | Ja |
+| **Document ChatBot** | - | - | Ja | Ja |
+| **Exam Composer** | - | - | Ja | Ja |
+| **SSO/SAML** | - | - | - | Ja |
+| **API Access** | - | - | - | Ja |
 
-**Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für detaillierte Informationen zur Monorepo-Struktur.**
+Alle Features werden ausschliesslich ueber RBAC gesteuert -- keine Environment-Feature-Flags.
 
-## 📚 Dokumentation
+## Core Features (Open Source)
 
-### 📖 User Documentation
+- **Multi-Format Dokumentenverarbeitung**: PDF, Word, Markdown (PyMuPDF)
+- **KI-Fragengenerierung** mit Claude API + PydanticAI
+- **Parallele Fragengenerierung** mit Celery Tasks und Fortschrittsanzeige
+- **Question Review Workflow** (Approve/Reject/Edit)
+- **Exam Composer** mit Drag-and-Drop, Auto-Fill und Export (Markdown/JSON/Moodle XML)
+- **Auto-Composition Engine** mit Constraint-basierter Pruefungszusammenstellung
+- **KI-gefuehrter Prompt Wizard** fuer Template-Erstellung
+- **Internationalisierung** (DE/EN/FR/IT)
+- **User Management** mit Authentication, OAuth (Google/Microsoft), RBAC
+- **Multi-Tenant Architecture** mit Institution Management
+- **GDPR Compliance** (Data Export, Account Deletion)
+- **Billing & Subscription Management** mit Stripe Integration
 
-- **[📚 User Guide](https://docs.examcraft.ch/user-guide/documents/)** - Comprehensive guide for educators
-- **[🎛️ Admin Guide](https://docs.examcraft.ch/admin-guide/prompts/)** - Prompt management and administration
-- **[🚀 Quick Start](https://docs.examcraft.ch/getting-started/quickstart/)** - Get started in 5 minutes
-
-### 🔧 Developer Documentation
-
-- **[🚀 Deployment Guide](DEPLOYMENT.md)** - Production deployment on Fly.io
-- **[📖 API Documentation](http://localhost:8000/docs)** - Interactive API docs (local)
-- **[🔧 Development Setup](#-quick-start)** - Local development environment (see below)
-- **[⚙️ Async Document Processing](docs/ASYNC_DOCUMENT_PROCESSING.md)** - RabbitMQ & Celery setup
-
-### 🗺️ Public Roadmap
-
-**Current Status:** Production-ready v1.0 with core features available
-
-#### ✅ Released (v1.0)
-- 📄 Multi-format document processing (PDF, Word, Markdown)
-- 🤖 AI-powered question generation with Claude API
-- 🔍 RAG-based semantic search (Premium)
-- 💬 Interactive document chatbot (Premium)
-- 👥 User management with RBAC
-- 📝 Question review workflow
-
-#### 🚧 In Progress (Q1 2026)
-- 📊 Advanced analytics dashboard
-- 🔄 Exam composition & export
-- 🌐 Multi-language support
-- 📱 Mobile-responsive UI improvements
-
-#### 🔮 Planned (Q2-Q3 2026)
-- 🔗 LMS integrations (Moodle, Canvas)
-- 🎨 Custom branding (Enterprise)
-- 🔐 SSO/SAML integration (Enterprise)
-- 📈 Performance optimizations
-
-**Want to influence our roadmap?** [Open a feature request](https://github.com/talent-factory/examcraft/issues/new?template=feature_request.md)
-
-### 💎 Subscription Tiers
-
-| Feature | Free (Core) | Starter (€19/mo) | Professional (€49/mo) | Enterprise (€149/mo) |
-|---------|-------------|------------------|----------------------|---------------------|
-| **Documents** | 5 | 50 | Unlimited | Unlimited |
-| **Questions/Month** | 20 | 200 | 1000 | Unlimited |
-| **Users** | 1 | 3 | 10 | Unlimited |
-| **Document Upload** | ✅ | ✅ | ✅ | ✅ |
-| **Basic Question Generation** | ✅ | ✅ | ✅ | ✅ |
-| **Question Review** | ✅ | ✅ | ✅ | ✅ |
-| **RBAC System** | ✅ | ✅ | ✅ | ✅ |
-| **RAG Generation** | ❌ | ✅ | ✅ | ✅ |
-| **Document ChatBot** | ❌ | ❌ | ✅ | ✅ |
-| **Advanced Prompt Management** | ❌ | ❌ | ✅ | ✅ |
-| **Analytics Dashboard** | ❌ | ❌ | ✅ | ✅ |
-| **SSO/SAML** | ❌ | ❌ | ❌ | ✅ |
-| **Custom Branding** | ❌ | ❌ | ❌ | ✅ |
-| **API Access** | ❌ | ❌ | ❌ | ✅ |
-| **Priority Support** | ❌ | ❌ | ❌ | ✅ |
-
-### ✨ Core Features (Open Source)
-
-- **📄 Multi-Format Dokumentenverarbeitung**: PDF, Word, Markdown
-- **🔬 PyMuPDF Integration** - Fast Document Processing (10x schneller als Docling)
-- **🤖 Basic Question Generation** mit Claude API + PydanticAI
-- **📝 Question Review Workflow** - Approve/Reject/Edit
-- **👥 User Management** - Authentication, Authorization, RBAC
-- **🔒 GDPR Compliance** - Data Export, Account Deletion
-- **⚛️ Moderne Web-UI** mit React 18 + TypeScript + Tailwind CSS
-- **🐳 Container-basiert** für einfache Entwicklung und Deployment
-
-### 🌟 Premium Features (Closed Source)
-
-- **🤖 RAG-basierte KI-Fragenerstellung** mit Vector Database (ChromaDB/Qdrant)
-- **💬 Interaktiver Document ChatBot** - NotebookLM-Style Konversationen
-- **🎛️ Advanced Prompt Management** - Versionierung, Template Variables, Semantic Search
-- **🔍 Semantische Suche** über Dokumente und Prompts
-- **📊 Analytics Dashboard** - Usage Metrics, Performance Tracking
-
-### 🏢 Enterprise Features (Closed Source)
-
-- **🔐 SSO/SAML Integration** - Single Sign-On mit SAML 2.0
-- **🎨 Custom Branding** - White-Label Lösung
-- **🔑 API Access Management** - REST API für Integrationen
-- **📈 Advanced Analytics** - BI Export, Custom Reports, Audit Logs
-- **☁️ On-Premise Deployment** - Self-Hosted Option
-- **🆘 Priority Support** - 24/7 Support, Dedicated Account Manager
-- **🚀 Production-Ready** mit Rate Limiting, Error Handling & Monitoring
-
-## 🏗️ Architektur
+## Architektur
 
 ```text
-ExamCraft/
-├── packages/
-│   ├── core/                       # ✅ Open Source (MIT License)
-│   │   ├── backend/                # FastAPI Backend Server
-│   │   │   ├── main.py             # REST API Endpoints
-│   │   │   ├── database.py         # PostgreSQL Connection
-│   │   │   ├── models/             # SQLAlchemy Models
-│   │   │   ├── services/           # Business Logic Services
-│   │   │   └── api/                # API Endpoints
-│   │   └── frontend/               # React 18 + TypeScript Frontend
-│   │       ├── src/components/     # React UI Components
-│   │       ├── src/services/       # API Client Services
-│   │       └── src/types/          # TypeScript Definitions
-│   ├── premium/                    # 🔒 Private Submodule (Proprietary)
-│   │   ├── backend/                # Premium Backend Features
-│   │   │   ├── api/v1/             # RAG, Chat, Prompts APIs
-│   │   │   ├── services/           # RAG, ChatBot, Vector Services
-│   │   │   └── models/             # Chat, Prompt Models
-│   │   └── frontend/               # Premium Frontend Components
-│   │       └── src/components/     # ChatBot, PromptEditor, RAG UI
-│   └── enterprise/                 # 🔒 Private Submodule (Proprietary)
-│       ├── backend/                # Enterprise Backend Features
-│       │   ├── api/v1/             # SSO, Branding, API Access, Analytics
-│       │   └── services/           # SSO, OAuth, Branding Services
-│       └── frontend/               # Enterprise Frontend Components
-│           └── src/components/     # SSO Config, Branding, API Management
-├── docker-compose.yml              # Core Services (PostgreSQL, Redis, RabbitMQ)
-├── docker-compose.full.yml         # Full Services (Core + Premium + Enterprise + Qdrant)
-├── start-dev.sh                    # 🚀 Smart Start Script (Auto-detects --core/--full)
-├── stop-dev.sh                     # 🛑 Stop All Services
-├── MONOREPO_SETUP.md               # Detailed Monorepo Setup Guide
-└── .gitmodules                     # Git Submodules Configuration
+core/
+├── backend/                    # FastAPI Backend
+│   ├── main.py                # API Server Entrypoint
+│   ├── database.py            # PostgreSQL Connection (SQLAlchemy)
+│   ├── celery_app.py          # Celery Worker Configuration
+│   ├── api/                   # Route Handlers
+│   │   ├── auth.py            # Authentication Endpoints
+│   │   ├── documents.py       # Document Management
+│   │   ├── exams.py           # Exam CRUD
+│   │   ├── rag_exams.py       # RAG-based Question Generation
+│   │   ├── question_review.py # Review Workflow
+│   │   ├── admin.py           # Admin Endpoints
+│   │   └── gdpr.py            # GDPR Compliance
+│   ├── models/                # SQLAlchemy Models
+│   │   ├── auth.py            # User, Role, Institution, Session
+│   │   ├── document.py        # Document Models
+│   │   ├── exam.py            # Exam Models
+│   │   ├── subscription.py    # Subscription & Billing
+│   │   └── rbac.py            # RBAC Models
+│   ├── services/              # Business Logic
+│   │   ├── claude_service.py  # Claude API Integration
+│   │   ├── document_service.py# Document Processing
+│   │   ├── rag_service.py     # RAG Pipeline
+│   │   ├── auth_service.py    # JWT Authentication
+│   │   ├── oauth_service.py   # Google/Microsoft OAuth
+│   │   ├── payment_service.py # Stripe Integration
+│   │   ├── exam_export_service.py # Export (MD/JSON/Moodle)
+│   │   └── ...                # Redis, Audit, RBAC, etc.
+│   ├── tasks/                 # Celery Async Tasks
+│   │   ├── question_tasks.py  # Question Generation Tasks
+│   │   ├── document_tasks.py  # Document Processing Tasks
+│   │   └── rag_tasks.py       # RAG Processing Tasks
+│   ├── middleware/            # Middleware
+│   │   ├── rate_limit.py      # Rate Limiting
+│   │   ├── rbac_middleware.py # RBAC Enforcement
+│   │   ├── i18n_middleware.py # Internationalisierung
+│   │   └── feature_gate.py    # Feature Gating
+│   ├── schemas/               # Pydantic Schemas
+│   ├── config/                # Feature & Subscription Config
+│   ├── locales/               # i18n Translations (DE/EN/FR/IT)
+│   ├── webhooks/              # Webhook Handlers (Resend)
+│   ├── alembic/               # Database Migrations
+│   └── tests/                 # pytest Tests
+├── frontend/                  # React 18 + TypeScript
+│   └── src/
+│       ├── components/        # React Components
+│       │   ├── auth/          # Login, Register, OAuth
+│       │   ├── layout/        # Navigation, Sidebar, AppLayout
+│       │   ├── guards/        # Route Protection
+│       │   ├── admin/         # Admin UI
+│       │   ├── composer/      # Exam Composer
+│       │   ├── DocumentChat/  # Document ChatBot
+│       │   └── ...            # Cards, Forms, Common
+│       ├── pages/             # Page Components
+│       │   ├── Dashboard.tsx
+│       │   ├── Documents.tsx
+│       │   ├── Exams.tsx
+│       │   ├── ExamComposer.tsx
+│       │   ├── BillingPage.tsx
+│       │   └── ...
+│       ├── contexts/          # React Context (Auth)
+│       ├── services/          # API Client Services
+│       ├── hooks/             # Custom React Hooks
+│       ├── routes/            # Routing Configuration
+│       ├── locales/           # Frontend i18n
+│       ├── types/             # TypeScript Definitions
+│       └── utils/             # Utility Functions
+├── utils/                     # Shared Python Utilities
+│   └── extraction.py          # Document Text Extraction
+├── docs-site/                 # MkDocs Documentation Site
+├── docker-compose.yml         # Core Services (PostgreSQL, Redis)
+└── pyproject.toml             # Python Dependencies (uv)
 ```
 
-## 🚀 Quick Start
+## Technologie-Stack
+
+### Backend
+
+- **FastAPI** -- REST API mit automatischer OpenAPI-Dokumentation
+- **SQLAlchemy** -- ORM mit Alembic Migrations
+- **PostgreSQL 17** -- Relationale Datenbank
+- **Redis 7** -- Caching, Session Management
+- **Celery + RabbitMQ** -- Async Task Processing
+- **PydanticAI** -- Claude API Integration
+- **Stripe** -- Payment Processing
+- **Sentry** -- Error Monitoring
+
+### Frontend
+
+- **React 18 + TypeScript** -- UI Framework
+- **Tailwind CSS v3** -- Utility-First CSS (mit CRACO)
+- **Material-UI (MUI)** -- Komponentenbibliothek
+- **react-i18next** -- Internationalisierung
+- **Bun** -- Package Manager
+
+### Infrastructure
+
+- **Docker & Docker Compose** -- Containerisierung
+- **Fly.io** -- Production Deployment
+- **Qdrant** -- Vector Database (Full Mode)
+- **RabbitMQ** -- Message Broker (Full Mode)
+
+## Quick Start
 
 ### Voraussetzungen
 
-- **Docker & Docker Compose** (für Container-basierte Entwicklung)
-- **Git** (für Repository-Management)
-- **Claude API Key** (für KI-Fragenerstellung, optional für Core)
-- **Python 3.13+** (für lokale Entwicklung ohne Docker)
+- **Docker & Docker Compose**
+- **Git**
+- **Python 3.13+** und **uv** (Backend)
+- **Bun** (Frontend)
+- **Claude API Key** (fuer KI-Fragenerstellung)
 
-### 🐳 Installation
-
-Das neue `start-dev.sh` Script erkennt automatisch, welche Packages verfügbar sind und startet die entsprechenden Services:
+### Installation
 
 ```bash
 # Repository klonen
@@ -179,304 +172,112 @@ cd examcraft
 
 # Umgebung konfigurieren
 cp .env.example .env
-# Edit .env with your configuration (ANTHROPIC_API_KEY für Premium/Enterprise)
+# .env anpassen (ANTHROPIC_API_KEY, Datenbank, etc.)
 
-# Services starten (erkennt automatisch Core/Premium/Enterprise)
-./start-dev.sh
+# Services starten
+./start-dev.sh          # Auto-Detection: Core oder Full
+./start-dev.sh --core   # Nur Core (ohne Qdrant)
+./start-dev.sh --full   # Alle Services inkl. Qdrant, RabbitMQ
 
 # Services stoppen
 ./stop-dev.sh
 ```
 
-**Das Script erkennt automatisch:**
+### Services & Ports
 
-- ✅ **Core Only**: Wenn nur `packages/core` vorhanden ist
-- ✅ **Premium**: Wenn `packages/premium` Submodule initialisiert ist
-- ✅ **Enterprise**: Wenn `packages/enterprise` Submodule initialisiert ist
+| Service    | Port  | Modus       |
+|------------|-------|-------------|
+| Frontend   | 3000  | Alle        |
+| Backend    | 8000  | Alle        |
+| API Docs   | 8000/docs | Alle    |
+| PostgreSQL | 5432  | Alle        |
+| Redis      | 6379  | Alle        |
+| Qdrant     | 6333  | Full        |
+| RabbitMQ   | 15672 | Full        |
+| Flower     | 5555  | Full        |
 
-**Access Points:**
+### Development Login
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-- PostgreSQL: localhost:5432
-- Redis: localhost:6380 (external) / 6379 (internal)
-- Qdrant: http://localhost:6333 (Premium/Enterprise)
+Das `start-dev.sh` Script erstellt automatisch Test-Daten:
 
-#### Premium/Enterprise Features aktivieren
+- **Admin**: `admin@talent-factory.ch` / `admin123`
+- **Institution**: Talent Factory (Professional Tier)
+- **Auto-Assignment**: Alle `@talent-factory.ch` E-Mails werden automatisch zugeordnet
 
-```bash
-# Premium Submodule initialisieren (requires access)
-git submodule update --init --recursive packages/premium
+Manuelles Seeding: `./seed-dev-data.sh`
 
-# Enterprise Submodule initialisieren (requires access, optional)
-git submodule update --init --recursive packages/enterprise
+## Entwicklung
 
-# Services starten (erkennt automatisch verfügbare Packages)
-./start-dev.sh
-```
-
-**Hinweis:** Features werden über User-Rollen und Institution-Settings gesteuert, nicht über die Package-Auswahl. Die Packages stellen nur die Code-Basis bereit.
-
-### 🌱 Development Login
-
-Das `start-dev.sh` Script erstellt automatisch Test-Daten für die Entwicklung:
-
-**Talent Factory Institution (Professional Tier):**
-
-- Domain: `talent-factory.ch` (Auto-Assignment für alle `@talent-factory.ch` E-Mails)
-- Subscription: Professional (Unlimited Documents, 1000 Questions/Month)
-
-**Admin User:**
-
-- Email: `admin@talent-factory.ch`
-- Password: `admin123` (nur Development!)  # pragma: allowlist secret
-- Rollen: Admin, Dozent, Assistant
-- Superuser: Ja
-
-**Auto-Assignment:**
-
-- Jeder User mit `@talent-factory.ch` E-Mail wird automatisch der Talent Factory Institution zugeordnet
-- Funktioniert für OAuth (Google, Microsoft) und normale Registrierung
-
-**Manuelles Seeding:**
+### Befehle
 
 ```bash
-# Falls automatisches Seeding fehlschlägt
-./seed-dev-data.sh
+# Tests
+make test                    # Alle Tests
+make test-backend            # uv run pytest core/backend/tests/ -v
+make test-frontend           # cd core/frontend && bun test -- --watchAll=false
+
+# Einzelne Tests
+uv run pytest core/backend/tests/test_auth_service.py -v
+uv run pytest core/backend/tests/test_auth_service.py::test_login -v
+
+# Linting
+make lint                    # Alle Linters
+make lint-fix                # Auto-Fix
+make lint-backend            # Ruff (check + format)
+make lint-frontend           # ESLint
+
+# Pre-Commit Hooks
+make pre-commit              # Alle Hooks ausfuehren
+make ci-check                # Vollstaendige CI-Checks lokal
+
+# Deployment (Fly.io)
+make deploy                  # Backend + Frontend
+make deploy-all              # Alle Services
+make deploy-status           # Status
 ```
 
-### 📚 Weitere Informationen
+### Code-Standards
 
-Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für:
+- **Python**: Ruff (Linting + Formatting), Type Hints, uv als Package Manager
+- **TypeScript/JS**: ESLint + Prettier, Bun als Package Manager
+- **CSS**: Tailwind CSS v3 Utility-First mit CRACO
+- **Pre-commit Hooks**: Ruff, YAML/JSON/TOML Validation, detect-secrets
+- **Sprache**: UI-Texte und Dokumentation auf Deutsch (Schweizer Orthographie), Code und API auf Englisch
 
-- Detaillierte Setup-Anleitung
-- Submodule-Verwaltung
-- Docker Compose Befehle
-- Troubleshooting
+### Git Workflow
 
-## 🛠️ Entwicklung
+- **Branch Naming**: `feature/tf-{linear-issue-number}-{description}`
+- **Base Branch**: `develop`
+- **Merge Strategy**: Squash Merge
+- **Commit Style**: Conventional Commits mit optionalem Emoji-Prefix
 
-### Services
+### Two-Tier Deployment
 
-- **Frontend (React)**: Port 3000
-- **Backend (FastAPI)**: Port 8000
-- **PostgreSQL**: Port 5432
-- **Redis**: Port 6379
+- **Core** (`docker-compose.yml`): Community Edition, kein Qdrant, Free Tier
+- **Full** (`docker-compose.full.yml`): Alle Services inkl. Qdrant, RabbitMQ, Celery, Flower
 
-### Code-Qualität & Lint-Checks
+## API Endpoints
 
-**Automatische Checks vor jedem Commit:**
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| `GET` | `/health` | Health Check |
+| `POST` | `/api/v1/auth/login` | Benutzer-Login |
+| `POST` | `/api/v1/auth/register` | Benutzer-Registrierung |
+| `GET` | `/api/v1/documents` | Dokumente auflisten |
+| `POST` | `/api/v1/documents/upload` | Dokument hochladen |
+| `POST` | `/api/v1/exams/generate` | Pruefung generieren |
+| `GET` | `/api/v1/exams/{exam_id}` | Pruefung abrufen |
 
-```bash
-# Pre-Commit-Hooks installieren (einmalig)
-make install-hooks
+Vollstaendige API-Dokumentation: http://localhost:8000/docs
 
-# Jetzt laufen Checks automatisch bei jedem Commit
-git commit -m "feat: Add feature"
-```
+## Contributing
 
-**Manuelle Lint-Checks:**
+Dieses Repository wird automatisch aus dem privaten Entwicklungs-Monorepo gespiegelt. Pull Requests koennen hier nicht direkt gemergt werden. Siehe [CONTRIBUTING.md](CONTRIBUTING.md) fuer Details.
 
-```bash
-# Alle Lint-Checks ausführen
-make lint
+## Lizenz
 
-# Auto-Fix für alle Fehler
-make lint-fix
-
-# Nur Backend
-make lint-backend
-make lint-fix-backend
-
-# Nur Frontend
-make lint-frontend
-make lint-fix-frontend
-
-# Pre-Commit-Hooks manuell ausführen
-make pre-commit
-```
-
-**Vor jedem Pull Request:**
-
-```bash
-# Umfassende Lint-Checks
-make pre-push
-
-# Oder manuell:
-cd packages/core/backend && ruff check . --fix && ruff format .
-cd packages/core/frontend && bun run lint:fix
-```
-
-**Siehe [Lint Checks](docs/LINT_CHECKS.md) für detaillierte Informationen.**
-
-### Nützliche Befehle
-
-```bash
-# Alle Services starten
-docker-compose up -d
-
-# Logs anzeigen
-docker-compose logs -f
-
-# Services neustarten
-docker-compose restart
-
-# Services stoppen
-docker-compose down
-
-# Backend Logs
-docker-compose logs -f backend
-
-# Frontend Logs
-docker-compose logs -f frontend
-```
-
-### 🔧 Troubleshooting
-
-#### Frontend Build Errors nach Git Pull/Branch Switch
-
-**Problem:** `Module not found: Error: Can't resolve '@examcraft/premium'` oder ähnliche Webpack-Fehler
-
-**Ursache:** Webpack cached alte Versionen von Dateien nach Branch-Wechsel oder Git Pull
-
-**Lösung:**
-
-```bash
-# Option 1: Cache-Clearing Script (empfohlen)
-./scripts/clean-frontend-cache.sh
-
-# Option 2: Alle Caches löschen + Neuinstallation
-./scripts/clean-frontend-cache.sh --all --reinstall
-
-# Option 3: Manuell (Core Frontend)
-cd packages/core/frontend
-rm -rf node_modules/.cache build/
-bun install
-```
-
-#### Bun
-
-ExamCraft AI verwendet **Bun** als Package Manager:
-
-```bash
-# Bun installieren (10-100x schneller!)
-curl -fsSL https://bun.sh/install | bash
-
-# Dependencies installieren
-bun install
-
-# Scripts ausführen
-bun run build:core
-```
-
-**Vorteile von Bun:**
-- ⚡ 10-100x schnellere Installation
-- 🚀 Schnellere Script-Ausführung
-- 📦 Besseres Monorepo-Handling
-
-#### Docker Container Probleme
-
-```bash
-# Alle Container stoppen und neu starten
-docker-compose down
-docker-compose up -d --build
-
-# Volumes löschen (ACHTUNG: Löscht Datenbank!)
-docker-compose down -v
-docker-compose up -d
-
-# Logs für Debugging
-docker-compose logs -f backend
-```
-
-**Siehe [MONOREPO_SETUP.md](MONOREPO_SETUP.md) für weitere Troubleshooting-Tipps.**
-
-### API Endpoints
-
-- `GET /` - Health Check
-- `GET /health` - Service Status
-- `POST /api/v1/generate-exam` - Prüfung generieren
-- `GET /api/v1/topics` - Verfügbare Themen
-- `GET /api/v1/exam/{exam_id}` - Prüfung abrufen
-
-## 📋 Workshop Demo
-
-Diese Version enthält eine funktionsfähige Demo für Workshop-Zwecke:
-
-- ✅ Vollständige UI für Prüfungserstellung
-- ✅ Demo-Fragen Generation (ohne Claude API)
-- ✅ Interaktive Prüfungsansicht mit Auswertung
-- ✅ Responsive Design mit Material-UI
-- ✅ Docker-basierte Entwicklungsumgebung
-
-## 🔧 Technologie-Stack
-
-### Backend
-
-- **FastAPI** - Moderne Python Web API
-- **SQLAlchemy** - ORM für Datenbankzugriff
-- **PostgreSQL** - Relationale Datenbank
-- **Redis** - Caching und Session Management
-- **Pydantic** - Datenvalidierung und Serialisierung
-
-### Frontend
-
-- **React 18** - UI Framework
-- **TypeScript** - Type-sichere Entwicklung
-- **Material-UI (MUI)** - Komponenten-Bibliothek
-- **Axios** - HTTP Client
-
-### DevOps
-
-- **Docker & Docker Compose** - Containerisierung
-- **uvicorn** - ASGI Server
-- **nginx** - Reverse Proxy (Produktion)
-
-## 🎯 Roadmap
-
-### Phase 1: Workshop Demo ✅
-
-- [x] Grundlegende Projektstruktur
-- [x] Docker-Umgebung Setup
-- [x] FastAPI Backend mit Demo-Endpoints
-- [x] React Frontend mit Material-UI
-- [x] Prüfungserstellung und -anzeige
-
-### Phase 2: Core Features
-
-- [ ] Claude API Integration
-- [ ] Benutzerauthentifizierung
-- [ ] Prüfungsverwaltung (CRUD)
-- [ ] Erweiterte Fragetypen
-- [ ] Export-Funktionen (PDF, Word)
-
-### Phase 3: Erweiterte Features
-
-- [ ] Fragenkatalog-Verwaltung
-- [ ] Statistiken und Analytics
-- [ ] Benutzerrollen und Permissions
-- [ ] Integration mit LMS-Systemen
-- [ ] Mobile App
-
-## 🤝 Contributing
-
-1. Fork das Repository
-2. Feature Branch erstellen (`git checkout -b feature/amazing-feature`)
-3. Änderungen committen (`git commit -m 'feat: Add amazing feature'`)
-4. Branch pushen (`git push origin feature/amazing-feature`)
-5. Pull Request erstellen
-
-## 📄 Lizenz
-
-Dieses Projekt ist unter der MIT Lizenz lizenziert - siehe [LICENSE](LICENSE) Datei für Details.
-
-## 📞 Support
-
-- **Issues**: GitHub Issues für Bug Reports und Feature Requests
-- **Dokumentation**: `/docs` Ordner für detaillierte Dokumentation
-- **API Docs**: <http://localhost:8000/docs> (während Entwicklung)
+MIT License -- siehe [LICENSE](LICENSE).
 
 ---
 
-**ExamCraft AI** - Revolutioniere die Art, wie Prüfungen erstellt werden! 🎓✨
+**ExamCraft AI** -- entwickelt von [Talent Factory GmbH](https://talent-factory.ch)
