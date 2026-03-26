@@ -95,9 +95,10 @@ def rbac_db(test_db):
     test_db.merge(RoleFeature(role_id="role_user", feature_id="feat_test_gen"))
     test_db.merge(RoleFeature(role_id="role_user", feature_id="feat_test_mgmt"))
 
-    # Create subscription tiers
-    tiers = [
-        SubscriptionTier(
+    # Get or create subscription tiers (may already exist from seed data)
+    tier_free = test_db.query(SubscriptionTier).filter_by(name="free").first()
+    if not tier_free:
+        tier_free = SubscriptionTier(
             id="tier_free",
             name="free",
             display_name="Free",
@@ -106,8 +107,12 @@ def rbac_db(test_db):
             price_yearly=0.0,
             is_active=True,
             sort_order=1,
-        ),
-        SubscriptionTier(
+        )
+        test_db.add(tier_free)
+
+    tier_pro = test_db.query(SubscriptionTier).filter_by(name="professional").first()
+    if not tier_pro:
+        tier_pro = SubscriptionTier(
             id="tier_pro",
             name="professional",
             display_name="Professional",
@@ -116,23 +121,21 @@ def rbac_db(test_db):
             price_yearly=490.0,
             is_active=True,
             sort_order=2,
-        ),
-    ]
-    for tier in tiers:
-        test_db.merge(tier)
+        )
+        test_db.add(tier_pro)
     test_db.flush()
 
     # Create tier quotas
     quotas = [
-        TierQuota(tier_id="tier_free", resource_type="documents", quota_limit=5),
+        TierQuota(tier_id=tier_free.id, resource_type="documents", quota_limit=5),
         TierQuota(
-            tier_id="tier_free", resource_type="questions_per_month", quota_limit=20
+            tier_id=tier_free.id, resource_type="questions_per_month", quota_limit=20
         ),
         TierQuota(
-            tier_id="tier_pro", resource_type="documents", quota_limit=-1
+            tier_id=tier_pro.id, resource_type="documents", quota_limit=-1
         ),  # Unlimited
         TierQuota(
-            tier_id="tier_pro", resource_type="questions_per_month", quota_limit=1000
+            tier_id=tier_pro.id, resource_type="questions_per_month", quota_limit=1000
         ),
     ]
     for quota in quotas:
@@ -140,10 +143,10 @@ def rbac_db(test_db):
 
     # Assign features to tiers
     # Free: only generation
-    test_db.merge(TierFeature(tier_id="tier_free", feature_id="feat_test_gen"))
+    test_db.merge(TierFeature(tier_id=tier_free.id, feature_id="feat_test_gen"))
     # Pro: generation + management
-    test_db.merge(TierFeature(tier_id="tier_pro", feature_id="feat_test_gen"))
-    test_db.merge(TierFeature(tier_id="tier_pro", feature_id="feat_test_mgmt"))
+    test_db.merge(TierFeature(tier_id=tier_pro.id, feature_id="feat_test_gen"))
+    test_db.merge(TierFeature(tier_id=tier_pro.id, feature_id="feat_test_mgmt"))
 
     # Create old-style roles for user mapping
     old_roles = [

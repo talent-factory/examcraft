@@ -187,7 +187,9 @@ class TestRAGAPI:
 
             response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
 
-        assert response.status_code == 200
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.json()}"
+        )
         data = response.json()
         assert "task_id" in data
         assert "message" in data
