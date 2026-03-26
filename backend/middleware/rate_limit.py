@@ -43,7 +43,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Skip rate limiting for health check, infrastructure endpoints, and test clients
-        if request.url.path in ["/health", "/docs", "/redoc", "/openapi.json"] or request.url.path.startswith("/mcp"):
+        if request.url.path in [
+            "/health",
+            "/docs",
+            "/redoc",
+            "/openapi.json",
+        ] or request.url.path.startswith("/mcp"):
             return await call_next(request)
 
         # Skip rate limiting for test clients (pytest TestClient)
