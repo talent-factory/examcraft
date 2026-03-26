@@ -61,9 +61,9 @@ def rbac_db(test_db):
         ),
     ]
     for feature in features:
-        test_db.add(feature)
+        test_db.merge(feature)
 
-    # Create RBAC roles
+    # Create RBAC roles (merge to handle pre-seeded roles)
     rbac_roles = [
         RBACRole(
             id="role_admin",
@@ -83,17 +83,17 @@ def rbac_db(test_db):
         ),
     ]
     for role in rbac_roles:
-        test_db.add(role)
+        test_db.merge(role)
     test_db.flush()
 
     # Assign features to roles
     # Admin: all features
     for feature in features:
-        test_db.add(RoleFeature(role_id="role_admin", feature_id=feature.id))
+        test_db.merge(RoleFeature(role_id="role_admin", feature_id=feature.id))
 
     # User: only generation and management
-    test_db.add(RoleFeature(role_id="role_user", feature_id="feat_test_gen"))
-    test_db.add(RoleFeature(role_id="role_user", feature_id="feat_test_mgmt"))
+    test_db.merge(RoleFeature(role_id="role_user", feature_id="feat_test_gen"))
+    test_db.merge(RoleFeature(role_id="role_user", feature_id="feat_test_mgmt"))
 
     # Create subscription tiers
     tiers = [
@@ -119,7 +119,7 @@ def rbac_db(test_db):
         ),
     ]
     for tier in tiers:
-        test_db.add(tier)
+        test_db.merge(tier)
     test_db.flush()
 
     # Create tier quotas
@@ -136,14 +136,14 @@ def rbac_db(test_db):
         ),
     ]
     for quota in quotas:
-        test_db.add(quota)
+        test_db.merge(quota)
 
     # Assign features to tiers
     # Free: only generation
-    test_db.add(TierFeature(tier_id="tier_free", feature_id="feat_test_gen"))
+    test_db.merge(TierFeature(tier_id="tier_free", feature_id="feat_test_gen"))
     # Pro: generation + management
-    test_db.add(TierFeature(tier_id="tier_pro", feature_id="feat_test_gen"))
-    test_db.add(TierFeature(tier_id="tier_pro", feature_id="feat_test_mgmt"))
+    test_db.merge(TierFeature(tier_id="tier_pro", feature_id="feat_test_gen"))
+    test_db.merge(TierFeature(tier_id="tier_pro", feature_id="feat_test_mgmt"))
 
     # Create old-style roles for user mapping
     old_roles = [
@@ -163,7 +163,7 @@ def rbac_db(test_db):
         ),
     ]
     for role in old_roles:
-        test_db.add(role)
+        test_db.merge(role)
 
     test_db.flush()
     yield test_db
