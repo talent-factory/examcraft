@@ -4,6 +4,7 @@
     "auth_username_taken": "Ce nom d'utilisateur est déjà pris",
     "auth_invalid_credentials": "E-mail ou mot de passe invalide",
     "auth_account_disabled": "Votre compte a été désactivé",
+    "auth_account_pending": "Veuillez d'abord vérifier votre adresse e-mail. Consultez votre boîte de réception.",
     "auth_session_expired": "Votre session a expiré, veuillez vous reconnecter",
     "auth_token_invalid": "Jeton invalide ou expiré",
     "auth_token_missing": "Jeton d'authentification manquant",

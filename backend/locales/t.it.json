@@ -4,6 +4,7 @@
     "auth_username_taken": "Il nome utente è già in uso",
     "auth_invalid_credentials": "E-mail o password non validi",
     "auth_account_disabled": "Il tuo account è stato disabilitato",
+    "auth_account_pending": "Verifica prima il tuo indirizzo e-mail. Controlla la tua casella di posta.",
     "auth_session_expired": "La tua sessione è scaduta, effettua nuovamente il login",
     "auth_token_invalid": "Token non valido o scaduto",
     "auth_token_missing": "Token di autenticazione mancante",

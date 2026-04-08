@@ -46,7 +46,11 @@
       "institutionCode": "Codice istituzione (Opzionale)",
       "institutionCodeHint": "Inserisci il codice della tua istituzione se ne hai uno",
       "password": "Password",
-      "passwordHint": "Minimo 8 caratteri",
+      "passwordReqTitle": "La password deve contenere:",
+      "passwordReqMinLength": "8+ caratteri",
+      "passwordReqUppercase": "Maiuscola (A–Z)",
+      "passwordReqLowercase": "Minuscola (a–z)",
+      "passwordReqNumber": "Numero (0–9)",
       "confirmPassword": "Conferma password",
       "creatingAccount": "Creazione account...",
       "createAccount": "Crea account",
@@ -107,6 +111,9 @@
       "required": "Compila tutti i campi obbligatori",
       "passwordMismatch": "Le password non corrispondono",
       "passwordMinLength": "La password deve contenere almeno 8 caratteri",
+      "passwordUppercase": "La password deve contenere almeno una lettera maiuscola",
+      "passwordLowercase": "La password deve contenere almeno una lettera minuscola",
+      "passwordNumber": "La password deve contenere almeno un numero",
       "invalidEmail": "Inserisci un indirizzo e-mail valido",
       "fillAllFields": "Compila tutti i campi"
     }

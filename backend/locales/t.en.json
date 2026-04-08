@@ -4,6 +4,7 @@
     "auth_username_taken": "Username is already taken",
     "auth_invalid_credentials": "Invalid email or password",
     "auth_account_disabled": "Your account has been disabled",
+    "auth_account_pending": "Please verify your email address first. Check your inbox.",
     "auth_session_expired": "Your session has expired, please log in again",
     "auth_token_invalid": "Invalid or expired token",
     "auth_token_missing": "Authentication token is missing",

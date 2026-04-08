@@ -4,6 +4,7 @@
     "auth_username_taken": "Benutzername ist bereits vergeben",
     "auth_invalid_credentials": "Ungültige E-Mail oder Passwort",
     "auth_account_disabled": "Ihr Konto wurde deaktiviert",
+    "auth_account_pending": "Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse. Prüfen Sie Ihr Postfach.",
     "auth_session_expired": "Ihre Sitzung ist abgelaufen, bitte melden Sie sich erneut an",
     "auth_token_invalid": "Ungültiger oder abgelaufener Token",
     "auth_token_missing": "Authentifizierungstoken fehlt",

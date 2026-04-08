@@ -46,7 +46,11 @@
       "institutionCode": "Institution Code (Optional)",
       "institutionCodeHint": "Enter your institution code if you have one",
       "password": "Password",
-      "passwordHint": "Minimum 8 characters",
+      "passwordReqTitle": "Password must contain:",
+      "passwordReqMinLength": "8+ characters",
+      "passwordReqUppercase": "Uppercase letter (A–Z)",
+      "passwordReqLowercase": "Lowercase letter (a–z)",
+      "passwordReqNumber": "Number (0–9)",
       "confirmPassword": "Confirm Password",
       "creatingAccount": "Creating account...",
       "createAccount": "Create Account",
@@ -107,6 +111,9 @@
       "required": "Please fill in all required fields",
       "passwordMismatch": "Passwords do not match",
       "passwordMinLength": "Password must be at least 8 characters long",
+      "passwordUppercase": "Password must contain at least one uppercase letter",
+      "passwordLowercase": "Password must contain at least one lowercase letter",
+      "passwordNumber": "Password must contain at least one number",
       "invalidEmail": "Please enter a valid email address",
       "fillAllFields": "Please fill in all fields"
     }

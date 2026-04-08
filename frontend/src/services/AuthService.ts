@@ -19,6 +19,23 @@ import {
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
+/**
+ * Extracts a human-readable error message from a FastAPI error response.
+ * FastAPI returns `detail` either as a string (for HTTPException) or as an
+ * array of validation error objects (for 422 Unprocessable Entity).
+ */
+function extractApiError(detail: unknown, fallback: string): string {
+  if (!detail) return fallback;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    const msg: string = first?.msg ?? first?.message ?? '';
+    // Strip Pydantic v2 "Value error, " prefix
+    return msg.replace(/^Value error,\s*/i, '') || fallback;
+  }
+  return fallback;
+}
+
 class AuthService {
   /**
    * Register a new user
@@ -34,7 +51,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Registration failed');
+      throw new Error(extractApiError(error.detail, 'Registration failed'));
     }
 
     return response.json();
@@ -54,7 +71,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Login failed');
+      throw new Error(extractApiError(error.detail, 'Login failed'));
     }
 
     return response.json();
@@ -73,7 +90,7 @@ class AuthService {
 
     if (!response.ok && response.status !== 401) {
       const error = await response.json();
-      throw new Error(error.detail || 'Logout failed');
+      throw new Error(extractApiError(error.detail, 'Logout failed'));
     }
   }
 
@@ -91,7 +108,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Token refresh failed');
+      throw new Error(extractApiError(error.detail, 'Token refresh failed'));
     }
 
     return response.json();
@@ -110,7 +127,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch profile');
+      throw new Error(extractApiError(error.detail, 'Failed to fetch profile'));
     }
 
     return response.json();
@@ -131,7 +148,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Failed to update profile');
+      throw new Error(extractApiError(error.detail, 'Failed to update profile'));
     }
 
     return response.json();
@@ -152,7 +169,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Failed to set password');
+      throw new Error(extractApiError(error.detail, 'Failed to set password'));
     }
   }
 
@@ -171,7 +188,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Failed to change password');
+      throw new Error(extractApiError(error.detail, 'Failed to change password'));
     }
   }
 
@@ -189,7 +206,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Failed to request password reset');
+      throw new Error(extractApiError(error.detail, 'Failed to request password reset'));
     }
   }
 
@@ -207,7 +224,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Failed to reset password');
+      throw new Error(extractApiError(error.detail, 'Failed to reset password'));
     }
   }
 
@@ -221,7 +238,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Failed to get OAuth URL');
+      throw new Error(extractApiError(error.detail, 'Failed to get OAuth URL'));
     }
 
     return response.json();
@@ -239,7 +256,7 @@ class AuthService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'OAuth code exchange failed');
+      throw new Error(extractApiError(error.detail, 'OAuth code exchange failed'));
     }
 
     return response.json();

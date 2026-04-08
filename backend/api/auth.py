@@ -427,6 +427,11 @@ async def login(
         )
 
     # Check if user is active
+    if user.status == UserStatus.PENDING.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=t("auth_account_pending", locale=locale),
+        )
     if user.status != UserStatus.ACTIVE.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
