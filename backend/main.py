@@ -108,6 +108,19 @@ async def lifespan(app: FastAPI):
     init_translations()
     print("✅ i18n translations initialized")
 
+    # Startup: Seed help context hints
+    try:
+        from utils.seed_help_hints import seed_help_hints
+
+        db = SessionLocal()
+        try:
+            created = seed_help_hints(db)
+            print(f"✅ Help hints seeded: {created} created")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error seeding help hints: {str(e)}")
+
     # Premium/Enterprise Features: Replace Core placeholders BEFORE loading routers
     if is_full_deployment:
         print("\n🌟 Loading Premium/Enterprise Features...")
@@ -214,6 +227,13 @@ async def lifespan(app: FastAPI):
     websocket_api = importlib.util.module_from_spec(spec_ws)
     spec_ws.loader.exec_module(websocket_api)
 
+    # Import Help API (Smart Help Widget — TF-308)
+    spec_help = importlib.util.spec_from_file_location(
+        "core_api_v1_help", os.path.join(core_api_path, "v1", "help.py")
+    )
+    help_api = importlib.util.module_from_spec(spec_help)
+    spec_help.loader.exec_module(help_api)
+
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(gdpr.router)
@@ -227,6 +247,7 @@ async def lifespan(app: FastAPI):
         webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"]
     )
     app.include_router(websocket_api.router)
+    app.include_router(help_api.router)
 
     # Email Webhooks (Resend)
     try:

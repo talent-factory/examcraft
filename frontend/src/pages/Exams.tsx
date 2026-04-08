@@ -34,10 +34,12 @@ export const Exams: React.FC = () => {
       </div>
 
       {/* RAG Exam Creator */}
-      <RAGExamCreator
-        selectedDocuments={[]}
-        onExamGenerated={handleExamGenerated}
-      />
+      <div data-testid="exam-config">
+        <RAGExamCreator
+          selectedDocuments={[]}
+          onExamGenerated={handleExamGenerated}
+        />
+      </div>
     </div>
   );
 };

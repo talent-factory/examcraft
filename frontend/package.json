@@ -79,6 +79,7 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "ajv": "^8.12.0",
     "axios": "^1.6.2",
+    "driver.js": "^1.4.0",
     "i18next": "^25.10.4",
     "i18next-browser-languagedetector": "^8.2.1",
     "lodash": "4.17.23",
@@ -112,6 +113,15 @@
     "lint:fix": "eslint src --ext .ts,.tsx,.js,.jsx --fix",
     "clean": "rm -rf dist",
     "eject": "react-scripts eject"
+  },
+  "jest": {
+    "resetMocks": false,
+    "transformIgnorePatterns": [
+      "node_modules/(?!driver\\.js/)"
+    ],
+    "moduleNameMapper": {
+      "driver\\.js/dist/driver\\.css$": "<rootDir>/src/__mocks__/styleMock.js"
+    }
   },
   "eslintConfig": {
     "extends": [

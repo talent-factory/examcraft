@@ -98,3 +98,12 @@ code {
     @apply bg-red-100 text-red-800;
   }
 }
+
+
+/* driver.js sets pointer-events:none on all .driver-active children.
+   MUI Dialogs render via React portals outside .driver-active-element,
+   so they need an explicit override to remain interactive during the tour. */
+.driver-active [role="dialog"],
+.driver-active [role="dialog"] * {
+  pointer-events: auto !important;
+}

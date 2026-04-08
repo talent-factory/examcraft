@@ -73,9 +73,18 @@ def create_tables():
             EmailEvent,
             EmailSuppressionList,
         )
+        from models.help import (  # noqa: F401
+            HelpOnboardingProgress,
+            HelpConversation,
+            HelpFeedback,
+            HelpContextHint,
+            HelpFaqCache,
+            HelpDismissedHint,
+            HelpIndexState,
+        )
 
         print(
-            "✅ Core models imported (Auth + Documents + Question Review + RBAC + Email)"
+            "✅ Core models imported (Auth + Documents + Question Review + RBAC + Email + Help)"
         )
     except Exception as e:
         import traceback

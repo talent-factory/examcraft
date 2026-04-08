@@ -1,0 +1,237 @@
+{
+  "teacher": [
+    {
+      "step": 0,
+      "title_de": "Willkommen bei ExamCraft AI!",
+      "title_en": "Welcome to ExamCraft AI!",
+      "description_de": "Ich zeige dir in wenigen Schritten, wie du deine erste Prüfung erstellst. Klicke auf «Tour starten» für eine geführte Einführung.",
+      "description_en": "I'll show you in a few steps how to create your first exam. Click 'Start tour' for a guided introduction.",
+      "route": null,
+      "highlight_selector": null,
+      "nav_selector": null,
+      "tab_selector": null
+    },
+    {
+      "step": 1,
+      "title_de": "Dashboard",
+      "title_en": "Dashboard",
+      "description_de": "Das ist dein persönliches Dashboard. Hier siehst du Schnellzugriffe auf alle wichtigen Funktionen und eine Übersicht deiner Aktivitäten.",
+      "description_en": "This is your personal dashboard. Here you'll find quick access to all key features and an overview of your activity.",
+      "route": "/dashboard",
+      "highlight_selector": "[data-testid='dashboard-content']",
+      "nav_selector": "[data-testid='nav-dashboard']",
+      "tab_selector": null
+    },
+    {
+      "step": 2,
+      "title_de": "Dokument hochladen",
+      "title_en": "Upload a Document",
+      "description_de": "Lade dein Kursmaterial als PDF, Word oder Markdown hoch. Ziehe die Datei einfach in den Upload-Bereich oder klicke darauf.",
+      "description_en": "Upload your course material as PDF, Word, or Markdown. Simply drag the file into the upload area or click on it.",
+      "route": "/documents",
+      "highlight_selector": "[data-testid='upload-area']",
+      "nav_selector": "[data-testid='nav-documents']",
+      "tab_selector": null
+    },
+    {
+      "step": 3,
+      "title_de": "Dokumentenbibliothek",
+      "title_en": "Document Library",
+      "description_de": "Hier siehst du alle hochgeladenen Dokumente. Wähle ein oder mehrere Dokumente aus, um daraus Prüfungsfragen zu generieren.",
+      "description_en": "Here you can see all uploaded documents. Select one or more to generate exam questions from them.",
+      "route": "/documents",
+      "highlight_selector": "[data-testid='document-list']",
+      "nav_selector": null,
+      "tab_selector": null
+    },
+    {
+      "step": 4,
+      "title_de": "Prüfung erstellen",
+      "title_en": "Create an Exam",
+      "description_de": "Wähle Schwierigkeitsgrad, Fragenanzahl und Prüfungsformat — die KI generiert passende Fragen aus deinen Dokumenten.",
+      "description_en": "Choose difficulty, number of questions, and format — the AI generates fitting questions from your documents.",
+      "route": "/questions/generate",
+      "highlight_selector": "[data-testid='exam-config']",
+      "nav_selector": "[data-testid='nav-questions-generate']",
+      "tab_selector": null
+    },
+    {
+      "step": 5,
+      "title_de": "Fragen reviewen und exportieren",
+      "title_en": "Review and Export Questions",
+      "description_de": "Überprüfe die generierten Fragen, bewerte sie mit Daumen hoch/runter und exportiere deine fertige Prüfung.",
+      "description_en": "Review the generated questions, rate them with thumbs up/down, and export your finished exam.",
+      "route": "/questions/review",
+      "highlight_selector": "[data-testid='review-queue']",
+      "nav_selector": "[data-testid='nav-questions-review']",
+      "tab_selector": null
+    },
+    {
+      "step": 6,
+      "title_de": "Prompt-Bibliothek",
+      "title_en": "Prompt Library",
+      "description_de": "Verwalte und passe die KI-Prompts für die Fragengenerierung an. Eigene Vorlagen steigern die Qualität der Ergebnisse.",
+      "description_en": "Manage and customize the AI prompts for question generation. Custom templates improve result quality.",
+      "route": "/prompts",
+      "highlight_selector": "[data-testid='prompts-content']",
+      "nav_selector": "[data-testid='nav-prompts']",
+      "tab_selector": null
+    },
+    {
+      "step": 7,
+      "title_de": "Fertig!",
+      "title_en": "All Done!",
+      "description_de": "Du bist startklar! Öffne dieses Hilfe-Widget jederzeit über den Button unten rechts.",
+      "description_en": "You're all set! Open this help widget anytime via the button at the bottom right.",
+      "route": null,
+      "highlight_selector": null,
+      "nav_selector": null,
+      "tab_selector": null
+    }
+  ],
+  "admin": [
+    {
+      "step": 0,
+      "title_de": "Willkommen, Administrator!",
+      "title_en": "Welcome, Administrator!",
+      "description_de": "Ich zeige dir alle Funktionen von ExamCraft AI — von der Dokumentenverwaltung bis zur Benutzerverwaltung. Klicke auf «Tour starten».",
+      "description_en": "I'll show you all features of ExamCraft AI — from document management to user administration. Click 'Start tour'.",
+      "route": null,
+      "highlight_selector": null,
+      "nav_selector": null,
+      "tab_selector": null
+    },
+    {
+      "step": 1,
+      "title_de": "Dashboard",
+      "title_en": "Dashboard",
+      "description_de": "Das ist dein persönliches Dashboard. Hier siehst du Schnellzugriffe auf alle wichtigen Funktionen und eine Übersicht deiner Aktivitäten.",
+      "description_en": "This is your personal dashboard. Here you'll find quick access to all key features and an overview of your activity.",
+      "route": "/dashboard",
+      "highlight_selector": "[data-testid='dashboard-content']",
+      "nav_selector": "[data-testid='nav-dashboard']",
+      "tab_selector": null
+    },
+    {
+      "step": 2,
+      "title_de": "Dokument hochladen",
+      "title_en": "Upload a Document",
+      "description_de": "Lade Kursmaterial als PDF, Word oder Markdown hoch. Als Admin kannst du Dokumente für alle Benutzer deiner Institution verwalten.",
+      "description_en": "Upload course material as PDF, Word, or Markdown. As an admin, you can manage documents for all users of your institution.",
+      "route": "/documents",
+      "highlight_selector": "[data-testid='upload-area']",
+      "nav_selector": "[data-testid='nav-documents']",
+      "tab_selector": null
+    },
+    {
+      "step": 3,
+      "title_de": "Dokumentenbibliothek",
+      "title_en": "Document Library",
+      "description_de": "Hier siehst du alle hochgeladenen Dokumente. Wähle Dokumente aus, um daraus Prüfungsfragen zu generieren.",
+      "description_en": "Here you can see all uploaded documents. Select documents to generate exam questions from them.",
+      "route": "/documents",
+      "highlight_selector": "[data-testid='document-list']",
+      "nav_selector": null,
+      "tab_selector": null
+    },
+    {
+      "step": 4,
+      "title_de": "Prüfung erstellen",
+      "title_en": "Create an Exam",
+      "description_de": "Wähle Schwierigkeitsgrad, Fragenanzahl und Prüfungsformat — die KI generiert passende Fragen aus deinen Dokumenten.",
+      "description_en": "Choose difficulty, number of questions, and format — the AI generates fitting questions from your documents.",
+      "route": "/questions/generate",
+      "highlight_selector": "[data-testid='exam-config']",
+      "nav_selector": "[data-testid='nav-questions-generate']",
+      "tab_selector": null
+    },
+    {
+      "step": 5,
+      "title_de": "Fragen reviewen und exportieren",
+      "title_en": "Review and Export Questions",
+      "description_de": "Überprüfe die generierten Fragen, bewerte sie mit Daumen hoch/runter und exportiere deine fertige Prüfung.",
+      "description_en": "Review the generated questions, rate them with thumbs up/down, and export your finished exam.",
+      "route": "/questions/review",
+      "highlight_selector": "[data-testid='review-queue']",
+      "nav_selector": "[data-testid='nav-questions-review']",
+      "tab_selector": null
+    },
+    {
+      "step": 6,
+      "title_de": "Benutzerverwaltung",
+      "title_en": "User Management",
+      "description_de": "Hier verwaltest du alle Benutzer deiner Institution, vergibst Rollen und setzt Berechtigungen.",
+      "description_en": "Here you manage all users of your institution, assign roles and set permissions.",
+      "route": "/admin",
+      "highlight_selector": "[data-testid='admin-tab-content-users']",
+      "nav_selector": "[data-testid='nav-admin']",
+      "tab_selector": null
+    },
+    {
+      "step": 7,
+      "title_de": "Institutionen",
+      "title_en": "Institutions",
+      "description_de": "Verwalte Institutionen und deren Einstellungen. Dieser Tab ist nur für Superadmins sichtbar.",
+      "description_en": "Manage institutions and their settings. This tab is only visible to superadmins.",
+      "route": "/admin",
+      "highlight_selector": "[data-testid='admin-tab-content-institutions']",
+      "nav_selector": null,
+      "tab_selector": "[data-testid='admin-tab-btn-institutions']"
+    },
+    {
+      "step": 8,
+      "title_de": "Rollen",
+      "title_en": "Roles",
+      "description_de": "Verwalte Benutzerrollen und deren Berechtigungen. Dieser Tab ist nur für Superadmins sichtbar.",
+      "description_en": "Manage user roles and permissions. This tab is only visible to superadmins.",
+      "route": "/admin",
+      "highlight_selector": "[data-testid='admin-tab-content-roles']",
+      "nav_selector": null,
+      "tab_selector": "[data-testid='admin-tab-btn-roles']"
+    },
+    {
+      "step": 9,
+      "title_de": "Audit-Log",
+      "title_en": "Audit Log",
+      "description_de": "Hier siehst du alle sicherheitsrelevanten Ereignisse deiner Institution — Logins, Rollenänderungen und mehr.",
+      "description_en": "Here you see all security-relevant events of your institution — logins, role changes, and more.",
+      "route": "/admin",
+      "highlight_selector": "[data-testid='admin-tab-content-audit']",
+      "nav_selector": null,
+      "tab_selector": "[data-testid='admin-tab-btn-audit']"
+    },
+    {
+      "step": 10,
+      "title_de": "Abonnement",
+      "title_en": "Subscription",
+      "description_de": "Hier siehst du den aktuellen Abonnementstatus deiner Institution, verfügbare Kontingente und Nutzungsstatistiken.",
+      "description_en": "Here you see your institution's current subscription status, available quotas, and usage statistics.",
+      "route": "/admin",
+      "highlight_selector": "[data-testid='admin-tab-content-subscription']",
+      "nav_selector": null,
+      "tab_selector": "[data-testid='admin-tab-btn-subscription']"
+    },
+    {
+      "step": 11,
+      "title_de": "Prompt-Bibliothek",
+      "title_en": "Prompt Library",
+      "description_de": "Verwalte und passe die KI-Prompts für die Fragengenerierung an. Eigene Vorlagen steigern die Qualität der Ergebnisse.",
+      "description_en": "Manage and customize the AI prompts for question generation. Custom templates improve result quality.",
+      "route": "/prompts",
+      "highlight_selector": "[data-testid='prompts-content']",
+      "nav_selector": "[data-testid='nav-prompts']",
+      "tab_selector": null
+    },
+    {
+      "step": 12,
+      "title_de": "Fertig!",
+      "title_en": "All Done!",
+      "description_de": "Dein System ist vollständig eingerichtet. Öffne das Hilfe-Widget jederzeit über den Button unten rechts.",
+      "description_en": "Your system is fully set up. Open the help widget anytime via the button at the bottom right.",
+      "route": null,
+      "highlight_selector": null,
+      "nav_selector": null,
+      "tab_selector": null
+    }
+  ]
+}

@@ -23,7 +23,9 @@ export const Review: React.FC = () => {
       </div>
 
       {/* Review Queue */}
-      <ReviewQueue />
+      <div data-testid="review-queue">
+        <ReviewQueue />
+      </div>
     </div>
   );
 };

@@ -16,6 +16,15 @@ from fastapi.testclient import TestClient
 from database import Base
 from main import app
 
+# Ensure all models are registered with Base before create_all() is called.
+# Models that use lazy imports in services/api must be explicitly imported here.
+import models.auth  # noqa: F401
+import models.document  # noqa: F401
+import models.question_review  # noqa: F401
+import models.rbac  # noqa: F401
+import models.email_event  # noqa: F401
+import models.help  # noqa: F401
+
 # Skip test files that need major fixture updates for current DB schema
 collect_ignore_glob = [
     "test_rbac.py",
@@ -201,3 +210,106 @@ def test_institution(test_db):
     test_db.refresh(institution)
 
     return institution
+
+
+# === Help Widget Shared Fixtures (TF-308) ===
+
+
+def _make_mock_user(is_admin: bool = False):
+    """Create a mock user for help API tests."""
+    from unittest.mock import MagicMock
+
+    user = MagicMock()
+    user.id = 999
+    user.email = "testuser@example.com"
+    user.first_name = "Test"
+    user.last_name = "User"
+    user.is_active = True
+    user.institution = None
+    role = MagicMock()
+    role.name = "admin" if is_admin else "teacher"
+    user.roles = [role]
+    return user
+
+
+@pytest.fixture(scope="function")
+def help_db(test_engine):
+    """DB session for help tests with seeded Institution + User for FK constraints."""
+    from sqlalchemy.orm import sessionmaker
+    from models.auth import Institution, User
+
+    TestSession = sessionmaker(bind=test_engine)
+    db = TestSession()
+
+    # Create institution (required by User.institution_id NOT NULL)
+    institution = Institution(
+        id=998,
+        name="Help Test University",
+        slug="help-test-university",
+        subscription_tier="free",
+        max_users=10,
+        max_documents=50,
+        max_questions_per_month=100,
+    )
+    db.merge(institution)
+    db.flush()
+
+    # Create user with id=999 to match mock_user.id
+    user = User(
+        id=999,
+        email="testuser@example.com",
+        first_name="Test",
+        last_name="User",
+        institution_id=998,
+        status="active",
+    )
+    db.merge(user)
+    db.commit()
+
+    yield db
+    db.rollback()
+    db.close()
+
+
+@pytest.fixture(scope="function")
+def help_client(help_db):
+    """TestClient with teacher user override."""
+    from main import app
+    from utils.auth_utils import get_current_user, get_current_active_user
+    from database import get_db
+    import api.v1.help as help_module
+    from fastapi.testclient import TestClient
+
+    app.include_router(help_module.router)
+
+    mock_user = _make_mock_user(is_admin=False)
+
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_current_active_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: help_db
+
+    client = TestClient(app, raise_server_exceptions=True)
+    yield client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(scope="function")
+def admin_client(help_db):
+    """TestClient with admin user override."""
+    from main import app
+    from utils.auth_utils import get_current_user, get_current_active_user
+    from database import get_db
+    import api.v1.help as help_module
+    from fastapi.testclient import TestClient
+
+    app.include_router(help_module.router)
+
+    mock_user = _make_mock_user(is_admin=True)
+
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_current_active_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: help_db
+
+    client = TestClient(app, raise_server_exceptions=True)
+    yield client
+    app.dependency_overrides.clear()

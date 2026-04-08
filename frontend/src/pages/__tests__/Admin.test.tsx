@@ -68,7 +68,7 @@ describe('Admin Page', () => {
 
       render(<Admin />);
 
-      expect(screen.getByTestId('user-management')).toBeInTheDocument();
+      expect(screen.getByTestId('admin-tab-content-users')).toBeInTheDocument();
     });
 
     it('switches to Audit Logs tab', () => {
@@ -79,7 +79,7 @@ describe('Admin Page', () => {
       fireEvent.click(screen.getByText('Audit Logs'));
 
       expect(screen.getByText('Audit Logs — Demnächst verfügbar')).toBeInTheDocument();
-      expect(screen.queryByTestId('user-management')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('admin-tab-content-users')).not.toBeInTheDocument();
     });
 
     it('switches to Subscription tab', () => {
@@ -89,7 +89,7 @@ describe('Admin Page', () => {
 
       fireEvent.click(screen.getByText('Abonnement'));
 
-      expect(screen.getByTestId('subscription-overview')).toBeInTheDocument();
+      expect(screen.getByTestId('admin-tab-content-subscription')).toBeInTheDocument();
     });
 
     it('switches to Institutions tab for superuser', () => {
@@ -99,7 +99,7 @@ describe('Admin Page', () => {
 
       fireEvent.click(screen.getByText('Institutionen'));
 
-      expect(screen.getByTestId('institution-management')).toBeInTheDocument();
+      expect(screen.getByTestId('admin-tab-content-institutions')).toBeInTheDocument();
     });
 
     it('switches to Roles tab for superuser', () => {
@@ -109,7 +109,7 @@ describe('Admin Page', () => {
 
       fireEvent.click(screen.getByText('Rollen & Berechtigungen'));
 
-      expect(screen.getByTestId('role-management')).toBeInTheDocument();
+      expect(screen.getByTestId('admin-tab-content-roles')).toBeInTheDocument();
     });
   });
 

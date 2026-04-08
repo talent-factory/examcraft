@@ -1396,5 +1396,37 @@
         "additionalVariables": "Additional Template Variables"
       }
     }
+  },
+  "help": {
+    "title": "Help",
+    "chatUnavailable": "The help chat is currently unavailable.",
+    "chatPlaceholder": "Ask a question...",
+    "send": "Send",
+    "newConversation": "New Conversation",
+    "onboarding": {
+      "skip": "Skip",
+      "next": "Next",
+      "finish": "Done",
+      "resume": "Continue later",
+      "later": "Later",
+      "startTour": "Start tour",
+      "confirmEndTitle": "End tour?",
+      "confirmEndText": "You can restart the tour anytime via the help button at the bottom right.",
+      "confirmEndCancel": "Cancel",
+      "confirmEndConfirm": "Yes, end tour",
+      "completedTitle": "🎉 Tour complete!",
+      "completedText": "You can open the help widget anytime via the button at the bottom right.",
+      "resumeText": "You haven't completed the onboarding tour yet.",
+      "resumeButton": "Resume tour"
+    },
+    "context": {
+      "understood": "Got it",
+      "learnMore": "Learn more",
+      "dontShowAgain": "Don't show again"
+    },
+    "feedback": {
+      "helpful": "Was this helpful?",
+      "thanks": "Thanks for your feedback!"
+    }
   }
 }

@@ -31,6 +31,7 @@ import { UserRole } from './types/auth';
 import { AppErrorBoundary } from './components/ErrorBoundary';
 import QuestionReviewDetail from './components/QuestionReviewDetail';
 import GenerationTasksBar from './components/GenerationTasksBar';
+import HelpWidget from './components/help/HelpWidget';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
 // Load Premium PromptLibrary with Upload (falls back to Core version)
@@ -58,6 +59,7 @@ export const AppWithAuth: React.FC = () => {
           <GenerationTasksProvider>
           <BrowserRouter>
             <GenerationTasksBar />
+            <HelpWidget />
             <Routes>
               {/* Public Routes - Only accessible when NOT authenticated */}
               <Route

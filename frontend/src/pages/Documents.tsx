@@ -48,7 +48,7 @@ export const Documents: React.FC = () => {
       </div>
 
       {/* Upload Section */}
-      <div className="card p-6">
+      <div className="card p-6" data-testid="upload-area">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
           {t('pages.documents.uploadTitle')}
         </h2>
@@ -56,7 +56,7 @@ export const Documents: React.FC = () => {
       </div>
 
       {/* Library Section */}
-      <div className="card p-6" ref={libraryRef}>
+      <div className="card p-6" ref={libraryRef} data-testid="document-list">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
           {t('pages.documents.myDocuments')}
         </h2>

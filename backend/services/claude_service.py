@@ -562,3 +562,13 @@ Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
         return demo_questions[:question_count]
 
     # NOTE: Only one _parse_claude_response method should exist - using the first one above
+
+
+_claude_service_instance = None
+
+
+def get_claude_service() -> "ClaudeService":
+    global _claude_service_instance
+    if _claude_service_instance is None:
+        _claude_service_instance = ClaudeService()
+    return _claude_service_instance

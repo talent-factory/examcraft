@@ -15,7 +15,7 @@ export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-8">
+    <div data-testid="dashboard-content" className="space-y-8">
       {/* Email Verification Banner */}
       <EmailVerificationBanner />
 

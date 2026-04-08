@@ -1396,5 +1396,37 @@
         "additionalVariables": "Zusätzliche Template-Variablen"
       }
     }
+  },
+  "help": {
+    "title": "Hilfe",
+    "chatUnavailable": "Der Hilfe-Chat ist derzeit nicht verfügbar.",
+    "chatPlaceholder": "Stelle eine Frage...",
+    "send": "Senden",
+    "newConversation": "Neue Konversation",
+    "onboarding": {
+      "skip": "Überspringen",
+      "next": "Weiter",
+      "finish": "Fertig",
+      "resume": "Später fortsetzen",
+      "later": "Später",
+      "startTour": "Tour starten",
+      "confirmEndTitle": "Tour beenden?",
+      "confirmEndText": "Du kannst die Tour später über den Hilfe-Button unten rechts neu starten.",
+      "confirmEndCancel": "Abbrechen",
+      "confirmEndConfirm": "Ja, beenden",
+      "completedTitle": "🎉 Tour abgeschlossen!",
+      "completedText": "Du kannst das Hilfe-Widget jederzeit über den Button unten rechts öffnen.",
+      "resumeText": "Du hast die Einführungstour noch nicht abgeschlossen.",
+      "resumeButton": "Tour fortsetzen"
+    },
+    "context": {
+      "understood": "Verstanden",
+      "learnMore": "Mehr erfahren",
+      "dontShowAgain": "Nicht mehr anzeigen"
+    },
+    "feedback": {
+      "helpful": "War das hilfreich?",
+      "thanks": "Danke für dein Feedback!"
+    }
   }
 }

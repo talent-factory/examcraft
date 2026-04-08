@@ -49,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
         <div className="flex items-center">
           <Link
             to={item.path}
+            data-testid={`nav-${item.path.slice(1).replace(/\//g, '-')}`}
             className={`flex-1 flex items-center px-4 py-3 rounded-lg transition-colors duration-250 ${
               isActive
                 ? 'bg-primary-100 text-primary-700 font-medium'
