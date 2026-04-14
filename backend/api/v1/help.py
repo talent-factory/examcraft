@@ -254,10 +254,15 @@ async def dismiss_hint(
 # === CHAT MESSAGE ===
 
 
+class ConversationMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., max_length=2000)
+
+
 class HelpMessageRequest(BaseModel):
     question: str = Field(..., min_length=2, max_length=1000)
     route: str = Field(default="/")
-    conversation_history: Optional[List[Dict[str, Any]]] = None
+    conversation_history: Optional[List[ConversationMessage]] = None
 
 
 class HelpMessageResponse(BaseModel):
@@ -282,14 +287,16 @@ async def send_help_message(
 
         redis_client = RedisService.get_ratelimit_client()
         rate_key = f"help_message_rate:{current_user.id}"
-        count = redis_client.get(rate_key)
-        if count and int(count) >= 20:
+        pipe = redis_client.pipeline()
+        pipe.incr(rate_key)
+        pipe.expire(rate_key, 3600, nx=True)
+        results = pipe.execute()
+        current_count = results[0]
+        if current_count > 20:
             raise HTTPException(
                 status_code=429,
                 detail="Rate limit exceeded: max 20 help questions per hour",
             )
-        redis_client.incr(rate_key)
-        redis_client.expire(rate_key, 3600)
     except HTTPException:
         raise
     except Exception as e:

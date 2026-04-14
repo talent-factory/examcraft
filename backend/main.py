@@ -117,7 +117,7 @@ async def lifespan(app: FastAPI):
             else:
                 print("ℹ️  Qdrant not available, docs indexing skipped")
         except Exception as e:
-            print(f"⚠️  Docs indexing skipped: {e}")
+            logger.error(f"Docs indexing failed: {e}", exc_info=True)
     else:
         print("ℹ️  Running in Core mode - Premium features disabled")
 

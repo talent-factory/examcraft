@@ -106,7 +106,11 @@ class HelpService {
       headers: this.getHeaders(token),
       body: JSON.stringify({ question, route, conversation_history: conversationHistory }),
     });
-    if (!response.ok) throw new Error('Failed to send help message');
+    if (!response.ok) {
+      const err = new Error('Failed to send help message') as Error & { status: number };
+      err.status = response.status;
+      throw err;
+    }
     return response.json();
   }
 

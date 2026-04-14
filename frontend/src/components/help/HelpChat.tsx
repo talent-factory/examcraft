@@ -51,10 +51,17 @@ const HelpChat: React.FC<HelpChatProps> = ({ route }) => {
           sources: result.sources,
         },
       ]);
-    } catch {
+    } catch (err: any) {
+      console.error('Help chat error:', err);
+      let errorMessage = t('help.chatUnavailable');
+      if (err?.status === 429) {
+        errorMessage = t('help.rateLimited');
+      } else if (err?.status === 401 || err?.status === 403) {
+        errorMessage = t('help.sessionExpired');
+      }
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: t('help.chatUnavailable') },
+        { role: 'assistant', content: errorMessage },
       ]);
     } finally {
       setLoading(false);

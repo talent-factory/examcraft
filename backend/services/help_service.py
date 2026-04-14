@@ -5,6 +5,14 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
+class VectorSearchError(Exception):
+    pass
+
+
+class ClaudeAPIError(Exception):
+    pass
+
+
 class HelpService:
     def __init__(self, db: Session):
         self.db = db
@@ -22,7 +30,17 @@ class HelpService:
         if cached:
             return cached
 
-        chunks = await self._search_docs(question)
+        try:
+            chunks = await self._search_docs(question)
+        except VectorSearchError:
+            return {
+                "answer": self._service_error_message(locale),
+                "confidence": 0.0,
+                "sources": [],
+                "docs_links": [],
+                "escalate": False,
+            }
+
         if not chunks or chunks[0]["score"] < 0.3:
             return {
                 "answer": self._no_answer_message(locale),
@@ -32,20 +50,29 @@ class HelpService:
                 "escalate": True,
             }
 
-        result = await self._call_claude(
-            question, chunks, user_role, user_tier, route, conversation_history, locale
-        )
-        if result["confidence"] < 0.6:
+        try:
             result = await self._call_claude(
-                question,
-                chunks,
-                user_role,
-                user_tier,
-                route,
-                conversation_history,
-                locale,
-                model="sonnet",
+                question, chunks, user_role, user_tier, route, conversation_history, locale
             )
+            if result["confidence"] < 0.6:
+                result = await self._call_claude(
+                    question,
+                    chunks,
+                    user_role,
+                    user_tier,
+                    route,
+                    conversation_history,
+                    locale,
+                    model="sonnet",
+                )
+        except ClaudeAPIError:
+            return {
+                "answer": self._service_error_message(locale),
+                "confidence": 0.0,
+                "sources": [],
+                "docs_links": [],
+                "escalate": False,
+            }
 
         result["escalate"] = result["confidence"] < 0.5
         return result
@@ -86,7 +113,7 @@ class HelpService:
             ]
         except Exception as e:
             logger.error(f"Qdrant search failed: {e}", exc_info=True)
-            return []
+            raise VectorSearchError(str(e)) from e
 
     async def _call_claude(
         self,
@@ -117,7 +144,10 @@ class HelpService:
         messages = []
         if history:
             for msg in history[-10:]:
-                messages.append({"role": msg["role"], "content": msg["content"]})
+                if isinstance(msg, dict):
+                    messages.append({"role": msg["role"], "content": msg["content"]})
+                else:
+                    messages.append({"role": msg.role, "content": msg.content})
         messages.append(
             {
                 "role": "user",
@@ -177,12 +207,7 @@ class HelpService:
             }
         except Exception as e:
             logger.error(f"Claude API call failed: {e}", exc_info=True)
-            return {
-                "answer": self._error_message(locale),
-                "confidence": 0.0,
-                "sources": [],
-                "docs_links": [],
-            }
+            raise ClaudeAPIError(str(e)) from e
 
     def _no_answer_message(self, locale: str) -> str:
         if locale == "de":
@@ -193,6 +218,17 @@ class HelpService:
         return (
             "I couldn't find a matching answer in the documentation. "
             "Would you like to contact support?"
+        )
+
+    def _service_error_message(self, locale: str) -> str:
+        if locale == "de":
+            return (
+                "Der Dienst ist vorübergehend nicht verfügbar. "
+                "Bitte versuche es später erneut oder besuche unsere Dokumentation."
+            )
+        return (
+            "The service is temporarily unavailable. "
+            "Please try again later or visit our documentation."
         )
 
     def _error_message(self, locale: str) -> str:

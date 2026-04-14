@@ -27,11 +27,19 @@ class DocsIndexerService:
             full_scan = True
 
         # Ensure the docs_help collection exists before any indexing
-        self._ensure_collection()
+        try:
+            self._ensure_collection()
+        except Exception as e:
+            logger.error(f"Cannot proceed with indexing: failed to ensure collection: {e}")
+            return {"indexed": 0, "deleted": 0}
 
         if full_scan:
             # Full Replace: clear entire collection before re-indexing
-            self._clear_collection()
+            try:
+                self._clear_collection()
+            except Exception as e:
+                logger.error(f"Cannot proceed with full-scan indexing: failed to clear collection: {e}")
+                return {"indexed": 0, "deleted": 0}
             changed = self._get_all_md_files()
             deleted = []
         elif not full_scan and state.last_indexed_sha:
@@ -42,8 +50,8 @@ class DocsIndexerService:
 
         indexed = 0
         for filepath in changed:
-            await self._index_file(filepath)
-            indexed += 1
+            if await self._index_file(filepath):
+                indexed += 1
 
         deleted_count = 0
         for filepath in deleted:
@@ -64,51 +72,45 @@ class DocsIndexerService:
 
     def _ensure_collection(self) -> None:
         """Create the docs_help collection if it doesn't exist."""
-        try:
-            from services.vector_service_factory import vector_service
+        from services.vector_service_factory import vector_service
 
-            if not hasattr(vector_service, "client") or vector_service.client is None:
-                return
+        if not hasattr(vector_service, "client") or vector_service.client is None:
+            return
 
-            if hasattr(vector_service, "get_or_create_collection"):
-                vector_service.get_or_create_collection("docs_help")
-                logger.info("Ensured docs_help collection exists")
-            else:
-                # Fallback: create manually if vector_service lacks the method
-                from qdrant_client.http.models import VectorParams, Distance
+        if hasattr(vector_service, "get_or_create_collection"):
+            vector_service.get_or_create_collection("docs_help")
+            logger.info("Ensured docs_help collection exists")
+        else:
+            # Fallback: create manually if vector_service lacks the method
+            from qdrant_client.http.models import VectorParams, Distance
 
-                collections = vector_service.client.get_collections()
-                if not any(c.name == "docs_help" for c in collections.collections):
-                    embedding_dim = 384  # Default for sentence-transformers
-                    vector_service.client.create_collection(
-                        collection_name="docs_help",
-                        vectors_config=VectorParams(
-                            size=embedding_dim, distance=Distance.COSINE
-                        ),
-                    )
-                    logger.info("Created docs_help collection (384 dim, cosine)")
-        except Exception as e:
-            logger.error(f"Failed to ensure docs_help collection: {e}")
+            collections = vector_service.client.get_collections()
+            if not any(c.name == "docs_help" for c in collections.collections):
+                embedding_dim = 384  # Default for sentence-transformers
+                vector_service.client.create_collection(
+                    collection_name="docs_help",
+                    vectors_config=VectorParams(
+                        size=embedding_dim, distance=Distance.COSINE
+                    ),
+                )
+                logger.info("Created docs_help collection (384 dim, cosine)")
 
     def _clear_collection(self) -> None:
         """Delete all points from the docs_help collection (Full Replace strategy)."""
-        try:
-            from services.vector_service_factory import vector_service
-            from qdrant_client.http import models
+        from services.vector_service_factory import vector_service
+        from qdrant_client.http import models
 
-            if not hasattr(vector_service, "client") or vector_service.client is None:
-                logger.warning("Qdrant not available, skipping collection clear")
-                return
+        if not hasattr(vector_service, "client") or vector_service.client is None:
+            logger.warning("Qdrant not available, skipping collection clear")
+            return
 
-            vector_service.client.delete(
-                collection_name="docs_help",
-                points_selector=models.FilterSelector(
-                    filter=models.Filter(must=[])
-                ),
-            )
-            logger.info("Cleared docs_help collection for full re-index")
-        except Exception as e:
-            logger.error(f"Failed to clear docs_help collection: {e}")
+        vector_service.client.delete(
+            collection_name="docs_help",
+            points_selector=models.FilterSelector(
+                filter=models.Filter(must=[])
+            ),
+        )
+        logger.info("Cleared docs_help collection for full re-index")
 
     def _get_all_md_files(self) -> List[str]:
         md_files = []
@@ -158,6 +160,7 @@ class DocsIndexerService:
             )
             return result.stdout.strip()
         except subprocess.CalledProcessError:
+            logger.warning("Could not determine current git SHA")
             return None
 
     def _parse_markdown(
@@ -207,13 +210,13 @@ class DocsIndexerService:
             return "en"
         return "de"
 
-    async def _index_file(self, filepath: str) -> None:
+    async def _index_file(self, filepath: str) -> bool:
         try:
             with open(filepath, encoding="utf-8") as f:
                 content = f.read()
         except FileNotFoundError:
             logger.warning(f"File not found: {filepath}")
-            return
+            return False
 
         language = self._detect_language(filepath)
         chunks = self._parse_markdown(content, filepath, language)
@@ -226,7 +229,7 @@ class DocsIndexerService:
 
             if not hasattr(vector_service, "client") or vector_service.client is None:
                 logger.warning("Qdrant not available, skipping indexing")
-                return
+                return False
 
             texts = [chunk["content"] for chunk in chunks]
             embeddings = await vector_service.create_embeddings(texts)
@@ -245,8 +248,10 @@ class DocsIndexerService:
                 for i, chunk in enumerate(chunks)
             ]
             vector_service.client.upsert(collection_name="docs_help", points=points)
+            return True
         except Exception as e:
             logger.error(f"Failed to index {filepath}: {e}")
+            return False
 
     async def _remove_file_from_index(self, filepath: str) -> None:
         try:

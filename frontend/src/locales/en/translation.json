@@ -1408,6 +1408,8 @@
   "help": {
     "title": "Help",
     "chatUnavailable": "The help chat is currently unavailable.",
+    "rateLimited": "You've reached the question limit. Please try again later.",
+    "sessionExpired": "Your session has expired. Please reload the page.",
     "chatPlaceholder": "Ask a question...",
     "send": "Send",
     "newConversation": "New Conversation",
