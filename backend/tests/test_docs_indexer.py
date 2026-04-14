@@ -37,3 +37,80 @@ def test_parse_short_sections_skipped():
     chunks = service._parse_markdown(content, "test.md", "de")
     # "OK" has < 20 chars so it's skipped
     assert all(len(c["content"]) >= 20 for c in chunks)
+
+
+from unittest.mock import MagicMock, AsyncMock, patch
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_full_scan_clears_collection_before_indexing():
+    """full_scan=True must delete all points from docs_help before re-indexing."""
+    mock_db = MagicMock()
+    # HelpIndexState query returns None → triggers full_scan
+    mock_db.query.return_value.first.return_value = None
+    mock_db.add = MagicMock()
+    mock_db.commit = MagicMock()
+
+    service = DocsIndexerService(mock_db)
+
+    mock_client = MagicMock()
+    mock_vector_service = MagicMock()
+    mock_vector_service.client = mock_client
+    mock_vector_service.create_embeddings = AsyncMock(return_value=[])
+
+    with (
+        patch(
+            "services.docs_indexer_service.DocsIndexerService._get_all_md_files",
+            return_value=[],
+        ),
+        patch(
+            "services.docs_indexer_service.DocsIndexerService._get_current_sha",
+            return_value="abc123" * 6 + "abcd",
+        ),
+        patch(
+            "services.vector_service_factory.vector_service",
+            mock_vector_service,
+        ),
+    ):
+        result = await service.run_index(full_scan=True)
+
+    # Verify collection was cleared
+    mock_client.delete.assert_called_once()
+    call_kwargs = mock_client.delete.call_args
+    assert call_kwargs[1]["collection_name"] == "docs_help"
+
+
+@pytest.mark.asyncio
+async def test_incremental_scan_does_not_clear_collection():
+    """full_scan=False should NOT delete all points."""
+    mock_db = MagicMock()
+    mock_state = MagicMock()
+    mock_state.last_indexed_sha = "a" * 40
+    mock_db.query.return_value.first.return_value = mock_state
+    mock_db.commit = MagicMock()
+
+    service = DocsIndexerService(mock_db)
+
+    mock_client = MagicMock()
+    mock_vector_service = MagicMock()
+    mock_vector_service.client = mock_client
+
+    with (
+        patch(
+            "services.docs_indexer_service.DocsIndexerService._get_changed_files",
+            return_value=([], []),
+        ),
+        patch(
+            "services.docs_indexer_service.DocsIndexerService._get_current_sha",
+            return_value="b" * 40,
+        ),
+        patch(
+            "services.vector_service_factory.vector_service",
+            mock_vector_service,
+        ),
+    ):
+        result = await service.run_index(full_scan=False)
+
+    # delete should NOT have been called (no full clear)
+    mock_client.delete.assert_not_called()

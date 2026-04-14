@@ -26,7 +26,12 @@ class DocsIndexerService:
             self.db.commit()
             full_scan = True
 
-        if not full_scan and state.last_indexed_sha:
+        if full_scan:
+            # Full Replace: clear entire collection before re-indexing
+            self._clear_collection()
+            changed = self._get_all_md_files()
+            deleted = []
+        elif not full_scan and state.last_indexed_sha:
             changed, deleted = self._get_changed_files(state.last_indexed_sha)
         else:
             changed = self._get_all_md_files()
@@ -53,6 +58,26 @@ class DocsIndexerService:
 
         logger.info(f"Indexing complete: {indexed} indexed, {deleted_count} deleted")
         return {"indexed": indexed, "deleted": deleted_count}
+
+    def _clear_collection(self) -> None:
+        """Delete all points from the docs_help collection (Full Replace strategy)."""
+        try:
+            from services.vector_service_factory import vector_service
+            from qdrant_client.http import models
+
+            if not hasattr(vector_service, "client") or vector_service.client is None:
+                logger.warning("Qdrant not available, skipping collection clear")
+                return
+
+            vector_service.client.delete(
+                collection_name="docs_help",
+                points_selector=models.FilterSelector(
+                    filter=models.Filter(must=[])
+                ),
+            )
+            logger.info("Cleared docs_help collection for full re-index")
+        except Exception as e:
+            logger.error(f"Failed to clear docs_help collection: {e}")
 
     def _get_all_md_files(self) -> List[str]:
         md_files = []
