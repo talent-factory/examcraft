@@ -2,6 +2,90 @@
 
 # Fixtures help_db, help_client, admin_client are defined in conftest.py
 
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from services.help_service import HelpService
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_retries_with_sonnet():
+    """answer_question retries with model='sonnet' when first call returns confidence < 0.6."""
+    mock_db = MagicMock()
+    service = HelpService(mock_db)
+
+    high_score_chunk = {
+        "content": "Some helpful documentation content.",
+        "source_file": "docs/help.md",
+        "section": "Getting Started",
+        "language": "de",
+        "score": 0.85,
+    }
+
+    first_result = {
+        "answer": "Weak answer",
+        "confidence": 0.4,
+        "sources": [],
+        "docs_links": [],
+    }
+    second_result = {
+        "answer": "Strong answer",
+        "confidence": 0.85,
+        "sources": [],
+        "docs_links": [],
+    }
+
+    with (
+        patch.object(service, '_try_faq_cache', new=AsyncMock(return_value=None)),
+        patch.object(service, '_search_docs', new=AsyncMock(return_value=[high_score_chunk])),
+        patch.object(
+            service,
+            '_call_claude',
+            new=AsyncMock(side_effect=[first_result, second_result]),
+        ) as mock_call,
+    ):
+        result = await service.answer_question(
+            question="Wie exportiere ich eine Prüfung?",
+            user_role="teacher",
+            user_tier="starter",
+            route="/exams",
+        )
+
+    assert mock_call.call_count == 2
+    # Second call must have model="sonnet"
+    _, second_kwargs = mock_call.call_args_list[1]
+    assert second_kwargs.get("model") == "sonnet"
+    assert result["confidence"] == 0.85
+
+
+@pytest.mark.asyncio
+async def test_low_score_docs_returns_escalate_true():
+    """answer_question returns escalate=True and confidence=0.0 when all chunks score < 0.3."""
+    mock_db = MagicMock()
+    service = HelpService(mock_db)
+
+    low_score_chunk = {
+        "content": "Unrelated content.",
+        "source_file": "docs/other.md",
+        "section": "Other",
+        "language": "de",
+        "score": 0.1,
+    }
+
+    with (
+        patch.object(service, '_try_faq_cache', new=AsyncMock(return_value=None)),
+        patch.object(service, '_search_docs', new=AsyncMock(return_value=[low_score_chunk])),
+    ):
+        result = await service.answer_question(
+            question="Was ist die Antwort auf alles?",
+            user_role="student",
+            user_tier="free",
+            route="/dashboard",
+        )
+
+    assert result["escalate"] is True
+    assert result["confidence"] == 0.0
+
 
 def test_full_help_flow(help_client, help_db, admin_client):
     """Status -> Onboarding -> Context -> Feedback -> Admin queue."""

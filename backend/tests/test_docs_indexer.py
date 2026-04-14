@@ -114,3 +114,12 @@ async def test_incremental_scan_does_not_clear_collection():
 
     # delete should NOT have been called (no full clear)
     mock_client.delete.assert_not_called()
+
+
+def test_invalid_sha_falls_back_to_full_scan():
+    service = DocsIndexerService.__new__(DocsIndexerService)
+    with patch.object(service, '_get_all_md_files', return_value=['a.md', 'b.md']) as mock_all:
+        changed, deleted = service._get_changed_files("not-a-valid-sha; rm -rf /")
+        assert changed == ['a.md', 'b.md']
+        assert deleted == []
+        mock_all.assert_called_once()
