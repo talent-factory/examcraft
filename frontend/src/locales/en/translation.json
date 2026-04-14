@@ -4,6 +4,7 @@
     "settings": "Settings",
     "logout": "Logout",
     "language": "Language",
+    "documentation": "Documentation",
     "sidebar": {
       "dashboard": "Dashboard",
       "documents": "Documents",
