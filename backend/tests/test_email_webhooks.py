@@ -10,6 +10,7 @@ Tests für:
 import pytest
 import hmac
 import hashlib
+import os
 from datetime import datetime
 from unittest.mock import patch
 
@@ -84,7 +85,10 @@ class TestWebhookEndpoint:
 
     def test_webhook_without_secret_development_mode(self, client):
         """Webhook processes without secret in development mode"""
-        with patch.dict("os.environ", {"ENVIRONMENT": "development"}, clear=True):
+        env = os.environ.copy()
+        env.pop("RESEND_WEBHOOK_SECRET", None)
+        env["ENVIRONMENT"] = "development"
+        with patch.dict("os.environ", env, clear=True):
             response = client.post(
                 "/webhooks/resend",
                 json={
@@ -102,7 +106,10 @@ class TestWebhookEndpoint:
 
     def test_webhook_without_secret_production_mode_rejected(self, client):
         """Webhook without secret is rejected in production mode"""
-        with patch.dict("os.environ", {"ENVIRONMENT": "production"}, clear=True):
+        env = os.environ.copy()
+        env.pop("RESEND_WEBHOOK_SECRET", None)
+        env["ENVIRONMENT"] = "production"
+        with patch.dict("os.environ", env, clear=True):
             response = client.post(
                 "/webhooks/resend",
                 json={
@@ -138,7 +145,10 @@ class TestWebhookEndpoint:
 
     def test_webhook_invalid_json_rejected(self, client):
         """Webhook with invalid JSON is rejected"""
-        with patch.dict("os.environ", {"ENVIRONMENT": "development"}, clear=True):
+        env = os.environ.copy()
+        env.pop("RESEND_WEBHOOK_SECRET", None)
+        env["ENVIRONMENT"] = "development"
+        with patch.dict("os.environ", env, clear=True):
             response = client.post(
                 "/webhooks/resend",
                 content="not json",
