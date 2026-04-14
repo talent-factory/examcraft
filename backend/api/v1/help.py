@@ -411,6 +411,43 @@ class MetricsResponse(BaseModel):
     avg_confidence: float
 
 
+class ClusterResponse(BaseModel):
+    id: int
+    topic_label: str
+    positive_count: int
+    negative_count: int
+    total_count: int
+    status: str
+    docs_gap: bool
+    suggested_answer_de: Optional[str] = None
+    suggested_answer_en: Optional[str] = None
+
+
+class ClusterListResponse(BaseModel):
+    items: List[ClusterResponse]
+    total: int
+
+
+class FaqCandidateResponse(BaseModel):
+    id: int
+    question_text: str
+    answer_de: str
+    answer_en: str
+    faq_status: str
+    cluster_id: Optional[int] = None
+    hit_count: int
+
+
+class FaqCandidateListResponse(BaseModel):
+    items: List[FaqCandidateResponse]
+    total: int
+
+
+class FaqApproveRequest(BaseModel):
+    answer_de: Optional[str] = None
+    answer_en: Optional[str] = None
+
+
 def _require_admin(user: User):
     if not any(r.name == "admin" for r in user.roles):
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -489,3 +526,137 @@ async def get_metrics(
 
     service = HelpFeedbackService(db)
     return MetricsResponse(**service.get_metrics())
+
+
+@router.get("/admin/clusters", response_model=ClusterListResponse)
+async def get_clusters(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    _require_admin(current_user)
+    from models.feedback_cluster import FeedbackCluster
+
+    query = db.query(FeedbackCluster).filter(FeedbackCluster.status == "aktiv")
+    total = query.count()
+    items = query.order_by(FeedbackCluster.total_count.desc()).offset(offset).limit(limit).all()
+    return ClusterListResponse(
+        items=[ClusterResponse(**c.to_dict()) for c in items],
+        total=total,
+    )
+
+
+@router.get("/admin/faq-candidates", response_model=FaqCandidateListResponse)
+async def get_faq_candidates(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    _require_admin(current_user)
+    from models.help import HelpFaqCache
+
+    items = db.query(HelpFaqCache).filter(HelpFaqCache.faq_status == "vorgeschlagen").all()
+    return FaqCandidateListResponse(
+        items=[
+            FaqCandidateResponse(
+                id=f.id,
+                question_text=f.question_text,
+                answer_de=f.answer_de,
+                answer_en=f.answer_en,
+                faq_status=f.faq_status,
+                cluster_id=f.cluster_id,
+                hit_count=f.hit_count,
+            )
+            for f in items
+        ],
+        total=len(items),
+    )
+
+
+@router.post("/admin/faq-candidates/{faq_id}/approve")
+async def approve_faq_candidate(
+    faq_id: int,
+    request_body: FaqApproveRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    _require_admin(current_user)
+    from models.help import HelpFaqCache
+
+    faq = db.query(HelpFaqCache).filter(HelpFaqCache.id == faq_id).first()
+    if not faq:
+        raise HTTPException(status_code=404, detail="FAQ candidate not found")
+
+    if request_body.answer_de:
+        faq.answer_de = request_body.answer_de
+    if request_body.answer_en:
+        faq.answer_en = request_body.answer_en
+
+    faq.faq_status = "freigegeben"
+    faq.approved_by = current_user.id
+    faq.stale = False
+
+    # Index in faq_approved Qdrant collection for cache lookups
+    try:
+        from services.vector_service_factory import vector_service
+
+        if hasattr(vector_service, "client") and vector_service.client is not None:
+            if hasattr(vector_service, "get_or_create_collection"):
+                vector_service.get_or_create_collection("faq_approved")
+
+            embeddings = await vector_service.create_embeddings([faq.question_text])
+            if len(embeddings) > 0:
+                import uuid
+                from qdrant_client.http.models import PointStruct
+
+                vector_service.client.upsert(
+                    collection_name="faq_approved",
+                    points=[
+                        PointStruct(
+                            id=str(uuid.uuid4()),
+                            vector=embeddings[0].tolist(),
+                            payload={"faq_id": faq.id},
+                        )
+                    ],
+                )
+    except Exception as e:
+        logger.warning(f"Failed to index approved FAQ in Qdrant: {e}")
+
+    db.commit()
+    return {"status": "approved", "id": faq.id}
+
+
+@router.post("/admin/faq-candidates/{faq_id}/reject")
+async def reject_faq_candidate(
+    faq_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    _require_admin(current_user)
+    from models.help import HelpFaqCache
+
+    faq = db.query(HelpFaqCache).filter(HelpFaqCache.id == faq_id).first()
+    if not faq:
+        raise HTTPException(status_code=404, detail="FAQ candidate not found")
+
+    faq.faq_status = "verworfen"
+    db.commit()
+    return {"status": "rejected", "id": faq.id}
+
+
+@router.post("/admin/clusters/{cluster_id}/mark-docs-gap")
+async def mark_docs_gap(
+    cluster_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    _require_admin(current_user)
+    from models.feedback_cluster import FeedbackCluster
+
+    cluster = db.query(FeedbackCluster).filter(FeedbackCluster.id == cluster_id).first()
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Cluster not found")
+
+    cluster.docs_gap = True
+    db.commit()
+    return {"status": "marked", "id": cluster.id, "topic": cluster.topic_label}
