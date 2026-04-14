@@ -279,7 +279,7 @@ const HelpWidget: React.FC = () => {
           </Box>
 
           {/* Content */}
-          <Box sx={{ flex: 1, overflow: 'auto' }}>
+          <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             {/* Tour completion message */}
             {tourJustCompleted && (
               <Box sx={{ p: 3 }}>
@@ -344,7 +344,11 @@ const HelpWidget: React.FC = () => {
             )}
 
             {/* Chat */}
-            {chatAvailable && <HelpChat route={route} />}
+            {chatAvailable && (
+              <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <HelpChat route={route} />
+              </Box>
+            )}
 
             {/* Fallback */}
             {!chatAvailable && !showOnboarding && (!hasContextHint || contextHintDismissed) && !tourJustCompleted && (
