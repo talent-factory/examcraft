@@ -179,6 +179,9 @@ class HelpFaqCache(Base):
     hit_count = Column(Integer, default=0, nullable=False)
     last_used = Column(DateTime(timezone=True), nullable=True)
     stale = Column(Boolean, default=False, nullable=False)
+    approved_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    cluster_id = Column(Integer, ForeignKey("feedback_clusters.id", ondelete="SET NULL"), nullable=True, index=True)
+    faq_status = Column(String(20), default="vorgeschlagen", nullable=False)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -192,6 +195,9 @@ class HelpFaqCache(Base):
             "docs_links": self.docs_links,
             "hit_count": self.hit_count,
             "stale": self.stale,
+            "faq_status": self.faq_status,
+            "cluster_id": self.cluster_id,
+            "approved_by": self.approved_by,
         }
 
 
