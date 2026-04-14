@@ -60,43 +60,44 @@ const HelpFeedbackQueue: React.FC = () => {
   const [editDialog, setEditDialog] = useState<FaqCandidate | null>(null);
   const [editAnswerDe, setEditAnswerDe] = useState('');
   const [editAnswerEn, setEditAnswerEn] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const headers = { Authorization: `Bearer ${accessToken}` };
 
   const fetchQueue = async () => {
     if (!accessToken) return;
+    setError(null);
     const params = new URLSearchParams();
     if (statusFilter) params.set('status', statusFilter);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/feedback-queue?${params}`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data.items);
-        setTotal(data.total);
-      }
-    } catch { /* ignore */ }
+      if (!res.ok) { setError(`Feedback laden fehlgeschlagen (${res.status})`); return; }
+      const data = await res.json();
+      setItems(data.items);
+      setTotal(data.total);
+    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
   };
 
   const fetchClusters = async () => {
     if (!accessToken) return;
+    setError(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/clusters`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setClusters(data.items);
-      }
-    } catch { /* ignore */ }
+      if (!res.ok) { setError(`Clusters laden fehlgeschlagen (${res.status})`); return; }
+      const data = await res.json();
+      setClusters(data.items);
+    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
   };
 
   const fetchCandidates = async () => {
     if (!accessToken) return;
+    setError(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/faq-candidates`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setCandidates(data.items);
-      }
-    } catch { /* ignore */ }
+      if (!res.ok) { setError(`FAQ-Kandidaten laden fehlgeschlagen (${res.status})`); return; }
+      const data = await res.json();
+      setCandidates(data.items);
+    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
   };
 
   useEffect(() => {
@@ -107,38 +108,54 @@ const HelpFeedbackQueue: React.FC = () => {
   }, [accessToken, tabIndex, statusFilter]);
 
   const updateStatus = async (id: number, newStatus: string) => {
-    await fetch(`${API_BASE_URL}/api/v1/help/admin/feedback/${id}`, {
-      method: 'PUT',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    fetchQueue();
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/feedback/${id}`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) { setError(`Status-Update fehlgeschlagen (${res.status})`); return; }
+      setError(null);
+      fetchQueue();
+    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
   };
 
   const approveFaq = async (id: number, answerDe?: string, answerEn?: string) => {
-    await fetch(`${API_BASE_URL}/api/v1/help/admin/faq-candidates/${id}/approve`, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answer_de: answerDe || null, answer_en: answerEn || null }),
-    });
-    setEditDialog(null);
-    fetchCandidates();
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/faq-candidates/${id}/approve`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer_de: answerDe || null, answer_en: answerEn || null }),
+      });
+      if (!res.ok) { setError(`FAQ-Freigabe fehlgeschlagen (${res.status})`); return; }
+      setError(null);
+      setEditDialog(null);
+      fetchCandidates();
+    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
   };
 
   const rejectFaq = async (id: number) => {
-    await fetch(`${API_BASE_URL}/api/v1/help/admin/faq-candidates/${id}/reject`, {
-      method: 'POST',
-      headers: { ...headers },
-    });
-    fetchCandidates();
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/faq-candidates/${id}/reject`, {
+        method: 'POST',
+        headers: { ...headers },
+      });
+      if (!res.ok) { setError(`FAQ-Ablehnung fehlgeschlagen (${res.status})`); return; }
+      setError(null);
+      fetchCandidates();
+    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
   };
 
   const markDocsGap = async (clusterId: number) => {
-    await fetch(`${API_BASE_URL}/api/v1/help/admin/clusters/${clusterId}/mark-docs-gap`, {
-      method: 'POST',
-      headers: { ...headers },
-    });
-    fetchClusters();
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/clusters/${clusterId}/mark-docs-gap`, {
+        method: 'POST',
+        headers: { ...headers },
+      });
+      if (!res.ok) { setError(`Docs-Lücke markieren fehlgeschlagen (${res.status})`); return; }
+      setError(null);
+      fetchClusters();
+    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
   };
 
   return (
@@ -148,6 +165,8 @@ const HelpFeedbackQueue: React.FC = () => {
         <Tab label={`FAQ-Kandidaten (${candidates.length})`} />
         <Tab label="Clusters & Docs-Lücken" />
       </Tabs>
+
+      {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
 
       {/* Tab 0: Feedback Queue */}
       {tabIndex === 0 && (

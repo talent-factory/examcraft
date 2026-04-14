@@ -603,8 +603,9 @@ async def approve_faq_candidate(
     faq.faq_status = "freigegeben"
     faq.approved_by = current_user.id
     faq.stale = False
+    db.commit()
 
-    # Index in faq_approved Qdrant collection for cache lookups
+    # Index in faq_approved Qdrant collection for cache lookups (after DB commit)
     try:
         from services.vector_service_factory import vector_service
 
@@ -628,9 +629,8 @@ async def approve_faq_candidate(
                     ],
                 )
     except Exception as e:
-        logger.warning(f"Failed to index approved FAQ in Qdrant: {e}")
+        logger.error(f"Failed to index approved FAQ in Qdrant: {e}", exc_info=True)
 
-    db.commit()
     return {"status": "approved", "id": faq.id}
 
 

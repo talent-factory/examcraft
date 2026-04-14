@@ -118,7 +118,11 @@ class HelpService:
 
             from models.help import HelpFaqCache
 
-            faq = self.db.query(HelpFaqCache).filter(HelpFaqCache.id == faq_id).first()
+            faq = self.db.query(HelpFaqCache).filter(
+                HelpFaqCache.id == faq_id,
+                HelpFaqCache.faq_status == "freigegeben",
+                HelpFaqCache.stale.is_(False),
+            ).first()
             if not faq:
                 return None
 
@@ -144,7 +148,7 @@ class HelpService:
             from services.vector_service_factory import vector_service
 
             if not hasattr(vector_service, "client") or vector_service.client is None:
-                return []
+                raise VectorSearchError("Qdrant client not available")
 
             embeddings = await vector_service.create_embeddings([question])
             if len(embeddings) == 0:

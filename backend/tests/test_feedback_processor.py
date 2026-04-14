@@ -30,7 +30,13 @@ async def test_assign_cluster_creates_new_when_no_match():
     mock_db = MagicMock()
     mock_db.add = MagicMock()
     mock_db.commit = MagicMock()
-    mock_db.flush = MagicMock()
+
+    # Simulate flush setting the id on the added cluster
+    def fake_flush():
+        added_obj = mock_db.add.call_args[0][0]
+        added_obj.id = 99
+
+    mock_db.flush = MagicMock(side_effect=fake_flush)
 
     service = FeedbackProcessorService(mock_db)
 
@@ -49,7 +55,7 @@ async def test_assign_cluster_creates_new_when_no_match():
         cluster_id = await service._assign_cluster(embedding, "Wie exportiere ich?")
 
     mock_db.add.assert_called_once()
-    assert cluster_id is not None
+    assert cluster_id == 99
 
 
 @pytest.mark.asyncio
@@ -120,4 +126,3 @@ def test_check_triggers_marks_docs_gap():
     service._check_triggers(2)
 
     assert cluster.docs_gap is True
-    mock_db.commit.assert_called()

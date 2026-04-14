@@ -12,7 +12,7 @@ CLUSTER_SIMILARITY_THRESHOLD = 0.85
 
 try:
     from services.vector_service_factory import vector_service
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     vector_service = None  # type: ignore[assignment]
 
 
@@ -36,24 +36,19 @@ class FeedbackProcessorService:
             logger.warning("Qdrant not available, skipping feedback processing")
             return
 
-        try:
-            embeddings = await vector_service.create_embeddings([feedback.question])
-            if len(embeddings) == 0:
-                logger.warning("Failed to create embedding for feedback question")
-                return
+        embeddings = await vector_service.create_embeddings([feedback.question])
+        if len(embeddings) == 0:
+            logger.warning("Failed to create embedding for feedback question")
+            return
 
-            self._ensure_feedback_collection()
-            cluster_id = await self._assign_cluster(embeddings[0], feedback.question)
+        self._ensure_feedback_collection()
+        cluster_id = await self._assign_cluster(embeddings[0], feedback.question)
 
-            if cluster_id:
-                feedback.cluster_id = cluster_id
-                self._update_cluster_stats(cluster_id, feedback.rating)
-                self._check_triggers(cluster_id)
-                self.db.commit()
-        except Exception as e:
-            logger.error(
-                f"Failed to process feedback {feedback_id}: {e}", exc_info=True
-            )
+        if cluster_id:
+            feedback.cluster_id = cluster_id
+            self._update_cluster_stats(cluster_id, feedback.rating)
+            self._check_triggers(cluster_id)
+            self.db.commit()
 
     def _ensure_feedback_collection(self) -> None:
         """Create the feedback_clusters Qdrant collection if it doesn't exist."""
@@ -123,7 +118,7 @@ class FeedbackProcessorService:
 
         # In production, cluster.id is set by SQLAlchemy after flush.
         # Fall back to vector_id (str) only when running without a real DB (tests).
-        return cluster.id or cluster.vector_id
+        return cluster.id
 
     def _update_cluster_stats(self, cluster_id: int, rating: str) -> None:
         """Update cluster positive/negative/total counts."""
@@ -180,13 +175,11 @@ class FeedbackProcessorService:
                         cluster_id=cluster_id,
                     )
                     self.db.add(faq)
-                    self.db.commit()
                     logger.info(f"FAQ candidate created for cluster {cluster_id}")
 
         # Trigger: 3+ negative → docs gap
         if cluster.negative_count >= 3 and not cluster.docs_gap:
             cluster.docs_gap = True
-            self.db.commit()
             logger.info(
                 f"Docs gap flagged for cluster {cluster_id}: {cluster.topic_label}"
             )
