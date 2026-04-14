@@ -226,6 +226,7 @@ def _make_mock_user(is_admin: bool = False):
     user.first_name = "Test"
     user.last_name = "User"
     user.is_active = True
+    user.is_superuser = is_admin
     user.institution = None
     role = MagicMock()
     role.name = "admin" if is_admin else "teacher"

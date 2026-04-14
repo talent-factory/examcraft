@@ -450,8 +450,8 @@ class FaqApproveRequest(BaseModel):
 
 
 def _require_admin(user: User):
-    if not any(r.name == "admin" for r in user.roles):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not getattr(user, "is_superuser", False):
+        raise HTTPException(status_code=403, detail="Superadmin access required")
 
 
 @router.get("/admin/feedback-queue", response_model=FeedbackQueueResponse)

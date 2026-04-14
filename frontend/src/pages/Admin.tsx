@@ -33,7 +33,7 @@ export const Admin: React.FC = () => {
     { key: 'roles', label: t('pages.admin.tabRoles'), visible: isSuperuser },
     { key: 'audit', label: t('pages.admin.tabAudit'), visible: isAdmin },
     { key: 'subscription', label: t('pages.admin.tabSubscription'), visible: isAdmin },
-    { key: 'help-feedback', label: 'Help Feedback', visible: isAdmin },
+    { key: 'help-feedback', label: 'Help Feedback', visible: isSuperuser },
   ].filter((t): t is TabConfig => t.visible);
 
   const [activeTab, setActiveTab] = useState<AdminTab>(tabs[0]?.key ?? 'users');
