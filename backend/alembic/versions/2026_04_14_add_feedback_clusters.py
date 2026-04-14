@@ -1,7 +1,7 @@
 """Add feedback_clusters table and extend help_faq_cache
 
 Revision ID: 2026_04_14_feedback
-Revises: 2026_03_31_add_skipped_steps
+Revises: 2026_03_31_skipped
 Create Date: 2026-04-14
 """
 
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "2026_04_14_feedback"
-down_revision = "2026_03_31_add_skipped_steps"
+down_revision = "2026_03_31_skipped"
 branch_labels = None
 depends_on = None
 
