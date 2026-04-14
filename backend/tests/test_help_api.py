@@ -285,9 +285,7 @@ class TestDocsLinksUrlConversion:
                     "url": "https://docs.examcraft.ch/user-guide/documents/",
                 }
             ],
-            "docs_links": [
-                "https://docs.examcraft.ch/user-guide/documents/"
-            ],
+            "docs_links": ["https://docs.examcraft.ch/user-guide/documents/"],
             "escalate": False,
             "from_cache": False,
         }
@@ -298,7 +296,10 @@ class TestDocsLinksUrlConversion:
         ):
             response = help_client.post(
                 "/api/v1/help/message",
-                json={"question": "Wie lade ich Dokumente hoch?", "route": "/documents"},
+                json={
+                    "question": "Wie lade ich Dokumente hoch?",
+                    "route": "/documents",
+                },
             )
         assert response.status_code == 200
         data = response.json()

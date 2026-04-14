@@ -52,7 +52,13 @@ class HelpService:
 
         try:
             result = await self._call_claude(
-                question, chunks, user_role, user_tier, route, conversation_history, locale
+                question,
+                chunks,
+                user_role,
+                user_tier,
+                route,
+                conversation_history,
+                locale,
             )
             if result["confidence"] < 0.6:
                 result = await self._call_claude(
@@ -175,7 +181,9 @@ class HelpService:
                 parsed = json.loads(json_match.group(), strict=False)
                 raw_links = parsed.get("docs_links", [])
                 converted_links = [
-                    convert_docs_path_to_url(link) if not link.startswith("http") else link
+                    convert_docs_path_to_url(link)
+                    if not link.startswith("http")
+                    else link
                     for link in raw_links
                 ]
                 sources = [

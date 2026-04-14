@@ -36,11 +36,13 @@ async def test_low_confidence_retries_with_sonnet():
     }
 
     with (
-        patch.object(service, '_try_faq_cache', new=AsyncMock(return_value=None)),
-        patch.object(service, '_search_docs', new=AsyncMock(return_value=[high_score_chunk])),
+        patch.object(service, "_try_faq_cache", new=AsyncMock(return_value=None)),
+        patch.object(
+            service, "_search_docs", new=AsyncMock(return_value=[high_score_chunk])
+        ),
         patch.object(
             service,
-            '_call_claude',
+            "_call_claude",
             new=AsyncMock(side_effect=[first_result, second_result]),
         ) as mock_call,
     ):
@@ -73,8 +75,10 @@ async def test_low_score_docs_returns_escalate_true():
     }
 
     with (
-        patch.object(service, '_try_faq_cache', new=AsyncMock(return_value=None)),
-        patch.object(service, '_search_docs', new=AsyncMock(return_value=[low_score_chunk])),
+        patch.object(service, "_try_faq_cache", new=AsyncMock(return_value=None)),
+        patch.object(
+            service, "_search_docs", new=AsyncMock(return_value=[low_score_chunk])
+        ),
     ):
         result = await service.answer_question(
             question="Was ist die Antwort auf alles?",

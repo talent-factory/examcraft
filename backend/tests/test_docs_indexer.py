@@ -1,5 +1,9 @@
 """Tests for DocsIndexerService (TF-308)."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from services.docs_indexer_service import DocsIndexerService
 
 
@@ -39,10 +43,6 @@ def test_parse_short_sections_skipped():
     assert all(len(c["content"]) >= 20 for c in chunks)
 
 
-from unittest.mock import MagicMock, AsyncMock, patch
-import pytest
-
-
 @pytest.mark.asyncio
 async def test_full_scan_clears_collection_before_indexing():
     """full_scan=True must delete all points from docs_help before re-indexing."""
@@ -73,7 +73,7 @@ async def test_full_scan_clears_collection_before_indexing():
             mock_vector_service,
         ),
     ):
-        result = await service.run_index(full_scan=True)
+        await service.run_index(full_scan=True)
 
     # Verify collection was cleared
     mock_client.delete.assert_called_once()
@@ -110,7 +110,7 @@ async def test_incremental_scan_does_not_clear_collection():
             mock_vector_service,
         ),
     ):
-        result = await service.run_index(full_scan=False)
+        await service.run_index(full_scan=False)
 
     # delete should NOT have been called (no full clear)
     mock_client.delete.assert_not_called()
@@ -118,8 +118,10 @@ async def test_incremental_scan_does_not_clear_collection():
 
 def test_invalid_sha_falls_back_to_full_scan():
     service = DocsIndexerService.__new__(DocsIndexerService)
-    with patch.object(service, '_get_all_md_files', return_value=['a.md', 'b.md']) as mock_all:
+    with patch.object(
+        service, "_get_all_md_files", return_value=["a.md", "b.md"]
+    ) as mock_all:
         changed, deleted = service._get_changed_files("not-a-valid-sha; rm -rf /")
-        assert changed == ['a.md', 'b.md']
+        assert changed == ["a.md", "b.md"]
         assert deleted == []
         mock_all.assert_called_once()

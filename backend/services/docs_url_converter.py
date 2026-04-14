@@ -25,7 +25,7 @@ def convert_docs_path_to_url(
 
     # Strip prefix if present
     if filepath.startswith(prefix):
-        path = filepath[len(prefix):]
+        path = filepath[len(prefix) :]
         path = path.lstrip("/")
     else:
         path = filepath

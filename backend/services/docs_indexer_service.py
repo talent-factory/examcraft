@@ -30,7 +30,9 @@ class DocsIndexerService:
         try:
             self._ensure_collection()
         except Exception as e:
-            logger.error(f"Cannot proceed with indexing: failed to ensure collection: {e}")
+            logger.error(
+                f"Cannot proceed with indexing: failed to ensure collection: {e}"
+            )
             return {"indexed": 0, "deleted": 0}
 
         if full_scan:
@@ -38,7 +40,9 @@ class DocsIndexerService:
             try:
                 self._clear_collection()
             except Exception as e:
-                logger.error(f"Cannot proceed with full-scan indexing: failed to clear collection: {e}")
+                logger.error(
+                    f"Cannot proceed with full-scan indexing: failed to clear collection: {e}"
+                )
                 return {"indexed": 0, "deleted": 0}
             changed = self._get_all_md_files()
             deleted = []
@@ -106,9 +110,7 @@ class DocsIndexerService:
 
         vector_service.client.delete(
             collection_name="docs_help",
-            points_selector=models.FilterSelector(
-                filter=models.Filter(must=[])
-            ),
+            points_selector=models.FilterSelector(filter=models.Filter(must=[])),
         )
         logger.info("Cleared docs_help collection for full re-index")
 
