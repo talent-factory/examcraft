@@ -101,6 +101,7 @@ class HelpService:
     ) -> Dict[str, Any]:
         import json
         import re
+        from services.docs_url_converter import convert_docs_path_to_url
 
         context = "\n\n---\n\n".join(
             f"[{c['source_file']} > {c['section']}]\n{c['content']}" for c in chunks[:5]
@@ -142,20 +143,34 @@ class HelpService:
             json_match = re.search(r"\{.*\}", text, re.DOTALL)
             if json_match:
                 parsed = json.loads(json_match.group(), strict=False)
+                raw_links = parsed.get("docs_links", [])
+                converted_links = [
+                    convert_docs_path_to_url(link) if not link.startswith("http") else link
+                    for link in raw_links
+                ]
+                sources = [
+                    {
+                        "file": c["source_file"],
+                        "section": c["section"],
+                        "url": convert_docs_path_to_url(c["source_file"]),
+                    }
+                    for c in chunks[:3]
+                ]
                 return {
                     "answer": parsed.get("answer", text),
                     "confidence": float(parsed.get("confidence", 0.5)),
-                    "sources": [
-                        {"file": c["source_file"], "section": c["section"]}
-                        for c in chunks[:3]
-                    ],
-                    "docs_links": parsed.get("docs_links", []),
+                    "sources": sources,
+                    "docs_links": converted_links,
                 }
             return {
                 "answer": text,
                 "confidence": 0.5,
                 "sources": [
-                    {"file": c["source_file"], "section": c["section"]}
+                    {
+                        "file": c["source_file"],
+                        "section": c["section"],
+                        "url": convert_docs_path_to_url(c["source_file"]),
+                    }
                     for c in chunks[:3]
                 ],
                 "docs_links": [],

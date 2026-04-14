@@ -270,3 +270,42 @@ class TestSeedHints:
         from utils.seed_help_hints import DEFAULT_HINTS
 
         assert count == len(DEFAULT_HINTS)
+
+
+class TestDocsLinksUrlConversion:
+    def test_docs_links_converted_to_urls(self, help_client):
+        """ChatBot response docs_links should contain full URLs, not file paths."""
+        mock_result = {
+            "answer": "Du kannst Dokumente hochladen.",
+            "confidence": 0.9,
+            "sources": [
+                {
+                    "file": "core/docs-site/docs/user-guide/documents.md",
+                    "section": "Upload",
+                    "url": "https://docs.examcraft.ch/user-guide/documents/",
+                }
+            ],
+            "docs_links": [
+                "https://docs.examcraft.ch/user-guide/documents/"
+            ],
+            "escalate": False,
+            "from_cache": False,
+        }
+        with patch(
+            "services.help_service.HelpService.answer_question",
+            new_callable=AsyncMock,
+            return_value=mock_result,
+        ):
+            response = help_client.post(
+                "/api/v1/help/message",
+                json={"question": "Wie lade ich Dokumente hoch?", "route": "/documents"},
+            )
+        assert response.status_code == 200
+        data = response.json()
+        # Verify URLs are full https:// URLs, not file paths
+        for link in data.get("docs_links", []):
+            assert link.startswith("https://"), f"Expected URL, got: {link}"
+        # Verify sources have url field
+        for source in data.get("sources", []):
+            if "url" in source:
+                assert source["url"].startswith("https://")
