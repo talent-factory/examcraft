@@ -25,6 +25,7 @@ celery_app = Celery(
         "tasks.question_tasks",
         # "tasks.rag_tasks",  # Requires Premium RAGService
         "tasks.session_cleanup",
+        "tasks.feedback_tasks",
     ],
 )
 
@@ -73,6 +74,12 @@ celery_app.conf.task_queues = (
         routing_key="notification.send",
         durable=True,
     ),
+    Queue(
+        "feedback_processing",
+        default_exchange,
+        routing_key="feedback.process",
+        durable=True,
+    ),
 )
 
 # Task Routes
@@ -92,6 +99,10 @@ celery_app.conf.task_routes = {
     "tasks.question_tasks.generate_questions": {
         "queue": "question_generation",
         "routing_key": "question.generate",
+    },
+    "tasks.feedback_tasks.process_feedback": {
+        "queue": "feedback_processing",
+        "routing_key": "feedback.process",
     },
 }
 

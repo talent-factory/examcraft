@@ -380,7 +380,16 @@ async def submit_feedback(
         route=request_body.route,
         language=locale,
     )
-    return FeedbackResponse(id=feedback.id, status=feedback.status)
+    result = FeedbackResponse(id=feedback.id, status=feedback.status)
+
+    # Dispatch async feedback processing (clustering + triggers)
+    try:
+        from tasks.feedback_tasks import process_feedback_task
+        process_feedback_task.delay(feedback.id)
+    except Exception as e:
+        logger.warning(f"Could not dispatch feedback processing: {e}")
+
+    return result
 
 
 # === ADMIN ===
