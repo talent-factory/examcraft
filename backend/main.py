@@ -99,6 +99,25 @@ async def lifespan(app: FastAPI):
             print("⚠️  Premium package not available, skipping prompt seeding")
         except Exception as e:
             print(f"❌ Error seeding prompts: {str(e)}")
+
+        # Startup: Auto-index documentation into Qdrant (Full Replace)
+        try:
+            from services.vector_service_factory import vector_service
+
+            if hasattr(vector_service, "client") and vector_service.client is not None:
+                from services.docs_indexer_service import DocsIndexerService
+
+                db = SessionLocal()
+                try:
+                    service = DocsIndexerService(db)
+                    result = await service.run_index(full_scan=True)
+                    print(f"✅ Docs indexed: {result['indexed']} files")
+                finally:
+                    db.close()
+            else:
+                print("ℹ️  Qdrant not available, docs indexing skipped")
+        except Exception as e:
+            print(f"⚠️  Docs indexing skipped: {e}")
     else:
         print("ℹ️  Running in Core mode - Premium features disabled")
 
