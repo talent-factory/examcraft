@@ -118,11 +118,15 @@ class HelpService:
 
             from models.help import HelpFaqCache
 
-            faq = self.db.query(HelpFaqCache).filter(
-                HelpFaqCache.id == faq_id,
-                HelpFaqCache.faq_status == "freigegeben",
-                HelpFaqCache.stale.is_(False),
-            ).first()
+            faq = (
+                self.db.query(HelpFaqCache)
+                .filter(
+                    HelpFaqCache.id == faq_id,
+                    HelpFaqCache.faq_status == "freigegeben",
+                    HelpFaqCache.stale.is_(False),
+                )
+                .first()
+            )
             if not faq:
                 return None
 
