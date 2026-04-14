@@ -22,7 +22,9 @@ def process_feedback_task(self, feedback_id: int) -> dict:
         )
         return {"status": "processed", "feedback_id": feedback_id}
     except Exception as e:
-        logger.error(f"Feedback processing failed for {feedback_id}: {e}", exc_info=True)
+        logger.error(
+            f"Feedback processing failed for {feedback_id}: {e}", exc_info=True
+        )
         raise self.retry(exc=e, countdown=30)
     finally:
         db.close()

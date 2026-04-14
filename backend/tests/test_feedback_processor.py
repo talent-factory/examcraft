@@ -1,9 +1,11 @@
 """Tests for FeedbackCluster model and FeedbackProcessorService."""
 
-from unittest.mock import MagicMock, AsyncMock, patch
-import pytest
+from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pytest
 from models.feedback_cluster import FeedbackCluster
+from services.feedback_processor_service import FeedbackProcessorService
 
 
 def test_feedback_cluster_to_dict():
@@ -20,9 +22,6 @@ def test_feedback_cluster_to_dict():
     assert d["topic_label"] == "export"
     assert d["total_count"] == 7
     assert d["docs_gap"] is False
-
-
-from services.feedback_processor_service import FeedbackProcessorService
 
 
 @pytest.mark.asyncio
@@ -44,7 +43,9 @@ async def test_assign_cluster_creates_new_when_no_match():
 
     embedding = np.zeros(384)
 
-    with patch("services.feedback_processor_service.vector_service", mock_vector_service):
+    with patch(
+        "services.feedback_processor_service.vector_service", mock_vector_service
+    ):
         cluster_id = await service._assign_cluster(embedding, "Wie exportiere ich?")
 
     mock_db.add.assert_called_once()
@@ -70,7 +71,9 @@ async def test_assign_cluster_joins_existing_when_high_score():
 
     embedding = np.zeros(384)
 
-    with patch("services.feedback_processor_service.vector_service", mock_vector_service):
+    with patch(
+        "services.feedback_processor_service.vector_service", mock_vector_service
+    ):
         cluster_id = await service._assign_cluster(embedding, "Wie exportiere ich?")
 
     assert cluster_id == 42

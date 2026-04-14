@@ -385,6 +385,7 @@ async def submit_feedback(
     # Dispatch async feedback processing (clustering + triggers)
     try:
         from tasks.feedback_tasks import process_feedback_task
+
         process_feedback_task.delay(feedback.id)
     except Exception as e:
         logger.warning(f"Could not dispatch feedback processing: {e}")
@@ -540,7 +541,12 @@ async def get_clusters(
 
     query = db.query(FeedbackCluster).filter(FeedbackCluster.status == "aktiv")
     total = query.count()
-    items = query.order_by(FeedbackCluster.total_count.desc()).offset(offset).limit(limit).all()
+    items = (
+        query.order_by(FeedbackCluster.total_count.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     return ClusterListResponse(
         items=[ClusterResponse(**c.to_dict()) for c in items],
         total=total,
@@ -555,7 +561,9 @@ async def get_faq_candidates(
     _require_admin(current_user)
     from models.help import HelpFaqCache
 
-    items = db.query(HelpFaqCache).filter(HelpFaqCache.faq_status == "vorgeschlagen").all()
+    items = (
+        db.query(HelpFaqCache).filter(HelpFaqCache.faq_status == "vorgeschlagen").all()
+    )
     return FaqCandidateListResponse(
         items=[
             FaqCandidateResponse(

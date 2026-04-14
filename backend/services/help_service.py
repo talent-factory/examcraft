@@ -102,7 +102,9 @@ class HelpService:
 
             search_results = vector_service.client.query_points(
                 collection_name="faq_approved",
-                query=embeddings[0].tolist() if hasattr(embeddings[0], "tolist") else embeddings[0],
+                query=embeddings[0].tolist()
+                if hasattr(embeddings[0], "tolist")
+                else embeddings[0],
                 limit=1,
                 with_payload=True,
             )

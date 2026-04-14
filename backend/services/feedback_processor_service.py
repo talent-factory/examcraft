@@ -25,7 +25,9 @@ class FeedbackProcessorService:
         from models.help import HelpFeedback
         from services.vector_service_factory import vector_service
 
-        feedback = self.db.query(HelpFeedback).filter(HelpFeedback.id == feedback_id).first()
+        feedback = (
+            self.db.query(HelpFeedback).filter(HelpFeedback.id == feedback_id).first()
+        )
         if not feedback:
             logger.warning(f"Feedback {feedback_id} not found")
             return
@@ -49,7 +51,9 @@ class FeedbackProcessorService:
                 self._check_triggers(cluster_id)
                 self.db.commit()
         except Exception as e:
-            logger.error(f"Failed to process feedback {feedback_id}: {e}", exc_info=True)
+            logger.error(
+                f"Failed to process feedback {feedback_id}: {e}", exc_info=True
+            )
 
     def _ensure_feedback_collection(self) -> None:
         """Create the feedback_clusters Qdrant collection if it doesn't exist."""
@@ -80,7 +84,10 @@ class FeedbackProcessorService:
             with_payload=True,
         )
 
-        if search_results.points and search_results.points[0].score >= CLUSTER_SIMILARITY_THRESHOLD:
+        if (
+            search_results.points
+            and search_results.points[0].score >= CLUSTER_SIMILARITY_THRESHOLD
+        ):
             cluster_id = search_results.points[0].payload["cluster_id"]
             return cluster_id
 
@@ -102,7 +109,9 @@ class FeedbackProcessorService:
             points=[
                 PointStruct(
                     id=cluster.vector_id,
-                    vector=embedding.tolist() if hasattr(embedding, "tolist") else embedding,
+                    vector=embedding.tolist()
+                    if hasattr(embedding, "tolist")
+                    else embedding,
                     payload={
                         "cluster_id": cluster.id,
                         "topic_label": cluster.topic_label,
@@ -120,7 +129,11 @@ class FeedbackProcessorService:
         """Update cluster positive/negative/total counts."""
         from models.feedback_cluster import FeedbackCluster
 
-        cluster = self.db.query(FeedbackCluster).filter(FeedbackCluster.id == cluster_id).first()
+        cluster = (
+            self.db.query(FeedbackCluster)
+            .filter(FeedbackCluster.id == cluster_id)
+            .first()
+        )
         if not cluster:
             return
 
@@ -135,13 +148,19 @@ class FeedbackProcessorService:
         from models.feedback_cluster import FeedbackCluster
         from models.help import HelpFaqCache, HelpFeedback
 
-        cluster = self.db.query(FeedbackCluster).filter(FeedbackCluster.id == cluster_id).first()
+        cluster = (
+            self.db.query(FeedbackCluster)
+            .filter(FeedbackCluster.id == cluster_id)
+            .first()
+        )
         if not cluster:
             return
 
         # Trigger: 3+ positive, 0 negative → FAQ candidate
         if cluster.positive_count >= 3 and cluster.negative_count == 0:
-            existing = self.db.query(HelpFaqCache).filter_by(cluster_id=cluster_id).first()
+            existing = (
+                self.db.query(HelpFaqCache).filter_by(cluster_id=cluster_id).first()
+            )
             if not existing:
                 best_feedback = (
                     self.db.query(HelpFeedback)
@@ -168,4 +187,6 @@ class FeedbackProcessorService:
         if cluster.negative_count >= 3 and not cluster.docs_gap:
             cluster.docs_gap = True
             self.db.commit()
-            logger.info(f"Docs gap flagged for cluster {cluster_id}: {cluster.topic_label}")
+            logger.info(
+                f"Docs gap flagged for cluster {cluster_id}: {cluster.topic_label}"
+            )
