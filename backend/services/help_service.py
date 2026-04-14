@@ -4,6 +4,11 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+try:
+    from services.vector_service_factory import vector_service
+except ImportError:
+    vector_service = None  # type: ignore
+
 
 class VectorSearchError(Exception):
     pass
@@ -86,9 +91,51 @@ class HelpService:
     async def _try_faq_cache(
         self, question: str, locale: str
     ) -> Optional[Dict[str, Any]]:
-        # Phase 2 feature: FAQ Qdrant collection not yet implemented
-        # Returns None so all questions go to Standard Path (Claude)
-        return None
+        """Check FAQ cache for a matching approved answer."""
+        try:
+            if not hasattr(vector_service, "client") or vector_service.client is None:
+                return None
+
+            embeddings = await vector_service.create_embeddings([question])
+            if len(embeddings) == 0:
+                return None
+
+            search_results = vector_service.client.query_points(
+                collection_name="faq_approved",
+                query=embeddings[0].tolist() if hasattr(embeddings[0], "tolist") else embeddings[0],
+                limit=1,
+                with_payload=True,
+            )
+
+            if not search_results.points or search_results.points[0].score < 0.92:
+                return None
+
+            faq_id = search_results.points[0].payload.get("faq_id")
+            if not faq_id:
+                return None
+
+            from models.help import HelpFaqCache
+
+            faq = self.db.query(HelpFaqCache).filter(HelpFaqCache.id == faq_id).first()
+            if not faq:
+                return None
+
+            # Update hit count
+            faq.hit_count = (faq.hit_count or 0) + 1
+            self.db.commit()
+
+            answer = faq.answer_de if locale == "de" else faq.answer_en
+            return {
+                "answer": answer,
+                "confidence": 1.0,
+                "sources": [],
+                "docs_links": faq.docs_links or [],
+                "escalate": False,
+                "from_cache": True,
+            }
+        except Exception as e:
+            logger.warning(f"FAQ cache lookup failed: {e}")
+            return None
 
     async def _search_docs(self, question: str) -> List[Dict[str, Any]]:
         try:
