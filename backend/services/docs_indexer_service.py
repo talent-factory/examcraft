@@ -26,6 +26,9 @@ class DocsIndexerService:
             self.db.commit()
             full_scan = True
 
+        # Ensure the docs_help collection exists before any indexing
+        self._ensure_collection()
+
         if full_scan:
             # Full Replace: clear entire collection before re-indexing
             self._clear_collection()
@@ -58,6 +61,34 @@ class DocsIndexerService:
 
         logger.info(f"Indexing complete: {indexed} indexed, {deleted_count} deleted")
         return {"indexed": indexed, "deleted": deleted_count}
+
+    def _ensure_collection(self) -> None:
+        """Create the docs_help collection if it doesn't exist."""
+        try:
+            from services.vector_service_factory import vector_service
+
+            if not hasattr(vector_service, "client") or vector_service.client is None:
+                return
+
+            if hasattr(vector_service, "get_or_create_collection"):
+                vector_service.get_or_create_collection("docs_help")
+                logger.info("Ensured docs_help collection exists")
+            else:
+                # Fallback: create manually if vector_service lacks the method
+                from qdrant_client.http.models import VectorParams, Distance
+
+                collections = vector_service.client.get_collections()
+                if not any(c.name == "docs_help" for c in collections.collections):
+                    embedding_dim = 384  # Default for sentence-transformers
+                    vector_service.client.create_collection(
+                        collection_name="docs_help",
+                        vectors_config=VectorParams(
+                            size=embedding_dim, distance=Distance.COSINE
+                        ),
+                    )
+                    logger.info("Created docs_help collection (384 dim, cosine)")
+        except Exception as e:
+            logger.error(f"Failed to ensure docs_help collection: {e}")
 
     def _clear_collection(self) -> None:
         """Delete all points from the docs_help collection (Full Replace strategy)."""
