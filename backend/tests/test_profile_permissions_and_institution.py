@@ -234,14 +234,18 @@ class TestPermissionsParsing:
         test_db.add(institution)
         test_db.flush()
 
-        role = Role(
-            name="viewer",
-            display_name="Empty Role",
-            description="No permissions",
-            permissions="{}",
-            is_system_role=True,
-        )
-        test_db.add(role)
+        role = test_db.query(Role).filter(Role.name == "viewer").first()
+        if role:
+            role.permissions = "{}"
+        else:
+            role = Role(
+                name="viewer",
+                display_name="Empty Role",
+                description="No permissions",
+                permissions="{}",
+                is_system_role=True,
+            )
+            test_db.add(role)
         test_db.commit()
 
         client = _create_test_client(test_db)
