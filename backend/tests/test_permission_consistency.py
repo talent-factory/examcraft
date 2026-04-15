@@ -14,16 +14,13 @@ drift between frontend and backend (e.g. 'questions:create' vs 'create_questions
 import os
 import re
 
-import pytest
 
 # ============================================================================
 # Constants: Source of truth
 # ============================================================================
 
 # Root paths
-BACKEND_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..")
-)
+BACKEND_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
 FRONTEND_SRC_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "src")
 )
@@ -42,19 +39,12 @@ def _get_seed_permissions() -> dict[str, list[str]]:
     with open(seed_path) as f:
         source = f.read()
 
-    # Extract role name from UserRole.XXX.value or string literal
-    role_pattern = re.compile(
-        r'"name":\s*UserRole\.(\w+)\.value', re.MULTILINE
-    )
-    # Extract all permission strings
-    perm_pattern = re.compile(r'"([a-z_:]+)"')
-
     roles = {}
     # Split by role blocks (each { ... } dict in roles_data list)
     blocks = re.split(r'\{\s*\n\s*"name":', source)
 
     for block in blocks[1:]:  # Skip the part before first role
-        name_match = re.search(r'UserRole\.(\w+)\.value', block)
+        name_match = re.search(r"UserRole\.(\w+)\.value", block)
         if not name_match:
             name_match = re.search(r'"(\w+)"', block)
         if not name_match:
@@ -63,9 +53,7 @@ def _get_seed_permissions() -> dict[str, list[str]]:
         role_name = name_match.group(1).lower()
 
         # Find the permissions list
-        perms_match = re.search(
-            r'"permissions":\s*\[(.*?)\]', block, re.DOTALL
-        )
+        perms_match = re.search(r'"permissions":\s*\[(.*?)\]', block, re.DOTALL)
         if perms_match:
             perms_str = perms_match.group(1)
             perms = re.findall(r'"([^"]+)"', perms_str)
@@ -156,9 +144,7 @@ class TestPermissionConsistency:
         """Seed roles file must exist and contain roles."""
         roles = _get_seed_permissions()
         assert len(roles) >= 4, f"Expected at least 4 roles, got {len(roles)}"
-        assert "admin" in [r.lower() for r in roles] or any(
-            "ADMIN" in r for r in roles
-        )
+        assert "admin" in [r.lower() for r in roles] or any("ADMIN" in r for r in roles)
 
     def test_all_backend_permissions_exist_in_seed_roles(self):
         """
@@ -294,13 +280,9 @@ class TestPermissionConsistency:
 
             mismatches = []
             if routes_only:
-                mismatches.append(
-                    f"  In routes but not navigation: {routes_only}"
-                )
+                mismatches.append(f"  In routes but not navigation: {routes_only}")
             if nav_only:
-                mismatches.append(
-                    f"  In navigation but not routes: {nav_only}"
-                )
+                mismatches.append(f"  In navigation but not routes: {nav_only}")
 
             assert not mismatches, (
                 "Permission mismatch between routes and navigation:\n"

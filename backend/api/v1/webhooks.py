@@ -182,6 +182,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         institution.subscription_tier = new_tier
 
         from utils.tenant_utils import sync_institution_quotas
+
         sync_institution_quotas(institution, db)
 
         logger.info(
@@ -290,6 +291,7 @@ async def handle_subscription_updated(subscription: dict, db: Session):
                     institution.subscription_tier = new_tier
 
                     from utils.tenant_utils import sync_institution_quotas
+
                     sync_institution_quotas(institution, db)
 
                     logger.info(
@@ -328,6 +330,7 @@ async def handle_subscription_deleted(subscription: dict, db: Session):
             institution.subscription_tier = "free"
 
             from utils.tenant_utils import sync_institution_quotas
+
             sync_institution_quotas(institution, db)
 
         # Downgrade billing owner's role from dozent back to viewer

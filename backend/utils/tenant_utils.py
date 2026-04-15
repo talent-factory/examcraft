@@ -289,7 +289,6 @@ class SubscriptionLimits:
             },
         }
 
-
     @staticmethod
     def check_storage_limit(
         institution: Institution, db: Session, file_size_bytes: int

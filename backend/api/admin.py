@@ -810,6 +810,7 @@ async def update_institution(
 
         # Sync quotas from tier_quotas DB table (single source of truth)
         from utils.tenant_utils import sync_institution_quotas
+
         sync_institution_quotas(institution, db)
 
     db.commit()

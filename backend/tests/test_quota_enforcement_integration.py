@@ -41,7 +41,10 @@ def db_with_quotas(test_db):
                     display_name=tier_name.capitalize(),
                     description=f"{tier_name} tier",
                     is_active=True,
-                    sort_order=["free", "starter", "professional", "enterprise"].index(tier_name) + 1,
+                    sort_order=["free", "starter", "professional", "enterprise"].index(
+                        tier_name
+                    )
+                    + 1,
                 )
             )
     test_db.flush()
@@ -76,9 +79,7 @@ def db_with_quotas(test_db):
             "is_system_role": True,
         },
     ]:
-        existing = (
-            test_db.query(Role).filter(Role.name == role_def["name"]).first()
-        )
+        existing = test_db.query(Role).filter(Role.name == role_def["name"]).first()
         if not existing:
             test_db.add(Role(**role_def))
 
@@ -147,9 +148,7 @@ def institution(db_with_quotas):
 @pytest.fixture
 def active_user(db_with_quotas, institution):
     """Create one active user in the institution."""
-    dozent = (
-        db_with_quotas.query(Role).filter(Role.name == "dozent").first()
-    )
+    dozent = db_with_quotas.query(Role).filter(Role.name == "dozent").first()
     user = User(
         email="existing@quotatest.edu",
         password_hash=AuthService.get_password_hash("TestPass123!"),
@@ -175,9 +174,7 @@ def active_user(db_with_quotas, institution):
 class TestUserLimitEnforcement:
     """User limit must be enforced when registering new users."""
 
-    def test_user_limit_checked_at_registration(
-        self, db_with_quotas, institution
-    ):
+    def test_user_limit_checked_at_registration(self, db_with_quotas, institution):
         """
         check_user_limit() must reject when the institution's active user
         count has reached max_users.
@@ -203,9 +200,7 @@ class TestUserLimitEnforcement:
         assert exc_info.value.status_code == 403
         assert "User limit" in exc_info.value.detail
 
-    def test_pending_users_dont_count_toward_limit(
-        self, db_with_quotas, institution
-    ):
+    def test_pending_users_dont_count_toward_limit(self, db_with_quotas, institution):
         """
         Pending users (not yet email-verified) must NOT count toward
         the user limit, allowing registration to proceed.
@@ -282,9 +277,7 @@ class TestStorageLimitEnforcement:
         db_with_quotas.commit()
 
         # Adding 500 KB more (total 600 KB < 1 MB) should succeed
-        SubscriptionLimits.check_storage_limit(
-            institution, db_with_quotas, 500 * 1024
-        )
+        SubscriptionLimits.check_storage_limit(institution, db_with_quotas, 500 * 1024)
 
     def test_storage_unlimited_skips_check(self, db_with_quotas, institution):
         """Unlimited storage (-1) should always pass."""
@@ -305,9 +298,7 @@ class TestStorageLimitEnforcement:
             institution, db_with_quotas, 999 * 1024 * 1024
         )
 
-    def test_storage_check_with_no_tier_quota_row(
-        self, db_with_quotas, institution
-    ):
+    def test_storage_check_with_no_tier_quota_row(self, db_with_quotas, institution):
         """If no storage_mb row exists in tier_quotas, skip check."""
         # Delete the storage_mb row
         db_with_quotas.query(TierQuota).filter(
@@ -405,7 +396,9 @@ class TestTierQuotaSync:
 class TestDocumentLimitEnforcement:
     """Document count limit must be enforced at upload."""
 
-    def test_document_limit_blocks_upload(self, db_with_quotas, institution, active_user):
+    def test_document_limit_blocks_upload(
+        self, db_with_quotas, institution, active_user
+    ):
         """
         When document count reaches max_documents, uploading another
         must return 403.
@@ -430,12 +423,12 @@ class TestDocumentLimitEnforcement:
         db_with_quotas.commit()
 
         with pytest.raises(HTTPException) as exc_info:
-            SubscriptionLimits.check_document_limit(
-                institution, db_with_quotas
-            )
+            SubscriptionLimits.check_document_limit(institution, db_with_quotas)
         assert exc_info.value.status_code == 403
 
-    def test_document_unlimited_allows_all(self, db_with_quotas, institution, active_user):
+    def test_document_unlimited_allows_all(
+        self, db_with_quotas, institution, active_user
+    ):
         """Unlimited documents (-1) should always pass."""
         institution.max_documents = -1
         db_with_quotas.commit()
@@ -499,9 +492,7 @@ class TestQuestionLimitEnforcement:
             )
         assert exc_info.value.status_code == 403
 
-    def test_question_limit_allows_within_quota(
-        self, db_with_quotas, institution
-    ):
+    def test_question_limit_allows_within_quota(self, db_with_quotas, institution):
         """Under-limit question generation should succeed."""
         institution.max_questions_per_month = 10
         db_with_quotas.commit()
@@ -566,9 +557,7 @@ class TestQuotaChangePropagatesToEnforcement:
 
         # Now at limit — next upload must fail
         with pytest.raises(HTTPException) as exc_info:
-            SubscriptionLimits.check_document_limit(
-                institution, db_with_quotas
-            )
+            SubscriptionLimits.check_document_limit(institution, db_with_quotas)
         assert exc_info.value.status_code == 403
 
     def test_tier_upgrade_unlocks_more_capacity(
@@ -599,9 +588,7 @@ class TestQuotaChangePropagatesToEnforcement:
 
         # At limit — should fail
         with pytest.raises(HTTPException):
-            SubscriptionLimits.check_document_limit(
-                institution, db_with_quotas
-            )
+            SubscriptionLimits.check_document_limit(institution, db_with_quotas)
 
         # Upgrade to professional
         institution.subscription_tier = "professional"

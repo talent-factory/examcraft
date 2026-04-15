@@ -370,7 +370,12 @@ def seed_tier_quotas(db):
 def seed_tier_features(db):
     """Erstellt Tier-Feature Mappings"""
     # Free: Basis Features (inkl. RAG — Quotas limitieren die Nutzung)
-    free_features = ["feat_question_gen_ai", "feat_doc_upload", "feat_doc_library", "feat_rag_gen"]
+    free_features = [
+        "feat_question_gen_ai",
+        "feat_doc_upload",
+        "feat_doc_library",
+        "feat_rag_gen",
+    ]
     for feat_id in free_features:
         existing = (
             db.query(TierFeature)

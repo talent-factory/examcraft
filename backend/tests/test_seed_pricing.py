@@ -15,7 +15,7 @@ def test_starter_tier_price_is_9(test_db):
 
 def test_starter_tier_quotas_reduced(test_db):
     """Starter tier quotas: 20 docs, 100 questions, 1 user, 500 MB."""
-    from models.rbac import SubscriptionTier, TierQuota
+    from models.rbac import TierQuota
 
     seed_subscription_tiers(test_db)
     seed_tier_quotas(test_db)
@@ -53,9 +53,11 @@ def test_seed_upserts_existing_quotas(test_db):
     seed_subscription_tiers(test_db)
     seed_tier_quotas(test_db)
 
-    q = test_db.query(TierQuota).filter_by(
-        tier_id="tier_starter", resource_type="documents"
-    ).first()
+    q = (
+        test_db.query(TierQuota)
+        .filter_by(tier_id="tier_starter", resource_type="documents")
+        .first()
+    )
     q.quota_limit = 999
     test_db.commit()
 

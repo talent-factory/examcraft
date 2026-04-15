@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from main import app
 from database import get_db
-from models.auth import User, Role, Institution, UserStatus, UserRole
+from models.auth import User, Role, Institution, UserStatus
 from services.auth_service import AuthService
 
 

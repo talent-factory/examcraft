@@ -47,17 +47,13 @@ class TestTierFeatureHierarchy:
         free = set(get_tier_features(SubscriptionTier.FREE))
         starter = set(get_tier_features(SubscriptionTier.STARTER))
         missing = free - starter
-        assert not missing, (
-            f"Starter tier is missing Free features: {missing}"
-        )
+        assert not missing, f"Starter tier is missing Free features: {missing}"
 
     def test_professional_includes_all_starter_features(self):
         starter = set(get_tier_features(SubscriptionTier.STARTER))
         professional = set(get_tier_features(SubscriptionTier.PROFESSIONAL))
         missing = starter - professional
-        assert not missing, (
-            f"Professional tier is missing Starter features: {missing}"
-        )
+        assert not missing, f"Professional tier is missing Starter features: {missing}"
 
     def test_enterprise_includes_all_professional_features(self):
         professional = set(get_tier_features(SubscriptionTier.PROFESSIONAL))
