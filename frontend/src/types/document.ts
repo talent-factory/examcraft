@@ -175,6 +175,7 @@ export interface GenerationTasksContextType {
   activeTasks: GenerationTaskState[];
   completedTasks: GenerationTaskState[];
   startGeneration: (request: RAGExamRequest) => Promise<string>;
+  retryTask: (taskId: string) => Promise<string>;
   dismissTask: (taskId: string) => void;
   getTask: (taskId: string) => GenerationTaskState | undefined;
 }

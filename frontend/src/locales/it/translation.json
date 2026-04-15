@@ -771,7 +771,8 @@
       "defaultTopic": "Generazione",
       "connectionLost": "Connessione persa – stato sconosciuto",
       "clickToView": "Clicca per visualizzare",
-      "errorOccurred": "Si è verificato un errore"
+      "errorOccurred": "Si è verificato un errore",
+      "retry": "Riprova"
     },
     "questionEditor": {
       "title": "Modifica domanda #{{id}}",
@@ -1138,7 +1139,8 @@
     "generationTasks": {
       "done": "Completato",
       "errorOccurred": "Si è verificato un errore",
-      "started": "Avviato..."
+      "started": "Avviato...",
+      "retrying": "Riprovando..."
     }
   },
   "premium": {

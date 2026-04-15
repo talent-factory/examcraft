@@ -804,7 +804,8 @@
       "defaultTopic": "Generierung",
       "connectionLost": "Verbindung verloren – Status unbekannt",
       "clickToView": "Klicken zum Anzeigen",
-      "errorOccurred": "Fehler aufgetreten"
+      "errorOccurred": "Fehler aufgetreten",
+      "retry": "Erneut versuchen"
     },
     "questionEditor": {
       "title": "Frage #{{id}} bearbeiten",
@@ -1171,7 +1172,8 @@
     "generationTasks": {
       "done": "Fertig",
       "errorOccurred": "Fehler aufgetreten",
-      "started": "Gestartet..."
+      "started": "Gestartet...",
+      "retrying": "Wird wiederholt..."
     }
   },
   "premium": {

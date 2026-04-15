@@ -771,7 +771,8 @@
       "defaultTopic": "Génération",
       "connectionLost": "Connexion perdue – statut inconnu",
       "clickToView": "Cliquer pour afficher",
-      "errorOccurred": "Une erreur s'est produite"
+      "errorOccurred": "Une erreur s'est produite",
+      "retry": "Réessayer"
     },
     "questionEditor": {
       "title": "Modifier la question n°{{id}}",
@@ -1138,7 +1139,8 @@
     "generationTasks": {
       "done": "Terminé",
       "errorOccurred": "Une erreur s'est produite",
-      "started": "Démarré..."
+      "started": "Démarré...",
+      "retrying": "Relance en cours..."
     }
   },
   "premium": {

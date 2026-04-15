@@ -199,6 +199,38 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
     return task_id;
   }, [accessToken, connectWebSocket]);
 
+  const retryTask = useCallback(async (taskId: string): Promise<string> => {
+    const { loadRAGService } = await import('../utils/componentLoader');
+    const RAGService = await loadRAGService();
+    if (!RAGService) throw new Error('RAGService not available in Core mode');
+
+    const { task_id: newTaskId } = await RAGService.retryGeneration(taskId);
+
+    const oldTask = tasks[taskId];
+
+    setTasks((prev) => {
+      const next = { ...prev };
+      delete next[taskId];
+      next[newTaskId] = {
+        taskId: newTaskId,
+        status: 'PENDING',
+        progress: 0,
+        message: i18n.t('contexts.generationTasks.retrying'),
+        topic: oldTask?.topic ?? null,
+        questionCount: oldTask?.questionCount ?? null,
+        createdAt: new Date().toISOString(),
+        result: null,
+      };
+      return next;
+    });
+
+    if (accessToken) {
+      connectWebSocket(newTaskId, accessToken);
+    }
+
+    return newTaskId;
+  }, [accessToken, connectWebSocket, tasks]);
+
   const dismissTask = useCallback((taskId: string) => {
     setTasks((prev) => {
       const next = { ...prev };
@@ -218,7 +250,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
 
   return (
     <GenerationTasksContext.Provider
-      value={{ tasks, activeTasks, completedTasks, startGeneration, dismissTask, getTask }}
+      value={{ tasks, activeTasks, completedTasks, startGeneration, retryTask, dismissTask, getTask }}
     >
       {children}
     </GenerationTasksContext.Provider>
