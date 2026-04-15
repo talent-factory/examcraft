@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
+import ReplayIcon from '@mui/icons-material/Replay';
 import WarningIcon from '@mui/icons-material/Warning';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -27,9 +28,21 @@ const AUTO_HIDE_DELAY_MS = 30_000;
 
 const GenerationTasksBar: React.FC = () => {
   const { t } = useTranslation();
-  const { activeTasks, completedTasks, dismissTask } = useGenerationTasks();
+  const { activeTasks, completedTasks, dismissTask, retryTask } = useGenerationTasks();
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(true);
+  const [retryingTaskId, setRetryingTaskId] = useState<string | null>(null);
+
+  const handleRetry = async (taskId: string) => {
+    try {
+      setRetryingTaskId(taskId);
+      await retryTask(taskId);
+    } catch (err) {
+      console.error('[GenerationTasks] Retry failed:', err);
+    } finally {
+      setRetryingTaskId(null);
+    }
+  };
   const [visible, setVisible] = useState(true);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -171,11 +184,23 @@ const GenerationTasksBar: React.FC = () => {
 
                 {/* Unknown status: connection lost */}
                 {isUnknown && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <WarningIcon fontSize="small" color="warning" />
-                    <Typography variant="caption" color="warning.main">
-                      {t('components.generationTasks.connectionLost')}
-                    </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
+                      <WarningIcon fontSize="small" color="warning" />
+                      <Typography variant="caption" color="warning.main">
+                        {t('components.generationTasks.connectionLost')}
+                      </Typography>
+                    </Box>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); handleRetry(task.taskId); }}
+                      disabled={retryingTaskId === task.taskId}
+                      sx={{ p: 0.25, ml: 0.5 }}
+                      aria-label={t('components.generationTasks.retry')}
+                      title={t('components.generationTasks.retry')}
+                    >
+                      <ReplayIcon fontSize="small" color="primary" />
+                    </IconButton>
                   </Box>
                 )}
 
@@ -204,21 +229,29 @@ const GenerationTasksBar: React.FC = () => {
                   </Box>
                 )}
 
-                {/* Failed task: red X + error message */}
+                {/* Failed task: red X + error message + retry button */}
                 {isFailure && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <ErrorIcon fontSize="small" color="error" />
-                    <Typography
-                      variant="caption"
-                      color="error"
-                      sx={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
+                      <ErrorIcon fontSize="small" color="error" />
+                      <Typography
+                        variant="caption"
+                        color="error"
+                        sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      >
+                        {task.message || t('components.generationTasks.errorOccurred')}
+                      </Typography>
+                    </Box>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); handleRetry(task.taskId); }}
+                      disabled={retryingTaskId === task.taskId}
+                      sx={{ p: 0.25, ml: 0.5 }}
+                      aria-label={t('components.generationTasks.retry')}
+                      title={t('components.generationTasks.retry')}
                     >
-                      {task.message || t('components.generationTasks.errorOccurred')}
-                    </Typography>
+                      <ReplayIcon fontSize="small" color="primary" />
+                    </IconButton>
                   </Box>
                 )}
               </Box>

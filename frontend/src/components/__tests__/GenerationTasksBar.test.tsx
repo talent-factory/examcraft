@@ -8,6 +8,7 @@ import type { GenerationTaskState } from '../../types';
 
 // Mock useGenerationTasks
 const mockDismissTask = jest.fn();
+const mockRetryTask = jest.fn();
 const mockUseGenerationTasks = jest.fn();
 
 jest.mock('../../contexts/GenerationTasksContext', () => ({
@@ -49,6 +50,7 @@ describe('GenerationTasksBar', () => {
       activeTasks: [],
       completedTasks: [],
       dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
     });
 
     const { container } = render(<GenerationTasksBar />, { wrapper: Wrapper });
@@ -67,6 +69,7 @@ describe('GenerationTasksBar', () => {
       activeTasks: [activeTask],
       completedTasks: [],
       dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
     });
 
     render(<GenerationTasksBar />, { wrapper: Wrapper });
@@ -83,6 +86,7 @@ describe('GenerationTasksBar', () => {
       activeTasks: [activeTask],
       completedTasks: [],
       dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
     });
 
     render(<GenerationTasksBar />, { wrapper: Wrapper });
@@ -102,6 +106,7 @@ describe('GenerationTasksBar', () => {
       activeTasks: [],
       completedTasks: [completedTask],
       dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
     });
 
     render(<GenerationTasksBar />, { wrapper: Wrapper });
@@ -122,6 +127,7 @@ describe('GenerationTasksBar', () => {
       activeTasks: [],
       completedTasks: [completedTask],
       dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
     });
 
     render(<GenerationTasksBar />, { wrapper: Wrapper });
@@ -145,6 +151,7 @@ describe('GenerationTasksBar', () => {
       activeTasks: [],
       completedTasks: [completedTask],
       dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
     });
 
     render(<GenerationTasksBar />, { wrapper: Wrapper });
@@ -166,6 +173,7 @@ describe('GenerationTasksBar', () => {
       activeTasks: [],
       completedTasks: [failedTask],
       dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
     });
 
     render(<GenerationTasksBar />, { wrapper: Wrapper });
@@ -180,6 +188,7 @@ describe('GenerationTasksBar', () => {
       activeTasks: [activeTask],
       completedTasks: [],
       dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
     });
 
     render(<GenerationTasksBar />, { wrapper: Wrapper });
