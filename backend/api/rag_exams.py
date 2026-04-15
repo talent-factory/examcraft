@@ -266,6 +266,98 @@ async def generate_rag_exam(
         )
 
 
+@router.post("/retry-generation/{task_id}", response_model=GenerateExamTaskResponse)
+async def retry_generation(
+    task_id: str,
+    http_request: Request,
+    current_user: User = Depends(require_permission("create_questions")),
+    db: Session = Depends(get_db),
+):
+    """
+    Retry a failed generation job using the same parameters.
+    Creates a new Celery task from the stored request_data.
+    """
+    locale = get_request_locale(http_request, current_user)
+
+    original_job = (
+        db.query(QuestionGenerationJob)
+        .filter(
+            QuestionGenerationJob.task_id == task_id,
+            QuestionGenerationJob.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not original_job:
+        raise HTTPException(
+            status_code=404, detail=t("rag_task_not_found", locale=locale)
+        )
+
+    if original_job.status not in ("FAILURE", "REVOKED"):
+        raise HTTPException(
+            status_code=400,
+            detail=t("rag_retry_only_failed", locale=locale),
+        )
+
+    if not original_job.request_data:
+        raise HTTPException(
+            status_code=400,
+            detail=t("rag_retry_no_request_data", locale=locale),
+        )
+
+    from utils.tenant_utils import SubscriptionLimits
+
+    if not current_user.institution:
+        raise HTTPException(
+            status_code=403, detail=t("rag_no_institution", locale=locale)
+        )
+
+    question_count = original_job.request_data.get("question_count", 5)
+    SubscriptionLimits.check_question_limit(
+        current_user.institution, db, additional_count=question_count
+    )
+
+    new_task_id = str(uuid.uuid4())
+    new_job = QuestionGenerationJob(
+        task_id=new_task_id,
+        user_id=current_user.id,
+        topic=original_job.topic,
+        question_count=original_job.question_count,
+        request_data=original_job.request_data,
+    )
+    db.add(new_job)
+    db.commit()
+
+    try:
+        generate_questions_task.apply_async(
+            args=[
+                original_job.request_data,
+                str(current_user.id),
+                current_user.institution_id,
+            ],
+            task_id=new_task_id,
+            queue="question_generation",
+        )
+    except Exception as broker_error:
+        db.delete(new_job)
+        db.commit()
+        logger.error(f"Celery Broker nicht erreichbar beim Retry: {broker_error}")
+        raise HTTPException(
+            status_code=503,
+            detail=t("rag_task_queue_unavailable", locale=locale),
+        )
+
+    logger.info(
+        f"Retry gestartet: new_task_id={new_task_id}, "
+        f"original_task_id={task_id}, user={current_user.id}"
+    )
+
+    return GenerateExamTaskResponse(
+        task_id=new_task_id,
+        message="Fragengenerierung wird wiederholt",
+    )
+
+
 @router.post("/retrieve-context", response_model=RAGContextResponse)
 async def retrieve_context(
     request: ContextRetrievalRequest,
