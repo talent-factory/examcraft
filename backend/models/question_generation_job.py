@@ -6,7 +6,7 @@ immer einen Eintrag findet.
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String
 
 from database import Base
 
@@ -23,6 +23,7 @@ class QuestionGenerationJob(Base):
     topic = Column(String, nullable=True)
     question_count = Column(Integer, nullable=True)
     status = Column(String, default="PENDING", server_default="PENDING", nullable=False)
+    request_data = Column(JSON, nullable=True)
 
     def __init__(self, **kwargs: object) -> None:
         kwargs.setdefault("status", "PENDING")
