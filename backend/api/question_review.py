@@ -607,7 +607,7 @@ async def edit_question(
 async def start_review(
     question_id: int,
     request: Request,
-    current_user: User = Depends(require_permission("approve_questions")),
+    current_user: User = Depends(require_permission("review_questions")),
     db: Session = Depends(get_db),
 ):
     """
@@ -678,7 +678,7 @@ async def approve_question(
     question_id: int,
     request: ReviewActionRequest,
     http_request: Request,
-    current_user: User = Depends(require_permission("approve_questions")),
+    current_user: User = Depends(require_permission("review_questions")),
     db: Session = Depends(get_db),
 ):
     """
@@ -784,7 +784,7 @@ async def reject_question(
     question_id: int,
     request: ReviewActionRequest,
     http_request: Request,
-    current_user: User = Depends(require_permission("approve_questions")),
+    current_user: User = Depends(require_permission("review_questions")),
     db: Session = Depends(get_db),
 ):
     """

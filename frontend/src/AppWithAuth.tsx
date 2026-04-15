@@ -113,7 +113,7 @@ export const AppWithAuth: React.FC = () => {
                 path="/questions/generate"
                 element={
                   <ProtectedRoute>
-                    <PermissionGuard requiredPermissions={['questions:create']}>
+                    <PermissionGuard requiredPermissions={['create_questions']}>
                       <AppLayout>
                         <Exams />
                       </AppLayout>
@@ -126,7 +126,7 @@ export const AppWithAuth: React.FC = () => {
                 path="/questions/review"
                 element={
                   <ProtectedRoute>
-                    <PermissionGuard requiredPermissions={['questions:review']}>
+                    <PermissionGuard requiredPermissions={['review_questions']}>
                       <AppLayout>
                         <Review />
                       </AppLayout>
@@ -150,7 +150,7 @@ export const AppWithAuth: React.FC = () => {
                 path="/exams/compose"
                 element={
                   <ProtectedRoute>
-                    <PermissionGuard requiredPermissions={['exams:create']}>
+                    <PermissionGuard requiredPermissions={['create_exams']}>
                       <AppLayout>
                         <ExamComposer />
                       </AppLayout>

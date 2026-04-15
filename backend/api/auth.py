@@ -140,6 +140,17 @@ class RoleResponse(BaseModel):
         from_attributes = True
 
 
+class InstitutionResponse(BaseModel):
+    """Institution response (embedded in user profile)"""
+
+    id: int
+    name: str
+    subscription_tier: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class UserProfileResponse(BaseModel):
     """User profile response"""
 
@@ -152,6 +163,7 @@ class UserProfileResponse(BaseModel):
     is_email_verified: bool  # Email verification status
     institution_id: Optional[int]
     institution_name: Optional[str]
+    institution: Optional[InstitutionResponse] = None
     oauth_provider: Optional[str] = None  # OAuth provider (google, microsoft, etc.)
     avatar_url: Optional[str] = None  # Profile picture URL (from OAuth or uploaded)
     preferred_language: Optional[str] = None
@@ -259,11 +271,14 @@ async def register(
     db.add(user)
     db.flush()  # Get user.id
 
-    # Assign default 'viewer' role
-    viewer_role = db.query(Role).filter(Role.name == UserRole.VIEWER.value).first()
-    if not viewer_role:
+    # Assign default 'dozent' role — self-registered users need core features
+    # (question generation, document management) that viewer role lacks
+    default_role = db.query(Role).filter(Role.name == UserRole.DOZENT.value).first()
+    if not default_role:
+        default_role = db.query(Role).filter(Role.name == UserRole.VIEWER.value).first()
+    if not default_role:
         # Create default viewer role if it doesn't exist
-        viewer_role = Role(
+        default_role = Role(
             name=UserRole.VIEWER.value,
             display_name="Viewer",
             description="Can view questions and exams, upload and manage documents",
@@ -276,10 +291,10 @@ async def register(
             ],
             is_system_role=True,
         )
-        db.add(viewer_role)
+        db.add(default_role)
         db.flush()
 
-    user.roles.append(viewer_role)
+    user.roles.append(default_role)
 
     # Generate verification token
     from services.email_service import EmailService
@@ -526,13 +541,24 @@ async def get_current_user_profile(
     # Build role responses with parsed permissions
     role_responses = []
     for role in current_user.roles:
-        # Parse permissions from JSON string if needed
+        # Parse permissions from JSON string or PostgreSQL array literal
         permissions = role.permissions
         if isinstance(permissions, str):
             try:
-                permissions = json.loads(permissions)
+                parsed = json.loads(permissions)
+                if isinstance(parsed, list):
+                    permissions = parsed
+                else:
+                    # json.loads("{}") returns a dict — treat as empty
+                    permissions = []
             except json.JSONDecodeError:
-                permissions = []
+                # Handle PostgreSQL array literal: {a,b,c}
+                if permissions.startswith("{") and permissions.endswith("}"):
+                    permissions = [
+                        p.strip() for p in permissions[1:-1].split(",") if p.strip()
+                    ]
+                else:
+                    permissions = []
         elif not isinstance(permissions, list):
             permissions = []
 
@@ -548,6 +574,14 @@ async def get_current_user_profile(
             )
         )
 
+    institution_resp = None
+    if current_user.institution:
+        institution_resp = InstitutionResponse(
+            id=current_user.institution.id,
+            name=current_user.institution.name,
+            subscription_tier=current_user.institution.subscription_tier,
+        )
+
     return UserProfileResponse(
         id=current_user.id,
         email=current_user.email,
@@ -560,6 +594,7 @@ async def get_current_user_profile(
         institution_name=current_user.institution.name
         if current_user.institution
         else None,
+        institution=institution_resp,
         oauth_provider=current_user.oauth_provider,
         avatar_url=current_user.avatar_url,
         preferred_language=current_user.preferred_language,
@@ -624,13 +659,24 @@ async def update_current_user_profile(
     # Build role responses with parsed permissions
     role_responses = []
     for role in current_user.roles:
-        # Parse permissions from JSON string if needed
+        # Parse permissions from JSON string or PostgreSQL array literal
         permissions = role.permissions
         if isinstance(permissions, str):
             try:
-                permissions = json.loads(permissions)
+                parsed = json.loads(permissions)
+                if isinstance(parsed, list):
+                    permissions = parsed
+                else:
+                    # json.loads("{}") returns a dict — treat as empty
+                    permissions = []
             except json.JSONDecodeError:
-                permissions = []
+                # Handle PostgreSQL array literal: {a,b,c}
+                if permissions.startswith("{") and permissions.endswith("}"):
+                    permissions = [
+                        p.strip() for p in permissions[1:-1].split(",") if p.strip()
+                    ]
+                else:
+                    permissions = []
         elif not isinstance(permissions, list):
             permissions = []
 
@@ -646,6 +692,14 @@ async def update_current_user_profile(
             )
         )
 
+    institution_resp = None
+    if current_user.institution:
+        institution_resp = InstitutionResponse(
+            id=current_user.institution.id,
+            name=current_user.institution.name,
+            subscription_tier=current_user.institution.subscription_tier,
+        )
+
     return UserProfileResponse(
         id=current_user.id,
         email=current_user.email,
@@ -658,6 +712,7 @@ async def update_current_user_profile(
         institution_name=current_user.institution.name
         if current_user.institution
         else None,
+        institution=institution_resp,
         oauth_provider=current_user.oauth_provider,
         avatar_url=current_user.avatar_url,
         preferred_language=current_user.preferred_language,

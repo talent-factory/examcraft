@@ -38,19 +38,19 @@ export const useRoleBasedNavigation = () => {
       label: t('nav.sidebar.questionGeneration'),
       path: '/questions/generate',
       icon: '✨',
-      requiredPermissions: ['questions:create'],
+      requiredPermissions: ['create_questions'],
     },
     {
       label: t('nav.sidebar.reviewQueue'),
       path: '/questions/review',
       icon: '✅',
-      requiredPermissions: ['questions:review'],
+      requiredPermissions: ['review_questions'],
     },
     {
       label: t('nav.sidebar.examComposer'),
       path: '/exams/compose',
       icon: '📝',
-      requiredPermissions: ['exams:create'],
+      requiredPermissions: ['create_exams'],
     },
     {
       label: t('nav.sidebar.documentChat'),
