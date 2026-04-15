@@ -1135,12 +1135,12 @@
           "documentUpload": "Document Upload",
           "basicQuestionGeneration": "Basic Question Generation",
           "documentLibrary": "Document Library",
+          "ragGeneration": "RAG Generation",
           "fiveDocuments": "5 Documents",
           "twentyQuestionsMonth": "20 Questions/Month"
         },
         "starter": {
           "allFreeFeatures": "All Free Features",
-          "ragGeneration": "RAG Generation",
           "promptTemplates": "Prompt Templates",
           "batchProcessing": "Batch Processing",
           "fiftyDocuments": "50 Documents",

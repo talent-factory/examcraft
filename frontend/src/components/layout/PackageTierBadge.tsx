@@ -48,6 +48,7 @@ export const PackageTierBadge: React.FC = () => {
         t('layout.packageTier.features.free.documentUpload'),
         t('layout.packageTier.features.free.basicQuestionGeneration'),
         t('layout.packageTier.features.free.documentLibrary'),
+        t('layout.packageTier.features.free.ragGeneration'),
         t('layout.packageTier.features.free.fiveDocuments'),
         t('layout.packageTier.features.free.twentyQuestionsMonth'),
       ]
@@ -58,7 +59,6 @@ export const PackageTierBadge: React.FC = () => {
       package: 'Premium',
       features: [
         t('layout.packageTier.features.starter.allFreeFeatures'),
-        t('layout.packageTier.features.starter.ragGeneration'),
         t('layout.packageTier.features.starter.promptTemplates'),
         t('layout.packageTier.features.starter.batchProcessing'),
         t('layout.packageTier.features.starter.fiftyDocuments'),

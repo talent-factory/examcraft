@@ -1102,12 +1102,12 @@
           "documentUpload": "Caricamento documenti",
           "basicQuestionGeneration": "Generazione domande di base",
           "documentLibrary": "Libreria documenti",
+          "ragGeneration": "Generazione RAG",
           "fiveDocuments": "5 documenti",
           "twentyQuestionsMonth": "20 domande/mese"
         },
         "starter": {
           "allFreeFeatures": "Tutte le funzionalità Free",
-          "ragGeneration": "Generazione RAG",
           "promptTemplates": "Modelli di prompt",
           "batchProcessing": "Elaborazione batch",
           "fiftyDocuments": "50 documenti",

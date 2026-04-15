@@ -23,9 +23,9 @@ class Feature(str, Enum):
     DOCUMENT_UPLOAD = "document_upload"
     BASIC_QUESTION_GENERATION = "basic_question_generation"
     DOCUMENT_LIBRARY = "document_library"
+    RAG_GENERATION = "rag_generation"
 
     # Starter Tier Features
-    RAG_GENERATION = "rag_generation"
     PROMPT_TEMPLATES = "prompt_templates"
     BATCH_PROCESSING = "batch_processing"
 
@@ -53,14 +53,15 @@ TIER_FEATURES: Dict[SubscriptionTier, List[Feature]] = {
         Feature.DOCUMENT_UPLOAD,
         Feature.BASIC_QUESTION_GENERATION,
         Feature.DOCUMENT_LIBRARY,
+        Feature.RAG_GENERATION,
     ],
     SubscriptionTier.STARTER: [
         # Free Features
         Feature.DOCUMENT_UPLOAD,
         Feature.BASIC_QUESTION_GENERATION,
         Feature.DOCUMENT_LIBRARY,
-        # Starter Features
         Feature.RAG_GENERATION,
+        # Starter Features
         Feature.PROMPT_TEMPLATES,
         Feature.BATCH_PROCESSING,
     ],
