@@ -262,8 +262,8 @@ def seed_subscription_tiers(db):
             "starter",
             "Starter",
             "Für einzelne Dozenten",
-            19.00,
-            190.00,
+            9.00,
+            90.00,
             2,
         ),
         (
@@ -298,7 +298,14 @@ def seed_subscription_tiers(db):
         existing = (
             db.query(SubscriptionTier).filter(SubscriptionTier.id == tier_id).first()
         )
-        if not existing:
+        if existing:
+            existing.name = name
+            existing.display_name = display_name
+            existing.description = description
+            existing.price_monthly = price_monthly
+            existing.price_yearly = price_yearly
+            existing.sort_order = sort_order
+        else:
             tier = SubscriptionTier(
                 id=tier_id,
                 name=name,
@@ -324,10 +331,10 @@ def seed_tier_quotas(db):
         ("tier_free", "users", 1),
         ("tier_free", "storage_mb", 100),
         # Starter Tier
-        ("tier_starter", "documents", 50),
-        ("tier_starter", "questions_per_month", 200),
-        ("tier_starter", "users", 3),
-        ("tier_starter", "storage_mb", 1000),
+        ("tier_starter", "documents", 20),
+        ("tier_starter", "questions_per_month", 100),
+        ("tier_starter", "users", 1),
+        ("tier_starter", "storage_mb", 500),
         # Professional Tier
         ("tier_professional", "documents", -1),  # Unlimited
         ("tier_professional", "questions_per_month", 1000),
@@ -348,7 +355,9 @@ def seed_tier_quotas(db):
             )
             .first()
         )
-        if not existing:
+        if existing:
+            existing.quota_limit = quota_limit
+        else:
             quota = TierQuota(
                 tier_id=tier_id, resource_type=resource_type, quota_limit=quota_limit
             )
