@@ -39,23 +39,34 @@ def db_with_pg_array_permissions(test_db):
     test_db.flush()
 
     # Store permissions as PostgreSQL array literal (how seed scripts store them)
-    viewer_role = Role(
-        name="viewer",
-        display_name="Viewer",
-        description="View-only access",
-        permissions="{view_questions,view_exams,documents:read,create_documents}",
-        is_system_role=True,
-    )
-    test_db.add(viewer_role)
+    # Use get-or-update pattern to avoid UniqueViolation when CI seeds roles at startup
+    viewer_role = test_db.query(Role).filter(Role.name == "viewer").first()
+    if viewer_role:
+        viewer_role.permissions = (
+            "{view_questions,view_exams,documents:read,create_documents}"
+        )
+    else:
+        viewer_role = Role(
+            name="viewer",
+            display_name="Viewer",
+            description="View-only access",
+            permissions="{view_questions,view_exams,documents:read,create_documents}",
+            is_system_role=True,
+        )
+        test_db.add(viewer_role)
 
-    dozent_role = Role(
-        name="dozent",
-        display_name="Dozent",
-        description="Full teaching access",
-        permissions="{create_questions,edit_questions,review_questions,view_questions,view_exams,documents:read,create_documents}",
-        is_system_role=True,
-    )
-    test_db.add(dozent_role)
+    dozent_role = test_db.query(Role).filter(Role.name == "dozent").first()
+    if dozent_role:
+        dozent_role.permissions = "{create_questions,edit_questions,review_questions,view_questions,view_exams,documents:read,create_documents}"
+    else:
+        dozent_role = Role(
+            name="dozent",
+            display_name="Dozent",
+            description="Full teaching access",
+            permissions="{create_questions,edit_questions,review_questions,view_questions,view_exams,documents:read,create_documents}",
+            is_system_role=True,
+        )
+        test_db.add(dozent_role)
     test_db.commit()
 
     yield test_db
@@ -78,16 +89,21 @@ def db_with_json_permissions(test_db):
     test_db.add(institution)
     test_db.flush()
 
-    viewer_role = Role(
-        name="viewer",
-        display_name="Viewer",
-        description="View-only access",
-        permissions=json.dumps(
-            ["view_questions", "view_exams", "documents:read", "create_documents"]
-        ),
-        is_system_role=True,
+    viewer_role = test_db.query(Role).filter(Role.name == "viewer").first()
+    json_perms = json.dumps(
+        ["view_questions", "view_exams", "documents:read", "create_documents"]
     )
-    test_db.add(viewer_role)
+    if viewer_role:
+        viewer_role.permissions = json_perms
+    else:
+        viewer_role = Role(
+            name="viewer",
+            display_name="Viewer",
+            description="View-only access",
+            permissions=json_perms,
+            is_system_role=True,
+        )
+        test_db.add(viewer_role)
     test_db.commit()
 
     yield test_db
