@@ -87,31 +87,35 @@ When answering:
         },
         {
             "name": "default_prompt_multiple_choice",
-            "content": """You are an expert in educational assessment and exam question generation.
+            "content": """Du bist ein Experte für die Erstellung von OpenBook-Prüfungsfragen für akademische Kurse.
 
-Your task is to create a high-quality multiple-choice question based on the provided context.
-
-Context:
+KONTEXT AUS DOKUMENTEN:
 {context}
 
-Topic: {topic}
-Difficulty: {difficulty}
-Language: {language}
+AUFGABE:
+Erstelle eine anspruchsvolle Multiple-Choice-Frage zum Thema "{topic}" basierend AUSSCHLIESSLICH auf dem obigen Kontext.
 
-Generate a multiple-choice question that:
-1. Tests understanding of key concepts from the context
-2. Is suitable for open-book examination format
-3. Has one clearly correct answer
-4. Includes 3-4 plausible distractors (incorrect options)
-5. Avoids ambiguity and trick questions
+ANFORDERUNGEN:
+- Schwierigkeitsgrad: {difficulty}
+- Sprache: {language}
+- Die Frage muss SPEZIFISCHE Details, Konzepte oder Zusammenhänge aus dem Kontext abfragen
+- Vermeide generische Fragen wie "Was ist wichtig bei..." oder "Welche Aspekte sind relevant..."
+- Fokussiere auf KONKRETE Fakten, Algorithmen, Formeln, Definitionen oder Prozesse aus dem Text
+- Die Frage soll Verständnis und Anwendung prüfen, nicht nur Auswendiglernen
 
-Format your response as structured JSON with the following fields:
-- question_text: The question text
-- options: Array of 4 answer options (strings)
-- correct_answer: The correct option (exact match from options array)
-- explanation: Detailed explanation of why the correct answer is right and why distractors are wrong
-- difficulty: The difficulty level (easy/medium/hard)
-- source_reference: Reference to the specific part of the context used""",
+ANTWORTOPTIONEN:
+- Erstelle 4 Optionen (A, B, C, D) mit konkreten, fachlichen Inhalten
+- Nur EINE korrekte Antwort
+- Distraktoren müssen plausibel sein und häufige Missverständnisse widerspiegeln
+- Keine Meta-Optionen wie "Alle oben genannten" oder "Keine der genannten"
+
+Antworte als JSON:
+- question_text: Die Fragestellung (spezifisch, detailliert)
+- options: Array mit 4 Antwortoptionen (Strings)
+- correct_answer: Die korrekte Option (exakter Match aus options Array)
+- explanation: Detaillierte Erklärung mit Verweis auf den Kontext
+- difficulty: Schwierigkeitsgrad (easy/medium/hard)
+- source_reference: Verweis auf den genutzten Kontext-Abschnitt""",
             "description": "Default system prompt for multiple-choice question generation",
             "category": "template",
             "use_case": "question_generation_multiple_choice",
@@ -121,32 +125,34 @@ Format your response as structured JSON with the following fields:
         },
         {
             "name": "default_prompt_open_ended",
-            "content": """You are an expert in educational assessment and exam question generation.
+            "content": """Du bist ein Experte für die Erstellung von OpenBook-Prüfungsfragen für akademische Kurse.
 
-Your task is to create a high-quality open-ended question based on the provided context.
-
-Context:
+KONTEXT AUS DOKUMENTEN:
 {context}
 
-Topic: {topic}
-Difficulty: {difficulty}
-Language: {language}
+AUFGABE:
+Erstelle eine anspruchsvolle offene Frage zum Thema "{topic}" basierend AUSSCHLIESSLICH auf dem obigen Kontext.
 
-Generate an open-ended question that:
-1. Requires critical thinking and analysis
-2. Is suitable for open-book examination format
-3. Cannot be answered with simple facts (requires synthesis and evaluation)
-4. Has clear evaluation criteria
-5. Allows for multiple valid approaches or perspectives
+ANFORDERUNGEN:
+- Schwierigkeitsgrad: {difficulty}
+- Sprache: {language}
+- Die Frage muss kritisches Denken und Analyse erfordern
+- Die Antwort soll Synthese und Bewertung verlangen, nicht nur Fakten wiedergeben
+- Beziehe dich auf KONKRETE Inhalte aus dem Kontext (Algorithmen, Konzepte, Beispiele)
+- Vermeide generische Fragen wie "Erklären Sie die Bedeutung von..."
 
-Format your response as structured JSON with the following fields:
-- question_text: The question text
-- evaluation_criteria: Array of criteria for grading (each with description and points)
-- sample_answer: A high-quality example answer
-- explanation: What makes a good answer to this question
-- difficulty: The difficulty level (easy/medium/hard)
-- estimated_time_minutes: Estimated time to answer (5-30 minutes)
-- source_reference: Reference to the specific part of the context used""",
+BEWERTUNGSKRITERIEN:
+- Definiere klare, messbare Bewertungskriterien
+- Jedes Kriterium mit Beschreibung und Punktzahl
+
+Antworte als JSON:
+- question_text: Die Fragestellung (spezifisch, kontextbezogen)
+- evaluation_criteria: Array von Kriterien (jeweils mit description und points)
+- sample_answer: Eine hochwertige Musterantwort mit Bezug zum Kontext
+- explanation: Was eine gute Antwort auszeichnet
+- difficulty: Schwierigkeitsgrad (easy/medium/hard)
+- estimated_time_minutes: Geschätzte Bearbeitungszeit (5-30 Minuten)
+- source_reference: Verweis auf den genutzten Kontext-Abschnitt""",
             "description": "Default system prompt for open-ended question generation",
             "category": "template",
             "use_case": "question_generation_open_ended",
@@ -156,30 +162,28 @@ Format your response as structured JSON with the following fields:
         },
         {
             "name": "default_prompt_true_false",
-            "content": """You are an expert in educational assessment and exam question generation.
+            "content": """Du bist ein Experte für die Erstellung von OpenBook-Prüfungsfragen für akademische Kurse.
 
-Your task is to create a high-quality true/false question based on the provided context.
-
-Context:
+KONTEXT AUS DOKUMENTEN:
 {context}
 
-Topic: {topic}
-Difficulty: {difficulty}
-Language: {language}
+AUFGABE:
+Erstelle eine Wahr/Falsch-Frage zum Thema "{topic}" basierend AUSSCHLIESSLICH auf dem obigen Kontext.
 
-Generate a true/false question that:
-1. Tests understanding of a specific concept or fact from the context
-2. Is unambiguous (clearly true or clearly false)
-3. Avoids double negatives and trick wording
-4. Is suitable for open-book examination format
-5. Includes a detailed explanation
+ANFORDERUNGEN:
+- Schwierigkeitsgrad: {difficulty}
+- Sprache: {language}
+- Die Aussage muss ein SPEZIFISCHES Konzept, eine Definition oder einen Zusammenhang aus dem Kontext prüfen
+- Die Aussage muss eindeutig wahr ODER falsch sein (keine Graubereiche)
+- Vermeide doppelte Verneinungen und Trickformulierungen
+- Bei falschen Aussagen: Verändere ein konkretes Detail (Zahl, Eigenschaft, Reihenfolge)
 
-Format your response as structured JSON with the following fields:
-- question_text: The statement to evaluate (true or false)
-- correct_answer: Either "true" or "false"
-- explanation: Detailed explanation of why the statement is true or false, with reference to the context
-- difficulty: The difficulty level (easy/medium/hard)
-- source_reference: Reference to the specific part of the context used""",
+Antworte als JSON:
+- question_text: Die zu bewertende Aussage (spezifisch, kontextbezogen)
+- correct_answer: "true" oder "false"
+- explanation: Detaillierte Erklärung mit Verweis auf die relevante Stelle im Kontext
+- difficulty: Schwierigkeitsgrad (easy/medium/hard)
+- source_reference: Verweis auf den genutzten Kontext-Abschnitt""",
             "description": "Default system prompt for true/false question generation",
             "category": "template",
             "use_case": "question_generation_true_false",

@@ -205,34 +205,25 @@ class ClaudeService:
             List of generated questions
         """
 
-        # Use demo mode if API key not available or explicitly enabled
         if self.demo_mode:
-            logger.info("Using demo mode for question generation")
-            return self._generate_demo_questions(
-                topic, difficulty, question_count, language
+            raise RuntimeError(
+                "Claude API is not configured (ANTHROPIC_API_KEY missing or CLAUDE_DEMO_MODE=true). "
+                "Cannot generate questions."
             )
 
-        try:
-            prompt = self._build_prompt(
-                topic, difficulty, question_count, question_types, language
-            )
+        prompt = self._build_prompt(
+            topic, difficulty, question_count, question_types, language
+        )
 
-            payload = {
-                "model": self.model,
-                "max_tokens": min(self.max_tokens_per_request, 4000),
-                "messages": [{"role": "user", "content": prompt}],
-            }
+        payload = {
+            "model": self.model,
+            "max_tokens": min(self.max_tokens_per_request, 4000),
+            "messages": [{"role": "user", "content": prompt}],
+        }
 
-            # Use new retry logic
-            result = await self._make_api_request_with_retry(payload)
-            content = result["content"][0]["text"]
-            return self._parse_claude_response(content, topic, difficulty)
-
-        except Exception as e:
-            logger.error(f"Claude API failed, falling back to demo mode: {str(e)}")
-            return self._generate_demo_questions(
-                topic, difficulty, question_count, language
-            )
+        result = await self._make_api_request_with_retry(payload)
+        content = result["content"][0]["text"]
+        return self._parse_claude_response(content, topic, difficulty)
 
     async def generate_exam_async(self, exam_request: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -266,19 +257,10 @@ class ClaudeService:
                     f"Using custom prompt template ({len(custom_prompt)} chars)"
                 )
 
-                # Use demo mode if API key not available
                 if self.demo_mode:
-                    logger.info("Demo mode: returning demo questions for custom prompt")
-                    return {
-                        "questions": self._generate_demo_questions(
-                            topic, difficulty, question_count, language
-                        ),
-                        "topic": topic,
-                        "difficulty": difficulty,
-                        "question_count": question_count,
-                        "context_used": bool(context),
-                        "custom_prompt_used": True,
-                    }
+                    raise RuntimeError(
+                        "Claude API is not configured. Cannot generate questions."
+                    )
 
                 # Send custom prompt directly to Claude API
                 payload = {
@@ -340,27 +322,8 @@ class ClaudeService:
             }
 
         except Exception as e:
-            import traceback
-
-            error_type = type(e).__name__
-            error_msg = str(e) if str(e) else repr(e)
-            error_detail = f"{error_type}: {error_msg}"
-            logger.error(f"Exam generation failed: {error_detail}")
-            logger.error(f"Full traceback:\n{traceback.format_exc()}")
-            # Return fallback structure with detailed error
-            return {
-                "questions": self._generate_demo_questions(
-                    exam_request.get("topic", "Fallback"),
-                    exam_request.get("difficulty", "medium"),
-                    exam_request.get("question_count", 1),
-                    exam_request.get("language", "de"),
-                ),
-                "topic": exam_request.get("topic", "Fallback"),
-                "difficulty": exam_request.get("difficulty", "medium"),
-                "question_count": exam_request.get("question_count", 1),
-                "context_used": False,
-                "error": error_detail,
-            }
+            logger.error(f"Exam generation failed: {e}", exc_info=True)
+            raise
 
     def _build_prompt(
         self,
@@ -497,7 +460,7 @@ Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
         except Exception as e:
             logger.error(f"Failed to parse Claude response: {type(e).__name__}: {e}")
             logger.error(f"Response content preview: {content[:300]}...")
-            return self._generate_demo_questions(topic, difficulty, 3, "de")
+            raise ValueError(f"Failed to parse Claude response: {e}") from e
 
     def _generate_demo_questions(
         self, topic: str, difficulty: str, question_count: int, language: str = "de"
