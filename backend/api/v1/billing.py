@@ -596,6 +596,9 @@ async def sync_subscription_from_stripe(
         old_tier = institution.subscription_tier
         institution.subscription_tier = tier
 
+        from utils.tenant_utils import sync_institution_quotas
+        sync_institution_quotas(institution, db)
+
         db.commit()
 
         logger.info(

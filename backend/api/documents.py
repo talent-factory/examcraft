@@ -94,6 +94,12 @@ async def upload_document(
 
         SubscriptionLimits.check_document_limit(current_user.institution, db)
 
+        # Check storage limit (if file size is known)
+        if file.size and file.size > 0:
+            SubscriptionLimits.check_storage_limit(
+                current_user.institution, db, file.size
+            )
+
         # Save document file and create DB entry
         document = await document_service.upload_document(
             file=file, user_id=current_user.id, db=db

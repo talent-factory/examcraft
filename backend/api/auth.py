@@ -255,6 +255,12 @@ async def register(
                 db.add(institution)
                 db.flush()  # Get institution.id
 
+    # Check user limit for institution (existing institutions only —
+    # new personal institutions start empty, so the first user always passes)
+    from utils.tenant_utils import SubscriptionLimits
+
+    SubscriptionLimits.check_user_limit(institution, db)
+
     # Create user (email not verified yet)
     user = User(
         email=request.email,
@@ -459,6 +465,13 @@ async def login(
     # Track login
     user.last_login_at = func.now()
     user.last_login_ip = http_request.client.host if http_request.client else None
+
+    # Sync tier_quotas → Institution.max_* fields on every login
+    from utils.tenant_utils import sync_institution_quotas
+
+    if user.institution:
+        sync_institution_quotas(user.institution, db)
+
     db.commit()
 
     # Audit log: Successful login

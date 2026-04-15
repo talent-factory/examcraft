@@ -290,6 +290,89 @@ class SubscriptionLimits:
         }
 
 
+    @staticmethod
+    def check_storage_limit(
+        institution: Institution, db: Session, file_size_bytes: int
+    ) -> None:
+        """
+        Check if institution would exceed storage quota with new file.
+        Reads limit from tier_quotas table (storage_mb resource_type).
+
+        Args:
+            institution: Institution to check
+            db: Database session
+            file_size_bytes: Size of file being uploaded in bytes
+
+        Raises:
+            HTTPException: If adding this file would exceed the storage limit
+        """
+        from models.rbac import TierQuota
+        from sqlalchemy import func as sqlfunc
+
+        tier_id = f"tier_{institution.subscription_tier}"
+        storage_quota = (
+            db.query(TierQuota)
+            .filter(
+                TierQuota.tier_id == tier_id,
+                TierQuota.resource_type == "storage_mb",
+            )
+            .first()
+        )
+
+        if not storage_quota or storage_quota.quota_limit == -1:
+            return  # No limit or unlimited
+
+        current_bytes = (
+            db.query(sqlfunc.coalesce(sqlfunc.sum(Document.file_size), 0))
+            .filter(Document.institution_id == institution.id)
+            .scalar()
+        )
+
+        limit_bytes = storage_quota.quota_limit * 1024 * 1024
+        if current_bytes + file_size_bytes > limit_bytes:
+            current_mb = round(current_bytes / (1024 * 1024), 1)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Storage limit exceeded ({current_mb}MB used of {storage_quota.quota_limit}MB). Please upgrade your subscription.",
+            )
+
+
+def sync_institution_quotas(institution: Institution, db: Session) -> None:
+    """
+    Sync quota limits from tier_quotas DB table to Institution.max_* fields.
+    Call after tier changes or at login to keep fields in sync with the
+    single source of truth (tier_quotas table).
+
+    If no tier_quotas rows exist (e.g. seed not run), leaves current values.
+    """
+    from models.rbac import TierQuota
+
+    tier_id = f"tier_{institution.subscription_tier}"
+    quotas = db.query(TierQuota).filter(TierQuota.tier_id == tier_id).all()
+
+    if not quotas:
+        return
+
+    mapping = {
+        "users": "max_users",
+        "documents": "max_documents",
+        "questions_per_month": "max_questions_per_month",
+    }
+
+    changed = False
+    for q in quotas:
+        field = mapping.get(q.resource_type)
+        if field and getattr(institution, field) != q.quota_limit:
+            setattr(institution, field, q.quota_limit)
+            changed = True
+
+    if changed:
+        logger.info(
+            f"Synced quotas for institution {institution.id} "
+            f"(tier: {institution.subscription_tier})"
+        )
+
+
 def get_tenant_context(user: User) -> TenantContext:
     """
     Create tenant context from user
