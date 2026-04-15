@@ -1,12 +1,13 @@
 import stripe
 import os
 import logging
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from services.payment_service import PaymentService
+from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_active_user
 from utils.billing_utils import get_allowed_price_ids, get_tier_from_price_id
 from models.auth import User, Institution
@@ -394,6 +395,7 @@ async def create_customer_portal(
 @router.post("/create-checkout-session")
 async def create_checkout_session(
     request: CheckoutRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -403,18 +405,19 @@ async def create_checkout_session(
     Requires authentication and active user status.
     The success/cancel URLs are constructed server-side for security.
     """
+    locale = get_request_locale(http_request, current_user)
     payment_service = PaymentService()
 
     if not payment_service.is_available():
         raise HTTPException(
             status_code=503,
-            detail="Payment service is not configured (missing STRIPE_SECRET_KEY)",
+            detail=t("billing_service_not_configured", locale=locale),
         )
 
     if not current_user.institution_id:
         raise HTTPException(
             status_code=400,
-            detail="User must be associated with an institution to subscribe",
+            detail=t("billing_no_institution", locale=locale),
         )
 
     # Prevent duplicate subscriptions
@@ -431,7 +434,7 @@ async def create_checkout_session(
     if existing_active:
         raise HTTPException(
             status_code=409,
-            detail="Institution already has an active subscription. Use the subscription management page to change plans.",
+            detail=t("billing_already_subscribed", locale=locale),
         )
 
     # Validate price_id against allowed prices (fail-closed)
@@ -442,12 +445,12 @@ async def create_checkout_session(
         )
         raise HTTPException(
             status_code=503,
-            detail="Subscription plans are not configured. Please contact support.",
+            detail=t("billing_plans_not_configured", locale=locale),
         )
     if request.price_id not in allowed_prices:
         raise HTTPException(
             status_code=400,
-            detail="Invalid price ID. Please select a valid subscription plan.",
+            detail=t("billing_invalid_price", locale=locale),
         )
 
     success_url = f"{FRONTEND_URL}/billing/success?session_id={{CHECKOUT_SESSION_ID}}"
@@ -472,19 +475,19 @@ async def create_checkout_session(
         logger.error(f"Stripe configuration error in checkout: {e}", exc_info=True)
         raise HTTPException(
             status_code=502,
-            detail="Der Zahlungsanbieter ist derzeit nicht korrekt konfiguriert. Bitte kontaktieren Sie den Support.",
+            detail=t("billing_provider_misconfigured", locale=locale),
         )
     except stripe.error.StripeError as e:
         logger.error(f"Stripe error in checkout: {e}", exc_info=True)
         raise HTTPException(
             status_code=502,
-            detail="Der Zahlungsanbieter ist vorübergehend nicht erreichbar. Bitte versuchen Sie es später erneut.",
+            detail=t("billing_provider_unavailable", locale=locale),
         )
     except Exception as e:
         logger.error(f"Unexpected error creating checkout session: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
+            detail=t("billing_unexpected_error", locale=locale),
         )
 
 
