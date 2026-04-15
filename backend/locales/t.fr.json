@@ -101,6 +101,7 @@
     "rag_task_not_found": "Tâche de génération introuvable.",
     "rag_retry_only_failed": "Seules les tâches échouées peuvent être relancées.",
     "rag_retry_no_request_data": "Aucun paramètre sauvegardé disponible pour la relance.",
+    "rag_retry_started": "La génération de questions est relancée",
     "rag_generation_failed": "Échec de la génération de questions",
     "rag_context_retrieval_failed": "Échec de la récupération du contexte",
     "rag_get_documents_failed": "Échec de la récupération des documents",

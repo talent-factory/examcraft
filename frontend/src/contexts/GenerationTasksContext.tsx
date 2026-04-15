@@ -206,9 +206,14 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
 
     const { task_id: newTaskId } = await RAGService.retryGeneration(taskId);
 
-    const oldTask = tasks[taskId];
+    // Close old WebSocket to prevent resource leak
+    if (wsRef.current[taskId]) {
+      wsRef.current[taskId].close();
+      delete wsRef.current[taskId];
+    }
 
     setTasks((prev) => {
+      const oldTask = prev[taskId];
       const next = { ...prev };
       delete next[taskId];
       next[newTaskId] = {
@@ -229,7 +234,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
     }
 
     return newTaskId;
-  }, [accessToken, connectWebSocket, tasks]);
+  }, [accessToken, connectWebSocket]);
 
   const dismissTask = useCallback((taskId: string) => {
     setTasks((prev) => {

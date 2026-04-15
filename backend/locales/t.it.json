@@ -101,6 +101,7 @@
     "rag_task_not_found": "Attività di generazione non trovata.",
     "rag_retry_only_failed": "Solo le attività fallite possono essere riprovate.",
     "rag_retry_no_request_data": "Nessun parametro salvato disponibile per il nuovo tentativo.",
+    "rag_retry_started": "La generazione delle domande viene riprovata",
     "rag_generation_failed": "Generazione delle domande fallita",
     "rag_context_retrieval_failed": "Recupero del contesto fallito",
     "rag_get_documents_failed": "Impossibile recuperare i documenti",

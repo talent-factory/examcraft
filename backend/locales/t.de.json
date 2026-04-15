@@ -100,6 +100,7 @@
     "rag_task_not_found": "Generierungsauftrag nicht gefunden.",
     "rag_retry_only_failed": "Nur fehlgeschlagene Aufträge können wiederholt werden.",
     "rag_retry_no_request_data": "Keine gespeicherten Parameter für Wiederholung verfügbar.",
+    "rag_retry_started": "Fragengenerierung wird wiederholt",
     "rag_task_queue_unavailable": "Aufgabenwarteschlange nicht verfügbar",
     "rag_generation_failed": "Fragengenerierung fehlgeschlagen",
     "rag_context_retrieval_failed": "Kontextabruf fehlgeschlagen",

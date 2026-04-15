@@ -33,12 +33,16 @@ const GenerationTasksBar: React.FC = () => {
   const [expanded, setExpanded] = useState(true);
   const [retryingTaskId, setRetryingTaskId] = useState<string | null>(null);
 
+  const [retryError, setRetryError] = useState<string | null>(null);
+
   const handleRetry = async (taskId: string) => {
     try {
       setRetryingTaskId(taskId);
+      setRetryError(null);
       await retryTask(taskId);
     } catch (err) {
       console.error('[GenerationTasks] Retry failed:', err);
+      setRetryError(err instanceof Error ? err.message : String(err));
     } finally {
       setRetryingTaskId(null);
     }
@@ -182,25 +186,13 @@ const GenerationTasksBar: React.FC = () => {
                   )}
                 </Box>
 
-                {/* Unknown status: connection lost */}
+                {/* Unknown status: connection lost — task may still be running on backend */}
                 {isUnknown && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
-                      <WarningIcon fontSize="small" color="warning" />
-                      <Typography variant="caption" color="warning.main">
-                        {t('components.generationTasks.connectionLost')}
-                      </Typography>
-                    </Box>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => { e.stopPropagation(); handleRetry(task.taskId); }}
-                      disabled={retryingTaskId === task.taskId}
-                      sx={{ p: 0.25, ml: 0.5 }}
-                      aria-label={t('components.generationTasks.retry')}
-                      title={t('components.generationTasks.retry')}
-                    >
-                      <ReplayIcon fontSize="small" color="primary" />
-                    </IconButton>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <WarningIcon fontSize="small" color="warning" />
+                    <Typography variant="caption" color="warning.main">
+                      {t('components.generationTasks.connectionLost')}
+                    </Typography>
                   </Box>
                 )}
 
@@ -253,6 +245,13 @@ const GenerationTasksBar: React.FC = () => {
                       <ReplayIcon fontSize="small" color="primary" />
                     </IconButton>
                   </Box>
+                )}
+
+                {/* Retry error feedback */}
+                {retryError && retryingTaskId === null && isFailure && (
+                  <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                    {retryError}
+                  </Typography>
                 )}
               </Box>
             );
