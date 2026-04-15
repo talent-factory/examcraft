@@ -462,68 +462,6 @@ Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
             logger.error(f"Response content preview: {content[:300]}...")
             raise ValueError(f"Failed to parse Claude response: {e}") from e
 
-    def _generate_demo_questions(
-        self, topic: str, difficulty: str, question_count: int, language: str = "de"
-    ) -> List[Dict[str, Any]]:
-        """Generate demo questions when Claude API is not available"""
-
-        demo_questions = []
-
-        # Multiple Choice Question
-        demo_questions.append(
-            {
-                "id": "demo_q1",
-                "type": "multiple_choice",
-                "question": f"Was ist ein wichtiger Aspekt von {topic}?",
-                "options": [
-                    "Option A: Grundlegendes Verständnis",
-                    "Option B: Praktische Anwendung",
-                    "Option C: Theoretische Fundierung",
-                    "Option D: Alle oben genannten",
-                ],
-                "correct_answer": "Option D: Alle oben genannten",
-                "explanation": f"Bei {topic} sind alle genannten Aspekte wichtig: Grundlegendes Verständnis bildet die Basis, praktische Anwendung zeigt die Relevanz, und theoretische Fundierung sorgt für tieferes Verständnis. Eine ganzheitliche Betrachtung ist daher am sinnvollsten.",
-                "difficulty": difficulty,
-                "topic": topic,
-            }
-        )
-
-        # Open Ended Question
-        demo_questions.append(
-            {
-                "id": "demo_q2",
-                "type": "open_ended",
-                "question": f"Erklären Sie die praktische Bedeutung von {topic} in der realen Welt. Geben Sie konkrete Beispiele.",
-                "options": None,
-                "correct_answer": None,
-                "explanation": f"Eine vollständige Antwort zu {topic} sollte folgende Elemente enthalten: 1) Praktische Anwendungsbereiche mit konkreten Beispielen, 2) Relevanz für verschiedene Branchen oder Lebensbereiche, 3) Vorteile und mögliche Herausforderungen. Bewertungskriterien: Fachliches Verständnis (40%), Konkrete Beispiele (30%), Strukturierte Darstellung (30%).",
-                "difficulty": difficulty,
-                "topic": topic,
-            }
-        )
-
-        # Additional questions based on count
-        if question_count > 2:
-            demo_questions.append(
-                {
-                    "id": "demo_q3",
-                    "type": "multiple_choice",
-                    "question": f"Welche Herausforderung ist typisch beim Erlernen von {topic}?",
-                    "options": [
-                        "Option A: Komplexität der Konzepte",
-                        "Option B: Mangel an Praxisbezug",
-                        "Option C: Schnelle Entwicklung des Fachgebiets",
-                        "Option D: Alle genannten Punkte",
-                    ],
-                    "correct_answer": "Option D: Alle genannten Punkte",
-                    "explanation": "Beim Erlernen komplexer Themen treten oft mehrere Herausforderungen gleichzeitig auf.",
-                    "difficulty": difficulty,
-                    "topic": topic,
-                }
-            )
-
-        return demo_questions[:question_count]
-
     # NOTE: Only one _parse_claude_response method should exist - using the first one above
 
 

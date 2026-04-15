@@ -606,7 +606,6 @@ async def rag_service_health():
                 },
                 "claude_service": {
                     "status": "available" if claude_available else "unavailable",
-                    "fallback_enabled": True,
                 },
                 "rag_templates": {
                     "status": "loaded",
@@ -620,7 +619,6 @@ async def rag_service_health():
                 "multi_type_questions",
                 "source_attribution",
                 "quality_metrics",
-                "fallback_generation",
             ],
         }
 

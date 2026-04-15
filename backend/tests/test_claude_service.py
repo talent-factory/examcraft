@@ -190,24 +190,15 @@ class TestClaudeService:
                 mock_sleep.assert_called()
 
     @pytest.mark.asyncio
-    async def test_fallback_to_demo_on_api_failure(self, claude_service):
-        """Test Fallback zu Demo Mode bei API Fehlern"""
+    async def test_api_failure_propagates_exception(self, claude_service):
+        """Test that API errors propagate instead of falling back to demo questions"""
         with patch.object(
             claude_service,
             "_make_api_request_with_retry",
             side_effect=Exception("API Error"),
         ):
-            with patch.object(
-                claude_service,
-                "_generate_demo_questions",
-                return_value=[{"id": 1, "question": "Demo"}],
-            ):
-                questions = await claude_service.generate_questions(
-                    "Python", "medium", 1
-                )
-
-                assert len(questions) == 1
-                assert questions[0]["question"] == "Demo"
+            with pytest.raises(Exception, match="API Error"):
+                await claude_service.generate_questions("Python", "medium", 1)
 
     def test_build_prompt_german(self, claude_service):
         """Test Prompt Building für deutsche Sprache"""

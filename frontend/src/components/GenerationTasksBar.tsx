@@ -33,7 +33,7 @@ const GenerationTasksBar: React.FC = () => {
   const [expanded, setExpanded] = useState(true);
   const [retryingTaskId, setRetryingTaskId] = useState<string | null>(null);
 
-  const [retryError, setRetryError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<{ taskId: string; message: string } | null>(null);
 
   const handleRetry = async (taskId: string) => {
     try {
@@ -42,7 +42,7 @@ const GenerationTasksBar: React.FC = () => {
       await retryTask(taskId);
     } catch (err) {
       console.error('[GenerationTasks] Retry failed:', err);
-      setRetryError(err instanceof Error ? err.message : String(err));
+      setRetryError({ taskId, message: err instanceof Error ? err.message : String(err) });
     } finally {
       setRetryingTaskId(null);
     }
@@ -248,9 +248,9 @@ const GenerationTasksBar: React.FC = () => {
                 )}
 
                 {/* Retry error feedback */}
-                {retryError && retryingTaskId === null && isFailure && (
+                {retryError && retryError.taskId === task.taskId && retryingTaskId === null && isFailure && (
                   <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-                    {retryError}
+                    {retryError.message}
                   </Typography>
                 )}
               </Box>
