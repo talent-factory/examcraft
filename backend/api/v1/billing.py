@@ -468,11 +468,23 @@ async def create_checkout_session(
         return session
     except HTTPException:
         raise
+    except stripe.error.InvalidRequestError as e:
+        logger.error(f"Stripe configuration error in checkout: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail="Der Zahlungsanbieter ist derzeit nicht korrekt konfiguriert. Bitte kontaktieren Sie den Support.",
+        )
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error in checkout: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail="Der Zahlungsanbieter ist vorübergehend nicht erreichbar. Bitte versuchen Sie es später erneut.",
+        )
     except Exception as e:
-        logger.error(f"Error creating checkout session: {e}")
+        logger.error(f"Unexpected error creating checkout session: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="An error occurred while creating the checkout session. Please try again.",
+            detail="Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
         )
 
 
