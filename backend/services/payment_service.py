@@ -49,7 +49,7 @@ class PaymentService:
                 cancel_url=cancel_url,
                 customer_email=customer_email,
                 metadata=metadata or {},
-                automatic_tax={"enabled": True},
+                automatic_tax={"enabled": False},
             )
             return {"session_id": checkout_session.id, "url": checkout_session.url}
         except stripe.error.StripeError as e:
