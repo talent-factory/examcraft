@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { paymentService } from '../services/paymentService';
 import { STRIPE_PRICES, getStripeConfigStatus } from '../config/stripe.config';
 
-const ENTERPRISE_CONTACT_EMAIL = process.env.REACT_APP_ENTERPRISE_CONTACT_EMAIL || 'enterprise@examcraft.ai';
+const ENTERPRISE_CONTACT_EMAIL = process.env.REACT_APP_ENTERPRISE_CONTACT_EMAIL || 'info@talent-factory.ch';
 
 export const BillingPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
