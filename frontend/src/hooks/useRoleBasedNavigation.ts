@@ -63,6 +63,7 @@ export const useRoleBasedNavigation = () => {
       path: '/prompts',
       icon: '💬',
       requiredRoles: [UserRole.ADMIN, UserRole.DOZENT],
+      requiredPermissions: ['prompt_templates'],
     },
     {
       label: t('nav.sidebar.admin'),
