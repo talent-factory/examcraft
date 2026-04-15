@@ -223,6 +223,7 @@ async def generate_rag_exam(
             user_id=current_user.id,
             topic=request.topic,
             question_count=request.question_count,
+            request_data=request_data,
         )
         db.add(job)
         db.commit()
