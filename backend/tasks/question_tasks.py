@@ -156,7 +156,10 @@ def _persist_questions(
         TypeError,  # Programmierfehler — Retry ändert nichts
         ImportError,  # Deployment-Problem — Retry ändert nichts
     ),
-    retry_kwargs={"max_retries": 2, "countdown": 30},
+    retry_kwargs={"max_retries": 4},
+    retry_backoff=30,
+    retry_backoff_max=300,
+    retry_jitter=True,
 )
 def generate_questions_task(
     self,
