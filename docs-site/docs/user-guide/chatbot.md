@@ -2,6 +2,13 @@
 
 Der ChatBot ermöglicht interaktive Gespräche mit Ihren hochgeladenen Dokumenten.
 
+![Chatbot Interface](../screenshots/chatbot/chatbot-interface.png)
+
+!!! warning "Premium-Feature"
+    Der Dokument-Chat ist ab dem **Starter-Abonnement** verfügbar und erfordert
+    die Berechtigung `document_chatbot`. Beim Free-Abonnement ist diese Funktion
+    nicht zugänglich. Siehe [Abonnement](subscription.md).
+
 ## Dokument auswählen
 
 1. Klicken Sie auf **Dokument ChatBot** in der Navigation
@@ -9,6 +16,8 @@ Der ChatBot ermöglicht interaktive Gespräche mit Ihren hochgeladenen Dokumente
 3. Der ChatBot lädt den Kontext (2–5 Sekunden)
 
 ## Chat starten
+
+![Chatbot Beispielgespräch](../screenshots/chatbot/chatbot-example-conversation.png)
 
 Stellen Sie Fragen zu Ihrem Dokument:
 
@@ -40,3 +49,30 @@ Jede Antwort enthält:
 - Alle Nachrichten werden innerhalb der Session gespeichert
 - Kontext bleibt erhalten (Multi-Turn)
 - Wählen Sie ein anderes Dokument, um eine neue Konversation zu starten
+
+## Limitierungen
+
+- **Nur hochgeladene Dokumente** als Wissensquelle — kein Internetzugang
+- **Kein Zugriff** auf Inhalte, die nicht als Dokument hochgeladen wurden
+- **Sitzungsgebunden** — der Gesprächsverlauf wird nicht zwischen Sitzungen gespeichert
+- Starten Sie eine neue Konversation, indem Sie ein anderes Dokument auswählen
+
+## Beispiel-Prompts
+
+Formulieren Sie Ihre Fragen präzise, um bessere Antworten zu erhalten:
+
+| Statt... | Besser... |
+|----------|-----------|
+| „Erkläre das Dokument" | „Fasse Kapitel 3 über Sortieralgorithmen in drei Punkten zusammen" |
+| „Was steht drin?" | „Was sind laut diesem Dokument die Unterschiede zwischen Quicksort und Mergesort?" |
+| „Wie geht das?" | „Erkläre den Heapsort-Algorithmus Schritt für Schritt anhand des Dokuments" |
+
+!!! tip "Folge-Fragen nutzen"
+    Der Chat versteht den Gesprächskontext. Nutzen Sie Folge-Fragen wie
+    „Erkläre das genauer" oder „Gib mir ein Beispiel dafür".
+
+## Nächste Schritte
+
+- [:octicons-arrow-right-24: Dokumente verwalten](documents.md)
+- [:octicons-arrow-right-24: Fragen aus Dokumenten generieren](rag-exam.md)
+- [:octicons-arrow-right-24: Abonnement verwalten](subscription.md)

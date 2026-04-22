@@ -136,6 +136,7 @@ const GenerationTasksBar: React.FC = () => {
             return (
               <Box
                 key={task.taskId}
+                data-testid={isSuccess ? 'generation-task-success' : undefined}
                 onClick={isSuccess ? () => handleTaskClick(task) : undefined}
                 sx={{
                   px: 2,

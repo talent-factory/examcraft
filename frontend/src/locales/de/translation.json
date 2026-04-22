@@ -960,7 +960,7 @@
       "formatMd": "Markdown (.md)",
       "formatJson": "JSON (.json)",
       "formatMoodle": "Moodle XML (.xml)",
-      "includeSolutions": "Loesungen einschliessen",
+      "includeSolutions": "Lösungen einschliessen",
       "noQuestionsWarning": "Die Prüfung hat noch keine Fragen. Füge zuerst Fragen hinzu.",
       "cancel": "Abbrechen",
       "exporting": "Exportiere...",
@@ -1262,7 +1262,10 @@
       "deleteChat": "Chat löschen",
       "errorDeletingSession": "Fehler beim Löschen der Session",
       "newChat": "Neuer Chat",
-      "noSessionsHint": "Starten Sie einen neuen Chat, um mit Ihren Dokumenten zu interagieren."
+      "noSessionsHint": "Starten Sie einen neuen Chat, um mit Ihren Dokumenten zu interagieren.",
+      "noProcessedDocuments": "Laden Sie zuerst ein Dokument hoch und warten Sie, bis es verarbeitet wurde. Danach können Sie hier aktualisieren.",
+      "lastUpdated": "Zuletzt aktualisiert: {{date}}",
+      "sessionInfo": "{{messages}} Nachrichten · {{documents}} Dokument(e)"
     },
     "chatInterface": {
       "errorSending": "Fehler beim Senden der Nachricht. Bitte versuchen Sie es erneut.",

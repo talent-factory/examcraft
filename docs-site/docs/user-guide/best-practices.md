@@ -59,3 +59,18 @@ Bot: [Vergleicht beide Algorithmen]
 Benutzer: "Welcher ist effizienter für grosse Datenmengen?"
 Bot: [Analysiert Komplexität]
 ```
+
+## Review Queue effektiv nutzen
+
+- Reviewen Sie Fragen zeitnah nach der Generierung — Kontext ist frischer
+- Nutzen Sie die Filteroptionen (Status, Schwierigkeit, Fragetyp) um die Queue übersichtlich zu halten
+- **Ablehnen ist besser als schlechte Fragen zulassen**: Qualität vor Quantität
+- Wenn viele Fragen abgelehnt werden: Prompt anpassen, Quelldokument verbessern oder Thema präzisieren
+- Genehmigen Sie nur Fragen, die Sie auch selbst stellen würden
+
+## Prüfungskomponist
+
+- Planen Sie die Prüfungsstruktur bevor Sie Fragen auswählen: Wie viele Fragen? Welche Typen? Welche Schwierigkeitsverteilung?
+- Mischen Sie Fragetypen (Multiple Choice + offene Fragen) für abwechslungsreiche Prüfungen
+- Exportieren Sie eine Testversion und lesen Sie sie vollständig durch, bevor Sie die finale Version erstellen
+- Überprüfen Sie die automatische Nummerierung und Formatierung im exportierten Dokument

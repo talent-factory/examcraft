@@ -1,5 +1,7 @@
 # Dokumente hochladen und verwalten
 
+![Dokumentenverwaltung](../screenshots/documents/documents-overview.png)
+
 ## Unterstützte Dateiformate
 
 | Format | Erweiterung | Max. Grösse | Besonderheiten |
@@ -85,3 +87,14 @@ Geben Sie Suchbegriffe in das Suchfeld ein. Ergebnisse werden in Echtzeit gefilt
 
 !!! warning "Achtung"
     Gelöschte Dokumente können nicht wiederhergestellt werden.
+
+## Nächste Schritte
+
+Nach dem Hochladen können Sie direkt mit der Fragengenerierung beginnen:
+
+- **[Fragen aus Dokumenten generieren (RAG)](rag-exam.md)**: Nutzen Sie Ihre Dokumente
+  als Wissensquelle für KI-gestützte Prüfungsfragen.
+- **[Fragen reviewen (Review Queue)](review-queue.md)**: Prüfen und genehmigen Sie
+  generierte Fragen, bevor sie für Prüfungen verwendet werden.
+- **[Dokument-Chat](chatbot.md)**: Stellen Sie direkte Fragen an Ihre Dokumente
+  (Premium-Feature).

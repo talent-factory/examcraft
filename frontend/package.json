@@ -141,7 +141,7 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://backend:8000",
+  "proxy": "http://api:8000",
   "devDependencies": {
     "@craco/craco": "^7.1.0",
     "@playwright/test": "^1.56.1",

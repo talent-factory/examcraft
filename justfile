@@ -222,3 +222,22 @@ setup: install install-hooks
     @echo "  1. cp .env.example .env   (if not done)"
     @echo "  2. Configure environment variables"
     @echo "  3. just dev"
+
+# ──────────────────────── Documentation (MkDocs) ────────────────────────
+
+# Live-Preview der Benutzer-Dokumentation auf http://127.0.0.1:8000
+# Dependencies werden ephemer via uv resolved (kein persistenter Install).
+[group('Documentation')]
+docs-serve:
+    cd docs-site && uv run --with-requirements requirements.txt mkdocs serve
+
+# Statische Site nach docs-site/site/ bauen. --strict: Warnings werden Fehler
+# (tote Links, missing nav entries, etc.) — geeignet als CI-Gate vor Deploy.
+[group('Documentation')]
+docs-build:
+    cd docs-site && uv run --with-requirements requirements.txt mkdocs build --strict
+
+# Dependencies persistent ins aktive Python-Env installieren (Alternative zu uv run).
+[group('Documentation')]
+docs-deps:
+    cd docs-site && uv pip install -r requirements.txt

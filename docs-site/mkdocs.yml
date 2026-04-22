@@ -36,6 +36,9 @@ theme:
     - content.tabs.link
     - content.action.edit
 
+hooks:
+  - hooks/generate_lang_sitemaps.py
+
 plugins:
   - search
   - i18n:
@@ -54,6 +57,24 @@ plugins:
             Admin-Guide: Admin Guide
             FAQ: FAQ
             Changelog: Changelog
+        - locale: fr
+          name: Français
+          build: true
+          nav_translations:
+            Start: Accueil
+            Benutzerhandbuch: Guide utilisateur
+            Admin-Guide: Guide administrateur
+            FAQ: FAQ
+            Changelog: Journal des modifications
+        - locale: it
+          name: Italiano
+          build: true
+          nav_translations:
+            Start: Inizio
+            Benutzerhandbuch: Guida utente
+            Admin-Guide: Guida amministratore
+            FAQ: FAQ
+            Changelog: Registro delle modifiche
 
 markdown_extensions:
   - admonition
@@ -78,19 +99,26 @@ nav:
       - getting-started/requirements.md
       - getting-started/registration.md
   - Benutzerhandbuch:
+      - user-guide/dashboard.md
       - user-guide/documents.md
       - user-guide/exam-create.md
       - user-guide/rag-exam.md
-      - user-guide/chatbot.md
+      - user-guide/review-queue.md
+      - user-guide/exam-composer.md
       - user-guide/exam-export.md
+      - user-guide/chatbot.md
+      - user-guide/prompt-library.md
+      - user-guide/profile.md
+      - user-guide/subscription.md
       - user-guide/best-practices.md
   - Admin-Guide:
       - admin-guide/deployment.md
       - admin-guide/user-mgmt.md
       - admin-guide/institutions.md
-      - admin-guide/prompts.md
-      - admin-guide/subscription.md
+      - admin-guide/roles.md
       - admin-guide/monitoring.md
+      - admin-guide/subscription.md
+      - admin-guide/prompts.md
   - FAQ:
       - faq/general.md
       - faq/troubleshooting.md

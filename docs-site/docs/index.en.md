@@ -11,11 +11,11 @@ ExamCraft AI is an AI-powered platform for automatic generation of exam question
 
 <div class="grid cards" markdown>
 
-- :material-school: **Educators**
+- :material-school: **Teachers and Instructors**
 
     ---
 
-    Learn how to create high-quality exam questions from your own materials using ExamCraft AI.
+    Learn how to create high-quality exam questions from ExamCraft AI using your own materials.
 
     [:octicons-arrow-right-24: User Guide](user-guide/documents.md)
 
@@ -33,9 +33,9 @@ ExamCraft AI is an AI-powered platform for automatic generation of exam question
 
 Create your first AI exam in 5 minutes:
 
-1. **Upload a document** -- Upload a PDF or Word document
-2. **Configure the exam** -- Choose question type, difficulty, and count
-3. **Generate** -- AI creates questions based on your materials
-4. **Review and export** -- Check and export the results
+1. **Upload Document** – Upload a PDF or Word document
+2. **Configure Exam** – Select question type, difficulty level, and number of questions
+3. **Generate** – AI creates questions based on your materials
+4. **Review and Export** – Check and export results
 
-[:octicons-arrow-right-24: Quick Start Guide](getting-started/quickstart.md)
+[:octicons-arrow-right-24: Go to Quick Start Guide](getting-started/quickstart.md)

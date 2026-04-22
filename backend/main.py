@@ -425,26 +425,7 @@ app = FastAPI(
     redirect_slashes=False,  # Prevent 307 redirects to HTTP behind proxy
 )
 
-# CORS middleware - Production-ready configuration
-cors_origins_str = os.getenv(
-    "CORS_ORIGINS", "http://localhost:3000,http://localhost:8000"
-)
-cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
-
-# Wenn "*" in den Origins ist, setze allow_credentials auf False
-# (CORS-Konflikt: allow_credentials=True und allow_origins="*" sind nicht kompatibel)
-allow_credentials = "*" not in cors_origins
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=allow_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
-)
-
-# Sentry Context Middleware (must be added before other middlewares)
+# Sentry Context Middleware
 from middleware.sentry_context import SentryContextMiddleware  # noqa: E402
 
 app.add_middleware(SentryContextMiddleware)
@@ -465,6 +446,28 @@ app.add_middleware(
 from middleware.i18n_middleware import I18nMiddleware  # noqa: E402
 
 app.add_middleware(I18nMiddleware)
+
+# CORS middleware - must be added LAST so it becomes the outermost layer.
+# In Starlette, add_middleware() prepends — last added = outermost.
+# This ensures CORS headers are present on ALL responses, including 429s
+# from RateLimitMiddleware, preventing net::ERR_FAILED in the browser.
+cors_origins_str = os.getenv(
+    "CORS_ORIGINS", "http://localhost:3000,http://localhost:8000"
+)
+cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
+
+# Wenn "*" in den Origins ist, setze allow_credentials auf False
+# (CORS-Konflikt: allow_credentials=True und allow_origins="*" sind nicht kompatibel)
+allow_credentials = "*" not in cors_origins
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
+)
 
 
 # Pydantic models
