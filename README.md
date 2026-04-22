@@ -175,12 +175,10 @@ cp .env.example .env
 # .env anpassen (ANTHROPIC_API_KEY, Datenbank, etc.)
 
 # Services starten
-./start-dev.sh          # Auto-Detection: Core oder Full
-./start-dev.sh --core   # Nur Core (ohne Qdrant)
-./start-dev.sh --full   # Alle Services inkl. Qdrant, RabbitMQ
+just dev                # Startet den Core-Stack
 
 # Services stoppen
-./stop-dev.sh
+just stop
 ```
 
 ### Services & Ports
@@ -198,13 +196,13 @@ cp .env.example .env
 
 ### Development Login
 
-Das `start-dev.sh` Script erstellt automatisch Test-Daten:
+`just dev` erstellt automatisch Test-Daten (beim ersten Start):
 
 - **Admin**: `admin@talent-factory.ch` / `admin123`
 - **Institution**: Talent Factory (Professional Tier)
 - **Auto-Assignment**: Alle `@talent-factory.ch` E-Mails werden automatisch zugeordnet
 
-Manuelles Seeding: `./seed-dev-data.sh`
+Manuelles Seeding: `just seed`
 
 ## Entwicklung
 
@@ -212,28 +210,26 @@ Manuelles Seeding: `./seed-dev-data.sh`
 
 ```bash
 # Tests
-make test                    # Alle Tests
-make test-backend            # uv run pytest core/backend/tests/ -v
-make test-frontend           # cd core/frontend && bun test -- --watchAll=false
+just test                    # Alle Tests
+just test-backend            # uv run pytest backend/tests/ -v
+just test-frontend           # cd frontend && bun test --watchAll=false
 
 # Einzelne Tests
-uv run pytest core/backend/tests/test_auth_service.py -v
-uv run pytest core/backend/tests/test_auth_service.py::test_login -v
+just test-file backend/tests/test_auth_service.py
+just test-one backend/tests/test_auth_service.py::test_login
 
 # Linting
-make lint                    # Alle Linters
-make lint-fix                # Auto-Fix
-make lint-backend            # Ruff (check + format)
-make lint-frontend           # ESLint
+just lint                    # Alle Linters
+just lint-fix                # Auto-Fix
+just lint-backend            # Ruff (check + format)
+just lint-frontend           # ESLint
 
 # Pre-Commit Hooks
-make pre-commit              # Alle Hooks ausfuehren
-make ci-check                # Vollstaendige CI-Checks lokal
+just pre-commit              # Alle Hooks ausfuehren
+just ci-check                # Vollstaendige CI-Checks lokal
 
-# Deployment (Fly.io)
-make deploy                  # Backend + Frontend
-make deploy-all              # Alle Services
-make deploy-status           # Status
+# Alle verfügbaren Rezepte anzeigen
+just
 ```
 
 ### Code-Standards

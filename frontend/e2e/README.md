@@ -86,10 +86,6 @@ docker-compose up -d frontend
 ### 3. Test-Daten einrichten
 
 ```bash
-# Via Makefile (empfohlen)
-make e2e-setup
-
-# Oder direkt
 cd packages/core/backend
 python scripts/setup_e2e_test_data.py
 ```

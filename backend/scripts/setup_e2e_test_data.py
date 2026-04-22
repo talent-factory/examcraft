@@ -4,9 +4,6 @@ Creates test user and test documents for Playwright E2E tests
 
 Usage:
     python scripts/setup_e2e_test_data.py
-
-Or via Makefile:
-    make e2e-setup
 """
 
 import sys
@@ -190,8 +187,8 @@ def main():
         print(f"   Password: {E2E_TEST_USER['password']}")
         print(f"\nTest Documents: {len(documents)} document(s) created")
         print("\nRun E2E tests with:")
-        print("   make e2e")
-        print("   make e2e-ui  (interactive mode)")
+        print("   just e2e")
+        print("   just e2e-ui  (interactive mode)")
         print("\n")
 
     except Exception as e:

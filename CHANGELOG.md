@@ -9,6 +9,59 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Improved — Developer Experience
+
+- Migrated Makefile-based developer workflow to [`just`](https://just.systems/).
+  Most `make X` commands have a direct `just X` counterpart; see Added/Removed
+  sections for diffs. Note that `just test-backend` in the root justfile now
+  runs pytest **inside the compose container** (requires a running stack);
+  use `just test-file <path>` or `just test-one <target>` for local-uv runs.
+  `just --list` shows all recipes grouped by category, replacing the
+  hand-maintained `help` target.
+- `.env` is auto-loaded for all recipes via `set dotenv-load`; manual
+  `--env-file .env` is no longer required for docker-compose invocations.
+- `just dev` now includes the auto-detection, `.env` scaffolding, and Alembic
+  migration retry logic previously only available via `./start-dev.sh`.
+
+### Added
+
+- `just test-file <path>` — run a single pytest file.
+- `just test-one <target>` — run a single pytest function
+  (e.g. `path::test_func`).
+- `just deploy-app <name>` — deploy any Fly.io app by name (replaces the need
+  for one recipe per service).
+- `just logs [app]` — follow logs for any Fly.io app (defaults to
+  `examcraft-api`).
+- `just dev-core` / `just dev-full` preserved as aliases for
+  `just dev core` / `just dev full`.
+
+### Removed
+
+- `start-dev.sh` — auto-detection logic moved into `just dev`.
+- `stop-dev.sh` — inlined into `just stop` / `just stop-volumes`.
+- `seed-dev-data.sh` — inlined into `just seed` (auto-detects full/core).
+- Root and `core/` `Makefile` — replaced by `justfile` at each location.
+
+### Fixed
+
+- `make ci-check` (and the pre-push git hook) silently pointed at a
+  non-existent `scripts/pre-push-lint-check.sh`. `just ci-check` is now a
+  working shebang recipe that actually runs the CI check chain.
+- Stale documentation references to `scripts/validate-env.sh` (never existed)
+  and `scripts/setup-premium-symlinks.sh` (never existed) removed from
+  `core/CLAUDE.md` and `docs/DEPLOYMENT.md`.
+
+### Migration Notes
+
+Install `just` locally before pulling this change:
+
+- macOS: `brew install just`
+- Linux: `cargo install just`
+- Windows: `winget install --id Casey.Just` (+ Git Bash or WSL2)
+
+The pre-push hook now invokes `just ci-check`; `git push` will fail with a
+hook error if `just` is not on `PATH`.
+
 ---
 
 ## [1.1.0] - 2026-03-23

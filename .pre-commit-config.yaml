@@ -53,7 +53,7 @@ repos:
     hooks:
       - id: pre-push-lint-check
         name: Pre-Push Lint Check
-        entry: bash scripts/pre-push-lint-check.sh
+        entry: just ci-check
         language: system
         stages: [pre-push]
         pass_filenames: false

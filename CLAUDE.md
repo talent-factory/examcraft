@@ -210,59 +210,36 @@ ExamCraft AI verwendet eine vereinfachte 2-Tier-Deployment-Architektur:
 ### Produktive Befehle
 
 ```bash
-# Development Stack starten (Auto-Detection: Core oder Full)
-./start-dev.sh
+# Development Stack starten (Core)
+just dev
 
-# Force Core-Modus (OpenSource Testing)
-./start-dev.sh --core
+# Logs überwachen
+docker compose logs -f backend
 
-# Force Full-Modus (Premium + Enterprise)
-./start-dev.sh --full
+# Services stoppen
+just stop
 
-# Environment-Variablen validieren
-bash scripts/validate-env.sh
+# Tests ausführen
+just test-backend
+just test-frontend
 
-# Logs überwachen (Core)
-docker compose --env-file .env -f docker-compose.yml logs -f backend
+# Einzelne Tests
+just test-file backend/tests/test_auth_service.py
+just test-one backend/tests/test_auth_service.py::test_login
 
-# Logs überwachen (Full)
-docker compose --env-file .env -f docker-compose.full.yml logs -f backend
-
-# Services stoppen (Auto-detect durch start-dev.sh)
-docker compose --env-file .env -f docker-compose.yml down
-docker compose --env-file .env -f docker-compose.full.yml down
-
-# Tests ausführen (Backend)
-cd packages/core/backend
-pytest tests/
-
-# Tests ausführen (Frontend)
-cd packages/core/frontend
-bun test
-
-# Code-Qualität prüfen
-ruff check packages/core/backend/ utils/
-ruff format packages/core/backend/ utils/
+# Code-Qualität
+just lint
+just lint-fix
 ```
 
-### ⚠️ WICHTIG: Docker Compose Environment Variables
+### Environment Variables
 
-**IMMER `--env-file .env` verwenden!**
-
-Docker Compose lädt die `.env` Datei NICHT automatisch für alle Variablen.
-Das `start-dev.sh` Skript verwendet automatisch `--env-file .env`.
-
-**Beispiele:**
+`just`-Rezepte laden `.env` automatisch via `set dotenv-load` — keine manuelle
+Arbeit nötig. Bei direkten `docker compose`-Aufrufen ausserhalb von `just`
+(z. B. in Debug-Sessions) weiterhin `--env-file .env` übergeben:
 
 ```bash
-# ✅ RICHTIG (via Script):
-./start-dev.sh --full
-
-# ✅ RICHTIG (manuell):
 docker compose --env-file .env -f docker-compose.full.yml up -d
-
-# ❌ FALSCH (Variablen werden nicht geladen):
-docker compose -f docker-compose.full.yml up -d
 ```
 
 ### ⚠️ WICHTIG: Git Submodules beim Push

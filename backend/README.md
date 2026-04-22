@@ -38,10 +38,10 @@ ANTHROPIC_API_KEY=sk-ant-...  # pragma: allowlist secret
 
 ```bash
 # Vom Projekt-Root
-./start-dev.sh --full
+just dev
 
 # Oder manuell
-docker compose --env-file .env -f docker-compose.full.yml up -d
+docker compose up -d
 ```
 
 ### 4. Database Migrations
@@ -256,7 +256,7 @@ pytest tests/ --cov=. --cov-report=html
 
 ```bash
 # Mit Docker Services
-./start-dev.sh --full
+just dev
 
 # Tests ausführen
 pytest tests/test_api_documents.py -v
