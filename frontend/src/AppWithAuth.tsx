@@ -187,11 +187,11 @@ export const AppWithAuth: React.FC = () => {
                 path="/prompts"
                 element={
                   <ProtectedRoute>
-                    <RoleGuard allowedRoles={[UserRole.ADMIN, UserRole.DOZENT]}>
+                    <PermissionGuard requiredPermissions={['prompt_templates']}>
                       <AppLayout>
                         <PromptLibrary />
                       </AppLayout>
-                    </RoleGuard>
+                    </PermissionGuard>
                   </ProtectedRoute>
                 }
               />

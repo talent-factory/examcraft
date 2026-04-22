@@ -79,10 +79,10 @@ describe('ExportDialog', () => {
   // -------------------------------------------------------------------------
 
   describe('solutions checkbox', () => {
-    it('shows "Loesungen einschliessen" checkbox when markdown is selected', () => {
+    it('shows "Lösungen einschliessen" checkbox when markdown is selected', () => {
       render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
       // Default format is markdown
-      expect(screen.getByLabelText(/Loesungen einschliessen/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Lösungen einschliessen/)).toBeInTheDocument();
     });
 
     it('hides solutions checkbox when JSON is selected', async () => {
@@ -91,7 +91,7 @@ describe('ExportDialog', () => {
       fireEvent.click(screen.getByLabelText('JSON (.json)'));
 
       await waitFor(() => {
-        expect(screen.queryByLabelText(/Loesungen einschliessen/)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/Lösungen einschliessen/)).not.toBeInTheDocument();
       });
     });
 
@@ -101,7 +101,7 @@ describe('ExportDialog', () => {
       fireEvent.click(screen.getByLabelText('Moodle XML (.xml)'));
 
       await waitFor(() => {
-        expect(screen.queryByLabelText(/Loesungen einschliessen/)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/Lösungen einschliessen/)).not.toBeInTheDocument();
       });
     });
 
@@ -112,7 +112,7 @@ describe('ExportDialog', () => {
       fireEvent.click(screen.getByLabelText('Markdown (.md)'));
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/Loesungen einschliessen/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Lösungen einschliessen/)).toBeInTheDocument();
       });
     });
   });
@@ -173,7 +173,7 @@ describe('ExportDialog', () => {
 
       render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByLabelText(/Loesungen einschliessen/));
+      fireEvent.click(screen.getByLabelText(/Lösungen einschliessen/));
       fireEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
 
       await waitFor(() => {

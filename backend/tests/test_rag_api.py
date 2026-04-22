@@ -536,7 +536,8 @@ class TestRAGAPI:
         data = response.json()
         assert data["status"] == "healthy"
         assert data["components"]["claude_service"]["status"] == "unavailable"
-        assert data["components"]["claude_service"]["fallback_enabled"] is True
+        # `fallback_enabled` wurde aus dem API-Schema entfernt, als Demo-Mode
+        # als Fallback-Pfad gestrichen wurde (siehe claude_service.py:208).
 
 
 class TestRAGAPIIntegration:
