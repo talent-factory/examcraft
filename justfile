@@ -207,10 +207,13 @@ install:
     cd backend && uv pip install -r requirements.txt
     cd frontend && bun install
 
+# Install pre-commit + pre-push hooks.
+# --allow-missing-config: safe when the hook runs from a directory without a
+# .pre-commit-config.yaml (e.g. a monorepo root that doesn't carry the config).
 [group('Setup')]
 install-hooks:
-    pre-commit install
-    pre-commit install --hook-type pre-push
+    pre-commit install --allow-missing-config
+    pre-commit install --hook-type pre-push --allow-missing-config
 
 [group('Setup')]
 setup: install install-hooks
