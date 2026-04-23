@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from pydantic import BaseModel, Field
@@ -412,6 +413,22 @@ class MetricsResponse(BaseModel):
     avg_confidence: float
 
 
+class IndexStateResponse(BaseModel):
+    """Persistent lifecycle view for the docs_help indexing job.
+
+    Distinct from the Redis SETNX lock (ephemeral "is running right now"):
+    these fields survive restarts and surface the last completed / failed
+    run for operators monitoring /admin/index-state.
+    """
+
+    status: str  # idle | in_progress | completed | failed
+    last_indexed_sha: Optional[str] = None
+    last_indexed_at: Optional[datetime] = None
+    files_indexed: int = 0
+    files_deleted: int = 0
+    last_error: Optional[str] = None
+
+
 class ClusterResponse(BaseModel):
     id: int
     topic_label: str
@@ -523,6 +540,33 @@ async def trigger_reindex(
         # a prior /admin/reindex call). Caller can retry once the lock expires.
         raise HTTPException(status_code=409, detail=str(e))
     return {"status": "completed", **result}
+
+
+@router.get("/admin/index-state", response_model=IndexStateResponse)
+async def get_index_state(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Persistent docs-indexing lifecycle view.
+
+    Returns 'idle' defaults when no run has happened yet. Otherwise reflects
+    the last transition — `in_progress` if a run is active, `completed` or
+    `failed` (with `last_error` populated) for terminal states.
+    """
+    _require_admin(current_user)
+    from models.help import HelpIndexState
+
+    state = db.query(HelpIndexState).first()
+    if state is None:
+        return IndexStateResponse(status="idle")
+    return IndexStateResponse(
+        status=state.indexing_status,
+        last_indexed_sha=state.last_indexed_sha,
+        last_indexed_at=state.last_indexed_at,
+        files_indexed=state.files_indexed,
+        files_deleted=state.files_deleted,
+        last_error=state.last_error,
+    )
 
 
 @router.get("/admin/metrics", response_model=MetricsResponse)

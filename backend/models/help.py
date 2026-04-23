@@ -241,3 +241,11 @@ class HelpIndexState(Base):
     last_indexed_at = Column(DateTime(timezone=True), nullable=True)
     files_indexed = Column(Integer, default=0, nullable=False)
     files_deleted = Column(Integer, default=0, nullable=False)
+    # Lifecycle state persisted across restarts. Complements the transient
+    # Redis SETNX lock ("is running right now?") with durable visibility
+    # of the last completed or failed run.
+    # Values: 'idle' | 'in_progress' | 'completed' | 'failed'
+    indexing_status = Column(
+        String(20), nullable=False, server_default="idle", default="idle"
+    )
+    last_error = Column(Text, nullable=True)

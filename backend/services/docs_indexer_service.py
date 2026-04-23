@@ -74,44 +74,72 @@ class DocsIndexerService:
             self.db.commit()
             full_scan = True
 
-        # Ensure the docs_help collection exists before any indexing.
-        # Let failures propagate — returning {indexed: 0} looked like success
-        # in the caller (print "✅ Docs indexed: 0 files") and hid real errors.
-        self._ensure_collection()
-
-        if full_scan:
-            # Full Replace: clear entire collection before re-indexing.
-            # Clear-failure must abort (not return 0) so caller sees the error.
-            self._clear_collection()
-            changed = self._get_all_md_files()
-            deleted = []
-        elif not full_scan and state.last_indexed_sha:
-            changed, deleted = self._get_changed_files(state.last_indexed_sha)
-        else:
-            changed = self._get_all_md_files()
-            deleted = []
-
-        indexed = 0
-        for filepath in changed:
-            if await self._index_file(filepath):
-                indexed += 1
-
-        deleted_count = 0
-        for filepath in deleted:
-            await self._remove_file_from_index(filepath)
-            deleted_count += 1
-
-        current_sha = self._get_current_sha()
-        state.last_indexed_sha = current_sha
-        state.last_indexed_at = datetime.now(timezone.utc)
-        state.files_indexed = indexed
-        state.files_deleted = deleted_count
+        # Lifecycle: mark as in-progress and clear any prior error before any work.
+        # The DB-commit here is critical: subsequent Qdrant/git operations may fail,
+        # and we want /admin/index-state to reflect "started but running" truthfully.
+        state.indexing_status = "in_progress"
+        state.last_error = None
         self.db.commit()
 
-        self._invalidate_stale_faq_cache(changed + deleted)
+        try:
+            # Ensure the docs_help collection exists before any indexing.
+            # Let failures propagate — returning {indexed: 0} looked like success
+            # in the caller (print "✅ Docs indexed: 0 files") and hid real errors.
+            self._ensure_collection()
 
-        logger.info(f"Indexing complete: {indexed} indexed, {deleted_count} deleted")
-        return {"indexed": indexed, "deleted": deleted_count}
+            if full_scan:
+                # Full Replace: clear entire collection before re-indexing.
+                # Clear-failure must abort (not return 0) so caller sees the error.
+                self._clear_collection()
+                changed = self._get_all_md_files()
+                deleted = []
+            elif not full_scan and state.last_indexed_sha:
+                changed, deleted = self._get_changed_files(state.last_indexed_sha)
+            else:
+                changed = self._get_all_md_files()
+                deleted = []
+
+            indexed = 0
+            for filepath in changed:
+                if await self._index_file(filepath):
+                    indexed += 1
+
+            deleted_count = 0
+            for filepath in deleted:
+                await self._remove_file_from_index(filepath)
+                deleted_count += 1
+
+            current_sha = self._get_current_sha()
+            state.last_indexed_sha = current_sha
+            state.last_indexed_at = datetime.now(timezone.utc)
+            state.files_indexed = indexed
+            state.files_deleted = deleted_count
+            state.indexing_status = "completed"
+            self.db.commit()
+
+            self._invalidate_stale_faq_cache(changed + deleted)
+
+            logger.info(
+                f"Indexing complete: {indexed} indexed, {deleted_count} deleted"
+            )
+            return {"indexed": indexed, "deleted": deleted_count}
+        except Exception as e:
+            # Persist failure state so /admin/index-state and operators can see
+            # WHY indexing stopped, not just that it did. Truncate message to
+            # keep DB column small and avoid leaking large stack traces.
+            try:
+                self.db.rollback()  # drop any partial transaction from the failing block
+                state = self.db.query(HelpIndexState).first()
+                if state is not None:
+                    state.indexing_status = "failed"
+                    state.last_error = f"{type(e).__name__}: {str(e)[:500]}"
+                    self.db.commit()
+            except Exception as persist_err:
+                logger.error(
+                    f"Could not persist indexing failure to DB: {persist_err}",
+                    exc_info=True,
+                )
+            raise
 
     def _ensure_collection(self) -> None:
         """Create the docs_help collection if it doesn't exist."""

@@ -125,3 +125,74 @@ def test_invalid_sha_falls_back_to_full_scan():
         assert changed == ["a.md", "b.md"]
         assert deleted == []
         mock_all.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_indexing_status_transitions_on_success():
+    """Happy path: idle → in_progress → completed, no last_error."""
+    mock_db = MagicMock()
+    mock_state = MagicMock()
+    mock_state.last_indexed_sha = None
+    mock_db.query.return_value.first.return_value = mock_state
+    mock_db.commit = MagicMock()
+
+    service = DocsIndexerService(mock_db)
+
+    mock_client = MagicMock()
+    mock_vector_service = MagicMock()
+    mock_vector_service.client = mock_client
+
+    with (
+        patch(
+            "services.docs_indexer_service.DocsIndexerService._get_all_md_files",
+            return_value=[],
+        ),
+        patch(
+            "services.docs_indexer_service.DocsIndexerService._get_current_sha",
+            return_value="a" * 40,
+        ),
+        patch(
+            "services.vector_service_factory.vector_service",
+            mock_vector_service,
+        ),
+    ):
+        await service.run_index(full_scan=True)
+
+    # After run: status='completed', error cleared
+    assert mock_state.indexing_status == "completed"
+    assert mock_state.last_error is None
+
+
+@pytest.mark.asyncio
+async def test_indexing_status_transitions_on_failure():
+    """Failure path: in_progress → failed, last_error populated with exception info."""
+    mock_db = MagicMock()
+    mock_state = MagicMock()
+    mock_state.last_indexed_sha = None
+    mock_db.query.return_value.first.return_value = mock_state
+    mock_db.commit = MagicMock()
+
+    service = DocsIndexerService(mock_db)
+
+    mock_vector_service = MagicMock()
+    mock_vector_service.client = MagicMock()
+
+    # _ensure_collection raises — propagates per PR #23 hardening
+    with (
+        patch(
+            "services.docs_indexer_service.DocsIndexerService._ensure_collection",
+            side_effect=RuntimeError("Qdrant connection refused"),
+        ),
+        patch(
+            "services.vector_service_factory.vector_service",
+            mock_vector_service,
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="Qdrant connection refused"):
+            await service.run_index(full_scan=True)
+
+    # Status reflects failure; last_error carries a truncated signature
+    assert mock_state.indexing_status == "failed"
+    assert mock_state.last_error is not None
+    assert "RuntimeError" in mock_state.last_error
+    assert "Qdrant connection refused" in mock_state.last_error
