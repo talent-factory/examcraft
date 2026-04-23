@@ -72,6 +72,11 @@ COPY premium/backend/ ./premium/
 # Copy utils directory (RAG, extraction modules)
 COPY core/utils/ ./utils/
 
+# Copy docs-site for startup auto-indexing.
+# DocsIndexerService reads DOCS_SITE_PATH=/app/docs-site/docs on backend startup
+# and re-indexes all markdown files into Qdrant collection "docs_help".
+COPY core/docs-site/ ./docs-site/
+
 # Copy entrypoint script
 COPY core/backend/docker-entrypoint.sh ./docker-entrypoint.sh
 

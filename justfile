@@ -241,3 +241,21 @@ docs-build:
 [group('Documentation')]
 docs-deps:
     cd docs-site && uv pip install -r requirements.txt
+
+# Docs neu vektorisieren (Qdrant collection "docs_help") nach Docs-Änderungen.
+# Mechanik: api-Container restart; DocsIndexerService indexiert beim Startup
+# alle markdown-Files unter DOCS_SITE_PATH (siehe backend/main.py:103).
+[group('Documentation')]
+reindex-docs:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker compose exec -T api echo ok >/dev/null 2>&1; then
+        echo "✖ Core stack is not running. Start it first:  just dev" >&2
+        exit 1
+    fi
+    echo "▸ Restarting api container to trigger docs re-indexing…"
+    docker compose restart api
+    echo "▸ Waiting for startup indexing…"
+    sleep 8
+    docker compose logs api --tail=30 | grep -iE "docs indexed|docs indexing" || true
+    echo "✓ Done. If no 'Docs indexed' line above, check full logs:  docker compose logs api --tail=100"

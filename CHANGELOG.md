@@ -9,6 +9,33 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added — Docs Deployment Pipeline
+
+- **`docs.examcraft.ch` automatische Publikation:** Neuer GitHub-Actions-Workflow
+  `.github/workflows/deploy-docs.yml` baut MkDocs bei jedem Merge auf `develop`
+  (wenn `core/docs-site/**` oder Indexer-Code geändert wurde) und publiziert
+  nach `talent-factory/examcraft:gh-pages` mit CNAME auf `docs.examcraft.ch`.
+  Bisher war die gh-pages-Branch 30 Tage hinter dem Code — ab jetzt synchron
+  mit jedem Docs-Merge.
+- **LiveBot-Vektorisierung in Production:** `core/backend/Dockerfile.fly` kopiert
+  jetzt `core/docs-site/` ins Runtime-Image. Zuvor enthielt das Backend-Image
+  keine Docs-Files, der Startup-Indexer (`DocsIndexerService`, siehe
+  `backend/main.py:103`) indexierte ins Leere. Nach dem Fix hat der LiveBot
+  tatsächlich Zugriff auf die Dokumentation via Qdrant-Collection `docs_help`.
+- **Automatischer Backend-Redeploy nach Docs-Change:** Der Deploy-Docs-Workflow
+  triggert nach dem gh-pages-Push einen `flyctl deploy` des Backend-Apps. Das
+  neue Image enthält die frischen Docs, und der Startup-Indexer läuft
+  automatisch — der LiveBot ist innerhalb von ~5 Minuten aktuell.
+- **`just reindex-docs`** in Root- und Core-Justfile: restartet den `api`-Container,
+  um lokale Docs-Änderungen in Qdrant neu zu vektorisieren. Zeigt anschliessend
+  die `Docs indexed: N files`-Zeile aus den Container-Logs.
+
+### Fixed
+
+- `fly.toml` setzt `DOCS_SITE_PATH=/app/docs-site/docs` passend zum neuen
+  Dockerfile-Layout. In Production war dieser Pfad zuvor via Code-Default
+  auf `core/docs-site/docs` (relativer Pfad, der im Container nicht existierte).
+
 ### Improved — Developer Experience
 
 - Migrated Makefile-based developer workflow to [`just`](https://just.systems/).
