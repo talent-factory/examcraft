@@ -3,6 +3,8 @@ ExamCraft AI - FastAPI Backend
 KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
 """
 
+import asyncio
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -34,6 +36,30 @@ except Exception as e:
 
 # Lazy-loaded services (to reduce memory at startup)
 _claude_service = None
+
+# Strong references to fire-and-forget background tasks.
+# Without this, asyncio.create_task() only holds a weak reference to the task,
+# which may be garbage-collected mid-run (CPython gotcha; see stdlib asyncio docs).
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _log_task_exception(task: asyncio.Task) -> None:
+    """Log unhandled exceptions from fire-and-forget tasks.
+
+    Handles the three failure modes of bare `lambda t: t.exception() and logger.error(...)`:
+    - `task.cancelled()` must be checked first; `task.exception()` raises
+      `CancelledError` on cancelled tasks instead of returning it.
+    - `CancelledError` is `BaseException` (not `Exception`), so the inner
+      `try/except Exception` inside the task body does not catch it.
+    - Without proper exception retrieval, asyncio emits "Task exception was
+      never retrieved" warnings to stderr, bypassing our logger and Sentry.
+    """
+    if task.cancelled():
+        logger.warning("Background task cancelled (likely app shutdown)")
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("Background task raised: %s", exc, exc_info=exc)
 
 
 def get_claude_service():
@@ -101,23 +127,49 @@ async def lifespan(app: FastAPI):
             print(f"❌ Error seeding prompts: {str(e)}")
 
         # Startup: Auto-index documentation into Qdrant (Full Replace)
-        try:
-            from services.vector_service_factory import vector_service
+        # Runs asynchronously as a fire-and-forget task so FastAPI can serve
+        # /health immediately. Synchronous indexing of the full docs corpus
+        # plus cold-start vector-backend initialisation (model download or
+        # remote warm-up) would exceed Fly.io's health-check grace period
+        # (see fly.toml: [checks.health].grace_period).
+        async def _index_docs_background():
+            try:
+                from services.vector_service_factory import vector_service
 
-            if hasattr(vector_service, "client") and vector_service.client is not None:
+                if not (
+                    hasattr(vector_service, "client")
+                    and vector_service.client is not None
+                ):
+                    # In full deployment mode this is an error state:
+                    # the operator expected Qdrant to be reachable.
+                    logger.error(
+                        "Qdrant client is None in full deployment mode — "
+                        "indexing skipped. Check QDRANT_URL and factory init logs."
+                    )
+                    return
+
                 from services.docs_indexer_service import DocsIndexerService
 
                 db = SessionLocal()
                 try:
                     service = DocsIndexerService(db)
                     result = await service.run_index(full_scan=True)
-                    print(f"✅ Docs indexed: {result['indexed']} files")
+                    print(f"✅ Docs indexing completed: {result['indexed']} files")
                 finally:
                     db.close()
-            else:
-                print("ℹ️  Qdrant not available, docs indexing skipped")
-        except Exception as e:
-            logger.error(f"Docs indexing failed: {e}", exc_info=True)
+            except Exception as e:
+                logger.error(f"Docs indexing failed: {e}", exc_info=True)
+
+        docs_index_task = asyncio.create_task(_index_docs_background())
+        # Keep a strong reference (GC safety) and remove it when done.
+        _background_tasks.add(docs_index_task)
+        docs_index_task.add_done_callback(_background_tasks.discard)
+        # Safety net for exceptions that escape the inner try/except
+        # (primarily CancelledError during shutdown, plus any import-time
+        # errors above the try block). This is not duplication of the inner
+        # handler — it catches a strictly disjoint set of failure modes.
+        docs_index_task.add_done_callback(_log_task_exception)
+        print("🔄 Docs indexing started in background")
     else:
         print("ℹ️  Running in Core mode - Premium features disabled")
 
@@ -410,8 +462,22 @@ async def lifespan(app: FastAPI):
 
     yield  # Application is running
 
-    # Shutdown: Cleanup (if needed in the future)
-    pass
+    # Shutdown: Give in-flight docs indexing a bounded chance to finish so
+    # that Qdrant isn't left in partial state (cleared but not re-populated).
+    # If the task is still running after 30s, proceed — the next startup
+    # will full-scan again and self-heal.
+    for task in list(_background_tasks):
+        if task.done():
+            continue
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=30)
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Shutdown: background task did not complete within 30s; "
+                "Qdrant docs_help may be in partial state until next startup."
+            )
+        except asyncio.CancelledError:
+            logger.warning("Shutdown: background task cancelled during grace window.")
 
 
 # Initialize FastAPI app with lifespan
