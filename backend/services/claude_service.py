@@ -205,34 +205,25 @@ class ClaudeService:
             List of generated questions
         """
 
-        # Use demo mode if API key not available or explicitly enabled
         if self.demo_mode:
-            logger.info("Using demo mode for question generation")
-            return self._generate_demo_questions(
-                topic, difficulty, question_count, language
+            raise RuntimeError(
+                "Claude API is not configured (ANTHROPIC_API_KEY missing or CLAUDE_DEMO_MODE=true). "
+                "Cannot generate questions."
             )
 
-        try:
-            prompt = self._build_prompt(
-                topic, difficulty, question_count, question_types, language
-            )
+        prompt = self._build_prompt(
+            topic, difficulty, question_count, question_types, language
+        )
 
-            payload = {
-                "model": self.model,
-                "max_tokens": min(self.max_tokens_per_request, 4000),
-                "messages": [{"role": "user", "content": prompt}],
-            }
+        payload = {
+            "model": self.model,
+            "max_tokens": min(self.max_tokens_per_request, 4000),
+            "messages": [{"role": "user", "content": prompt}],
+        }
 
-            # Use new retry logic
-            result = await self._make_api_request_with_retry(payload)
-            content = result["content"][0]["text"]
-            return self._parse_claude_response(content, topic, difficulty)
-
-        except Exception as e:
-            logger.error(f"Claude API failed, falling back to demo mode: {str(e)}")
-            return self._generate_demo_questions(
-                topic, difficulty, question_count, language
-            )
+        result = await self._make_api_request_with_retry(payload)
+        content = result["content"][0]["text"]
+        return self._parse_claude_response(content, topic, difficulty)
 
     async def generate_exam_async(self, exam_request: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -266,19 +257,10 @@ class ClaudeService:
                     f"Using custom prompt template ({len(custom_prompt)} chars)"
                 )
 
-                # Use demo mode if API key not available
                 if self.demo_mode:
-                    logger.info("Demo mode: returning demo questions for custom prompt")
-                    return {
-                        "questions": self._generate_demo_questions(
-                            topic, difficulty, question_count, language
-                        ),
-                        "topic": topic,
-                        "difficulty": difficulty,
-                        "question_count": question_count,
-                        "context_used": bool(context),
-                        "custom_prompt_used": True,
-                    }
+                    raise RuntimeError(
+                        "Claude API is not configured. Cannot generate questions."
+                    )
 
                 # Send custom prompt directly to Claude API
                 payload = {
@@ -340,27 +322,8 @@ class ClaudeService:
             }
 
         except Exception as e:
-            import traceback
-
-            error_type = type(e).__name__
-            error_msg = str(e) if str(e) else repr(e)
-            error_detail = f"{error_type}: {error_msg}"
-            logger.error(f"Exam generation failed: {error_detail}")
-            logger.error(f"Full traceback:\n{traceback.format_exc()}")
-            # Return fallback structure with detailed error
-            return {
-                "questions": self._generate_demo_questions(
-                    exam_request.get("topic", "Fallback"),
-                    exam_request.get("difficulty", "medium"),
-                    exam_request.get("question_count", 1),
-                    exam_request.get("language", "de"),
-                ),
-                "topic": exam_request.get("topic", "Fallback"),
-                "difficulty": exam_request.get("difficulty", "medium"),
-                "question_count": exam_request.get("question_count", 1),
-                "context_used": False,
-                "error": error_detail,
-            }
+            logger.error(f"Exam generation failed: {e}", exc_info=True)
+            raise
 
     def _build_prompt(
         self,
@@ -497,68 +460,16 @@ Wichtig: Antworte nur mit dem JSON, keine zusätzlichen Erklärungen.
         except Exception as e:
             logger.error(f"Failed to parse Claude response: {type(e).__name__}: {e}")
             logger.error(f"Response content preview: {content[:300]}...")
-            return self._generate_demo_questions(topic, difficulty, 3, "de")
-
-    def _generate_demo_questions(
-        self, topic: str, difficulty: str, question_count: int, language: str = "de"
-    ) -> List[Dict[str, Any]]:
-        """Generate demo questions when Claude API is not available"""
-
-        demo_questions = []
-
-        # Multiple Choice Question
-        demo_questions.append(
-            {
-                "id": "demo_q1",
-                "type": "multiple_choice",
-                "question": f"Was ist ein wichtiger Aspekt von {topic}?",
-                "options": [
-                    "Option A: Grundlegendes Verständnis",
-                    "Option B: Praktische Anwendung",
-                    "Option C: Theoretische Fundierung",
-                    "Option D: Alle oben genannten",
-                ],
-                "correct_answer": "Option D: Alle oben genannten",
-                "explanation": f"Bei {topic} sind alle genannten Aspekte wichtig: Grundlegendes Verständnis bildet die Basis, praktische Anwendung zeigt die Relevanz, und theoretische Fundierung sorgt für tieferes Verständnis. Eine ganzheitliche Betrachtung ist daher am sinnvollsten.",
-                "difficulty": difficulty,
-                "topic": topic,
-            }
-        )
-
-        # Open Ended Question
-        demo_questions.append(
-            {
-                "id": "demo_q2",
-                "type": "open_ended",
-                "question": f"Erklären Sie die praktische Bedeutung von {topic} in der realen Welt. Geben Sie konkrete Beispiele.",
-                "options": None,
-                "correct_answer": None,
-                "explanation": f"Eine vollständige Antwort zu {topic} sollte folgende Elemente enthalten: 1) Praktische Anwendungsbereiche mit konkreten Beispielen, 2) Relevanz für verschiedene Branchen oder Lebensbereiche, 3) Vorteile und mögliche Herausforderungen. Bewertungskriterien: Fachliches Verständnis (40%), Konkrete Beispiele (30%), Strukturierte Darstellung (30%).",
-                "difficulty": difficulty,
-                "topic": topic,
-            }
-        )
-
-        # Additional questions based on count
-        if question_count > 2:
-            demo_questions.append(
-                {
-                    "id": "demo_q3",
-                    "type": "multiple_choice",
-                    "question": f"Welche Herausforderung ist typisch beim Erlernen von {topic}?",
-                    "options": [
-                        "Option A: Komplexität der Konzepte",
-                        "Option B: Mangel an Praxisbezug",
-                        "Option C: Schnelle Entwicklung des Fachgebiets",
-                        "Option D: Alle genannten Punkte",
-                    ],
-                    "correct_answer": "Option D: Alle genannten Punkte",
-                    "explanation": "Beim Erlernen komplexer Themen treten oft mehrere Herausforderungen gleichzeitig auf.",
-                    "difficulty": difficulty,
-                    "topic": topic,
-                }
-            )
-
-        return demo_questions[:question_count]
+            raise ValueError(f"Failed to parse Claude response: {e}") from e
 
     # NOTE: Only one _parse_claude_response method should exist - using the first one above
+
+
+_claude_service_instance = None
+
+
+def get_claude_service() -> "ClaudeService":
+    global _claude_service_instance
+    if _claude_service_instance is None:
+        _claude_service_instance = ClaudeService()
+    return _claude_service_instance

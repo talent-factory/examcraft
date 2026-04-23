@@ -18,12 +18,12 @@ export const PromptLibrary: React.FC = () => {
   // Try to load Premium version with upload functionality
   if (isFullDeployment()) {
     const PremiumPromptLibrary = loadPromptLibraryWithUpload();
-    return <PremiumPromptLibrary />;
+    return <div data-testid="prompts-content"><PremiumPromptLibrary /></div>;
   }
 
   // Fallback: Core version without upload
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="prompts-content">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">

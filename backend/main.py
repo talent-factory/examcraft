@@ -3,6 +3,8 @@ ExamCraft AI - FastAPI Backend
 KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
 """
 
+import asyncio
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -34,6 +36,30 @@ except Exception as e:
 
 # Lazy-loaded services (to reduce memory at startup)
 _claude_service = None
+
+# Strong references to fire-and-forget background tasks.
+# Without this, asyncio.create_task() only holds a weak reference to the task,
+# which may be garbage-collected mid-run (CPython gotcha; see stdlib asyncio docs).
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _log_task_exception(task: asyncio.Task) -> None:
+    """Log unhandled exceptions from fire-and-forget tasks.
+
+    Handles the three failure modes of bare `lambda t: t.exception() and logger.error(...)`:
+    - `task.cancelled()` must be checked first; `task.exception()` raises
+      `CancelledError` on cancelled tasks instead of returning it.
+    - `CancelledError` is `BaseException` (not `Exception`), so the inner
+      `try/except Exception` inside the task body does not catch it.
+    - Without proper exception retrieval, asyncio emits "Task exception was
+      never retrieved" warnings to stderr, bypassing our logger and Sentry.
+    """
+    if task.cancelled():
+        logger.warning("Background task cancelled (likely app shutdown)")
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("Background task raised: %s", exc, exc_info=exc)
 
 
 def get_claude_service():
@@ -99,6 +125,60 @@ async def lifespan(app: FastAPI):
             print("⚠️  Premium package not available, skipping prompt seeding")
         except Exception as e:
             print(f"❌ Error seeding prompts: {str(e)}")
+
+        # Startup: Auto-index documentation into Qdrant (Full Replace)
+        # Runs asynchronously as a fire-and-forget task so FastAPI can serve
+        # /health immediately. Synchronous indexing of the full docs corpus
+        # plus cold-start vector-backend initialisation (model download or
+        # remote warm-up) would exceed Fly.io's health-check grace period
+        # (see fly.toml: [checks.health].grace_period).
+        async def _index_docs_background():
+            try:
+                from services.vector_service_factory import vector_service
+
+                if not (
+                    hasattr(vector_service, "client")
+                    and vector_service.client is not None
+                ):
+                    # In full deployment mode this is an error state:
+                    # the operator expected Qdrant to be reachable.
+                    logger.error(
+                        "Qdrant client is None in full deployment mode — "
+                        "indexing skipped. Check QDRANT_URL and factory init logs."
+                    )
+                    return
+
+                from services.docs_indexer_service import (
+                    DocsIndexerService,
+                    IndexingInProgressError,
+                )
+
+                db = SessionLocal()
+                try:
+                    service = DocsIndexerService(db)
+                    result = await service.run_index(full_scan=True)
+                    print(f"✅ Docs indexing completed: {result['indexed']} files")
+                except IndexingInProgressError:
+                    # Only realistic on overlapping container rollovers; next
+                    # startup or admin call will catch up.
+                    logger.info(
+                        "Docs indexing lock held by another run; skipping startup indexing."
+                    )
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error(f"Docs indexing failed: {e}", exc_info=True)
+
+        docs_index_task = asyncio.create_task(_index_docs_background())
+        # Keep a strong reference (GC safety) and remove it when done.
+        _background_tasks.add(docs_index_task)
+        docs_index_task.add_done_callback(_background_tasks.discard)
+        # Safety net for exceptions that escape the inner try/except
+        # (primarily CancelledError during shutdown, plus any import-time
+        # errors above the try block). This is not duplication of the inner
+        # handler — it catches a strictly disjoint set of failure modes.
+        docs_index_task.add_done_callback(_log_task_exception)
+        print("🔄 Docs indexing started in background")
     else:
         print("ℹ️  Running in Core mode - Premium features disabled")
 
@@ -107,6 +187,19 @@ async def lifespan(app: FastAPI):
 
     init_translations()
     print("✅ i18n translations initialized")
+
+    # Startup: Seed help context hints
+    try:
+        from utils.seed_help_hints import seed_help_hints
+
+        db = SessionLocal()
+        try:
+            created = seed_help_hints(db)
+            print(f"✅ Help hints seeded: {created} created")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error seeding help hints: {str(e)}")
 
     # Premium/Enterprise Features: Replace Core placeholders BEFORE loading routers
     if is_full_deployment:
@@ -214,6 +307,13 @@ async def lifespan(app: FastAPI):
     websocket_api = importlib.util.module_from_spec(spec_ws)
     spec_ws.loader.exec_module(websocket_api)
 
+    # Import Help API (Smart Help Widget — TF-308)
+    spec_help = importlib.util.spec_from_file_location(
+        "core_api_v1_help", os.path.join(core_api_path, "v1", "help.py")
+    )
+    help_api = importlib.util.module_from_spec(spec_help)
+    spec_help.loader.exec_module(help_api)
+
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(gdpr.router)
@@ -227,6 +327,7 @@ async def lifespan(app: FastAPI):
         webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"]
     )
     app.include_router(websocket_api.router)
+    app.include_router(help_api.router)
 
     # Email Webhooks (Resend)
     try:
@@ -370,8 +471,22 @@ async def lifespan(app: FastAPI):
 
     yield  # Application is running
 
-    # Shutdown: Cleanup (if needed in the future)
-    pass
+    # Shutdown: Give in-flight docs indexing a bounded chance to finish so
+    # that Qdrant isn't left in partial state (cleared but not re-populated).
+    # If the task is still running after 30s, proceed — the next startup
+    # will full-scan again and self-heal.
+    for task in list(_background_tasks):
+        if task.done():
+            continue
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=30)
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Shutdown: background task did not complete within 30s; "
+                "Qdrant docs_help may be in partial state until next startup."
+            )
+        except asyncio.CancelledError:
+            logger.warning("Shutdown: background task cancelled during grace window.")
 
 
 # Initialize FastAPI app with lifespan
@@ -385,26 +500,7 @@ app = FastAPI(
     redirect_slashes=False,  # Prevent 307 redirects to HTTP behind proxy
 )
 
-# CORS middleware - Production-ready configuration
-cors_origins_str = os.getenv(
-    "CORS_ORIGINS", "http://localhost:3000,http://localhost:8000"
-)
-cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
-
-# Wenn "*" in den Origins ist, setze allow_credentials auf False
-# (CORS-Konflikt: allow_credentials=True und allow_origins="*" sind nicht kompatibel)
-allow_credentials = "*" not in cors_origins
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=allow_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
-)
-
-# Sentry Context Middleware (must be added before other middlewares)
+# Sentry Context Middleware
 from middleware.sentry_context import SentryContextMiddleware  # noqa: E402
 
 app.add_middleware(SentryContextMiddleware)
@@ -425,6 +521,28 @@ app.add_middleware(
 from middleware.i18n_middleware import I18nMiddleware  # noqa: E402
 
 app.add_middleware(I18nMiddleware)
+
+# CORS middleware - must be added LAST so it becomes the outermost layer.
+# In Starlette, add_middleware() prepends — last added = outermost.
+# This ensures CORS headers are present on ALL responses, including 429s
+# from RateLimitMiddleware, preventing net::ERR_FAILED in the browser.
+cors_origins_str = os.getenv(
+    "CORS_ORIGINS", "http://localhost:3000,http://localhost:8000"
+)
+cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
+
+# Wenn "*" in den Origins ist, setze allow_credentials auf False
+# (CORS-Konflikt: allow_credentials=True und allow_origins="*" sind nicht kompatibel)
+allow_credentials = "*" not in cors_origins
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
+)
 
 
 # Pydantic models
@@ -519,7 +637,7 @@ async def api_health_check():
 
     health_status = {
         "status": "healthy",
-        "version": "1.0.0",
+        "version": os.getenv("APP_VERSION", "1.1.0"),
         "environment": os.getenv("ENVIRONMENT", "development"),
         "services": {},
     }

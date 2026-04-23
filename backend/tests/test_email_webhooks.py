@@ -84,7 +84,13 @@ class TestWebhookEndpoint:
 
     def test_webhook_without_secret_development_mode(self, client):
         """Webhook processes without secret in development mode"""
-        with patch.dict("os.environ", {"ENVIRONMENT": "development"}, clear=True):
+        with patch(
+            "webhooks.resend_webhooks.os.getenv",
+            side_effect=lambda key, default=None: {
+                "RESEND_WEBHOOK_SECRET": None,
+                "ENVIRONMENT": "development",
+            }.get(key, default),
+        ):
             response = client.post(
                 "/webhooks/resend",
                 json={
@@ -102,7 +108,13 @@ class TestWebhookEndpoint:
 
     def test_webhook_without_secret_production_mode_rejected(self, client):
         """Webhook without secret is rejected in production mode"""
-        with patch.dict("os.environ", {"ENVIRONMENT": "production"}, clear=True):
+        with patch(
+            "webhooks.resend_webhooks.os.getenv",
+            side_effect=lambda key, default=None: {
+                "RESEND_WEBHOOK_SECRET": None,
+                "ENVIRONMENT": "production",
+            }.get(key, default),
+        ):
             response = client.post(
                 "/webhooks/resend",
                 json={
@@ -138,7 +150,13 @@ class TestWebhookEndpoint:
 
     def test_webhook_invalid_json_rejected(self, client):
         """Webhook with invalid JSON is rejected"""
-        with patch.dict("os.environ", {"ENVIRONMENT": "development"}, clear=True):
+        with patch(
+            "webhooks.resend_webhooks.os.getenv",
+            side_effect=lambda key, default=None: {
+                "RESEND_WEBHOOK_SECRET": None,
+                "ENVIRONMENT": "development",
+            }.get(key, default),
+        ):
             response = client.post(
                 "/webhooks/resend",
                 content="not json",

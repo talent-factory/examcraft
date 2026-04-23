@@ -29,6 +29,8 @@ ExamCraft AI ist eine KI-gesteuerte Plattform zur automatischen Generierung von 
 
 </div>
 
+![ExamCraft AI Anmeldeseite](screenshots/auth/login.png)
+
 ## Schnellstart
 
 Erstellen Sie Ihre erste KI-Prüfung in 5 Minuten:

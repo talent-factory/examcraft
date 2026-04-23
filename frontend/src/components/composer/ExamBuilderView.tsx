@@ -85,7 +85,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
   const isDraft = exam.status === ExamStatus.DRAFT;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="exam-builder">
       {/* Back button */}
       <button
         onClick={onBack}

@@ -4,6 +4,7 @@
     "settings": "Paramètres",
     "logout": "Déconnexion",
     "language": "Langue",
+    "documentation": "Documentation",
     "sidebar": {
       "dashboard": "Tableau de bord",
       "documents": "Documents",
@@ -46,7 +47,11 @@
       "institutionCode": "Code d'institution (Optionnel)",
       "institutionCodeHint": "Entrez votre code d'institution si vous en avez un",
       "password": "Mot de passe",
-      "passwordHint": "Minimum 8 caractères",
+      "passwordReqTitle": "Le mot de passe doit contenir :",
+      "passwordReqMinLength": "8+ caractères",
+      "passwordReqUppercase": "Majuscule (A–Z)",
+      "passwordReqLowercase": "Minuscule (a–z)",
+      "passwordReqNumber": "Chiffre (0–9)",
       "confirmPassword": "Confirmer le mot de passe",
       "creatingAccount": "Création du compte...",
       "createAccount": "Créer un compte",
@@ -107,6 +112,9 @@
       "required": "Veuillez remplir tous les champs obligatoires",
       "passwordMismatch": "Les mots de passe ne correspondent pas",
       "passwordMinLength": "Le mot de passe doit contenir au moins 8 caractères",
+      "passwordUppercase": "Le mot de passe doit contenir au moins une lettre majuscule",
+      "passwordLowercase": "Le mot de passe doit contenir au moins une lettre minuscule",
+      "passwordNumber": "Le mot de passe doit contenir au moins un chiffre",
       "invalidEmail": "Veuillez saisir une adresse e-mail valide",
       "fillAllFields": "Veuillez remplir tous les champs"
     }
@@ -445,9 +453,13 @@
       "btnSave": "Enregistrer",
       "sectionDetails": "Détails du prompt",
       "nameLabel": "Nom",
+      "fieldName": "Nom",
       "namePlaceholder": "ex., system_prompt_question_generation",
+      "fieldNamePlaceholder": "ex., system_prompt_question_generation",
       "descriptionLabel": "Description",
+      "fieldDescription": "Description",
       "descriptionPlaceholder": "Courte description du prompt",
+      "fieldDescriptionPlaceholder": "Courte description du prompt",
       "tabEdit": "Modifier",
       "tabPreview": "Aperçu",
       "contentPlaceholder": "Contenu du prompt (supporte la syntaxe {variable})",
@@ -759,7 +771,8 @@
       "defaultTopic": "Génération",
       "connectionLost": "Connexion perdue – statut inconnu",
       "clickToView": "Cliquer pour afficher",
-      "errorOccurred": "Une erreur s'est produite"
+      "errorOccurred": "Une erreur s'est produite",
+      "retry": "Réessayer"
     },
     "questionEditor": {
       "title": "Modifier la question n°{{id}}",
@@ -1090,12 +1103,12 @@
           "documentUpload": "Téléchargement de documents",
           "basicQuestionGeneration": "Génération de questions de base",
           "documentLibrary": "Bibliothèque de documents",
+          "ragGeneration": "Génération RAG",
           "fiveDocuments": "5 documents",
           "twentyQuestionsMonth": "20 questions/mois"
         },
         "starter": {
           "allFreeFeatures": "Toutes les fonctionnalités gratuites",
-          "ragGeneration": "Génération RAG",
           "promptTemplates": "Modèles de prompts",
           "batchProcessing": "Traitement par lots",
           "fiftyDocuments": "50 documents",
@@ -1126,7 +1139,8 @@
     "generationTasks": {
       "done": "Terminé",
       "errorOccurred": "Une erreur s'est produite",
-      "started": "Démarré..."
+      "started": "Démarré...",
+      "retrying": "Relance en cours..."
     }
   },
   "premium": {

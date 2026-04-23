@@ -53,6 +53,21 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
       return false;
     }
 
+    if (!/[A-Z]/.test(formData.password)) {
+      setLocalError(t('auth.validation.passwordUppercase'));
+      return false;
+    }
+
+    if (!/[a-z]/.test(formData.password)) {
+      setLocalError(t('auth.validation.passwordLowercase'));
+      return false;
+    }
+
+    if (!/\d/.test(formData.password)) {
+      setLocalError(t('auth.validation.passwordNumber'));
+      return false;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setLocalError(t('auth.validation.invalidEmail'));
@@ -212,9 +227,22 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
                 {showPassword ? '👁️' : '👁️‍🗨️'}
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {t('auth.register.passwordHint')}
-            </p>
+            <div className="mt-2">
+              <p className="text-xs font-medium text-gray-600 mb-1">{t('auth.register.passwordReqTitle')}</p>
+              <ul className="text-xs space-y-0.5 list-none">
+                {[
+                  { key: 'auth.register.passwordReqMinLength', met: formData.password.length >= 8 },
+                  { key: 'auth.register.passwordReqUppercase', met: /[A-Z]/.test(formData.password) },
+                  { key: 'auth.register.passwordReqLowercase', met: /[a-z]/.test(formData.password) },
+                  { key: 'auth.register.passwordReqNumber',    met: /\d/.test(formData.password) },
+                ].map(({ key, met }) => (
+                  <li key={key} className={`flex items-center gap-1.5 ${met ? 'text-green-600' : 'text-gray-400'}`}>
+                    <span className="text-sm leading-none">{met ? '✓' : '○'}</span>
+                    {t(key)}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           {/* Confirm Password */}

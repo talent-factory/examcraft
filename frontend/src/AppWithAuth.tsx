@@ -31,6 +31,7 @@ import { UserRole } from './types/auth';
 import { AppErrorBoundary } from './components/ErrorBoundary';
 import QuestionReviewDetail from './components/QuestionReviewDetail';
 import GenerationTasksBar from './components/GenerationTasksBar';
+import HelpWidget from './components/help/HelpWidget';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
 // Load Premium PromptLibrary with Upload (falls back to Core version)
@@ -58,6 +59,7 @@ export const AppWithAuth: React.FC = () => {
           <GenerationTasksProvider>
           <BrowserRouter>
             <GenerationTasksBar />
+            <HelpWidget />
             <Routes>
               {/* Public Routes - Only accessible when NOT authenticated */}
               <Route
@@ -111,7 +113,7 @@ export const AppWithAuth: React.FC = () => {
                 path="/questions/generate"
                 element={
                   <ProtectedRoute>
-                    <PermissionGuard requiredPermissions={['questions:create']}>
+                    <PermissionGuard requiredPermissions={['create_questions']}>
                       <AppLayout>
                         <Exams />
                       </AppLayout>
@@ -124,7 +126,7 @@ export const AppWithAuth: React.FC = () => {
                 path="/questions/review"
                 element={
                   <ProtectedRoute>
-                    <PermissionGuard requiredPermissions={['questions:review']}>
+                    <PermissionGuard requiredPermissions={['review_questions']}>
                       <AppLayout>
                         <Review />
                       </AppLayout>
@@ -148,7 +150,7 @@ export const AppWithAuth: React.FC = () => {
                 path="/exams/compose"
                 element={
                   <ProtectedRoute>
-                    <PermissionGuard requiredPermissions={['exams:create']}>
+                    <PermissionGuard requiredPermissions={['create_exams']}>
                       <AppLayout>
                         <ExamComposer />
                       </AppLayout>
@@ -185,11 +187,11 @@ export const AppWithAuth: React.FC = () => {
                 path="/prompts"
                 element={
                   <ProtectedRoute>
-                    <RoleGuard allowedRoles={[UserRole.ADMIN, UserRole.DOZENT]}>
+                    <PermissionGuard requiredPermissions={['prompt_templates']}>
                       <AppLayout>
                         <PromptLibrary />
                       </AppLayout>
-                    </RoleGuard>
+                    </PermissionGuard>
                   </ProtectedRoute>
                 }
               />

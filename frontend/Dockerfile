@@ -3,8 +3,8 @@ FROM oven/bun:1-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy package files (bun.lock is at repo root)
-COPY bun.lock frontend/package.json ./
+# Copy package files
+COPY frontend/package.json frontend/bun.lock ./
 
 # Install dependencies
 RUN bun install

@@ -4,6 +4,7 @@
     "settings": "Settings",
     "logout": "Logout",
     "language": "Language",
+    "documentation": "Documentation",
     "sidebar": {
       "dashboard": "Dashboard",
       "documents": "Documents",
@@ -46,7 +47,11 @@
       "institutionCode": "Institution Code (Optional)",
       "institutionCodeHint": "Enter your institution code if you have one",
       "password": "Password",
-      "passwordHint": "Minimum 8 characters",
+      "passwordReqTitle": "Password must contain:",
+      "passwordReqMinLength": "8+ characters",
+      "passwordReqUppercase": "Uppercase letter (A–Z)",
+      "passwordReqLowercase": "Lowercase letter (a–z)",
+      "passwordReqNumber": "Number (0–9)",
       "confirmPassword": "Confirm Password",
       "creatingAccount": "Creating account...",
       "createAccount": "Create Account",
@@ -107,6 +112,9 @@
       "required": "Please fill in all required fields",
       "passwordMismatch": "Passwords do not match",
       "passwordMinLength": "Password must be at least 8 characters long",
+      "passwordUppercase": "Password must contain at least one uppercase letter",
+      "passwordLowercase": "Password must contain at least one lowercase letter",
+      "passwordNumber": "Password must contain at least one number",
       "invalidEmail": "Please enter a valid email address",
       "fillAllFields": "Please fill in all fields"
     }
@@ -169,9 +177,9 @@
       "starterUsers": "1 user",
       "professionalDescription": "For departments and small schools.",
       "professionalUsers": "up to 10 users",
-      "enterpriseDescription": "For institutions with SSO, branding, API, and priority support.",
+      "enterpriseDescription": "For institutions — custom quote from 30 users.",
       "enterprisePrice": "from CHF 149",
-      "enterpriseSeats": "10-100 seats",
+      "enterpriseSeats": "10 incl. + CHF 10/user",
       "requestQuote": "Request a Quote",
       "processing": "Processing...",
       "subscribe": "Subscribe",
@@ -478,9 +486,13 @@
       "btnSave": "Save",
       "sectionDetails": "Prompt Details",
       "nameLabel": "Name",
+      "fieldName": "Name",
       "namePlaceholder": "e.g., system_prompt_question_generation",
+      "fieldNamePlaceholder": "e.g., system_prompt_question_generation",
       "descriptionLabel": "Description",
+      "fieldDescription": "Description",
       "descriptionPlaceholder": "Short description of the prompt",
+      "fieldDescriptionPlaceholder": "Short description of the prompt",
       "tabEdit": "Edit",
       "tabPreview": "Preview",
       "contentPlaceholder": "Prompt Content (supports {variable} syntax)",
@@ -792,7 +804,8 @@
       "defaultTopic": "Generation",
       "connectionLost": "Connection lost – status unknown",
       "clickToView": "Click to view",
-      "errorOccurred": "Error occurred"
+      "errorOccurred": "Error occurred",
+      "retry": "Retry"
     },
     "questionEditor": {
       "title": "Edit Question #{{id}}",
@@ -1123,12 +1136,12 @@
           "documentUpload": "Document Upload",
           "basicQuestionGeneration": "Basic Question Generation",
           "documentLibrary": "Document Library",
+          "ragGeneration": "RAG Generation",
           "fiveDocuments": "5 Documents",
           "twentyQuestionsMonth": "20 Questions/Month"
         },
         "starter": {
           "allFreeFeatures": "All Free Features",
-          "ragGeneration": "RAG Generation",
           "promptTemplates": "Prompt Templates",
           "batchProcessing": "Batch Processing",
           "fiftyDocuments": "50 Documents",
@@ -1159,7 +1172,8 @@
     "generationTasks": {
       "done": "Done",
       "errorOccurred": "Error occurred",
-      "started": "Started..."
+      "started": "Started...",
+      "retrying": "Retrying..."
     }
   },
   "premium": {
@@ -1391,6 +1405,40 @@
       "variablesEditor": {
         "additionalVariables": "Additional Template Variables"
       }
+    }
+  },
+  "help": {
+    "title": "Help",
+    "chatUnavailable": "The help chat is currently unavailable.",
+    "rateLimited": "You've reached the question limit. Please try again later.",
+    "sessionExpired": "Your session has expired. Please reload the page.",
+    "chatPlaceholder": "Ask a question...",
+    "send": "Send",
+    "newConversation": "New Conversation",
+    "onboarding": {
+      "skip": "Skip",
+      "next": "Next",
+      "finish": "Done",
+      "resume": "Continue later",
+      "later": "Later",
+      "startTour": "Start tour",
+      "confirmEndTitle": "End tour?",
+      "confirmEndText": "You can restart the tour anytime via the help button at the bottom right.",
+      "confirmEndCancel": "Cancel",
+      "confirmEndConfirm": "Yes, end tour",
+      "completedTitle": "🎉 Tour complete!",
+      "completedText": "You can open the help widget anytime via the button at the bottom right.",
+      "resumeText": "You haven't completed the onboarding tour yet.",
+      "resumeButton": "Resume tour"
+    },
+    "context": {
+      "understood": "Got it",
+      "learnMore": "Learn more",
+      "dontShowAgain": "Don't show again"
+    },
+    "feedback": {
+      "helpful": "Was this helpful?",
+      "thanks": "Thanks for your feedback!"
     }
   }
 }

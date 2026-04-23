@@ -72,9 +72,9 @@ const SubscriptionTierOverview: React.FC = () => {
   };
 
   const formatPrice = (price: number): string => {
-    return new Intl.NumberFormat('de-DE', {
+    return new Intl.NumberFormat('de-CH', {
       style: 'currency',
-      currency: 'EUR'
+      currency: 'CHF'
     }).format(price);
   };
 
@@ -109,13 +109,15 @@ const SubscriptionTierOverview: React.FC = () => {
             <Card
               sx={{
                 height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
                 borderTop: `4px solid ${TIER_COLORS[tier.id] || '#9E9E9E'}`,
                 '&:hover': {
                   boxShadow: 6
                 }
               }}
             >
-              <CardContent>
+              <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <Typography variant="h6" component="h3" gutterBottom>
                   {tier.display_name}
                 </Typography>
@@ -143,7 +145,7 @@ const SubscriptionTierOverview: React.FC = () => {
                   </Box>
                 )}
 
-                <Box mt={2}>
+                <Box mt="auto" pt={2}>
                   {tier.is_active ? (
                     <Chip label={t('admin.subscriptionTier.available')} size="small" color="success" />
                   ) : (

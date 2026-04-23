@@ -16,15 +16,27 @@ branch_labels = None
 depends_on = None
 
 
+def _table_exists(table: str) -> bool:
+    """Check if a table exists."""
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    return inspector.has_table(table)
+
+
 def _column_exists(table: str, column: str) -> bool:
     """Check if a column already exists (idempotent migration support)."""
     bind = op.get_bind()
     inspector = inspect(bind)
+    if not inspector.has_table(table):
+        return False
     columns = [c["name"] for c in inspector.get_columns(table)]
     return column in columns
 
 
 def upgrade() -> None:
+    # Skip if table doesn't exist yet — create_all() will create it with these columns
+    if not _table_exists("users"):
+        return
     if not _column_exists("users", "email_verified_at"):
         op.add_column(
             "users",

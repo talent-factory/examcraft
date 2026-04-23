@@ -247,9 +247,11 @@ export const loadPromptLibraryWithUpload = () => {
   );
 
   return (props: any) => (
-    <Suspense fallback={<LoadingFallback componentName="Prompt Library" />}>
-      <LazyComponent {...props} />
-    </Suspense>
+    <div data-testid="prompts-content">
+      <Suspense fallback={<LoadingFallback componentName="Prompt Library" />}>
+        <LazyComponent {...props} />
+      </Suspense>
+    </div>
   );
 };
 

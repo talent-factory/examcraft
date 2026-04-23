@@ -190,7 +190,7 @@ def _exam_detail_to_out(exam: Exam) -> dict:
 async def create_exam(
     request: ExamCreate,
     http_request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Create a new exam (draft status)."""
@@ -229,7 +229,7 @@ async def list_exams(
     search: Optional[str] = Query(None, max_length=200),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """List exams for the current user's institution."""
@@ -284,7 +284,7 @@ async def list_approved_questions(
     search: Optional[str] = Query(None, max_length=500),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Browse approved questions for exam composition."""
@@ -345,7 +345,7 @@ async def list_approved_questions(
 async def get_exam(
     exam_id: int,
     request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Get exam with all questions."""
@@ -359,7 +359,7 @@ async def update_exam(
     exam_id: int,
     request: ExamUpdate,
     http_request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Update exam metadata. Requires updated_at for optimistic locking."""
@@ -398,7 +398,7 @@ async def update_exam(
 async def delete_exam(
     exam_id: int,
     request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Delete a draft exam."""
@@ -448,7 +448,7 @@ async def add_questions(
     exam_id: int,
     request: AddQuestionsRequest,
     http_request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Add approved questions to exam with auto-suggested points."""
@@ -513,7 +513,7 @@ async def update_exam_question(
     eq_id: int,
     request: UpdateExamQuestionRequest,
     http_request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Update points or section of a question in the exam."""
@@ -563,7 +563,7 @@ async def remove_exam_question(
     exam_id: int,
     eq_id: int,
     request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Remove a question from the exam and re-number remaining positions."""
@@ -620,7 +620,7 @@ async def reorder_questions(
     exam_id: int,
     request: ReorderRequest,
     http_request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Batch reorder questions in the exam."""
@@ -736,7 +736,7 @@ async def auto_fill_questions(
     exam_id: int,
     request: AutoFillRequest,
     http_request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Auto-fill exam with questions matching criteria.
@@ -993,7 +993,7 @@ def _auto_fill_simple(
 async def finalize_exam(
     exam_id: int,
     request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Finalize exam. Validates all questions are still approved."""
@@ -1037,7 +1037,7 @@ async def finalize_exam(
 async def unfinalize_exam(
     exam_id: int,
     request: Request,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Revert exam from finalized/exported to draft."""
@@ -1072,7 +1072,7 @@ async def export_exam(
     format: str,
     include_solutions: bool = Query(False),
     request: Request = None,
-    current_user: User = Depends(require_permission("exams:create")),
+    current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
     """Export exam in specified format (md, json, moodle)."""

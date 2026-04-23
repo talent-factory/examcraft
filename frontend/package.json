@@ -79,6 +79,7 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "ajv": "^8.12.0",
     "axios": "^1.6.2",
+    "driver.js": "^1.4.0",
     "i18next": "^25.10.4",
     "i18next-browser-languagedetector": "^8.2.1",
     "lodash": "4.17.23",
@@ -113,6 +114,15 @@
     "clean": "rm -rf dist",
     "eject": "react-scripts eject"
   },
+  "jest": {
+    "resetMocks": false,
+    "transformIgnorePatterns": [
+      "node_modules/(?!driver\\.js/)"
+    ],
+    "moduleNameMapper": {
+      "driver\\.js/dist/driver\\.css$": "<rootDir>/src/__mocks__/styleMock.js"
+    }
+  },
   "eslintConfig": {
     "extends": [
       "react-app",
@@ -131,7 +141,7 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://backend:8000",
+  "proxy": "http://api:8000",
   "devDependencies": {
     "@craco/craco": "^7.1.0",
     "@playwright/test": "^1.56.1",

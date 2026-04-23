@@ -4,6 +4,7 @@
     "settings": "Impostazioni",
     "logout": "Esci",
     "language": "Lingua",
+    "documentation": "Documentazione",
     "sidebar": {
       "dashboard": "Dashboard",
       "documents": "Documenti",
@@ -46,7 +47,11 @@
       "institutionCode": "Codice istituzione (Opzionale)",
       "institutionCodeHint": "Inserisci il codice della tua istituzione se ne hai uno",
       "password": "Password",
-      "passwordHint": "Minimo 8 caratteri",
+      "passwordReqTitle": "La password deve contenere:",
+      "passwordReqMinLength": "8+ caratteri",
+      "passwordReqUppercase": "Maiuscola (A–Z)",
+      "passwordReqLowercase": "Minuscola (a–z)",
+      "passwordReqNumber": "Numero (0–9)",
       "confirmPassword": "Conferma password",
       "creatingAccount": "Creazione account...",
       "createAccount": "Crea account",
@@ -107,6 +112,9 @@
       "required": "Compila tutti i campi obbligatori",
       "passwordMismatch": "Le password non corrispondono",
       "passwordMinLength": "La password deve contenere almeno 8 caratteri",
+      "passwordUppercase": "La password deve contenere almeno una lettera maiuscola",
+      "passwordLowercase": "La password deve contenere almeno una lettera minuscola",
+      "passwordNumber": "La password deve contenere almeno un numero",
       "invalidEmail": "Inserisci un indirizzo e-mail valido",
       "fillAllFields": "Compila tutti i campi"
     }
@@ -445,9 +453,13 @@
       "btnSave": "Salva",
       "sectionDetails": "Dettagli prompt",
       "nameLabel": "Nome",
+      "fieldName": "Nome",
       "namePlaceholder": "es., system_prompt_question_generation",
+      "fieldNamePlaceholder": "es., system_prompt_question_generation",
       "descriptionLabel": "Descrizione",
+      "fieldDescription": "Descrizione",
       "descriptionPlaceholder": "Breve descrizione del prompt",
+      "fieldDescriptionPlaceholder": "Breve descrizione del prompt",
       "tabEdit": "Modifica",
       "tabPreview": "Anteprima",
       "contentPlaceholder": "Contenuto del prompt (supporta la sintassi {variabile})",
@@ -759,7 +771,8 @@
       "defaultTopic": "Generazione",
       "connectionLost": "Connessione persa – stato sconosciuto",
       "clickToView": "Clicca per visualizzare",
-      "errorOccurred": "Si è verificato un errore"
+      "errorOccurred": "Si è verificato un errore",
+      "retry": "Riprova"
     },
     "questionEditor": {
       "title": "Modifica domanda #{{id}}",
@@ -1090,12 +1103,12 @@
           "documentUpload": "Caricamento documenti",
           "basicQuestionGeneration": "Generazione domande di base",
           "documentLibrary": "Libreria documenti",
+          "ragGeneration": "Generazione RAG",
           "fiveDocuments": "5 documenti",
           "twentyQuestionsMonth": "20 domande/mese"
         },
         "starter": {
           "allFreeFeatures": "Tutte le funzionalità Free",
-          "ragGeneration": "Generazione RAG",
           "promptTemplates": "Modelli di prompt",
           "batchProcessing": "Elaborazione batch",
           "fiftyDocuments": "50 documenti",
@@ -1126,7 +1139,8 @@
     "generationTasks": {
       "done": "Completato",
       "errorOccurred": "Si è verificato un errore",
-      "started": "Avviato..."
+      "started": "Avviato...",
+      "retrying": "Riprovando..."
     }
   },
   "premium": {

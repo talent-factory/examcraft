@@ -151,9 +151,9 @@ def test_register_new_user(test_client, db):
     assert user.last_name == "User"
     assert user.status == UserStatus.PENDING.value
 
-    # Verify user has viewer role
+    # Verify user has default role (dozent if available, else viewer)
     assert len(user.roles) == 1
-    assert user.roles[0].name == UserRole.VIEWER.value
+    assert user.roles[0].name in (UserRole.DOZENT.value, UserRole.VIEWER.value)
 
 
 def test_register_duplicate_email(test_client, test_user):

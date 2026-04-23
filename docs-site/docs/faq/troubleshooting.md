@@ -37,6 +37,36 @@
 3. Prüfen Sie Ihre Browser-Version
 4. Deaktivieren Sie Browser-Erweiterungen
 
+## Review Queue und Prüfungskomponist
+
+## Fragen erscheinen nicht im Prüfungskomponisten
+
+**Ursache**: Nur Fragen mit Status „Genehmigt" erscheinen im Prüfungskomponisten.
+
+**Lösung**:
+1. Öffnen Sie die [Review Queue](../user-guide/review-queue.md)
+2. Filtern Sie nach Status „Ausstehend"
+3. Prüfen und genehmigen Sie die gewünschten Fragen
+4. Diese stehen danach sofort im Prüfungskomponisten zur Verfügung
+
+## Dokument-Chat
+
+## „Dokument-Chat" ist nicht sichtbar oder nicht zugänglich
+
+**Ursache**: Der Dokument-Chat ist ab dem Starter-Abonnement verfügbar.
+
+**Lösung**: Prüfen Sie Ihr aktuelles Abonnement unter [Abonnement](../user-guide/subscription.md).
+Beim Free-Plan ist diese Funktion nicht enthalten.
+
+## Build und Dokumentation
+
+## Der mkdocs build schlägt mit fehlenden Dateien fehl
+
+**Ursache**: In `mkdocs.yml` referenzierte Seiten existieren noch nicht.
+
+**Lösung**: Stellen Sie sicher, dass alle in der Navigation eingetragenen `.md`-Dateien
+tatsächlich vorhanden sind.
+
 ## Support
 
 Wenn das Problem weiterhin besteht:

@@ -16,7 +16,7 @@ DATABASE_URL = os.getenv(
 )
 
 # Create SQLAlchemy engine
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -73,9 +73,19 @@ def create_tables():
             EmailEvent,
             EmailSuppressionList,
         )
+        from models.help import (  # noqa: F401
+            HelpOnboardingProgress,
+            HelpConversation,
+            HelpFeedback,
+            HelpContextHint,
+            HelpFaqCache,
+            HelpDismissedHint,
+            HelpIndexState,
+        )
+        from models.feedback_cluster import FeedbackCluster  # noqa: F401
 
         print(
-            "✅ Core models imported (Auth + Documents + Question Review + RBAC + Email)"
+            "✅ Core models imported (Auth + Documents + Question Review + RBAC + Email + Help)"
         )
     except Exception as e:
         import traceback
@@ -161,6 +171,20 @@ def _run_migrations_or_create_all():
             if current_rev == head_rev:
                 print(f"✅ Database schema is up to date (revision: {current_rev})")
                 return
+
+            # Fresh database: no revision and no tables — create schema
+            # from models, then stamp Alembic head so migrations don't
+            # try to ALTER tables that were just created with all columns.
+            if current_rev is None:
+                from sqlalchemy import inspect as sa_inspect
+
+                inspector = sa_inspect(engine)
+                if not inspector.has_table("users"):
+                    print("🆕 Fresh database detected — creating schema from models...")
+                    Base.metadata.create_all(bind=engine)
+                    command.stamp(alembic_cfg, "head")
+                    print(f"✅ Schema created and stamped at {head_rev}")
+                    return
 
             pending_msg = (
                 f"Pending migrations: DB at {current_rev or 'None'}, head at {head_rev}"

@@ -30,10 +30,20 @@ For bug reports, please use the bug report issue template.
 
 ### Prerequisites
 
+- **`just`** — Task runner used in place of `make`:
+  - macOS: `brew install just`
+  - Linux: `cargo install just`
+  - Windows: `winget install --id Casey.Just` or `scoop install just`
+  - Windows contributors additionally need **Git Bash** (ships with Git for
+    Windows) or **WSL2** — recipes use POSIX-shell.
+  - Verify: `just --version` (requires 1.18+ for grouped recipe lists).
 - Docker & Docker Compose (recommended)
 - Python 3.13+ (for local development)
 - Node.js 18+ (for frontend development)
 - Claude API Key (optional, for testing KI features)
+
+Run `just` (no arguments) in the project root to see all recipes grouped by
+category.
 
 ### Setup
 
@@ -43,7 +53,7 @@ git clone https://github.com/yourusername/examcraft-ai.git
 cd examcraft-ai
 
 # Start development stack
-./start-dev.sh
+just dev
 
 # Access services
 # Frontend: http://localhost:3000

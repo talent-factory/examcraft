@@ -25,7 +25,7 @@ Erstellen Sie Ihre erste KI-Prüfung in 5 Minuten.
 
 ## Schritt 3: Prüfung erstellen
 
-1. Wechseln Sie zum Tab **RAG-Prüfung erstellen**
+1. Wechseln Sie zum Reiter **RAG-Prüfung erstellen**
 2. Wählen Sie Ihre hochgeladenen Dokumente aus
 3. Konfigurieren Sie:
     - **Thema/Fokus**: z.B. "Sortieralgorithmen"
@@ -41,10 +41,13 @@ Nach 20–60 Sekunden sehen Sie Ihre generierten Fragen mit:
 - Fragetext und Antwortoptionen
 - Korrekte Antwort mit Erklärung
 - Quellenangaben aus Ihren Dokumenten
-- Confidence Score (Qualitätsindikator)
+- Zuverlässigkeitswert (Confidence Score) — Qualitätsindikator
 
 ## Nächste Schritte
 
+- [:octicons-arrow-right-24: Dashboard verstehen](../user-guide/dashboard.md)
 - [:octicons-arrow-right-24: Dokumente verwalten](../user-guide/documents.md)
 - [:octicons-arrow-right-24: KI-Prüfungen ohne Dokumente](../user-guide/exam-create.md)
+- [:octicons-arrow-right-24: Fragen reviewen (Review Queue)](../user-guide/review-queue.md)
+- [:octicons-arrow-right-24: Prüfung zusammenstellen](../user-guide/exam-composer.md)
 - [:octicons-arrow-right-24: Best Practices](../user-guide/best-practices.md)

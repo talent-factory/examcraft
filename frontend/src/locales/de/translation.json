@@ -4,6 +4,7 @@
     "settings": "Einstellungen",
     "logout": "Abmelden",
     "language": "Sprache",
+    "documentation": "Dokumentation",
     "sidebar": {
       "dashboard": "Dashboard",
       "documents": "Dokumente",
@@ -46,7 +47,11 @@
       "institutionCode": "Institutionscode (Optional)",
       "institutionCodeHint": "Geben Sie Ihren Institutionscode ein, falls vorhanden",
       "password": "Passwort",
-      "passwordHint": "Mindestens 8 Zeichen",
+      "passwordReqTitle": "Das Passwort muss enthalten:",
+      "passwordReqMinLength": "8+ Zeichen",
+      "passwordReqUppercase": "Grossbuchstabe (A–Z)",
+      "passwordReqLowercase": "Kleinbuchstabe (a–z)",
+      "passwordReqNumber": "Zahl (0–9)",
       "confirmPassword": "Passwort bestätigen",
       "creatingAccount": "Konto wird erstellt...",
       "createAccount": "Konto erstellen",
@@ -107,6 +112,9 @@
       "required": "Bitte füllen Sie alle Pflichtfelder aus",
       "passwordMismatch": "Passwörter stimmen nicht überein",
       "passwordMinLength": "Das Passwort muss mindestens 8 Zeichen lang sein",
+      "passwordUppercase": "Das Passwort muss mindestens einen Grossbuchstaben enthalten",
+      "passwordLowercase": "Das Passwort muss mindestens einen Kleinbuchstaben enthalten",
+      "passwordNumber": "Das Passwort muss mindestens eine Zahl enthalten",
       "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
       "fillAllFields": "Bitte füllen Sie alle Felder aus"
     }
@@ -169,9 +177,9 @@
       "starterUsers": "1 Benutzer",
       "professionalDescription": "Für Fachgruppen und kleine Schulen.",
       "professionalUsers": "bis zu 10 Benutzer",
-      "enterpriseDescription": "Für Institutionen mit SSO, Branding, API und Priority Support.",
+      "enterpriseDescription": "Für Institutionen — ab 30 Usern individuelle Offerte.",
       "enterprisePrice": "ab CHF 149",
-      "enterpriseSeats": "10-100 Seats",
+      "enterpriseSeats": "10 inkl. + CHF 10/User",
       "requestQuote": "Offerte anfordern",
       "processing": "Verarbeitung...",
       "subscribe": "Abonnieren",
@@ -478,9 +486,13 @@
       "btnSave": "Speichern",
       "sectionDetails": "Prompt Details",
       "nameLabel": "Name",
+      "fieldName": "Name",
       "namePlaceholder": "z.B. system_prompt_question_generation",
+      "fieldNamePlaceholder": "z.B. system_prompt_question_generation",
       "descriptionLabel": "Beschreibung",
+      "fieldDescription": "Beschreibung",
       "descriptionPlaceholder": "Kurze Beschreibung des Prompts",
+      "fieldDescriptionPlaceholder": "Kurze Beschreibung des Prompts",
       "tabEdit": "Bearbeiten",
       "tabPreview": "Vorschau",
       "contentPlaceholder": "Prompt Content (unterstützt {variable} Syntax)",
@@ -792,7 +804,8 @@
       "defaultTopic": "Generierung",
       "connectionLost": "Verbindung verloren – Status unbekannt",
       "clickToView": "Klicken zum Anzeigen",
-      "errorOccurred": "Fehler aufgetreten"
+      "errorOccurred": "Fehler aufgetreten",
+      "retry": "Erneut versuchen"
     },
     "questionEditor": {
       "title": "Frage #{{id}} bearbeiten",
@@ -947,7 +960,7 @@
       "formatMd": "Markdown (.md)",
       "formatJson": "JSON (.json)",
       "formatMoodle": "Moodle XML (.xml)",
-      "includeSolutions": "Loesungen einschliessen",
+      "includeSolutions": "Lösungen einschliessen",
       "noQuestionsWarning": "Die Prüfung hat noch keine Fragen. Füge zuerst Fragen hinzu.",
       "cancel": "Abbrechen",
       "exporting": "Exportiere...",
@@ -1123,12 +1136,12 @@
           "documentUpload": "Dokumenten-Upload",
           "basicQuestionGeneration": "Einfache Fragengenerierung",
           "documentLibrary": "Dokumentenbibliothek",
+          "ragGeneration": "RAG-Generierung",
           "fiveDocuments": "5 Dokumente",
           "twentyQuestionsMonth": "20 Fragen/Monat"
         },
         "starter": {
           "allFreeFeatures": "Alle Free-Funktionen",
-          "ragGeneration": "RAG-Generierung",
           "promptTemplates": "Prompt-Vorlagen",
           "batchProcessing": "Stapelverarbeitung",
           "fiftyDocuments": "50 Dokumente",
@@ -1159,7 +1172,8 @@
     "generationTasks": {
       "done": "Fertig",
       "errorOccurred": "Fehler aufgetreten",
-      "started": "Gestartet..."
+      "started": "Gestartet...",
+      "retrying": "Wird wiederholt..."
     }
   },
   "premium": {
@@ -1248,7 +1262,10 @@
       "deleteChat": "Chat löschen",
       "errorDeletingSession": "Fehler beim Löschen der Session",
       "newChat": "Neuer Chat",
-      "noSessionsHint": "Starten Sie einen neuen Chat, um mit Ihren Dokumenten zu interagieren."
+      "noSessionsHint": "Starten Sie einen neuen Chat, um mit Ihren Dokumenten zu interagieren.",
+      "noProcessedDocuments": "Laden Sie zuerst ein Dokument hoch und warten Sie, bis es verarbeitet wurde. Danach können Sie hier aktualisieren.",
+      "lastUpdated": "Zuletzt aktualisiert: {{date}}",
+      "sessionInfo": "{{messages}} Nachrichten · {{documents}} Dokument(e)"
     },
     "chatInterface": {
       "errorSending": "Fehler beim Senden der Nachricht. Bitte versuchen Sie es erneut.",
@@ -1391,6 +1408,40 @@
       "variablesEditor": {
         "additionalVariables": "Zusätzliche Template-Variablen"
       }
+    }
+  },
+  "help": {
+    "title": "Hilfe",
+    "chatUnavailable": "Der Hilfe-Chat ist derzeit nicht verfügbar.",
+    "rateLimited": "Du hast das Fragelimit erreicht. Bitte versuche es später erneut.",
+    "sessionExpired": "Deine Sitzung ist abgelaufen. Bitte lade die Seite neu.",
+    "chatPlaceholder": "Stelle eine Frage...",
+    "send": "Senden",
+    "newConversation": "Neue Konversation",
+    "onboarding": {
+      "skip": "Überspringen",
+      "next": "Weiter",
+      "finish": "Fertig",
+      "resume": "Später fortsetzen",
+      "later": "Später",
+      "startTour": "Tour starten",
+      "confirmEndTitle": "Tour beenden?",
+      "confirmEndText": "Du kannst die Tour später über den Hilfe-Button unten rechts neu starten.",
+      "confirmEndCancel": "Abbrechen",
+      "confirmEndConfirm": "Ja, beenden",
+      "completedTitle": "🎉 Tour abgeschlossen!",
+      "completedText": "Du kannst das Hilfe-Widget jederzeit über den Button unten rechts öffnen.",
+      "resumeText": "Du hast die Einführungstour noch nicht abgeschlossen.",
+      "resumeButton": "Tour fortsetzen"
+    },
+    "context": {
+      "understood": "Verstanden",
+      "learnMore": "Mehr erfahren",
+      "dontShowAgain": "Nicht mehr anzeigen"
+    },
+    "feedback": {
+      "helpful": "War das hilfreich?",
+      "thanks": "Danke für dein Feedback!"
     }
   }
 }

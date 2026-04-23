@@ -15,9 +15,9 @@ export enum Feature {
   DOCUMENT_UPLOAD = 'document_upload',
   BASIC_QUESTION_GENERATION = 'basic_question_generation',
   DOCUMENT_LIBRARY = 'document_library',
+  RAG_GENERATION = 'rag_generation',
 
   // Starter Tier Features
-  RAG_GENERATION = 'rag_generation',
   PROMPT_TEMPLATES = 'prompt_templates',
   BATCH_PROCESSING = 'batch_processing',
 
@@ -48,6 +48,7 @@ const TIER_FEATURES: Record<SubscriptionTier, Feature[]> = {
     Feature.DOCUMENT_UPLOAD,
     Feature.BASIC_QUESTION_GENERATION,
     Feature.DOCUMENT_LIBRARY,
+    Feature.RAG_GENERATION,
   ],
   [SubscriptionTier.STARTER]: [
     Feature.DOCUMENT_UPLOAD,

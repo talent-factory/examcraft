@@ -771,7 +771,7 @@ async def update_institution(
     - Requires 'manage_users' permission
     """
     locale = get_request_locale(request, current_user)
-    from config.features import SubscriptionTier, TIER_QUOTAS
+    from config.features import SubscriptionTier
 
     # Get institution
     institution = db.query(Institution).filter(Institution.id == institution_id).first()
@@ -808,11 +808,10 @@ async def update_institution(
 
         institution.subscription_tier = tier.value
 
-        # Update quotas based on tier
-        quotas = TIER_QUOTAS[tier]
-        institution.max_users = quotas["max_users"]
-        institution.max_documents = quotas["max_documents"]
-        institution.max_questions_per_month = quotas["max_questions_per_month"]
+        # Sync quotas from tier_quotas DB table (single source of truth)
+        from utils.tenant_utils import sync_institution_quotas
+
+        sync_institution_quotas(institution, db)
 
     db.commit()
     db.refresh(institution)

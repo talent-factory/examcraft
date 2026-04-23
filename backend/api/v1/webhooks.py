@@ -180,6 +180,11 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         new_tier = get_tier_from_price_id(price_id)
 
         institution.subscription_tier = new_tier
+
+        from utils.tenant_utils import sync_institution_quotas
+
+        sync_institution_quotas(institution, db)
+
         logger.info(
             f"Updated institution {institution_id} to tier: {new_tier} (price_id: {price_id})"
         )
@@ -284,6 +289,11 @@ async def handle_subscription_updated(subscription: dict, db: Session):
                 if institution:
                     old_tier = institution.subscription_tier
                     institution.subscription_tier = new_tier
+
+                    from utils.tenant_utils import sync_institution_quotas
+
+                    sync_institution_quotas(institution, db)
+
                     logger.info(
                         f"Subscription updated: institution {institution.id} tier {old_tier} -> {new_tier} "
                         f"(price_id: {price_id})"
@@ -318,6 +328,10 @@ async def handle_subscription_deleted(subscription: dict, db: Session):
         institution = local_sub.institution
         if institution:
             institution.subscription_tier = "free"
+
+            from utils.tenant_utils import sync_institution_quotas
+
+            sync_institution_quotas(institution, db)
 
         # Downgrade billing owner's role from dozent back to viewer
         if local_sub.billing_owner_id:
