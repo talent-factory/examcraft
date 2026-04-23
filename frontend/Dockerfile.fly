@@ -13,11 +13,21 @@ RUN apk add --no-cache nodejs
 
 WORKDIR /app
 
-# Build arguments for environment configuration
+# Build arguments for environment configuration.
+# react-scripts build reads process.env at build time; without ARG+ENV pairs,
+# values passed via `fly.frontend.toml:[build.args]` are ignored by the build.
 ARG REACT_APP_API_URL
 ARG REACT_APP_DEPLOYMENT_MODE=full
+ARG REACT_APP_VERSION=unknown
+ARG REACT_APP_STRIPE_PRICE_STARTER
+ARG REACT_APP_STRIPE_PRICE_PROFESSIONAL
+ARG REACT_APP_ENTERPRISE_CONTACT_EMAIL
 ENV REACT_APP_API_URL=${REACT_APP_API_URL}
 ENV REACT_APP_DEPLOYMENT_MODE=${REACT_APP_DEPLOYMENT_MODE}
+ENV REACT_APP_VERSION=${REACT_APP_VERSION}
+ENV REACT_APP_STRIPE_PRICE_STARTER=${REACT_APP_STRIPE_PRICE_STARTER}
+ENV REACT_APP_STRIPE_PRICE_PROFESSIONAL=${REACT_APP_STRIPE_PRICE_PROFESSIONAL}
+ENV REACT_APP_ENTERPRISE_CONTACT_EMAIL=${REACT_APP_ENTERPRISE_CONTACT_EMAIL}
 
 # Create directory structure matching monorepo layout
 # craco.config.js expects ../../premium/frontend/src relative to core/frontend
