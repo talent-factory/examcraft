@@ -100,18 +100,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
         </nav>
 
         {/* Version Footer */}
-        {isOpen && (
-          <div className="px-4 py-3 border-t border-gray-200">
-            <a
-              href="https://github.com/talent-factory/ExamCraft/releases"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              v{process.env.REACT_APP_VERSION || 'dev'}
-            </a>
-          </div>
-        )}
+        {isOpen && (() => {
+          const version = process.env.REACT_APP_VERSION;
+          // Bei fehlendem Version-Build-Arg → Liste-View als Fallback;
+          // sonst direkt auf das spezifische Release-Tag verlinken.
+          const releasesBase = 'https://github.com/talent-factory/examcraft/releases';
+          const href = version ? `${releasesBase}/tag/v${version}` : releasesBase;
+          return (
+            <div className="px-4 py-3 border-t border-gray-200">
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                v{version || 'dev'}
+              </a>
+            </div>
+          );
+        })()}
       </div>
     </aside>
   );
