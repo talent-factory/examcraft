@@ -11,12 +11,60 @@ logger = logging.getLogger(__name__)
 
 DOCS_SITE_PATH = os.environ.get("DOCS_SITE_PATH", "core/docs-site/docs")
 
+# Redis SETNX key + TTL for the indexing lock. 15 min is well above the
+# realistic worst case (sentence-transformers cold-load plus full re-index
+# of the corpus); if exceeded, the key expires and the next attempt proceeds.
+_LOCK_KEY = "docs_help:indexing_lock"
+_LOCK_TTL_SECONDS = 15 * 60
+
+
+class IndexingInProgressError(RuntimeError):
+    """Raised when another indexing run (startup task or admin call) holds the lock."""
+
 
 class DocsIndexerService:
     def __init__(self, db: Session):
         self.db = db
 
+    @staticmethod
+    def _acquire_lock() -> bool:
+        """SETNX on Redis. Returns True if lock was acquired.
+
+        Falls back to True (skip locking) when Redis is unavailable — better
+        to allow a potentially-concurrent run than to refuse indexing entirely.
+        """
+        try:
+            from services.redis_service import RedisService
+
+            client = RedisService.get_ratelimit_client()
+            return bool(client.set(_LOCK_KEY, "1", nx=True, ex=_LOCK_TTL_SECONDS))
+        except Exception as e:
+            logger.warning(f"Redis unreachable, proceeding without lock: {e}")
+            return True
+
+    @staticmethod
+    def _release_lock() -> None:
+        try:
+            from services.redis_service import RedisService
+
+            RedisService.get_ratelimit_client().delete(_LOCK_KEY)
+        except Exception as e:
+            logger.warning(f"Redis lock release failed: {e}")
+
     async def run_index(self, full_scan: bool = False) -> Dict[str, int]:
+        """Serialize indexing via Redis SETNX lock; raises IndexingInProgressError on conflict."""
+        if not self._acquire_lock():
+            raise IndexingInProgressError(
+                "Docs indexing is already in progress "
+                "(startup task or another admin call holds the Redis lock)."
+            )
+
+        try:
+            return await self._run_index_locked(full_scan=full_scan)
+        finally:
+            self._release_lock()
+
+    async def _run_index_locked(self, full_scan: bool) -> Dict[str, int]:
         from models.help import HelpIndexState
 
         state = self.db.query(HelpIndexState).first()
@@ -26,24 +74,15 @@ class DocsIndexerService:
             self.db.commit()
             full_scan = True
 
-        # Ensure the docs_help collection exists before any indexing
-        try:
-            self._ensure_collection()
-        except Exception as e:
-            logger.error(
-                f"Cannot proceed with indexing: failed to ensure collection: {e}"
-            )
-            return {"indexed": 0, "deleted": 0}
+        # Ensure the docs_help collection exists before any indexing.
+        # Let failures propagate — returning {indexed: 0} looked like success
+        # in the caller (print "✅ Docs indexed: 0 files") and hid real errors.
+        self._ensure_collection()
 
         if full_scan:
-            # Full Replace: clear entire collection before re-indexing
-            try:
-                self._clear_collection()
-            except Exception as e:
-                logger.error(
-                    f"Cannot proceed with full-scan indexing: failed to clear collection: {e}"
-                )
-                return {"indexed": 0, "deleted": 0}
+            # Full Replace: clear entire collection before re-indexing.
+            # Clear-failure must abort (not return 0) so caller sees the error.
+            self._clear_collection()
             changed = self._get_all_md_files()
             deleted = []
         elif not full_scan and state.last_indexed_sha:
@@ -123,6 +162,12 @@ class DocsIndexerService:
         return md_files
 
     def _get_changed_files(self, last_sha: str) -> Tuple[List[str], List[str]]:
+        # Defensive: guards against None and any other non-string sentinel.
+        # The regex below would raise TypeError on None rather than returning
+        # no match, masking the real issue behind a generic exception.
+        if not last_sha or not isinstance(last_sha, str):
+            logger.warning("No valid last_sha provided, falling back to full scan")
+            return self._get_all_md_files(), []
         if not re.match(r"^[0-9a-f]{40}$", last_sha):
             logger.warning(f"Invalid SHA format: {last_sha}, falling back to full scan")
             return self._get_all_md_files(), []
@@ -151,8 +196,12 @@ class DocsIndexerService:
                 else:
                     changed.append(filepath)
             return changed, deleted
-        except subprocess.CalledProcessError:
-            logger.warning("Git diff failed, falling back to full scan")
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
+            # FileNotFoundError: git binary not on PATH (possible in minimal
+            # container images); OSError: broader subprocess spawn failures.
+            logger.warning(
+                f"Git diff failed ({type(e).__name__}), falling back to full scan"
+            )
             return self._get_all_md_files(), []
 
     def _get_current_sha(self) -> Optional[str]:
@@ -161,8 +210,8 @@ class DocsIndexerService:
                 ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
             )
             return result.stdout.strip()
-        except subprocess.CalledProcessError:
-            logger.warning("Could not determine current git SHA")
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
+            logger.warning(f"Could not determine current git SHA ({type(e).__name__})")
             return None
 
     def _parse_markdown(

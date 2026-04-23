@@ -148,13 +148,22 @@ async def lifespan(app: FastAPI):
                     )
                     return
 
-                from services.docs_indexer_service import DocsIndexerService
+                from services.docs_indexer_service import (
+                    DocsIndexerService,
+                    IndexingInProgressError,
+                )
 
                 db = SessionLocal()
                 try:
                     service = DocsIndexerService(db)
                     result = await service.run_index(full_scan=True)
                     print(f"✅ Docs indexing completed: {result['indexed']} files")
+                except IndexingInProgressError:
+                    # Only realistic on overlapping container rollovers; next
+                    # startup or admin call will catch up.
+                    logger.info(
+                        "Docs indexing lock held by another run; skipping startup indexing."
+                    )
                 finally:
                     db.close()
             except Exception as e:

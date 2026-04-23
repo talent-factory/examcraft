@@ -510,10 +510,18 @@ async def trigger_reindex(
             detail="Re-indexing is only available in Full mode (Qdrant required)",
         )
 
-    from services.docs_indexer_service import DocsIndexerService
+    from services.docs_indexer_service import (
+        DocsIndexerService,
+        IndexingInProgressError,
+    )
 
     service = DocsIndexerService(db)
-    result = await service.run_index(full_scan=full_scan)
+    try:
+        result = await service.run_index(full_scan=full_scan)
+    except IndexingInProgressError as e:
+        # 409 Conflict: another indexing run holds the lock (startup task or
+        # a prior /admin/reindex call). Caller can retry once the lock expires.
+        raise HTTPException(status_code=409, detail=str(e))
     return {"status": "completed", **result}
 
 
