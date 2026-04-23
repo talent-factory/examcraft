@@ -23,8 +23,8 @@ ENV REACT_APP_DEPLOYMENT_MODE=${REACT_APP_DEPLOYMENT_MODE}
 # craco.config.js expects ../../premium/frontend/src relative to core/frontend
 WORKDIR /app/core/frontend
 
-# Copy package files (bun.lock is at core/ level)
-COPY core/bun.lock core/frontend/package.json ./
+# Copy package files (bun.lock lives alongside package.json in core/frontend/)
+COPY core/frontend/bun.lock core/frontend/package.json ./
 
 # Install all dependencies (including devDependencies for build)
 RUN bun install
