@@ -9,6 +9,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-04-23
+
 ### Added — Docs Deployment Pipeline
 
 - **`docs.examcraft.ch` automatische Publikation:** Neuer GitHub-Actions-Workflow
