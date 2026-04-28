@@ -639,8 +639,18 @@ async def get_active_tasks(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Return all active (non-terminal) generation tasks for the current user."""
+    """Return all active (non-terminal) generation tasks for the current user.
+
+    Defense-in-depth: a job whose DB status is non-terminal but whose Celery
+    state is already terminal (e.g. worker died before ``_update_job_status``
+    committed) is treated as a phantom — excluded from the response and the
+    DB row is synced idempotently via ``_try_update_job_status`` (single attempt
+    only — the watchdog from TF-329 reconciles persistent failures, so the HTTP
+    handler never blocks on the multi-attempt retry loop in ``_update_job_status``).
+    """
     from celery.result import AsyncResult
+
+    from tasks.question_tasks import _try_update_job_status
 
     # created_at is timezone-aware (UTC) — use aware cutoff
     cutoff = datetime.now(timezone.utc) - ACTIVE_TASK_MAX_AGE
@@ -658,14 +668,16 @@ async def get_active_tasks(
     for job in jobs:
         progress = 0
         message = None
+        celery_state: Optional[str] = None
         try:
             result = AsyncResult(job.task_id)
-            if result.state == "PROGRESS" and isinstance(result.info, dict):
+            celery_state = result.state
+            if celery_state == "PROGRESS" and isinstance(result.info, dict):
                 current = result.info.get("current", 0)
                 total = result.info.get("total", 1)
                 progress = int((current / max(total, 1)) * 100)
                 message = result.info.get("message")
-            elif result.state == "STARTED":
+            elif celery_state == "STARTED":
                 progress = 0
                 message = "Gestartet..."
         except Exception as celery_err:
@@ -674,6 +686,26 @@ async def get_active_tasks(
                 job.task_id,
                 celery_err,
             )
+
+        if celery_state in TERMINAL_STATUSES:
+            logger.info(
+                "Phantom job detected: task_id=%s db_status=%s celery_state=%s — syncing DB",
+                job.task_id,
+                job.status,
+                celery_state,
+            )
+            try:
+                _try_update_job_status(job.task_id, celery_state)
+            except Exception as sync_err:
+                # Includes JobNotFoundError, SQLAlchemyError, OSError. We don't
+                # retry inline — TF-329's watchdog reconciles persistent
+                # failures so the request handler never blocks.
+                logger.warning(
+                    "Failed to sync DB status for phantom job %s: %s",
+                    job.task_id,
+                    sync_err,
+                )
+            continue
 
         tasks.append(
             ActiveTaskInfo(
