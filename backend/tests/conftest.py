@@ -237,7 +237,13 @@ def _make_mock_user(is_admin: bool = False):
 
 @pytest.fixture(scope="function")
 def help_db(test_engine):
-    """DB session for help tests with seeded Institution + User for FK constraints."""
+    """DB session for help tests with seeded Institution + User for FK constraints.
+
+    Cleanup beim Teardown: löscht User(id=999) und Institution(id=998), damit
+    diese Rows nicht später von ``Institution.first()``-Fixtures in anderen
+    Test-Files (test_quota_enforcement_integration, test_profile_permissions_
+    and_institution u.a.) als "frische" Institution interpretiert werden.
+    """
     from sqlalchemy.orm import sessionmaker
     from models.auth import Institution, User
 
@@ -269,9 +275,18 @@ def help_db(test_engine):
     db.merge(user)
     db.commit()
 
-    yield db
-    db.rollback()
-    db.close()
+    try:
+        yield db
+    finally:
+        db.rollback()
+        try:
+            db.query(User).filter(User.id == 999).delete()
+            db.query(Institution).filter(Institution.id == 998).delete()
+            db.commit()
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
 
 
 @pytest.fixture(scope="function")

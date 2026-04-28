@@ -36,6 +36,7 @@ def mock_user():
     user.id = 1
     user.email = "test@example.com"
     user.is_active = True
+    user.is_superuser = False
     return user
 
 

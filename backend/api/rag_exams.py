@@ -200,7 +200,11 @@ async def generate_rag_exam(
                 detail=t("rag_no_institution", locale=locale),
             )
         SubscriptionLimits.check_question_limit(
-            current_user.institution, db, additional_count=request.question_count
+            current_user.institution,
+            db,
+            additional_count=request.question_count,
+            user=current_user,
+            request=http_request,
         )
 
         rag_request = RAGExamRequest(
@@ -281,10 +285,7 @@ async def retry_generation(
     try:
         original_job = (
             db.query(QuestionGenerationJob)
-            .filter(
-                QuestionGenerationJob.task_id == task_id,
-                QuestionGenerationJob.user_id == current_user.id,
-            )
+            .filter(QuestionGenerationJob.task_id == task_id)
             .first()
         )
 
@@ -292,6 +293,18 @@ async def retry_generation(
             raise HTTPException(
                 status_code=404, detail=t("rag_task_not_found", locale=locale)
             )
+
+        # Owner-Check (Superuser-Bypass mit Audit-Log)
+        from utils.auth_utils import enforce_resource_access
+
+        enforce_resource_access(
+            obj=original_job,
+            user=current_user,
+            action="retry",
+            db=db,
+            resource_type="question_generation_job",
+            request=http_request,
+        )
 
         if original_job.status not in ("FAILURE", "REVOKED"):
             raise HTTPException(
@@ -316,7 +329,11 @@ async def retry_generation(
 
         question_count = original_job.request_data.get("question_count", 5)
         SubscriptionLimits.check_question_limit(
-            current_user.institution, db, additional_count=question_count
+            current_user.institution,
+            db,
+            additional_count=question_count,
+            user=current_user,
+            request=http_request,
         )
 
         new_task_id = str(uuid.uuid4())
@@ -636,10 +653,15 @@ ACTIVE_TASK_MAX_AGE = timedelta(hours=2)
 
 @router.get("/active-tasks", response_model=ActiveTasksResponse)
 async def get_active_tasks(
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Return all active (non-terminal) generation tasks for the current user.
+    """Return all active (non-terminal) generation tasks.
+
+    Normal users see only their own jobs. Superusers see jobs of all users;
+    the broadening is audit-logged via AuditService.log_superuser_bypass
+    (resource_type="question_generation_job_list", action="list_all_active").
 
     Defense-in-depth: a job whose DB status is non-terminal but whose Celery
     state is already terminal (e.g. worker died before ``_update_job_status``
@@ -654,15 +676,36 @@ async def get_active_tasks(
 
     # created_at is timezone-aware (UTC) — use aware cutoff
     cutoff = datetime.now(timezone.utc) - ACTIVE_TASK_MAX_AGE
-    jobs = (
-        db.query(QuestionGenerationJob)
-        .filter(
-            QuestionGenerationJob.user_id == current_user.id,
-            QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
-            QuestionGenerationJob.created_at > cutoff,
+    if current_user.is_superuser:
+        from services.audit_service import AuditService
+
+        AuditService.log_superuser_bypass(
+            db=db,
+            superuser=current_user,
+            resource_type="question_generation_job_list",
+            resource_id=None,
+            action="list_all_active",
+            owner_user_id=None,
+            request=http_request,
         )
-        .all()
-    )
+        jobs = (
+            db.query(QuestionGenerationJob)
+            .filter(
+                QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
+                QuestionGenerationJob.created_at > cutoff,
+            )
+            .all()
+        )
+    else:
+        jobs = (
+            db.query(QuestionGenerationJob)
+            .filter(
+                QuestionGenerationJob.user_id == current_user.id,
+                QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
+                QuestionGenerationJob.created_at > cutoff,
+            )
+            .all()
+        )
 
     tasks = []
     for job in jobs:

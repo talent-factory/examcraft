@@ -384,62 +384,48 @@ def test_try_update_job_status_propagates_db_errors():
         mock_session.close.assert_called_once()
 
 
-def test_safe_update_job_status_swallows_job_status_update_error_and_logs(caplog):
+def test_safe_update_job_status_swallows_job_status_update_error_and_logs(mocker):
     """When _update_job_status raises JobStatusUpdateError, _safe_update_job_status
     logs at CRITICAL level with traceback (logger.critical + exc_info=True), and
     does NOT re-raise.
-    """
-    import logging
 
+    mocker.patch direkt auf den Modul-Logger statt caplog: pytest 7.4.3
+    (CI-Pin) lässt caplog.records hier leer; der direkte Mock ist
+    versionsunabhängig.
+    """
     from tasks.question_tasks import JobStatusUpdateError, _safe_update_job_status
 
+    mock_logger = mocker.patch("tasks.question_tasks.logger")
     err = JobStatusUpdateError("task-x", "FAILURE", 4, RuntimeError("simulated cause"))
 
-    with (
-        patch("tasks.question_tasks._update_job_status", side_effect=err),
-        caplog.at_level(logging.CRITICAL, logger="tasks.question_tasks"),
-    ):
+    with patch("tasks.question_tasks._update_job_status", side_effect=err):
         _safe_update_job_status("task-x", "FAILURE")  # no exception
 
-    matching = [
-        r
-        for r in caplog.records
-        if r.levelno == logging.CRITICAL
-        and "task-x" in r.message
-        and r.exc_info is not None
-    ]
-    assert matching, (
-        "expected at least one CRITICAL log record with task-x in message and exc_info set"
-    )
+    mock_logger.critical.assert_called_once()
+    call = mock_logger.critical.call_args
+    rendered = call.args[0] % call.args[1:] if len(call.args) > 1 else call.args[0]
+    assert "task-x" in rendered
+    assert call.kwargs.get("exc_info") is True
 
 
-def test_safe_update_job_status_swallows_job_not_found_error_and_logs(caplog):
+def test_safe_update_job_status_swallows_job_not_found_error_and_logs(mocker):
     """When _update_job_status raises JobNotFoundError, _safe_update_job_status
-    logs at CRITICAL with exc_info and does NOT re-raise.
-    """
-    import logging
-
+    logs at CRITICAL with exc_info and does NOT re-raise."""
     from tasks.question_tasks import JobNotFoundError, _safe_update_job_status
 
-    with (
-        patch(
-            "tasks.question_tasks._update_job_status",
-            side_effect=JobNotFoundError("ghost", "SUCCESS"),
-        ),
-        caplog.at_level(logging.CRITICAL, logger="tasks.question_tasks"),
+    mock_logger = mocker.patch("tasks.question_tasks.logger")
+
+    with patch(
+        "tasks.question_tasks._update_job_status",
+        side_effect=JobNotFoundError("ghost", "SUCCESS"),
     ):
         _safe_update_job_status("ghost", "SUCCESS")  # no exception
 
-    matching = [
-        r
-        for r in caplog.records
-        if r.levelno == logging.CRITICAL
-        and "ghost" in r.message
-        and r.exc_info is not None
-    ]
-    assert matching, (
-        "expected at least one CRITICAL log record with ghost in message and exc_info set"
-    )
+    mock_logger.critical.assert_called_once()
+    call = mock_logger.critical.call_args
+    rendered = call.args[0] % call.args[1:] if len(call.args) > 1 else call.args[0]
+    assert "ghost" in rendered
+    assert call.kwargs.get("exc_info") is True
 
 
 def test_safe_update_job_status_passes_through_on_success():

@@ -19,6 +19,37 @@ from models.exam import Exam, ExamQuestion, ExamStatus
 # ---------------------------------------------------------------------------
 
 
+def _make_committable_session(test_engine, slug: str, email: str):
+    """Yield a committable Session and clean its Institution+User on teardown.
+
+    Endpoints under test call session.commit() — die ``test_db``-Fixture
+    aus conftest.py hat keinen SAVEPOINT-Mode, eine SAVEPOINT-Variante
+    bricht optimistic-locking-Tests (updated_at-Refresh-Verhalten). Daher
+    bleibt es bei einer "echten" Session ohne Outer-Transaction. Damit
+    Pollution für andere Test-Files (test_quota_enforcement_integration,
+    test_profile_permissions_and_institution u.a., die ``Institution.first()``
+    abfragen) nicht entsteht, löschen wir die für diesen Test class-spezifisch
+    angelegten Institution-/User-Rows beim Teardown explizit.
+    """
+    from sqlalchemy.orm import sessionmaker
+    from models.auth import Institution, User
+
+    TestSession = sessionmaker(bind=test_engine)
+    session = TestSession()
+    try:
+        yield session
+    finally:
+        session.rollback()  # falls letzter Test eine offene Transaktion hatte
+        try:
+            session.query(User).filter(User.email == email).delete()
+            session.query(Institution).filter(Institution.slug == slug).delete()
+            session.commit()
+        except Exception:
+            session.rollback()
+        finally:
+            session.close()
+
+
 def make_user(test_db: Session, institution_id: int, suffix: str = "1") -> User:
     user = User(
         email=f"examuser{suffix}@test.com",
@@ -372,17 +403,9 @@ class TestExamCRUDApi:
 
     @pytest.fixture
     def exam_db(self, test_engine):
-        """Fresh DB session that supports commit/rollback (no wrapping transaction).
-
-        test_db uses a connection-level transaction which prevents commit()
-        inside the API endpoints. This fixture creates a plain session instead.
-        """
-        from sqlalchemy.orm import sessionmaker
-
-        TestSession = sessionmaker(bind=test_engine)
-        session = TestSession()
-        yield session
-        session.close()
+        yield from _make_committable_session(
+            test_engine, slug="exam-test-university", email="examcrud@test.com"
+        )
 
     @pytest.fixture
     def exam_institution(self, exam_db):
@@ -564,13 +587,9 @@ class TestExamQuestionApi:
 
     @pytest.fixture
     def exam_db(self, test_engine):
-        """Fresh DB session that supports commit/rollback (no wrapping transaction)."""
-        from sqlalchemy.orm import sessionmaker
-
-        TestSession = sessionmaker(bind=test_engine)
-        session = TestSession()
-        yield session
-        session.close()
+        yield from _make_committable_session(
+            test_engine, slug="examq-test-university", email="examqcrud@test.com"
+        )
 
     @pytest.fixture
     def exam_institution(self, exam_db):
@@ -806,13 +825,9 @@ class TestExamWorkflowApi:
 
     @pytest.fixture
     def exam_db(self, test_engine):
-        """Fresh DB session that supports commit/rollback (no wrapping transaction)."""
-        from sqlalchemy.orm import sessionmaker
-
-        TestSession = sessionmaker(bind=test_engine)
-        session = TestSession()
-        yield session
-        session.close()
+        yield from _make_committable_session(
+            test_engine, slug="examwf-test-university", email="examwfcrud@test.com"
+        )
 
     @pytest.fixture
     def exam_institution(self, exam_db):
@@ -999,12 +1014,7 @@ def _make_exam_test_class_fixtures(slug: str, email: str):
     class _Fixtures:
         @pytest.fixture
         def exam_db(self, test_engine):
-            from sqlalchemy.orm import sessionmaker
-
-            TestSession = sessionmaker(bind=test_engine)
-            session = TestSession()
-            yield session
-            session.close()
+            yield from _make_committable_session(test_engine, slug=slug, email=email)
 
         @pytest.fixture
         def exam_institution(self, exam_db):

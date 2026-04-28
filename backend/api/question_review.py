@@ -406,7 +406,12 @@ async def create_question_review(
         # Check question generation limit for institution
         from utils.tenant_utils import SubscriptionLimits
 
-        SubscriptionLimits.check_question_limit(current_user.institution, db)
+        SubscriptionLimits.check_question_limit(
+            current_user.institution,
+            db,
+            user=current_user,
+            request=http_request,
+        )
 
         # Create Question Review
         question = QuestionReview(
@@ -462,6 +467,12 @@ async def create_question_review(
         logger.info(f"Created question review {question.id}")
         return question
 
+    except HTTPException:
+        # Audit-Failure-500 aus check_question_limit/log_superuser_bypass nicht
+        # in generisches 500 umverpacken — sonst geht das DSGVO-Signal in den
+        # Logs verloren.
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating question review: {e}")

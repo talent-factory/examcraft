@@ -128,15 +128,27 @@ async def _check_task_ownership(websocket: WebSocket, task_id: str, user: User) 
         """Returns 'ok', 'denied', or 'unknown'. Runs in executor to avoid blocking."""
         db = SessionLocal()
         try:
+            from services.audit_service import AuditService
+
             document = db.query(Document).filter(Document.task_id == task_id).first()
             if document:
-                if document.user_id != user.id:
-                    logger.warning(
-                        f"Ownership-Verletzung (Dokument): User {user.id} versucht Task "
-                        f"{task_id} (Owner: {document.user_id}) zu überwachen"
+                if document.user_id == user.id:
+                    return "ok"
+                if user.is_superuser:
+                    AuditService.log_superuser_bypass(
+                        db=db,
+                        superuser=user,
+                        resource_type="document",
+                        resource_id=document.id,
+                        action="ws_subscribe",
+                        owner_user_id=document.user_id,
                     )
-                    return "denied"
-                return "ok"
+                    return "ok"
+                logger.warning(
+                    f"Ownership-Verletzung (Dokument): User {user.id} versucht Task "
+                    f"{task_id} (Owner: {document.user_id}) zu überwachen"
+                )
+                return "denied"
 
             job = (
                 db.query(QuestionGenerationJob)
@@ -144,13 +156,23 @@ async def _check_task_ownership(websocket: WebSocket, task_id: str, user: User) 
                 .first()
             )
             if job:
-                if job.user_id != user.id:
-                    logger.warning(
-                        f"Ownership-Verletzung (Fragen): User {user.id} versucht Task "
-                        f"{task_id} (Owner: {job.user_id}) zu überwachen"
+                if job.user_id == user.id:
+                    return "ok"
+                if user.is_superuser:
+                    AuditService.log_superuser_bypass(
+                        db=db,
+                        superuser=user,
+                        resource_type="question_generation_job",
+                        resource_id=job.id,
+                        action="ws_subscribe",
+                        owner_user_id=job.user_id,
                     )
-                    return "denied"
-                return "ok"
+                    return "ok"
+                logger.warning(
+                    f"Ownership-Verletzung (Fragen): User {user.id} versucht Task "
+                    f"{task_id} (Owner: {job.user_id}) zu überwachen"
+                )
+                return "denied"
 
             # Unbekannte task_id — ablehnen (kein legitimer Fall, da Job vor apply_async erstellt wird)
             logger.warning(

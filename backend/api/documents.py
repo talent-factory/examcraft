@@ -92,12 +92,21 @@ async def upload_document(
         # Check document limit for institution
         from utils.tenant_utils import SubscriptionLimits
 
-        SubscriptionLimits.check_document_limit(current_user.institution, db)
+        SubscriptionLimits.check_document_limit(
+            current_user.institution,
+            db,
+            user=current_user,
+            request=http_request,
+        )
 
         # Check storage limit (if file size is known)
         if file.size and file.size > 0:
             SubscriptionLimits.check_storage_limit(
-                current_user.institution, db, file.size
+                current_user.institution,
+                db,
+                file.size,
+                user=current_user,
+                request=http_request,
             )
 
         # Save document file and create DB entry
@@ -481,7 +490,6 @@ async def delete_document(
     """
     locale = get_request_locale(http_request, current_user)
     try:
-        # Check if document exists and user owns it (or is superuser)
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
@@ -489,21 +497,41 @@ async def delete_document(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Only allow deletion if:
-        # 1. User is superuser (can delete any document)
-        # 2. User owns the document
-        # 3. User is admin in the same institution
-        if not current_user.is_superuser:
+        # Access policy (in evaluation order):
+        #   1. Same-institution admin → allowed + audit (admin_cross_owner if foreign)
+        #   2. Owner / orphan / superuser → handled by enforce_resource_access
+        #   3. else → 403
+        from utils.auth_utils import enforce_resource_access
+
+        is_same_institution_admin = (
+            current_user.has_role("admin")
+            and document.institution_id == current_user.institution_id
+        )
+        if is_same_institution_admin:
             if document.user_id and document.user_id != current_user.id:
-                # Check if user is admin in same institution
-                if not (
-                    current_user.has_role("admin")
-                    and document.institution_id == current_user.institution_id
-                ):
-                    raise HTTPException(
-                        status_code=403,
-                        detail=t("documents_access_denied", locale=locale),
-                    )
+                from services.audit_service import AuditService
+
+                # Fail-loud auf Audit-Persistenz-Fehler (DSGVO): kein cross-owner
+                # DELETE ohne Trail, deshalb log_admin_cross_owner statt
+                # log_action — analog log_superuser_bypass.
+                AuditService.log_admin_cross_owner(
+                    db=db,
+                    admin=current_user,
+                    resource_type="document",
+                    resource_id=document.id,
+                    action="delete",
+                    owner_user_id=document.user_id,
+                    request=http_request,
+                )
+        else:
+            enforce_resource_access(
+                obj=document,
+                user=current_user,
+                action="delete",
+                db=db,
+                resource_type="document",
+                request=http_request,
+            )
 
         # Store filename for audit log
         filename = document.filename
@@ -577,11 +605,17 @@ async def process_document(
             status_code=404, detail=t("documents_not_found", locale=locale)
         )
 
-    # Prüfe User-Berechtigung
-    if document.user_id and document.user_id != current_user.id:
-        raise HTTPException(
-            status_code=403, detail=t("documents_access_denied", locale=locale)
-        )
+    # Prüfe User-Berechtigung (Superuser-Bypass mit Audit-Log)
+    from utils.auth_utils import enforce_resource_access
+
+    enforce_resource_access(
+        obj=document,
+        user=current_user,
+        action="process",
+        db=db,
+        resource_type="document",
+        request=request,
+    )
 
     try:
         # Starte Verarbeitung im Hintergrund

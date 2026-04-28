@@ -3,13 +3,16 @@ Audit Logging Service für ExamCraft AI
 Implementiert Security & GDPR Compliance Logging
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 from sqlalchemy.orm import Session
 from fastapi import Request
 import logging
 import json
 
 from models.auth import AuditLog
+
+if TYPE_CHECKING:
+    from models.auth import User
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +51,8 @@ class AuditService:
     ACTION_API_ACCESS = "api_access"
     ACTION_PERMISSION_DENIED = "permission_denied"
     ACTION_RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
+    ACTION_SUPERUSER_BYPASS = "superuser_bypass"
+    ACTION_ADMIN_CROSS_OWNER = "admin_cross_owner"
 
     # Status Types
     STATUS_SUCCESS = "success"
@@ -274,6 +279,114 @@ class AuditService:
             error_message=error_message,
             additional_data=additional_data,
         )
+
+    @staticmethod
+    def log_superuser_bypass(
+        db: Session,
+        superuser: "User",
+        resource_type: str,
+        resource_id: Optional[Any],
+        action: str,
+        owner_user_id: Optional[int],
+        request: Optional[Request] = None,
+    ) -> AuditLog:
+        """
+        Log a superuser bypass event (access to foreign owner data or quota override).
+
+        DSGVO-compliance contract: This log MUST be persisted before the bypass
+        proceeds. If the underlying log_action returns None (silent DB failure),
+        this method raises HTTPException 500 to abort the bypass — better to
+        deny access than to bypass without an audit trail.
+
+        Args:
+            db: Database session
+            superuser: User-Object performing the bypass (must have id, email)
+            resource_type: Bypassed resource type ("document", "chat_session", "quota", ...)
+            resource_id: PK of the resource or None for quota bypasses
+            action: Concrete bypassed action ("process", "delete", "ws_subscribe",
+                "list_all", "list_all_active", "override_user_limit",
+                "override_document_limit", "override_question_limit",
+                "override_storage_limit", ...)
+            owner_user_id: ID of original owner (None for quota)
+            request: Optional FastAPI Request for IP/UA extraction
+
+        Returns:
+            Created AuditLog entry (never None — raises on persistence failure)
+
+        Raises:
+            HTTPException 500: If audit log could not be persisted.
+        """
+        from fastapi import HTTPException
+
+        audit_log = AuditService.log_action(
+            db=db,
+            action=AuditService.ACTION_SUPERUSER_BYPASS,
+            user_id=superuser.id,
+            resource_type=resource_type,
+            resource_id=str(resource_id) if resource_id is not None else None,
+            additional_data={
+                "bypassed_action": action,
+                "owner_user_id": owner_user_id,
+                "superuser_email": superuser.email,
+            },
+            request=request,
+        )
+        if audit_log is None:
+            logger.critical(
+                "Superuser bypass refused: audit log persistence failed "
+                f"(superuser={superuser.id}, resource={resource_type}:{resource_id}, "
+                f"action={action}). Bypass aborted to preserve DSGVO trail."
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Audit log unavailable; superuser bypass denied.",
+            )
+        return audit_log
+
+    @staticmethod
+    def log_admin_cross_owner(
+        db: Session,
+        admin: "User",
+        resource_type: str,
+        resource_id: Optional[Any],
+        action: str,
+        owner_user_id: int,
+        request: Optional[Request] = None,
+    ) -> AuditLog:
+        """
+        Log a same-institution-admin acting on a resource owned by another user.
+
+        Same DSGVO contract as log_superuser_bypass: if the audit log can not be
+        persisted, raise HTTPException 500 so the cross-owner action is aborted
+        rather than completed without an audit trail.
+        """
+        from fastapi import HTTPException
+
+        audit_log = AuditService.log_action(
+            db=db,
+            action=AuditService.ACTION_ADMIN_CROSS_OWNER,
+            user_id=admin.id,
+            resource_type=resource_type,
+            resource_id=str(resource_id) if resource_id is not None else None,
+            additional_data={
+                "bypassed_action": action,
+                "owner_user_id": owner_user_id,
+                "admin_email": admin.email,
+            },
+            request=request,
+        )
+        if audit_log is None:
+            logger.critical(
+                "Admin cross-owner action refused: audit log persistence failed "
+                f"(admin={admin.id}, resource={resource_type}:{resource_id}, "
+                f"action={action}, owner={owner_user_id}). Action aborted to preserve "
+                "DSGVO trail."
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Audit log unavailable; admin cross-owner action denied.",
+            )
+        return audit_log
 
     @staticmethod
     def log_permission_denied(

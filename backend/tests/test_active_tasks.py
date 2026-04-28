@@ -24,10 +24,11 @@ from main import app
 
 @pytest.fixture
 def mock_user():
-    """Authenticated user mock."""
+    """Authenticated user mock (non-superuser)."""
     user = Mock()
     user.id = 7
     user.email = "tester@example.com"
+    user.is_superuser = False
     return user
 
 
@@ -78,10 +79,16 @@ class TestGetActiveTasks:
     """Unit-level tests for the /active-tasks endpoint."""
 
     def _setup_db_query(self, mock_db, jobs: list):
-        """Wire mock_db.query(...).filter(...).all() to return *jobs*."""
+        """Wire mock_db.query(...).filter(...).all() to return *jobs*.
+
+        Code path for non-superusers chains two .filter() calls (status/age,
+        then user_id), so we wire both filter levels to the same .all() result.
+        """
         query_mock = MagicMock()
         filter_mock = MagicMock()
         filter_mock.all.return_value = jobs
+        # Inner filter (user_id) returns a chain whose .all() is also jobs
+        filter_mock.filter.return_value.all.return_value = jobs
         query_mock.filter.return_value = filter_mock
         mock_db.query.return_value = query_mock
 
@@ -262,6 +269,64 @@ class TestGetActiveTasks:
         task = response.json()["tasks"][0]
         assert task["topic"] is None
         assert task["question_count"] is None
+
+
+class TestActiveTasksSuperuser:
+    """Superuser-Bypass für /active-tasks: alle aktiven Jobs + Audit-Log."""
+
+    @pytest.fixture
+    def super_user(self):
+        u = Mock()
+        u.id = 99
+        u.email = "admin@s.ch"
+        u.is_superuser = True
+        return u
+
+    @pytest.fixture
+    def super_client(self, super_user, mock_db):
+        from utils.auth_utils import get_current_active_user
+        from database import get_db
+
+        app.dependency_overrides[get_current_active_user] = lambda: super_user
+        app.dependency_overrides[get_db] = lambda: mock_db
+        with TestClient(app) as c:
+            yield c
+        app.dependency_overrides.clear()
+
+    def test_superuser_lists_all_active_jobs_and_logs_bypass(
+        self, super_client, mock_db
+    ):
+        """Superuser sieht Jobs von allen Usern; ein Bypass-Audit-Log entsteht."""
+        foreign_job = _make_job("task-foreign", user_id=42)
+        own_job = _make_job("task-own", user_id=99)
+
+        # Build query chain — superuser branch does NOT filter by user_id
+        query_chain = MagicMock()
+        query_chain.filter.return_value.all.return_value = [foreign_job, own_job]
+        mock_db.query.return_value = query_chain
+
+        with (
+            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.audit_service.AuditService") as mock_audit,
+        ):
+            mock_result = Mock()
+            mock_result.state = "PENDING"
+            mock_result.info = {}
+            mock_ar_cls.return_value = mock_result
+            mock_audit.log_superuser_bypass.return_value = Mock()
+
+            response = super_client.get("/api/v1/rag/active-tasks")
+
+        assert response.status_code == 200
+        task_ids = [t["task_id"] for t in response.json()["tasks"]]
+        assert "task-foreign" in task_ids
+        assert "task-own" in task_ids
+
+        mock_audit.log_superuser_bypass.assert_called_once()
+        kwargs = mock_audit.log_superuser_bypass.call_args.kwargs
+        assert kwargs["resource_type"] == "question_generation_job_list"
+        assert kwargs["action"] == "list_all_active"
+        assert kwargs["request"] is not None  # http_request forwarded
 
 
 class TestPhantomJobFiltering:

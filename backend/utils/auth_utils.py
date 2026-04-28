@@ -3,6 +3,7 @@ Authentication Utilities für FastAPI
 Dependencies für Token Validation und User Authentication
 """
 
+import logging
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -11,6 +12,8 @@ from sqlalchemy.orm import Session, joinedload
 from database import get_db
 from models.auth import User, UserStatus
 from services.auth_service import AuthService
+
+logger = logging.getLogger(__name__)
 
 # HTTP Bearer Token Security Scheme
 security = HTTPBearer()
@@ -199,6 +202,85 @@ def require_permission(required_permission: str):
         return current_user
 
     return permission_checker
+
+
+def enforce_resource_access(
+    obj,
+    user: User,
+    action: str,
+    db: Session,
+    resource_type: str,
+    owner_field: str = "user_id",
+    request=None,
+) -> None:
+    """
+    Enforce that user owns obj, or is superuser (which gets logged).
+
+    Behavior:
+        - obj is None                               → HTTPException 404
+        - obj has no <owner_field> attribute        → HTTPException 500
+        - obj.<owner_field> is None (orphan)        → return + warning log
+        - obj.<owner_field> == user.id              → return
+        - user.is_superuser                         → return + audit log
+        - else                                      → HTTPException 403
+
+    Orphan resources (owner_id is None) arise legitimately when a User row is
+    soft-deleted via ON DELETE SET NULL. They are intentionally allowed for
+    any authenticated user — treated as institution-shared. If you need
+    stricter handling for a specific resource type, do not use this helper.
+
+    Args:
+        obj: The resource object to check (must have id and owner_field attributes).
+        user: The authenticated user requesting access.
+        action: Concrete action being performed (e.g. "process", "delete", "view").
+        db: SQLAlchemy session, used for audit log.
+        resource_type: Audit-log resource type (e.g. "document", "chat_session").
+        owner_field: Attribute name on obj holding the owner user_id.
+        request: Optional FastAPI Request for IP/user-agent in audit log.
+
+    Raises:
+        HTTPException 404 if obj is None.
+        HTTPException 500 if obj does not have the requested owner_field
+            (programmer error — caller passed wrong owner_field or model
+            schema drifted; safer to fail loud than silently grant access).
+        HTTPException 403 if user is neither owner nor superuser.
+    """
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
+
+    if not hasattr(obj, owner_field):
+        logger.error(
+            f"enforce_resource_access: {type(obj).__name__} has no attribute "
+            f"{owner_field!r} — programmer error or schema drift"
+        )
+        raise HTTPException(status_code=500, detail="Internal authorization error")
+
+    owner_id = getattr(obj, owner_field)
+    if owner_id is None:
+        logger.warning(
+            f"Orphan {resource_type} {getattr(obj, 'id', '?')} accessed by "
+            f"user {user.id} (action={action!r})"
+        )
+        return
+
+    if owner_id == user.id:
+        return
+
+    if user.is_superuser:
+        from services.audit_service import AuditService
+
+        AuditService.log_superuser_bypass(
+            db=db,
+            superuser=user,
+            resource_type=resource_type,
+            resource_id=getattr(obj, "id", None),
+            action=action,
+            owner_user_id=owner_id,
+            request=request,
+        )
+        return
+
+    raise HTTPException(status_code=403, detail="Access denied")
 
 
 async def get_optional_user(
