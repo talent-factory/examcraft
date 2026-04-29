@@ -917,11 +917,16 @@
       "fieldExamDate": "Exam Date",
       "fieldTimeLimit": "Time Limit (minutes)",
       "fieldAllowedAids": "Allowed Aids",
+      "fieldDocuments": "Source Documents (optional)",
+      "fieldDocumentsPlaceholder": "Search and select documents...",
+      "fieldDocumentsHint": "Question pool will be restricted to the selected documents",
       "cancel": "Cancel",
       "creating": "Creating...",
       "create": "Create",
       "errorCreate": "Could not create exam. Please try again.",
-      "errorDelete": "Could not delete exam. Please try again."
+      "errorDelete": "Could not delete exam. Please try again.",
+      "deleteDialogTitle": "Delete Exam",
+      "deleteDialogMessage": "This exam will be permanently deleted."
     },
     "examMetadata": {
       "statusDraft": "Draft",
@@ -982,6 +987,9 @@
       "panelTitle": "Question Pool",
       "autoFill": "Auto-Fill",
       "searchPlaceholder": "Search questions...",
+      "documentFilterLabel": "Document filter",
+      "documentFilterAll": "All documents",
+      "documentFilterRemove": "Remove",
       "loading": "Loading questions...",
       "empty": "No approved questions found.",
       "available": "{{count}} questions available",

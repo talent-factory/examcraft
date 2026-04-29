@@ -139,7 +139,11 @@ async def upload_document(
             current_user.id,
             document.id,
             request=http_request,
-            additional_data={"original_filename": document.original_filename, "filename": document.filename, "task_id": task.id},
+            additional_data={
+                "original_filename": document.original_filename,
+                "filename": document.filename,
+                "task_id": task.id,
+            },
         )
 
         return UploadResponse(

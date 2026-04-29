@@ -228,7 +228,13 @@ def _persist_questions(
         Liste der generierten QuestionReview-IDs
     """
     from database import SessionLocal
-    from models.question_review import QuestionReview, ReviewHistory, ReviewStatus
+    from models.document import Document
+    from models.question_review import (
+        QuestionReview,
+        QuestionSourceDocument,
+        ReviewHistory,
+        ReviewStatus,
+    )
     from utils.question_options import normalize_options
 
     db = SessionLocal()
@@ -275,6 +281,17 @@ def _persist_questions(
 
         db.flush()
 
+        # Build filename→document_id lookup for this institution (best-effort)
+        if institution_id is not None:
+            all_docs = (
+                db.query(Document.id, Document.original_filename)
+                .filter(Document.institution_id == institution_id)
+                .all()
+            )
+            filename_to_doc_id = {d.original_filename: d.id for d in all_docs}
+        else:
+            filename_to_doc_id = {}
+
         review_ids = []
         for question_review in reviews:
             history = ReviewHistory(
@@ -286,6 +303,16 @@ def _persist_questions(
             )
             db.add(history)
             review_ids.append(question_review.id)
+
+            # Link to source documents in the normalised join table
+            for fname in question_review.source_documents or []:
+                doc_id = filename_to_doc_id.get(fname)
+                if doc_id:
+                    db.merge(
+                        QuestionSourceDocument(
+                            question_id=question_review.id, document_id=doc_id
+                        )
+                    )
 
         db.commit()
         return review_ids

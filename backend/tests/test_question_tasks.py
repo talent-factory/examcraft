@@ -661,12 +661,30 @@ def _capture_persisted_options(fake_question):
 
     captured: list = []
 
+    class _EmptyQuery:
+        """Tiny chainable stub for the Document filename→id lookup path
+        introduced by TF-321. Returns no documents so the QuestionSourceDocument
+        merge loop is a no-op — these tests focus on options normalization."""
+
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def all(self):
+            return []
+
     class _StubSession:
         def add(self, obj):
             # Capture the first QuestionReview only — ReviewHistory rows
             # come through later in the same loop and don't carry options.
             if obj.__class__.__name__ == "QuestionReview":
                 captured.append(obj.options)
+
+        def query(self, *_args, **_kwargs):
+            return _EmptyQuery()
+
+        def merge(self, obj):
+            # TF-321 QuestionSourceDocument merge — no-op for these tests.
+            return obj
 
         def flush(self):
             # Simulate the autoincrement IDs the real DB would assign so the

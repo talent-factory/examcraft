@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     CheckConstraint,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -43,6 +44,7 @@ class Exam(Base):
         String(20), default=ExamStatus.DRAFT.value, nullable=False, index=True
     )
     language = Column(String(10), default="de", nullable=False)
+    default_document_ids = Column(JSON, nullable=True)  # List[int] | null
 
     institution_id = Column(
         Integer,

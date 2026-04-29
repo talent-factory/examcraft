@@ -917,11 +917,16 @@
       "fieldExamDate": "Prüfungsdatum",
       "fieldTimeLimit": "Zeitlimit (Minuten)",
       "fieldAllowedAids": "Erlaubte Hilfsmittel",
+      "fieldDocuments": "Quelldokumente (optional)",
+      "fieldDocumentsPlaceholder": "Dokumente suchen und auswählen...",
+      "fieldDocumentsHint": "Fragenpool wird auf die gewählten Dokumente eingeschränkt",
       "cancel": "Abbrechen",
       "creating": "Erstelle...",
       "create": "Erstellen",
       "errorCreate": "Prüfung konnte nicht erstellt werden. Bitte versuche es erneut.",
-      "errorDelete": "Prüfung konnte nicht gelöscht werden. Bitte versuche es erneut."
+      "errorDelete": "Prüfung konnte nicht gelöscht werden. Bitte versuche es erneut.",
+      "deleteDialogTitle": "Prüfung löschen",
+      "deleteDialogMessage": "Diese Prüfung wird unwiderruflich gelöscht."
     },
     "examMetadata": {
       "statusDraft": "Entwurf",
@@ -982,6 +987,9 @@
       "panelTitle": "Fragenpool",
       "autoFill": "Auto-Fill",
       "searchPlaceholder": "Fragen durchsuchen...",
+      "documentFilterLabel": "Dokumentfilter",
+      "documentFilterAll": "Alle Dokumente",
+      "documentFilterRemove": "Entfernen",
       "loading": "Lade Fragen...",
       "empty": "Keine genehmigten Fragen gefunden.",
       "available": "{{count}} Fragen verfügbar",

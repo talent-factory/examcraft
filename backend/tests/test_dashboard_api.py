@@ -1,13 +1,14 @@
 # core/backend/tests/test_dashboard_api.py
 """Tests für Dashboard API (TF-319)"""
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+import json
+
 from main import app
-from models.auth import Institution, User, UserStatus
-from models.document import Document, DocumentStatus
+from models.auth import AuditLog, Institution, User, UserStatus
+from models.document import Document
 from models.question_review import QuestionReview, ReviewStatus
 from models.exam import Exam
 from utils.auth_utils import get_current_active_user
@@ -17,6 +18,7 @@ from database import get_db
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_institution(test_db: Session, name: str = "Test Inst") -> Institution:
     inst = Institution(
@@ -47,7 +49,9 @@ def make_user(test_db: Session, institution_id: int, email: str = "u@test.ch") -
     return user
 
 
-def make_document(test_db: Session, institution_id: int, user_id: int, filename: str = "doc.pdf") -> Document:
+def make_document(
+    test_db: Session, institution_id: int, user_id: int, filename: str = "doc.pdf"
+) -> Document:
     doc = Document(
         filename=filename,
         original_filename=filename,
@@ -59,11 +63,31 @@ def make_document(test_db: Session, institution_id: int, user_id: int, filename:
     )
     test_db.add(doc)
     test_db.flush()
+    # Mirror what AuditService.log_document_action does in production: the
+    # dashboard activity feed reads from AuditLog (so deleted documents stay
+    # visible in history), so without this row the activity query returns
+    # nothing and dashboard tests report 0 items.
+    test_db.add(
+        AuditLog(
+            user_id=user_id,
+            action="create_document",
+            resource_type="document",
+            resource_id=str(doc.id),
+            status="success",
+            additional_data=json.dumps({"original_filename": filename}),
+        )
+    )
+    test_db.flush()
     return doc
 
 
-def make_question(test_db: Session, institution_id: int, user_id: int,
-                  status: str = ReviewStatus.PENDING.value, topic: str = "Mathe") -> QuestionReview:
+def make_question(
+    test_db: Session,
+    institution_id: int,
+    user_id: int,
+    status: str = ReviewStatus.PENDING.value,
+    topic: str = "Mathe",
+) -> QuestionReview:
     q = QuestionReview(
         question_text="Was ist 2+2?",
         question_type="open_ended",
@@ -76,16 +100,42 @@ def make_question(test_db: Session, institution_id: int, user_id: int,
     )
     test_db.add(q)
     test_db.flush()
+    # Approved questions show up in the activity feed via AuditLog; mirror that.
+    if status == ReviewStatus.APPROVED.value:
+        test_db.add(
+            AuditLog(
+                user_id=user_id,
+                action="approve_question",
+                resource_type="question",
+                resource_id=str(q.id),
+                status="success",
+                additional_data=json.dumps({"topic": topic}),
+            )
+        )
+        test_db.flush()
     return q
 
 
-def make_exam(test_db: Session, institution_id: int, user_id: int, title: str = "Prüfung 1") -> Exam:
+def make_exam(
+    test_db: Session, institution_id: int, user_id: int, title: str = "Prüfung 1"
+) -> Exam:
     exam = Exam(
         title=title,
         institution_id=institution_id,
         created_by=user_id,
     )
     test_db.add(exam)
+    test_db.flush()
+    test_db.add(
+        AuditLog(
+            user_id=user_id,
+            action="create_exam",
+            resource_type="exam",
+            resource_id=str(exam.id),
+            status="success",
+            additional_data=json.dumps({"title": title}),
+        )
+    )
     test_db.flush()
     return exam
 
@@ -114,8 +164,8 @@ def make_dashboard_client(test_db: Session, institution_id: int, user_id: int):
 # Stats Tests
 # ---------------------------------------------------------------------------
 
-class TestDashboardStats:
 
+class TestDashboardStats:
     def test_stats_returns_zeros_for_empty_institution(self, test_db: Session):
         """Leere Institution → alle Werte 0."""
         inst = make_institution(test_db, "Empty Inst")
@@ -180,7 +230,6 @@ class TestDashboardStats:
 
 
 class TestDashboardActivity:
-
     def test_activity_empty(self, test_db: Session):
         """Keine Daten → leere Liste."""
         inst = make_institution(test_db, "Empty Act")
@@ -196,12 +245,16 @@ class TestDashboardActivity:
         finally:
             app.dependency_overrides.clear()
 
-    def test_activity_returns_max_10(self, test_db: Session):
-        """Mehr als 10 Datensätze → nur 10 werden zurückgegeben."""
+    def test_activity_returns_max_25(self, test_db: Session):
+        """Mehr als 25 Datensätze → nur 25 werden zurückgegeben.
+
+        Limit wurde mit dem TF-319 Follow-up-Commit von 10 auf 25 erhöht;
+        die Aktivitätsliste fasst per Aktivitätstyp jeweils 25 Einträge.
+        """
         inst = make_institution(test_db, "Many Act")
         user = make_user(test_db, inst.id, "manyact@test.ch")
 
-        for i in range(15):
+        for i in range(30):
             make_document(test_db, inst.id, user.id, f"doc{i}.pdf")
         test_db.commit()
 
@@ -210,7 +263,7 @@ class TestDashboardActivity:
             resp = client.get("/api/dashboard/activity")
             assert resp.status_code == 200
             data = resp.json()
-            assert len(data["activities"]) == 10
+            assert len(data["activities"]) == 25
         finally:
             app.dependency_overrides.clear()
 

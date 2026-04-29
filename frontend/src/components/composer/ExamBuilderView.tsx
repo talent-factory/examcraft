@@ -125,6 +125,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
             examId={examId}
             disabled={!isDraft}
             onInvalidate={invalidateExam}
+            defaultDocumentIds={exam.default_document_ids ?? []}
           />
         </div>
 

@@ -254,6 +254,7 @@ async def generate_rag_exam(
         )
 
         from services.audit_service import AuditService
+
         AuditService.log_action(
             db,
             action="create_question",
@@ -262,7 +263,10 @@ async def generate_rag_exam(
             resource_type="question",
             resource_id=task_id,
             request=http_request,
-            additional_data={"topic": request.topic, "question_count": request.question_count},
+            additional_data={
+                "topic": request.topic,
+                "question_count": request.question_count,
+            },
         )
 
         return GenerateExamTaskResponse(

@@ -58,22 +58,24 @@ def get_dashboard_stats(
             generated_questions=0, documents=0, validated_questions=0, exams=0
         )
 
-    generated = db.query(QuestionReview).filter(
-        QuestionReview.institution_id == institution_id
-    ).count()
+    generated = (
+        db.query(QuestionReview)
+        .filter(QuestionReview.institution_id == institution_id)
+        .count()
+    )
 
-    docs = db.query(Document).filter(
-        Document.institution_id == institution_id
-    ).count()
+    docs = db.query(Document).filter(Document.institution_id == institution_id).count()
 
-    validated = db.query(QuestionReview).filter(
-        QuestionReview.institution_id == institution_id,
-        QuestionReview.review_status == ReviewStatus.APPROVED.value,
-    ).count()
+    validated = (
+        db.query(QuestionReview)
+        .filter(
+            QuestionReview.institution_id == institution_id,
+            QuestionReview.review_status == ReviewStatus.APPROVED.value,
+        )
+        .count()
+    )
 
-    exams = db.query(Exam).filter(
-        Exam.institution_id == institution_id
-    ).count()
+    exams = db.query(Exam).filter(Exam.institution_id == institution_id).count()
 
     return DashboardStatsResponse(
         generated_questions=generated,
@@ -114,15 +116,19 @@ def get_dashboard_activity(
             if log.additional_data:
                 try:
                     data = json.loads(log.additional_data)
-                    title = data.get("original_filename") or data.get("filename") or title
+                    title = (
+                        data.get("original_filename") or data.get("filename") or title
+                    )
                 except (json.JSONDecodeError, AttributeError):
                     pass
-            items.append(ActivityItem(
-                id=f"doc_{log.id}",
-                type="document_uploaded",
-                title=title,
-                timestamp=_to_utc(log.created_at),
-            ))
+            items.append(
+                ActivityItem(
+                    id=f"doc_{log.id}",
+                    type="document_uploaded",
+                    title=title,
+                    timestamp=_to_utc(log.created_at),
+                )
+            )
 
     # 2. Fragen generiert (QuestionReview-Tabelle, nach Erstellungsdatum)
     questions = (
@@ -134,12 +140,14 @@ def get_dashboard_activity(
     )
     for q in questions:
         if q.created_at:
-            items.append(ActivityItem(
-                id=f"qgen_{q.id}",
-                type="questions_generated",
-                title=q.topic or str(q.id),
-                timestamp=_to_utc(q.created_at),
-            ))
+            items.append(
+                ActivityItem(
+                    id=f"qgen_{q.id}",
+                    type="questions_generated",
+                    title=q.topic or str(q.id),
+                    timestamp=_to_utc(q.created_at),
+                )
+            )
 
     # 3. Fragen validiert (aus AuditLog, damit gelöschte Fragen sichtbar bleiben)
     qapproved_logs = (
@@ -165,18 +173,22 @@ def get_dashboard_activity(
                     pass
             if title == str(log.resource_id):
                 try:
-                    q = db.query(QuestionReview).filter(
-                        QuestionReview.id == int(log.resource_id)
-                    ).first()
+                    q = (
+                        db.query(QuestionReview)
+                        .filter(QuestionReview.id == int(log.resource_id))
+                        .first()
+                    )
                     title = q.topic if (q and q.topic) else "–"
                 except (ValueError, TypeError):
                     title = "–"
-            items.append(ActivityItem(
-                id=f"qapproved_{log.id}",
-                type="question_approved",
-                title=title,
-                timestamp=_to_utc(log.created_at),
-            ))
+            items.append(
+                ActivityItem(
+                    id=f"qapproved_{log.id}",
+                    type="question_approved",
+                    title=title,
+                    timestamp=_to_utc(log.created_at),
+                )
+            )
 
     # 4. Prüfungen erstellt (aus AuditLog, damit gelöschte Prüfungen sichtbar bleiben)
     exam_logs = (
@@ -200,12 +212,14 @@ def get_dashboard_activity(
                     title = data.get("title") or title
                 except (json.JSONDecodeError, AttributeError):
                     pass
-            items.append(ActivityItem(
-                id=f"exam_{log.id}",
-                type="exam_created",
-                title=title,
-                timestamp=_to_utc(log.created_at),
-            ))
+            items.append(
+                ActivityItem(
+                    id=f"exam_{log.id}",
+                    type="exam_created",
+                    title=title,
+                    timestamp=_to_utc(log.created_at),
+                )
+            )
 
     # 5. Fragen abgelehnt (aus AuditLog)
     qrejected_logs = (
@@ -231,18 +245,22 @@ def get_dashboard_activity(
                     pass
             if title == str(log.resource_id):
                 try:
-                    q = db.query(QuestionReview).filter(
-                        QuestionReview.id == int(log.resource_id)
-                    ).first()
+                    q = (
+                        db.query(QuestionReview)
+                        .filter(QuestionReview.id == int(log.resource_id))
+                        .first()
+                    )
                     title = q.topic if (q and q.topic) else "–"
                 except (ValueError, TypeError):
                     title = "–"
-            items.append(ActivityItem(
-                id=f"qrejected_{log.id}",
-                type="question_rejected",
-                title=title,
-                timestamp=_to_utc(log.created_at),
-            ))
+            items.append(
+                ActivityItem(
+                    id=f"qrejected_{log.id}",
+                    type="question_rejected",
+                    title=title,
+                    timestamp=_to_utc(log.created_at),
+                )
+            )
 
     # 6. Prüfungen gelöscht (aus AuditLog)
     exam_deleted_logs = (
@@ -266,12 +284,14 @@ def get_dashboard_activity(
                     title = data.get("title") or title
                 except (json.JSONDecodeError, AttributeError):
                     pass
-            items.append(ActivityItem(
-                id=f"examdeleted_{log.id}",
-                type="exam_deleted",
-                title=title,
-                timestamp=_to_utc(log.created_at),
-            ))
+            items.append(
+                ActivityItem(
+                    id=f"examdeleted_{log.id}",
+                    type="exam_deleted",
+                    title=title,
+                    timestamp=_to_utc(log.created_at),
+                )
+            )
 
     # 7. Dokumente gelöscht (aus AuditLog, gefiltert über User.institution_id)
     deleted_logs = (
@@ -292,15 +312,19 @@ def get_dashboard_activity(
             if log.additional_data:
                 try:
                     data = json.loads(log.additional_data)
-                    title = data.get("original_filename") or data.get("filename") or title
+                    title = (
+                        data.get("original_filename") or data.get("filename") or title
+                    )
                 except (json.JSONDecodeError, AttributeError):
                     pass
-            items.append(ActivityItem(
-                id=f"docdeleted_{log.id}",
-                type="document_deleted",
-                title=title,
-                timestamp=_to_utc(log.created_at),
-            ))
+            items.append(
+                ActivityItem(
+                    id=f"docdeleted_{log.id}",
+                    type="document_deleted",
+                    title=title,
+                    timestamp=_to_utc(log.created_at),
+                )
+            )
 
     items.sort(key=lambda x: x.timestamp, reverse=True)
     return DashboardActivityResponse(activities=items[:25])

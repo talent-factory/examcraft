@@ -8,6 +8,7 @@ import type {
   ApprovedQuestionsResponse,
   AutoFillRequest,
   AutoComposePreview,
+  DocumentWithQuestions,
 } from '../types/composer';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -123,10 +124,22 @@ export class ComposerService {
     bloom_level?: number;
     question_type?: string;
     search?: string;
+    document_ids?: number[];
     limit?: number;
     offset?: number;
   }): Promise<ApprovedQuestionsResponse> {
-    const response = await apiClient.get('/api/v1/exams/approved-questions', { params });
+    const { document_ids, ...rest } = params ?? {};
+    const response = await apiClient.get('/api/v1/exams/approved-questions', {
+      params: {
+        ...rest,
+        ...(document_ids?.length ? { document_ids: document_ids.join(',') } : {}),
+      },
+    });
+    return response.data;
+  }
+
+  static async listDocumentsWithQuestions(): Promise<DocumentWithQuestions[]> {
+    const response = await apiClient.get('/api/v1/exams/documents-with-questions');
     return response.data;
   }
 
