@@ -310,8 +310,13 @@ describe('ComposerService', () => {
 
       await ComposerService.listApprovedQuestions();
 
+      // The service destructures `document_ids` and spreads the rest into a
+      // new params object, so callers without arguments get `params: {}`
+      // (TF-321 introduced this when adding the document_ids array→csv
+      // serialization). axios drops empty params from the URL anyway, so
+      // there's no behavioral difference vs. `undefined`.
       expect(fakeInstance.get).toHaveBeenCalledWith('/api/v1/exams/approved-questions', {
-        params: undefined,
+        params: {},
       });
     });
 

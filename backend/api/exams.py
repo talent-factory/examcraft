@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session, joinedload
 from database import get_db
 from models.exam import Exam, ExamQuestion, ExamStatus
 from models.auth import User
-from models.question_review import QuestionReview, ReviewStatus
+from models.document import Document
+from models.question_review import QuestionReview, ReviewStatus, QuestionSourceDocument
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -50,6 +51,7 @@ class ExamCreate(BaseModel):
     instructions: Optional[str] = None
     passing_percentage: float = Field(50.0, ge=0, le=100)
     language: str = Field("de", pattern="^(de|en)$")
+    default_document_ids: Optional[List[int]] = None
 
 
 class ExamUpdate(BaseModel):
@@ -61,6 +63,7 @@ class ExamUpdate(BaseModel):
     instructions: Optional[str] = None
     passing_percentage: Optional[float] = Field(None, ge=0, le=100)
     language: Optional[str] = Field(None, pattern="^(de|en)$")
+    default_document_ids: Optional[List[int]] = None
     updated_at: datetime = Field(..., description="For optimistic locking")
 
 
@@ -99,6 +102,7 @@ class ExamOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     question_count: int = 0
+    default_document_ids: Optional[List[int]] = None
 
     class Config:
         from_attributes = True
@@ -156,6 +160,7 @@ def _exam_to_out(exam: Exam) -> dict:
         "created_at": exam.created_at,
         "updated_at": exam.updated_at,
         "question_count": len(exam.questions) if exam.questions else 0,
+        "default_document_ids": exam.default_document_ids,
     }
 
 
@@ -206,6 +211,7 @@ async def create_exam(
         language=request.language,
         institution_id=current_user.institution_id,
         created_by=current_user.id,
+        default_document_ids=request.default_document_ids,
     )
     db.add(exam)
     try:
@@ -220,6 +226,20 @@ async def create_exam(
         logger.error("Database error in create_exam: %s", exc)
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     logger.info(f"Created exam {exam.id} by user {current_user.id}")
+
+    from services.audit_service import AuditService
+
+    AuditService.log_action(
+        db,
+        action="create_exam",
+        status=AuditService.STATUS_SUCCESS,
+        user_id=current_user.id,
+        resource_type="exam",
+        resource_id=str(exam.id),
+        request=http_request,
+        additional_data={"title": exam.title},
+    )
+
     return _exam_to_out(exam)
 
 
@@ -273,6 +293,56 @@ class ApprovedQuestionsListOut(BaseModel):
     questions: List[ApprovedQuestionOut]
 
 
+class DocumentWithQuestionsOut(BaseModel):
+    id: int
+    title: str
+    approved_question_count: int
+
+
+@router.get("/documents-with-questions", response_model=List[DocumentWithQuestionsOut])
+async def list_documents_with_questions(
+    current_user: User = Depends(require_permission("create_exams")),
+    db: Session = Depends(get_db),
+):
+    """Return all documents of the institution.
+    approved_question_count is 0 for documents with no approved questions yet."""
+    from sqlalchemy import case as sa_case
+
+    results = (
+        db.query(
+            Document.id,
+            Document.original_filename,
+            sa_func.count(
+                sa_case(
+                    (
+                        QuestionReview.review_status == ReviewStatus.APPROVED.value,
+                        QuestionReview.id,
+                    ),
+                    else_=None,
+                )
+            ).label("approved_question_count"),
+        )
+        .outerjoin(
+            QuestionSourceDocument, QuestionSourceDocument.document_id == Document.id
+        )
+        .outerjoin(
+            QuestionReview, QuestionReview.id == QuestionSourceDocument.question_id
+        )
+        .filter(Document.institution_id == current_user.institution_id)
+        .group_by(Document.id, Document.original_filename)
+        .order_by(Document.original_filename)
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "title": r.original_filename,
+            "approved_question_count": r.approved_question_count,
+        }
+        for r in results
+    ]
+
+
 @router.get("/approved-questions", response_model=ApprovedQuestionsListOut)
 async def list_approved_questions(
     topic: Optional[str] = None,
@@ -282,6 +352,9 @@ async def list_approved_questions(
         None, pattern="^(multiple_choice|open_ended|true_false)$"
     ),
     search: Optional[str] = Query(None, max_length=500),
+    document_ids: Optional[str] = Query(
+        None, description="Comma-separated document IDs"
+    ),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(require_permission("create_exams")),
@@ -304,6 +377,15 @@ async def list_approved_questions(
         query = query.filter(QuestionReview.question_type == question_type)
     if search:
         query = query.filter(QuestionReview.question_text.ilike(f"%{search}%"))
+    if document_ids:
+        parsed_ids = [int(i) for i in document_ids.split(",") if i.strip().isdigit()]
+        if parsed_ids:
+            linked_ids_select = (
+                db.query(QuestionSourceDocument.question_id)
+                .filter(QuestionSourceDocument.document_id.in_(parsed_ids))
+                .distinct()
+            )
+            query = query.filter(QuestionReview.id.in_(linked_ids_select))
 
     total = query.count()
     questions = (
@@ -405,6 +487,7 @@ async def delete_exam(
     locale = get_request_locale(request, current_user)
     exam = _get_exam_or_404(exam_id, db, current_user, locale)
     _require_draft(exam, locale)
+    exam_title = exam.title
     db.delete(exam)
     try:
         db.commit()
@@ -417,6 +500,19 @@ async def delete_exam(
         logger.error("Database error in delete_exam for exam %s: %s", exam_id, exc)
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     logger.info(f"Deleted exam {exam_id} by user {current_user.id}")
+
+    from services.audit_service import AuditService
+
+    AuditService.log_action(
+        db,
+        action="delete_exam",
+        status=AuditService.STATUS_SUCCESS,
+        user_id=current_user.id,
+        resource_type="exam",
+        resource_id=str(exam_id),
+        request=request,
+        additional_data={"title": exam_title},
+    )
 
 
 # --- Question Management Schemas ---
@@ -675,6 +771,7 @@ class AutoFillRequest(BaseModel):
     bloom_level_min: Optional[int] = Field(None, ge=1, le=6)
     question_types: Optional[List[str]] = None
     exclude_question_ids: Optional[List[int]] = None
+    document_ids: Optional[List[int]] = None
 
     # Composition mode fields
     target_points: Optional[float] = Field(None, gt=0)
@@ -805,6 +902,13 @@ def _build_candidate_query(
         query = query.filter(QuestionReview.bloom_level >= request.bloom_level_min)
     if request.question_types:
         query = query.filter(QuestionReview.question_type.in_(request.question_types))
+    if request.document_ids:
+        linked_ids = (
+            db.query(QuestionSourceDocument.question_id)
+            .filter(QuestionSourceDocument.document_id.in_(request.document_ids))
+            .distinct()
+        )
+        query = query.filter(QuestionReview.id.in_(linked_ids))
 
     return query
 

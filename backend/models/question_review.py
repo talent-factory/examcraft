@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     JSON,
     CheckConstraint,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -101,6 +102,11 @@ class QuestionReview(Base):
     )
     history = relationship(
         "ReviewHistory", back_populates="question", cascade="all, delete-orphan"
+    )
+    source_document_links = relationship(
+        "QuestionSourceDocument",
+        cascade="all, delete-orphan",
+        back_populates="question",
     )
 
     # Table constraints
@@ -194,3 +200,27 @@ class ReviewHistory(Base):
 
     def __repr__(self):
         return f"<ReviewHistory(id={self.id}, question_id={self.question_id}, action={self.action})>"
+
+
+class QuestionSourceDocument(Base):
+    """Join table linking QuestionReview to Document (normalised source_documents)."""
+
+    __tablename__ = "question_source_documents"
+
+    id = Column(Integer, primary_key=True)
+    question_id = Column(
+        Integer,
+        ForeignKey("question_reviews.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    document_id = Column(
+        Integer,
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    # Relationships
+    question = relationship("QuestionReview", back_populates="source_document_links")
+
+    __table_args__ = (UniqueConstraint("question_id", "document_id"),)

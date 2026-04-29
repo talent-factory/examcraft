@@ -200,7 +200,11 @@ async def generate_rag_exam(
                 detail=t("rag_no_institution", locale=locale),
             )
         SubscriptionLimits.check_question_limit(
-            current_user.institution, db, additional_count=request.question_count
+            current_user.institution,
+            db,
+            additional_count=request.question_count,
+            user=current_user,
+            request=http_request,
         )
 
         rag_request = RAGExamRequest(
@@ -249,6 +253,22 @@ async def generate_rag_exam(
             f"user={current_user.id}, topic='{request.topic}'"
         )
 
+        from services.audit_service import AuditService
+
+        AuditService.log_action(
+            db,
+            action="create_question",
+            status=AuditService.STATUS_SUCCESS,
+            user_id=current_user.id,
+            resource_type="question",
+            resource_id=task_id,
+            request=http_request,
+            additional_data={
+                "topic": request.topic,
+                "question_count": request.question_count,
+            },
+        )
+
         return GenerateExamTaskResponse(
             task_id=task_id,
             message="Fragengenerierung gestartet",
@@ -281,10 +301,7 @@ async def retry_generation(
     try:
         original_job = (
             db.query(QuestionGenerationJob)
-            .filter(
-                QuestionGenerationJob.task_id == task_id,
-                QuestionGenerationJob.user_id == current_user.id,
-            )
+            .filter(QuestionGenerationJob.task_id == task_id)
             .first()
         )
 
@@ -292,6 +309,18 @@ async def retry_generation(
             raise HTTPException(
                 status_code=404, detail=t("rag_task_not_found", locale=locale)
             )
+
+        # Owner-Check (Superuser-Bypass mit Audit-Log)
+        from utils.auth_utils import enforce_resource_access
+
+        enforce_resource_access(
+            obj=original_job,
+            user=current_user,
+            action="retry",
+            db=db,
+            resource_type="question_generation_job",
+            request=http_request,
+        )
 
         if original_job.status not in ("FAILURE", "REVOKED"):
             raise HTTPException(
@@ -309,20 +338,41 @@ async def retry_generation(
 
         from utils.tenant_utils import SubscriptionLimits
 
-        if not current_user.institution:
+        # Preserve original ownership across retries. For owner-driven retries
+        # this is a no-op (original_user is current_user). For superuser-bypass
+        # retries this is critical: the original job's request_data is scoped
+        # to the original institution (exam_id, document filenames), so
+        # creating the new job under the superuser's user/institution would
+        # silently move quota consumption and resulting QuestionReview rows
+        # into the wrong institution.
+        if original_job.user_id == current_user.id:
+            owner_user = current_user
+        else:
+            owner_user = db.query(User).filter(User.id == original_job.user_id).first()
+            if owner_user is None or owner_user.institution is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=t("rag_retry_owner_unavailable", locale=locale),
+                )
+
+        if not owner_user.institution:
             raise HTTPException(
                 status_code=403, detail=t("rag_no_institution", locale=locale)
             )
 
         question_count = original_job.request_data.get("question_count", 5)
         SubscriptionLimits.check_question_limit(
-            current_user.institution, db, additional_count=question_count
+            owner_user.institution,
+            db,
+            additional_count=question_count,
+            user=owner_user,
+            request=http_request,
         )
 
         new_task_id = str(uuid.uuid4())
         new_job = QuestionGenerationJob(
             task_id=new_task_id,
-            user_id=current_user.id,
+            user_id=owner_user.id,
             topic=original_job.topic,
             question_count=original_job.question_count,
             request_data=original_job.request_data,
@@ -334,8 +384,8 @@ async def retry_generation(
             generate_questions_task.apply_async(
                 args=[
                     original_job.request_data,
-                    str(current_user.id),
-                    current_user.institution_id,
+                    str(owner_user.id),
+                    owner_user.institution_id,
                 ],
                 task_id=new_task_id,
                 queue="question_generation",
@@ -636,36 +686,83 @@ ACTIVE_TASK_MAX_AGE = timedelta(hours=2)
 
 @router.get("/active-tasks", response_model=ActiveTasksResponse)
 async def get_active_tasks(
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Return all active (non-terminal) generation tasks for the current user."""
+    """Return all active (non-terminal) generation tasks.
+
+    Normal users see only their own jobs. Superusers see jobs of all users;
+    the broadening is audit-logged via AuditService.log_superuser_bypass
+    (resource_type="question_generation_job_list", action="list_all_active").
+
+    Defense-in-depth: a job whose DB status is non-terminal but whose Celery
+    state is already terminal (e.g. worker died before ``_update_job_status``
+    committed) is treated as a phantom — excluded from the response and the
+    DB row is synced idempotently via ``_try_update_job_status`` (single attempt
+    only — the watchdog from TF-329 reconciles persistent failures, so the HTTP
+    handler never blocks on the multi-attempt retry loop in ``_update_job_status``).
+    """
     from celery.result import AsyncResult
+
+    from tasks.question_tasks import _try_update_job_status
 
     # created_at is timezone-aware (UTC) — use aware cutoff
     cutoff = datetime.now(timezone.utc) - ACTIVE_TASK_MAX_AGE
-    jobs = (
-        db.query(QuestionGenerationJob)
-        .filter(
-            QuestionGenerationJob.user_id == current_user.id,
-            QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
-            QuestionGenerationJob.created_at > cutoff,
+    if current_user.is_superuser:
+        jobs = (
+            db.query(QuestionGenerationJob)
+            .filter(
+                QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
+                QuestionGenerationJob.created_at > cutoff,
+            )
+            .all()
         )
-        .all()
-    )
+        # Audit only when the bypass actually surfaced a foreign-owned job.
+        # The frontend GenerationTasksContext polls this endpoint on a multi-
+        # second interval; emitting an audit row every poll cycle (most of
+        # which return only the superuser's own jobs) flooded the DSGVO trail
+        # with low-signal entries and obscured genuine cross-owner access
+        # events. Logging on first foreign-job detection per request keeps
+        # the security signal sharp.
+        foreign_owned = [j for j in jobs if j.user_id != current_user.id]
+        if foreign_owned:
+            from services.audit_service import AuditService
+
+            AuditService.log_superuser_bypass(
+                db=db,
+                superuser=current_user,
+                resource_type="question_generation_job_list",
+                resource_id=None,
+                action="list_all_active",
+                owner_user_id=None,
+                request=http_request,
+            )
+    else:
+        jobs = (
+            db.query(QuestionGenerationJob)
+            .filter(
+                QuestionGenerationJob.user_id == current_user.id,
+                QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
+                QuestionGenerationJob.created_at > cutoff,
+            )
+            .all()
+        )
 
     tasks = []
     for job in jobs:
         progress = 0
         message = None
+        celery_state: Optional[str] = None
         try:
             result = AsyncResult(job.task_id)
-            if result.state == "PROGRESS" and isinstance(result.info, dict):
+            celery_state = result.state
+            if celery_state == "PROGRESS" and isinstance(result.info, dict):
                 current = result.info.get("current", 0)
                 total = result.info.get("total", 1)
                 progress = int((current / max(total, 1)) * 100)
                 message = result.info.get("message")
-            elif result.state == "STARTED":
+            elif celery_state == "STARTED":
                 progress = 0
                 message = "Gestartet..."
         except Exception as celery_err:
@@ -674,6 +771,31 @@ async def get_active_tasks(
                 job.task_id,
                 celery_err,
             )
+
+        if celery_state in TERMINAL_STATUSES:
+            logger.info(
+                "Phantom job detected: task_id=%s db_status=%s celery_state=%s — syncing DB",
+                job.task_id,
+                job.status,
+                celery_state,
+            )
+            try:
+                _try_update_job_status(job.task_id, celery_state)
+            except Exception as sync_err:
+                # Includes JobNotFoundError, SQLAlchemyError, OSError. We don't
+                # retry inline — TF-329's watchdog reconciles persistent
+                # failures so the request handler never blocks. ERROR (not
+                # WARNING) so log aggregation surfaces a real DB outage; the
+                # phantom job stays excluded from the response (same effect as
+                # before), but operators see the symptom loudly.
+                logger.error(
+                    "Failed to sync DB status for phantom job %s (celery_state=%s): %s",
+                    job.task_id,
+                    celery_state,
+                    sync_err,
+                    exc_info=True,
+                )
+            continue
 
         tasks.append(
             ActiveTaskInfo(

@@ -25,6 +25,15 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
   const { isAuthenticated, accessToken } = useAuth();
   const [tasks, setTasks] = useState<Record<string, GenerationTaskState>>({});
   const progressRef = useRef<Record<string, Partial<GenerationTaskState>>>({});
+  // Synchronous record of which task_ids have reached a terminal state. Updated
+  // INSIDE `setTasks` updaters (sync) before the React commit phase, so the
+  // sticky-terminal guards in `ws.onmessage`/`ws.onclose` cannot lose a race
+  // against the post-render `useEffect` that would mirror full task state.
+  // The race scenario: server sends FAILURE, then closes the socket in the
+  // same JS turn — `ws.onclose` fires before React re-renders, so a `tasks`-
+  // mirror ref would still show pre-FAILURE state. The Set is the minimal
+  // sync witness needed to make the guards reliable.
+  const terminalTaskIdsRef = useRef<Set<string>>(new Set());
   const wsRef = useRef<Record<string, WebSocket>>({});
   const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -75,7 +84,16 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
         return;
       }
 
+      // Sticky-terminal guard: once a task has reached SUCCESS/FAILURE/REVOKED,
+      // ignore any further messages (eg stale Redis state on reconnect, late
+      // PROGRESS from a worker that doesn't know it failed). The Set check is
+      // synchronous — no React-render race like a `tasks`-mirror ref would have.
+      if (terminalTaskIdsRef.current.has(taskId)) {
+        return;
+      }
+
       if (data.status === 'SUCCESS') {
+        terminalTaskIdsRef.current.add(taskId);
         setTasks((prev) => ({
           ...prev,
           [taskId]: {
@@ -88,6 +106,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
         }));
         delete progressRef.current[taskId];
       } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
+        terminalTaskIdsRef.current.add(taskId);
         setTasks((prev) => ({
           ...prev,
           [taskId]: {
@@ -111,6 +130,16 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
 
     ws.onclose = (event) => {
       delete wsRef.current[taskId];
+
+      // Sticky-terminal guard: if the task already reached a terminal state
+      // (set sync inside the `ws.onmessage` handler before the `setTasks`
+      // call), NEVER reconnect. Reconnecting would re-fetch possibly-stale
+      // Redis state and could overwrite the committed terminal status with
+      // PROGRESS/PENDING from a stale worker.
+      if (terminalTaskIdsRef.current.has(taskId)) {
+        return;
+      }
+
       if (event.code !== 1000 && event.code !== 1001 && retryCount < WS_RECONNECT_MAX_RETRIES) {
         const delay = WS_RECONNECT_BASE_DELAY_MS * Math.pow(2, retryCount);
         setTimeout(() => connectWebSocket(taskId, token, retryCount + 1), delay);

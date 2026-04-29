@@ -3,13 +3,18 @@ Audit Logging Service für ExamCraft AI
 Implementiert Security & GDPR Compliance Logging
 """
 
-from typing import Optional, Dict, Any
-from sqlalchemy.orm import Session
-from fastapi import Request
 import logging
 import json
+import uuid
+from typing import Optional, Dict, Any, TYPE_CHECKING
+
+from sqlalchemy.orm import Session
+from fastapi import Request
 
 from models.auth import AuditLog
+
+if TYPE_CHECKING:
+    from models.auth import User
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +53,8 @@ class AuditService:
     ACTION_API_ACCESS = "api_access"
     ACTION_PERMISSION_DENIED = "permission_denied"
     ACTION_RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
+    ACTION_SUPERUSER_BYPASS = "superuser_bypass"
+    ACTION_ADMIN_CROSS_OWNER = "admin_cross_owner"
 
     # Status Types
     STATUS_SUCCESS = "success"
@@ -103,15 +110,27 @@ class AuditService:
                 if not user_agent:
                     user_agent = request.headers.get("user-agent")
 
-            # Serialize additional data to JSON
+            # Serialize additional data to JSON. If serialization fails we
+            # preserve the original keys (truncated repr) so the audit row
+            # stays diagnostically useful instead of collapsing to a generic
+            # "Failed to serialize data" stub that hides what the caller
+            # intended to log.
             additional_data_json = None
             if additional_data:
                 try:
                     additional_data_json = json.dumps(additional_data)
                 except Exception as e:
-                    logger.warning(f"Failed to serialize additional_data: {e}")
+                    logger.warning(
+                        "Failed to serialize additional_data for action=%s: %s",
+                        action,
+                        e,
+                        exc_info=True,
+                    )
                     additional_data_json = json.dumps(
-                        {"error": "Failed to serialize data"}
+                        {
+                            "_serialization_error": str(e),
+                            "_keys": sorted(str(k) for k in additional_data.keys()),
+                        }
                     )
 
             # Create audit log entry
@@ -141,9 +160,34 @@ class AuditService:
             return audit_log
 
         except Exception as e:
-            logger.error(f"Failed to create audit log: {e}")
-            db.rollback()
-            # Don't raise exception - audit logging should not break application flow
+            # Generate a correlation ID so operators can match this loud log
+            # line to whatever exception trace lands in Sentry / log
+            # aggregation. Returning None preserves the historical contract
+            # for call sites that do not gate a privileged bypass; the
+            # bypass-helpers (log_superuser_bypass / log_admin_cross_owner)
+            # check for None and abort the action with HTTP 500 to keep the
+            # privileged-action audit invariant. Login / password / permission-
+            # denied paths still fail loud in the logs via the error_id below
+            # rather than silently swallowing — they just don't refuse the
+            # user-facing operation when the audit insert fails.
+            error_id = uuid.uuid4().hex
+            logger.error(
+                "Failed to create audit log [error_id=%s, action=%s, user_id=%s, "
+                "resource=%s:%s]: %s",
+                error_id,
+                action,
+                user_id,
+                resource_type,
+                resource_id,
+                e,
+                exc_info=True,
+            )
+            try:
+                db.rollback()
+            except Exception:
+                logger.error(
+                    "Audit-log rollback failed [error_id=%s]", error_id, exc_info=True
+                )
             return None
 
     @staticmethod
@@ -274,6 +318,114 @@ class AuditService:
             error_message=error_message,
             additional_data=additional_data,
         )
+
+    @staticmethod
+    def log_superuser_bypass(
+        db: Session,
+        superuser: "User",
+        resource_type: str,
+        resource_id: Optional[Any],
+        action: str,
+        owner_user_id: Optional[int],
+        request: Optional[Request] = None,
+    ) -> AuditLog:
+        """
+        Log a superuser bypass event (access to foreign owner data or quota override).
+
+        DSGVO-compliance contract: This log MUST be persisted before the bypass
+        proceeds. If the underlying log_action returns None (silent DB failure),
+        this method raises HTTPException 500 to abort the bypass — better to
+        deny access than to bypass without an audit trail.
+
+        Args:
+            db: Database session
+            superuser: User-Object performing the bypass (must have id, email)
+            resource_type: Bypassed resource type ("document", "chat_session", "quota", ...)
+            resource_id: PK of the resource or None for quota bypasses
+            action: Concrete bypassed action ("process", "delete", "ws_subscribe",
+                "list_all", "list_all_active", "override_user_limit",
+                "override_document_limit", "override_question_limit",
+                "override_storage_limit", ...)
+            owner_user_id: ID of original owner (None for quota)
+            request: Optional FastAPI Request for IP/UA extraction
+
+        Returns:
+            Created AuditLog entry (never None — raises on persistence failure)
+
+        Raises:
+            HTTPException 500: If audit log could not be persisted.
+        """
+        from fastapi import HTTPException
+
+        audit_log = AuditService.log_action(
+            db=db,
+            action=AuditService.ACTION_SUPERUSER_BYPASS,
+            user_id=superuser.id,
+            resource_type=resource_type,
+            resource_id=str(resource_id) if resource_id is not None else None,
+            additional_data={
+                "bypassed_action": action,
+                "owner_user_id": owner_user_id,
+                "superuser_email": superuser.email,
+            },
+            request=request,
+        )
+        if audit_log is None:
+            logger.critical(
+                "Superuser bypass refused: audit log persistence failed "
+                f"(superuser={superuser.id}, resource={resource_type}:{resource_id}, "
+                f"action={action}). Bypass aborted to preserve DSGVO trail."
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Audit log unavailable; superuser bypass denied.",
+            )
+        return audit_log
+
+    @staticmethod
+    def log_admin_cross_owner(
+        db: Session,
+        admin: "User",
+        resource_type: str,
+        resource_id: Optional[Any],
+        action: str,
+        owner_user_id: int,
+        request: Optional[Request] = None,
+    ) -> AuditLog:
+        """
+        Log a same-institution-admin acting on a resource owned by another user.
+
+        Same DSGVO contract as log_superuser_bypass: if the audit log can not be
+        persisted, raise HTTPException 500 so the cross-owner action is aborted
+        rather than completed without an audit trail.
+        """
+        from fastapi import HTTPException
+
+        audit_log = AuditService.log_action(
+            db=db,
+            action=AuditService.ACTION_ADMIN_CROSS_OWNER,
+            user_id=admin.id,
+            resource_type=resource_type,
+            resource_id=str(resource_id) if resource_id is not None else None,
+            additional_data={
+                "bypassed_action": action,
+                "owner_user_id": owner_user_id,
+                "admin_email": admin.email,
+            },
+            request=request,
+        )
+        if audit_log is None:
+            logger.critical(
+                "Admin cross-owner action refused: audit log persistence failed "
+                f"(admin={admin.id}, resource={resource_type}:{resource_id}, "
+                f"action={action}, owner={owner_user_id}). Action aborted to preserve "
+                "DSGVO trail."
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Audit log unavailable; admin cross-owner action denied.",
+            )
+        return audit_log
 
     @staticmethod
     def log_permission_denied(

@@ -20,7 +20,9 @@ const HelpWidget: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [tourActive, setTourActive] = useState(false);
   const [tourJustCompleted, setTourJustCompleted] = useState(false);
-  const [modalDismissed, setModalDismissed] = useState(false);
+  const [modalDismissed, setModalDismissed] = useState(() =>
+    localStorage.getItem('ec_onboarding_modal_dismissed') === 'true'
+  );
   const [contextHintDismissed, setContextHintDismissed] = useState(false);
   const [onboardingSteps, setOnboardingSteps] = useState<any[]>([]);
   const [catchUpMode, setCatchUpMode] = useState(false);
@@ -125,12 +127,14 @@ const HelpWidget: React.FC = () => {
   }, [tourActive, tourJustCompleted]);
 
   const handleStartTour = useCallback(async () => {
+    localStorage.setItem('ec_onboarding_modal_dismissed', 'true');
     setModalDismissed(true);
     await completeStep(0);
     setTourActive(true);
   }, [completeStep]);
 
   const handleModalLater = useCallback(() => {
+    localStorage.setItem('ec_onboarding_modal_dismissed', 'true');
     setModalDismissed(true);
   }, []);
 
@@ -316,20 +320,31 @@ const HelpWidget: React.FC = () => {
               </Box>
             )}
 
-            {/* Resume onboarding tour (when tour is in progress but not active) */}
-            {showOnboarding && !tourActive && !tourJustCompleted && onboardingStatus && onboardingStatus.current_step > 0 && onboardingSteps.length > 0 && (
-              <Box sx={{ p: 3 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
+            {/* Tour-Banner — starten (step 0) oder fortsetzen (step > 0).
+                Gate: Banner nur zeigen wenn Modal bereits dismissed oder Tour bereits begonnen,
+                damit Modal und Banner nicht gleichzeitig sichtbar sind. */}
+            {showOnboarding && !tourActive && !tourJustCompleted && onboardingSteps.length > 0 && (modalDismissed || (onboardingStatus?.current_step ?? 0) > 0) && (
+              <Box sx={{ p: 2, m: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+                <Typography variant="body2" gutterBottom>
                   {t('help.onboarding.resumeText', 'Du hast die Einführungstour noch nicht abgeschlossen.')}
                 </Typography>
                 <Button
                   variant="contained"
                   size="small"
                   startIcon={<PlayArrow />}
-                  onClick={() => { setOpen(false); setTourActive(true); }}
+                  onClick={() => {
+                    if (onboardingStatus && onboardingStatus.current_step === 0) {
+                      handleStartTour();
+                    } else {
+                      setOpen(false);
+                      setTourActive(true);
+                    }
+                  }}
                   sx={{ mt: 1 }}
                 >
-                  {t('help.onboarding.resumeButton', 'Tour fortsetzen')}
+                  {onboardingStatus && onboardingStatus.current_step === 0
+                    ? t('help.onboarding.startTour', 'Tour starten')
+                    : t('help.onboarding.resumeButton', 'Tour fortsetzen')}
                 </Button>
               </Box>
             )}

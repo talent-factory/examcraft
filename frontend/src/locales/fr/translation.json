@@ -873,11 +873,16 @@
       "fieldExamDate": "Date de l'examen",
       "fieldTimeLimit": "Limite de temps (minutes)",
       "fieldAllowedAids": "Aides autorisées",
+      "fieldDocuments": "Documents sources (optionnel)",
+      "fieldDocumentsPlaceholder": "Rechercher et sélectionner des documents...",
+      "fieldDocumentsHint": "Le pool de questions sera limité aux documents sélectionnés",
       "cancel": "Annuler",
       "creating": "Création...",
       "create": "Créer",
       "errorCreate": "Impossible de créer l'examen. Veuillez réessayer.",
-      "errorDelete": "Impossible de supprimer l'examen. Veuillez réessayer."
+      "errorDelete": "Impossible de supprimer l'examen. Veuillez réessayer.",
+      "deleteDialogTitle": "Supprimer l'examen",
+      "deleteDialogMessage": "Cet examen sera définitivement supprimé."
     },
     "examMetadata": {
       "statusDraft": "Brouillon",
@@ -938,7 +943,12 @@
       "panelTitle": "Pool de questions",
       "autoFill": "Remplissage auto",
       "searchPlaceholder": "Rechercher des questions...",
+      "documentFilterLabel": "Filtre par document",
+      "documentFilterAll": "Tous les documents",
+      "documentFilterRemove": "Supprimer",
       "loading": "Chargement des questions...",
+      "errorLoadingQuestions": "Impossible de charger les questions.",
+      "errorLoadingDocuments": "Impossible de charger les documents.",
       "empty": "Aucune question approuvée trouvée.",
       "available": "{{count}} questions disponibles",
       "difficultyEasy": "Facile",
@@ -1373,5 +1383,8 @@
         "additionalVariables": "Variables de template supplémentaires"
       }
     }
+  },
+  "help": {
+    "thinking": "Réflexion en cours…"
   }
 }

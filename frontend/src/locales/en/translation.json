@@ -137,7 +137,18 @@
       "generatedQuestions": "Generated Questions",
       "validatedQuestions": "Validated Questions",
       "recentActivity": "Recent Activity",
-      "noActivity": "No activity yet. Start by uploading documents!"
+      "noActivity": "No activity yet. Start by uploading documents!",
+      "activityTypes": {
+        "document_uploaded": "Document uploaded",
+        "questions_generated": "Questions generated",
+        "exam_created": "Exam created",
+        "question_approved": "Question approved",
+        "question_rejected": "Question rejected",
+        "document_deleted": "Document deleted",
+        "exam_deleted": "Exam deleted"
+      },
+      "statsError": "Statistics could not be loaded.",
+      "activityError": "Activities could not be loaded."
     },
     "documents": {
       "title": "Document Library",
@@ -906,11 +917,16 @@
       "fieldExamDate": "Exam Date",
       "fieldTimeLimit": "Time Limit (minutes)",
       "fieldAllowedAids": "Allowed Aids",
+      "fieldDocuments": "Source Documents (optional)",
+      "fieldDocumentsPlaceholder": "Search and select documents...",
+      "fieldDocumentsHint": "Question pool will be restricted to the selected documents",
       "cancel": "Cancel",
       "creating": "Creating...",
       "create": "Create",
       "errorCreate": "Could not create exam. Please try again.",
-      "errorDelete": "Could not delete exam. Please try again."
+      "errorDelete": "Could not delete exam. Please try again.",
+      "deleteDialogTitle": "Delete Exam",
+      "deleteDialogMessage": "This exam will be permanently deleted."
     },
     "examMetadata": {
       "statusDraft": "Draft",
@@ -971,7 +987,12 @@
       "panelTitle": "Question Pool",
       "autoFill": "Auto-Fill",
       "searchPlaceholder": "Search questions...",
+      "documentFilterLabel": "Document filter",
+      "documentFilterAll": "All documents",
+      "documentFilterRemove": "Remove",
       "loading": "Loading questions...",
+      "errorLoadingQuestions": "Could not load questions.",
+      "errorLoadingDocuments": "Could not load documents.",
       "empty": "No approved questions found.",
       "available": "{{count}} questions available",
       "difficultyEasy": "Easy",
@@ -1415,6 +1436,7 @@
     "chatPlaceholder": "Ask a question...",
     "send": "Send",
     "newConversation": "New Conversation",
+    "thinking": "Thinking…",
     "onboarding": {
       "skip": "Skip",
       "next": "Next",

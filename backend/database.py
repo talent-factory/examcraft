@@ -15,8 +15,22 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql://examcraft:examcraft_dev@localhost:5432/examcraft"
 )
 
-# Create SQLAlchemy engine
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+# Engine pool-resilience settings (TF-327): pool_recycle prevents stale
+# connections after Fly internalrouting idle-timeouts (~5-10 min); connect_timeout
+# caps DNS/TCP handshake hangs at 5 s; pool_size=10 + max_overflow=20 give up
+# to 30 concurrent connections PER PROCESS under burst load. With FastAPI
+# workers and Celery workers each opening their own pool, total connections
+# to PG = 30 × (api_workers + celery_workers) — keep this in mind when sizing
+# PG max_connections on Fly. pool_pre_ping (existing) remains as the reactive
+# checkout-time validation.
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=1800,
+    pool_size=10,
+    max_overflow=20,
+    connect_args={"connect_timeout": 5},
+)
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -209,10 +223,21 @@ def _run_migrations_or_create_all():
 
             traceback.print_exc()
             print(f"⚠️  CRITICAL: Alembic migration failed: {e}")
+            # When AUTO_MIGRATE=true, the operator explicitly asked us to apply
+            # migrations on boot. Falling through to Base.metadata.create_all()
+            # would mask the failure: new model tables get created, but
+            # ALTER-style migrations (column adds/renames, data backfills like
+            # TF-330) silently fail to apply. The container would boot a
+            # half-migrated schema and serve traffic. Re-raise so the deploy
+            # pipeline reports the failure instead of producing an inconsistent
+            # production state.
+            if auto_migrate:
+                raise RuntimeError(
+                    f"Alembic migration failed under AUTO_MIGRATE=true: {e}"
+                ) from e
             print(
                 "⚠️  The database schema may be inconsistent. Fix migrations before proceeding."
             )
-            # Still create missing tables, but the warning is loud
 
     Base.metadata.create_all(bind=engine)
     print("Database tables created/verified (create_all fallback)")

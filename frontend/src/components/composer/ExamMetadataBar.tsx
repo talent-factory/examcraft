@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   Dialog,
@@ -8,10 +8,12 @@ import {
   DialogActions,
   TextField,
   Button,
+  Autocomplete,
+  Chip,
 } from '@mui/material';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
 import { getDateLocale } from '../../utils/dateLocale';
-import type { ExamDetail, UpdateExamRequest } from '../../types/composer';
+import type { ExamDetail, UpdateExamRequest, DocumentWithQuestions } from '../../types/composer';
 import { ExamStatus } from '../../types/composer';
 
 interface ExamMetadataBarProps {
@@ -55,7 +57,19 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
     instructions: '',
     passing_percentage: '',
   });
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<number[]>([]);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
+
+  const { data: availableDocuments = [] } = useQuery({
+    queryKey: ['documents-with-questions'],
+    queryFn: () => ComposerService.listDocumentsWithQuestions(),
+    enabled: editOpen,
+  });
+
+  // Derive full objects from IDs once the query resolves
+  const selectedDocuments = availableDocuments.filter((d) =>
+    selectedDocumentIds.includes(d.id)
+  );
 
   const openEdit = () => {
     setForm({
@@ -67,6 +81,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       instructions: exam.instructions || '',
       passing_percentage: exam.passing_percentage?.toString() || '50',
     });
+    setSelectedDocumentIds(exam.default_document_ids ?? []);
     setEditOpen(true);
   };
 
@@ -113,6 +128,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       allowed_aids: form.allowed_aids || undefined,
       instructions: form.instructions || undefined,
       passing_percentage: form.passing_percentage ? parseFloat(form.passing_percentage) : undefined,
+      default_document_ids: selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined,
     };
     updateMutation.mutate(payload);
   };
@@ -259,6 +275,38 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
               inputProps={{ min: 0, max: 100, step: 1 }}
               value={form.passing_percentage}
               onChange={(e) => setForm({ ...form, passing_percentage: e.target.value })}
+            />
+            <Autocomplete
+              multiple
+              options={availableDocuments}
+              getOptionLabel={(doc) => `${doc.title}`}
+              isOptionEqualToValue={(a, b) => a.id === b.id}
+              value={selectedDocuments}
+              onChange={(_, newValue) =>
+                setSelectedDocumentIds(newValue.map((d) => d.id))
+              }
+              renderTags={(value, getTagProps) =>
+                value.map((doc, index) => (
+                  <Chip
+                    label={`${doc.title}`}
+                    size="small"
+                    {...getTagProps({ index })}
+                    key={doc.id}
+                  />
+                ))
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={t('composer.examList.fieldDocuments')}
+                  placeholder={
+                    selectedDocuments.length === 0
+                      ? t('composer.examList.fieldDocumentsPlaceholder')
+                      : ''
+                  }
+                  helperText={t('composer.examList.fieldDocumentsHint')}
+                />
+              )}
             />
           </div>
           {updateMutation.isError && finalizeError && (

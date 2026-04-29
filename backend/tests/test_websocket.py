@@ -36,6 +36,7 @@ def mock_user():
     user.id = 1
     user.email = "test@example.com"
     user.is_active = True
+    user.is_superuser = False
     return user
 
 
@@ -246,6 +247,48 @@ class TestWebSocketProgressUpdates:
                 data = ws.receive_json()
                 assert data["status"] == "FAILURE"
                 assert data["error"] is not None
+
+    def test_connection_closed_on_revoked(
+        self, ws_app, valid_token_payload, mock_user, mock_document
+    ):
+        """REVOKED ist genauso terminal wie FAILURE — der Client darf nach
+        einer REVOKED-Nachricht keine weiteren Updates erhalten. Ohne diesen
+        Test würde eine Regression, die REVOKED aus dem Terminal-Tuple
+        entfernt (z. B. eine "Vereinheitlichung" mit FAILURE), unbemerkt
+        bleiben — der Frontend-Sticky-Terminal-Schutz (TF-328) wäre dann
+        wirkungslos, weil das Backend gar keinen REVOKED-Frame mehr sendet.
+        """
+        with (
+            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.SessionLocal") as mock_session,
+            patch("api.v1.websocket.AsyncResult") as mock_result,
+        ):
+            mock_auth.decode_token.return_value = valid_token_payload
+            mock_auth.is_token_revoked.return_value = False
+
+            mock_db = MagicMock()
+            mock_session.return_value = mock_db
+            mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_user
+            mock_db.query.return_value.filter.return_value.first.return_value = (
+                mock_document
+            )
+
+            mock_task_result = MagicMock()
+            mock_task_result.state = "REVOKED"
+            mock_task_result.info = Exception("Task wurde abgebrochen")
+            mock_task_result.result = None
+            mock_result.return_value = mock_task_result
+
+            client = TestClient(ws_app)
+            with client.websocket_connect("/ws/tasks/test-task-id") as ws:
+                ws.send_json({"token": "valid-token"})
+                data = ws.receive_json()
+                assert data["status"] == "REVOKED"
+                assert data["error"] is not None
+                with pytest.raises(Exception):
+                    # Server muss nach REVOKED schliessen — kein weiterer
+                    # Frame (analog zum SUCCESS- und FAILURE-Verhalten).
+                    ws.receive_json()
 
 
 class TestWebSocketDisconnect:

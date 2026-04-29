@@ -3,7 +3,7 @@ Tenant Isolation Utilities für ExamCraft AI
 Multi-Tenant Data Isolation und Access Control
 """
 
-from typing import Type, TypeVar
+from typing import Optional, Type, TypeVar
 from sqlalchemy.orm import Session, Query
 from sqlalchemy import and_
 from fastapi import HTTPException, status
@@ -116,25 +116,50 @@ class SubscriptionLimits:
     """
 
     @staticmethod
-    def check_user_limit(institution: Institution, db: Session) -> None:
+    def check_user_limit(
+        institution: Institution,
+        db: Session,
+        user: Optional[User] = None,
+        request=None,
+    ) -> None:
         """
-        Check if institution has reached user limit
+        Check if institution has reached user limit.
+
+        Superusers bypass enforcement. The bypass is audit-logged unconditionally
+        whenever a quota is configured (`max_users != -1`) — this is intentional:
+        the race-free signal "superuser is bypassing a configured quota" beats a
+        per-call count query that may miss bypass events under concurrent inserts.
 
         Raises:
-            HTTPException: If limit exceeded
+            HTTPException: If limit exceeded (and user is not superuser).
         """
+        from models.auth import User as UserModel, UserStatus
+
+        if user is not None and getattr(user, "is_superuser", False):
+            if institution.max_users != -1:
+                from services.audit_service import AuditService
+
+                AuditService.log_superuser_bypass(
+                    db=db,
+                    superuser=user,
+                    resource_type="quota",
+                    resource_id=None,
+                    action="override_user_limit",
+                    owner_user_id=None,
+                    request=request,
+                )
+            return
+
         # -1 means unlimited
         if institution.max_users == -1:
             return
 
-        from models.auth import User, UserStatus
-
         active_users = (
-            db.query(User)
+            db.query(UserModel)
             .filter(
                 and_(
-                    User.institution_id == institution.id,
-                    User.status == UserStatus.ACTIVE.value,
+                    UserModel.institution_id == institution.id,
+                    UserModel.status == UserStatus.ACTIVE.value,
                 )
             )
             .count()
@@ -147,14 +172,36 @@ class SubscriptionLimits:
             )
 
     @staticmethod
-    def check_document_limit(institution: Institution, db: Session) -> None:
+    def check_document_limit(
+        institution: Institution,
+        db: Session,
+        user: Optional[User] = None,
+        request=None,
+    ) -> None:
         """
-        Check if institution has reached document limit
+        Check if institution has reached document limit.
+
+        Superusers bypass; bypass is audit-logged unconditionally when a quota
+        is configured (race-free, see check_user_limit docstring).
 
         Raises:
-            HTTPException: If limit exceeded
+            HTTPException: If limit exceeded (and user is not superuser).
         """
-        # -1 means unlimited
+        if user is not None and getattr(user, "is_superuser", False):
+            if institution.max_documents != -1:
+                from services.audit_service import AuditService
+
+                AuditService.log_superuser_bypass(
+                    db=db,
+                    superuser=user,
+                    resource_type="quota",
+                    resource_id=None,
+                    action="override_document_limit",
+                    owner_user_id=None,
+                    request=request,
+                )
+            return
+
         if institution.max_documents == -1:
             return
 
@@ -173,23 +220,45 @@ class SubscriptionLimits:
         institution: Institution,
         db: Session,
         additional_count: int = 0,
+        user: Optional[User] = None,
+        request=None,
     ) -> None:
         """
-        Check if institution has reached monthly question generation limit
+        Check if institution would exceed monthly question limit.
+
+        Superusers bypass; bypass is audit-logged unconditionally when a quota
+        is configured (race-free, see check_user_limit docstring).
 
         Args:
-            institution: Institution to check
-            db: Database session
-            additional_count: Number of questions about to be created
+            institution: Institution row with ``max_questions_per_month``
+            db: Database session (for the bypass-audit-log INSERT)
+            additional_count: Number of questions about to be created (default 0,
+                e.g. 5 for retry-flow batches)
+            user: Acting user — if superuser, bypass + audit-log
+            request: Optional FastAPI Request for IP/UA in the audit log
 
         Raises:
-            HTTPException: If adding additional_count questions would exceed the limit
+            HTTPException: If limit would be exceeded (and user is not superuser).
         """
-        # -1 means unlimited
-        if institution.max_questions_per_month == -1:
+        from datetime import datetime, timezone
+
+        if user is not None and getattr(user, "is_superuser", False):
+            if institution.max_questions_per_month != -1:
+                from services.audit_service import AuditService
+
+                AuditService.log_superuser_bypass(
+                    db=db,
+                    superuser=user,
+                    resource_type="quota",
+                    resource_id=None,
+                    action="override_question_limit",
+                    owner_user_id=None,
+                    request=request,
+                )
             return
 
-        from datetime import datetime, timezone
+        if institution.max_questions_per_month == -1:
+            return
 
         # Count questions generated this month
         month_start = datetime.now(timezone.utc).replace(
@@ -291,19 +360,29 @@ class SubscriptionLimits:
 
     @staticmethod
     def check_storage_limit(
-        institution: Institution, db: Session, file_size_bytes: int
+        institution: Institution,
+        db: Session,
+        file_size_bytes: int,
+        user: Optional[User] = None,
+        request=None,
     ) -> None:
         """
         Check if institution would exceed storage quota with new file.
         Reads limit from tier_quotas table (storage_mb resource_type).
 
+        Superusers bypass; bypass is audit-logged unconditionally when a quota
+        is configured (race-free, see check_user_limit docstring).
+
         Args:
             institution: Institution to check
             db: Database session
             file_size_bytes: Size of file being uploaded in bytes
+            user: Optional user; if superuser, bypasses with audit log.
+            request: Optional FastAPI Request for audit context (IP, UA).
 
         Raises:
             HTTPException: If adding this file would exceed the storage limit
+                          (and user is not superuser).
         """
         from models.rbac import TierQuota
         from sqlalchemy import func as sqlfunc
@@ -320,6 +399,20 @@ class SubscriptionLimits:
 
         if not storage_quota or storage_quota.quota_limit == -1:
             return  # No limit or unlimited
+
+        if user is not None and getattr(user, "is_superuser", False):
+            from services.audit_service import AuditService
+
+            AuditService.log_superuser_bypass(
+                db=db,
+                superuser=user,
+                resource_type="quota",
+                resource_id=None,
+                action="override_storage_limit",
+                owner_user_id=None,
+                request=request,
+            )
+            return
 
         current_bytes = (
             db.query(sqlfunc.coalesce(sqlfunc.sum(Document.file_size), 0))

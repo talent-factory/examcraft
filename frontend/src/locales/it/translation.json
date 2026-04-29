@@ -873,11 +873,16 @@
       "fieldExamDate": "Data esame",
       "fieldTimeLimit": "Limite di tempo (minuti)",
       "fieldAllowedAids": "Ausili consentiti",
+      "fieldDocuments": "Documenti sorgente (opzionale)",
+      "fieldDocumentsPlaceholder": "Cerca e seleziona documenti...",
+      "fieldDocumentsHint": "Il pool di domande sarà limitato ai documenti selezionati",
       "cancel": "Annulla",
       "creating": "Creazione...",
       "create": "Crea",
       "errorCreate": "Impossibile creare l'esame. Riprova.",
-      "errorDelete": "Impossibile eliminare l'esame. Riprova."
+      "errorDelete": "Impossibile eliminare l'esame. Riprova.",
+      "deleteDialogTitle": "Elimina esame",
+      "deleteDialogMessage": "Questo esame verrà eliminato definitivamente."
     },
     "examMetadata": {
       "statusDraft": "Bozza",
@@ -938,7 +943,12 @@
       "panelTitle": "Pool di domande",
       "autoFill": "Riempimento auto",
       "searchPlaceholder": "Cerca domande...",
+      "documentFilterLabel": "Filtro documenti",
+      "documentFilterAll": "Tutti i documenti",
+      "documentFilterRemove": "Rimuovi",
       "loading": "Caricamento domande...",
+      "errorLoadingQuestions": "Impossibile caricare le domande.",
+      "errorLoadingDocuments": "Impossibile caricare i documenti.",
       "empty": "Nessuna domanda approvata trovata.",
       "available": "{{count}} domande disponibili",
       "difficultyEasy": "Facile",
@@ -1373,5 +1383,8 @@
         "additionalVariables": "Variabili template aggiuntive"
       }
     }
+  },
+  "help": {
+    "thinking": "Sto pensando…"
   }
 }

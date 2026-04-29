@@ -26,6 +26,7 @@ celery_app = Celery(
         # "tasks.rag_tasks",  # Requires Premium RAGService
         "tasks.session_cleanup",
         "tasks.feedback_tasks",
+        "tasks.maintenance_tasks",
     ],
 )
 
@@ -44,6 +45,19 @@ celery_app.conf.update(
     task_acks_late=True,  # Acknowledge after task completion
     worker_disable_rate_limits=False,
 )
+
+# Beat-Schedule für periodische Wartung (TF-329 Watchdog).
+# Voraussetzung: ein laufender `celery -A celery_app beat`-Process. In der
+# Fly.io-Deployment läuft Beat als Sidecar-Process in `fly.celery.toml`
+# (oder als `--beat`-Flag auf dem Worker für Single-Instance-Setup). Siehe
+# docs/superpowers/plans/2026-04-28-tf329-watchdog-pending-jobs.md für die
+# Deployment-Rezeptur.
+celery_app.conf.beat_schedule = {
+    "reconcile-stuck-jobs-every-5-minutes": {
+        "task": "tasks.maintenance_tasks.reconcile_stuck_jobs",
+        "schedule": 300.0,  # 5 Minuten
+    },
+}
 
 # Queue Definitions
 default_exchange = Exchange("default", type="direct")

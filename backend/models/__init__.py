@@ -11,6 +11,7 @@ from models.question_review import (
     ReviewComment,
     ReviewHistory,
     ReviewStatus,
+    QuestionSourceDocument,
 )
 from models.auth import (
     User,
@@ -51,6 +52,7 @@ __all__ = [
     "ReviewComment",
     "ReviewHistory",
     "ReviewStatus",
+    "QuestionSourceDocument",
     "User",
     "Role",
     "Institution",

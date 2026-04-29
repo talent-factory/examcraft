@@ -137,7 +137,18 @@
       "generatedQuestions": "Generierte Fragen",
       "validatedQuestions": "Validierte Fragen",
       "recentActivity": "Letzte Aktivitäten",
-      "noActivity": "Keine Aktivitäten vorhanden. Starten Sie mit dem Hochladen von Dokumenten!"
+      "noActivity": "Keine Aktivitäten vorhanden. Starten Sie mit dem Hochladen von Dokumenten!",
+      "activityTypes": {
+        "document_uploaded": "Dokument hochgeladen",
+        "questions_generated": "Fragen generiert",
+        "exam_created": "Prüfung erstellt",
+        "question_approved": "Frage validiert",
+        "question_rejected": "Frage abgelehnt",
+        "document_deleted": "Dokument gelöscht",
+        "exam_deleted": "Prüfung gelöscht"
+      },
+      "statsError": "Statistiken konnten nicht geladen werden.",
+      "activityError": "Aktivitäten konnten nicht geladen werden."
     },
     "documents": {
       "title": "Dokumentenbibliothek",
@@ -906,11 +917,16 @@
       "fieldExamDate": "Prüfungsdatum",
       "fieldTimeLimit": "Zeitlimit (Minuten)",
       "fieldAllowedAids": "Erlaubte Hilfsmittel",
+      "fieldDocuments": "Quelldokumente (optional)",
+      "fieldDocumentsPlaceholder": "Dokumente suchen und auswählen...",
+      "fieldDocumentsHint": "Fragenpool wird auf die gewählten Dokumente eingeschränkt",
       "cancel": "Abbrechen",
       "creating": "Erstelle...",
       "create": "Erstellen",
       "errorCreate": "Prüfung konnte nicht erstellt werden. Bitte versuche es erneut.",
-      "errorDelete": "Prüfung konnte nicht gelöscht werden. Bitte versuche es erneut."
+      "errorDelete": "Prüfung konnte nicht gelöscht werden. Bitte versuche es erneut.",
+      "deleteDialogTitle": "Prüfung löschen",
+      "deleteDialogMessage": "Diese Prüfung wird unwiderruflich gelöscht."
     },
     "examMetadata": {
       "statusDraft": "Entwurf",
@@ -971,7 +987,12 @@
       "panelTitle": "Fragenpool",
       "autoFill": "Auto-Fill",
       "searchPlaceholder": "Fragen durchsuchen...",
+      "documentFilterLabel": "Dokumentfilter",
+      "documentFilterAll": "Alle Dokumente",
+      "documentFilterRemove": "Entfernen",
       "loading": "Lade Fragen...",
+      "errorLoadingQuestions": "Fragen konnten nicht geladen werden.",
+      "errorLoadingDocuments": "Dokumentliste konnte nicht geladen werden.",
       "empty": "Keine genehmigten Fragen gefunden.",
       "available": "{{count}} Fragen verfügbar",
       "difficultyEasy": "Einfach",
@@ -1418,6 +1439,7 @@
     "chatPlaceholder": "Stelle eine Frage...",
     "send": "Senden",
     "newConversation": "Neue Konversation",
+    "thinking": "Denke nach…",
     "onboarding": {
       "skip": "Überspringen",
       "next": "Weiter",

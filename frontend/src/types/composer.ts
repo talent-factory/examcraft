@@ -36,6 +36,7 @@ export interface Exam {
   created_at: string;
   updated_at: string;
   question_count: number;
+  default_document_ids: number[] | null;
 }
 
 export interface ExamDetail extends Exam {
@@ -43,10 +44,17 @@ export interface ExamDetail extends Exam {
 }
 
 export interface ExamListResponse { total: number; exams: Exam[]; }
-export interface CreateExamRequest { title: string; course?: string; exam_date?: string; time_limit_minutes?: number; allowed_aids?: string; instructions?: string; passing_percentage?: number; language?: string; }
+export interface CreateExamRequest { title: string; course?: string; exam_date?: string; time_limit_minutes?: number; allowed_aids?: string; instructions?: string; passing_percentage?: number; language?: string; default_document_ids?: number[]; }
 export interface UpdateExamRequest extends Partial<CreateExamRequest> { updated_at: string; }
 export interface ApprovedQuestion { id: number; question_text: string; question_type: string; difficulty: string; topic: string; bloom_level: number | null; options: string[] | null; usage_count: number; }
 export interface ApprovedQuestionsResponse { total: number; questions: ApprovedQuestion[]; }
+
+export interface DocumentWithQuestions {
+  id: number;
+  title: string;
+  approved_question_count: number;
+}
+
 export interface AutoFillRequest {
   count?: number;
   topic?: string;
@@ -54,6 +62,7 @@ export interface AutoFillRequest {
   bloom_level_min?: number;
   question_types?: string[];
   exclude_question_ids?: number[];
+  document_ids?: number[];
   // Composition mode fields
   target_points?: number;
   target_duration_minutes?: number;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -196,6 +196,10 @@ describe('ExamListView', () => {
   // -------------------------------------------------------------------------
 
   describe('delete button', () => {
+    // The delete button is an icon-only button with aria-label="Löschen"
+    // (see ExamListView.tsx) — the visible glyph is an SVG trash icon. Use
+    // getByLabelText so the tests stay accessible-name-based and don't
+    // break if the icon changes.
     it('shows Löschen button for draft exams', async () => {
       mockComposerService.listExams.mockResolvedValue({
         total: 1,
@@ -207,7 +211,7 @@ describe('ExamListView', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('Löschen')).toBeInTheDocument();
+        expect(screen.getByLabelText('Löschen')).toBeInTheDocument();
       });
     });
 
@@ -222,12 +226,15 @@ describe('ExamListView', () => {
       });
 
       await waitFor(() => {
-        expect(screen.queryByText('Löschen')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Löschen')).not.toBeInTheDocument();
       });
     });
 
     it('calls deleteExam when delete is clicked and confirmed', async () => {
-      mockConfirm.mockReturnValue(true);
+      // ExamListView uses a MUI confirmation Dialog, not window.confirm.
+      // Flow: click trash icon (aria-label "Löschen") → dialog opens →
+      // click the dialog's "Löschen" button (text label, error variant)
+      // → deleteMutation fires.
       mockComposerService.listExams.mockResolvedValue({
         total: 1,
         exams: [makeExam({ id: 7 })],
@@ -239,10 +246,17 @@ describe('ExamListView', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('Löschen')).toBeInTheDocument();
+        expect(screen.getByLabelText('Löschen')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Löschen'));
+      // Open the confirmation dialog
+      fireEvent.click(screen.getByLabelText('Löschen'));
+
+      // Find the dialog's confirm button (text "Löschen", inside the
+      // MUI dialog role="dialog")
+      const dialog = await screen.findByRole('dialog');
+      const confirmButton = within(dialog).getByRole('button', { name: 'Löschen' });
+      fireEvent.click(confirmButton);
 
       await waitFor(() => {
         expect(mockComposerService.deleteExam).toHaveBeenCalled();
@@ -251,7 +265,6 @@ describe('ExamListView', () => {
     });
 
     it('does NOT call deleteExam when delete is cancelled', async () => {
-      mockConfirm.mockReturnValue(false);
       mockComposerService.listExams.mockResolvedValue({
         total: 1,
         exams: [makeExam({ id: 7 })],
@@ -262,10 +275,15 @@ describe('ExamListView', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('Löschen')).toBeInTheDocument();
+        expect(screen.getByLabelText('Löschen')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Löschen'));
+      // Open the confirmation dialog and cancel
+      fireEvent.click(screen.getByLabelText('Löschen'));
+      const dialog = await screen.findByRole('dialog');
+      const cancelButton = within(dialog).getByRole('button', { name: 'Abbrechen' });
+      fireEvent.click(cancelButton);
+
       expect(mockComposerService.deleteExam).not.toHaveBeenCalled();
     });
   });

@@ -22,16 +22,28 @@ class IndexingInProgressError(RuntimeError):
     """Raised when another indexing run (startup task or admin call) holds the lock."""
 
 
+class IndexingLockUnavailableError(RuntimeError):
+    """Raised when Redis is unreachable and the indexing lock can't be evaluated.
+
+    The previous behavior of returning ``True`` (proceeding lockless) caused a
+    data-corruption race: ``_clear_collection`` and concurrent upserts against
+    the same Qdrant collection produced inconsistent results. Operators should
+    see a 503 and retry once Redis is healthy — concurrent indexing is worse
+    than a delayed indexing run.
+    """
+
+
 class DocsIndexerService:
     def __init__(self, db: Session):
         self.db = db
 
     @staticmethod
     def _acquire_lock() -> bool:
-        """SETNX on Redis. Returns True if lock was acquired.
+        """SETNX on Redis. Returns True if lock was acquired, False otherwise.
 
-        Falls back to True (skip locking) when Redis is unavailable — better
-        to allow a potentially-concurrent run than to refuse indexing entirely.
+        Raises IndexingLockUnavailableError when Redis is unreachable. Refusing
+        is safer than allowing concurrent runs against the same Qdrant
+        collection.
         """
         try:
             from services.redis_service import RedisService
@@ -39,8 +51,13 @@ class DocsIndexerService:
             client = RedisService.get_ratelimit_client()
             return bool(client.set(_LOCK_KEY, "1", nx=True, ex=_LOCK_TTL_SECONDS))
         except Exception as e:
-            logger.warning(f"Redis unreachable, proceeding without lock: {e}")
-            return True
+            logger.error(
+                "Redis unreachable while acquiring docs-indexing lock; refusing run",
+                exc_info=True,
+            )
+            raise IndexingLockUnavailableError(
+                f"Cannot acquire docs-indexing lock: Redis unreachable ({e})"
+            ) from e
 
     @staticmethod
     def _release_lock() -> None:
@@ -48,8 +65,16 @@ class DocsIndexerService:
             from services.redis_service import RedisService
 
             RedisService.get_ratelimit_client().delete(_LOCK_KEY)
-        except Exception as e:
-            logger.warning(f"Redis lock release failed: {e}")
+        except Exception:
+            # 15-min TTL on the lock key bounds the worst-case impact: even if
+            # release fails, the next run can proceed once the key expires.
+            # Log loud so operators can correlate with downstream "indexing
+            # already in progress" 409s.
+            logger.error(
+                "Redis lock release failed for docs-indexing key %s",
+                _LOCK_KEY,
+                exc_info=True,
+            )
 
     async def run_index(self, full_scan: bool = False) -> Dict[str, int]:
         """Serialize indexing via Redis SETNX lock; raises IndexingInProgressError on conflict."""
@@ -100,29 +125,62 @@ class DocsIndexerService:
                 deleted = []
 
             indexed = 0
+            failed_index: List[str] = []
             for filepath in changed:
                 if await self._index_file(filepath):
                     indexed += 1
+                else:
+                    failed_index.append(filepath)
 
             deleted_count = 0
+            failed_delete: List[str] = []
             for filepath in deleted:
-                await self._remove_file_from_index(filepath)
-                deleted_count += 1
+                if await self._remove_file_from_index(filepath):
+                    deleted_count += 1
+                else:
+                    failed_delete.append(filepath)
 
+            failures = failed_index + failed_delete
             current_sha = self._get_current_sha()
-            state.last_indexed_sha = current_sha
+            # Only advance last_indexed_sha when every file in the run succeeded.
+            # Otherwise the next incremental scan would diff from a SHA whose
+            # corpus is missing chunks, and the failed files would never be
+            # retried unless they happened to change again.
+            if not failures:
+                state.last_indexed_sha = current_sha
+                state.indexing_status = "completed"
+                state.last_error = None
+            else:
+                state.indexing_status = "partial"
+                state.last_error = (
+                    f"{len(failures)} file(s) failed during indexing; "
+                    f"last_indexed_sha not advanced. "
+                    f"First failures: {failures[:3]}"
+                )[:500]
             state.last_indexed_at = datetime.now(timezone.utc)
             state.files_indexed = indexed
             state.files_deleted = deleted_count
-            state.indexing_status = "completed"
             self.db.commit()
 
             self._invalidate_stale_faq_cache(changed + deleted)
 
-            logger.info(
-                f"Indexing complete: {indexed} indexed, {deleted_count} deleted"
-            )
-            return {"indexed": indexed, "deleted": deleted_count}
+            if failures:
+                logger.error(
+                    "Indexing finished with failures: %d indexed, %d deleted, "
+                    "%d failures (last_indexed_sha NOT advanced).",
+                    indexed,
+                    deleted_count,
+                    len(failures),
+                )
+            else:
+                logger.info(
+                    "Indexing complete: %d indexed, %d deleted", indexed, deleted_count
+                )
+            return {
+                "indexed": indexed,
+                "deleted": deleted_count,
+                "failed": len(failures),
+            }
         except Exception as e:
             # Persist failure state so /admin/index-state and operators can see
             # WHY indexing stopped, not just that it did. Truncate message to
@@ -227,8 +285,17 @@ class DocsIndexerService:
         except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
             # FileNotFoundError: git binary not on PATH (possible in minimal
             # container images); OSError: broader subprocess spawn failures.
-            logger.warning(
-                f"Git diff failed ({type(e).__name__}), falling back to full scan"
+            # ERROR rather than WARNING: every subsequent run will fall back
+            # to a full scan + clear, multiplying load until the operator
+            # notices. Surface enough context (last_sha, DOCS_SITE_PATH) to
+            # diagnose from logs alone.
+            logger.error(
+                "Git diff failed (%s) for last_sha=%s docs_site_path=%s — "
+                "falling back to full scan. Indexing load will multiply "
+                "until git availability is restored.",
+                type(e).__name__,
+                last_sha,
+                DOCS_SITE_PATH,
             )
             return self._get_all_md_files(), []
 
@@ -332,13 +399,19 @@ class DocsIndexerService:
             logger.error(f"Failed to index {filepath}: {e}")
             return False
 
-    async def _remove_file_from_index(self, filepath: str) -> None:
+    async def _remove_file_from_index(self, filepath: str) -> bool:
+        """Remove a file's chunks from the docs_help collection.
+
+        Returns True on success, False on failure. Callers MUST check the
+        return — silently treating failures as success let stale chunks
+        accumulate in the corpus while the run reported "deleted".
+        """
         try:
             from services.vector_service_factory import vector_service
             from qdrant_client.http import models
 
             if not hasattr(vector_service, "client") or vector_service.client is None:
-                return
+                return False
 
             vector_service.client.delete(
                 collection_name="docs_help",
@@ -353,8 +426,10 @@ class DocsIndexerService:
                     )
                 ),
             )
+            return True
         except Exception as e:
             logger.error(f"Failed to remove {filepath} from index: {e}")
+            return False
 
     def _invalidate_stale_faq_cache(self, changed_files: List[str]) -> None:
         if not changed_files:

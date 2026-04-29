@@ -19,6 +19,37 @@ from models.exam import Exam, ExamQuestion, ExamStatus
 # ---------------------------------------------------------------------------
 
 
+def _make_committable_session(test_engine, slug: str, email: str):
+    """Yield a committable Session and clean its Institution+User on teardown.
+
+    Endpoints under test call session.commit() — die ``test_db``-Fixture
+    aus conftest.py hat keinen SAVEPOINT-Mode, eine SAVEPOINT-Variante
+    bricht optimistic-locking-Tests (updated_at-Refresh-Verhalten). Daher
+    bleibt es bei einer "echten" Session ohne Outer-Transaction. Damit
+    Pollution für andere Test-Files (test_quota_enforcement_integration,
+    test_profile_permissions_and_institution u.a., die ``Institution.first()``
+    abfragen) nicht entsteht, löschen wir die für diesen Test class-spezifisch
+    angelegten Institution-/User-Rows beim Teardown explizit.
+    """
+    from sqlalchemy.orm import sessionmaker
+    from models.auth import Institution, User
+
+    TestSession = sessionmaker(bind=test_engine)
+    session = TestSession()
+    try:
+        yield session
+    finally:
+        session.rollback()  # falls letzter Test eine offene Transaktion hatte
+        try:
+            session.query(User).filter(User.email == email).delete()
+            session.query(Institution).filter(Institution.slug == slug).delete()
+            session.commit()
+        except Exception:
+            session.rollback()
+        finally:
+            session.close()
+
+
 def make_user(test_db: Session, institution_id: int, suffix: str = "1") -> User:
     user = User(
         email=f"examuser{suffix}@test.com",
@@ -186,6 +217,25 @@ class TestExamModel:
         exam.recalculate_total_points()
         assert exam.total_points == 15.0
 
+    def test_default_document_ids_nullable(
+        self, test_db: Session, test_institution: Institution
+    ):
+        """Exam.default_document_ids defaults to None and accepts a list of ints."""
+        user = make_user(test_db, test_institution.id, suffix="ddi1")
+        exam = Exam(
+            title="Doc Filter Exam",
+            institution_id=test_institution.id,
+            created_by=user.id,
+        )
+        test_db.add(exam)
+        test_db.flush()
+        assert exam.default_document_ids is None
+
+        exam.default_document_ids = [1, 2, 3]
+        test_db.flush()
+        test_db.refresh(exam)
+        assert exam.default_document_ids == [1, 2, 3]
+
 
 class TestExamQuestionModel:
     """Tests for the ExamQuestion join-table model."""
@@ -338,6 +388,67 @@ class TestExamQuestionModel:
 
 
 # ---------------------------------------------------------------------------
+# Task 1: QuestionSourceDocument join model
+# ---------------------------------------------------------------------------
+
+
+class TestQuestionSourceDocumentModel:
+    """Tests for QuestionSourceDocument join model."""
+
+    def test_create_link(self, test_db: Session, test_institution: Institution):
+        from models.question_review import QuestionSourceDocument
+        from models.document import Document
+
+        user = make_user(test_db, test_institution.id, suffix="qsd1")
+        doc = Document(
+            filename="ds.pdf",
+            original_filename="ds.pdf",
+            file_path="/tmp/ds.pdf",
+            file_size=1000,
+            mime_type="application/pdf",
+            institution_id=test_institution.id,
+            user_id=user.id,
+        )
+        test_db.add(doc)
+        test_db.flush()
+
+        question = make_question(test_db, test_institution.id, user.id, suffix="qsd1")
+        link = QuestionSourceDocument(question_id=question.id, document_id=doc.id)
+        test_db.add(link)
+        test_db.flush()
+
+        assert link.id is not None
+        assert link.question_id == question.id
+        assert link.document_id == doc.id
+
+    def test_unique_constraint(self, test_db: Session, test_institution: Institution):
+        from models.question_review import QuestionSourceDocument
+        from models.document import Document
+        from sqlalchemy.exc import IntegrityError
+
+        user = make_user(test_db, test_institution.id, suffix="qsd2")
+        doc = Document(
+            filename="ds2.pdf",
+            original_filename="ds2.pdf",
+            file_path="/tmp/ds2.pdf",
+            file_size=1000,
+            mime_type="application/pdf",
+            institution_id=test_institution.id,
+            user_id=user.id,
+        )
+        test_db.add(doc)
+        test_db.flush()
+
+        question = make_question(test_db, test_institution.id, user.id, suffix="qsd2")
+        test_db.add(QuestionSourceDocument(question_id=question.id, document_id=doc.id))
+        test_db.flush()
+
+        test_db.add(QuestionSourceDocument(question_id=question.id, document_id=doc.id))
+        with pytest.raises(IntegrityError):
+            test_db.flush()
+
+
+# ---------------------------------------------------------------------------
 # Task 2: CRUD API Tests
 # ---------------------------------------------------------------------------
 
@@ -372,17 +483,9 @@ class TestExamCRUDApi:
 
     @pytest.fixture
     def exam_db(self, test_engine):
-        """Fresh DB session that supports commit/rollback (no wrapping transaction).
-
-        test_db uses a connection-level transaction which prevents commit()
-        inside the API endpoints. This fixture creates a plain session instead.
-        """
-        from sqlalchemy.orm import sessionmaker
-
-        TestSession = sessionmaker(bind=test_engine)
-        session = TestSession()
-        yield session
-        session.close()
+        yield from _make_committable_session(
+            test_engine, slug="exam-test-university", email="examcrud@test.com"
+        )
 
     @pytest.fixture
     def exam_institution(self, exam_db):
@@ -553,6 +656,29 @@ class TestExamCRUDApi:
         )
         assert response.status_code == 409
 
+    def test_create_exam_with_default_document_ids(self, exam_client):
+        """POST /api/v1/exams/ persists default_document_ids and returns them."""
+        response = exam_client.post(
+            "/api/v1/exams/",
+            json={
+                "title": "DS Exam",
+                "language": "de",
+                "default_document_ids": [10, 20],
+            },
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["default_document_ids"] == [10, 20]
+
+    def test_create_exam_without_document_ids_defaults_to_none(self, exam_client):
+        """POST /api/v1/exams/ without default_document_ids returns null."""
+        response = exam_client.post(
+            "/api/v1/exams/",
+            json={"title": "Plain Exam", "language": "de"},
+        )
+        assert response.status_code == 201
+        assert response.json()["default_document_ids"] is None
+
 
 # ---------------------------------------------------------------------------
 # Task 3: Question Management API Tests
@@ -564,13 +690,9 @@ class TestExamQuestionApi:
 
     @pytest.fixture
     def exam_db(self, test_engine):
-        """Fresh DB session that supports commit/rollback (no wrapping transaction)."""
-        from sqlalchemy.orm import sessionmaker
-
-        TestSession = sessionmaker(bind=test_engine)
-        session = TestSession()
-        yield session
-        session.close()
+        yield from _make_committable_session(
+            test_engine, slug="examq-test-university", email="examqcrud@test.com"
+        )
 
     @pytest.fixture
     def exam_institution(self, exam_db):
@@ -806,13 +928,9 @@ class TestExamWorkflowApi:
 
     @pytest.fixture
     def exam_db(self, test_engine):
-        """Fresh DB session that supports commit/rollback (no wrapping transaction)."""
-        from sqlalchemy.orm import sessionmaker
-
-        TestSession = sessionmaker(bind=test_engine)
-        session = TestSession()
-        yield session
-        session.close()
+        yield from _make_committable_session(
+            test_engine, slug="examwf-test-university", email="examwfcrud@test.com"
+        )
 
     @pytest.fixture
     def exam_institution(self, exam_db):
@@ -999,12 +1117,7 @@ def _make_exam_test_class_fixtures(slug: str, email: str):
     class _Fixtures:
         @pytest.fixture
         def exam_db(self, test_engine):
-            from sqlalchemy.orm import sessionmaker
-
-            TestSession = sessionmaker(bind=test_engine)
-            session = TestSession()
-            yield session
-            session.close()
+            yield from _make_committable_session(test_engine, slug=slug, email=email)
 
         @pytest.fixture
         def exam_institution(self, exam_db):
@@ -2150,3 +2263,501 @@ class TestAutoComposeQuestions(
         assert "bloom_distribution" in report
         assert "overall_satisfaction" in report
         assert report["points_achieved"] <= 30.0
+
+
+# ---------------------------------------------------------------------------
+# Task 5 (TF-321): GET /documents-with-questions endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestDocumentsWithQuestionsEndpoint:
+    """Tests for GET /api/v1/exams/documents-with-questions."""
+
+    @pytest.fixture
+    def dwq_db(self, test_engine):
+        from sqlalchemy.orm import sessionmaker
+
+        TestSession = sessionmaker(bind=test_engine)
+        session = TestSession()
+        yield session
+        session.close()
+
+    @pytest.fixture
+    def dwq_institution(self, dwq_db):
+        existing = dwq_db.query(Institution).filter_by(slug="dwq-test-inst").first()
+        if existing:
+            return existing
+        inst = Institution(
+            name="DWQ Test University",
+            slug="dwq-test-inst",
+            subscription_tier="professional",
+            max_users=-1,
+            max_documents=-1,
+            max_questions_per_month=-1,
+        )
+        dwq_db.add(inst)
+        dwq_db.commit()
+        dwq_db.refresh(inst)
+        return inst
+
+    @pytest.fixture
+    def dwq_user(self, dwq_db, dwq_institution):
+        existing = dwq_db.query(User).filter_by(email="dwq@test.com").first()
+        if existing:
+            return existing
+        user = User(
+            email="dwq@test.com",
+            first_name="DWQ",
+            last_name="User",
+            password_hash="dummy_hash",  # pragma: allowlist secret
+            institution_id=dwq_institution.id,
+            status=UserStatus.ACTIVE.value,
+        )
+        dwq_db.add(user)
+        dwq_db.commit()
+        dwq_db.refresh(user)
+        return user
+
+    @pytest.fixture
+    def dwq_client(self, dwq_db, dwq_institution, dwq_user):
+        from utils.auth_utils import get_current_user
+        from database import get_db
+        import api.exams as exams_module
+
+        app.include_router(exams_module.router)
+
+        mock_user = _make_mock_user(
+            institution_id=dwq_institution.id, user_id=dwq_user.id
+        )
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = lambda: dwq_db
+        client = TestClient(app, raise_server_exceptions=True)
+        yield client
+        app.dependency_overrides.clear()
+
+    def test_returns_documents_with_approved_questions(
+        self, dwq_client, dwq_db, dwq_institution, dwq_user
+    ):
+        from models.document import Document
+        from models.question_review import QuestionSourceDocument
+
+        doc = Document(
+            filename="algo.pdf",
+            original_filename="algo.pdf",
+            file_path="/tmp/algo.pdf",
+            file_size=1000,
+            mime_type="application/pdf",
+            institution_id=dwq_institution.id,
+            user_id=dwq_user.id,
+        )
+        dwq_db.add(doc)
+        dwq_db.flush()
+
+        q = QuestionReview(
+            question_text="What is Big-O?",
+            question_type="open_ended",
+            difficulty="medium",
+            topic="Algorithms",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=dwq_institution.id,
+            created_by=dwq_user.id,
+        )
+        dwq_db.add(q)
+        dwq_db.flush()
+        dwq_db.add(QuestionSourceDocument(question_id=q.id, document_id=doc.id))
+        dwq_db.commit()
+
+        response = dwq_client.get("/api/v1/exams/documents-with-questions")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        ids = [d["id"] for d in data]
+        assert doc.id in ids
+        entry = next(d for d in data if d["id"] == doc.id)
+        assert entry["title"] == "algo.pdf"
+        assert entry["approved_question_count"] >= 1
+
+    def test_includes_documents_without_approved_questions(
+        self, dwq_client, dwq_db, dwq_institution, dwq_user
+    ):
+        """All institution documents appear; approved_question_count is 0 when none approved."""
+        from models.document import Document
+
+        doc_empty = Document(
+            filename="empty.pdf",
+            original_filename="empty.pdf",
+            file_path="/tmp/empty.pdf",
+            file_size=500,
+            mime_type="application/pdf",
+            institution_id=dwq_institution.id,
+            user_id=dwq_user.id,
+        )
+        dwq_db.add(doc_empty)
+        dwq_db.commit()
+
+        response = dwq_client.get("/api/v1/exams/documents-with-questions")
+        assert response.status_code == 200
+        data = response.json()
+        ids = [d["id"] for d in data]
+        assert doc_empty.id in ids
+        entry = next(d for d in data if d["id"] == doc_empty.id)
+        assert entry["approved_question_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Task 6: document_ids filter on GET /approved-questions
+# ---------------------------------------------------------------------------
+
+
+class TestApprovedQuestionsDocumentFilter:
+    """Tests for document_ids filter on GET /approved-questions."""
+
+    @pytest.fixture
+    def aqdf_db(self, test_engine):
+        from sqlalchemy.orm import sessionmaker
+
+        TestSession = sessionmaker(bind=test_engine)
+        session = TestSession()
+        yield session
+        session.close()
+
+    @pytest.fixture
+    def aqdf_institution(self, aqdf_db):
+        existing = aqdf_db.query(Institution).filter_by(slug="aqdf-test-inst").first()
+        if existing:
+            return existing
+        inst = Institution(
+            name="AQDF Test University",
+            slug="aqdf-test-inst",
+            subscription_tier="professional",
+            max_users=-1,
+            max_documents=-1,
+            max_questions_per_month=-1,
+        )
+        aqdf_db.add(inst)
+        aqdf_db.commit()
+        aqdf_db.refresh(inst)
+        return inst
+
+    @pytest.fixture
+    def aqdf_user(self, aqdf_db, aqdf_institution):
+        existing = aqdf_db.query(User).filter_by(email="aqdf@test.com").first()
+        if existing:
+            return existing
+        user = User(
+            email="aqdf@test.com",
+            first_name="AQDF",
+            last_name="User",
+            password_hash="dummy_hash",  # pragma: allowlist secret
+            institution_id=aqdf_institution.id,
+            status=UserStatus.ACTIVE.value,
+        )
+        aqdf_db.add(user)
+        aqdf_db.commit()
+        aqdf_db.refresh(user)
+        return user
+
+    @pytest.fixture
+    def aqdf_client(self, aqdf_db, aqdf_institution, aqdf_user):
+        from utils.auth_utils import get_current_user
+        from database import get_db
+        import api.exams as exams_module
+
+        app.include_router(exams_module.router)
+
+        mock_user = _make_mock_user(
+            institution_id=aqdf_institution.id, user_id=aqdf_user.id
+        )
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = lambda: aqdf_db
+        client = TestClient(app, raise_server_exceptions=True)
+        yield client
+        app.dependency_overrides.clear()
+
+    def test_filter_by_document_id_returns_only_linked_questions(
+        self, aqdf_client, aqdf_db, aqdf_institution, aqdf_user
+    ):
+        from models.document import Document
+        from models.question_review import QuestionSourceDocument
+
+        doc = Document(
+            filename="heap.pdf",
+            original_filename="heap.pdf",
+            file_path="/tmp/heap.pdf",
+            file_size=1000,
+            mime_type="application/pdf",
+            institution_id=aqdf_institution.id,
+            user_id=aqdf_user.id,
+        )
+        aqdf_db.add(doc)
+        aqdf_db.flush()
+
+        q_linked = QuestionReview(
+            question_text="Explain heapsort.",
+            question_type="open_ended",
+            difficulty="hard",
+            topic="Sorting",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=aqdf_institution.id,
+            created_by=aqdf_user.id,
+        )
+        q_other = QuestionReview(
+            question_text="What is a stack?",
+            question_type="open_ended",
+            difficulty="easy",
+            topic="Data Structures",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=aqdf_institution.id,
+            created_by=aqdf_user.id,
+        )
+        aqdf_db.add_all([q_linked, q_other])
+        aqdf_db.flush()
+        aqdf_db.add(QuestionSourceDocument(question_id=q_linked.id, document_id=doc.id))
+        aqdf_db.commit()
+
+        response = aqdf_client.get(
+            f"/api/v1/exams/approved-questions?document_ids={doc.id}"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        returned_ids = [q["id"] for q in data["questions"]]
+        assert q_linked.id in returned_ids
+        assert q_other.id not in returned_ids
+
+    def test_no_document_ids_returns_all_questions(
+        self, aqdf_client, aqdf_db, aqdf_institution, aqdf_user
+    ):
+        q = QuestionReview(
+            question_text="What is recursion?",
+            question_type="open_ended",
+            difficulty="medium",
+            topic="Programming",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=aqdf_institution.id,
+            created_by=aqdf_user.id,
+        )
+        aqdf_db.add(q)
+        aqdf_db.commit()
+
+        response = aqdf_client.get("/api/v1/exams/approved-questions")
+        assert response.status_code == 200
+        ids = [x["id"] for x in response.json()["questions"]]
+        assert q.id in ids
+
+    def test_filter_by_multiple_document_ids_returns_union(
+        self, aqdf_client, aqdf_db, aqdf_institution, aqdf_user
+    ):
+        """Multi-document filter (?document_ids=1,2 — comma-separated, as
+        serialized by ComposerService.listApprovedQuestions) returns the
+        UNION of questions linked to any of the requested documents. The
+        SQLAlchemy ``IN`` clause is the most likely break point, so verify
+        it directly with a multi-doc selection.
+        """
+        from models.document import Document
+        from models.question_review import QuestionSourceDocument
+
+        doc_a = Document(
+            filename="a.pdf",
+            original_filename="a.pdf",
+            file_path="/tmp/a.pdf",
+            file_size=1000,
+            mime_type="application/pdf",
+            institution_id=aqdf_institution.id,
+            user_id=aqdf_user.id,
+        )
+        doc_b = Document(
+            filename="b.pdf",
+            original_filename="b.pdf",
+            file_path="/tmp/b.pdf",
+            file_size=1000,
+            mime_type="application/pdf",
+            institution_id=aqdf_institution.id,
+            user_id=aqdf_user.id,
+        )
+        aqdf_db.add_all([doc_a, doc_b])
+        aqdf_db.flush()
+
+        q_a = QuestionReview(
+            question_text="Linked to A only",
+            question_type="open_ended",
+            difficulty="medium",
+            topic="A",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=aqdf_institution.id,
+            created_by=aqdf_user.id,
+        )
+        q_b = QuestionReview(
+            question_text="Linked to B only",
+            question_type="open_ended",
+            difficulty="medium",
+            topic="B",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=aqdf_institution.id,
+            created_by=aqdf_user.id,
+        )
+        q_neither = QuestionReview(
+            question_text="Linked to no document",
+            question_type="open_ended",
+            difficulty="easy",
+            topic="None",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=aqdf_institution.id,
+            created_by=aqdf_user.id,
+        )
+        aqdf_db.add_all([q_a, q_b, q_neither])
+        aqdf_db.flush()
+        aqdf_db.add_all(
+            [
+                QuestionSourceDocument(question_id=q_a.id, document_id=doc_a.id),
+                QuestionSourceDocument(question_id=q_b.id, document_id=doc_b.id),
+            ]
+        )
+        aqdf_db.commit()
+
+        response = aqdf_client.get(
+            f"/api/v1/exams/approved-questions?document_ids={doc_a.id},{doc_b.id}"
+        )
+        assert response.status_code == 200
+        returned_ids = {q["id"] for q in response.json()["questions"]}
+        assert q_a.id in returned_ids
+        assert q_b.id in returned_ids
+        assert q_neither.id not in returned_ids
+
+
+# ---------------------------------------------------------------------------
+# Task 8: document_ids filter on POST /{exam_id}/auto-fill
+# ---------------------------------------------------------------------------
+
+
+class TestAutoFillDocumentFilter:
+    """Tests that auto-fill respects document_ids filter."""
+
+    @pytest.fixture
+    def afdf_db(self, test_engine):
+        from sqlalchemy.orm import sessionmaker
+
+        TestSession = sessionmaker(bind=test_engine)
+        session = TestSession()
+        yield session
+        session.close()
+
+    @pytest.fixture
+    def afdf_institution(self, afdf_db):
+        existing = afdf_db.query(Institution).filter_by(slug="afdf-test-inst").first()
+        if existing:
+            return existing
+        inst = Institution(
+            name="AFDF Test University",
+            slug="afdf-test-inst",
+            subscription_tier="professional",
+            max_users=-1,
+            max_documents=-1,
+            max_questions_per_month=-1,
+        )
+        afdf_db.add(inst)
+        afdf_db.commit()
+        afdf_db.refresh(inst)
+        return inst
+
+    @pytest.fixture
+    def afdf_user(self, afdf_db, afdf_institution):
+        existing = afdf_db.query(User).filter_by(email="afdf@test.com").first()
+        if existing:
+            return existing
+        user = User(
+            email="afdf@test.com",
+            first_name="AFDF",
+            last_name="User",
+            password_hash="dummy_hash",  # pragma: allowlist secret
+            institution_id=afdf_institution.id,
+            status=UserStatus.ACTIVE.value,
+        )
+        afdf_db.add(user)
+        afdf_db.commit()
+        afdf_db.refresh(user)
+        return user
+
+    @pytest.fixture
+    def afdf_client(self, afdf_db, afdf_institution, afdf_user):
+        from utils.auth_utils import get_current_user
+        from database import get_db
+        import api.exams as exams_module
+
+        app.include_router(exams_module.router)
+        mock_user = _make_mock_user(
+            institution_id=afdf_institution.id, user_id=afdf_user.id
+        )
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = lambda: afdf_db
+        client = TestClient(app, raise_server_exceptions=True)
+        yield client
+        app.dependency_overrides.clear()
+
+    def test_auto_fill_respects_document_ids(
+        self, afdf_client, afdf_db, afdf_institution, afdf_user
+    ):
+        from models.document import Document
+        from models.question_review import QuestionSourceDocument
+
+        doc = Document(
+            filename="os.pdf",
+            original_filename="os.pdf",
+            file_path="/tmp/os.pdf",
+            file_size=1000,
+            mime_type="application/pdf",
+            institution_id=afdf_institution.id,
+            user_id=afdf_user.id,
+        )
+        afdf_db.add(doc)
+        afdf_db.flush()
+
+        exam = Exam(
+            title="OS Exam",
+            institution_id=afdf_institution.id,
+            created_by=afdf_user.id,
+        )
+        afdf_db.add(exam)
+        afdf_db.flush()
+
+        q_linked = QuestionReview(
+            question_text="What is a process?",
+            question_type="open_ended",
+            difficulty="medium",
+            topic="OS",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=afdf_institution.id,
+            created_by=afdf_user.id,
+            estimated_time_minutes=5,
+        )
+        q_other = QuestionReview(
+            question_text="What is a binary tree?",
+            question_type="open_ended",
+            difficulty="medium",
+            topic="Data Structures",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=afdf_institution.id,
+            created_by=afdf_user.id,
+            estimated_time_minutes=5,
+        )
+        afdf_db.add_all([q_linked, q_other])
+        afdf_db.flush()
+        afdf_db.add(QuestionSourceDocument(question_id=q_linked.id, document_id=doc.id))
+        afdf_db.commit()
+
+        response = afdf_client.post(
+            f"/api/v1/exams/{exam.id}/auto-fill",
+            json={"count": 10, "document_ids": [doc.id]},
+        )
+        assert response.status_code == 200
+        added_ids = [eq["question_id"] for eq in response.json()["questions"]]
+        assert q_linked.id in added_ids
+        assert q_other.id not in added_ids

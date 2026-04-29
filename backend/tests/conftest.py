@@ -3,11 +3,22 @@ Pytest Configuration und Fixtures für ExamCraft AI Tests
 """
 
 import pytest
+import sys
 import tempfile
 import os
 
 # Disable rate limiting for tests before importing the app
 os.environ["RATE_LIMIT_ENABLED"] = "false"
+
+# Pydantic v2 builds nested TypeAdapters recursively when FastAPI rebuilds the
+# OpenAPI schema during TestClient lifespan startup. With deeply nested models
+# (RAGExamRequestModel and friends) the default 1000-deep limit can be hit
+# during the per-test TestClient context entry, surfacing as a RecursionError
+# at fixture setup time. Lifting the cap here is cheap, safe (CPython enforces
+# its own native-stack limit independently), and resolves the flake without
+# touching production schema build paths.
+if sys.getrecursionlimit() < 3000:
+    sys.setrecursionlimit(3000)
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -237,7 +248,13 @@ def _make_mock_user(is_admin: bool = False):
 
 @pytest.fixture(scope="function")
 def help_db(test_engine):
-    """DB session for help tests with seeded Institution + User for FK constraints."""
+    """DB session for help tests with seeded Institution + User for FK constraints.
+
+    Cleanup beim Teardown: löscht User(id=999) und Institution(id=998), damit
+    diese Rows nicht später von ``Institution.first()``-Fixtures in anderen
+    Test-Files (test_quota_enforcement_integration, test_profile_permissions_
+    and_institution u.a.) als "frische" Institution interpretiert werden.
+    """
     from sqlalchemy.orm import sessionmaker
     from models.auth import Institution, User
 
@@ -269,9 +286,18 @@ def help_db(test_engine):
     db.merge(user)
     db.commit()
 
-    yield db
-    db.rollback()
-    db.close()
+    try:
+        yield db
+    finally:
+        db.rollback()
+        try:
+            db.query(User).filter(User.id == 999).delete()
+            db.query(Institution).filter(Institution.id == 998).delete()
+            db.commit()
+        except Exception:
+            db.rollback()
+        finally:
+            db.close()
 
 
 @pytest.fixture(scope="function")
