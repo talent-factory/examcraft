@@ -48,9 +48,10 @@ celery_app.conf.update(
 
 # Beat-Schedule für periodische Wartung (TF-329 Watchdog).
 # Voraussetzung: ein laufender `celery -A celery_app beat`-Process. In der
-# Fly.io-Deployment können wir das via einer separaten Process-Group im
-# fly.toml von `examcraft-celery` realisieren — oder als `--beat`-Flag auf dem
-# Worker für Single-Instance-Setup. Siehe TF-329 PR-Body für Details.
+# Fly.io-Deployment läuft Beat als Sidecar-Process in `fly.celery.toml`
+# (oder als `--beat`-Flag auf dem Worker für Single-Instance-Setup). Siehe
+# docs/superpowers/plans/2026-04-28-tf329-watchdog-pending-jobs.md für die
+# Deployment-Rezeptur.
 celery_app.conf.beat_schedule = {
     "reconcile-stuck-jobs-every-5-minutes": {
         "task": "tasks.maintenance_tasks.reconcile_stuck_jobs",

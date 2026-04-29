@@ -991,6 +991,8 @@
       "documentFilterAll": "All documents",
       "documentFilterRemove": "Remove",
       "loading": "Loading questions...",
+      "errorLoadingQuestions": "Could not load questions.",
+      "errorLoadingDocuments": "Could not load documents.",
       "empty": "No approved questions found.",
       "available": "{{count}} questions available",
       "difficultyEasy": "Easy",

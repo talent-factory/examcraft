@@ -173,6 +173,69 @@ def test_enforce_custom_owner_field(other_user, test_db):
     assert test_db.query(AuditLog).count() == 0  # owner-match path
 
 
+def test_enforce_blocks_cross_institution_access_for_non_superuser(other_user, test_db):
+    """Resource in a different institution → 403 even if owner_id is None
+    (orphan). Previously the orphan branch returned success unconditionally,
+    so a user from institution B could touch an orphan resource from
+    institution A. The institution check now runs BEFORE the orphan branch.
+    """
+    obj = SimpleNamespace(id=42, user_id=None, institution_id=999)
+    with pytest.raises(HTTPException) as exc:
+        enforce_resource_access(
+            obj=obj,
+            user=other_user,
+            action="process",
+            db=test_db,
+            resource_type="document",
+        )
+    assert exc.value.status_code == 403
+    # No audit log: a non-superuser blocked at the institution boundary
+    # never reaches the bypass branch.
+    from models.auth import AuditLog as _AuditLog
+
+    assert test_db.query(_AuditLog).count() == 0
+
+
+def test_enforce_allows_cross_institution_access_for_superuser_with_audit(
+    super_user, test_db
+):
+    """Superusers cross institution boundaries (audit-logged), so a foreign
+    institution's resource is still accessible — but a superuser bypass is
+    written to the audit trail.
+    """
+    obj = SimpleNamespace(id=42, user_id=1, institution_id=999)
+    enforce_resource_access(
+        obj=obj,
+        user=super_user,
+        action="delete",
+        db=test_db,
+        resource_type="document",
+    )
+    logs = test_db.query(AuditLog).all()
+    assert len(logs) == 1
+    assert logs[0].action == "superuser_bypass"
+
+
+def test_enforce_skips_institution_check_when_obj_lacks_institution_id(
+    other_user, test_db
+):
+    """Backwards compatibility: objects without an ``institution_id``
+    attribute (existing call patterns) still flow through the owner / orphan
+    / superuser branches — the institution gate is opt-in by attribute
+    presence so existing callers don't regress.
+    """
+    obj = SimpleNamespace(id=42, user_id=other_user.id)  # no institution_id
+    enforce_resource_access(
+        obj=obj,
+        user=other_user,
+        action="view",
+        db=test_db,
+        resource_type="exam",
+    )
+    # Owner-match path returns silently with no audit.
+    assert test_db.query(AuditLog).count() == 0
+
+
 def test_enforce_superuser_bypass_aborts_when_audit_persistence_fails(
     super_user, test_db, mocker
 ):

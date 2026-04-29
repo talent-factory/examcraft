@@ -2548,6 +2548,88 @@ class TestApprovedQuestionsDocumentFilter:
         ids = [x["id"] for x in response.json()["questions"]]
         assert q.id in ids
 
+    def test_filter_by_multiple_document_ids_returns_union(
+        self, aqdf_client, aqdf_db, aqdf_institution, aqdf_user
+    ):
+        """Multi-document filter (?document_ids=1,2 — comma-separated, as
+        serialized by ComposerService.listApprovedQuestions) returns the
+        UNION of questions linked to any of the requested documents. The
+        SQLAlchemy ``IN`` clause is the most likely break point, so verify
+        it directly with a multi-doc selection.
+        """
+        from models.document import Document
+        from models.question_review import QuestionSourceDocument
+
+        doc_a = Document(
+            filename="a.pdf",
+            original_filename="a.pdf",
+            file_path="/tmp/a.pdf",
+            file_size=1000,
+            mime_type="application/pdf",
+            institution_id=aqdf_institution.id,
+            user_id=aqdf_user.id,
+        )
+        doc_b = Document(
+            filename="b.pdf",
+            original_filename="b.pdf",
+            file_path="/tmp/b.pdf",
+            file_size=1000,
+            mime_type="application/pdf",
+            institution_id=aqdf_institution.id,
+            user_id=aqdf_user.id,
+        )
+        aqdf_db.add_all([doc_a, doc_b])
+        aqdf_db.flush()
+
+        q_a = QuestionReview(
+            question_text="Linked to A only",
+            question_type="open_ended",
+            difficulty="medium",
+            topic="A",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=aqdf_institution.id,
+            created_by=aqdf_user.id,
+        )
+        q_b = QuestionReview(
+            question_text="Linked to B only",
+            question_type="open_ended",
+            difficulty="medium",
+            topic="B",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=aqdf_institution.id,
+            created_by=aqdf_user.id,
+        )
+        q_neither = QuestionReview(
+            question_text="Linked to no document",
+            question_type="open_ended",
+            difficulty="easy",
+            topic="None",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=aqdf_institution.id,
+            created_by=aqdf_user.id,
+        )
+        aqdf_db.add_all([q_a, q_b, q_neither])
+        aqdf_db.flush()
+        aqdf_db.add_all(
+            [
+                QuestionSourceDocument(question_id=q_a.id, document_id=doc_a.id),
+                QuestionSourceDocument(question_id=q_b.id, document_id=doc_b.id),
+            ]
+        )
+        aqdf_db.commit()
+
+        response = aqdf_client.get(
+            f"/api/v1/exams/approved-questions?document_ids={doc_a.id},{doc_b.id}"
+        )
+        assert response.status_code == 200
+        returned_ids = {q["id"] for q in response.json()["questions"]}
+        assert q_a.id in returned_ids
+        assert q_b.id in returned_ids
+        assert q_neither.id not in returned_ids
+
 
 # ---------------------------------------------------------------------------
 # Task 8: document_ids filter on POST /{exam_id}/auto-fill

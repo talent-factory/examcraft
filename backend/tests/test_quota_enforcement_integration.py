@@ -142,7 +142,12 @@ def db_with_quotas(test_db):
 
 @pytest.fixture
 def institution(db_with_quotas):
-    return db_with_quotas.query(Institution).first()
+    # Filter by slug — `.first()` would pick up leaked Institution rows from
+    # other test files (test_exam_api's dwq-test-inst, etc.) that commit
+    # raw sessions without rollback, breaking quota assertions.
+    return (
+        db_with_quotas.query(Institution).filter(Institution.slug == "quota-test").one()
+    )
 
 
 @pytest.fixture

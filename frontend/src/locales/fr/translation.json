@@ -947,6 +947,8 @@
       "documentFilterAll": "Tous les documents",
       "documentFilterRemove": "Supprimer",
       "loading": "Chargement des questions...",
+      "errorLoadingQuestions": "Impossible de charger les questions.",
+      "errorLoadingDocuments": "Impossible de charger les documents.",
       "empty": "Aucune question approuvée trouvée.",
       "available": "{{count}} questions disponibles",
       "difficultyEasy": "Facile",

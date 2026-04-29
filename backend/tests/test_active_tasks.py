@@ -328,6 +328,73 @@ class TestActiveTasksSuperuser:
         assert kwargs["action"] == "list_all_active"
         assert kwargs["request"] is not None  # http_request forwarded
 
+    def test_superuser_no_audit_when_only_own_jobs_returned(
+        self, super_client, mock_db
+    ):
+        """Audit fires ONLY when at least one foreign-owned job is in the
+        response. The frontend polls this endpoint repeatedly; emitting an
+        audit row every poll cycle (most of which return only own jobs)
+        flooded the DSGVO trail with low-signal entries and obscured genuine
+        cross-owner access.
+        """
+        own_job_a = _make_job("task-own-a", user_id=99)
+        own_job_b = _make_job("task-own-b", user_id=99)
+
+        query_chain = MagicMock()
+        query_chain.filter.return_value.all.return_value = [own_job_a, own_job_b]
+        mock_db.query.return_value = query_chain
+
+        with (
+            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.audit_service.AuditService") as mock_audit,
+        ):
+            mock_result = Mock()
+            mock_result.state = "PENDING"
+            mock_result.info = {}
+            mock_ar_cls.return_value = mock_result
+
+            response = super_client.get("/api/v1/rag/active-tasks")
+
+        assert response.status_code == 200
+        # Both own jobs returned, but no audit-bypass log generated.
+        mock_audit.log_superuser_bypass.assert_not_called()
+
+    def test_active_tasks_superuser_bypass_aborts_when_audit_fails(
+        self, super_client, mock_db
+    ):
+        """DSGVO contract symmetry: when /active-tasks's bypass-audit insert
+        fails (log_superuser_bypass raises HTTPException(500) per the
+        invariant tested elsewhere), the endpoint must return 500 instead
+        of silently leaking foreign-owned jobs into the response. Without
+        this assertion, a regression that swallows the helper's exception
+        would silently restore the bypass-without-trail risk that TF-324
+        was specifically meant to close.
+        """
+        from fastapi import HTTPException
+
+        foreign_job = _make_job("task-foreign", user_id=42)
+
+        query_chain = MagicMock()
+        query_chain.filter.return_value.all.return_value = [foreign_job]
+        mock_db.query.return_value = query_chain
+
+        with (
+            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.audit_service.AuditService") as mock_audit,
+        ):
+            mock_result = Mock()
+            mock_result.state = "PENDING"
+            mock_result.info = {}
+            mock_ar_cls.return_value = mock_result
+            mock_audit.log_superuser_bypass.side_effect = HTTPException(
+                status_code=500, detail="Audit log unavailable"
+            )
+
+            response = super_client.get("/api/v1/rag/active-tasks")
+
+        assert response.status_code == 500
+        assert "Audit log unavailable" in response.json().get("detail", "")
+
 
 class TestPhantomJobFiltering:
     """TF-326: jobs with terminal Celery state must be excluded and DB synced."""

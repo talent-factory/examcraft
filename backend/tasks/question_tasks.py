@@ -252,13 +252,30 @@ def _persist_questions(
             else:
                 explanation_text = None
 
+            # TF-330: normalize on write so new rows are canonical List[str];
+            # the read-side validator exists only for legacy rows that this
+            # branch will never produce again. Multiple-choice questions
+            # MUST persist a usable list — fail-loud if normalization could
+            # not recover one, otherwise the question lands in the review
+            # queue with no answer choices and reviewers can't tell whether
+            # it's corrupt or just rendered wrong.
+            normalized_options = normalize_options(question.options)
+            if (
+                question.question_type == "multiple_choice"
+                and question.options is not None
+                and normalized_options is None
+            ):
+                raise ValueError(
+                    f"Refusing to persist multiple_choice question with "
+                    f"unrecoverable options shape "
+                    f"(type={type(question.options).__name__}); "
+                    f"see question_options.unsafe_dict_keys / "
+                    f"question_options.unsupported_type log entry above."
+                )
             question_review = QuestionReview(
                 question_text=question.question_text,
                 question_type=question.question_type,
-                # TF-330: normalize on write so new rows are canonical
-                # List[str]; the read-side validator only exists for legacy
-                # data that this branch will never produce again.
-                options=normalize_options(question.options),
+                options=normalized_options,
                 correct_answer=question.correct_answer,
                 explanation=explanation_text,
                 difficulty=question.difficulty,
@@ -290,9 +307,19 @@ def _persist_questions(
             )
             filename_to_doc_id = {d.original_filename: d.id for d in all_docs}
         else:
+            # No institution_id → no QuestionSourceDocument rows can be
+            # created, so the TF-321 source-document filter UI will return
+            # empty pools for these questions. Surface so the gap is visible
+            # in logs rather than appearing as a frontend bug.
+            logger.info(
+                "persist_questions.no_institution: skipping source-document "
+                "linking for %d questions; TF-321 filter will not see them",
+                len(reviews),
+            )
             filename_to_doc_id = {}
 
         review_ids = []
+        unmatched_filenames: set[str] = set()
         for question_review in reviews:
             history = ReviewHistory(
                 question_id=question_review.id,
@@ -313,6 +340,24 @@ def _persist_questions(
                             question_id=question_review.id, document_id=doc_id
                         )
                     )
+                elif filename_to_doc_id:
+                    # Filename present in question metadata but not in the
+                    # institution's Document table — most likely filename
+                    # normalization drift (e.g. underscores vs. spaces,
+                    # case). De-duplicate the warning since the same source
+                    # filename usually appears across multiple questions.
+                    unmatched_filenames.add(fname)
+
+        if unmatched_filenames:
+            logger.warning(
+                "persist_questions.source_document_unmatched institution=%s "
+                "count=%d sample=%s — TF-321 source filter will miss linked "
+                "questions for these filenames; check RAG metadata vs. "
+                "Document.original_filename for normalization drift",
+                institution_id,
+                len(unmatched_filenames),
+                sorted(unmatched_filenames)[:5],
+            )
 
         db.commit()
         return review_ids

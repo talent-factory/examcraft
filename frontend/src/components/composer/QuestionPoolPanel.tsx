@@ -134,7 +134,11 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
 
   // Explicit staleTime: 0 and refetchOnMount: 'always' to override the global 5-minute default
   // (set in AppWithAuth). Both queries must reflect question approvals on navigation back here.
-  const { data: allDocs = [] } = useQuery({
+  const {
+    data: allDocs = [],
+    isError: isDocsError,
+    error: docsError,
+  } = useQuery({
     queryKey: ['documents-with-questions'],
     queryFn: () => ComposerService.listDocumentsWithQuestions(),
     staleTime: 0,
@@ -146,7 +150,12 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
     ? allDocs.filter((d) => defaultDocumentIds.includes(d.id))
     : allDocs;
 
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError: isQuestionsError,
+    error: questionsError,
+  } = useQuery({
     queryKey: ['approved-questions', search, filterType, filterDifficulty, selectedDocumentIds, defaultDocumentIds],
     queryFn: () =>
       ComposerService.listApprovedQuestions({
@@ -323,8 +332,18 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent mb-2"
       />
 
-      {/* Document filter */}
-      {availableDocs.length > 0 && (
+      {/* Document filter — show error banner if the document list query failed
+          so the filter UI doesn't silently disappear (which is identical to
+          the "institution has no documents" state and looks like a bug). */}
+      {isDocsError && (
+        <div
+          className="mb-2 px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm"
+          role="alert"
+        >
+          {getErrorMessage(docsError, t('composer.questionPool.errorLoadingDocuments'))}
+        </div>
+      )}
+      {!isDocsError && availableDocs.length > 0 && (
         <div className="mb-2">
           <div className="relative w-fit" ref={docFilterRef}>
             <button
@@ -428,6 +447,13 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
         {isLoading ? (
           <div className="text-center py-8 text-gray-500 text-sm">{t('composer.questionPool.loading')}</div>
+        ) : isQuestionsError ? (
+          <div
+            className="mx-auto my-4 max-w-sm px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm text-center"
+            role="alert"
+          >
+            {getErrorMessage(questionsError, t('composer.questionPool.errorLoadingQuestions'))}
+          </div>
         ) : !data?.questions.length ? (
           <div className="text-center py-8 text-gray-400 text-sm">
             {t('composer.questionPool.noQuestions')}

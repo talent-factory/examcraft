@@ -50,8 +50,14 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# 120s > process_document retry countdown (60s), damit der WebSocket
-# nicht timeout bevor ein Retry-Versuch beginnt.
+# 120s ist eine Kompromiss-Schwelle für beide Task-Typen, die der Endpoint
+# bedient:
+#   - process_document: countdown=60 s (immer < 120 s, Retry beginnt
+#     rechtzeitig).
+#   - generate_questions_task: retry_backoff=30, retry_backoff_max=300
+#     mit retry_jitter=True. Erster Retry typischerweise bei ~30-60 s,
+#     im Worst Case bis 150 s. Über 120 s übergeben wir an den TF-329-
+#     Watchdog, der den DB-Status setzt; der Client muss neu verbinden.
 PENDING_TIMEOUT_SECONDS = 120
 # 1s balanciert Responsivität mit Redis-Last; Progress-Updates sind schritt-basiert.
 POLL_INTERVAL_SECONDS = 1

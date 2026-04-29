@@ -163,11 +163,13 @@ class AuditService:
             # Generate a correlation ID so operators can match this loud log
             # line to whatever exception trace lands in Sentry / log
             # aggregation. Returning None preserves the historical contract
-            # for non-DSGVO call sites; the bypass-helpers
-            # (log_superuser_bypass / log_admin_cross_owner) check for None
-            # and abort the action with HTTP 500 to keep the audit
-            # invariant. Other call sites (login, password change, …) at
-            # least get a loud trail now instead of a silent swallow.
+            # for call sites that do not gate a privileged bypass; the
+            # bypass-helpers (log_superuser_bypass / log_admin_cross_owner)
+            # check for None and abort the action with HTTP 500 to keep the
+            # privileged-action audit invariant. Login / password / permission-
+            # denied paths still fail loud in the logs via the error_id below
+            # rather than silently swallowing — they just don't refuse the
+            # user-facing operation when the audit insert fails.
             error_id = uuid.uuid4().hex
             logger.error(
                 "Failed to create audit log [error_id=%s, action=%s, user_id=%s, "

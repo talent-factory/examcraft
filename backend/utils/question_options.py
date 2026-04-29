@@ -28,17 +28,20 @@ def normalize_options(value: Any) -> Optional[List[str]]:
       ordered by sorted key. Logged at WARNING — this branch only fires on
       the legacy shape the data migration is supposed to drain; persistent
       hits mean the migration didn't run or a writer reintroduced the bug.
-    * ``dict`` with non-letter keys (numeric strings ``'1','10','2'``,
-      mixed shapes, …) → ``None`` and logged at ERROR. Lex-sorting numeric
-      keys silently reorders answers (``'1','10','2'`` → answer at
-      original position 2 ends up rendered between positions 1 and 10).
-      The TF-330 migration explicitly leaves numeric-key rows untouched
-      because the original positional intent can't be reconstructed; the
-      read path follows suit.
+    * ``dict`` with any non-single-letter keys (numeric strings
+      ``'1','10','2'``, longer strings like ``'opt1'``, mixed shapes, …) →
+      ``None`` and logged at ERROR. Only ``'A'/'B'/'C'/'D'``-style keys
+      have a known intended order; everything else risks lex-sort
+      corruption (``'1','10','2'`` → answer at original position 2 ends
+      up rendered between positions 1 and 10) or simply has no canonical
+      ordering. The TF-330 migration filters its UPDATE on
+      ``?| array['A','B','C','D']`` for the same reason — the read path
+      mirrors that filter.
     * any other type → ``None`` and logged at ERROR. The defensive ``None``
       keeps a corrupt row from crashing the read path, but masking it
-      silently would hide a real data-corruption bug class (e.g. legacy
-      double-encoded JSON strings) — surface it loudly instead.
+      silently would hide a real data-corruption bug class (hypothetical
+      example: legacy double-encoded JSON strings) — surface it loudly
+      instead.
     """
     if value is None:
         return None

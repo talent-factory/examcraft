@@ -338,24 +338,41 @@ async def retry_generation(
 
         from utils.tenant_utils import SubscriptionLimits
 
-        if not current_user.institution:
+        # Preserve original ownership across retries. For owner-driven retries
+        # this is a no-op (original_user is current_user). For superuser-bypass
+        # retries this is critical: the original job's request_data is scoped
+        # to the original institution (exam_id, document filenames), so
+        # creating the new job under the superuser's user/institution would
+        # silently move quota consumption and resulting QuestionReview rows
+        # into the wrong institution.
+        if original_job.user_id == current_user.id:
+            owner_user = current_user
+        else:
+            owner_user = db.query(User).filter(User.id == original_job.user_id).first()
+            if owner_user is None or owner_user.institution is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=t("rag_retry_owner_unavailable", locale=locale),
+                )
+
+        if not owner_user.institution:
             raise HTTPException(
                 status_code=403, detail=t("rag_no_institution", locale=locale)
             )
 
         question_count = original_job.request_data.get("question_count", 5)
         SubscriptionLimits.check_question_limit(
-            current_user.institution,
+            owner_user.institution,
             db,
             additional_count=question_count,
-            user=current_user,
+            user=owner_user,
             request=http_request,
         )
 
         new_task_id = str(uuid.uuid4())
         new_job = QuestionGenerationJob(
             task_id=new_task_id,
-            user_id=current_user.id,
+            user_id=owner_user.id,
             topic=original_job.topic,
             question_count=original_job.question_count,
             request_data=original_job.request_data,
@@ -367,8 +384,8 @@ async def retry_generation(
             generate_questions_task.apply_async(
                 args=[
                     original_job.request_data,
-                    str(current_user.id),
-                    current_user.institution_id,
+                    str(owner_user.id),
+                    owner_user.institution_id,
                 ],
                 task_id=new_task_id,
                 queue="question_generation",
@@ -693,17 +710,6 @@ async def get_active_tasks(
     # created_at is timezone-aware (UTC) — use aware cutoff
     cutoff = datetime.now(timezone.utc) - ACTIVE_TASK_MAX_AGE
     if current_user.is_superuser:
-        from services.audit_service import AuditService
-
-        AuditService.log_superuser_bypass(
-            db=db,
-            superuser=current_user,
-            resource_type="question_generation_job_list",
-            resource_id=None,
-            action="list_all_active",
-            owner_user_id=None,
-            request=http_request,
-        )
         jobs = (
             db.query(QuestionGenerationJob)
             .filter(
@@ -712,6 +718,26 @@ async def get_active_tasks(
             )
             .all()
         )
+        # Audit only when the bypass actually surfaced a foreign-owned job.
+        # The frontend GenerationTasksContext polls this endpoint on a multi-
+        # second interval; emitting an audit row every poll cycle (most of
+        # which return only the superuser's own jobs) flooded the DSGVO trail
+        # with low-signal entries and obscured genuine cross-owner access
+        # events. Logging on first foreign-job detection per request keeps
+        # the security signal sharp.
+        foreign_owned = [j for j in jobs if j.user_id != current_user.id]
+        if foreign_owned:
+            from services.audit_service import AuditService
+
+            AuditService.log_superuser_bypass(
+                db=db,
+                superuser=current_user,
+                resource_type="question_generation_job_list",
+                resource_id=None,
+                action="list_all_active",
+                owner_user_id=None,
+                request=http_request,
+            )
     else:
         jobs = (
             db.query(QuestionGenerationJob)

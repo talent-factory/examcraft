@@ -76,10 +76,16 @@ def reconcile_stuck_jobs() -> dict:
     """Reconcile DB-Status für stuck PENDING-Jobs gegen Celerys Result-Backend.
 
     Returns:
-        dict mit Counters: ``{reconciled, lost, skipped_in_progress, errors}``.
+        dict mit Counters:
+        ``{reconciled, lost, skipped_in_progress, skipped_unexpected, errors}``.
         Counter-Semantik:
           - ``reconciled``: tatsächliche DB-Status-Updates, die persistiert wurden.
           - ``lost``: Untermenge von ``reconciled`` für broker-verlorene Jobs.
+          - ``skipped_in_progress``: läuft noch, nichts zu tun.
+          - ``skipped_unexpected``: Celery-State ausserhalb des bekannten Vokabulars
+            (Tippfehler in einem custom State, kompatibilitätsbruch beim Upgrade,
+            …) — nicht reconciled, aber sichtbar im Counter, damit Operatoren
+            das Symptom in der Beat-Health-Metrik sehen.
           - ``errors``: AsyncResult-Read-Fehler ODER persistierungs-Fehler.
         Gut für Sentry-Metriken und Beat-Health-Checks — gibt operatorisch
         ehrliches Signal bei DB-Outages, statt grün zu bleiben.
@@ -89,6 +95,7 @@ def reconcile_stuck_jobs() -> dict:
         "reconciled": 0,
         "lost": 0,
         "skipped_in_progress": 0,
+        "skipped_unexpected": 0,
         "errors": 0,
     }
 
@@ -151,14 +158,24 @@ def reconcile_stuck_jobs() -> dict:
                 )
                 counters["skipped_in_progress"] += 1
             else:
-                # Unbekannter State — defensiv loggen, nicht anfassen.
+                # Unbekannter State — defensiv loggen, nicht anfassen, aber
+                # zählen. Ohne Counter wäre eine schleichende Drift (z. B.
+                # Celery-Upgrade führt einen neuen State ein, custom State
+                # mit Tippfehler) für Operatoren unsichtbar — der Summary-Log
+                # unten würde nicht feuern und der Watchdog "grün" bleiben.
                 logger.warning(
                     "Watchdog: task %s in unexpected celery state %r — skipping",
                     job.task_id,
                     celery_state,
                 )
+                counters["skipped_unexpected"] += 1
 
-        if counters["reconciled"] or counters["lost"] or counters["errors"]:
+        if (
+            counters["reconciled"]
+            or counters["lost"]
+            or counters["errors"]
+            or counters["skipped_unexpected"]
+        ):
             logger.info(
                 "Watchdog summary: %s",
                 counters,

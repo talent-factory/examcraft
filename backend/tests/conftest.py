@@ -3,11 +3,22 @@ Pytest Configuration und Fixtures für ExamCraft AI Tests
 """
 
 import pytest
+import sys
 import tempfile
 import os
 
 # Disable rate limiting for tests before importing the app
 os.environ["RATE_LIMIT_ENABLED"] = "false"
+
+# Pydantic v2 builds nested TypeAdapters recursively when FastAPI rebuilds the
+# OpenAPI schema during TestClient lifespan startup. With deeply nested models
+# (RAGExamRequestModel and friends) the default 1000-deep limit can be hit
+# during the per-test TestClient context entry, surfacing as a RecursionError
+# at fixture setup time. Lifting the cap here is cheap, safe (CPython enforces
+# its own native-stack limit independently), and resolves the flake without
+# touching production schema build paths.
+if sys.getrecursionlimit() < 3000:
+    sys.setrecursionlimit(3000)
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker

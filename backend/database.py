@@ -17,8 +17,11 @@ DATABASE_URL = os.getenv(
 
 # Engine pool-resilience settings (TF-327): pool_recycle prevents stale
 # connections after Fly internalrouting idle-timeouts (~5-10 min); connect_timeout
-# caps DNS/TCP handshake hangs at 5 s; pool_size/max_overflow give 30 concurrent
-# connections under burst load. pool_pre_ping (existing) remains as the reactive
+# caps DNS/TCP handshake hangs at 5 s; pool_size=10 + max_overflow=20 give up
+# to 30 concurrent connections PER PROCESS under burst load. With FastAPI
+# workers and Celery workers each opening their own pool, total connections
+# to PG = 30 × (api_workers + celery_workers) — keep this in mind when sizing
+# PG max_connections on Fly. pool_pre_ping (existing) remains as the reactive
 # checkout-time validation.
 engine = create_engine(
     DATABASE_URL,

@@ -1,6 +1,8 @@
 # core/backend/api/dashboard.py
 """Dashboard API – Statistiken und Aktivitäten (TF-319)"""
 
+import json
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -8,14 +10,14 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-import json
-
 from database import get_db
 from models.auth import AuditLog, User
 from models.document import Document
 from models.exam import Exam
 from models.question_review import QuestionReview, ReviewStatus
 from utils.auth_utils import get_current_active_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -25,6 +27,39 @@ def _to_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
+
+def _extract_audit_title(
+    log: AuditLog, fallback_title: str, preferred_keys: tuple[str, ...]
+) -> str:
+    """Read a human-readable title from AuditLog.additional_data (JSON).
+
+    Tries ``preferred_keys`` in order; falls back to ``fallback_title``
+    (typically the resource id as string) when the JSON is missing,
+    malformed, or doesn't carry a recognized field. Malformed JSON is
+    logged at WARNING — corrupt audit rows are themselves a security-
+    relevant signal (someone wrote invalid JSON into an audit log) so we
+    surface it rather than silently absorbing.
+    """
+    if not log.additional_data:
+        return fallback_title
+    try:
+        data = json.loads(log.additional_data)
+    except (json.JSONDecodeError, TypeError):
+        logger.warning(
+            "Corrupt additional_data in audit log id=%s action=%s — "
+            "rendering fallback title",
+            log.id,
+            log.action,
+        )
+        return fallback_title
+    if not isinstance(data, dict):
+        return fallback_title
+    for key in preferred_keys:
+        value = data.get(key)
+        if value:
+            return str(value)
+    return fallback_title
 
 
 class DashboardStatsResponse(BaseModel):
@@ -112,15 +147,11 @@ def get_dashboard_activity(
     )
     for log in uploaded_logs:
         if log.created_at:
-            title = str(log.resource_id)
-            if log.additional_data:
-                try:
-                    data = json.loads(log.additional_data)
-                    title = (
-                        data.get("original_filename") or data.get("filename") or title
-                    )
-                except (json.JSONDecodeError, AttributeError):
-                    pass
+            title = _extract_audit_title(
+                log,
+                fallback_title=str(log.resource_id),
+                preferred_keys=("original_filename", "filename"),
+            )
             items.append(
                 ActivityItem(
                     id=f"doc_{log.id}",
@@ -164,13 +195,11 @@ def get_dashboard_activity(
     )
     for log in qapproved_logs:
         if log.created_at:
-            title = str(log.resource_id)
-            if log.additional_data:
-                try:
-                    data = json.loads(log.additional_data)
-                    title = data.get("topic") or title
-                except (json.JSONDecodeError, AttributeError):
-                    pass
+            title = _extract_audit_title(
+                log,
+                fallback_title=str(log.resource_id),
+                preferred_keys=("topic",),
+            )
             if title == str(log.resource_id):
                 try:
                     q = (
@@ -205,13 +234,11 @@ def get_dashboard_activity(
     )
     for log in exam_logs:
         if log.created_at:
-            title = str(log.resource_id)
-            if log.additional_data:
-                try:
-                    data = json.loads(log.additional_data)
-                    title = data.get("title") or title
-                except (json.JSONDecodeError, AttributeError):
-                    pass
+            title = _extract_audit_title(
+                log,
+                fallback_title=str(log.resource_id),
+                preferred_keys=("title",),
+            )
             items.append(
                 ActivityItem(
                     id=f"exam_{log.id}",
@@ -236,13 +263,11 @@ def get_dashboard_activity(
     )
     for log in qrejected_logs:
         if log.created_at:
-            title = str(log.resource_id)
-            if log.additional_data:
-                try:
-                    data = json.loads(log.additional_data)
-                    title = data.get("topic") or title
-                except (json.JSONDecodeError, AttributeError):
-                    pass
+            title = _extract_audit_title(
+                log,
+                fallback_title=str(log.resource_id),
+                preferred_keys=("topic",),
+            )
             if title == str(log.resource_id):
                 try:
                     q = (
@@ -277,13 +302,11 @@ def get_dashboard_activity(
     )
     for log in exam_deleted_logs:
         if log.created_at:
-            title = str(log.resource_id)
-            if log.additional_data:
-                try:
-                    data = json.loads(log.additional_data)
-                    title = data.get("title") or title
-                except (json.JSONDecodeError, AttributeError):
-                    pass
+            title = _extract_audit_title(
+                log,
+                fallback_title=str(log.resource_id),
+                preferred_keys=("title",),
+            )
             items.append(
                 ActivityItem(
                     id=f"examdeleted_{log.id}",
@@ -308,15 +331,11 @@ def get_dashboard_activity(
     )
     for log in deleted_logs:
         if log.created_at:
-            title = str(log.resource_id)
-            if log.additional_data:
-                try:
-                    data = json.loads(log.additional_data)
-                    title = (
-                        data.get("original_filename") or data.get("filename") or title
-                    )
-                except (json.JSONDecodeError, AttributeError):
-                    pass
+            title = _extract_audit_title(
+                log,
+                fallback_title=str(log.resource_id),
+                preferred_keys=("original_filename", "filename"),
+            )
             items.append(
                 ActivityItem(
                     id=f"docdeleted_{log.id}",

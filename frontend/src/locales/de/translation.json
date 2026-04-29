@@ -991,6 +991,8 @@
       "documentFilterAll": "Alle Dokumente",
       "documentFilterRemove": "Entfernen",
       "loading": "Lade Fragen...",
+      "errorLoadingQuestions": "Fragen konnten nicht geladen werden.",
+      "errorLoadingDocuments": "Dokumentliste konnte nicht geladen werden.",
       "empty": "Keine genehmigten Fragen gefunden.",
       "available": "{{count}} Fragen verfügbar",
       "difficultyEasy": "Einfach",

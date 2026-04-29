@@ -184,6 +184,7 @@ def test_reconcile_returns_zero_counts_when_no_stuck_jobs():
         "reconciled": 0,
         "lost": 0,
         "skipped_in_progress": 0,
+        "skipped_unexpected": 0,
         "errors": 0,
     }
 
@@ -326,3 +327,63 @@ def test_reconcile_stuck_jobs_registered_in_beat_schedule():
     schedule = celery_app.conf.beat_schedule
     task_names = [entry["task"] for entry in schedule.values()]
     assert "tasks.maintenance_tasks.reconcile_stuck_jobs" in task_names
+
+
+def test_watchdog_beat_schedule_interval_within_sla():
+    """Beat-Schedule interval must stay within the operational SLA.
+
+    Pin the interval so a regression like 5 min → 5 hours doesn't slip
+    through silently. 15 min is the upper bound: stuck-threshold is 25 min,
+    so the watchdog must run at least once per threshold window to catch
+    every stuck job within ~40 min in the worst case.
+    """
+    from celery_app import celery_app
+
+    schedule = celery_app.conf.beat_schedule
+    watchdog_entries = [
+        entry
+        for entry in schedule.values()
+        if entry["task"] == "tasks.maintenance_tasks.reconcile_stuck_jobs"
+    ]
+    assert watchdog_entries, "Watchdog task must be registered in beat_schedule"
+    for entry in watchdog_entries:
+        interval_seconds = entry["schedule"]
+        # Accept either a float-seconds schedule (current) or a timedelta.
+        if isinstance(interval_seconds, timedelta):
+            interval_seconds = interval_seconds.total_seconds()
+        assert interval_seconds <= 15 * 60, (
+            f"Watchdog interval {interval_seconds}s exceeds 15-min SLA "
+            f"upper bound — stuck jobs would linger past the 25-min threshold"
+        )
+
+
+def test_reconcile_unknown_state_increments_skipped_unexpected_counter():
+    """Unknown Celery state → counted in skipped_unexpected (not silently 0).
+
+    Without the counter, drift like a Celery upgrade introducing a new state
+    or a typo in a custom state would be invisible to operators — the summary
+    log gate would never fire and beat health stays falsely green.
+    """
+    job = _make_job("task-unknown")
+
+    mock_session = MagicMock()
+    _setup_db_query(mock_session, [job])
+
+    mock_async_result = MagicMock()
+    mock_async_result.state = "WEIRD_CUSTOM_STATE"
+
+    with (
+        patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
+        patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
+        patch(
+            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+        ) as mock_safe,
+    ):
+        from tasks.maintenance_tasks import reconcile_stuck_jobs
+
+        result = reconcile_stuck_jobs()
+
+    mock_safe.assert_not_called()
+    assert result["skipped_unexpected"] == 1
+    assert result["reconciled"] == 0
+    assert result["errors"] == 0

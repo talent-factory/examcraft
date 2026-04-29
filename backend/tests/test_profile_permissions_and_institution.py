@@ -128,7 +128,15 @@ def _create_test_client(db):
 
 def _create_user_and_login(db, client, role_name="viewer"):
     """Helper: create user with given role, login, return (user, access_token)."""
-    institution = db.query(Institution).first()
+    # Filter by the slugs the file's fixtures use; `.first()` would pick up
+    # leaked Institution rows from other test files (test_exam_api's
+    # dwq-test-inst, exam-test-university, etc.) that commit raw sessions
+    # without rollback, breaking the institution.name assertion below.
+    institution = (
+        db.query(Institution)
+        .filter(Institution.slug.in_(["pg-array-test", "json-test", "empty-perm"]))
+        .first()
+    )
     role = db.query(Role).filter(Role.name == role_name).first()
 
     user = User(

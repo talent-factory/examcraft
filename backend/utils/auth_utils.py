@@ -212,6 +212,7 @@ def enforce_resource_access(
     resource_type: str,
     owner_field: str = "user_id",
     request=None,
+    require_same_institution: bool = True,
 ) -> None:
     """
     Enforce that user owns obj, or is superuser (which gets logged).
@@ -219,15 +220,27 @@ def enforce_resource_access(
     Behavior:
         - obj is None                               → HTTPException 404
         - obj has no <owner_field> attribute        → HTTPException 500
+        - obj.institution_id != user.institution_id → HTTPException 403
+          (when require_same_institution=True and obj has institution_id;
+          superuser bypasses with audit log)
         - obj.<owner_field> is None (orphan)        → return + warning log
+          (only after the institution check above passes)
         - obj.<owner_field> == user.id              → return
         - user.is_superuser                         → return + audit log
         - else                                      → HTTPException 403
 
-    Orphan resources (owner_id is None) arise legitimately when a User row is
-    soft-deleted via ON DELETE SET NULL. They are intentionally allowed for
-    any authenticated user — treated as institution-shared. If you need
-    stricter handling for a specific resource type, do not use this helper.
+    Tenant boundary: by default, the helper refuses cross-institution access
+    even for orphan resources (owner_id is None). Previously the orphan branch
+    returned success without checking institution_id, which meant a non-admin,
+    non-superuser user from institution B could touch an orphan resource from
+    institution A. Pass ``require_same_institution=False`` only when the
+    resource is intentionally cross-tenant.
+
+    Note: callers that need cross-owner DSGVO trails (delete_document,
+    retry_generation) layer log_admin_cross_owner / log_superuser_bypass
+    *outside* this helper for non-orphan paths. Orphan resources that pass
+    the tenant check still return silently below — the orphan log line is a
+    warning, not an audit entry.
 
     Args:
         obj: The resource object to check (must have id and owner_field attributes).
@@ -237,13 +250,18 @@ def enforce_resource_access(
         resource_type: Audit-log resource type (e.g. "document", "chat_session").
         owner_field: Attribute name on obj holding the owner user_id.
         request: Optional FastAPI Request for IP/user-agent in audit log.
+        require_same_institution: When True (default) and obj exposes an
+            ``institution_id`` attribute, refuse access from users in a
+            different institution. Superusers bypass with audit log.
 
     Raises:
         HTTPException 404 if obj is None.
         HTTPException 500 if obj does not have the requested owner_field
             (programmer error — caller passed wrong owner_field or model
             schema drifted; safer to fail loud than silently grant access).
-        HTTPException 403 if user is neither owner nor superuser.
+        HTTPException 403 if user is neither owner nor superuser, or if
+            require_same_institution=True and the resource belongs to a
+            different institution.
     """
     if obj is None:
         raise HTTPException(status_code=404, detail="Resource not found")
@@ -254,6 +272,26 @@ def enforce_resource_access(
             f"{owner_field!r} — programmer error or schema drift"
         )
         raise HTTPException(status_code=500, detail="Internal authorization error")
+
+    # Tenant boundary check FIRST — before owner check, so an orphan resource
+    # in a different institution still rejects a non-superuser regardless of
+    # owner_field state.
+    if require_same_institution and hasattr(obj, "institution_id"):
+        obj_institution_id = getattr(obj, "institution_id")
+        user_institution_id = getattr(user, "institution_id", None)
+        if obj_institution_id is not None and obj_institution_id != user_institution_id:
+            if not user.is_superuser:
+                logger.warning(
+                    "enforce_resource_access: cross-institution access blocked "
+                    "for %s id=%s (user.institution_id=%s, obj.institution_id=%s)",
+                    resource_type,
+                    getattr(obj, "id", "?"),
+                    user_institution_id,
+                    obj_institution_id,
+                )
+                raise HTTPException(status_code=403, detail="Access denied")
+            # Superuser cross-institution access is allowed but audited
+            # below in the bypass branch — fall through.
 
     owner_id = getattr(obj, owner_field)
     if owner_id is None:
