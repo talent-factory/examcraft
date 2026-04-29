@@ -9,6 +9,128 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-04-29
+
+### Added
+
+- **TF-319 — Dashboard-Statistiken & Aktivitätsfeed (#17):** Neuer
+  Dashboard-Endpoint `/api/dashboard/stats` plus `/activity` mit den
+  letzten 25 Aktivitäten pro Institution (Dokument-Upload, Fragen-
+  Generierung, Review-Approve/Reject, Exam-Erstellung, Lösch-Events).
+  Der Activity-Feed liest aus `audit_logs`, sodass auch gelöschte
+  Ressourcen sichtbar bleiben.
+- **TF-321 — Exam-Composer-Filter nach Quelldokument (#30):**
+  Question-Pool im Composer kann jetzt auf einzelne oder mehrere
+  Quelldokumente eingeschränkt werden (`?document_ids=1,2`). Neue
+  `QuestionSourceDocument`-Join-Tabelle (Migration
+  `2026_04_23_tf321_a_question_source_documents.py`) und ein optionales
+  `Exam.default_document_ids`-Array für Composer-Vorbelegung.
+- **TF-324 — Superuser-Vollzugriff mit Audit-Trail (#31):** Neue
+  `is_superuser`-Rolle mit Tenant-übergreifendem Lesezugriff. Jede
+  cross-owner-Aktion landet via `AuditService.log_superuser_bypass`
+  bzw. `log_admin_cross_owner` im Audit-Log und schlägt fail-loud
+  mit HTTP 500 fehl, wenn die Audit-Persistenz selbst kippt
+  (DSGVO-Vertrag).
+- **TF-329 — Watchdog für stuck PENDING-Jobs (#36):** Celery-Beat-
+  Periodic-Task `tasks.maintenance_tasks.reconcile_stuck_jobs` läuft
+  alle 5 Minuten und syncen `QuestionGenerationJob.status` mit dem
+  echten Celery-Result-Backend. Counter
+  `{reconciled, lost, skipped_in_progress, skipped_unexpected, errors}`
+  geben Operatoren ehrliches Beat-Health-Signal.
+- **HelpIndexState + `/admin/index-state`-Endpoint (#28):** Persistenter
+  Status der Docs-Indexierung mit Admin-API für Beobachtbarkeit.
+  Status-Übergänge `idle → in_progress → completed | partial | failed`
+  mit `last_error`-Feld.
+- **Help-Widget UX-Verbesserungen (#27):** Verbesserte
+  Onboarding-Tour, klarere Empty-States, präzisere Status-Indikatoren.
+- **Generation-Retry-Mechanismus:** Neuer Endpoint
+  `POST /rag/retry-generation/{task_id}` plus Retry-Button in der
+  `GenerationTasksBar`. Originalparameter werden in
+  `QuestionGenerationJob.request_data` (neue JSON-Spalte) persistiert,
+  so dass fehlgeschlagene Jobs ohne Datenverlust neu gestartet werden
+  können. Exponentielles Backoff für Celery-Task-Retries (perf).
+- **Billing — lokalisierte Fehlermeldungen:** Stripe-Checkout-Fehler
+  in DE/EN/FR/IT mit spezifischen Stripe-Fehlercodes statt generischen
+  Meldungen.
+
+### Fixed
+
+- **TF-325 — `_update_job_status` fail-loud + Retry (#32):** Status-
+  Updates auf `QuestionGenerationJob` werden jetzt mit 4 Versuchen
+  (Backoffs 2s/5s/10s) durchgeführt; nach Retry-Erschöpfung wird
+  `JobStatusUpdateError` geraist statt schweigend weiterzulaufen. Deckt
+  das 5-15s-Postgres-Restart-Fenster aus dem 2026-04-28-Incident ab.
+- **TF-326 — `/active-tasks` reconcile gegen Celery-State (#33):**
+  Jobs, deren DB-Status `PENDING` aber Celery-State `SUCCESS`/`FAILURE`/
+  `REVOKED` ist, werden idempotent synchronisiert und aus der Antwort
+  ausgefiltert. Eliminiert Phantom-Tasks im UI.
+- **TF-327 — SQLAlchemy-Pool-Resilienz (#34):** `pool_recycle=1800`
+  und `connect_timeout=5` gegen verlorene Verbindungen unter Last.
+  `pool_size=10 + max_overflow=20 = 30 connections per process`.
+- **TF-328 — WebSocket-Sticky-Terminal-State (#35):** `FAILURE`/
+  `REVOKED` bleibt im Frontend sticky — kein Auto-Recovery in
+  `RUNNING` mehr nach einem Late-PROGRESS-Frame. Backend schliesst
+  die Verbindung nach Terminal-State.
+- **TF-330 — `ReviewQueue` toleriert Legacy-Dict-Shape (#37):**
+  `options` mit Letter-Keys (`'A'/'B'/'C'/'D'`) wird zu `List[str]`
+  normalisiert; numeric/mixed Keys werden auf `None` gemappt mit
+  ERROR-Log. Migration
+  `2026_04_29_tf330_normalize_options_dict_to_list.py` zieht Legacy-Rows
+  einmalig auf den kanonischen Shape um.
+- **TF-331 — Silent-Failure-Patterns aus PR #38 Review beseitigen (#39):**
+  Erste Iteration: `_safe_update_job_status` mit CRITICAL-Logs,
+  `audit_service.log_action` fail-loud bei Bypass-Audits,
+  `docs_indexer_service` Redis-Lock-Failure schlägt jetzt mit 503 durch
+  statt locklos weiterzulaufen, `database._run_migrations_or_create_all`
+  re-raised unter `AUTO_MIGRATE=true`.
+- **TF-332 — PR #38 Second-Pass-Review-Findings (#40):** Zweite
+  Iteration:
+  - `docs_indexer` SHA-Poisoning beseitigt (per-File-Failures avancieren
+    `last_indexed_sha` nicht mehr fälschlich).
+  - `_persist_questions` fail-loud bei unrecoverbaren MC-Options.
+  - `enforce_resource_access` blockiert Cross-Institution-Zugriff auf
+    Orphan-Resources (Tenant-Check vor Orphan-Branch).
+  - `retry_generation` bewahrt Original-Owner-Identität bei Superuser-
+    Retry.
+  - `/active-tasks`-Audit nur noch wenn fremder Job in der Antwort.
+  - `QuestionPoolPanel` Error-Banner statt stilles "noQuestions".
+  - Watchdog `skipped_unexpected`-Counter gegen State-Drift.
+  - Dashboard WARNING bei korruptem `additional_data`-JSON.
+- **document-chat:** Dokument-Auswahl im Neuer-Chat-Dialog wieder
+  sichtbar.
+- **Sidebar:** Versionsnummer und Release-Link auf spezifisches v-Tag
+  korrigiert (Hotfixes #25, #26).
+- **Docs-Indexer-Follow-ups:** Fail-Surfaces, Git-Robustness,
+  Redis-Lock-Cleanup.
+
+### Added — Tests
+
+- 4 neue Test-Cases aus dem Second-Pass-Review (Multi-Doc-Filter UNION,
+  REVOKED-WebSocket-Close, active-tasks audit-fail-aborts,
+  Watchdog-SLA-Bound).
+- 3 neue `enforce_resource_access`-Branch-Tests
+  (Cross-Institution-Block, Superuser-Cross-Tenant-mit-Audit,
+  Backwards-Compat ohne `institution_id`-Attribut).
+- Pre-existing Test-Isolation-Flakes aufgelöst (quota-Fixture filtert
+  per Slug, profile-permissions-Fixture filtert per Slug-Set,
+  `sys.setrecursionlimit(3000)` für Pydantic-Schema-Rebuild).
+
+### Migration Notes
+
+Migrationen sind additiv und laufen via `AUTO_MIGRATE=true` automatisch
+beim Backend-Start:
+
+- `2026_04_23_tf321_a_question_source_documents.py` — neue Join-Tabelle
+- `2026_04_23_tf321_b_exam_default_document_ids.py` —
+  `Exam.default_document_ids`-Spalte
+- `2026_04_29_tf330_normalize_options_dict_to_list.py` —
+  Daten-Migration für Legacy-Dict-Shape (idempotent, downgrade
+  `NotImplementedError`)
+- `2026_04_29_9d70cdf25a49_merge_tf321_and_tf330_heads.py` —
+  Alembic-Multi-Head-Merge
+
+---
+
 ## [1.2.0] - 2026-04-23
 
 ### Added — Docs Deployment Pipeline
