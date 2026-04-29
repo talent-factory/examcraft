@@ -22,13 +22,27 @@ interface HelpChatProps {
 const HelpChat: React.FC<HelpChatProps> = ({ route }) => {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('ec_help_chat_messages') || '[]');
+    } catch {
+      return [];
+    }
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    if (messages.length === 0) {
+      sessionStorage.removeItem('ec_help_chat_messages');
+    } else {
+      sessionStorage.setItem('ec_help_chat_messages', JSON.stringify(messages));
+    }
   }, [messages]);
 
   const handleSend = async () => {
@@ -68,6 +82,11 @@ const HelpChat: React.FC<HelpChatProps> = ({ route }) => {
     }
   };
 
+  const handleNewConversation = () => {
+    sessionStorage.removeItem('ec_help_chat_messages');
+    setMessages([]);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -95,9 +114,24 @@ const HelpChat: React.FC<HelpChatProps> = ({ route }) => {
           />
         ))}
         {loading && (
-          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-            ...
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
+            <Box
+              sx={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                bgcolor: 'primary.main',
+                animation: 'help-pulse 1.2s ease-in-out infinite',
+                '@keyframes help-pulse': {
+                  '0%, 100%': { transform: 'scale(1)', opacity: 0.6 },
+                  '50%': { transform: 'scale(1.5)', opacity: 1 },
+                },
+              }}
+            />
+            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+              {t('help.thinking', 'Denke nach…')}
+            </Typography>
+          </Box>
         )}
         <div ref={messagesEndRef} />
       </Box>
@@ -106,7 +140,7 @@ const HelpChat: React.FC<HelpChatProps> = ({ route }) => {
 
       {messages.length > 0 && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 0.5 }}>
-          <Button size="small" startIcon={<RestartAlt />} onClick={() => setMessages([])}>
+          <Button size="small" startIcon={<RestartAlt />} onClick={handleNewConversation}>
             {t('help.newConversation')}
           </Button>
         </Box>
