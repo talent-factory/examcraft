@@ -80,3 +80,26 @@ class TestNormalizeOptions:
             normalize_options(["a", "b"])
         mock_log.warning.assert_not_called()
         mock_log.error.assert_not_called()
+
+    def test_dict_with_numeric_keys_returns_none(self):
+        """Numeric-string keys ('1','10','2') would lex-sort wrong — return
+        None so the API rejects the corrupt row instead of silently
+        re-ordering the answers."""
+        legacy_numeric = {"1": "first", "2": "second", "10": "tenth"}
+        assert normalize_options(legacy_numeric) is None
+
+    def test_dict_with_numeric_keys_emits_error(self):
+        """Numeric-key shape must surface as ERROR — not silently lex-sort."""
+        with patch("utils.question_options.logger") as mock_log:
+            normalize_options({"1": "x", "2": "y"})
+        mock_log.error.assert_called_once()
+        msg = mock_log.error.call_args[0][0]
+        assert "unsafe_dict_keys" in msg
+
+    def test_dict_with_multi_char_keys_returns_none(self):
+        """Free-form keys ('opt_a', 'option_1') aren't the legacy shape."""
+        assert normalize_options({"opt_a": "x", "opt_b": "y"}) is None
+
+    def test_dict_with_mixed_keys_returns_none(self):
+        """Mix of letter and digit keys must not be silently sorted."""
+        assert normalize_options({"A": "x", "1": "y"}) is None

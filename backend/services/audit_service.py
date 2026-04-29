@@ -3,11 +3,13 @@ Audit Logging Service für ExamCraft AI
 Implementiert Security & GDPR Compliance Logging
 """
 
-from typing import Optional, Dict, Any, TYPE_CHECKING
-from sqlalchemy.orm import Session
-from fastapi import Request
 import logging
 import json
+import uuid
+from typing import Optional, Dict, Any, TYPE_CHECKING
+
+from sqlalchemy.orm import Session
+from fastapi import Request
 
 from models.auth import AuditLog
 
@@ -108,15 +110,27 @@ class AuditService:
                 if not user_agent:
                     user_agent = request.headers.get("user-agent")
 
-            # Serialize additional data to JSON
+            # Serialize additional data to JSON. If serialization fails we
+            # preserve the original keys (truncated repr) so the audit row
+            # stays diagnostically useful instead of collapsing to a generic
+            # "Failed to serialize data" stub that hides what the caller
+            # intended to log.
             additional_data_json = None
             if additional_data:
                 try:
                     additional_data_json = json.dumps(additional_data)
                 except Exception as e:
-                    logger.warning(f"Failed to serialize additional_data: {e}")
+                    logger.warning(
+                        "Failed to serialize additional_data for action=%s: %s",
+                        action,
+                        e,
+                        exc_info=True,
+                    )
                     additional_data_json = json.dumps(
-                        {"error": "Failed to serialize data"}
+                        {
+                            "_serialization_error": str(e),
+                            "_keys": sorted(str(k) for k in additional_data.keys()),
+                        }
                     )
 
             # Create audit log entry
@@ -146,9 +160,32 @@ class AuditService:
             return audit_log
 
         except Exception as e:
-            logger.error(f"Failed to create audit log: {e}")
-            db.rollback()
-            # Don't raise exception - audit logging should not break application flow
+            # Generate a correlation ID so operators can match this loud log
+            # line to whatever exception trace lands in Sentry / log
+            # aggregation. Returning None preserves the historical contract
+            # for non-DSGVO call sites; the bypass-helpers
+            # (log_superuser_bypass / log_admin_cross_owner) check for None
+            # and abort the action with HTTP 500 to keep the audit
+            # invariant. Other call sites (login, password change, …) at
+            # least get a loud trail now instead of a silent swallow.
+            error_id = uuid.uuid4().hex
+            logger.error(
+                "Failed to create audit log [error_id=%s, action=%s, user_id=%s, "
+                "resource=%s:%s]: %s",
+                error_id,
+                action,
+                user_id,
+                resource_type,
+                resource_id,
+                e,
+                exc_info=True,
+            )
+            try:
+                db.rollback()
+            except Exception:
+                logger.error(
+                    "Audit-log rollback failed [error_id=%s]", error_id, exc_info=True
+                )
             return None
 
     @staticmethod

@@ -742,11 +742,16 @@ async def get_active_tasks(
             except Exception as sync_err:
                 # Includes JobNotFoundError, SQLAlchemyError, OSError. We don't
                 # retry inline — TF-329's watchdog reconciles persistent
-                # failures so the request handler never blocks.
-                logger.warning(
-                    "Failed to sync DB status for phantom job %s: %s",
+                # failures so the request handler never blocks. ERROR (not
+                # WARNING) so log aggregation surfaces a real DB outage; the
+                # phantom job stays excluded from the response (same effect as
+                # before), but operators see the symptom loudly.
+                logger.error(
+                    "Failed to sync DB status for phantom job %s (celery_state=%s): %s",
                     job.task_id,
+                    celery_state,
                     sync_err,
+                    exc_info=True,
                 )
             continue
 

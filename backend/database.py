@@ -220,10 +220,21 @@ def _run_migrations_or_create_all():
 
             traceback.print_exc()
             print(f"⚠️  CRITICAL: Alembic migration failed: {e}")
+            # When AUTO_MIGRATE=true, the operator explicitly asked us to apply
+            # migrations on boot. Falling through to Base.metadata.create_all()
+            # would mask the failure: new model tables get created, but
+            # ALTER-style migrations (column adds/renames, data backfills like
+            # TF-330) silently fail to apply. The container would boot a
+            # half-migrated schema and serve traffic. Re-raise so the deploy
+            # pipeline reports the failure instead of producing an inconsistent
+            # production state.
+            if auto_migrate:
+                raise RuntimeError(
+                    f"Alembic migration failed under AUTO_MIGRATE=true: {e}"
+                ) from e
             print(
                 "⚠️  The database schema may be inconsistent. Fix migrations before proceeding."
             )
-            # Still create missing tables, but the warning is loud
 
     Base.metadata.create_all(bind=engine)
     print("Database tables created/verified (create_all fallback)")

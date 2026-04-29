@@ -4,7 +4,20 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from services.docs_indexer_service import DocsIndexerService
+from services.docs_indexer_service import (
+    DocsIndexerService,
+    IndexingLockUnavailableError,
+)
+
+
+# Bypass Redis lock acquisition in tests that exercise the full run_index flow.
+# The lock contract is tested independently in
+# test_acquire_lock_raises_on_redis_unavailable.
+_BYPASS_LOCK = patch.multiple(
+    "services.docs_indexer_service.DocsIndexerService",
+    _acquire_lock=MagicMock(return_value=True),
+    _release_lock=MagicMock(),
+)
 
 
 def test_parse_markdown_into_chunks():
@@ -60,6 +73,7 @@ async def test_full_scan_clears_collection_before_indexing():
     mock_vector_service.create_embeddings = AsyncMock(return_value=[])
 
     with (
+        _BYPASS_LOCK,
         patch(
             "services.docs_indexer_service.DocsIndexerService._get_all_md_files",
             return_value=[],
@@ -97,6 +111,7 @@ async def test_incremental_scan_does_not_clear_collection():
     mock_vector_service.client = mock_client
 
     with (
+        _BYPASS_LOCK,
         patch(
             "services.docs_indexer_service.DocsIndexerService._get_changed_files",
             return_value=([], []),
@@ -143,6 +158,7 @@ async def test_indexing_status_transitions_on_success():
     mock_vector_service.client = mock_client
 
     with (
+        _BYPASS_LOCK,
         patch(
             "services.docs_indexer_service.DocsIndexerService._get_all_md_files",
             return_value=[],
@@ -179,6 +195,7 @@ async def test_indexing_status_transitions_on_failure():
 
     # _ensure_collection raises — propagates per PR #23 hardening
     with (
+        _BYPASS_LOCK,
         patch(
             "services.docs_indexer_service.DocsIndexerService._ensure_collection",
             side_effect=RuntimeError("Qdrant connection refused"),
@@ -196,3 +213,31 @@ async def test_indexing_status_transitions_on_failure():
     assert mock_state.last_error is not None
     assert "RuntimeError" in mock_state.last_error
     assert "Qdrant connection refused" in mock_state.last_error
+
+
+@pytest.mark.asyncio
+async def test_acquire_lock_raises_on_redis_unavailable():
+    """Redis-down must NOT silently allow concurrent indexing — refusing is
+    safer than racing two clear+upsert runs against the same Qdrant
+    collection. Operators see a 503 and retry once Redis is healthy."""
+    with patch(
+        "services.redis_service.RedisService.get_ratelimit_client",
+        side_effect=ConnectionError("redis down"),
+    ):
+        with pytest.raises(IndexingLockUnavailableError):
+            DocsIndexerService._acquire_lock()
+
+
+@pytest.mark.asyncio
+async def test_run_index_propagates_lock_unavailable_error():
+    """run_index must surface the new error so the admin endpoint can map it
+    to a 503 response."""
+    mock_db = MagicMock()
+    service = DocsIndexerService(mock_db)
+
+    with patch(
+        "services.redis_service.RedisService.get_ratelimit_client",
+        side_effect=ConnectionError("redis down"),
+    ):
+        with pytest.raises(IndexingLockUnavailableError):
+            await service.run_index(full_scan=False)

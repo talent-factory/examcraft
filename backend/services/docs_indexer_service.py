@@ -22,16 +22,28 @@ class IndexingInProgressError(RuntimeError):
     """Raised when another indexing run (startup task or admin call) holds the lock."""
 
 
+class IndexingLockUnavailableError(RuntimeError):
+    """Raised when Redis is unreachable and the indexing lock can't be evaluated.
+
+    The previous behavior of returning ``True`` (proceeding lockless) caused a
+    data-corruption race: ``_clear_collection`` and concurrent upserts against
+    the same Qdrant collection produced inconsistent results. Operators should
+    see a 503 and retry once Redis is healthy — concurrent indexing is worse
+    than a delayed indexing run.
+    """
+
+
 class DocsIndexerService:
     def __init__(self, db: Session):
         self.db = db
 
     @staticmethod
     def _acquire_lock() -> bool:
-        """SETNX on Redis. Returns True if lock was acquired.
+        """SETNX on Redis. Returns True if lock was acquired, False otherwise.
 
-        Falls back to True (skip locking) when Redis is unavailable — better
-        to allow a potentially-concurrent run than to refuse indexing entirely.
+        Raises IndexingLockUnavailableError when Redis is unreachable. Refusing
+        is safer than allowing concurrent runs against the same Qdrant
+        collection.
         """
         try:
             from services.redis_service import RedisService
@@ -39,8 +51,13 @@ class DocsIndexerService:
             client = RedisService.get_ratelimit_client()
             return bool(client.set(_LOCK_KEY, "1", nx=True, ex=_LOCK_TTL_SECONDS))
         except Exception as e:
-            logger.warning(f"Redis unreachable, proceeding without lock: {e}")
-            return True
+            logger.error(
+                "Redis unreachable while acquiring docs-indexing lock; refusing run",
+                exc_info=True,
+            )
+            raise IndexingLockUnavailableError(
+                f"Cannot acquire docs-indexing lock: Redis unreachable ({e})"
+            ) from e
 
     @staticmethod
     def _release_lock() -> None:
@@ -48,8 +65,16 @@ class DocsIndexerService:
             from services.redis_service import RedisService
 
             RedisService.get_ratelimit_client().delete(_LOCK_KEY)
-        except Exception as e:
-            logger.warning(f"Redis lock release failed: {e}")
+        except Exception:
+            # 15-min TTL on the lock key bounds the worst-case impact: even if
+            # release fails, the next run can proceed once the key expires.
+            # Log loud so operators can correlate with downstream "indexing
+            # already in progress" 409s.
+            logger.error(
+                "Redis lock release failed for docs-indexing key %s",
+                _LOCK_KEY,
+                exc_info=True,
+            )
 
     async def run_index(self, full_scan: bool = False) -> Dict[str, int]:
         """Serialize indexing via Redis SETNX lock; raises IndexingInProgressError on conflict."""

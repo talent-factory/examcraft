@@ -84,6 +84,8 @@ def test_generate_questions_task_emits_step_zero():
     with (
         patch("tasks.question_tasks.run_async", side_effect=fake_run_async),
         patch("tasks.question_tasks.RAGService", return_value=mock_rag_service),
+        patch("tasks.question_tasks._persist_questions", return_value=[1]),
+        patch("tasks.question_tasks._safe_update_job_status"),
     ):
         task = generate_questions_task
         task.update_state = MagicMock(
@@ -142,6 +144,8 @@ def test_generate_questions_task_returns_correct_format():
     with (
         patch("tasks.question_tasks.run_async", return_value=mock_result),
         patch("tasks.question_tasks.RAGService", return_value=mock_rag_service),
+        patch("tasks.question_tasks._persist_questions", return_value=[1]),
+        patch("tasks.question_tasks._safe_update_job_status"),
     ):
         generate_questions_task.update_state = MagicMock()
 

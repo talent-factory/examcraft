@@ -530,6 +530,7 @@ async def trigger_reindex(
     from services.docs_indexer_service import (
         DocsIndexerService,
         IndexingInProgressError,
+        IndexingLockUnavailableError,
     )
 
     service = DocsIndexerService(db)
@@ -539,6 +540,11 @@ async def trigger_reindex(
         # 409 Conflict: another indexing run holds the lock (startup task or
         # a prior /admin/reindex call). Caller can retry once the lock expires.
         raise HTTPException(status_code=409, detail=str(e))
+    except IndexingLockUnavailableError as e:
+        # 503 Service Unavailable: Redis is down so we can't safely serialize
+        # against concurrent indexing. Refuse rather than risk a Qdrant-clear
+        # race; operator should retry once Redis is healthy.
+        raise HTTPException(status_code=503, detail=str(e))
     return {"status": "completed", **result}
 
 

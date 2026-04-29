@@ -24,10 +24,17 @@ def normalize_options(value: Any) -> Optional[List[str]]:
 
     * ``None`` → ``None``.
     * ``list`` → returned with each entry coerced to ``str``.
-    * ``dict`` → values ordered by sorted keys (so ``'A'/'B'/'C'/'D'`` keeps
-      its natural order). Logged at WARNING — this branch only fires on the
-      legacy shape the data migration is supposed to drain; persistent hits
-      mean the migration didn't run or a writer reintroduced the bug.
+    * ``dict`` with single-letter keys (``'A'/'B'/'C'/'D'``) → values
+      ordered by sorted key. Logged at WARNING — this branch only fires on
+      the legacy shape the data migration is supposed to drain; persistent
+      hits mean the migration didn't run or a writer reintroduced the bug.
+    * ``dict`` with non-letter keys (numeric strings ``'1','10','2'``,
+      mixed shapes, …) → ``None`` and logged at ERROR. Lex-sorting numeric
+      keys silently reorders answers (``'1','10','2'`` → answer at
+      original position 2 ends up rendered between positions 1 and 10).
+      The TF-330 migration explicitly leaves numeric-key rows untouched
+      because the original positional intent can't be reconstructed; the
+      read path follows suit.
     * any other type → ``None`` and logged at ERROR. The defensive ``None``
       keeps a corrupt row from crashing the read path, but masking it
       silently would hide a real data-corruption bug class (e.g. legacy
@@ -38,11 +45,21 @@ def normalize_options(value: Any) -> Optional[List[str]]:
     if isinstance(value, list):
         return [str(item) for item in value]
     if isinstance(value, dict):
+        keys = list(value.keys())
+        # Defensive: numeric/mixed keys can't be lex-sorted into the original
+        # positional order. TF-330 migration leaves them alone for the same
+        # reason — surface as ERROR so the corruption is visible.
+        if not all(isinstance(k, str) and len(k) == 1 and k.isalpha() for k in keys):
+            logger.error(
+                "question_options.unsafe_dict_keys keys=%s — refusing to lex-sort",
+                sorted(str(k) for k in keys),
+            )
+            return None
         logger.warning(
             "question_options.legacy_dict_shape keys=%s",
-            sorted(str(k) for k in value.keys()),
+            sorted(str(k) for k in keys),
         )
-        return [str(value[key]) for key in sorted(value.keys())]
+        return [str(value[key]) for key in sorted(keys)]
     logger.error(
         "question_options.unsupported_type type=%s repr=%r",
         type(value).__name__,

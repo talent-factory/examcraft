@@ -52,7 +52,9 @@ def test_reconcile_syncs_success_state_to_db():
     with (
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
-        patch("tasks.maintenance_tasks._safe_update_job_status") as mock_safe,
+        patch(
+            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+        ) as mock_safe,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
 
@@ -75,7 +77,9 @@ def test_reconcile_syncs_failure_state_to_db():
     with (
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
-        patch("tasks.maintenance_tasks._safe_update_job_status") as mock_safe,
+        patch(
+            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+        ) as mock_safe,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
 
@@ -97,7 +101,9 @@ def test_reconcile_syncs_revoked_state_to_db():
     with (
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
-        patch("tasks.maintenance_tasks._safe_update_job_status") as mock_safe,
+        patch(
+            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+        ) as mock_safe,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
 
@@ -108,7 +114,8 @@ def test_reconcile_syncs_revoked_state_to_db():
 
 
 def test_reconcile_marks_pending_with_no_celery_state_as_failure():
-    """Celery state PENDING (task lost in broker) → DB FAILURE + lost counter."""
+    """Celery state PENDING (task lost in broker) → DB FAILURE + lost counter
+    + Celery backend mark_as_failure mirror so the WebSocket sees terminal state."""
     job = _make_job("task-1")
     mock_session = MagicMock()
     _setup_db_query(mock_session, [job])
@@ -120,15 +127,20 @@ def test_reconcile_marks_pending_with_no_celery_state_as_failure():
     with (
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
-        patch("tasks.maintenance_tasks._safe_update_job_status") as mock_safe,
+        patch(
+            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+        ) as mock_safe,
+        patch("tasks.maintenance_tasks._notify_celery_backend_failure") as mock_notify,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
 
         result = reconcile_stuck_jobs.run()
 
     mock_safe.assert_called_once_with("task-1", "FAILURE")
+    mock_notify.assert_called_once_with("task-1")
     assert result["lost"] == 1
     assert result["reconciled"] == 1
+    assert result["errors"] == 0
 
 
 def test_reconcile_skips_jobs_still_in_progress():
@@ -168,7 +180,12 @@ def test_reconcile_returns_zero_counts_when_no_stuck_jobs():
         result = reconcile_stuck_jobs.run()
 
     mock_safe.assert_not_called()
-    assert result == {"reconciled": 0, "lost": 0, "skipped_in_progress": 0}
+    assert result == {
+        "reconciled": 0,
+        "lost": 0,
+        "skipped_in_progress": 0,
+        "errors": 0,
+    }
 
 
 def test_reconcile_continues_after_individual_job_error():
@@ -192,7 +209,9 @@ def test_reconcile_continues_after_individual_job_error():
         patch(
             "tasks.maintenance_tasks.AsyncResult", side_effect=async_result_side_effect
         ),
-        patch("tasks.maintenance_tasks._safe_update_job_status") as mock_safe,
+        patch(
+            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+        ) as mock_safe,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
 
@@ -201,4 +220,109 @@ def test_reconcile_continues_after_individual_job_error():
     # task-1 errored → not reconciled. task-2 succeeded → reconciled.
     mock_safe.assert_called_once_with("task-2", "SUCCESS")
     assert result["reconciled"] == 1
-    assert result.get("errors", 0) == 1
+    assert result["errors"] == 1
+
+
+def test_reconcile_counts_db_write_failure_as_error_not_reconciled():
+    """When _safe_update_job_status returns False (DB write failed) the
+    watchdog must NOT increment reconciled — counters have to reflect reality
+    so beat-health checks alarm during a real DB outage instead of staying
+    green."""
+    job = _make_job("task-1")
+    mock_session = MagicMock()
+    _setup_db_query(mock_session, [job])
+
+    mock_async_result = MagicMock()
+    mock_async_result.state = "SUCCESS"
+
+    with (
+        patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
+        patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
+        patch(
+            "tasks.maintenance_tasks._safe_update_job_status", return_value=False
+        ) as mock_safe,
+    ):
+        from tasks.maintenance_tasks import reconcile_stuck_jobs
+
+        result = reconcile_stuck_jobs.run()
+
+    mock_safe.assert_called_once_with("task-1", "SUCCESS")
+    assert result["reconciled"] == 0
+    assert result["errors"] == 1
+
+
+def test_reconcile_skips_celery_backend_notify_when_db_write_fails():
+    """Phantom-PENDING with failing DB write must NOT mirror FAILURE into
+    Celery backend — that would double-misrepresent the state (Celery says
+    FAILURE while DB still says PENDING)."""
+    job = _make_job("task-1")
+    mock_session = MagicMock()
+    _setup_db_query(mock_session, [job])
+
+    mock_async_result = MagicMock()
+    mock_async_result.state = "PENDING"  # broker-lost
+
+    with (
+        patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
+        patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
+        patch("tasks.maintenance_tasks._safe_update_job_status", return_value=False),
+        patch("tasks.maintenance_tasks._notify_celery_backend_failure") as mock_notify,
+    ):
+        from tasks.maintenance_tasks import reconcile_stuck_jobs
+
+        result = reconcile_stuck_jobs.run()
+
+    mock_notify.assert_not_called()
+    assert result["lost"] == 0
+    assert result["reconciled"] == 0
+    assert result["errors"] == 1
+
+
+def test_notify_celery_backend_failure_marks_async_result():
+    """The notify helper writes a terminal FAILURE into the Celery backend so
+    AsyncResult.state stops returning PENDING after watchdog reconciliation."""
+    from tasks.maintenance_tasks import (
+        WatchdogReconciliationFailure,
+        _notify_celery_backend_failure,
+    )
+
+    fake_backend = MagicMock()
+    with patch("tasks.maintenance_tasks.celery_app") as mock_celery:
+        mock_celery.backend = fake_backend
+        _notify_celery_backend_failure("task-1")
+
+    fake_backend.mark_as_failure.assert_called_once()
+    args, _ = fake_backend.mark_as_failure.call_args
+    assert args[0] == "task-1"
+    assert isinstance(args[1], WatchdogReconciliationFailure)
+
+
+def test_notify_celery_backend_failure_swallows_backend_errors():
+    """Backend write failure must not abort the watchdog — log and continue."""
+    from tasks.maintenance_tasks import _notify_celery_backend_failure
+
+    with patch("tasks.maintenance_tasks.celery_app") as mock_celery:
+        mock_celery.backend.mark_as_failure.side_effect = RuntimeError("redis down")
+        # Must not raise:
+        _notify_celery_backend_failure("task-1")
+
+
+def test_reconcile_stuck_threshold_at_least_25_min():
+    """Threshold must exceed worst-case retry chain
+    (max_retries=4 × retry_backoff_max=300s ≈ 20 min) so an actively-retrying
+    task isn't reaped by the watchdog before its scheduled retry runs."""
+    from datetime import timedelta
+
+    from tasks.maintenance_tasks import _STUCK_THRESHOLD
+
+    assert _STUCK_THRESHOLD >= timedelta(minutes=25)
+
+
+def test_reconcile_stuck_jobs_registered_in_beat_schedule():
+    """Beat-Schedule includes the watchdog task — typo in the task name would
+    silently disable production reconciliation."""
+    from celery_app import celery_app
+
+    schedule = celery_app.conf.beat_schedule
+    task_names = [entry["task"] for entry in schedule.values()]
+    assert "tasks.maintenance_tasks.reconcile_stuck_jobs" in task_names

@@ -176,15 +176,22 @@ def _update_job_status(task_id: str, status: str) -> None:
     raise JobStatusUpdateError(task_id, status, attempts, last_err) from last_err
 
 
-def _safe_update_job_status(task_id: str, status: str) -> None:
-    """Best-effort status update used by Celery task body. Swallows
-    `JobStatusUpdateError` and `JobNotFoundError` after logging at CRITICAL so a
-    status-write failure never overrides the actual task outcome (e.g., losing
-    a successful generation because the DB write failed, or the row vanished).
-    The watchdog (TF-329) reconciles any phantom PENDING rows that survive.
+def _safe_update_job_status(task_id: str, status: str) -> bool:
+    """Best-effort status update used by Celery task body and the TF-329
+    watchdog. Swallows `JobStatusUpdateError` and `JobNotFoundError` after
+    logging at CRITICAL so a status-write failure never overrides the actual
+    task outcome (e.g., losing a successful generation because the DB write
+    failed, or the row vanished).
+
+    Returns:
+        True if the row was updated, False on any swallowed failure. Callers
+        like the watchdog need this signal to keep their counters honest —
+        previously the watchdog incremented ``reconciled`` unconditionally,
+        so beat-health metrics looked green during a real DB outage.
     """
     try:
         _update_job_status(task_id, status)
+        return True
     except JobStatusUpdateError:
         logger.critical(
             "Could not persist %s status for task %s after retries — "
@@ -193,6 +200,7 @@ def _safe_update_job_status(task_id: str, status: str) -> None:
             task_id,
             exc_info=True,
         )
+        return False
     except JobNotFoundError:
         logger.critical(
             "Cannot update status to %s for task %s: no QuestionGenerationJob row "
@@ -201,6 +209,7 @@ def _safe_update_job_status(task_id: str, status: str) -> None:
             task_id,
             exc_info=True,
         )
+        return False
 
 
 def _persist_questions(
@@ -367,30 +376,26 @@ def generate_questions_task(
             f"({question_count} Fragen in {result.generation_time:.1f}s)"
         )
 
-        # Persistiere Fragen in question_reviews (Status: pending)
-        review_question_ids: List[int] = []
-        persistence_warning = None
-        try:
-            review_question_ids = _persist_questions(
-                questions=result.questions,
-                exam_id=result.exam_id,
-                topic=rag_request.topic,
-                language=rag_request.language,
-                user_id=int(user_id),
-                institution_id=institution_id,
-            )
-            logger.info(
-                f"Fragen persistiert: {len(review_question_ids)} Reviews für Exam {result.exam_id}"
-            )
-        except Exception as persist_err:
-            logger.error(
-                f"Persistierung fehlgeschlagen für Exam '{result.exam_id}': {persist_err}",
-                exc_info=True,
-            )
-            persistence_warning = (
-                "Questions were generated but could not be saved to the review workflow. "
-                "Please try again."
-            )
+        # Persistiere Fragen in question_reviews (Status: pending). Falls die
+        # Persistierung scheitert, behandeln wir den Task als FAILURE statt
+        # SUCCESS-mit-Warnung: aus User-Sicht ist eine "erfolgreiche"
+        # Generierung ohne abrufbare Review-Queue indistinct von einem
+        # Pipeline-Fehler. Außerdem würde der Watchdog den Job nicht mehr
+        # einsammeln (terminal SUCCESS), so dass die Inkonsistenz dauerhaft
+        # bliebe. Re-Raise lässt Celery den Task — wenn noch Retry-Budget da
+        # ist — erneut versuchen, andernfalls geht der Task FAILURE durch das
+        # generische except weiter unten.
+        review_question_ids: List[int] = _persist_questions(
+            questions=result.questions,
+            exam_id=result.exam_id,
+            topic=rag_request.topic,
+            language=rag_request.language,
+            user_id=int(user_id),
+            institution_id=institution_id,
+        )
+        logger.info(
+            f"Fragen persistiert: {len(review_question_ids)} Reviews für Exam {result.exam_id}"
+        )
 
         _safe_update_job_status(self.request.id, "SUCCESS")
 
@@ -403,7 +408,6 @@ def generate_questions_task(
             "generation_time": result.generation_time,
             "quality_metrics": result.quality_metrics,
             "review_question_ids": review_question_ids,
-            "persistence_warning": persistence_warning,
         }
     except Ignore:
         raise
