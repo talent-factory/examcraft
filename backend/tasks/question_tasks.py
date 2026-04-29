@@ -220,6 +220,7 @@ def _persist_questions(
     """
     from database import SessionLocal
     from models.question_review import QuestionReview, ReviewHistory, ReviewStatus
+    from utils.question_options import normalize_options
 
     db = SessionLocal()
     try:
@@ -239,7 +240,10 @@ def _persist_questions(
             question_review = QuestionReview(
                 question_text=question.question_text,
                 question_type=question.question_type,
-                options=question.options,
+                # TF-330: normalize on write so new rows are canonical
+                # List[str]; the read-side validator only exists for legacy
+                # data that this branch will never produce again.
+                options=normalize_options(question.options),
                 correct_answer=question.correct_answer,
                 explanation=explanation_text,
                 difficulty=question.difficulty,

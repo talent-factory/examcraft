@@ -5,9 +5,11 @@ Implementiert Review-Workflow für generierte Prüfungsfragen
 
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 from datetime import datetime
+
+from utils.question_options import normalize_options
 
 from database import get_db
 from models.question_review import (
@@ -180,6 +182,13 @@ class QuestionReviewResponse(BaseModel):
     exam_id: Optional[str]
     created_at: datetime
     updated_at: datetime
+
+    # TF-330: legacy records store ``options`` as a dict keyed by
+    # 'A'/'B'/'C'/'D'. Normalize on read so the API never 500s on these rows.
+    @field_validator("options", mode="before")
+    @classmethod
+    def _normalize_options(cls, value: Any) -> Any:
+        return normalize_options(value)
 
     class Config:
         from_attributes = True

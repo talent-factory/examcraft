@@ -205,3 +205,86 @@ class TestQuestionReviewAPI:
         response = client.get("/api/v1/questions/1/history")
 
         assert response.status_code == 200
+
+
+class TestReviewQueueOptionsShape:
+    """TF-330: ``ReviewQueueResponse`` must tolerate legacy dict-shaped options.
+
+    Older generation paths persisted ``options`` as ``{'A': ..., 'B': ...}``;
+    the schema expects ``List[str]``. A ``before`` field validator normalizes
+    both shapes so the read path never 500s on a legacy row. We exercise the
+    schema directly (instead of through TestClient) because the regression
+    surfaced during Pydantic validation of the response body — that's the
+    exact code path the validator guards.
+    """
+
+    @staticmethod
+    def _question_payload(options):
+        return {
+            "id": 1,
+            "question_text": "Welche Empfehlung gilt für E-Mails?",
+            "question_type": "multiple_choice",
+            "options": options,
+            "correct_answer": "A",
+            "explanation": "Aktive Sprache ist klarer.",
+            "difficulty": "medium",
+            "topic": "Kommunikation",
+            "language": "de",
+            "source_chunks": [],
+            "source_documents": [],
+            "confidence_score": 0.9,
+            "bloom_level": 3,
+            "estimated_time_minutes": 2,
+            "quality_tier": "A",
+            "review_status": ReviewStatus.PENDING.value,
+            "reviewed_by": None,
+            "reviewed_at": None,
+            "exam_id": "exam_demo",
+            "created_at": datetime.now(),
+            "updated_at": datetime.now(),
+        }
+
+    @staticmethod
+    def _build_response(questions):
+        # Imported locally to avoid pulling in api.question_review at module
+        # collection time (tests in this file already do so via TestClient
+        # paths above; keep parity).
+        from api.question_review import ReviewQueueResponse
+
+        return ReviewQueueResponse(
+            total=len(questions),
+            pending=len(questions),
+            approved=0,
+            rejected=0,
+            in_review=0,
+            questions=questions,
+        )
+
+    def test_dict_shaped_legacy_options_normalize_to_list_sorted_by_key(self):
+        legacy = {
+            "A": "Verwenden Sie aktive Sprache",
+            "B": "Schreiben Sie passiv",
+            "C": "Antworten Sie spät",
+            "D": "Melden Sie sich bis Freitag",
+        }
+
+        response = self._build_response([self._question_payload(legacy)])
+
+        assert response.questions[0].options == [
+            "Verwenden Sie aktive Sprache",
+            "Schreiben Sie passiv",
+            "Antworten Sie spät",
+            "Melden Sie sich bis Freitag",
+        ]
+
+    def test_list_shaped_options_round_trip_unchanged(self):
+        list_options = ["alpha", "beta", "gamma", "delta"]
+
+        response = self._build_response([self._question_payload(list_options)])
+
+        assert response.questions[0].options == list_options
+
+    def test_none_options_remain_none(self):
+        response = self._build_response([self._question_payload(None)])
+
+        assert response.questions[0].options is None

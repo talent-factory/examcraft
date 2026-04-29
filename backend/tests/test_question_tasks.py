@@ -626,3 +626,120 @@ def test_job_not_found_error_carries_structured_fields():
     assert err.status == "SUCCESS"
     assert "ghost" in str(err)
     assert "SUCCESS" in str(err)
+
+
+# === TF-330: write-path normalization in _persist_questions ===
+
+
+def _make_fake_question(options):
+    """Premium RAGQuestion is a dataclass; the persist path uses attribute
+    access, so a SimpleNamespace is enough for unit-level tests."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        question_text="Welche Empfehlung gilt für E-Mails?",
+        question_type="multiple_choice",
+        options=options,
+        correct_answer="A",
+        explanation="Aktive Sprache ist klarer.",
+        difficulty="medium",
+        source_chunks=[],
+        source_documents=[],
+        confidence_score=0.9,
+        bloom_level=3,
+    )
+
+
+def _capture_persisted_options(fake_question):
+    """Run ``_persist_questions`` against a stubbed SessionLocal and return
+    the ``options`` value that ended up on the QuestionReview row."""
+    from tasks.question_tasks import _persist_questions
+
+    captured: list = []
+
+    class _StubSession:
+        def add(self, obj):
+            # Capture the first QuestionReview only — ReviewHistory rows
+            # come through later in the same loop and don't carry options.
+            if obj.__class__.__name__ == "QuestionReview":
+                captured.append(obj.options)
+
+        def flush(self):
+            # Simulate the autoincrement IDs the real DB would assign so the
+            # subsequent ReviewHistory rows have something to FK against.
+            pass
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+
+        def close(self):
+            pass
+
+    # _persist_questions iterates ``reviews`` after flush() to read .id for
+    # the history rows; pre-seed an id so that loop succeeds.
+    def _flush():
+        for obj in captured_objs:
+            obj.id = 1
+
+    captured_objs: list = []
+
+    class _StubSessionWithIds(_StubSession):
+        def add(self, obj):
+            if obj.__class__.__name__ == "QuestionReview":
+                captured.append(obj.options)
+                captured_objs.append(obj)
+
+        def flush(self):
+            _flush()
+
+    with patch("database.SessionLocal", return_value=_StubSessionWithIds()):
+        _persist_questions(
+            questions=[fake_question],
+            exam_id="exam_demo",
+            topic="Kommunikation",
+            language="de",
+            user_id=42,
+            institution_id=1,
+        )
+
+    assert captured, "QuestionReview row was not added to the session"
+    return captured[0]
+
+
+def test_persist_questions_normalizes_dict_options_to_list():
+    """TF-330 AC #2: write-path emits the canonical List[str] shape even when
+    the upstream generator returns the legacy dict shape."""
+    legacy_dict = {
+        "A": "Verwenden Sie aktive Sprache",
+        "B": "Schreiben Sie passiv",
+        "C": "Antworten Sie spät",
+        "D": "Melden Sie sich bis Freitag",
+    }
+
+    persisted = _capture_persisted_options(_make_fake_question(legacy_dict))
+
+    assert persisted == [
+        "Verwenden Sie aktive Sprache",
+        "Schreiben Sie passiv",
+        "Antworten Sie spät",
+        "Melden Sie sich bis Freitag",
+    ]
+
+
+def test_persist_questions_passes_list_options_through():
+    """List-shape generation paths must round-trip unchanged."""
+    list_options = ["alpha", "beta", "gamma", "delta"]
+
+    persisted = _capture_persisted_options(_make_fake_question(list_options))
+
+    assert persisted == list_options
+
+
+def test_persist_questions_preserves_none_options():
+    """Open-ended / true-false rows have no options; ``None`` stays ``None``."""
+    persisted = _capture_persisted_options(_make_fake_question(None))
+
+    assert persisted is None
