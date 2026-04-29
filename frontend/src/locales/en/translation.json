@@ -137,7 +137,18 @@
       "generatedQuestions": "Generated Questions",
       "validatedQuestions": "Validated Questions",
       "recentActivity": "Recent Activity",
-      "noActivity": "No activity yet. Start by uploading documents!"
+      "noActivity": "No activity yet. Start by uploading documents!",
+      "activityTypes": {
+        "document_uploaded": "Document uploaded",
+        "questions_generated": "Questions generated",
+        "exam_created": "Exam created",
+        "question_approved": "Question approved",
+        "question_rejected": "Question rejected",
+        "document_deleted": "Document deleted",
+        "exam_deleted": "Exam deleted"
+      },
+      "statsError": "Statistics could not be loaded.",
+      "activityError": "Activities could not be loaded."
     },
     "documents": {
       "title": "Document Library",

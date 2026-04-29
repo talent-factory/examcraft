@@ -139,7 +139,7 @@ async def upload_document(
             current_user.id,
             document.id,
             request=http_request,
-            additional_data={"filename": document.filename, "task_id": task.id},
+            additional_data={"original_filename": document.original_filename, "filename": document.filename, "task_id": task.id},
         )
 
         return UploadResponse(
@@ -533,8 +533,8 @@ async def delete_document(
                 request=http_request,
             )
 
-        # Store filename for audit log
-        filename = document.filename
+        # Store filenames for audit log before deletion
+        original_filename = document.original_filename
 
         # Delete document
         success = document_service.delete_document(document_id, db)
@@ -553,7 +553,7 @@ async def delete_document(
             current_user.id,
             document_id,
             request=http_request,
-            additional_data={"filename": filename},
+            additional_data={"original_filename": original_filename},
         )
 
         return JSONResponse(

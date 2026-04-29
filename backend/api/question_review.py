@@ -782,7 +782,7 @@ async def approve_question(
             AuditService.ACTION_APPROVE_QUESTION,
             current_user.id,
             question_id,
-            additional_data={"reason": request.reason},
+            additional_data={"reason": request.reason, "topic": question.topic},
         )
 
         logger.info(f"Approved question {question_id} by {current_user.email}")
@@ -864,7 +864,7 @@ async def reject_question(
             AuditService.ACTION_REJECT_QUESTION,
             current_user.id,
             question_id,
-            additional_data={"reason": request.reason},
+            additional_data={"reason": request.reason, "topic": question.topic},
         )
 
         logger.info(f"Rejected question {question_id} by {current_user.email}")

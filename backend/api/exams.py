@@ -220,6 +220,19 @@ async def create_exam(
         logger.error("Database error in create_exam: %s", exc)
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     logger.info(f"Created exam {exam.id} by user {current_user.id}")
+
+    from services.audit_service import AuditService
+    AuditService.log_action(
+        db,
+        action="create_exam",
+        status=AuditService.STATUS_SUCCESS,
+        user_id=current_user.id,
+        resource_type="exam",
+        resource_id=str(exam.id),
+        request=http_request,
+        additional_data={"title": exam.title},
+    )
+
     return _exam_to_out(exam)
 
 
@@ -405,6 +418,7 @@ async def delete_exam(
     locale = get_request_locale(request, current_user)
     exam = _get_exam_or_404(exam_id, db, current_user, locale)
     _require_draft(exam, locale)
+    exam_title = exam.title
     db.delete(exam)
     try:
         db.commit()
@@ -417,6 +431,18 @@ async def delete_exam(
         logger.error("Database error in delete_exam for exam %s: %s", exam_id, exc)
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     logger.info(f"Deleted exam {exam_id} by user {current_user.id}")
+
+    from services.audit_service import AuditService
+    AuditService.log_action(
+        db,
+        action="delete_exam",
+        status=AuditService.STATUS_SUCCESS,
+        user_id=current_user.id,
+        resource_type="exam",
+        resource_id=str(exam_id),
+        request=request,
+        additional_data={"title": exam_title},
+    )
 
 
 # --- Question Management Schemas ---

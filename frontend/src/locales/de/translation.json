@@ -137,7 +137,18 @@
       "generatedQuestions": "Generierte Fragen",
       "validatedQuestions": "Validierte Fragen",
       "recentActivity": "Letzte Aktivitäten",
-      "noActivity": "Keine Aktivitäten vorhanden. Starten Sie mit dem Hochladen von Dokumenten!"
+      "noActivity": "Keine Aktivitäten vorhanden. Starten Sie mit dem Hochladen von Dokumenten!",
+      "activityTypes": {
+        "document_uploaded": "Dokument hochgeladen",
+        "questions_generated": "Fragen generiert",
+        "exam_created": "Prüfung erstellt",
+        "question_approved": "Frage validiert",
+        "question_rejected": "Frage abgelehnt",
+        "document_deleted": "Dokument gelöscht",
+        "exam_deleted": "Prüfung gelöscht"
+      },
+      "statsError": "Statistiken konnten nicht geladen werden.",
+      "activityError": "Aktivitäten konnten nicht geladen werden."
     },
     "documents": {
       "title": "Dokumentenbibliothek",

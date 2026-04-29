@@ -253,6 +253,18 @@ async def generate_rag_exam(
             f"user={current_user.id}, topic='{request.topic}'"
         )
 
+        from services.audit_service import AuditService
+        AuditService.log_action(
+            db,
+            action="create_question",
+            status=AuditService.STATUS_SUCCESS,
+            user_id=current_user.id,
+            resource_type="question",
+            resource_id=task_id,
+            request=http_request,
+            additional_data={"topic": request.topic, "question_count": request.question_count},
+        )
+
         return GenerateExamTaskResponse(
             task_id=task_id,
             message="Fragengenerierung gestartet",
