@@ -197,6 +197,29 @@ export class DocumentService {
   }
 
   /**
+   * Set or clear the user-editable display name for a document.
+   * Pass null to clear the override and fall back to the resolver chain
+   * (filtered metadata title → original filename).
+   */
+  static async renameDocument(
+    documentId: number,
+    displayName: string | null,
+  ): Promise<Document> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ display_name: displayName }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to rename document: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
    * Delete a document
    */
   static async deleteDocument(documentId: number): Promise<void> {

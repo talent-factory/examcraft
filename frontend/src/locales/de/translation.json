@@ -24,6 +24,9 @@
     "fr": "Français",
     "it": "Italiano"
   },
+  "common": {
+    "refresh": "Aktualisieren"
+  },
   "auth": {
     "login": {
       "title": "Willkommen zurück",
@@ -624,6 +627,17 @@
       "statsProcessed": "Verarbeitet",
       "statsWithVectors": "Mit Vektoren",
       "statsInProgress": "In Bearbeitung",
+      "errorTitle": "Verarbeitungsfehler",
+      "errorTooltip": "Fehlertyp: {{code}} · Datei: {{filename}}",
+      "errorMessages": {
+        "legacy_doc_format": "Altes Word-Format (.doc) erkannt — bitte als .docx speichern und erneut hochladen.",
+        "empty_document": "Keine extrahierbaren Inhalte gefunden. Möglicherweise nur Bilder oder ein leeres Dokument.",
+        "binary_content": "Datei scheint kein Text zu sein. Bitte das Dateiformat überprüfen.",
+        "unsupported_format": "Format wird nicht unterstützt. Erlaubt: .pdf, .doc, .docx, .txt, .md.",
+        "vectorization_failed": "Vektorisierung fehlgeschlagen. Bitte später erneut versuchen oder Support kontaktieren.",
+        "file_corrupt": "Datei konnte nicht geöffnet werden — möglicherweise beschädigt.",
+        "unknown_error": "Unerwarteter Fehler bei der Verarbeitung. Details siehe Vorschau."
+      },
       "noDocuments": "Keine Dokumente vorhanden",
       "noDocumentsHint": "Laden Sie Dokumente hoch, um mit der RAG-basierten Prüfungserstellung zu beginnen.",
       "vectorsAvailable": "Vector Embeddings verfügbar",
@@ -671,7 +685,11 @@
       "loadError": "Fehler beim Laden der Dokumente",
       "deleteError": "Fehler beim Löschen",
       "downloadError": "Fehler beim Download",
-      "processError": "Fehler beim Verarbeiten des Dokuments"
+      "processError": "Fehler beim Verarbeiten des Dokuments",
+      "renameError": "Umbenennen fehlgeschlagen",
+      "renameSave": "Speichern",
+      "renameCancel": "Abbrechen",
+      "renameTooltip": "Umbenennen"
     },
     "documentUpload": {
       "dropActive": "Dateien hier ablegen...",
@@ -1258,7 +1276,9 @@
       "sourceDocuments": "{{count}} Quelldokumente",
       "quality": "Qualität:",
       "confidence": "Konfidenz",
+      "confidencePercent": "{{value}}% Konfidenz",
       "sourceCoverage": "Quellenabdeckung",
+      "sourceCoveragePercent": "{{value}}% Quellenabdeckung",
       "chunksUsed": "Textabschnitte verwendet",
       "questionNumber": "Frage {{number}}",
       "modelAnswer": "Musterlösung:",
@@ -1311,7 +1331,13 @@
       "newDocument": "Neues Dokument",
       "saveAsDocument": "Als Dokument speichern",
       "title": "Chat-Schnittstelle",
-      "unknownError": "Ein unbekannter Fehler ist aufgetreten"
+      "unknownError": "Ein unbekannter Fehler ist aufgetreten",
+      "documentCount_one": "{{count}} Dokument",
+      "documentCount_other": "{{count}} Dokumente",
+      "exportFailed": "Export fehlgeschlagen: {{error}}",
+      "savedAsDocument": "Als Dokument gespeichert: {{title}}",
+      "conversionFailed": "Konvertierung fehlgeschlagen: {{error}}",
+      "exportDialogTitle": "Als {{format}} exportieren"
     },
     "documentSelector": {
       "heading": "Dokumente für den Chat auswählen",
@@ -1440,6 +1466,9 @@
     "send": "Senden",
     "newConversation": "Neue Konversation",
     "thinking": "Denke nach…",
+    "catchUp": {
+      "button": "Jetzt erkunden"
+    },
     "onboarding": {
       "skip": "Überspringen",
       "next": "Weiter",

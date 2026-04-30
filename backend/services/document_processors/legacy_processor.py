@@ -12,6 +12,11 @@ import markdown
 import re
 
 from services.docling_service import DocumentChunk, ProcessedDocument
+from services.document_errors import (
+    EMPTY_DOCUMENT,
+    UNSUPPORTED_FORMAT,
+    DocumentProcessingError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +70,12 @@ class LegacyProcessor:
 
         try:
             if mime_type not in self.supported_types:
-                raise ValueError(f"Unsupported MIME type: {mime_type}")
+                raise DocumentProcessingError(
+                    UNSUPPORTED_FORMAT,
+                    f"Unsupported MIME type: {mime_type}",
+                    filename=filename,
+                    mime_type=mime_type,
+                )
 
             logger.info(f"Processing document with Legacy Processor: {filename}")
 
@@ -148,17 +158,16 @@ class LegacyProcessor:
             raise
 
     async def _process_docx(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite DOCX-Datei"""
+        """Verarbeite DOCX-Datei (Body + Tabellen + Header/Footer)."""
+        from services.document_processors.pymupdf_processor import (
+            _iter_docx_text_blocks,
+        )
+
         try:
             doc = DocxDocument(file_path)
 
-            # Extrahiere Text
-            text_content = []
-            for paragraph in doc.paragraphs:
-                if paragraph.text.strip():
-                    text_content.append(paragraph.text)
+            text_content = list(_iter_docx_text_blocks(doc))
 
-            # Extrahiere Metadaten
             metadata = {
                 "title": doc.core_properties.title or "",
                 "author": doc.core_properties.author or "",
@@ -170,11 +179,19 @@ class LegacyProcessor:
                 if doc.core_properties.modified
                 else None,
                 "paragraphs": len(doc.paragraphs),
+                "text_blocks": len(text_content),
             }
 
             full_text = "\n\n".join(text_content)
+            if not full_text.strip():
+                raise DocumentProcessingError(
+                    EMPTY_DOCUMENT,
+                    "No extractable text found in DOCX (empty or media-only)",
+                )
             return full_text, metadata
 
+        except ValueError:
+            raise
         except Exception as e:
             logger.error(f"DOCX processing failed: {str(e)}")
             raise
@@ -199,43 +216,25 @@ class LegacyProcessor:
             raise
 
     async def _process_text(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite Text-Datei"""
+        """Verarbeite Text-Datei mit Encoding-Fallback (UTF-8 → Latin-1)."""
         try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                content = file.read()
+            content, encoding = self._read_text_with_fallback(file_path)
+        except Exception as e:
+            logger.error(f"Text processing failed: {str(e)}")
+            raise
 
-            lines = content.split("\n")
-            words = content.split()
-
-            metadata = {
-                "lines": len(lines),
-                "words": len(words),
-                "characters": len(content),
-                "encoding": "utf-8",
-            }
-
-            return content, metadata
-
-        except UnicodeDecodeError:
-            try:
-                with open(file_path, "r", encoding="latin-1") as file:
-                    content = file.read()
-                metadata = {
-                    "lines": len(content.split("\n")),
-                    "words": len(content.split()),
-                    "characters": len(content),
-                    "encoding": "latin-1",
-                }
-                return content, metadata
-            except Exception as e:
-                logger.error(f"Text processing failed: {str(e)}")
-                raise
+        metadata = {
+            "lines": len(content.split("\n")),
+            "words": len(content.split()),
+            "characters": len(content),
+            "encoding": encoding,
+        }
+        return content, metadata
 
     async def _process_markdown(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite Markdown-Datei"""
+        """Verarbeite Markdown-Datei mit Encoding-Fallback (UTF-8 → Latin-1)."""
         try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                md_content = file.read()
+            md_content, encoding = self._read_text_with_fallback(file_path)
 
             # Konvertiere Markdown zu HTML und extrahiere Plain Text
             html = markdown.markdown(md_content)
@@ -243,6 +242,7 @@ class LegacyProcessor:
 
             metadata = {
                 "format": "Markdown",
+                "encoding": encoding,
                 "original_markdown": md_content[:500] + "..."
                 if len(md_content) > 500
                 else md_content,
@@ -255,6 +255,20 @@ class LegacyProcessor:
         except Exception as e:
             logger.error(f"Markdown processing failed: {str(e)}")
             raise
+
+    @staticmethod
+    def _read_text_with_fallback(file_path: str) -> Tuple[str, str]:
+        """Read a text file as UTF-8, falling back to Latin-1.
+
+        Delegates to the same hardened helper used by ``PyMuPDFProcessor``
+        so both processors share the mojibake check, the OSError context
+        wrapping, and the Latin-1 warning log.
+        """
+        from services.document_processors.pymupdf_processor import (
+            PyMuPDFProcessor,
+        )
+
+        return PyMuPDFProcessor._read_text_with_fallback(file_path)
 
     def _create_chunks(self, text: str) -> List[DocumentChunk]:
         """Erstelle Text-Chunks für RAG-Processing"""

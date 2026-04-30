@@ -310,8 +310,7 @@ async def list_documents_with_questions(
 
     results = (
         db.query(
-            Document.id,
-            Document.original_filename,
+            Document,
             sa_func.count(
                 sa_case(
                     (
@@ -329,17 +328,19 @@ async def list_documents_with_questions(
             QuestionReview, QuestionReview.id == QuestionSourceDocument.question_id
         )
         .filter(Document.institution_id == current_user.institution_id)
-        .group_by(Document.id, Document.original_filename)
+        .group_by(Document.id)
         .order_by(Document.original_filename)
         .all()
     )
+    # Use Document.title resolver so users see display_name overrides + the
+    # filtered metadata title instead of "1" / "Untitled" leftovers.
     return [
         {
-            "id": r.id,
-            "title": r.original_filename,
-            "approved_question_count": r.approved_question_count,
+            "id": doc.id,
+            "title": doc.title,
+            "approved_question_count": count,
         }
-        for r in results
+        for doc, count in results
     ]
 
 

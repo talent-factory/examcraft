@@ -15,8 +15,9 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
 from typing import List, Optional
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import os
 import io
 
@@ -42,7 +43,8 @@ class DocumentResponse(BaseModel):
     id: int
     filename: str
     original_filename: str
-    title: str  # Neues Feld für bessere UI-Anzeige
+    title: str  # Resolved display title (display_name → metadata → filename)
+    display_name: Optional[str] = None  # Raw user override, null when unset
     file_size: int
     mime_type: str
     status: str
@@ -54,6 +56,39 @@ class DocumentResponse(BaseModel):
     created_at: Optional[str]
     updated_at: Optional[str]
     processed_at: Optional[str]
+
+
+class DocumentRenameRequest(BaseModel):
+    """Body for PATCH /documents/{id} — set or clear the user-editable title.
+
+    ``display_name=None`` (or an empty/whitespace string) clears the override
+    and falls back to the resolver chain (filtered metadata title → original
+    filename). Otherwise the value is trimmed and must be 1–255 characters of
+    printable text — control characters are rejected to prevent storing
+    invisible/garbage names.
+    """
+
+    display_name: Optional[str] = None
+
+    @field_validator("display_name")
+    @classmethod
+    def _normalise_display_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        if not isinstance(v, str):
+            raise ValueError("display_name must be a string")
+        trimmed = v.strip()
+        if not trimmed:
+            # Empty/whitespace string is the "clear override" signal
+            return None
+        if len(trimmed) > 255:
+            raise ValueError("display_name must be 255 characters or fewer")
+        # Reject ASCII control characters (except tab, which we strip anyway).
+        # A document name is a UI label, not a payload — invisible/escape
+        # sequences here are almost always malicious or accidental paste.
+        if any(ord(c) < 0x20 or ord(c) == 0x7F for c in trimmed):
+            raise ValueError("display_name contains invalid control characters")
+        return trimmed
 
 
 class DocumentListResponse(BaseModel):
@@ -284,6 +319,80 @@ async def get_document(
         raise HTTPException(
             status_code=500,
             detail=t("documents_load_failed", locale=locale),
+        )
+
+
+@router.patch("/{document_id}", response_model=DocumentResponse)
+async def rename_document(
+    document_id: int,
+    payload: DocumentRenameRequest,
+    request: Request,
+    current_user: User = Depends(require_permission("create_documents")),
+    db: Session = Depends(get_db),
+):
+    """Set or clear a user-editable display name for a document.
+
+    Pass ``display_name`` as a non-empty string to override the auto-extracted
+    title, or as ``null``/empty/whitespace to fall back to the metadata-then-
+    filename resolver chain. Auto-extracted titles like "1" or "Untitled" are
+    filtered by the resolver, so clearing the override usually surfaces the
+    original filename automatically.
+
+    Validation (length, control characters) happens in
+    ``DocumentRenameRequest`` and surfaces as 422 errors automatically.
+
+    **Required Permission:** ``create_documents``
+    """
+    locale = get_request_locale(request, current_user)
+    try:
+        document = document_service.get_document_by_id(document_id, db)
+        if not document:
+            raise HTTPException(
+                status_code=404, detail=t("documents_not_found", locale=locale)
+            )
+
+        # Tenant + ownership check (raises HTTPException(403) on mismatch)
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+
+        tenant_context = get_tenant_context(current_user)
+        TenantFilter.verify_tenant_access(document, tenant_context)
+
+        # Pydantic validator already normalised empty/whitespace to None
+        # and enforced the 255-char + no-control-chars invariant.
+        document.display_name = payload.display_name
+
+        # Build the response dict BEFORE committing so a serialisation failure
+        # cannot mask an already-persisted change as a generic 500.
+        response_payload = document.to_dict()
+        db.commit()
+        return DocumentResponse(**response_payload)
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        # DB-level failure (constraint, connection, …) — roll back the open
+        # transaction and report a rename-specific error so the user knows
+        # which action failed and can retry.
+        db.rollback()
+        logger.error(
+            f"DB error renaming document {document_id} for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=t("documents_rename_failed", locale=locale),
+        )
+    except Exception as e:
+        # Programming errors / unexpected bugs — log with stack, surface as 500.
+        # We deliberately do NOT swallow these as a generic "load failed".
+        db.rollback()
+        logger.error(
+            f"Unexpected error renaming document {document_id} for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=t("documents_rename_failed", locale=locale),
         )
 
 
@@ -698,9 +807,7 @@ async def get_document_content(
 
         return {
             "document_id": document_id,
-            "title": document.doc_metadata.get("title", document.original_filename)
-            if document.doc_metadata
-            else document.original_filename,
+            "title": document.title,  # resolver: display_name → metadata → filename
             "content": content,
             "content_length": len(content) if content else 0,
             "metadata": document.doc_metadata,
