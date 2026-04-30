@@ -14,6 +14,12 @@ from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from models.document import Document, DocumentStatus
 from services.docling_service import DoclingService, ProcessedDocument
+from services.document_errors import (
+    EMPTY_DOCUMENT,
+    VECTORIZATION_FAILED,
+    DocumentProcessingError,
+    classify_error,
+)
 from services.vector_service_factory import get_vector_service
 from services.storage_service import storage_service
 from datetime import datetime
@@ -205,18 +211,60 @@ class DocumentService:
             return "application/octet-stream"
 
     def _detect_mime_type_from_bytes(self, content: bytes, filename: str) -> str:
-        """Erkenne MIME-Type aus Datei-Bytes"""
+        """Erkenne MIME-Type aus Datei-Bytes.
+
+        The file extension is authoritative when it maps to one of our
+        ``supported_formats``. ``magic.from_buffer`` reads only the leading
+        bytes and frequently disagrees with the extension in ways that break
+        downstream processing:
+
+        * ``.docx`` is reported as ``application/zip`` on older libmagic
+          versions (OOXML is a ZIP archive under the hood).
+        * ``.doc`` is reported as ``application/x-ole-storage``.
+        * ``.md`` is reported as ``text/plain`` because Markdown is
+          syntactically plain text — but routing it through ``_process_text``
+          loses the markdown-specific path (heading extraction, syntax
+          stripping).
+
+        **Tradeoff:** trusting the extension means a renamed file (e.g. a
+        PDF saved as ``.docx``) is routed to the wrong processor. The
+        downstream parsers will reject malformed input loudly, and the
+        text processors apply a printable-character check to refuse
+        binaries renamed to ``.txt``/``.md``. Mismatches are logged at
+        INFO level so admins can correlate downstream failures.
+
+        For unrecognised extensions we still fall back to whatever libmagic
+        returned so the upstream validation can produce a useful error.
+        """
         try:
-            mime_type = magic.from_buffer(content, mime=True)
-            return mime_type
+            detected = magic.from_buffer(content, mime=True)
         except Exception as e:
             logger.warning(f"Could not detect MIME type from buffer: {str(e)}")
-            # Fallback based on extension
-            extension = self._get_file_extension(filename)
-            for mime, ext in self.supported_formats.items():
-                if ext == extension:
-                    return mime
-            return "application/octet-stream"
+            detected = None
+
+        extension_mime = self._mime_for_extension(filename)
+        if extension_mime is not None:
+            if detected and detected != extension_mime:
+                logger.info(
+                    f"libmagic returned {detected!r} for {filename!r}; "
+                    f"using extension-derived MIME {extension_mime!r}"
+                )
+            return extension_mime
+
+        if detected and detected in self.supported_formats:
+            return detected
+
+        return detected or "application/octet-stream"
+
+    def _mime_for_extension(self, filename: str) -> Optional[str]:
+        """Return the supported MIME for ``filename``'s extension, if any."""
+        extension = self._get_file_extension(filename)
+        if not extension:
+            return None
+        for mime, ext in self.supported_formats.items():
+            if ext == extension:
+                return mime
+        return None
 
     def get_document_by_id(self, document_id: int, db: Session) -> Optional[Document]:
         """Hole Dokument nach ID"""
@@ -382,16 +430,23 @@ class DocumentService:
                 mime_type=document.mime_type,
             )
 
-            # Erstelle Content Preview (erste 200 Zeichen)
-            if processed_doc.chunks:
-                first_chunk = processed_doc.chunks[0].content
-                # Entferne NUL-Zeichen die PostgreSQL nicht unterstützt
-                clean_chunk = first_chunk.replace("\x00", "").replace("\0", "")
-                content_preview = (
-                    clean_chunk[:200] + "..." if len(clean_chunk) > 200 else clean_chunk
+            # Reject empty extractions early — otherwise the document would
+            # be marked PROCESSED but vectorization would silently fail at
+            # the Qdrant upsert step, leaving has_vectors=False with no
+            # explanation visible to the user.
+            if not processed_doc.chunks:
+                raise DocumentProcessingError(
+                    EMPTY_DOCUMENT,
+                    f"No extractable text in document '{document.original_filename}'.",
+                    filename=document.original_filename,
                 )
-            else:
-                content_preview = "No content extracted"
+
+            first_chunk = processed_doc.chunks[0].content
+            # Entferne NUL-Zeichen die PostgreSQL nicht unterstützt
+            clean_chunk = first_chunk.replace("\x00", "").replace("\0", "")
+            content_preview = (
+                clean_chunk[:200] + "..." if len(clean_chunk) > 200 else clean_chunk
+            )
 
             # Aktualisiere Dokument mit verarbeiteten Daten
             document.status = DocumentStatus.PROCESSED
@@ -410,12 +465,16 @@ class DocumentService:
         except Exception as e:
             logger.error(f"Document processing failed for {document_id}: {str(e)}")
 
-            # Setze Status auf Error
+            # Setze Status auf Error mit strukturiertem Code, damit die UI den
+            # Fehler lokalisiert anzeigen kann statt nur die englische Raw-Message.
+            error_code, error_details = classify_error(e)
             document = self.get_document_by_id(document_id, db)
             if document:
                 document.status = DocumentStatus.ERROR
                 document.doc_metadata = {
                     "error": str(e),
+                    "error_code": error_code,
+                    "error_details": error_details,
                     "processing_failed_at": datetime.utcnow().isoformat(),
                 }
                 db.commit()
@@ -450,6 +509,7 @@ class DocumentService:
         else:
             close_db = False
 
+        processed_doc = None
         try:
             # Erst normale Dokumentenverarbeitung
             processed_doc = await self.process_document_content(document_id, db)
@@ -519,20 +579,39 @@ class DocumentService:
                 f"Vector embedding creation failed for {document_id}: {str(e)}"
             )
 
-            # Dokument bleibt als PROCESSED (Docling war erfolgreich)
-            # Aber Vector Embeddings sind fehlgeschlagen
+            # Mark the document as ERROR so the UI does not display it as
+            # "Verarbeitet" without vectors. Surface a structured error code
+            # so the frontend can render a localised, actionable message —
+            # if the underlying processor already attached a code we keep
+            # it; otherwise we treat it as a vectorisation failure.
+            inner_code, inner_details = classify_error(e)
+            if inner_code == "unknown_error":
+                inner_code = VECTORIZATION_FAILED
             document = self.get_document_by_id(document_id, db)
-            if document and document.doc_metadata:
-                document.doc_metadata["vector_embedding_error"] = str(e)
+            if document is not None:
+                document.status = DocumentStatus.ERROR
+                metadata = dict(document.doc_metadata or {})
+                metadata["vector_embedding_error"] = str(e)
+                metadata["error_code"] = inner_code
+                metadata["error_details"] = inner_details
+                document.doc_metadata = metadata
+                from sqlalchemy.orm.attributes import flag_modified
+
+                flag_modified(document, "doc_metadata")
                 db.commit()
 
-            return {
-                "document_id": document_id,
-                "docling_processing": {
+            docling_stats = (
+                {
                     "total_chunks": processed_doc.total_chunks,
                     "processing_time": processed_doc.processing_time,
                     "total_pages": processed_doc.total_pages,
-                },
+                }
+                if processed_doc is not None
+                else {"error": "processing_failed_before_vectorization"}
+            )
+            return {
+                "document_id": document_id,
+                "docling_processing": docling_stats,
                 "vector_embeddings": {"error": str(e)},
             }
         finally:
@@ -624,11 +703,11 @@ class DocumentService:
 
         except Exception as e:
             logger.error(f"Failed to get document chunks for {document_id}: {str(e)}")
+            return None
         finally:
             # Cleanup temp file if S3 was used
             if local_file_path and document:
                 self._cleanup_temp_file(local_file_path, document)
-            return None
 
     async def get_full_document_content(
         self, document_id: int, db: Session

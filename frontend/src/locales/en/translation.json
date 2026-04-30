@@ -24,6 +24,9 @@
     "fr": "Français",
     "it": "Italiano"
   },
+  "common": {
+    "refresh": "Refresh"
+  },
   "auth": {
     "login": {
       "title": "Welcome back",
@@ -624,6 +627,17 @@
       "statsProcessed": "Processed",
       "statsWithVectors": "With Vectors",
       "statsInProgress": "In Progress",
+      "errorTitle": "Processing error",
+      "errorTooltip": "Error type: {{code}} · File: {{filename}}",
+      "errorMessages": {
+        "legacy_doc_format": "Legacy Word format (.doc) detected — please save as .docx and re-upload.",
+        "empty_document": "No extractable content found. The file may contain only images or be empty.",
+        "binary_content": "The file does not appear to be text. Please verify the file format.",
+        "unsupported_format": "Format not supported. Allowed: .pdf, .doc, .docx, .txt, .md.",
+        "vectorization_failed": "Vector embedding failed. Please retry later or contact support.",
+        "file_corrupt": "Could not open the file — it may be corrupted.",
+        "unknown_error": "Unexpected processing error. See the preview for details."
+      },
       "noDocuments": "No documents available",
       "noDocumentsHint": "Upload documents to start creating RAG-based exams.",
       "vectorsAvailable": "Vector Embeddings available",
@@ -671,7 +685,11 @@
       "loadError": "Error loading documents",
       "deleteError": "Error deleting",
       "downloadError": "Error downloading",
-      "processError": "Error processing document"
+      "processError": "Error processing document",
+      "renameError": "Rename failed",
+      "renameSave": "Save",
+      "renameCancel": "Cancel",
+      "renameTooltip": "Rename"
     },
     "documentUpload": {
       "dropActive": "Drop files here...",
@@ -1258,7 +1276,9 @@
       "sourceDocuments": "{{count}} source documents",
       "quality": "Quality:",
       "confidence": "Confidence",
+      "confidencePercent": "{{value}}% confidence",
       "sourceCoverage": "Source Coverage",
+      "sourceCoveragePercent": "{{value}}% source coverage",
       "chunksUsed": "Text chunks used",
       "questionNumber": "Question {{number}}",
       "modelAnswer": "Model Answer:",
@@ -1283,7 +1303,10 @@
       "deleteChat": "Delete Chat",
       "errorDeletingSession": "Error deleting session",
       "newChat": "New Chat",
-      "noSessionsHint": "Start a new chat to interact with your documents."
+      "noSessionsHint": "Start a new chat to interact with your documents.",
+      "lastUpdated": "Last updated: {{date}}",
+      "noProcessedDocuments": "Please upload a document first and wait until it has been processed. You can then refresh here.",
+      "sessionInfo": "{{messages}} messages · {{documents}} document(s)"
     },
     "chatInterface": {
       "errorSending": "Error sending message. Please try again.",
@@ -1308,7 +1331,13 @@
       "newDocument": "New Document",
       "saveAsDocument": "Save as Document",
       "title": "Chat Interface",
-      "unknownError": "An unknown error occurred"
+      "unknownError": "An unknown error occurred",
+      "documentCount_one": "{{count}} document",
+      "documentCount_other": "{{count}} documents",
+      "exportFailed": "Export failed: {{error}}",
+      "savedAsDocument": "Saved as document: {{title}}",
+      "conversionFailed": "Conversion failed: {{error}}",
+      "exportDialogTitle": "Export as {{format}}"
     },
     "documentSelector": {
       "heading": "Select documents for chat",
@@ -1437,6 +1466,9 @@
     "send": "Send",
     "newConversation": "New Conversation",
     "thinking": "Thinking…",
+    "catchUp": {
+      "button": "Explore now"
+    },
     "onboarding": {
       "skip": "Skip",
       "next": "Next",

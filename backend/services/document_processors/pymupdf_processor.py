@@ -5,15 +5,67 @@ Schnelle und effiziente PDF-Verarbeitung mit PyMuPDF (fitz)
 
 import logging
 import time
-from typing import Dict, List, Any, Tuple
+from typing import Dict, Iterable, List, Any, Tuple
 import fitz  # PyMuPDF
 from docx import Document as DocxDocument
+from docx.oxml.ns import qn
 import markdown
 import re
 
 from services.docling_service import DocumentChunk, ProcessedDocument
+from services.document_errors import (
+    BINARY_CONTENT,
+    EMPTY_DOCUMENT,
+    LEGACY_DOC_FORMAT,
+    UNSUPPORTED_FORMAT,
+    DocumentProcessingError,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _looks_like_text(content: str, threshold: float = 0.85) -> bool:
+    """Return True when ``content`` looks like real text.
+
+    Used to reject binary blobs that decoded successfully via Latin-1
+    (which maps every byte 0–255 to a code point and therefore never
+    raises). Real text is mostly printable plus tabs/newlines; binary
+    is mostly control characters and high-bit noise.
+    """
+    if not content:
+        return True  # empty content is handled by the upstream 0-chunk guard
+    printable = sum(1 for c in content if c.isprintable() or c in "\t\n\r")
+    return printable / len(content) >= threshold
+
+
+def _iter_docx_text_blocks(doc) -> Iterable[str]:
+    """Yield all visible text blocks in a python-docx Document.
+
+    `doc.paragraphs` only walks the top-level body; tables, nested tables,
+    headers, footers and text-frames are skipped. We iterate every `<w:t>`
+    element in the document body instead, then add headers/footers from each
+    section explicitly (those live outside the body XML tree).
+    """
+
+    seen_ids = set()
+
+    body = doc.element.body
+    for t_elem in body.iter(qn("w:t")):
+        text = t_elem.text
+        if text and text.strip():
+            yield text
+
+    for section in doc.sections:
+        for hdr_ftr in (section.header, section.footer):
+            for paragraph in hdr_ftr.paragraphs:
+                # `Paragraph` elements may repeat across sections that share
+                # a header part; dedupe on the underlying lxml element id.
+                pid = id(paragraph._p)
+                if pid in seen_ids:
+                    continue
+                seen_ids.add(pid)
+                if paragraph.text.strip():
+                    yield paragraph.text
 
 
 class PyMuPDFProcessor:
@@ -67,7 +119,12 @@ class PyMuPDFProcessor:
 
         try:
             if mime_type not in self.supported_types:
-                raise ValueError(f"Unsupported MIME type: {mime_type}")
+                raise DocumentProcessingError(
+                    UNSUPPORTED_FORMAT,
+                    f"Unsupported MIME type: {mime_type}",
+                    filename=filename,
+                    mime_type=mime_type,
+                )
 
             logger.info(f"Processing document with PyMuPDF: {filename}")
 
@@ -259,17 +316,12 @@ class PyMuPDFProcessor:
     async def _process_docx(
         self, file_path: str, filename: str
     ) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite DOCX-Datei"""
+        """Verarbeite DOCX-Datei (Body + Tabellen + Header/Footer)."""
         try:
             doc = DocxDocument(file_path)
 
-            # Extrahiere Text
-            text_content = []
-            for paragraph in doc.paragraphs:
-                if paragraph.text.strip():
-                    text_content.append(paragraph.text)
+            text_content = list(_iter_docx_text_blocks(doc))
 
-            # Extrahiere Metadaten
             title = doc.core_properties.title or ""
             if not title:
                 title = filename.rsplit(".", 1)[0] if "." in filename else filename
@@ -285,11 +337,23 @@ class PyMuPDFProcessor:
                 if doc.core_properties.modified
                 else None,
                 "paragraphs": len(doc.paragraphs),
+                "text_blocks": len(text_content),
             }
 
             full_text = "\n\n".join(text_content)
+
+            if not full_text.strip():
+                raise DocumentProcessingError(
+                    EMPTY_DOCUMENT,
+                    f"No extractable text found in DOCX '{filename}' "
+                    "(document is empty or contains only images/objects)",
+                    filename=filename,
+                )
+
             return full_text, metadata
 
+        except ValueError:
+            raise
         except Exception as e:
             logger.error(f"DOCX processing failed: {str(e)}")
             raise
@@ -297,71 +361,74 @@ class PyMuPDFProcessor:
     async def _process_doc(
         self, file_path: str, filename: str
     ) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite DOC-Datei (Legacy Format)"""
-        try:
-            # Versuche als Text zu lesen (sehr basic)
-            with open(file_path, "rb") as file:
-                content = file.read()
-                text_content = content.decode("utf-8", errors="ignore")
+        """Verarbeite DOC-Datei (Legacy CFB/OLE2 Format).
 
-            metadata = {
-                "title": filename.rsplit(".", 1)[0] if "." in filename else filename,
-                "format": "DOC (Legacy)",
-                "note": "Basic text extraction - consider converting to DOCX for better results",
-            }
+        `.doc` is a binary OLE2 compound file. Without `antiword`,
+        `libreoffice --headless` or a CFB parser, we cannot reliably extract
+        text. The previous implementation decoded raw bytes as UTF-8 with
+        `errors='ignore'`, producing garbage that silently embedded as
+        nonsense vectors. We now refuse the file with a clear error so the
+        document is marked ERROR and the user knows to convert to DOCX.
+        """
+        with open(file_path, "rb") as fh:
+            header = fh.read(8)
 
-            return text_content, metadata
+        if header.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            raise DocumentProcessingError(
+                LEGACY_DOC_FORMAT,
+                f"Legacy .doc format detected for '{filename}'. "
+                "Reliable text extraction requires conversion. "
+                "Please save the document as .docx and re-upload.",
+                filename=filename,
+            )
 
-        except Exception as e:
-            logger.error(f"DOC processing failed: {str(e)}")
-            raise
+        # Some `.doc` files in the wild are actually mislabeled RTF or text.
+        # Try a best-effort decode and refuse if no meaningful text remains.
+        with open(file_path, "rb") as fh:
+            raw = fh.read()
+        text_content = raw.decode("utf-8", errors="ignore")
+        # Strip control bytes that survived decode
+        cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text_content)
+        if len(cleaned.strip()) < 50:
+            raise DocumentProcessingError(
+                EMPTY_DOCUMENT,
+                f"No extractable text found in legacy .doc '{filename}'. "
+                "Please save the document as .docx and re-upload.",
+                filename=filename,
+            )
+
+        metadata = {
+            "title": filename.rsplit(".", 1)[0] if "." in filename else filename,
+            "format": "DOC (Legacy)",
+            "note": "Best-effort text extraction; converting to DOCX is recommended.",
+        }
+        return cleaned, metadata
 
     async def _process_text(
         self, file_path: str, filename: str
     ) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite Text-Datei"""
+        """Verarbeite Text-Datei mit Encoding-Fallback (UTF-8 → Latin-1)."""
         try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                content = file.read()
+            content, encoding = self._read_text_with_fallback(file_path)
+        except Exception as e:
+            logger.error(f"Text processing failed: {str(e)}")
+            raise
 
-            lines = content.split("\n")
-            words = content.split()
-
-            metadata = {
-                "title": filename.rsplit(".", 1)[0] if "." in filename else filename,
-                "lines": len(lines),
-                "words": len(words),
-                "characters": len(content),
-                "encoding": "utf-8",
-            }
-
-            return content, metadata
-
-        except UnicodeDecodeError:
-            try:
-                with open(file_path, "r", encoding="latin-1") as file:
-                    content = file.read()
-                metadata = {
-                    "title": filename.rsplit(".", 1)[0]
-                    if "." in filename
-                    else filename,
-                    "lines": len(content.split("\n")),
-                    "words": len(content.split()),
-                    "characters": len(content),
-                    "encoding": "latin-1",
-                }
-                return content, metadata
-            except Exception as e:
-                logger.error(f"Text processing failed: {str(e)}")
-                raise
+        metadata = {
+            "title": filename.rsplit(".", 1)[0] if "." in filename else filename,
+            "lines": len(content.split("\n")),
+            "words": len(content.split()),
+            "characters": len(content),
+            "encoding": encoding,
+        }
+        return content, metadata
 
     async def _process_markdown(
         self, file_path: str, filename: str
     ) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite Markdown-Datei"""
+        """Verarbeite Markdown-Datei mit Encoding-Fallback (UTF-8 → Latin-1)."""
         try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                md_content = file.read()
+            md_content, encoding = self._read_text_with_fallback(file_path)
 
             # Konvertiere Markdown zu HTML und extrahiere Plain Text
             html = markdown.markdown(md_content)
@@ -381,6 +448,7 @@ class PyMuPDFProcessor:
             metadata = {
                 "title": filename.rsplit(".", 1)[0] if "." in filename else filename,
                 "format": "Markdown",
+                "encoding": encoding,
                 "sections": sections[:30] if sections else [],
                 "section_count": len(sections[:30]) if sections else 0,
                 "html_length": len(html),
@@ -392,6 +460,40 @@ class PyMuPDFProcessor:
         except Exception as e:
             logger.error(f"Markdown processing failed: {str(e)}")
             raise
+
+    @staticmethod
+    def _read_text_with_fallback(file_path: str) -> Tuple[str, str]:
+        """Read a text file as UTF-8, falling back to Latin-1.
+
+        Returns ``(content, encoding)`` so callers can record the encoding
+        in metadata for diagnostics. Latin-1 decodes any byte sequence —
+        including binary files renamed with a text extension — so when
+        the fallback fires we additionally check the printable-character
+        ratio and refuse mojibake. Failures of the fallback ``open()``
+        itself are wrapped to preserve the file path in the error.
+        """
+        try:
+            with open(file_path, "r", encoding="utf-8") as file:
+                return file.read(), "utf-8"
+        except UnicodeDecodeError:
+            pass
+
+        try:
+            with open(file_path, "r", encoding="latin-1") as file:
+                content = file.read()
+        except OSError as e:
+            raise OSError(f"Latin-1 fallback read failed for {file_path}: {e}") from e
+
+        if not _looks_like_text(content):
+            raise DocumentProcessingError(
+                BINARY_CONTENT,
+                f"File {file_path} does not appear to be a text file "
+                "(low printable-character ratio after Latin-1 fallback). "
+                "Likely binary content with a misleading extension.",
+            )
+
+        logger.warning(f"File {file_path} is not valid UTF-8; decoded as Latin-1")
+        return content, "latin-1"
 
     def _create_chunks(self, text: str) -> List[DocumentChunk]:
         """Erstelle Text-Chunks für RAG-Processing"""

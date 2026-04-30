@@ -12,6 +12,7 @@ export interface Document {
   filename: string;
   original_filename: string;
   title: string;
+  display_name?: string | null;
   mime_type: string;
   status: DocumentStatus;
   created_at: string;
@@ -26,6 +27,10 @@ export interface Document {
     total_chunks?: number;
     embedding_model?: string;
     processing_time?: number;
+    error?: string;
+    error_code?: string;
+    error_details?: { filename?: string; mime_type?: string; [key: string]: any };
+    vector_embedding_error?: string;
     [key: string]: any;
   };
 }

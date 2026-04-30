@@ -153,7 +153,18 @@ class TestLegacyProcessor:
         mock_doc_instance = Mock()
         mock_docx_document.return_value = mock_doc_instance
 
-        # Mock Paragraphen
+        # Mock w:t XML-Elemente (TF-331: _iter_docx_text_blocks iteriert XML-Body
+        # statt doc.paragraphs, um auch Tabellen/Header/Footer zu erfassen)
+        mock_t1 = Mock()
+        mock_t1.text = "Dies ist der erste Paragraph."
+        mock_t2 = Mock()
+        mock_t2.text = "Dies ist der zweite Paragraph."
+        mock_body = Mock()
+        mock_body.iter.return_value = [mock_t1, mock_t2]
+        mock_doc_instance.element.body = mock_body
+        mock_doc_instance.sections = []  # keine Header/Footer in diesem Test
+
+        # Mock Paragraphen (weiterhin für metadata["paragraphs"])
         mock_paragraph1 = Mock()
         mock_paragraph1.text = "Dies ist der erste Paragraph."
         mock_paragraph2 = Mock()

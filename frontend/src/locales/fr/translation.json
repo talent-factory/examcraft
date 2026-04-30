@@ -204,8 +204,7 @@
     "paymentSuccess": {
       "title": "Paiement réussi !",
       "subtitle": "Merci pour votre abonnement. Votre compte a été mis à niveau.",
-      "redirecting": "Redirection vers la facturation...",
-      "returnToBilling": "Retour à la facturation"
+      "redirecting": "Redirection vers la facturation..."
     },
     "paymentCancel": {
       "title": "Paiement annulé",
@@ -580,6 +579,17 @@
       "statsProcessed": "Traités",
       "statsWithVectors": "Avec vecteurs",
       "statsInProgress": "En cours",
+      "errorTitle": "Erreur de traitement",
+      "errorTooltip": "Type d'erreur : {{code}} · Fichier : {{filename}}",
+      "errorMessages": {
+        "legacy_doc_format": "Ancien format Word (.doc) détecté — veuillez enregistrer en .docx et téléverser à nouveau.",
+        "empty_document": "Aucun contenu extractible trouvé. Le fichier peut ne contenir que des images ou être vide.",
+        "binary_content": "Le fichier ne semble pas être du texte. Veuillez vérifier le format.",
+        "unsupported_format": "Format non pris en charge. Autorisés : .pdf, .doc, .docx, .txt, .md.",
+        "vectorization_failed": "Échec de la vectorisation. Veuillez réessayer plus tard ou contacter le support.",
+        "file_corrupt": "Impossible d'ouvrir le fichier — il est peut-être corrompu.",
+        "unknown_error": "Erreur de traitement inattendue. Voir l'aperçu pour les détails."
+      },
       "noDocuments": "Aucun document disponible",
       "noDocumentsHint": "Téléchargez des documents pour commencer à créer des examens basés sur RAG.",
       "vectorsAvailable": "Embeddings vectoriels disponibles",
@@ -1264,7 +1274,13 @@
       "newDocument": "Nouveau document",
       "saveAsDocument": "Enregistrer comme document",
       "title": "Interface de chat",
-      "unknownError": "Une erreur inconnue est survenue"
+      "unknownError": "Une erreur inconnue est survenue",
+      "documentCount_one": "{{count}} document",
+      "documentCount_other": "{{count}} documents",
+      "exportFailed": "Échec de l'exportation : {{error}}",
+      "savedAsDocument": "Enregistré comme document : {{title}}",
+      "conversionFailed": "Échec de la conversion : {{error}}",
+      "exportDialogTitle": "Exporter en {{format}}"
     },
     "documentSelector": {
       "heading": "Sélectionner les documents pour le chat",

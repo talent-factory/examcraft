@@ -310,3 +310,57 @@ class TestLegacyProcessorPerformance:
 
         # Processing sollte schnell sein (< 5 Sekunden)
         assert result.processing_time < 5.0
+
+
+class TestLegacyProcessorEncodingFallback:
+    """Tests: Encoding-Fallback für .txt und .md (UTF-8 → Latin-1)."""
+
+    @pytest.mark.asyncio
+    async def test_text_latin1_fallback(self, legacy_processor, tmp_path):
+        """Latin-1 encoded .txt must decode without crashing."""
+        txt_file = tmp_path / "umlaute.txt"
+        txt_file.write_bytes("Über Ärger und Öl".encode("latin-1"))
+
+        result = await legacy_processor.process_document(
+            document_id=1,
+            file_path=str(txt_file),
+            filename="umlaute.txt",
+            mime_type="text/plain",
+        )
+
+        full_text = " ".join(c.content for c in result.chunks)
+        assert "Über" in full_text
+        assert result.metadata["encoding"] == "latin-1"
+
+    @pytest.mark.asyncio
+    async def test_markdown_latin1_fallback(self, legacy_processor, tmp_path):
+        """Latin-1 encoded .md must not raise (regression: previously hard UTF-8)."""
+        md_file = tmp_path / "umlaute.md"
+        md_file.write_bytes("# Überschrift\n\nÄÖÜ ßeispieltext.\n".encode("latin-1"))
+
+        result = await legacy_processor.process_document(
+            document_id=2,
+            file_path=str(md_file),
+            filename="umlaute.md",
+            mime_type="text/markdown",
+        )
+
+        full_text = " ".join(c.content for c in result.chunks)
+        assert "Überschrift" in full_text
+        assert result.metadata["encoding"] == "latin-1"
+
+    @pytest.mark.asyncio
+    async def test_binary_renamed_as_md_is_rejected(self, legacy_processor, tmp_path):
+        """A binary file renamed `.md` must not silently vectorize as mojibake."""
+        md_file = tmp_path / "fake.md"
+        # Random-ish binary: predominantly control bytes that Latin-1 maps to
+        # control characters → fails the printable-character ratio check.
+        md_file.write_bytes(bytes(range(256)) * 4)
+
+        with pytest.raises(ValueError, match="(?i)not.*text|binary"):
+            await legacy_processor.process_document(
+                document_id=3,
+                file_path=str(md_file),
+                filename="fake.md",
+                mime_type="text/markdown",
+            )

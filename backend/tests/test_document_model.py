@@ -27,7 +27,12 @@ class TestDocumentModel:
         assert doc.title == "Custom Title"
 
     def test_document_title_property_fallback_to_filename(self, test_db):
-        """Test dass title Property auf original_filename zurückfällt"""
+        """Test dass title Property auf original_filename (ohne Extension) zurückfällt.
+
+        TF-331: der Resolver liefert den Filename-Stem ohne Extension, weil
+        ".pdf"/".docx" am Ende der Anzeige weder Information liefern noch
+        die Findbarkeit verbessern.
+        """
         doc = Document(
             filename="abc123.pdf",
             original_filename="My Document.pdf",
@@ -41,11 +46,10 @@ class TestDocumentModel:
         test_db.add(doc)
         test_db.commit()
 
-        # Sollte auf original_filename zurückfallen
-        assert doc.title == "My Document.pdf"
+        assert doc.title == "My Document"
 
     def test_document_title_property_no_metadata(self, test_db):
-        """Test dass title Property funktioniert wenn doc_metadata None ist"""
+        """Test dass title Property funktioniert wenn doc_metadata None ist."""
         doc = Document(
             filename="test.pdf",
             original_filename="Test Document.pdf",
@@ -59,8 +63,7 @@ class TestDocumentModel:
         test_db.add(doc)
         test_db.commit()
 
-        # Sollte auf original_filename zurückfallen
-        assert doc.title == "Test Document.pdf"
+        assert doc.title == "Test Document"
 
     def test_document_to_dict_uses_title_property(self, test_db):
         """Test dass to_dict() die title Property verwendet"""
@@ -84,7 +87,13 @@ class TestDocumentModel:
         assert doc_dict["original_filename"] == "test.md"
 
     def test_chat_export_document_structure(self, test_db):
-        """Test dass Chat-Export Dokumente korrekte Struktur haben"""
+        """Test dass Chat-Export Dokumente korrekte Struktur haben.
+
+        Bewusst ohne ``user_id`` — der ``test_db``-Transaction-Scope hat
+        keine seeded Users, eine FK zu ``users.id`` würde scheitern. Der
+        Test verifiziert die Chat-Export-spezifische Struktur (source,
+        full_content, has_vectors=False), nicht die User-Beziehung.
+        """
         doc = Document(
             filename="chat_export_20251009_120000.md",
             original_filename="chat_export_20251009_120000.md",
@@ -92,7 +101,6 @@ class TestDocumentModel:
             file_size=2000,
             mime_type="text/markdown",
             status=DocumentStatus.PROCESSED,
-            user_id=1,
             doc_metadata={
                 "title": "Chat: Test Session",
                 "source": "chat_export",
@@ -110,7 +118,6 @@ class TestDocumentModel:
         assert doc.title == "Chat: Test Session"
         assert doc.mime_type == "text/markdown"
         assert doc.status == DocumentStatus.PROCESSED
-        assert doc.user_id == 1
         assert doc.doc_metadata["source"] == "chat_export"
         assert "full_content" in doc.doc_metadata
         assert doc.has_vectors is False

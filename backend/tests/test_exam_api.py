@@ -2375,8 +2375,50 @@ class TestDocumentsWithQuestionsEndpoint:
         ids = [d["id"] for d in data]
         assert doc.id in ids
         entry = next(d for d in data if d["id"] == doc.id)
-        assert entry["title"] == "algo.pdf"
+        # TF-331: title now resolves via Document.title (extension stripped,
+        # display_name override respected). Filename "algo.pdf" → "algo".
+        assert entry["title"] == "algo"
         assert entry["approved_question_count"] >= 1
+
+    def test_returns_display_name_override_when_set(
+        self, dwq_client, dwq_db, dwq_institution, dwq_user
+    ):
+        """TF-331: a user-set display_name surfaces through the composer endpoint."""
+        from models.document import Document
+        from models.question_review import QuestionSourceDocument
+
+        doc = Document(
+            filename="algo.pdf",
+            original_filename="algo.pdf",
+            file_path="/tmp/algo_renamed.pdf",
+            file_size=1000,
+            mime_type="application/pdf",
+            display_name="Algorithmen-Cheatsheet",
+            institution_id=dwq_institution.id,
+            user_id=dwq_user.id,
+        )
+        dwq_db.add(doc)
+        dwq_db.flush()
+
+        q = QuestionReview(
+            question_text="What is Big-O?",
+            question_type="open_ended",
+            difficulty="medium",
+            topic="Algorithms",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=dwq_institution.id,
+            created_by=dwq_user.id,
+        )
+        dwq_db.add(q)
+        dwq_db.flush()
+        dwq_db.add(QuestionSourceDocument(question_id=q.id, document_id=doc.id))
+        dwq_db.commit()
+
+        response = dwq_client.get("/api/v1/exams/documents-with-questions")
+        assert response.status_code == 200
+        entry = next(d for d in response.json() if d["id"] == doc.id)
+        assert entry["title"] == "Algorithmen-Cheatsheet"
 
     def test_includes_documents_without_approved_questions(
         self, dwq_client, dwq_db, dwq_institution, dwq_user

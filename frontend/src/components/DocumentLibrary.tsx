@@ -23,7 +23,9 @@ import {
   Divider,
   Tabs,
   Tab,
-  Paper
+  Paper,
+  TextField,
+  Stack
 } from '@mui/material';
 import {
   Description,
@@ -40,7 +42,10 @@ import {
   Error as ErrorIcon,
   Schedule,
   CloudUpload,
-  PlayArrow
+  PlayArrow,
+  Edit,
+  Check,
+  Close
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../utils/dateLocale';
@@ -75,6 +80,11 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [documentContent, setDocumentContent] = useState<string | null>(null);
   const [processingDocumentId, setProcessingDocumentId] = useState<number | null>(null);
+
+  // Inline title rename state
+  const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
+  const [editingValue, setEditingValue] = useState('');
+  const [renaming, setRenaming] = useState(false);
 
   // Pagination state for large documents
   const [documentChunks, setDocumentChunks] = useState<any[]>([]);
@@ -137,7 +147,26 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     return <Description />;
   };
 
-  const getStatusChip = (status: DocumentStatus) => {
+  /**
+   * Resolve a localised error message for a failed document.
+   * Looks up `metadata.error_code` in i18n; falls back to the raw English
+   * `error` string when the code is unknown to keep the user informed.
+   */
+  const resolveErrorMessage = (document: Document): string => {
+    const code = document.metadata?.error_code;
+    if (code) {
+      const i18nKey = `components.documentLibrary.errorMessages.${code}`;
+      const localised = t(i18nKey);
+      if (localised && localised !== i18nKey) {
+        return localised;
+      }
+    }
+    return document.metadata?.error
+      || document.metadata?.vector_embedding_error
+      || t('components.documentLibrary.errorMessages.unknown_error');
+  };
+
+  const getStatusChip = (status: DocumentStatus, document?: Document) => {
     switch (status) {
       case DocumentStatus.UPLOADED:
         return <Chip icon={<CloudUpload />} label={t('components.documentLibrary.statusUploaded')} color="default" size="small" />;
@@ -145,8 +174,17 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         return <Chip icon={<Schedule />} label={t('components.documentLibrary.statusProcessing')} color="warning" size="small" />;
       case DocumentStatus.PROCESSED:
         return <Chip icon={<CheckCircle />} label={t('components.documentLibrary.statusProcessed')} color="success" size="small" />;
-      case DocumentStatus.ERROR:
-        return <Chip icon={<ErrorIcon />} label={t('components.documentLibrary.statusError')} color="error" size="small" />;
+      case DocumentStatus.ERROR: {
+        const errorChip = (
+          <Chip icon={<ErrorIcon />} label={t('components.documentLibrary.statusError')} color="error" size="small" />
+        );
+        if (!document) return errorChip;
+        const tooltipText = t('components.documentLibrary.errorTooltip', {
+          code: document.metadata?.error_code || 'unknown_error',
+          filename: document.metadata?.error_details?.filename || document.original_filename,
+        });
+        return <Tooltip title={tooltipText}>{errorChip}</Tooltip>;
+      }
       default:
         return <Chip label={t('components.documentLibrary.statusUnknown')} color="default" size="small" />;
     }
@@ -247,6 +285,43 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       handleMenuClose();
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.downloadError'));
+    }
+  };
+
+  const handleStartRename = (document: Document) => {
+    setEditingDocumentId(document.id);
+    setEditingValue(document.display_name ?? document.title);
+  };
+
+  const handleCancelRename = () => {
+    setEditingDocumentId(null);
+    setEditingValue('');
+  };
+
+  const handleSaveRename = async () => {
+    // Guard against double-fire from rapid Enter keypresses or
+    // simultaneous Save-button clicks while a request is in flight.
+    if (renaming || editingDocumentId === null) return;
+    const trimmed = editingValue.trim();
+    // Empty value clears the override and falls back to the resolver chain
+    const payload = trimmed.length === 0 ? null : trimmed;
+    try {
+      setRenaming(true);
+      const updated = await DocumentService.renameDocument(editingDocumentId, payload);
+      setDocuments(prev =>
+        prev.map(d => (d.id === updated.id ? { ...d, ...updated } : d))
+      );
+      setEditingDocumentId(null);
+      setEditingValue('');
+      setError(null);
+    } catch (err) {
+      setError(
+        err && typeof err === 'object' && 'message' in err
+          ? (err as Error).message
+          : t('components.documentLibrary.renameError', 'Umbenennen fehlgeschlagen'),
+      );
+    } finally {
+      setRenaming(false);
     }
   };
 
@@ -478,15 +553,101 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     </IconButton>
                   </Box>
 
-                  {/* Document Title */}
-                  <Typography variant="subtitle1" noWrap title={document.title}>
-                    {document.title}
-                  </Typography>
+                  {/* Document Title — inline-editable */}
+                  {editingDocumentId === document.id ? (
+                    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+                      <TextField
+                        size="small"
+                        value={editingValue}
+                        onChange={(e) => setEditingValue(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSaveRename();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            handleCancelRename();
+                          }
+                        }}
+                        autoFocus
+                        fullWidth
+                        disabled={renaming}
+                        placeholder={document.original_filename}
+                        inputProps={{ maxLength: 255 }}
+                      />
+                      <Tooltip title={t('components.documentLibrary.renameSave', 'Speichern')}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSaveRename();
+                          }}
+                          disabled={renaming}
+                        >
+                          {renaming ? <CircularProgress size={16} /> : <Check fontSize="small" />}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={t('components.documentLibrary.renameCancel', 'Abbrechen')}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCancelRename();
+                          }}
+                          disabled={renaming}
+                        >
+                          <Close fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  ) : (
+                    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+                      <Typography
+                        variant="subtitle1"
+                        noWrap
+                        title={document.title}
+                        sx={{ flex: 1, minWidth: 0 }}
+                      >
+                        {document.title}
+                      </Typography>
+                      <Tooltip title={t('components.documentLibrary.renameTooltip', 'Umbenennen')}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartRename(document);
+                          }}
+                          sx={{ opacity: 0.6, '&:hover': { opacity: 1 } }}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  )}
 
                   {/* Status */}
                   <Box sx={{ mb: 2 }}>
-                    {getStatusChip(document.status)}
+                    {getStatusChip(document.status, document)}
                   </Box>
+
+                  {/* Localised error detail — only when status === ERROR.
+                      Tooltip on the chip shows the machine-readable code +
+                      filename for support diagnostics; the inline Alert
+                      shows the actionable message every user can read. */}
+                  {document.status === DocumentStatus.ERROR && (
+                    <Alert
+                      severity="error"
+                      icon={false}
+                      sx={{
+                        mb: 2,
+                        py: 0.5,
+                        '& .MuiAlert-message': { fontSize: '0.85rem' },
+                      }}
+                    >
+                      {resolveErrorMessage(document)}
+                    </Alert>
+                  )}
 
                   {/* Processing Progress */}
                   {document.status === DocumentStatus.PROCESSING && (
