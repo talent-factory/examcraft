@@ -13,6 +13,22 @@ from botocore.exceptions import ClientError
 logger = logging.getLogger(__name__)
 
 
+class StorageAccessDeniedError(RuntimeError):
+    """S3 returned AccessDenied / 403 — credentials lack permission for this object."""
+
+
+class StorageThrottledError(RuntimeError):
+    """S3 returned SlowDown / Throttling — caller should retry with backoff."""
+
+
+class StorageUnavailableError(RuntimeError):
+    """S3 returned ServiceUnavailable / 5xx, or the endpoint was unreachable."""
+
+
+class StorageConfigurationError(RuntimeError):
+    """S3 client is misconfigured (missing creds, bad region, expired tokens)."""
+
+
 class StorageService:
     """S3-compatible storage service for file upload/download operations"""
 
@@ -155,11 +171,54 @@ class StorageService:
 
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "")
-            if error_code in ("NoSuchKey", "404"):
-                logger.error(f"File not found in S3: {object_key}")
+            status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if error_code in ("NoSuchKey", "NoSuchBucket", "404"):
+                logger.warning(
+                    f"File not found in S3: {object_key} (code={error_code})"
+                )
                 raise FileNotFoundError(f"File not found: {object_key}")
-            logger.error(f"Failed to download file from S3: {e}")
-            raise RuntimeError(f"S3 download failed: {e}")
+            if error_code in ("AccessDenied", "403"):
+                logger.error(f"S3 AccessDenied on {object_key}", exc_info=True)
+                raise StorageAccessDeniedError(
+                    f"S3 access denied for {object_key}"
+                ) from e
+            if error_code in ("SlowDown", "Throttling", "ThrottlingException", "429"):
+                logger.warning(f"S3 throttled on {object_key} (code={error_code})")
+                raise StorageThrottledError(f"S3 throttled: {error_code}") from e
+            if error_code in (
+                "ServiceUnavailable",
+                "InternalError",
+                "503",
+            ) or (isinstance(status, int) and 500 <= status < 600):
+                logger.error(
+                    f"S3 unavailable for {object_key} (code={error_code}, "
+                    f"http={status})",
+                    exc_info=True,
+                )
+                raise StorageUnavailableError(f"S3 unavailable: {error_code}") from e
+            if error_code in (
+                "InvalidAccessKeyId",
+                "SignatureDoesNotMatch",
+                "ExpiredToken",
+                "InvalidToken",
+                "IllegalLocationConstraintException",
+            ):
+                logger.error(
+                    f"S3 misconfigured for {object_key} (code={error_code})",
+                    exc_info=True,
+                )
+                raise StorageConfigurationError(
+                    f"S3 misconfigured: {error_code}"
+                ) from e
+            # Unknown ClientError — log fully and surface as a generic runtime
+            # error so the caller still gets a 500, but the log carries the
+            # error_code for triage.
+            logger.error(
+                f"S3 download failed for {object_key} (code={error_code}, "
+                f"http={status}): {e}",
+                exc_info=True,
+            )
+            raise RuntimeError(f"S3 download failed: {error_code or e}") from e
 
     def delete_file(self, object_key: str) -> bool:
         """

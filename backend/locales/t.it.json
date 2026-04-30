@@ -57,6 +57,8 @@
     "documents_download_storage_failed": "Download dall'archivio fallito",
     "documents_file_not_found_disk": "File non trovato su disco",
     "documents_download_failed": "Download del documento fallito",
+    "documents_preview_failed": "Anteprima non caricabile — prova a scaricare o riprova a breve.",
+    "documents_storage_unavailable": "Servizio di archiviazione temporaneamente non disponibile — riprovare tra qualche secondo.",
     "documents_status_failed": "Impossibile recuperare lo stato del documento",
     "documents_access_denied": "Accesso a questo documento negato",
     "documents_delete_failed": "Impossibile eliminare il documento",

@@ -629,4 +629,77 @@ describe('DocumentService', () => {
         .rejects.toThrow('Network timeout');
     });
   });
+
+  describe('getDocumentRaw', () => {
+    const { DocumentFetchError } = jest.requireActual('../DocumentService');
+
+    it('returns the raw Response on success so the caller can read .blob()/.text()', async () => {
+      const fakeResponse = {
+        ok: true,
+        status: 200,
+        blob: jest.fn().mockResolvedValue(new Blob(['x'])),
+        text: jest.fn().mockResolvedValue('hello'),
+      } as unknown as Response;
+      mockFetch.mockResolvedValueOnce(fakeResponse);
+
+      const result = await DocumentService.getDocumentRaw(42);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/documents/42/raw'),
+        expect.objectContaining({ method: 'GET' }),
+      );
+      expect(result).toBe(fakeResponse);
+    });
+
+    it('throws DocumentFetchError carrying the backend detail and status', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        clone: function () { return this; },
+        text: async () => JSON.stringify({ detail: 'Datei im Speicher nicht gefunden' }),
+      } as unknown as Response);
+
+      await expect(DocumentService.getDocumentRaw(42)).rejects.toMatchObject({
+        name: 'DocumentFetchError',
+        status: 404,
+        message: 'Datei im Speicher nicht gefunden',
+      });
+    });
+
+    it('falls back to statusText when the body is not JSON', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        clone: function () { return this; },
+        text: async () => '<html><body>nginx</body></html>',
+      } as unknown as Response);
+
+      await expect(DocumentService.getDocumentRaw(42)).rejects.toMatchObject({
+        status: 502,
+        message: 'Bad Gateway',
+      });
+      // Diagnostic snippet logged for the developer.
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+
+    it('translates fetch rejection into DocumentFetchError(status=0)', async () => {
+      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await expect(DocumentService.getDocumentRaw(42)).rejects.toMatchObject({
+        status: 0,
+        message: 'Failed to fetch',
+      });
+    });
+
+    it('exports DocumentFetchError as a real Error subclass', () => {
+      const err = new DocumentFetchError('boom', 503);
+      expect(err).toBeInstanceOf(Error);
+      expect(err.status).toBe(503);
+      expect(err.name).toBe('DocumentFetchError');
+    });
+  });
 });

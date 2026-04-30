@@ -57,6 +57,8 @@
     "documents_download_storage_failed": "Download from storage failed",
     "documents_file_not_found_disk": "File not found on disk",
     "documents_download_failed": "Document download failed",
+    "documents_preview_failed": "Preview could not be loaded — try downloading or retry shortly.",
+    "documents_storage_unavailable": "Storage service temporarily unavailable — please try again in a few seconds.",
     "documents_status_failed": "Failed to retrieve document status",
     "documents_access_denied": "Access to this document is denied",
     "documents_delete_failed": "Failed to delete document",

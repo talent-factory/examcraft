@@ -57,6 +57,8 @@
     "documents_download_storage_failed": "Échec du téléchargement depuis le stockage",
     "documents_file_not_found_disk": "Fichier introuvable sur le disque",
     "documents_download_failed": "Échec du téléchargement du document",
+    "documents_preview_failed": "Impossible de charger l'aperçu — essayez de télécharger ou réessayez plus tard.",
+    "documents_storage_unavailable": "Service de stockage temporairement indisponible — réessayez dans quelques secondes.",
     "documents_status_failed": "Échec de la récupération du statut du document",
     "documents_access_denied": "Accès à ce document refusé",
     "documents_delete_failed": "Échec de la suppression du document",

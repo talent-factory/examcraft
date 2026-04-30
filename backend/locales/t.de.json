@@ -57,6 +57,8 @@
     "documents_download_storage_failed": "Download aus Speicher fehlgeschlagen",
     "documents_file_not_found_disk": "Datei auf Datenträger nicht gefunden",
     "documents_download_failed": "Dokument-Download fehlgeschlagen",
+    "documents_preview_failed": "Vorschau konnte nicht geladen werden — bitte herunterladen oder später erneut versuchen.",
+    "documents_storage_unavailable": "Speicherdienst vorübergehend nicht erreichbar — bitte in wenigen Sekunden erneut versuchen.",
     "documents_status_failed": "Dokumentstatus konnte nicht abgerufen werden",
     "documents_access_denied": "Zugriff auf dieses Dokument verweigert",
     "documents_delete_failed": "Dokument konnte nicht gelöscht werden",

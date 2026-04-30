@@ -18,11 +18,19 @@ from typing import List, Optional
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, field_validator
+import mimetypes
 import os
 import io
+from urllib.parse import quote
 
 from services.document_service import DocumentService
-from services.storage_service import storage_service
+from services.storage_service import (
+    storage_service,
+    StorageAccessDeniedError,
+    StorageConfigurationError,
+    StorageThrottledError,
+    StorageUnavailableError,
+)
 from services.translation_service import t, get_request_locale
 from services.vector_service_factory import vector_service
 from models.document import Document, DocumentStatus
@@ -396,6 +404,157 @@ async def rename_document(
         )
 
 
+def _content_disposition(filename: str, inline: bool) -> str:
+    """RFC 6266 Content-Disposition with both ASCII fallback and UTF-8 form.
+
+    Quotes the ASCII portion via ``urllib.parse.quote`` so a malicious or
+    accidental newline / quote in ``original_filename`` cannot inject extra
+    response headers.
+    """
+    disposition_type = "inline" if inline else "attachment"
+    encoded = quote(filename or "download", safe="")
+    return f"{disposition_type}; filename=\"{encoded}\"; filename*=UTF-8''{encoded}"
+
+
+def _resolve_media_type(document) -> str:
+    """Pick a safe Content-Type for the original bytes.
+
+    - DB ``mime_type`` is the source of truth when set.
+    - ``text/*`` without a charset gets ``;charset=utf-8`` appended (we
+      always encode UTF-8 ourselves; see chat-export branch).
+    - Missing/None falls back to ``mimetypes.guess_type`` then
+      ``application/octet-stream`` so the iframe/browser still gets *some*
+      Content-Type. Logs a warning so corrupt rows surface.
+    """
+    media_type = document.mime_type
+    if not media_type:
+        guessed, _ = mimetypes.guess_type(document.original_filename or "")
+        media_type = guessed or "application/octet-stream"
+        logger.warning(
+            "Document %s has no mime_type; falling back to %s",
+            document.id,
+            media_type,
+        )
+    if media_type.startswith("text/") and "charset" not in media_type.lower():
+        media_type = f"{media_type}; charset=utf-8"
+    return media_type
+
+
+def _build_document_file_response(
+    document, *, locale: str, inline: bool, caller_id: int | None = None
+):
+    """Return a FastAPI response carrying the document's original bytes.
+
+    inline=False → ``Content-Disposition: attachment`` (browser downloads).
+    inline=True  → ``Content-Disposition: inline`` (browser embeds, e.g. iframe).
+
+    Branch precedence — chat exports MUST come first because their
+    ``file_path`` is a synthetic value (``virtual://chat/<id>``) and would not
+    pass the later existence checks.
+
+      1. Chat-Export → bytes from ``doc_metadata.full_content``
+      2. S3-backed file (``file_path`` starts with ``uploads/`` and
+         ``storage_service.is_configured``)
+      3. Local file on disk (fallback)
+
+    Callers MUST allow ``HTTPException`` raised here to propagate; the outer
+    endpoint catches generic ``Exception`` and would otherwise mask the
+    intended 404/403/503 status as a 500.
+    """
+    headers = {
+        "Content-Disposition": _content_disposition(
+            document.original_filename, inline=inline
+        )
+    }
+    media_type = _resolve_media_type(document)
+    log_ctx = (
+        f"doc={document.id} user={caller_id}" if caller_id else f"doc={document.id}"
+    )
+
+    # Chat-Export (virtual file)
+    if document.doc_metadata and document.doc_metadata.get("source") == "chat_export":
+        content = document.doc_metadata.get("full_content", "")
+        if not content:
+            raise HTTPException(
+                status_code=404,
+                detail=t("documents_content_not_available", locale=locale),
+            )
+        return Response(
+            content=content.encode("utf-8"),
+            media_type=media_type,
+            headers=headers,
+        )
+
+    # S3-backed file
+    if document.file_path.startswith("uploads/") and storage_service.is_configured:
+        try:
+            file_data = storage_service.download_file(document.file_path)
+        except FileNotFoundError:
+            raise HTTPException(
+                status_code=404,
+                detail=t("documents_file_not_found_storage", locale=locale),
+            )
+        except StorageAccessDeniedError:
+            logger.error(
+                f"S3 access denied while serving {log_ctx} path={document.file_path}",
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=403,
+                detail=t("documents_access_denied", locale=locale),
+            )
+        except StorageThrottledError:
+            logger.warning(
+                f"S3 throttled while serving {log_ctx} path={document.file_path}"
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=t("documents_storage_unavailable", locale=locale),
+                headers={"Retry-After": "5"},
+            )
+        except (StorageUnavailableError, StorageConfigurationError):
+            logger.error(
+                f"S3 unavailable/misconfigured while serving {log_ctx} "
+                f"path={document.file_path}",
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=t("documents_storage_unavailable", locale=locale),
+            )
+        except Exception as e:
+            logger.error(
+                f"Unexpected S3 failure while serving {log_ctx} "
+                f"path={document.file_path}: {e}",
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=t("documents_download_storage_failed", locale=locale),
+            )
+        return StreamingResponse(
+            io.BytesIO(file_data),
+            media_type=media_type,
+            headers=headers,
+        )
+
+    # Local file
+    if not os.path.exists(document.file_path):
+        logger.warning(
+            f"Local file missing while serving {log_ctx} path={document.file_path}"
+        )
+        raise HTTPException(
+            status_code=404,
+            detail=t("documents_file_not_found_disk", locale=locale),
+        )
+    return FileResponse(
+        path=document.file_path,
+        filename=document.original_filename,
+        media_type=media_type,
+        content_disposition_type="inline" if inline else "attachment",
+    )
+
+
 @router.get("/{document_id}/download")
 async def download_document(
     document_id: int,
@@ -403,17 +562,14 @@ async def download_document(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Download original document file
+    """Download the original document file as an attachment.
 
-    **Required:** Authenticated user
+    **Required:** Authenticated user.
 
-    - **document_id**: ID of the document to download
+    - **document_id**: ID of the document to download.
 
-    Returns:
-        File download with original filename
-
-    **Note:** Supports both physical files and virtual files (e.g., chat exports)
+    Delegates to ``_build_document_file_response`` with ``inline=False`` —
+    the helper handles chat-export, S3, and local-disk storage paths.
     """
     locale = get_request_locale(request, current_user)
     try:
@@ -430,70 +586,9 @@ async def download_document(
         tenant_context = get_tenant_context(current_user)
         TenantFilter.verify_tenant_access(document, tenant_context)
 
-        # Check if this is a chat export (virtual file)
-        if (
-            document.doc_metadata
-            and document.doc_metadata.get("source") == "chat_export"
-        ):
-            # Chat exports don't have physical files - content is in metadata
-            content = document.doc_metadata.get("full_content", "")
-            if not content:
-                raise HTTPException(
-                    status_code=404,
-                    detail=t("documents_content_not_available", locale=locale),
-                )
-
-            # Return content as downloadable file
-            headers = {
-                "Content-Disposition": f'attachment; filename="{document.original_filename}"'
-            }
-            return Response(
-                content=content.encode("utf-8"),
-                media_type=document.mime_type,
-                headers=headers,
-            )
-        else:
-            # Normal documents - check storage type
-            if (
-                document.file_path.startswith("uploads/")
-                and storage_service.is_configured
-            ):
-                # S3 Storage: Download from S3 and stream to client
-                try:
-                    file_data = storage_service.download_file(document.file_path)
-                    headers = {
-                        "Content-Disposition": f'attachment; filename="{document.original_filename}"'
-                    }
-                    return StreamingResponse(
-                        io.BytesIO(file_data),
-                        media_type=document.mime_type,
-                        headers=headers,
-                    )
-                except FileNotFoundError:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=t("documents_file_not_found_storage", locale=locale),
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to download from S3: {e}")
-                    raise HTTPException(
-                        status_code=500,
-                        detail=t("documents_download_storage_failed", locale=locale),
-                    )
-            else:
-                # Local Storage: Check if file exists on disk
-                if not os.path.exists(document.file_path):
-                    raise HTTPException(
-                        status_code=404,
-                        detail=t("documents_file_not_found_disk", locale=locale),
-                    )
-
-                # Return file with original filename
-                return FileResponse(
-                    path=document.file_path,
-                    filename=document.original_filename,
-                    media_type=document.mime_type,
-                )
+        return _build_document_file_response(
+            document, locale=locale, inline=False, caller_id=current_user.id
+        )
 
     except HTTPException:
         raise
@@ -505,6 +600,55 @@ async def download_document(
         raise HTTPException(
             status_code=500,
             detail=t("documents_download_failed", locale=locale),
+        )
+
+
+@router.get("/{document_id}/raw")
+async def get_document_raw(
+    document_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Liefert die Original-Datei mit Content-Disposition: inline.
+
+    Identisch zu /download, jedoch ohne attachment-Header, sodass das
+    Frontend die Datei einbetten kann (z. B. PDF in einem iframe via
+    Blob-URL) statt sie herunterzuladen.
+
+    **Required:** Authenticated user.
+
+    - **document_id**: ID des Dokuments.
+    """
+    locale = get_request_locale(request, current_user)
+    try:
+        document = document_service.get_document_by_id(document_id, db)
+
+        if not document:
+            raise HTTPException(
+                status_code=404, detail=t("documents_not_found", locale=locale)
+            )
+
+        # Tenant-aware access control
+        from utils.tenant_utils import TenantFilter, get_tenant_context
+
+        tenant_context = get_tenant_context(current_user)
+        TenantFilter.verify_tenant_access(document, tenant_context)
+
+        return _build_document_file_response(
+            document, locale=locale, inline=True, caller_id=current_user.id
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch raw document {document_id} for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=t("documents_preview_failed", locale=locale),
         )
 
 
