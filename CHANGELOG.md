@@ -18,13 +18,13 @@ and this project adheres to
   `doc.paragraphs` (Top-Level-Body) — Tabellen, geschachtelte Tabellen,
   Header, Footer, Textfelder und Fussnoten wurden übersprungen.
   Tabellenlastige `.docx`-Dateien lieferten 0 Chunks → Qdrant
-  HTTP 400 „Empty update request" → stiller Fehlschlag mit
+  HTTP 400 "Empty update request" → stiller Fehlschlag mit
   `has_vectors=False`. Neue `_iter_docx_text_blocks()`-Funktion walkt
   alle `<w:t>`-Elemente plus Section-Header/Footer.
   Defense-in-Depth: `process_document_content` und
   `add_document_chunks` lösen jetzt bei 0 Chunks eine Exception aus,
   statt still fehlzuschlagen. Begleitend: `.doc` (OLE2/CFB) wird klar
-  abgewiesen („Bitte als .docx speichern"), `.md`-MIME-Detection
+  abgewiesen ("Bitte als .docx speichern"), `.md`-MIME-Detection
   priorisiert die Datei-Endung über libmagic, `.txt`/`.md`-Encoding-Fallback
   (UTF-8 → Latin-1) mit Mojibake-Schutz.
   Title-Resolver filtert Office-Defaults (`"1"`, `"Untitled"`,
