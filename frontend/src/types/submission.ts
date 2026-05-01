@@ -126,6 +126,10 @@ export interface Grade {
   is_correct: boolean | null;
   llm_confidence: number | null;
   llm_rationale: string | null;
+  llm_matched_aspects: string[] | null;
+  llm_missing_aspects: string[] | null;
+  reviewer_id: number | null;
+  reviewer_note: string | null;
 }
 
 export interface AttemptAnswer {
@@ -159,6 +163,60 @@ export interface SubmissionDetail {
   percentage: number;
   grade_status: SubmissionGradeStatus;
   attempts: Attempt[];
+}
+
+// ---------------------------------------------------------------------------
+// Review queue (TF-334)
+// ---------------------------------------------------------------------------
+
+export interface ReviewQueueItem {
+  grade_id: number;
+  submission_id: number;
+  student_id: number;
+  student_external_id: string;
+  student_display_name: string | null;
+  exam_question_id: number;
+  question_id: number;
+  question_text: string;
+  correct_answer: string | null;
+  explanation: string | null;
+  given_answer: string | null;
+  points_awarded: number;
+  points_max: number;
+  confidence: number | null;
+  rationale: string | null;
+  matched_aspects: string[];
+  missing_aspects: string[];
+  status: GradeStatus;
+}
+
+export interface ReviewQueue {
+  items: ReviewQueueItem[];
+  total: number;
+}
+
+export interface ReviewQueueFilter {
+  confidence_min?: number;
+  confidence_max?: number;
+  question_id?: number;
+  student_id?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface GradeAction {
+  id: number;
+  points_awarded: number;
+  points_max: number;
+  status: GradeStatus;
+  reviewer_id: number | null;
+  reviewer_note: string | null;
+  reviewed_at: string | null;
+}
+
+export interface BulkApproveResult {
+  approved_count: number;
+  grade_ids: number[];
 }
 
 // ---------------------------------------------------------------------------

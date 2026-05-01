@@ -132,6 +132,10 @@ class GradeOut(BaseModel):
     is_correct: bool | None
     llm_confidence: float | None = None
     llm_rationale: str | None = None
+    llm_matched_aspects: list[str] | None = None
+    llm_missing_aspects: list[str] | None = None
+    reviewer_id: int | None = None
+    reviewer_note: str | None = None
 
 
 class AttemptAnswerOut(BaseModel):
@@ -571,6 +575,10 @@ async def get_submission(
                             is_correct=ans.grade.is_correct,
                             llm_confidence=ans.grade.llm_confidence,
                             llm_rationale=ans.grade.llm_rationale,
+                            llm_matched_aspects=ans.grade.llm_matched_aspects,
+                            llm_missing_aspects=ans.grade.llm_missing_aspects,
+                            reviewer_id=ans.grade.reviewer_id,
+                            reviewer_note=ans.grade.reviewer_note,
                         )
                         if ans.grade
                         else None,

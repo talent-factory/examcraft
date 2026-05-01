@@ -30,7 +30,8 @@
     "next": "Next",
     "back": "Back",
     "cancel": "Cancel",
-    "close": "Close"
+    "close": "Close",
+    "invalidNumber": "Invalid number"
   },
   "auswertungen": {
     "overview": {
@@ -69,7 +70,9 @@
       "gradeStatus": {
         "pending_review": "Pending review",
         "partially_reviewed": "Partially reviewed",
-        "fully_reviewed": "Reviewed"
+        "fully_reviewed": "Reviewed",
+        "approved": "Approved",
+        "manual_override": "Manual"
       },
       "drawer": {
         "points": "{{awarded}} / {{max}} points",
@@ -77,7 +80,58 @@
         "gradedTag": "Counts",
         "colQuestion": "Question",
         "colAnswer": "Answer",
-        "colGrade": "Grade"
+        "colGrade": "Grade",
+        "actionOverrideMc": "Manual override",
+        "actionOverrideOpen": "Adjust",
+        "rationale": "Claude's rationale"
+      },
+      "review": {
+        "title": "Review queue",
+        "loadError": "Could not load review queue.",
+        "emptyHint": "No open suggestions — all open-ended answers are reviewed.",
+        "filterConfidence": "Confidence",
+        "filterConfidenceFrom": "Min",
+        "filterConfidenceTo": "Max",
+        "filterQuestion": "Question",
+        "filterStudent": "Student",
+        "filterClear": "Clear filters",
+        "filterAllQuestions": "All questions",
+        "filterAllStudents": "All students",
+        "totalCount": "{{count}} pending",
+        "confidenceLabel": "Confidence {{value}}%",
+        "noConfidence": "No confidence",
+        "rationale": "Rationale",
+        "matchedAspects": "Matched aspects",
+        "missingAspects": "Missing aspects",
+        "questionLabel": "Question",
+        "correctAnswerLabel": "Reference answer",
+        "studentAnswerLabel": "Student answer",
+        "proposalLabel": "Proposal",
+        "actionApprove": "Approve",
+        "actionOverride": "Adjust",
+        "actionContext": "In context",
+        "actionApproveSuccess": "Grade approved.",
+        "actionOverrideSuccess": "Grade saved.",
+        "actionFailure": "Action failed.",
+        "overrideDialog": {
+          "title": "Adjust grade",
+          "pointsLabel": "Points",
+          "pointsHelp": "0 to {{max}}",
+          "outOfBounds": "Points must be between 0 and {{max}}.",
+          "noteLabel": "Audit-trail note (optional)",
+          "submit": "Save",
+          "cancel": "Cancel"
+        },
+        "bulk": {
+          "title": "Bulk approve",
+          "thresholdLabel": "Confidence ≥",
+          "applyByThreshold": "Approve all above threshold",
+          "applyBySelection": "Approve selected ({{count}})",
+          "selectAll": "Select all",
+          "clearSelection": "Clear selection",
+          "confirmThreshold": "Approve {{count}} suggestions with confidence ≥ {{threshold}}%?",
+          "success": "{{count}} grades approved."
+        }
       }
     },
     "importDialog": {

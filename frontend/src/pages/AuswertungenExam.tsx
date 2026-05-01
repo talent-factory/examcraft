@@ -38,12 +38,15 @@ import {
 import { SubmissionsService } from '../services/submissionsService';
 import { ComposerService } from '../services/ComposerService';
 import {
+  AttemptAnswer,
   SubmissionDetail,
   SubmissionGradeStatus,
   SubmissionListItem,
 } from '../types/submission';
 import { ExamDetail } from '../types/composer';
 import ImportDialog from '../components/auswertungen/ImportDialog';
+import OverrideGradeDialog from '../components/auswertungen/OverrideGradeDialog';
+import ReviewQueue from '../components/auswertungen/ReviewQueue';
 
 const formatPct = (pct: number): string => `${Math.round(pct * 10) / 10}%`;
 
@@ -60,7 +63,7 @@ const AuswertungenExam: React.FC = () => {
   const params = useParams<{ examId: string }>();
   const examId = Number(params.examId);
 
-  const [tab, setTab] = useState<'submissions'>('submissions');
+  const [tab, setTab] = useState<'submissions' | 'review'>('submissions');
   const [exam, setExam] = useState<ExamDetail | null>(null);
   const [items, setItems] = useState<SubmissionListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +72,10 @@ const AuswertungenExam: React.FC = () => {
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
+  const [overrideAnswer, setOverrideAnswer] = useState<AttemptAnswer | null>(
+    null,
+  );
 
   // Keep ``t`` out of the deps: in production it is stable across
   // language-change re-renders, but i18next mocks (and react-i18next's
@@ -169,19 +176,38 @@ const AuswertungenExam: React.FC = () => {
 
       <Tabs
         value={tab}
-        onChange={(_, v) => setTab(v as 'submissions')}
+        onChange={(_, v) => setTab(v as 'submissions' | 'review')}
         sx={{ mb: 2 }}
       >
         <Tab
           label={`${t('auswertungen.exam.tabSubmissions')} (${items.length})`}
           value="submissions"
         />
-        <Tab label={t('auswertungen.exam.tabReview')} disabled />
+        <Tab
+          label={
+            reviewCount !== null
+              ? `${t('auswertungen.exam.tabReview')} (${reviewCount})`
+              : t('auswertungen.exam.tabReview')
+          }
+          value="review"
+        />
         <Tab label={t('auswertungen.exam.tabStatistik')} disabled />
         <Tab label={t('auswertungen.exam.tabExport')} disabled />
       </Tabs>
 
-      {loading ? (
+      {tab === 'review' ? (
+        <ReviewQueue
+          examId={examId}
+          onTotalChange={(total) => setReviewCount(total)}
+          onOpenSubmission={(submissionId) => {
+            const item = items.find((i) => i.id === submissionId);
+            if (item) {
+              setTab('submissions');
+              void handleRowClick(item);
+            }
+          }}
+        />
+      ) : loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
@@ -337,21 +363,74 @@ const AuswertungenExam: React.FC = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {attempt.answers.map((answer) => (
-                        <TableRow key={answer.id}>
-                          <TableCell>#{answer.exam_question_id}</TableCell>
-                          <TableCell>{answer.given_answer ?? '—'}</TableCell>
-                          <TableCell align="right">
-                            {answer.grade
-                              ? `${answer.grade.points_awarded.toFixed(
-                                  1,
-                                )} / ${answer.grade.points_max.toFixed(1)}`
-                              : '—'}
-                            {answer.grade?.is_correct === true && ' ✓'}
-                            {answer.grade?.is_correct === false && ' ✗'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {attempt.answers.map((answer) => {
+                        const grade = answer.grade;
+                        const statusLabel = grade
+                          ? t(`auswertungen.exam.gradeStatus.${grade.status}`)
+                          : null;
+                        return (
+                          <TableRow key={answer.id}>
+                            <TableCell>#{answer.exam_question_id}</TableCell>
+                            <TableCell>
+                              {answer.given_answer ?? '—'}
+                              {grade?.llm_rationale && (
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{ display: 'block', mt: 0.5 }}
+                                >
+                                  {t('auswertungen.exam.drawer.rationale')}:{' '}
+                                  {grade.llm_rationale}
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell align="right">
+                              {grade
+                                ? `${grade.points_awarded.toFixed(
+                                    1,
+                                  )} / ${grade.points_max.toFixed(1)}`
+                                : '—'}
+                              {grade?.is_correct === true && ' ✓'}
+                              {grade?.is_correct === false && ' ✗'}
+                              {statusLabel && (
+                                <Chip
+                                  size="small"
+                                  label={statusLabel}
+                                  sx={{ ml: 1 }}
+                                  color={
+                                    grade?.status === 'manual_override'
+                                      ? 'secondary'
+                                      : grade?.status === 'approved'
+                                      ? 'success'
+                                      : 'default'
+                                  }
+                                  variant={
+                                    grade?.status === 'proposed'
+                                      ? 'outlined'
+                                      : 'filled'
+                                  }
+                                />
+                              )}
+                              {grade && grade.status !== 'manual_override' && (
+                                <Button
+                                  size="small"
+                                  sx={{ ml: 1 }}
+                                  onClick={() => setOverrideAnswer(answer)}
+                                  data-testid={`drawer-override-${answer.id}`}
+                                >
+                                  {grade.is_correct === null
+                                    ? t(
+                                        'auswertungen.exam.drawer.actionOverrideOpen',
+                                      )
+                                    : t(
+                                        'auswertungen.exam.drawer.actionOverrideMc',
+                                      )}
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </Box>
@@ -360,6 +439,25 @@ const AuswertungenExam: React.FC = () => {
           ) : null}
         </Box>
       </Drawer>
+
+      <OverrideGradeDialog
+        open={!!overrideAnswer}
+        gradeId={overrideAnswer?.grade?.id ?? null}
+        initialPoints={overrideAnswer?.grade?.points_awarded ?? 0}
+        pointsMax={overrideAnswer?.grade?.points_max ?? 0}
+        onClose={() => setOverrideAnswer(null)}
+        onSuccess={async () => {
+          // Drawer-State zum Aufruf-Zeitpunkt einfangen — der Drawer
+          // kann während des Requests geschlossen werden, dann brauchen
+          // wir keinen Re-Fetch.
+          const submissionId = drawer?.id;
+          if (submissionId !== undefined) {
+            const updated = await SubmissionsService.getDetail(submissionId);
+            setDrawer(updated);
+          }
+          void reload();
+        }}
+      />
 
       {importOpen && exam && (
         <ImportDialog

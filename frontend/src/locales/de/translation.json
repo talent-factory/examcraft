@@ -30,7 +30,8 @@
     "next": "Weiter",
     "back": "Zurück",
     "cancel": "Abbrechen",
-    "close": "Schliessen"
+    "close": "Schliessen",
+    "invalidNumber": "Ungültige Zahl"
   },
   "auswertungen": {
     "overview": {
@@ -69,7 +70,9 @@
       "gradeStatus": {
         "pending_review": "In Review",
         "partially_reviewed": "Teilweise reviewt",
-        "fully_reviewed": "Reviewt"
+        "fully_reviewed": "Reviewt",
+        "approved": "Übernommen",
+        "manual_override": "Manuell"
       },
       "drawer": {
         "points": "{{awarded}} / {{max}} Punkte",
@@ -77,7 +80,58 @@
         "gradedTag": "Wertend",
         "colQuestion": "Frage",
         "colAnswer": "Antwort",
-        "colGrade": "Bewertung"
+        "colGrade": "Bewertung",
+        "actionOverrideMc": "Manuell überstimmen",
+        "actionOverrideOpen": "Anpassen",
+        "rationale": "Claudes Begründung"
+      },
+      "review": {
+        "title": "Review-Queue",
+        "loadError": "Review-Queue konnte nicht geladen werden.",
+        "emptyHint": "Keine offenen Vorschläge — alle offenen Fragen sind reviewt.",
+        "filterConfidence": "Konfidenz",
+        "filterConfidenceFrom": "Min",
+        "filterConfidenceTo": "Max",
+        "filterQuestion": "Frage",
+        "filterStudent": "Studi",
+        "filterClear": "Filter zurücksetzen",
+        "filterAllQuestions": "Alle Fragen",
+        "filterAllStudents": "Alle Studis",
+        "totalCount": "{{count}} offen",
+        "confidenceLabel": "Konfidenz {{value}}%",
+        "noConfidence": "Keine Konfidenz",
+        "rationale": "Begründung",
+        "matchedAspects": "Erfasste Aspekte",
+        "missingAspects": "Fehlende Aspekte",
+        "questionLabel": "Frage",
+        "correctAnswerLabel": "Musterlösung",
+        "studentAnswerLabel": "Studi-Antwort",
+        "proposalLabel": "Vorschlag",
+        "actionApprove": "Übernehmen",
+        "actionOverride": "Anpassen",
+        "actionContext": "Im Kontext",
+        "actionApproveSuccess": "Bewertung übernommen.",
+        "actionOverrideSuccess": "Bewertung gespeichert.",
+        "actionFailure": "Aktion fehlgeschlagen.",
+        "overrideDialog": {
+          "title": "Bewertung anpassen",
+          "pointsLabel": "Punkte",
+          "pointsHelp": "0 bis {{max}}",
+          "outOfBounds": "Punkte müssen zwischen 0 und {{max}} liegen.",
+          "noteLabel": "Notiz für Audit-Trail (optional)",
+          "submit": "Speichern",
+          "cancel": "Abbrechen"
+        },
+        "bulk": {
+          "title": "Bulk-Übernehmen",
+          "thresholdLabel": "Konfidenz ≥",
+          "applyByThreshold": "Alle ab Schwelle übernehmen",
+          "applyBySelection": "Auswahl übernehmen ({{count}})",
+          "selectAll": "Alle auswählen",
+          "clearSelection": "Auswahl aufheben",
+          "confirmThreshold": "{{count}} Vorschläge mit Konfidenz ≥ {{threshold}}% übernehmen?",
+          "success": "{{count}} Bewertungen übernommen."
+        }
       }
     },
     "importDialog": {

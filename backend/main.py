@@ -261,6 +261,12 @@ async def lifespan(app: FastAPI):
     submissions_api = importlib.util.module_from_spec(spec_submissions)
     spec_submissions.loader.exec_module(submissions_api)
 
+    spec_grades = importlib.util.spec_from_file_location(
+        "core_api_grades", os.path.join(core_api_path, "grades.py")
+    )
+    grades_api = importlib.util.module_from_spec(spec_grades)
+    spec_grades.loader.exec_module(grades_api)
+
     spec_dashboard = importlib.util.spec_from_file_location(
         "core_api_dashboard", os.path.join(core_api_path, "dashboard.py")
     )
@@ -336,6 +342,8 @@ async def lifespan(app: FastAPI):
     app.include_router(exams_api.router)
     app.include_router(submissions_api.router)
     app.include_router(submissions_api.exams_alias_router)
+    app.include_router(grades_api.router_grades)
+    app.include_router(grades_api.router_exams_review_queue)
     app.include_router(dashboard_api.router)
     app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["billing"])
     app.include_router(
