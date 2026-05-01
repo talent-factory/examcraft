@@ -80,6 +80,9 @@ def seed_default_roles(db: Session):
                 "submissions:read",
                 "submissions:import",
                 "submissions:grade",
+                # TF-335: Admin manages institution-scoped Grading-
+                # Schemes; System schemes stay read-only via the API.
+                "grading_schemes:manage",
             ],
             "is_system_role": True,
         },

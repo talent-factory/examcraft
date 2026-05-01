@@ -145,6 +145,9 @@
     "validation_invalid_email": "Indirizzo e-mail non valido",
     "validation_password_too_short": "La password deve contenere almeno 8 caratteri",
     "server_error": "Errore interno del server",
-    "not_found": "Non trovato"
+    "not_found": "Non trovato",
+    "submissions_grade_export_blocked_pending_review": "Esportazione voti bloccata: completare prima la coda di revisione — tutti i voti devono essere approvati prima dell'esportazione finale.",
+    "submissions_grade_export_blocked_draft": "Esportazione voti bloccata: l'esame è ancora in stato di bozza. Si prega di finalizzarlo prima.",
+    "submissions_grade_export_internal_error": "Esportazione voti fallita — riprova o contatta il supporto."
   }
 }

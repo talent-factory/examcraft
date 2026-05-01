@@ -120,7 +120,12 @@ class Institution(Base):
     # built-in defaults".
     default_grading_scheme_id = Column(
         Integer,
-        ForeignKey("grading_schemes.id", ondelete="SET NULL"),
+        # ON DELETE RESTRICT for the same reason as Exam.grading_scheme_id
+        # — silently nulling an institution's default scheme is a data-
+        # loss surprise. The API's DELETE endpoint pre-checks this so
+        # the user gets a friendly 409, not a 500 from a raw constraint
+        # violation.
+        ForeignKey("grading_schemes.id", ondelete="RESTRICT"),
         nullable=True,
     )
 

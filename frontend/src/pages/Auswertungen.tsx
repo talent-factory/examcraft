@@ -16,6 +16,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   Typography,
   Chip,
@@ -37,22 +38,27 @@ const Auswertungen: React.FC = () => {
   const navigate = useNavigate();
 
   const [exams, setExams] = useState<Exam[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Preserve structured server-side hints so the user can act on them
   // (e.g. validation issues), mirroring ImportDialog.handleApiError.
   const [errorIssues, setErrorIssues] = useState<string[]>([]);
   const [importExam, setImportExam] = useState<Exam | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    // Backend cap is 100; institutions with more exams need a future
-    // pagination UI (TF-335 Statistik-Phase passt das ohnehin an).
-    ComposerService.listExams({ limit: 100 })
+    // TF-335: Echte Pagination — Backend-Cap auf 500 angehoben, UI
+    // schickt limit=rowsPerPage + offset. Daten kommen page-weise,
+    // ``total`` wird vom Backend mitgeliefert.
+    ComposerService.listExams({ limit: rowsPerPage, offset: page * rowsPerPage })
       .then((response) => {
         if (cancelled) return;
         setExams(response.exams);
+        setTotal(response.total);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -74,7 +80,7 @@ const Auswertungen: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [t]);
+  }, [t, page, rowsPerPage]);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -117,7 +123,7 @@ const Auswertungen: React.FC = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
-      ) : exams.length === 0 ? (
+      ) : exams.length === 0 && page === 0 ? (
         <Alert severity="info">{t('auswertungen.overview.emptyHint')}</Alert>
       ) : (
         <TableContainer component={Paper} data-testid="auswertungen-exam-table">
@@ -168,6 +174,19 @@ const Auswertungen: React.FC = () => {
               ))}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={total}
+            page={page}
+            onPageChange={(_, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            rowsPerPageOptions={[25, 50, 100]}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0);
+            }}
+            data-testid="auswertungen-pagination"
+          />
         </TableContainer>
       )}
 

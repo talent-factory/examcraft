@@ -217,6 +217,8 @@ class TestPermissionConsistency:
             "submissions:read",
             "submissions:import",
             "submissions:grade",
+            # TF-335 — Custom Grading-Schemes management permission.
+            "grading_schemes:manage",
         }
 
         frontend_perms = _get_frontend_required_permissions()

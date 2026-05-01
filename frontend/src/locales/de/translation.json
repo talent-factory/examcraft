@@ -170,6 +170,50 @@
         "queued": "Import wartet"
       },
       "resultSummary": "{{processed}} verarbeitet, {{failed}} fehlerhaft."
+    },
+    "stats": {
+      "loadError": "Statistiken konnten nicht geladen werden.",
+      "empty": "Noch keine Submissions importiert — Statistik wird verfügbar, sobald Resultate vorliegen.",
+      "kpiSubmissions": "Submissions",
+      "kpiReviewed": "{{count}} reviewt",
+      "kpiAvg": "Ø Punkte",
+      "kpiMedian": "Median {{value}}",
+      "kpiPassRate": "Erfolgsquote",
+      "kpiAvgDuration": "Ø Bearbeitungszeit",
+      "histogramTitle": "Punkteverteilung",
+      "perQuestionTitle": "Pro Frage",
+      "colPosition": "Pos.",
+      "colQuestion": "Frage",
+      "colSuccessRate": "Erfolgsquote",
+      "colDifficulty": "Schwierigkeit",
+      "colDiscrimination": "Trennschärfe",
+      "colLearning": "Lerneffekt"
+    },
+    "export": {
+      "title": "Notenexport",
+      "formatLabel": "Format wählen",
+      "format": {
+        "csv": "CSV (Excel-friendly)",
+        "moodle_csv": "Moodle-Grades-Reimport CSV",
+        "pdf": "PDF Notenliste"
+      },
+      "downloadButton": "Herunterladen",
+      "summary": "{{total}} Submissions, {{pending}} noch offen.",
+      "noSubmissionsHint": "Noch keine Submissions importiert.",
+      "pendingReviewHint": "Notenexport gesperrt — {{count}} Bewertungen müssen noch reviewt werden.",
+      "openReviewQueue": "Zur Review-Queue",
+      "unexpectedError": "Notenexport fehlgeschlagen.",
+      "errorAuth": "Sitzung abgelaufen — bitte erneut anmelden.",
+      "errorPermission": "Keine Berechtigung für den Notenexport.",
+      "errorNotFound": "Prüfung nicht gefunden.",
+      "errorServer": "Notenexport fehlgeschlagen — bitte erneut versuchen oder Support kontaktieren."
+    },
+    "statistik": {
+      "errorAuth": "Sitzung abgelaufen — bitte erneut anmelden.",
+      "errorPermission": "Keine Berechtigung für die Statistik-Ansicht.",
+      "errorNotFound": "Prüfung nicht gefunden.",
+      "errorServer": "Statistik konnte nicht geladen werden — bitte später erneut versuchen.",
+      "errorPartial": "Statistik teilweise nicht geladen — einzelne Bereiche fehlen."
     }
   },
   "auth": {
@@ -1127,6 +1171,11 @@
       "fieldAllowedAids": "Erlaubte Hilfsmittel",
       "fieldInstructions": "Hinweise / Anweisungen",
       "fieldPassingPercentage": "Bestehensprozentsatz (%)",
+      "fieldGradingScheme": "Notenskala",
+      "gradingSchemeInherit": "Institution-Default verwenden",
+      "gradingSchemeSystemGroup": "System-Skalen",
+      "gradingSchemeInstitutionGroup": "Eigene Skalen",
+      "gradingSchemeDefaultMarker": "(Default)",
       "cancel": "Abbrechen",
       "saving": "Speichere...",
       "save": "Speichern",

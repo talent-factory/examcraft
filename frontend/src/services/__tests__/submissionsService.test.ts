@@ -115,7 +115,13 @@ describe('SubmissionsService', () => {
   // ----- list / detail ----------------------------------------------------
 
   it('listForExam() builds the URL with exam_id query param', async () => {
-    const list: SubmissionList = { items: [], total: 0, limit: 200, offset: 0 };
+    const list: SubmissionList = {
+      items: [],
+      total: 0,
+      pending_count: 0,
+      limit: 200,
+      offset: 0,
+    };
     mockFetch.mockResolvedValueOnce(json(200, list));
 
     const result = await SubmissionsService.listForExam(42);

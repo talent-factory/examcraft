@@ -145,6 +145,9 @@
     "validation_invalid_email": "Adresse e-mail invalide",
     "validation_password_too_short": "Le mot de passe doit comporter au moins 8 caractères",
     "server_error": "Erreur interne du serveur",
-    "not_found": "Non trouvé"
+    "not_found": "Non trouvé",
+    "submissions_grade_export_blocked_pending_review": "Export des notes bloqué : veuillez d'abord traiter la file d'évaluation — toutes les notes doivent être validées avant l'export final.",
+    "submissions_grade_export_blocked_draft": "Export des notes bloqué : l'examen est encore en mode brouillon. Veuillez d'abord le finaliser.",
+    "submissions_grade_export_internal_error": "Échec de l'export des notes — veuillez réessayer ou contacter le support."
   }
 }

@@ -47,6 +47,8 @@ import { ExamDetail } from '../types/composer';
 import ImportDialog from '../components/auswertungen/ImportDialog';
 import OverrideGradeDialog from '../components/auswertungen/OverrideGradeDialog';
 import ReviewQueue from '../components/auswertungen/ReviewQueue';
+import StatistikPanel from '../components/auswertungen/StatistikPanel';
+import NotenexportPanel from '../components/auswertungen/NotenexportPanel';
 
 const formatPct = (pct: number): string => `${Math.round(pct * 10) / 10}%`;
 
@@ -63,9 +65,15 @@ const AuswertungenExam: React.FC = () => {
   const params = useParams<{ examId: string }>();
   const examId = Number(params.examId);
 
-  const [tab, setTab] = useState<'submissions' | 'review'>('submissions');
+  const [tab, setTab] = useState<
+    'submissions' | 'review' | 'statistik' | 'export'
+  >('submissions');
   const [exam, setExam] = useState<ExamDetail | null>(null);
   const [items, setItems] = useState<SubmissionListItem[]>([]);
+  // Server-reported totals so the export-pending banner is accurate
+  // even when the visible items page is smaller than the full set.
+  const [submissionTotal, setSubmissionTotal] = useState(0);
+  const [submissionPending, setSubmissionPending] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<SubmissionDetail | null>(null);
@@ -92,6 +100,8 @@ const AuswertungenExam: React.FC = () => {
       ]);
       setExam(examDetail);
       setItems(list.items);
+      setSubmissionTotal(list.total);
+      setSubmissionPending(list.pending_count);
     } catch (err) {
       setError(
         err instanceof Error
@@ -176,7 +186,9 @@ const AuswertungenExam: React.FC = () => {
 
       <Tabs
         value={tab}
-        onChange={(_, v) => setTab(v as 'submissions' | 'review')}
+        onChange={(_, v) =>
+          setTab(v as 'submissions' | 'review' | 'statistik' | 'export')
+        }
         sx={{ mb: 2 }}
       >
         <Tab
@@ -191,11 +203,20 @@ const AuswertungenExam: React.FC = () => {
           }
           value="review"
         />
-        <Tab label={t('auswertungen.exam.tabStatistik')} disabled />
-        <Tab label={t('auswertungen.exam.tabExport')} disabled />
+        <Tab label={t('auswertungen.exam.tabStatistik')} value="statistik" />
+        <Tab label={t('auswertungen.exam.tabExport')} value="export" />
       </Tabs>
 
-      {tab === 'review' ? (
+      {tab === 'statistik' ? (
+        <StatistikPanel examId={examId} />
+      ) : tab === 'export' ? (
+        <NotenexportPanel
+          examId={examId}
+          totalSubmissions={submissionTotal}
+          pendingCount={submissionPending}
+          onOpenReview={() => setTab('review')}
+        />
+      ) : tab === 'review' ? (
         <ReviewQueue
           examId={examId}
           onTotalChange={(total) => setReviewCount(total)}

@@ -77,6 +77,9 @@ markdown==3.5.1                     # Markdown Processing
 
 # Legacy/Alternative Processors (Optional)
 pypdf>=6.1.0                        # PDF Processing Fallback
+
+# PDF Generation (TF-335 Notenexport)
+reportlab>=4.2.0                    # PDF Generation für GradePdfExporter
 # docling==2.23.0                   # IBM Docling (deprecated - too slow)
 # docling-core==2.48.4              # Docling Core (deprecated)
 # docling-ibm-models==3.9.1         # IBM Models (deprecated)

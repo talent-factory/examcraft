@@ -37,6 +37,8 @@ export interface Exam {
   updated_at: string;
   question_count: number;
   default_document_ids: number[] | null;
+  // TF-335: NULL ⇒ Exam erbt Institution-Default (oder bleibt ohne).
+  grading_scheme_id?: number | null;
 }
 
 export interface ExamDetail extends Exam {
@@ -44,7 +46,7 @@ export interface ExamDetail extends Exam {
 }
 
 export interface ExamListResponse { total: number; exams: Exam[]; }
-export interface CreateExamRequest { title: string; course?: string; exam_date?: string; time_limit_minutes?: number; allowed_aids?: string; instructions?: string; passing_percentage?: number; language?: string; default_document_ids?: number[]; }
+export interface CreateExamRequest { title: string; course?: string; exam_date?: string; time_limit_minutes?: number; allowed_aids?: string; instructions?: string; passing_percentage?: number; language?: string; default_document_ids?: number[]; grading_scheme_id?: number | null; }
 export interface UpdateExamRequest extends Partial<CreateExamRequest> { updated_at: string; }
 export interface ApprovedQuestion { id: number; question_text: string; question_type: string; difficulty: string; topic: string; bloom_level: number | null; options: string[] | null; usage_count: number; }
 export interface ApprovedQuestionsResponse { total: number; questions: ApprovedQuestion[]; }

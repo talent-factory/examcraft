@@ -180,6 +180,7 @@ class SubmissionListOut(BaseModel):
 
     items: list[SubmissionListItemOut]
     total: int
+    pending_count: int  # Submissions whose grade_status != fully_reviewed.
     limit: int
     offset: int
 
@@ -489,6 +490,17 @@ async def list_submissions(
         .filter(Submission.exam_id == exam_id)
     )
     total = base_query.with_entities(Submission.id).count()
+    # Count pending separately: the frontend pagination would otherwise
+    # only see the visible page and report a wrong "X of Y reviewed"
+    # for classes larger than ``limit``.
+    pending_count = (
+        db.query(Submission.id)
+        .filter(
+            Submission.exam_id == exam_id,
+            Submission.grade_status != "fully_reviewed",
+        )
+        .count()
+    )
     rows = (
         base_query.options(joinedload(Submission.attempts))
         .order_by(Submission.id)
@@ -512,7 +524,13 @@ async def list_submissions(
         )
         for s, student in rows
     ]
-    return SubmissionListOut(items=items, total=total, limit=limit, offset=offset)
+    return SubmissionListOut(
+        items=items,
+        total=total,
+        pending_count=pending_count,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/{submission_id}", response_model=SubmissionDetailOut)

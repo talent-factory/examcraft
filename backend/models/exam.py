@@ -47,7 +47,11 @@ class Exam(Base):
     default_document_ids = Column(JSON, nullable=True)  # List[int] | null
     grading_scheme_id = Column(
         Integer,
-        ForeignKey("grading_schemes.id", ondelete="SET NULL"),
+        # ON DELETE RESTRICT: deleting a scheme that's still attached to
+        # an exam would silently break the export contract (Note column
+        # would render "—" for every row). Force the lehrperson to
+        # detach first.
+        ForeignKey("grading_schemes.id", ondelete="RESTRICT"),
         nullable=True,
     )
 

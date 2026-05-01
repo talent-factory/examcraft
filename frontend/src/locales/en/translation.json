@@ -170,6 +170,50 @@
         "queued": "Import queued"
       },
       "resultSummary": "{{processed}} processed, {{failed}} faulty."
+    },
+    "stats": {
+      "loadError": "Failed to load statistics.",
+      "empty": "No submissions yet — statistics become available once results are imported.",
+      "kpiSubmissions": "Submissions",
+      "kpiReviewed": "{{count}} reviewed",
+      "kpiAvg": "Avg. points",
+      "kpiMedian": "Median {{value}}",
+      "kpiPassRate": "Pass rate",
+      "kpiAvgDuration": "Avg. duration",
+      "histogramTitle": "Score distribution",
+      "perQuestionTitle": "Per question",
+      "colPosition": "Pos.",
+      "colQuestion": "Question",
+      "colSuccessRate": "Success rate",
+      "colDifficulty": "Difficulty",
+      "colDiscrimination": "Discrimination",
+      "colLearning": "Learning effect"
+    },
+    "export": {
+      "title": "Grade export",
+      "formatLabel": "Choose format",
+      "format": {
+        "csv": "CSV (Excel-friendly)",
+        "moodle_csv": "Moodle grades re-import CSV",
+        "pdf": "PDF grade list"
+      },
+      "downloadButton": "Download",
+      "summary": "{{total}} submissions, {{pending}} still pending review.",
+      "noSubmissionsHint": "No submissions imported yet.",
+      "pendingReviewHint": "Export blocked — {{count}} grades still need review.",
+      "openReviewQueue": "Open review queue",
+      "unexpectedError": "Grade export failed.",
+      "errorAuth": "Session expired — please sign in again.",
+      "errorPermission": "You do not have permission to export grades.",
+      "errorNotFound": "Exam not found.",
+      "errorServer": "Grade export failed — please retry or contact support."
+    },
+    "statistik": {
+      "errorAuth": "Session expired — please sign in again.",
+      "errorPermission": "You do not have permission to view statistics.",
+      "errorNotFound": "Exam not found.",
+      "errorServer": "Statistics could not be loaded — please try again later.",
+      "errorPartial": "Statistics only partially loaded — some sections are missing."
     }
   },
   "auth": {
@@ -1127,6 +1171,11 @@
       "fieldAllowedAids": "Allowed Aids",
       "fieldInstructions": "Notes / Instructions",
       "fieldPassingPercentage": "Passing Percentage (%)",
+      "fieldGradingScheme": "Grading scheme",
+      "gradingSchemeInherit": "Use institution default",
+      "gradingSchemeSystemGroup": "System schemes",
+      "gradingSchemeInstitutionGroup": "Institution schemes",
+      "gradingSchemeDefaultMarker": "(default)",
       "cancel": "Cancel",
       "saving": "Saving...",
       "save": "Save",

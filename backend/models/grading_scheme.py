@@ -13,7 +13,14 @@ as a wrong grade weeks later.
 
 from typing import Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    ValidationError,
+    model_validator,
+)
 from sqlalchemy import (
     Column,
     Integer,
@@ -33,45 +40,120 @@ from typing_extensions import Annotated
 from database import Base
 
 
-class _BaseConfig(BaseModel):
-    # ``extra='allow'`` so future optional fields don't break old rows;
-    # the discriminator + required fields below still catch typos.
-    model_config = ConfigDict(extra="allow")
+_STRICT = ConfigDict(extra="forbid")
 
 
 class _LinearSegment(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    """One piece of a piecewise-linear scheme.
 
-    from_pct: float
-    to_pct: float
+    ``from_pct < to_pct`` is enforced — descending or zero-width
+    segments produce a divide-by-zero in the evaluator.
+    """
+
+    model_config = _STRICT
+
+    from_pct: float = Field(ge=0, le=100)
+    to_pct: float = Field(ge=0, le=100)
     from_grade: float
     to_grade: float
 
+    @model_validator(mode="after")
+    def _check_pct_order(self) -> "_LinearSegment":
+        if self.from_pct >= self.to_pct:
+            raise ValueError(
+                f"linear segment: from_pct ({self.from_pct}) "
+                f"muss kleiner to_pct ({self.to_pct}) sein"
+            )
+        return self
 
-class _LinearSegmentsConfig(_BaseConfig):
+
+class _LinearSegmentsConfig(BaseModel):
+    """Piecewise-linear scheme — segments must cover [0, 100] continuously."""
+
+    model_config = _STRICT
+
     type: Literal["linear_segments"]
-    segments: list[_LinearSegment]
+    segments: list[_LinearSegment] = Field(min_length=1)
+    round_to: float | None = Field(default=None, gt=0)
+    pass_grade_label: str | None = None  # UI hint only; not a threshold.
+
+    @model_validator(mode="after")
+    def _check_coverage(self) -> "_LinearSegmentsConfig":
+        ordered = sorted(self.segments, key=lambda s: s.from_pct)
+        if ordered[0].from_pct != 0:
+            raise ValueError(
+                f"linear_segments: erstes Segment muss bei 0 % beginnen "
+                f"(bekam {ordered[0].from_pct})"
+            )
+        if ordered[-1].to_pct != 100:
+            raise ValueError(
+                f"linear_segments: letztes Segment muss bei 100 % enden "
+                f"(bekam {ordered[-1].to_pct})"
+            )
+        for prev, curr in zip(ordered, ordered[1:]):
+            if prev.to_pct != curr.from_pct:
+                raise ValueError(
+                    f"linear_segments: Lücke oder Überlappung "
+                    f"(prev.to_pct={prev.to_pct}, curr.from_pct={curr.from_pct})"
+                )
+        return self
 
 
-class _LinearConfig(_BaseConfig):
+class _LinearConfig(BaseModel):
+    """Single linear scale across [min_pct, max_pct]."""
+
+    model_config = _STRICT
+
     type: Literal["linear"]
-    min_pct: float
-    max_pct: float
+    min_pct: float = Field(ge=0, le=100)
+    max_pct: float = Field(ge=0, le=100)
     min_grade: float
     max_grade: float
+    round_to: float | None = Field(default=None, gt=0)
+    pass_grade_label: str | None = None  # UI hint only; not a threshold.
+
+    @model_validator(mode="after")
+    def _check_pct_order(self) -> "_LinearConfig":
+        if self.min_pct >= self.max_pct:
+            raise ValueError(
+                f"linear: min_pct ({self.min_pct}) muss kleiner "
+                f"max_pct ({self.max_pct}) sein"
+            )
+        return self
 
 
 class _Step(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = _STRICT
 
-    min_pct: float
+    min_pct: float = Field(ge=0, le=100)
     grade_label: str
     is_passing: bool
 
 
-class _SteppedConfig(_BaseConfig):
+class _SteppedConfig(BaseModel):
+    """Discrete-buckets scheme — must include a step covering 0 % and ≥1 passing step."""
+
+    model_config = _STRICT
+
     type: Literal["stepped"]
-    steps: list[_Step]
+    steps: list[_Step] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _check_steps(self) -> "_SteppedConfig":
+        seen: set[float] = set()
+        for s in self.steps:
+            if s.min_pct in seen:
+                raise ValueError(f"stepped: dupliziertes min_pct {s.min_pct}")
+            seen.add(s.min_pct)
+        if not any(s.is_passing for s in self.steps):
+            raise ValueError("stepped: mindestens ein Step muss is_passing=True haben")
+        ordered = sorted(self.steps, key=lambda s: s.min_pct)
+        if ordered[0].min_pct != 0:
+            raise ValueError(
+                f"stepped: niedrigster Step muss bei 0 % beginnen "
+                f"(bekam {ordered[0].min_pct})"
+            )
+        return self
 
 
 GradingSchemeConfig = Annotated[

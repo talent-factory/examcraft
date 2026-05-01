@@ -113,6 +113,9 @@ const oneSubmission = {
     },
   ],
   total: 1,
+  pending_count: 0,
+  limit: 200,
+  offset: 0,
 } satisfies SubmissionList;
 
 const sampleDetail: SubmissionDetail = {

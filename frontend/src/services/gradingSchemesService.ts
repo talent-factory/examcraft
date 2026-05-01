@@ -1,0 +1,129 @@
+/**
+ * GradingSchemesService — API client for `/api/v1/grading-schemes/*`.
+ *
+ * Mirrors the backend in `core/backend/api/grading_schemes.py`. Auth-
+ * token handling matches the project's other service classes (Bearer
+ * from localStorage). All errors raise an `ApiError` with a `kind`
+ * field so callers can branch on intent without re-parsing status
+ * codes.
+ */
+
+import { ApiError } from './submissionsService';
+import {
+  GradingSchemeCreate,
+  GradingSchemeListOut,
+  GradingSchemeOut,
+  GradingSchemeUpdate,
+} from '../types/gradingScheme';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const ROOT = '/api/v1/grading-schemes';
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('access_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
+  if (response.ok) {
+    if (response.status === 204) {
+      return undefined as unknown as T;
+    }
+    return (await response.json()) as T;
+  }
+
+  let detail: unknown;
+  let issues: string[] = [];
+  try {
+    const body = await response.json();
+    detail = body.detail;
+    if (Array.isArray(body.detail)) {
+      issues = body.detail
+        .map((d: { msg?: string }) => d?.msg)
+        .filter((m): m is string => typeof m === 'string');
+    }
+  } catch {
+    // Non-JSON error body — capture raw text for Sentry/console so an
+    // upstream HTML error page (CDN/nginx/fly health check) doesn't
+    // disappear without trace.
+    try {
+      const text = await response.text();
+      if (text) {
+        detail = text.slice(0, 500);
+        console.warn(
+          '[GradingSchemesService] non-JSON error body for status',
+          response.status,
+          text.slice(0, 200),
+        );
+      }
+    } catch {
+      /* body fully unavailable */
+    }
+  }
+  const message =
+    typeof detail === 'string'
+      ? detail
+      : `Request failed (${response.status})`;
+  throw new ApiError({
+    kind:
+      response.status === 401
+        ? 'auth'
+        : response.status === 403
+        ? 'permission'
+        : response.status === 404
+        ? 'not_found'
+        : response.status === 409
+        ? 'conflict'
+        : response.status === 422
+        ? 'validation'
+        : 'server',
+    status: response.status,
+    message,
+    detail,
+    issues,
+  });
+}
+
+export class GradingSchemesService {
+  static async list(includeSystem = true): Promise<GradingSchemeListOut> {
+    const url = `${API_BASE_URL}${ROOT}?include_system=${includeSystem}`;
+    const response = await fetch(url, { headers: authHeaders() });
+    return handleResponse<GradingSchemeListOut>(response);
+  }
+
+  static async get(id: number): Promise<GradingSchemeOut> {
+    const response = await fetch(`${API_BASE_URL}${ROOT}/${id}`, {
+      headers: authHeaders(),
+    });
+    return handleResponse<GradingSchemeOut>(response);
+  }
+
+  static async create(payload: GradingSchemeCreate): Promise<GradingSchemeOut> {
+    const response = await fetch(`${API_BASE_URL}${ROOT}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<GradingSchemeOut>(response);
+  }
+
+  static async update(
+    id: number,
+    payload: GradingSchemeUpdate,
+  ): Promise<GradingSchemeOut> {
+    const response = await fetch(`${API_BASE_URL}${ROOT}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<GradingSchemeOut>(response);
+  }
+
+  static async delete(id: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}${ROOT}/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    return handleResponse<void>(response);
+  }
+}

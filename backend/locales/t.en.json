@@ -145,6 +145,9 @@
     "validation_invalid_email": "Invalid email address",
     "validation_password_too_short": "Password must be at least 8 characters long",
     "server_error": "Internal server error",
-    "not_found": "Not found"
+    "not_found": "Not found",
+    "submissions_grade_export_blocked_pending_review": "Grade export blocked: please clear the review queue first — every grade must be approved before the final list can be exported.",
+    "submissions_grade_export_blocked_draft": "Grade export blocked: the exam is still in draft status. Please finalize it first.",
+    "submissions_grade_export_internal_error": "Grade export failed — please try again or contact support."
   }
 }

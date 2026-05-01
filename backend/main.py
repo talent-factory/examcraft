@@ -267,6 +267,26 @@ async def lifespan(app: FastAPI):
     grades_api = importlib.util.module_from_spec(spec_grades)
     spec_grades.loader.exec_module(grades_api)
 
+    spec_grading_schemes = importlib.util.spec_from_file_location(
+        "core_api_grading_schemes",
+        os.path.join(core_api_path, "grading_schemes.py"),
+    )
+    grading_schemes_api = importlib.util.module_from_spec(spec_grading_schemes)
+    spec_grading_schemes.loader.exec_module(grading_schemes_api)
+
+    spec_stats = importlib.util.spec_from_file_location(
+        "core_api_stats", os.path.join(core_api_path, "stats.py")
+    )
+    stats_api = importlib.util.module_from_spec(spec_stats)
+    spec_stats.loader.exec_module(stats_api)
+
+    spec_grade_export = importlib.util.spec_from_file_location(
+        "core_api_grade_export",
+        os.path.join(core_api_path, "grade_export.py"),
+    )
+    grade_export_api = importlib.util.module_from_spec(spec_grade_export)
+    spec_grade_export.loader.exec_module(grade_export_api)
+
     spec_dashboard = importlib.util.spec_from_file_location(
         "core_api_dashboard", os.path.join(core_api_path, "dashboard.py")
     )
@@ -344,6 +364,10 @@ async def lifespan(app: FastAPI):
     app.include_router(submissions_api.exams_alias_router)
     app.include_router(grades_api.router_grades)
     app.include_router(grades_api.router_exams_review_queue)
+    app.include_router(grading_schemes_api.router)
+    app.include_router(stats_api.router_exam_stats)
+    app.include_router(stats_api.router_submission_stats)
+    app.include_router(grade_export_api.router)
     app.include_router(dashboard_api.router)
     app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["billing"])
     app.include_router(

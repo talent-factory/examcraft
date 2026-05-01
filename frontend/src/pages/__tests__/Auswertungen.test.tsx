@@ -121,17 +121,75 @@ describe('Auswertungen overview', () => {
     });
   });
 
-  test('listExams limit stays within backend cap (≤100)', async () => {
-    // Regression-Guard: Backend `/api/v1/exams/` enforces le=100 on
-    // ``limit`` and 422s on anything higher. The Auswertungen overview
-    // previously sent limit=200 which broke the page entirely.
+  test('listExams limit stays within backend cap (≤500)', async () => {
+    // Regression-Guard: Backend `/api/v1/exams/` enforces le=500 on
+    // ``limit`` (TF-335 raised from le=100) and 422s on anything
+    // higher. The Auswertungen overview previously sent limit=200
+    // which broke the page entirely on the old le=100 cap.
     mockComposerService.listExams.mockResolvedValue({ total: 0, exams: [] });
     renderPage();
     await waitFor(() => {
       expect(mockComposerService.listExams).toHaveBeenCalled();
     });
     const arg = mockComposerService.listExams.mock.calls[0][0];
-    expect(arg?.limit).toBeLessThanOrEqual(100);
+    expect(arg?.limit).toBeLessThanOrEqual(500);
     expect(arg?.limit).toBeGreaterThan(0);
+  });
+
+  test('paginates with ≥101 exams via TablePagination', async () => {
+    // TF-335 DoD MUSS: institutions with >100 exams must be able to
+    // navigate page-by-page. We mock 25 exams on page 0 (total 101) and
+    // verify the second page-load fires with offset=25.
+    const page0 = Array.from({ length: 25 }, (_, i) => ({
+      ...sampleExams[0],
+      id: i + 1,
+      title: `Exam ${i + 1}`,
+    })) as Exam[];
+    const page1 = Array.from({ length: 25 }, (_, i) => ({
+      ...sampleExams[0],
+      id: i + 26,
+      title: `Exam ${i + 26}`,
+    })) as Exam[];
+    // Mock implementation responds based on offset so any number of
+    // re-renders (e.g. duplicate effect runs in StrictMode/test harness)
+    // doesn't exhaust a fixed queue and surface as
+    // "Cannot read properties of undefined (reading 'then')".
+    mockComposerService.listExams.mockImplementation(
+      async (params: { limit: number; offset: number }) => ({
+        total: 101,
+        exams: (params.offset ?? 0) >= 25 ? page1 : page0,
+      }),
+    );
+
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Exam 1')).toBeInTheDocument();
+    });
+
+    // First call: offset=0, limit=25 (default rowsPerPage)
+    expect(mockComposerService.listExams.mock.calls[0][0]).toEqual({
+      limit: 25,
+      offset: 0,
+    });
+
+    // Click "next page" — TablePagination renders a button with
+    // aria-label "Go to next page".
+    const nextBtn = screen.getByRole('button', { name: /next/i });
+    fireEvent.click(nextBtn);
+
+    // After the click we expect at least one additional call with
+    // offset=25. Don't pin the exact total — re-renders from MUI's
+    // pagination + the mock implementation can produce extras that
+    // are harmless. The behaviour we care about: a refetch happened
+    // for the new page, and the new rows render.
+    await waitFor(() => {
+      const offsets = mockComposerService.listExams.mock.calls.map(
+        (c) => c[0]?.offset,
+      );
+      expect(offsets).toContain(25);
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Exam 26')).toBeInTheDocument();
+    });
   });
 });

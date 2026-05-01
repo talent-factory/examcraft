@@ -114,6 +114,9 @@ export interface SubmissionListItem {
 export interface SubmissionList {
   items: SubmissionListItem[];
   total: number;
+  /** Count of all submissions where grade_status !== 'fully_reviewed'.
+   *  Server-side count, accurate even when the visible page is small. */
+  pending_count: number;
   limit: number;
   offset: number;
 }
