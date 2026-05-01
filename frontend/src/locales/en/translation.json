@@ -12,9 +12,12 @@
       "reviewQueue": "Review Queue",
       "examComposer": "Exam Composer",
       "auswertungen": "Evaluations",
+      "auswertungenKlassen": "Classes",
+      "auswertungenStudierende": "Students",
       "documentChat": "Document Chat",
       "promptLibrary": "Prompt Library",
       "admin": "Admin",
+      "moodleConnection": "Moodle connection",
       "pricing": "Pricing",
       "profile": "Profile"
     }
@@ -148,6 +151,7 @@
       "sourceMoodleCsv": "Moodle CSV file (Quiz Responses Export)",
       "sourceMoodleApi": "Moodle Web Service API",
       "unavailableTag": "not yet available",
+      "moodleProbeError": "Could not check the Moodle connection — please try again later.",
       "chooseFile": "Choose CSV file",
       "uploadHint": "UTF-8 with delimiter ; or ,. Answer columns are named 'Antwort N' or 'Response N'.",
       "studentCount": "{{count}} students",
@@ -214,6 +218,121 @@
       "errorNotFound": "Exam not found.",
       "errorServer": "Statistics could not be loaded — please try again later.",
       "errorPartial": "Statistics only partially loaded — some sections are missing."
+    },
+    "klassen": {
+      "title": "Classes",
+      "subtitle": "Manage classes and assign students.",
+      "loadError": "Classes could not be loaded.",
+      "emptyHint": "No classes yet. A class is created during import or manually here.",
+      "colName": "Name",
+      "colMembers": "Members",
+      "colCreated": "Created",
+      "colActions": "Actions",
+      "actionCreate": "Create class",
+      "actionDetail": "Detail",
+      "actionRename": "Rename",
+      "actionDelete": "Delete",
+      "createDialog": {
+        "title": "Create class",
+        "nameLabel": "Class name",
+        "nameHelper": "e.g. INF-23a",
+        "submit": "Create",
+        "cancel": "Cancel",
+        "error": "Class could not be created.",
+        "duplicate": "A class with this name already exists."
+      },
+      "renameDialog": {
+        "title": "Rename class",
+        "submit": "Save"
+      },
+      "deleteConfirm": {
+        "title": "Delete class?",
+        "body": "Class \"{{name}}\" and all memberships will be removed. Students themselves remain.",
+        "submit": "Delete",
+        "cancel": "Cancel"
+      },
+      "detail": {
+        "loadError": "Class detail could not be loaded.",
+        "membersTitle": "Members",
+        "memberCount": "{{count}} member(s)",
+        "emptyMembers": "No students assigned yet.",
+        "actionAssign": "Assign student",
+        "actionRemoveMember": "Remove from class",
+        "memberRemoveSuccess": "Member removed.",
+        "memberAddSuccess": "Student assigned to class.",
+        "tabHistory": "History",
+        "tabMembers": "Members",
+        "examTrendTitle": "Class average per exam",
+        "examTrendNoData": "No submissions in this class yet — history appears after the first import.",
+        "topicCoverageTitle": "Topic coverage",
+        "topicCoverageNoData": "No topic data available.",
+        "memberPerformanceTitle": "Performance per student",
+        "colSubmissions": "Submissions",
+        "colAvg": "Average"
+      },
+      "assignDialog": {
+        "title": "Assign student",
+        "searchLabel": "Search by email / name",
+        "loading": "Searching…",
+        "noMatch": "No matches.",
+        "submit": "Assign",
+        "cancel": "Cancel",
+        "duplicate": "Student is already a member of this class.",
+        "searchError": "Search failed — please try again.",
+        "assignError": "Assignment failed — please try again."
+      }
+    },
+    "studierende": {
+      "title": "Students",
+      "subtitle": "Master data and cross-exam history per student.",
+      "loadError": "Students could not be loaded.",
+      "emptyHint": "No students yet.",
+      "searchLabel": "Search by email / name",
+      "filterClass": "Class filter",
+      "filterAllClasses": "All classes",
+      "colExternalId": "Identifier",
+      "colDisplayName": "Name",
+      "colClasses": "Classes",
+      "colSubmissions": "Exams",
+      "colAvg": "Average",
+      "colActions": "Actions",
+      "actionDetail": "Detail",
+      "noClasses": "—",
+      "detail": {
+        "loadError": "Student detail could not be loaded.",
+        "submissionsTitle": "Submissions chronologically",
+        "noSubmissions": "No submissions yet for this student.",
+        "bloomTitle": "Bloom mix",
+        "bloomNoData": "No Bloom data — questions without Bloom level are not aggregated.",
+        "topicHeatmapTitle": "Topic heatmap",
+        "topicHeatmapNoData": "No topic data available.",
+        "classesTitle": "Class memberships",
+        "noClasses": "No classes assigned.",
+        "avgSummary": "{{count}} exam(s) — average {{percentage}}%"
+      }
+    },
+    "tierBanner": {
+      "title": "Tier limit reached",
+      "upgradeAction": "Upgrade to {{tier}}",
+      "auswertung_driver_not_in_tier": "Tier {{tier}} does not include the \"{{driver}}\" driver. Upgrade to Professional or higher.",
+      "auswertung_class_history_enterprise_only": "Class and student history is an Enterprise feature.",
+      "auswertung_review_bulk_pro_only": "Bulk review actions are available from Professional.",
+      "auswertung_custom_grading_schemes_enterprise_only": "Custom grading schemes are an Enterprise feature.",
+      "auswertung_exam_monthly_quota_exceeded": "Monthly limit reached: {{used}} of {{limit}} evaluations used. Upgrade to Starter or higher.",
+      "auswertung_submission_quota_exceeded": "Per-exam submission limit reached ({{limit}}). Upgrade to Professional."
+    },
+    "moodleSync": {
+      "actionLabel": "Capture Moodle IDs",
+      "dialogTitle": "Sync Moodle quiz IDs",
+      "quizIdLabel": "Moodle Quiz ID",
+      "quizIdHelper": "From the URL of the quiz settings page, e.g. ../mod/quiz/view.php?id=42",
+      "questionIdsLabel": "Question IDs (optional, slot order)",
+      "questionIdsHelper": "Comma-separated — leave empty to write only slot=position.",
+      "submit": "Sync",
+      "cancel": "Cancel",
+      "success": "{{count}} question(s) linked to Moodle quiz {{quiz}}.",
+      "error": "Sync failed.",
+      "notVisible": "Quiz {{id}} is not visible to the stored token — check token permissions."
     }
   },
   "auth": {
@@ -451,6 +570,35 @@
     }
   },
   "admin": {
+    "moodle": {
+      "title": "Moodle connection",
+      "subtitle": "Token and base URL for the Moodle Web Service driver.",
+      "loadError": "Connections could not be loaded.",
+      "saveError": "Save failed — please try again.",
+      "deleteError": "Removal failed — please try again.",
+      "testError": "Test failed — please try again.",
+      "validationError": "Please fill in both base URL and token.",
+      "noConnection": "No connection configured yet.",
+      "baseUrlLabel": "Base URL",
+      "baseUrlHelper": "e.g. https://moodle.your-school.org",
+      "tokenLabel": "Web service token",
+      "tokenHelper": "From Moodle: Site administration → Server → Web services → Manage tokens.",
+      "tokenRotateLabel": "New token (optional)",
+      "tokenRotateHelper": "Leave empty to keep the existing token.",
+      "actionSave": "Save",
+      "actionUpdate": "Update",
+      "actionTest": "Test connection",
+      "actionDelete": "Remove connection",
+      "createSuccess": "Connection saved.",
+      "updateSuccess": "Connection updated.",
+      "deleteSuccess": "Connection removed.",
+      "testRunning": "Testing…",
+      "testSuccess": "Connection OK — {{site}} (user: {{user}})",
+      "testFailure": "Connection test failed: {{error}}",
+      "lastUsedNever": "never used yet",
+      "lastUsedAt": "last used: {{when}}",
+      "tokenMaskedHint": "The token is stored encrypted and only shown masked."
+    },
     "userManagement": {
       "title": "User Management",
       "subtitle": "Manage users, assign roles, and control access permissions"

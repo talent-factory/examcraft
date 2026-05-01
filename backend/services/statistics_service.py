@@ -24,14 +24,18 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
+from datetime import date
+
 from sqlalchemy.orm import Session
 
-from models.auth import Institution
 from models.exam import Exam, ExamQuestion
-from models.grading_scheme import GradingScheme
 from models.question_review import QuestionReview
+from models.student import Student, StudentClass, StudentClassMembership
 from models.submission import Attempt, AttemptAnswer, Grade, Submission
 from services.grading_scheme_evaluator import is_passing
+from services.grading_scheme_resolver import (
+    resolve_scheme_config as _resolve_scheme_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +96,86 @@ class PerSubmissionStat:
     per_question: list[dict[str, Any]]
     bloom_mix: dict[int, int]
     topic_heatmap: dict[str, dict[str, float]]
+
+
+# ---------------------------------------------------------------------------
+# Cross-Exam DTOs (TF-336 Subarea B)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class StudentSubmissionRecord:
+    """One submission's headline data, chronological."""
+
+    submission_id: int
+    exam_id: int
+    exam_title: str
+    exam_date: date | None
+    percentage: float
+    grade_status: str
+
+
+@dataclass(frozen=True)
+class TopicAggregate:
+    """Topic coverage across multiple submissions."""
+
+    topic: str
+    points_awarded: float
+    points_max: float
+    percentage: float
+
+
+@dataclass(frozen=True)
+class ClassMemberPerformance:
+    """One student's progress as seen from the class perspective."""
+
+    student_id: int
+    external_id: str
+    display_name: str | None
+    submission_count: int
+    avg_percentage: float | None
+    submissions: list[StudentSubmissionRecord]
+
+
+@dataclass(frozen=True)
+class ClassExamAggregate:
+    """Class-wide aggregate per exam — for the trend chart."""
+
+    exam_id: int
+    exam_title: str
+    exam_date: date | None
+    submission_count: int
+    avg_percentage: float | None
+    pass_rate: float | None
+
+
+@dataclass(frozen=True)
+class ClassHistoryStats:
+    class_id: int
+    class_name: str
+    member_count: int
+    members: list[ClassMemberPerformance]
+    exam_aggregates: list[ClassExamAggregate]
+    topic_coverage: list[TopicAggregate]
+
+
+@dataclass(frozen=True)
+class StudentClassRef:
+    class_id: int
+    class_name: str
+
+
+@dataclass(frozen=True)
+class StudentHistoryStats:
+    student_id: int
+    external_id: str
+    display_name: str | None
+    submission_count: int
+    avg_percentage: float | None
+    submissions: list[StudentSubmissionRecord]
+    bloom_mix: dict[int, int]
+    topic_heatmap: list[TopicAggregate]
+    classes: list[StudentClassRef]
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +439,289 @@ class StatisticsService:
         )
 
     # ------------------------------------------------------------------
+    # Cross-Exam (TF-336 Subarea B)
+    # ------------------------------------------------------------------
+
+    def class_history(
+        self, *, class_id: int, institution_id: int
+    ) -> ClassHistoryStats | None:
+        """Klassen-Verlauf: alle Studis × alle Prüfungen.
+
+        Filtert die Submissions auf Studis, die zum Zeitpunkt des
+        Aufrufs Mitglied der Klasse sind. Studis, die zwischenzeitlich
+        ausgetreten sind, fliessen *nicht* in die Aggregate ein —
+        Mitgliedschaft ist hier eine "as of now"-Sicht. Dass das
+        retroaktive Daten verändert ist gewollt: das Klassen-Dashboard
+        spiegelt die *aktuelle* Zusammensetzung wider, sonst wäre
+        Klassenwechsel + Anzeige nicht mehr nachvollziehbar.
+        """
+        student_class = (
+            self.db.query(StudentClass)
+            .filter(
+                StudentClass.id == class_id,
+                StudentClass.institution_id == institution_id,
+            )
+            .one_or_none()
+        )
+        if student_class is None:
+            return None
+
+        members = (
+            self.db.query(Student)
+            .join(
+                StudentClassMembership, StudentClassMembership.student_id == Student.id
+            )
+            .filter(StudentClassMembership.class_id == class_id)
+            .order_by(Student.display_name.nullslast(), Student.external_id)
+            .all()
+        )
+        student_ids = [s.id for s in members]
+        if not student_ids:
+            return ClassHistoryStats(
+                class_id=class_id,
+                class_name=student_class.name,
+                member_count=0,
+                members=[],
+                exam_aggregates=[],
+                topic_coverage=[],
+            )
+
+        submission_rows = (
+            self.db.query(Submission, Exam)
+            .join(Exam, Exam.id == Submission.exam_id)
+            .filter(
+                Submission.student_id.in_(student_ids),
+                Exam.institution_id == institution_id,
+            )
+            .order_by(Exam.exam_date.nullslast(), Exam.id, Submission.student_id)
+            .all()
+        )
+
+        # Per-student aggregation
+        by_student: dict[int, list[StudentSubmissionRecord]] = {
+            sid: [] for sid in student_ids
+        }
+        for submission, exam in submission_rows:
+            by_student[submission.student_id].append(
+                StudentSubmissionRecord(
+                    submission_id=submission.id,
+                    exam_id=exam.id,
+                    exam_title=exam.title,
+                    exam_date=exam.exam_date,
+                    percentage=float(submission.percentage),
+                    grade_status=submission.grade_status,
+                )
+            )
+
+        member_perf = []
+        for student in members:
+            recs = by_student.get(student.id, [])
+            avg = _safe_mean([r.percentage for r in recs])
+            member_perf.append(
+                ClassMemberPerformance(
+                    student_id=student.id,
+                    external_id=student.external_id,
+                    display_name=student.display_name,
+                    submission_count=len(recs),
+                    avg_percentage=avg,
+                    submissions=recs,
+                )
+            )
+
+        # Per-exam aggregate (across this class's members only)
+        exam_buckets: dict[int, list[Submission]] = {}
+        exam_metadata: dict[int, Exam] = {}
+        for submission, exam in submission_rows:
+            exam_buckets.setdefault(exam.id, []).append(submission)
+            exam_metadata[exam.id] = exam
+
+        exam_aggregates: list[ClassExamAggregate] = []
+        for exam_id, subs in sorted(
+            exam_buckets.items(),
+            key=lambda kv: (
+                exam_metadata[kv[0]].exam_date or date.max,
+                kv[0],
+            ),
+        ):
+            exam = exam_metadata[exam_id]
+            percentages = [float(s.percentage) for s in subs]
+            scheme_config = _resolve_scheme_config(self.db, exam)
+            passing_pct = float(exam.passing_percentage or 0)
+            if scheme_config is not None:
+                pass_count = sum(
+                    1
+                    for p in percentages
+                    if is_passing(p, scheme_config, passing_percentage=passing_pct)
+                )
+            else:
+                pass_count = sum(1 for p in percentages if p >= passing_pct)
+            exam_aggregates.append(
+                ClassExamAggregate(
+                    exam_id=exam.id,
+                    exam_title=exam.title,
+                    exam_date=exam.exam_date,
+                    submission_count=len(subs),
+                    avg_percentage=_safe_mean(percentages),
+                    pass_rate=pass_count / len(percentages) if percentages else None,
+                )
+            )
+
+        # Topic coverage across the class — sum points across all
+        # graded attempts of this class's members.
+        topic_coverage = self._aggregate_topic_coverage(
+            submission_ids=[
+                s.id for s, _ in submission_rows if s.graded_attempt_id is not None
+            ]
+        )
+
+        return ClassHistoryStats(
+            class_id=class_id,
+            class_name=student_class.name,
+            member_count=len(members),
+            members=member_perf,
+            exam_aggregates=exam_aggregates,
+            topic_coverage=topic_coverage,
+        )
+
+    def student_history(
+        self, *, student_id: int, institution_id: int
+    ) -> StudentHistoryStats | None:
+        """Studi-Verlauf: alle Submissions chronologisch + Bloom + Topic."""
+        student = (
+            self.db.query(Student)
+            .filter(
+                Student.id == student_id,
+                Student.institution_id == institution_id,
+            )
+            .one_or_none()
+        )
+        if student is None:
+            return None
+
+        submission_rows = (
+            self.db.query(Submission, Exam)
+            .join(Exam, Exam.id == Submission.exam_id)
+            .filter(
+                Submission.student_id == student_id,
+                Exam.institution_id == institution_id,
+            )
+            .order_by(Exam.exam_date.nullslast(), Exam.id)
+            .all()
+        )
+
+        records = [
+            StudentSubmissionRecord(
+                submission_id=submission.id,
+                exam_id=exam.id,
+                exam_title=exam.title,
+                exam_date=exam.exam_date,
+                percentage=float(submission.percentage),
+                grade_status=submission.grade_status,
+            )
+            for submission, exam in submission_rows
+        ]
+
+        graded_submission_ids = [
+            s.id for s, _ in submission_rows if s.graded_attempt_id is not None
+        ]
+        topic_coverage = self._aggregate_topic_coverage(
+            submission_ids=graded_submission_ids
+        )
+
+        # Bloom-Mix aggregated across all answered questions in graded
+        # attempts. Bloom levels live on the QuestionReview master.
+        bloom_rows = (
+            self.db.query(QuestionReview.bloom_level)
+            .join(ExamQuestion, ExamQuestion.question_id == QuestionReview.id)
+            .join(AttemptAnswer, AttemptAnswer.exam_question_id == ExamQuestion.id)
+            .join(Attempt, Attempt.id == AttemptAnswer.attempt_id)
+            .join(Submission, Submission.id == Attempt.submission_id)
+            .filter(
+                Submission.student_id == student_id,
+                Submission.graded_attempt_id == Attempt.id,
+                QuestionReview.bloom_level.isnot(None),
+            )
+            .all()
+        )
+        bloom_mix: Counter[int] = Counter()
+        for (level,) in bloom_rows:
+            if level is not None:
+                bloom_mix[int(level)] += 1
+
+        classes = (
+            self.db.query(StudentClass)
+            .join(
+                StudentClassMembership,
+                StudentClassMembership.class_id == StudentClass.id,
+            )
+            .filter(
+                StudentClassMembership.student_id == student_id,
+                StudentClass.institution_id == institution_id,
+            )
+            .order_by(StudentClass.name)
+            .all()
+        )
+
+        avg = _safe_mean([r.percentage for r in records])
+        return StudentHistoryStats(
+            student_id=student.id,
+            external_id=student.external_id,
+            display_name=student.display_name,
+            submission_count=len(records),
+            avg_percentage=avg,
+            submissions=records,
+            bloom_mix=dict(bloom_mix),
+            topic_heatmap=topic_coverage,
+            classes=[
+                StudentClassRef(class_id=c.id, class_name=c.name) for c in classes
+            ],
+        )
+
+    def _aggregate_topic_coverage(
+        self, *, submission_ids: list[int]
+    ) -> list[TopicAggregate]:
+        """Sum (points_awarded, points_max) per topic over graded answers."""
+        if not submission_ids:
+            return []
+        rows = (
+            self.db.query(
+                QuestionReview.topic,
+                Grade.points_awarded,
+                Grade.points_max,
+            )
+            .join(ExamQuestion, ExamQuestion.question_id == QuestionReview.id)
+            .join(AttemptAnswer, AttemptAnswer.exam_question_id == ExamQuestion.id)
+            .join(Grade, Grade.attempt_answer_id == AttemptAnswer.id)
+            .join(Attempt, Attempt.id == AttemptAnswer.attempt_id)
+            .join(Submission, Submission.id == Attempt.submission_id)
+            .filter(
+                Submission.id.in_(submission_ids),
+                Submission.graded_attempt_id == Attempt.id,
+            )
+            .all()
+        )
+        acc: dict[str, dict[str, float]] = {}
+        for topic, points_awarded, points_max in rows:
+            key = topic or "—"
+            bucket = acc.setdefault(key, {"awarded": 0.0, "max": 0.0})
+            bucket["awarded"] += float(points_awarded or 0.0)
+            bucket["max"] += float(points_max or 0.0)
+        return sorted(
+            (
+                TopicAggregate(
+                    topic=topic,
+                    points_awarded=v["awarded"],
+                    points_max=v["max"],
+                    percentage=(
+                        100.0 * v["awarded"] / v["max"] if v["max"] > 0 else 0.0
+                    ),
+                )
+                for topic, v in acc.items()
+            ),
+            key=lambda t: t.topic,
+        )
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
@@ -500,22 +867,3 @@ def _learning_effect(
     if not deltas:
         return None
     return sum(deltas) / len(deltas)
-
-
-def _resolve_scheme_config(db: Session, exam: Exam) -> dict[str, Any] | None:
-    """Pull the scheme dict for the exam, falling back to the institution
-    default. Mirrors the helper in ``api.grade_export`` — duplicated to
-    keep the service free of API-layer imports.
-    """
-    scheme_id = exam.grading_scheme_id
-    if scheme_id is None:
-        institution = (
-            db.query(Institution)
-            .filter(Institution.id == exam.institution_id)
-            .one_or_none()
-        )
-        scheme_id = institution.default_grading_scheme_id if institution else None
-    if scheme_id is None:
-        return None
-    scheme = db.query(GradingScheme).filter(GradingScheme.id == scheme_id).one_or_none()
-    return scheme.config if scheme is not None else None

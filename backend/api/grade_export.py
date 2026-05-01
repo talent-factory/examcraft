@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.auth import Institution, User
 from models.exam import Exam, ExamStatus
-from models.grading_scheme import GradingScheme
 from models.student import Student
 from models.submission import Submission
 from services.grade_export_service import (
@@ -31,6 +30,9 @@ from services.grade_export_service import (
     GradePdfExporter,
     GradeRow,
     MoodleGradeCsvExporter,
+)
+from services.grading_scheme_resolver import (
+    resolve_scheme_config as _resolve_scheme_config,
 )
 from services.translation_service import get_request_locale, t
 from utils.auth_utils import require_permission
@@ -87,26 +89,6 @@ def _ensure_exam_for_user(db: Session, user: User, exam_id: int) -> Exam:
     if exam is None:
         raise HTTPException(status_code=404, detail="Prüfung nicht gefunden")
     return exam
-
-
-def _resolve_scheme_config(db: Session, exam: Exam) -> dict | None:
-    """Pull the scheme-config dict from the configured scheme, falling
-    back to the institution default. Returns ``None`` if neither is
-    set — the exporter will render "—" in the Note column rather than
-    crashing.
-    """
-    scheme_id = exam.grading_scheme_id
-    if scheme_id is None:
-        institution = (
-            db.query(Institution)
-            .filter(Institution.id == exam.institution_id)
-            .one_or_none()
-        )
-        scheme_id = institution.default_grading_scheme_id if institution else None
-    if scheme_id is None:
-        return None
-    scheme = db.query(GradingScheme).filter(GradingScheme.id == scheme_id).one_or_none()
-    return scheme.config if scheme is not None else None
 
 
 def _build_export_data(db: Session, exam: Exam) -> GradeExportData:

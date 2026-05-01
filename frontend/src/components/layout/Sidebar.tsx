@@ -20,8 +20,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
-  const isActivePath = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(path + '/');
+  const isActivePath = (path: string, hasChildren: boolean) => {
+    if (location.pathname === path) return true;
+    // Nur Items mit echten Children dürfen über Prefix-Match aktiv werden.
+    // Sonst lösen flache Geschwister-Routes wie `/auswertungen` und
+    // `/auswertungen/klassen` doppeltes Highlighting aus.
+    return hasChildren && location.pathname.startsWith(path + '/');
   };
 
   const toggleExpanded = (path: string) => {
@@ -40,8 +44,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
   };
 
   const renderNavItem = (item: NavigationItem, isChild = false) => {
-    const isActive = isActivePath(item.path);
-    const hasChildren = item.children && item.children.length > 0;
+    const hasChildren = !!(item.children && item.children.length > 0);
+    const isActive = isActivePath(item.path, hasChildren);
     const isExpanded = expandedItems.has(item.path);
 
     return (

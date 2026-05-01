@@ -143,13 +143,29 @@ class MoodleCsvDriver(BaseImportDriver):
     )
     STATUS_COLUMNS: ClassVar[tuple[str, ...]] = ("status", "state")
     ATTEMPT_COLUMNS: ClassVar[tuple[str, ...]] = ("versuch", "attempt")
+    # TF-336: Optional class hint column. ImportService reads this to
+    # auto-attach the student to a StudentClass with the same name.
+    CLASS_COLUMNS: ClassVar[tuple[str, ...]] = (
+        "klasse",
+        "class",
+        "kurs",
+        "course",
+        "group",
+        "gruppe",
+    )
 
     ANSWER_COLUMN_REGEX: ClassVar[re.Pattern[str]] = re.compile(
         r"^(antwort|response)\s*(\d+)$",
         re.IGNORECASE,
     )
 
-    def parse(self, source: bytes | str, *, exam: ExamLike) -> ImportPayload:
+    def parse(
+        self,
+        source: bytes | str,
+        *,
+        exam: ExamLike,
+        db=None,  # unused: CSV is self-contained.
+    ) -> ImportPayload:
         text, encoding = self._decode(source)
         if not text.strip():
             raise EmptyCsvError("CSV ist leer")
@@ -175,6 +191,7 @@ class MoodleCsvDriver(BaseImportDriver):
         started_col = self._find_column(header_index, self.STARTED_COLUMNS)
         submitted_col = self._find_column(header_index, self.SUBMITTED_COLUMNS)
         attempt_col = self._find_column(header_index, self.ATTEMPT_COLUMNS)
+        class_col = self._find_column(header_index, self.CLASS_COLUMNS)
 
         answer_columns = self._find_answer_columns(raw_headers)
         questions_by_position: dict[int, int] = {
@@ -259,6 +276,7 @@ class MoodleCsvDriver(BaseImportDriver):
                     started_col=started_col,
                     submitted_col=submitted_col,
                     attempt_col=attempt_col,
+                    class_col=class_col,
                     answer_columns=answer_columns,
                     questions_by_position=questions_by_position,
                 )
@@ -273,19 +291,12 @@ class MoodleCsvDriver(BaseImportDriver):
                 payload.errors.append(
                     ImportRowError(row_index=row_idx, reason=str(exc))
                 )
-            except Exception as exc:
-                # Unexpected errors must not abort the whole import —
-                # log with context and surface as a row error so the
-                # operator can see which row caused trouble.
-                logger.exception(
-                    "MoodleCsvDriver: unerwarteter Fehler in Zeile %s", row_idx
-                )
-                payload.errors.append(
-                    ImportRowError(
-                        row_index=row_idx,
-                        reason=f"Unerwarteter Fehler: {type(exc).__name__}: {exc}",
-                    )
-                )
+            # No bare ``except Exception`` here: unexpected errors
+            # (AttributeError from a model rename, NotImplementedError
+            # from a partially-stubbed driver subclass, …) must reach
+            # ``ImportService._fail_job`` so the operator sees a job
+            # failure with a traceback rather than 100 mystery row
+            # warnings that "mostly worked".
 
         # If the sniffer fell back AND most rows failed for the same
         # reason, the delimiter is almost certainly wrong. Prepend an
@@ -421,6 +432,7 @@ class MoodleCsvDriver(BaseImportDriver):
         started_col: str | None,
         submitted_col: str | None,
         attempt_col: str | None,
+        class_col: str | None,
         answer_columns: list[tuple[str, int]],
         questions_by_position: dict[int, int],
     ) -> None:
@@ -428,15 +440,24 @@ class MoodleCsvDriver(BaseImportDriver):
         if not external_id:
             raise ValueError("Leere external_id (E-Mail)")
 
+        class_hint = (row.get(class_col) or "").strip() if class_col else ""
+        class_hint = class_hint or None
+
         if external_id not in students_by_id:
             student = StudentRef(
                 external_id=external_id,
                 display_name=self._compose_display_name(
                     row, first_name_col, last_name_col
                 ),
+                class_hint=class_hint,
             )
             students_by_id[external_id] = student
             payload.students.append(student)
+        elif class_hint and not students_by_id[external_id].class_hint:
+            # Same student, multiple rows: keep the first non-empty hint
+            # rather than overwriting (the first row tends to be the
+            # canonical one in Moodle's grouped exports).
+            students_by_id[external_id].class_hint = class_hint
 
         attempt_number, attempt_warning = self._extract_attempt_number(row, attempt_col)
         if attempt_warning:

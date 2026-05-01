@@ -105,7 +105,36 @@ class GradingService:
         self.grader = deterministic_grader or DeterministicGrader()
         # LlmGrader-Konstruktion ist günstig (kein API-Call); im Demo-
         # Mode (kein API-Key) liefert sie einen 0-Punkte-Stub.
+        self._explicit_llm_grader = llm_grader
         self.llm_grader = llm_grader or LlmGrader()
+        # TF-336: Cache pro Modell-String, damit Enterprise-
+        # Institutionen mit eigenem ``llm_model_for_grading`` kein
+        # Re-Build der Anthropic-Client-Konstruktion pro Submission
+        # bezahlen, aber gleichzeitig zwei verschiedene Modelle in
+        # einer Pipeline nicht teilen.
+        self._llm_grader_by_model: dict[str | None, LlmGrader] = {None: self.llm_grader}
+
+    def _resolve_llm_grader(self, *, submission: Submission) -> LlmGrader:
+        """Get the right ``LlmGrader`` for the submission's institution.
+
+        Honours ``Institution.llm_model_for_grading`` (Enterprise-only
+        setting). Tests that inject a fixture ``llm_grader`` keep their
+        instance — we only branch when no explicit grader was passed.
+        """
+        if self._explicit_llm_grader is not None:
+            return self._explicit_llm_grader
+        exam = getattr(submission, "exam", None)
+        institution = getattr(exam, "institution", None) if exam else None
+        model_override = (
+            getattr(institution, "llm_model_for_grading", None) if institution else None
+        )
+        if model_override:
+            cached = self._llm_grader_by_model.get(model_override)
+            if cached is None:
+                cached = LlmGrader(model=model_override)
+                self._llm_grader_by_model[model_override] = cached
+            return cached
+        return self.llm_grader
 
     # ------------------------------------------------------------------
     # Grading
@@ -125,6 +154,11 @@ class GradingService:
         submission = self.db.get(Submission, submission_id)
         if submission is None:
             raise SubmissionNotFoundError(f"Submission {submission_id} nicht gefunden")
+
+        # TF-336: pick the institution-configured LLM model (Enterprise
+        # tier). For all other tiers the default is reused. Service is
+        # per-DB-session, so swapping the attribute is safe.
+        self.llm_grader = self._resolve_llm_grader(submission=submission)
 
         attempts = (
             self.db.query(Attempt)

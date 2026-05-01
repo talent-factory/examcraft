@@ -45,6 +45,7 @@ import {
 } from '../types/submission';
 import { ExamDetail } from '../types/composer';
 import ImportDialog from '../components/auswertungen/ImportDialog';
+import SyncMoodleIdsDialog from '../components/auswertungen/SyncMoodleIdsDialog';
 import OverrideGradeDialog from '../components/auswertungen/OverrideGradeDialog';
 import ReviewQueue from '../components/auswertungen/ReviewQueue';
 import StatistikPanel from '../components/auswertungen/StatistikPanel';
@@ -80,6 +81,7 @@ const AuswertungenExam: React.FC = () => {
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [syncMoodleOpen, setSyncMoodleOpen] = useState(false);
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [overrideAnswer, setOverrideAnswer] = useState<AttemptAnswer | null>(
     null,
@@ -154,6 +156,14 @@ const AuswertungenExam: React.FC = () => {
             {exam?.title ?? '…'}
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
+          <Button
+            variant="outlined"
+            onClick={() => setSyncMoodleOpen(true)}
+            data-testid="auswertungen-exam-sync-moodle"
+            sx={{ mr: 1 }}
+          >
+            {t('auswertungen.moodleSync.actionLabel')}
+          </Button>
           <Button
             variant="contained"
             startIcon={<UploadIcon />}
@@ -490,6 +500,13 @@ const AuswertungenExam: React.FC = () => {
             setImportOpen(false);
             void reload();
           }}
+        />
+      )}
+      {syncMoodleOpen && exam && (
+        <SyncMoodleIdsDialog
+          open
+          examId={exam.id}
+          onClose={() => setSyncMoodleOpen(false)}
         />
       )}
     </Box>

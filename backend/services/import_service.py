@@ -36,7 +36,7 @@ from enums import (
     SubmissionGradeStatus,
 )
 from models.exam import Exam, ExamQuestion
-from models.student import Student
+from models.student import Student, StudentClass, StudentClassMembership
 from models.submission import (
     Attempt,
     AttemptAnswer,
@@ -49,6 +49,7 @@ from services.import_drivers import (
     ImportDriverError,
     ImportPayload,
     ImportRowError,
+    MoodleApiDriver,
     MoodleCsvDriver,
 )
 
@@ -92,6 +93,7 @@ class ImportService:
     DRIVERS: Mapping[str, BaseImportDriver] = MappingProxyType(
         {
             MoodleCsvDriver.name: MoodleCsvDriver(),
+            MoodleApiDriver.name: MoodleApiDriver(),
         }
     )
 
@@ -108,7 +110,7 @@ class ImportService:
     ) -> ImportPayload:
         """Steps 1+2: parse + validate, no persistence."""
         driver = self._get_driver(driver_name)
-        payload = driver.parse(source, exam=exam)
+        payload = driver.parse(source, exam=exam, db=self.db)
         self._validate_payload(payload, exam)
         return payload
 
@@ -179,11 +181,19 @@ class ImportService:
 
         try:
             with self.db.begin_nested():  # SAVEPOINT: rolls back on failure
-                payload = driver.parse(source, exam=exam)
+                payload = driver.parse(source, exam=exam, db=self.db)
                 self._validate_payload(payload, exam)
 
                 students_by_external_id = self._upsert_students(
                     payload, institution_id=exam.institution_id
+                )
+                # TF-336: auto-attach students to classes based on the
+                # driver-supplied ``class_hint``. Missing classes are
+                # created on the fly; existing memberships are kept.
+                self._attach_class_memberships(
+                    payload=payload,
+                    institution_id=exam.institution_id,
+                    students_by_external_id=students_by_external_id,
                 )
                 touched_submissions = self._persist_attempts(
                     payload=payload,
@@ -297,6 +307,122 @@ class ImportService:
 
         self.db.flush()
         return result
+
+    def _attach_class_memberships(
+        self,
+        *,
+        payload: ImportPayload,
+        institution_id: int,
+        students_by_external_id: dict[str, Student],
+    ) -> None:
+        """Auto-attach students to a ``StudentClass`` per ``class_hint``.
+
+        Idempotent: existing memberships (or pre-existing classes with
+        the same name in the institution) are reused. A missing class is
+        created. Per-student errors degrade to ``payload.warnings`` so
+        one bad row never aborts the whole import.
+
+        We trim and treat empty strings as None to defend against the
+        Moodle locale exports that fill the column with whitespace.
+        """
+        hint_map: dict[str, list[Student]] = {}
+        for ref in payload.students:
+            hint = (ref.class_hint or "").strip()
+            if not hint:
+                continue
+            student = students_by_external_id.get(ref.external_id)
+            if student is None:
+                continue
+            hint_map.setdefault(hint, []).append(student)
+
+        if not hint_map:
+            return
+
+        existing_classes = {
+            cls.name: cls
+            for cls in (
+                self.db.query(StudentClass)
+                .filter(
+                    StudentClass.institution_id == institution_id,
+                    StudentClass.name.in_(list(hint_map)),
+                )
+                .all()
+            )
+        }
+
+        # Pre-load existing memberships to avoid one SELECT per student.
+        student_ids = {s.id for students in hint_map.values() for s in students}
+        existing_memberships: set[tuple[int, int]] = set()
+        if student_ids and existing_classes:
+            class_ids = [c.id for c in existing_classes.values()]
+            rows = (
+                self.db.query(
+                    StudentClassMembership.student_id,
+                    StudentClassMembership.class_id,
+                )
+                .filter(
+                    StudentClassMembership.student_id.in_(student_ids),
+                    StudentClassMembership.class_id.in_(class_ids),
+                )
+                .all()
+            )
+            existing_memberships = {(row.student_id, row.class_id) for row in rows}
+
+        classes_created = 0
+        members_added = 0
+        for class_name, students in hint_map.items():
+            student_class = existing_classes.get(class_name)
+            if student_class is None:
+                # Race-safe class insert: another concurrent import may
+                # have created the same class name in the same
+                # institution between our SELECT above and this INSERT.
+                try:
+                    with self.db.begin_nested():
+                        student_class = StudentClass(
+                            institution_id=institution_id,
+                            name=class_name,
+                        )
+                        self.db.add(student_class)
+                        self.db.flush()
+                except IntegrityError:
+                    student_class = (
+                        self.db.query(StudentClass)
+                        .filter(
+                            StudentClass.institution_id == institution_id,
+                            StudentClass.name == class_name,
+                        )
+                        .one()
+                    )
+                else:
+                    classes_created += 1
+                existing_classes[class_name] = student_class
+
+            for student in students:
+                key = (student.id, student_class.id)
+                if key in existing_memberships:
+                    continue
+                try:
+                    with self.db.begin_nested():
+                        self.db.add(
+                            StudentClassMembership(
+                                student_id=student.id,
+                                class_id=student_class.id,
+                            )
+                        )
+                        self.db.flush()
+                except IntegrityError:
+                    # Same race window as above — another import added
+                    # the membership; nothing to do.
+                    continue
+                existing_memberships.add(key)
+                members_added += 1
+
+        self.db.flush()
+        if classes_created or members_added:
+            payload.warnings.append(
+                f"Klassen-Zuordnung: {classes_created} Klasse(n) angelegt, "
+                f"{members_added} Mitgliedschaft(en) ergänzt"
+            )
 
     def _persist_attempts(
         self,
@@ -446,7 +572,7 @@ class ImportService:
 
     def _grade_touched_submissions(
         self, submissions: list[Submission], *, job: ImportJob
-    ) -> list[tuple[int, str]]:
+    ) -> list[tuple[int, str, str]]:
         """Grade each submission, isolating per-submission failures.
 
         One bad submission must not roll back the whole import — record
@@ -456,8 +582,12 @@ class ImportService:
         UI can render a red banner instead of "0 / N points,
         pending_review" — which reads as "awaiting LLM" and would
         silently mask the real failure.
+
+        Returns ``(submission_id, reason, traceback)`` per failure so
+        the import-job error_log carries the full stack — the worker
+        log alone is not visible to the operator triaging via the UI.
         """
-        failures: list[tuple[int, str]] = []
+        failures: list[tuple[int, str, str]] = []
         for submission in submissions:
             try:
                 with self.db.begin_nested():
@@ -467,7 +597,10 @@ class ImportService:
                     "Grading failed for submission_id=%s during import",
                     submission.id,
                 )
-                failures.append((submission.id, f"{type(exc).__name__}: {exc}"))
+                tb = "".join(
+                    traceback.format_exception(type(exc), exc, exc.__traceback__)
+                )
+                failures.append((submission.id, f"{type(exc).__name__}: {exc}", tb))
                 # Outside the rolled-back savepoint: mutate the
                 # submission row in the outer transaction so the failed
                 # state is visible to the UI even after the savepoint
@@ -558,7 +691,7 @@ class ImportService:
         job: ImportJob,
         payload: ImportPayload,
         *,
-        grading_failures: list[tuple[int, str]] | None = None,
+        grading_failures: list[tuple[int, str, str]] | None = None,
     ) -> None:
         """Set job aggregates + status.
 
@@ -566,6 +699,10 @@ class ImportService:
         partial means *some* rows persisted (re-import with the failed
         rows fixed will round-trip clean). FAILED means nothing useful
         was imported.
+
+        ``grading_failures``: ``(submission_id, reason, traceback)``
+        tuples; the traceback ends up in ``error_log[*].details`` so
+        the UI surfaces the real cause without server-log access.
         """
         grading_failures = grading_failures or []
         rows_failed = len(payload.errors) + len(grading_failures)
@@ -589,9 +726,12 @@ class ImportService:
                 "row_index": 0,
                 "reason": reason,
                 "step": "grading",
-                "details": {"submission_id": sub_id},
+                "details": {
+                    "submission_id": sub_id,
+                    "traceback": tb,
+                },
             }
-            for sub_id, reason in grading_failures
+            for sub_id, reason, tb in grading_failures
         )
         # Always store an explicit list — empty is still meaningful
         # ("never populated" vs "no errors" stays distinguishable).

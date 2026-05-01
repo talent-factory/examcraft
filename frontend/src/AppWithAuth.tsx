@@ -26,6 +26,11 @@ import { BillingPage } from './pages/BillingPage';
 import { ExamComposer } from './pages/ExamComposer';
 import Auswertungen from './pages/Auswertungen';
 import AuswertungenExam from './pages/AuswertungenExam';
+import AuswertungenKlassen from './pages/AuswertungenKlassen';
+import AuswertungenKlassenDetail from './pages/AuswertungenKlassenDetail';
+import AuswertungenStudierende from './pages/AuswertungenStudierende';
+import AuswertungenStudiDetail from './pages/AuswertungenStudiDetail';
+import MoodleConnectionPage from './pages/MoodleConnectionPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { SubscriptionManagementPage } from './pages/SubscriptionManagementPage';
@@ -181,6 +186,68 @@ export const AppWithAuth: React.FC = () => {
                     <PermissionGuard requiredPermissions={['submissions:read']}>
                       <AppLayout>
                         <AuswertungenExam />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* TF-336: Klassen-Pages (students:manage). */}
+              <Route
+                path="/auswertungen/klassen"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['students:manage']}>
+                      <AppLayout>
+                        <AuswertungenKlassen />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/auswertungen/klassen/:classId"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['students:manage']}>
+                      <AppLayout>
+                        <AuswertungenKlassenDetail />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/auswertungen/studierende"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['students:manage']}>
+                      <AppLayout>
+                        <AuswertungenStudierende />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/auswertungen/studierende/:studentId"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['students:manage']}>
+                      <AppLayout>
+                        <AuswertungenStudiDetail />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/integrations/moodle"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['moodle:configure']}>
+                      <AppLayout>
+                        <MoodleConnectionPage />
                       </AppLayout>
                     </PermissionGuard>
                   </ProtectedRoute>

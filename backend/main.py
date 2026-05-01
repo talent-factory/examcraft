@@ -261,6 +261,38 @@ async def lifespan(app: FastAPI):
     submissions_api = importlib.util.module_from_spec(spec_submissions)
     spec_submissions.loader.exec_module(submissions_api)
 
+    # TF-336: Klassen-CRUD + Mitglieder.
+    spec_student_classes = importlib.util.spec_from_file_location(
+        "core_api_student_classes",
+        os.path.join(core_api_path, "student_classes.py"),
+    )
+    student_classes_api = importlib.util.module_from_spec(spec_student_classes)
+    spec_student_classes.loader.exec_module(student_classes_api)
+
+    # TF-336: Studi-Verlauf-Endpoints.
+    spec_students = importlib.util.spec_from_file_location(
+        "core_api_students",
+        os.path.join(core_api_path, "students.py"),
+    )
+    students_api = importlib.util.module_from_spec(spec_students)
+    spec_students.loader.exec_module(students_api)
+
+    # TF-336: Moodle-Connections (Token-verschlüsselt).
+    spec_moodle_connections = importlib.util.spec_from_file_location(
+        "core_api_moodle_connections",
+        os.path.join(core_api_path, "moodle_connections.py"),
+    )
+    moodle_connections_api = importlib.util.module_from_spec(spec_moodle_connections)
+    spec_moodle_connections.loader.exec_module(moodle_connections_api)
+
+    # TF-336: Question-ID-Round-Trip (Export → Sync → API-Re-Import).
+    spec_moodle_roundtrip = importlib.util.spec_from_file_location(
+        "core_api_moodle_roundtrip",
+        os.path.join(core_api_path, "moodle_roundtrip.py"),
+    )
+    moodle_roundtrip_api = importlib.util.module_from_spec(spec_moodle_roundtrip)
+    spec_moodle_roundtrip.loader.exec_module(moodle_roundtrip_api)
+
     spec_grades = importlib.util.spec_from_file_location(
         "core_api_grades", os.path.join(core_api_path, "grades.py")
     )
@@ -362,6 +394,10 @@ async def lifespan(app: FastAPI):
     app.include_router(exams_api.router)
     app.include_router(submissions_api.router)
     app.include_router(submissions_api.exams_alias_router)
+    app.include_router(student_classes_api.router)
+    app.include_router(students_api.router)
+    app.include_router(moodle_connections_api.router)
+    app.include_router(moodle_roundtrip_api.router)
     app.include_router(grades_api.router_grades)
     app.include_router(grades_api.router_exams_review_queue)
     app.include_router(grading_schemes_api.router)

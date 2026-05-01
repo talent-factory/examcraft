@@ -12,6 +12,12 @@ from services.import_drivers.base import (
     MissingColumnError,
     UnparseableCsvError,
 )
+from services.import_drivers.moodle_api_driver import (
+    MoodleApiAuthError,
+    MoodleApiDriver,
+    MoodleApiSchemaError,
+    MoodleConnectionMissingError,
+)
 from services.import_drivers.moodle_csv_driver import MoodleCsvDriver
 from services.import_drivers.payloads import (
     AnswerRecord,
@@ -28,6 +34,10 @@ __all__ = [
     "MissingColumnError",
     "UnparseableCsvError",
     "MoodleCsvDriver",
+    "MoodleApiDriver",
+    "MoodleApiAuthError",
+    "MoodleApiSchemaError",
+    "MoodleConnectionMissingError",
     "ImportPayload",
     "StudentRef",
     "AttemptRecord",

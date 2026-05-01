@@ -42,6 +42,11 @@ from models.auth import User
 from models.exam import Exam
 from models.student import Student
 from models.submission import Attempt, AttemptAnswer, ImportJob, Submission
+from services.auswertung_quotas import (
+    assert_driver_allowed,
+    assert_exam_quota_for_import,
+    assert_submission_quota_for_exam,
+)
 from services.import_drivers import ImportDriverError
 from services.import_service import ImportService, ImportValidationError
 from utils.auth_utils import require_permission
@@ -357,6 +362,9 @@ async def import_preview(
     ``/import/commit`` run.
     """
     exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    # Tier-Gate vor dem teuren Parsing — Free/Starter dürfen keinen
+    # API-Driver, sonst würde der Preview den Token verbrennen.
+    assert_driver_allowed(user=current_user, driver_name=driver_name)
     contents = await _read_upload(file)
 
     try:
@@ -400,7 +408,33 @@ async def import_commit(
     being imported.
     """
     exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    assert_driver_allowed(user=current_user, driver_name=driver_name)
+    # Monatslimit greift nur bei neuem Exam, nicht beim Re-Import des
+    # gleichen — die Helper-Logik kümmert sich darum.
+    assert_exam_quota_for_import(db=db, user=current_user, exam_id=exam.id)
     contents = await _read_upload(file)
+
+    # Submission-Quota: vor dem Persist eine Pre-Flight-Parse, damit
+    # ein Free-/Starter-CSV mit zu vielen Zeilen *vor* der Persistenz
+    # 402 wirft, statt halb importiert auf einer Constraint zu landen.
+    try:
+        preview_payload = await run_in_threadpool(
+            ImportService(db).preview,
+            exam=exam,
+            driver_name=driver_name,
+            source=contents,
+        )
+    except (ImportDriverError, ImportValidationError):
+        # Defer the proper 4xx to the commit branch below — same
+        # exception will be raised again with full context.
+        pass
+    else:
+        assert_submission_quota_for_exam(
+            db=db,
+            user=current_user,
+            exam_id=exam.id,
+            additional=len(preview_payload.students),
+        )
 
     try:
         job = await run_in_threadpool(
@@ -607,6 +641,120 @@ async def get_submission(
             for a in submission.attempts
         ],
     )
+
+
+# ---------------------------------------------------------------------------
+# API-Driver Import (TF-336)
+# ---------------------------------------------------------------------------
+
+
+class ApiImportIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    exam_id: int = Field(gt=0)
+    quiz_id: int = Field(gt=0, description="Moodle-Quiz-ID")
+
+
+@router.post("/import/api-preview", response_model=ImportPreviewOut)
+async def import_api_preview(
+    body: ApiImportIn,
+    current_user: User = Depends(require_permission("submissions:import")),
+    db: Session = Depends(get_db),
+) -> ImportPreviewOut:
+    """Preview-Variante für den ``moodle_api``-Driver.
+
+    Macht die Web-Service-Calls ohne Persistenz, damit das Frontend
+    die erkannten Studis und Antworten anzeigen kann, bevor die
+    Lehrperson auf "Importieren" klickt.
+    """
+    import json as _json
+
+    exam = _load_exam_for_user(db=db, user=current_user, exam_id=body.exam_id)
+    # Tier-Gate vor allen Web-Service-Calls — Free/Starter dürfen API
+    # gar nicht erst nutzen.
+    assert_driver_allowed(user=current_user, driver_name=DriverName.MOODLE_API.value)
+    source = _json.dumps({"quiz_id": body.quiz_id}).encode("utf-8")
+    try:
+        payload = await run_in_threadpool(
+            ImportService(db).preview,
+            exam=exam,
+            driver_name=DriverName.MOODLE_API.value,
+            source=source,
+        )
+    except ImportDriverError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ImportValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": str(exc), "issues": exc.issues},
+        ) from exc
+    except Exception:
+        logger.exception(
+            "import_api_preview unerwartet fehlgeschlagen (exam_id=%s, quiz_id=%s)",
+            body.exam_id,
+            body.quiz_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Moodle-API-Vorschau fehlgeschlagen — siehe Server-Logs.",
+        )
+
+    return _import_payload_to_preview(payload)
+
+
+@router.post("/import/api-commit", response_model=ImportJobOut)
+async def import_api_commit(
+    body: ApiImportIn,
+    current_user: User = Depends(require_permission("submissions:import")),
+    db: Session = Depends(get_db),
+) -> ImportJobOut:
+    """Volle Pipeline gegen den Moodle-API-Driver.
+
+    Nutzt dieselbe Idempotenz wie der CSV-Import (über
+    ``source_attempt_id`` = Moodle-Attempt-ID), so dass ein erneuter
+    Aufruf nach Korrektur einer Frage ohne Duplikate durchläuft.
+    """
+    import json as _json
+
+    exam = _load_exam_for_user(db=db, user=current_user, exam_id=body.exam_id)
+    assert_driver_allowed(user=current_user, driver_name=DriverName.MOODLE_API.value)
+    assert_exam_quota_for_import(db=db, user=current_user, exam_id=exam.id)
+    source_bytes = _json.dumps({"quiz_id": body.quiz_id}).encode("utf-8")
+    try:
+        job = await run_in_threadpool(
+            ImportService(db).commit,
+            exam=exam,
+            driver_name=DriverName.MOODLE_API.value,
+            source=source_bytes,
+            triggered_by=current_user.id,
+            source_metadata={"quiz_id": body.quiz_id},
+        )
+    except ImportDriverError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ImportValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": str(exc), "issues": exc.issues},
+        ) from exc
+    except Exception as exc:
+        logger.exception(
+            "import_api_commit unerwartet fehlgeschlagen (exam_id=%s, quiz_id=%s)",
+            body.exam_id,
+            body.quiz_id,
+        )
+        job_id = _latest_failed_job_id(
+            db=db, exam_id=exam.id, institution_id=current_user.institution_id
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Moodle-API-Import fehlgeschlagen — siehe Job-Detail.",
+                "import_job_id": job_id,
+                "exception": type(exc).__name__,
+            },
+        ) from exc
+
+    return _import_job_to_out(job)
 
 
 # ---------------------------------------------------------------------------

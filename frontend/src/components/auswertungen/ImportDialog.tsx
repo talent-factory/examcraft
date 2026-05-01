@@ -1,9 +1,13 @@
 /**
  * Import dialog for exam results.
  *
- * The moodle_api radio is disabled in the UI rather than hidden so
- * users see what will eventually be available without the page having
- * to know about a feature flag.
+ * Two source paths:
+ *   - ``moodle_csv``: file upload (default).
+ *   - ``moodle_api``: nur sichtbar, wenn die Institution eine
+ *     ``moodle_connections``-Eintragung hat. Statt Datei-Upload wird
+ *     die Moodle-Quiz-ID erfasst; Preview/Commit gehen an
+ *     `/import/api-preview` resp. `/import/api-commit`. Tier-Quota
+ *     402 propagiert via `ApiError.message`.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -35,10 +39,12 @@ import {
   TableRow,
   Paper,
   Chip,
+  TextField,
 } from '@mui/material';
 import { CloudUpload as CloudUploadIcon } from '@mui/icons-material';
 
 import { ApiError, SubmissionsService } from '../../services/submissionsService';
+import { MoodleConnectionsService } from '../../services/moodleConnectionsService';
 import {
   DriverName,
   ImportJob,
@@ -79,6 +85,18 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [step, setStep] = useState<WizardStep>('source');
   const [driverName, setDriverName] = useState<DriverName>('moodle_csv');
   const [file, setFile] = useState<File | null>(null);
+  const [quizIdRaw, setQuizIdRaw] = useState('');
+  const [hasMoodleConnection, setHasMoodleConnection] = useState<boolean | null>(
+    null,
+  );
+  // ``null`` means "probe finished cleanly — either no permission or
+  // no connection, both rendered as the existing 'unavailableTag'
+  // chip". A non-null string means the probe itself errored
+  // (network, 500, parse) and we surface it so the operator sees the
+  // real cause instead of a silent disabled radio.
+  const [moodleProbeError, setMoodleProbeError] = useState<string | null>(
+    null,
+  );
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorIssues, setErrorIssues] = useState<string[]>([]);
@@ -94,10 +112,46 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     };
   }, []);
 
+  // TF-336: Beim Öffnen prüfen, ob die Institution eine Moodle-API-
+  // Connection hat — nur dann ist das ``moodle_api``-Radio aktiv.
+  // 403/permission-Fehler ist normal (Lehrperson hat
+  // ``moodle:configure`` nicht) und wird als "keine Connection"
+  // gerendert. Andere Fehler (Netzwerk, 500, Parse) müssen sichtbar
+  // werden, sonst sieht die Lehrperson nur ein deaktiviertes Radio
+  // ohne zu wissen, warum.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setMoodleProbeError(null);
+    MoodleConnectionsService.list()
+      .then((res) => {
+        if (cancelled) return;
+        setHasMoodleConnection(res.items.length > 0);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setHasMoodleConnection(false);
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          // Expected: caller has no ``moodle:configure``. Stay silent
+          // and let the radio's existing "unavailable" chip explain.
+          return;
+        }
+        setMoodleProbeError(
+          err instanceof ApiError
+            ? err.message
+            : t('auswertungen.importDialog.moodleProbeError'),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, t]);
+
   const resetState = () => {
     setStep('source');
     setDriverName('moodle_csv');
     setFile(null);
+    setQuizIdRaw('');
     setPreview(null);
     setError(null);
     setErrorIssues([]);
@@ -141,18 +195,31 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   };
 
   const runPreview = async () => {
-    if (!file) return;
     setBusy(true);
     setError(null);
     setErrorIssues([]);
     abortRef.current = new AbortController();
     try {
-      const result = await SubmissionsService.preview({
-        examId,
-        file,
-        driverName,
-        signal: abortRef.current.signal,
-      });
+      let result: ImportPreview;
+      if (driverName === 'moodle_api') {
+        const quizId = Number(quizIdRaw);
+        if (!Number.isFinite(quizId) || quizId <= 0) {
+          throw new Error(t('auswertungen.importDialog.errorPreview'));
+        }
+        result = await SubmissionsService.apiPreview({
+          examId,
+          quizId,
+          signal: abortRef.current.signal,
+        });
+      } else {
+        if (!file) return;
+        result = await SubmissionsService.preview({
+          examId,
+          file,
+          driverName,
+          signal: abortRef.current.signal,
+        });
+      }
       setPreview(result);
       setStep('preview');
     } catch (err) {
@@ -164,19 +231,29 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   };
 
   const runCommit = async () => {
-    if (!file) return;
     setBusy(true);
     setStep('submitting');
     setError(null);
     setErrorIssues([]);
     abortRef.current = new AbortController();
     try {
-      const result = await SubmissionsService.commit({
-        examId,
-        file,
-        driverName,
-        signal: abortRef.current.signal,
-      });
+      let result: ImportJob;
+      if (driverName === 'moodle_api') {
+        const quizId = Number(quizIdRaw);
+        result = await SubmissionsService.apiCommit({
+          examId,
+          quizId,
+          signal: abortRef.current.signal,
+        });
+      } else {
+        if (!file) return;
+        result = await SubmissionsService.commit({
+          examId,
+          file,
+          driverName,
+          signal: abortRef.current.signal,
+        });
+      }
       setJob(result);
       // Only signal completion when nothing failed — partial / failed
       // imports must keep the dialog open so the user reads the alert
@@ -321,24 +398,31 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               />
               <FormControlLabel
                 value="moodle_api"
-                control={<Radio disabled />}
+                control={<Radio disabled={!hasMoodleConnection} />}
                 label={
                   <span>
-                    {t('auswertungen.importDialog.sourceMoodleApi')}{' '}
-                    <Chip
-                      label={t('auswertungen.importDialog.unavailableTag')}
-                      size="small"
-                      color="default"
-                      sx={{ ml: 1 }}
-                    />
+                    {t('auswertungen.importDialog.sourceMoodleApi')}
+                    {!hasMoodleConnection && (
+                      <Chip
+                        label={t('auswertungen.importDialog.unavailableTag')}
+                        size="small"
+                        color="default"
+                        sx={{ ml: 1 }}
+                      />
+                    )}
                   </span>
                 }
               />
             </RadioGroup>
+            {moodleProbeError && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                {moodleProbeError}
+              </Alert>
+            )}
           </FormControl>
         )}
 
-        {step === 'upload' && (
+        {step === 'upload' && driverName === 'moodle_csv' && (
           <Box sx={{ textAlign: 'center', py: 4 }}>
             <Button
               component="label"
@@ -366,6 +450,23 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
             >
               {t('auswertungen.importDialog.uploadHint')}
             </Typography>
+          </Box>
+        )}
+
+        {step === 'upload' && driverName === 'moodle_api' && (
+          <Box sx={{ py: 2 }}>
+            <TextField
+              autoFocus
+              fullWidth
+              label={t('auswertungen.moodleSync.quizIdLabel')}
+              helperText={t('auswertungen.moodleSync.quizIdHelper')}
+              value={quizIdRaw}
+              onChange={(e) => setQuizIdRaw(e.target.value)}
+              inputProps={{
+                'data-testid': 'import-quiz-id',
+                inputMode: 'numeric',
+              }}
+            />
           </Box>
         )}
 
@@ -504,7 +605,12 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         {step === 'upload' && (
           <Button
             variant="contained"
-            disabled={!file || busy}
+            disabled={
+              busy ||
+              (driverName === 'moodle_csv'
+                ? !file
+                : !quizIdRaw || Number(quizIdRaw) <= 0)
+            }
             onClick={runPreview}
             data-testid="import-run-preview"
           >

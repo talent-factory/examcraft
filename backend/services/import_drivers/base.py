@@ -62,13 +62,24 @@ class BaseImportDriver(ABC):
     name: ClassVar[str]
 
     @abstractmethod
-    def parse(self, source: bytes | str, *, exam: ExamLike) -> ImportPayload:
+    def parse(
+        self,
+        source: bytes | str,
+        *,
+        exam: ExamLike,
+        db: Any | None = None,
+    ) -> ImportPayload:
         """Turn the source into an ``ImportPayload``.
 
         Args:
-            source: file bytes (uploads) or string (tests).
+            source: file bytes (uploads), JSON-encoded params, or
+                a quiz id (depending on the driver).
             exam: target exam (column-to-question mapping via
                 ``position``).
+            db: optional SQLAlchemy session for drivers that need to
+                load institution-scoped state (e.g. the API driver
+                resolves ``moodle_connections``). The CSV driver
+                ignores this argument.
 
         Returns:
             Complete payload incl. warnings + per-row errors.

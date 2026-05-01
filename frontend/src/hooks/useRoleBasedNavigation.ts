@@ -59,6 +59,18 @@ export const useRoleBasedNavigation = () => {
       requiredPermissions: ['submissions:read'],
     },
     {
+      label: t('nav.sidebar.auswertungenKlassen'),
+      path: '/auswertungen/klassen',
+      icon: '🎓',
+      requiredPermissions: ['students:manage'],
+    },
+    {
+      label: t('nav.sidebar.auswertungenStudierende'),
+      path: '/auswertungen/studierende',
+      icon: '👥',
+      requiredPermissions: ['students:manage'],
+    },
+    {
       label: t('nav.sidebar.documentChat'),
       path: '/chat',
       icon: '💬',
@@ -76,6 +88,13 @@ export const useRoleBasedNavigation = () => {
       path: '/admin',
       icon: '⚙️',
       requiredRoles: [UserRole.ADMIN],
+    },
+    {
+      label: t('nav.sidebar.moodleConnection'),
+      path: '/admin/integrations/moodle',
+      icon: '🔗',
+      requiredRoles: [UserRole.ADMIN],
+      requiredPermissions: ['moodle:configure'],
     },
   ], [t]);
 

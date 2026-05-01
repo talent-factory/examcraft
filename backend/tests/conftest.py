@@ -152,6 +152,25 @@ def test_db(test_engine):
     connection.close()
 
 
+@pytest.fixture(autouse=True)
+def _reset_dependency_overrides():
+    """Clear FastAPI dependency overrides after each test.
+
+    Several test modules (test_moodle_connections_api, test_submissions_api,
+    test_subscription_quotas, test_student_classes_api, test_review_queue_api,
+    test_rbac_submissions, test_question_id_roundtrip, test_cross_exam_statistics)
+    set ``app.dependency_overrides[get_current_user]`` etc. via ad-hoc
+    helpers without cleaning up. The next test then inherits a stale User
+    bound to a closed Session — accessing relationships on it raises
+    ``DetachedInstanceError`` (e.g. ``current_user.roles`` in /api/auth/me).
+
+    This autouse teardown guarantees a clean slate per test regardless of
+    which helper a test uses to install overrides.
+    """
+    yield
+    app.dependency_overrides.clear()
+
+
 @pytest.fixture(scope="function")
 def client():
     """FastAPI Test Client"""

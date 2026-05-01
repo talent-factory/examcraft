@@ -219,6 +219,9 @@ class TestPermissionConsistency:
             "submissions:grade",
             # TF-335 — Custom Grading-Schemes management permission.
             "grading_schemes:manage",
+            # TF-336 — Klassen-/Studi-Stammdaten und Moodle-Connections.
+            "students:manage",
+            "moodle:configure",
         }
 
         frontend_perms = _get_frontend_required_permissions()

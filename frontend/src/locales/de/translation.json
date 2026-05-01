@@ -12,9 +12,12 @@
       "reviewQueue": "Review Queue",
       "examComposer": "Prüfungskomponist",
       "auswertungen": "Auswertungen",
+      "auswertungenKlassen": "Klassen",
+      "auswertungenStudierende": "Studierende",
       "documentChat": "Dokument-Chat",
       "promptLibrary": "Prompt-Bibliothek",
       "admin": "Admin",
+      "moodleConnection": "Moodle-Verbindung",
       "pricing": "Preise",
       "profile": "Profil"
     }
@@ -148,6 +151,7 @@
       "sourceMoodleCsv": "Moodle CSV-Datei (Quiz Responses Export)",
       "sourceMoodleApi": "Moodle Web-Service-API",
       "unavailableTag": "noch nicht verfügbar",
+      "moodleProbeError": "Konnte Moodle-Verbindung nicht prüfen — bitte später erneut versuchen.",
       "chooseFile": "CSV-Datei wählen",
       "uploadHint": "UTF-8 mit Trenner ; oder ,. Antwort-Spalten heissen «Antwort N» oder «Response N».",
       "studentCount": "{{count}} Studierende",
@@ -214,6 +218,121 @@
       "errorNotFound": "Prüfung nicht gefunden.",
       "errorServer": "Statistik konnte nicht geladen werden — bitte später erneut versuchen.",
       "errorPartial": "Statistik teilweise nicht geladen — einzelne Bereiche fehlen."
+    },
+    "klassen": {
+      "title": "Klassen",
+      "subtitle": "Pflege deine Klassen und ordne Studierende zu.",
+      "loadError": "Klassen konnten nicht geladen werden.",
+      "emptyHint": "Noch keine Klassen angelegt. Eine Klasse legst du beim Import an oder hier manuell.",
+      "colName": "Name",
+      "colMembers": "Mitglieder",
+      "colCreated": "Angelegt",
+      "colActions": "Aktionen",
+      "actionCreate": "Klasse anlegen",
+      "actionDetail": "Detail",
+      "actionRename": "Umbenennen",
+      "actionDelete": "Löschen",
+      "createDialog": {
+        "title": "Klasse anlegen",
+        "nameLabel": "Klassenname",
+        "nameHelper": "z. B. INF-23a",
+        "submit": "Anlegen",
+        "cancel": "Abbrechen",
+        "error": "Klasse konnte nicht angelegt werden.",
+        "duplicate": "Eine Klasse mit diesem Namen existiert bereits."
+      },
+      "renameDialog": {
+        "title": "Klasse umbenennen",
+        "submit": "Speichern"
+      },
+      "deleteConfirm": {
+        "title": "Klasse löschen?",
+        "body": "Die Klasse \"{{name}}\" und alle Mitgliedschaften werden entfernt. Studierende selbst bleiben erhalten.",
+        "submit": "Löschen",
+        "cancel": "Abbrechen"
+      },
+      "detail": {
+        "loadError": "Klassen-Detail konnte nicht geladen werden.",
+        "membersTitle": "Mitglieder",
+        "memberCount": "{{count}} Mitglied(er)",
+        "emptyMembers": "Noch keine Studierenden zugewiesen.",
+        "actionAssign": "Studi zuweisen",
+        "actionRemoveMember": "Aus Klasse entfernen",
+        "memberRemoveSuccess": "Mitglied entfernt.",
+        "memberAddSuccess": "Studi der Klasse zugewiesen.",
+        "tabHistory": "Verlauf",
+        "tabMembers": "Mitglieder",
+        "examTrendTitle": "Klassen-Durchschnitt pro Prüfung",
+        "examTrendNoData": "Noch keine Submissions in dieser Klasse — Verlauf erscheint nach dem ersten Import.",
+        "topicCoverageTitle": "Topic-Abdeckung",
+        "topicCoverageNoData": "Keine Topic-Daten verfügbar.",
+        "memberPerformanceTitle": "Performance pro Studi",
+        "colSubmissions": "Submissions",
+        "colAvg": "Durchschnitt"
+      },
+      "assignDialog": {
+        "title": "Studi zuweisen",
+        "searchLabel": "Suche nach E-Mail / Name",
+        "loading": "Suche läuft...",
+        "noMatch": "Keine Treffer.",
+        "submit": "Zuweisen",
+        "cancel": "Abbrechen",
+        "duplicate": "Studi ist bereits Mitglied dieser Klasse.",
+        "searchError": "Suche fehlgeschlagen — bitte erneut versuchen.",
+        "assignError": "Zuweisen fehlgeschlagen — bitte erneut versuchen."
+      }
+    },
+    "studierende": {
+      "title": "Studierende",
+      "subtitle": "Stammdaten und Cross-Exam-Verlauf einzelner Studierender.",
+      "loadError": "Studierende konnten nicht geladen werden.",
+      "emptyHint": "Noch keine Studierenden vorhanden.",
+      "searchLabel": "Suche nach E-Mail / Name",
+      "filterClass": "Klassenfilter",
+      "filterAllClasses": "Alle Klassen",
+      "colExternalId": "Identifikation",
+      "colDisplayName": "Name",
+      "colClasses": "Klassen",
+      "colSubmissions": "Prüfungen",
+      "colAvg": "Durchschnitt",
+      "colActions": "Aktionen",
+      "actionDetail": "Detail",
+      "noClasses": "—",
+      "detail": {
+        "loadError": "Studi-Detail konnte nicht geladen werden.",
+        "submissionsTitle": "Submissions chronologisch",
+        "noSubmissions": "Noch keine Submissions für diesen Studi.",
+        "bloomTitle": "Bloom-Mix",
+        "bloomNoData": "Bloom-Daten fehlen — Fragen ohne Bloom-Level werden nicht aggregiert.",
+        "topicHeatmapTitle": "Topic-Heatmap",
+        "topicHeatmapNoData": "Keine Topic-Daten verfügbar.",
+        "classesTitle": "Klassenzugehörigkeit",
+        "noClasses": "Keine Klassen zugewiesen.",
+        "avgSummary": "{{count}} Prüfung(en) — Durchschnitt {{percentage}}%"
+      }
+    },
+    "tierBanner": {
+      "title": "Tier-Limit erreicht",
+      "upgradeAction": "Upgrade auf {{tier}}",
+      "auswertung_driver_not_in_tier": "Tier {{tier}} schaltet den Driver \"{{driver}}\" nicht frei. Upgrade auf Professional oder höher.",
+      "auswertung_class_history_enterprise_only": "Klassen- und Studi-Verlauf ist nur im Enterprise-Tier enthalten.",
+      "auswertung_review_bulk_pro_only": "Bulk-Review-Aktionen sind erst ab Professional verfügbar.",
+      "auswertung_custom_grading_schemes_enterprise_only": "Eigene Notenmodelle sind Teil des Enterprise-Tiers.",
+      "auswertung_exam_monthly_quota_exceeded": "Monatslimit erreicht: {{used}} von {{limit}} Auswertungen genutzt. Upgrade auf Starter oder höher.",
+      "auswertung_submission_quota_exceeded": "Submission-Limit pro Prüfung erreicht ({{limit}}). Upgrade auf Professional."
+    },
+    "moodleSync": {
+      "actionLabel": "Moodle-IDs erfassen",
+      "dialogTitle": "Moodle-Quiz-IDs synchronisieren",
+      "quizIdLabel": "Moodle-Quiz-ID",
+      "quizIdHelper": "Aus der URL der Quiz-Settings-Seite, z. B. ../mod/quiz/view.php?id=42",
+      "questionIdsLabel": "Question-IDs (optional, Slot-Reihenfolge)",
+      "questionIdsHelper": "Komma-getrennt — wenn leer, wird nur Slot=Position geschrieben.",
+      "submit": "Synchronisieren",
+      "cancel": "Abbrechen",
+      "success": "{{count}} Frage(n) verknüpft mit Moodle-Quiz {{quiz}}.",
+      "error": "Sync fehlgeschlagen.",
+      "notVisible": "Quiz {{id}} ist für den gespeicherten Token nicht sichtbar — Token-Berechtigung prüfen."
     }
   },
   "auth": {
@@ -451,6 +570,35 @@
     }
   },
   "admin": {
+    "moodle": {
+      "title": "Moodle-Verbindung",
+      "subtitle": "Token und Base-URL für den Moodle-Web-Service-Driver.",
+      "loadError": "Verbindungen konnten nicht geladen werden.",
+      "saveError": "Speichern fehlgeschlagen — bitte nochmals versuchen.",
+      "deleteError": "Entfernen fehlgeschlagen — bitte nochmals versuchen.",
+      "testError": "Test fehlgeschlagen — bitte nochmals versuchen.",
+      "validationError": "Bitte Base-URL und Token ausfüllen.",
+      "noConnection": "Noch keine Verbindung eingerichtet.",
+      "baseUrlLabel": "Base-URL",
+      "baseUrlHelper": "z. B. https://moodle.deine-schule.ch",
+      "tokenLabel": "Web-Service-Token",
+      "tokenHelper": "Aus Moodle: Site-Administration → Server → Web-Services → Tokens verwalten.",
+      "tokenRotateLabel": "Neuer Token (optional)",
+      "tokenRotateHelper": "Leer lassen, um den bestehenden Token zu behalten.",
+      "actionSave": "Speichern",
+      "actionUpdate": "Aktualisieren",
+      "actionTest": "Verbindung testen",
+      "actionDelete": "Verbindung entfernen",
+      "createSuccess": "Verbindung gespeichert.",
+      "updateSuccess": "Verbindung aktualisiert.",
+      "deleteSuccess": "Verbindung entfernt.",
+      "testRunning": "Teste …",
+      "testSuccess": "Verbindung OK — {{site}} (User: {{user}})",
+      "testFailure": "Verbindungstest fehlgeschlagen: {{error}}",
+      "lastUsedNever": "noch nie genutzt",
+      "lastUsedAt": "zuletzt genutzt: {{when}}",
+      "tokenMaskedHint": "Token wird verschlüsselt gespeichert und nur maskiert angezeigt."
+    },
     "userManagement": {
       "title": "Benutzerverwaltung",
       "subtitle": "Benutzer verwalten, Rollen zuweisen und Zugriffsberechtigungen steuern"

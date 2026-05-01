@@ -224,4 +224,51 @@ export class SubmissionsService {
     await ensureOk(response);
     return (await response.json()) as SubmissionDetail;
   }
+
+  /**
+   * TF-336: Moodle-API-Import (Pro+ only). Backend wirft 402 wenn der
+   * Tier den ``moodle_api``-Driver nicht freischaltet — der Caller
+   * unterscheidet das via ``ApiError.status``.
+   */
+  static async apiPreview(params: {
+    examId: number;
+    quizId: number;
+    signal?: AbortSignal;
+  }): Promise<ImportPreview> {
+    const response = await safeFetch(
+      `${API_BASE_URL}${ROOT}/import/api-preview`,
+      {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          exam_id: params.examId,
+          quiz_id: params.quizId,
+        }),
+        signal: params.signal,
+      },
+    );
+    await ensureOk(response);
+    return (await response.json()) as ImportPreview;
+  }
+
+  static async apiCommit(params: {
+    examId: number;
+    quizId: number;
+    signal?: AbortSignal;
+  }): Promise<ImportJob> {
+    const response = await safeFetch(
+      `${API_BASE_URL}${ROOT}/import/api-commit`,
+      {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          exam_id: params.examId,
+          quiz_id: params.quizId,
+        }),
+        signal: params.signal,
+      },
+    );
+    await ensureOk(response);
+    return (await response.json()) as ImportJob;
+  }
 }

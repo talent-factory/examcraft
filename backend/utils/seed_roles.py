@@ -83,6 +83,10 @@ def seed_default_roles(db: Session):
                 # TF-335: Admin manages institution-scoped Grading-
                 # Schemes; System schemes stay read-only via the API.
                 "grading_schemes:manage",
+                # TF-336: Admin pflegt Studierenden-Stammdaten und Klassen
+                # sowie Moodle-Web-Service-Verbindungen.
+                "students:manage",
+                "moodle:configure",
             ],
             "is_system_role": True,
         },
@@ -129,8 +133,11 @@ def seed_default_roles(db: Session):
                 "delete_documents",
                 "prompt:create",
                 "prompt:read",
-                # Reviewer can read submissions but not import or grade.
+                # TF-336: Reviewer-Rolle bekommt Lese- + Bewertungs-
+                # Permission. Importieren bleibt der Lehrperson
+                # vorbehalten, weil dort auch das Quota-Buchen passiert.
                 "submissions:read",
+                "submissions:grade",
             ],
             "is_system_role": True,
         },

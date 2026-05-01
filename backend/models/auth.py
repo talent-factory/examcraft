@@ -129,6 +129,13 @@ class Institution(Base):
         nullable=True,
     )
 
+    # TF-336: Enterprise-Tier kann das Claude-Modell pro Institution
+    # wählen ("claude-sonnet-4-..." oder "claude-opus-4-..."). NULL =
+    # Plattform-Default (Sonnet). Wert-Validierung passiert serviceseitig
+    # (z. B. claude_service.py); die DB hält den String roh, damit ein
+    # Modell-Update keine Schema-Migration erfordert.
+    llm_model_for_grading = Column(String(100), nullable=True)
+
     # Timestamps
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
