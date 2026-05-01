@@ -115,6 +115,15 @@ class Institution(Base):
     # Review-Workflow
     require_second_reviewer = Column(Boolean, default=False)
 
+    # Institution-wide default grading scheme (FK; per-exam overrides
+    # via Exam.grading_scheme_id). NULL means "use the platform's
+    # built-in defaults".
+    default_grading_scheme_id = Column(
+        Integer,
+        ForeignKey("grading_schemes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     # Timestamps
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -135,6 +144,30 @@ class Institution(Base):
     )
     resource_usage = relationship(
         "ResourceUsage", back_populates="institution", cascade="all, delete-orphan"
+    )
+    students = relationship(
+        "Student", back_populates="institution", cascade="all, delete-orphan"
+    )
+    student_classes = relationship(
+        "StudentClass", back_populates="institution", cascade="all, delete-orphan"
+    )
+    grading_schemes = relationship(
+        "GradingScheme",
+        back_populates="institution",
+        cascade="all, delete-orphan",
+        foreign_keys="GradingScheme.institution_id",
+    )
+    default_grading_scheme = relationship(
+        "GradingScheme", foreign_keys=[default_grading_scheme_id]
+    )
+    import_jobs = relationship(
+        "ImportJob", back_populates="institution", cascade="all, delete-orphan"
+    )
+    moodle_connection = relationship(
+        "MoodleConnection",
+        back_populates="institution",
+        cascade="all, delete-orphan",
+        uselist=False,
     )
 
     def __repr__(self):

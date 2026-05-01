@@ -53,6 +53,12 @@ export const useRoleBasedNavigation = () => {
       requiredPermissions: ['create_exams'],
     },
     {
+      label: t('nav.sidebar.auswertungen'),
+      path: '/auswertungen',
+      icon: '📈',
+      requiredPermissions: ['submissions:read'],
+    },
+    {
       label: t('nav.sidebar.documentChat'),
       path: '/chat',
       icon: '💬',

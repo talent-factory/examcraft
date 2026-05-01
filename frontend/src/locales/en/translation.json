@@ -11,6 +11,7 @@
       "questionGeneration": "Question Generation",
       "reviewQueue": "Review Queue",
       "examComposer": "Exam Composer",
+      "auswertungen": "Evaluations",
       "documentChat": "Document Chat",
       "promptLibrary": "Prompt Library",
       "admin": "Admin",
@@ -25,7 +26,97 @@
     "it": "Italiano"
   },
   "common": {
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "next": "Next",
+    "back": "Back",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "auswertungen": {
+    "overview": {
+      "title": "Evaluations",
+      "subtitle": "Import exam results and evaluate them.",
+      "loadError": "Could not load exams.",
+      "emptyHint": "No exams yet. Create one in the Exam Composer.",
+      "colTitle": "Exam",
+      "colCourse": "Course",
+      "colDate": "Date",
+      "colStatus": "Status",
+      "colActions": "Actions",
+      "actionEvaluate": "Evaluate",
+      "actionImport": "Import results",
+      "examStatus": {
+        "draft": "Draft",
+        "finalized": "Finalized",
+        "exported": "Exported"
+      }
+    },
+    "exam": {
+      "loadError": "Could not load exam or submissions.",
+      "detailError": "Could not load submission detail.",
+      "actionImport": "Import results",
+      "tabSubmissions": "Submissions",
+      "tabReview": "Review",
+      "tabStatistik": "Statistics",
+      "tabExport": "Grade export",
+      "emptyHint": "No results imported yet. Upload a Moodle CSV.",
+      "colExternalId": "Identifier",
+      "colDisplayName": "Name",
+      "colAttempts": "Attempts",
+      "colPoints": "Points",
+      "colPercentage": "Percentage",
+      "colGradeStatus": "Status",
+      "gradeStatus": {
+        "pending_review": "Pending review",
+        "partially_reviewed": "Partially reviewed",
+        "fully_reviewed": "Reviewed"
+      },
+      "drawer": {
+        "points": "{{awarded}} / {{max}} points",
+        "attemptHeader": "Attempt {{number}}",
+        "gradedTag": "Counts",
+        "colQuestion": "Question",
+        "colAnswer": "Answer",
+        "colGrade": "Grade"
+      }
+    },
+    "importDialog": {
+      "title": "Import results — {{examTitle}}",
+      "errorPreview": "Preview failed.",
+      "errorCommit": "Import failed.",
+      "steps": {
+        "source": "Source",
+        "upload": "File",
+        "preview": "Preview",
+        "confirm": "Confirm"
+      },
+      "sourceLabel": "Which format do you want to import?",
+      "sourceMoodleCsv": "Moodle CSV file (Quiz Responses Export)",
+      "sourceMoodleApi": "Moodle Web Service API",
+      "unavailableTag": "not yet available",
+      "chooseFile": "Choose CSV file",
+      "uploadHint": "UTF-8 with delimiter ; or ,. Answer columns are named 'Antwort N' or 'Response N'.",
+      "studentCount": "{{count}} students",
+      "attemptCount": "{{count}} attempts",
+      "errorCount": "{{count}} faulty rows",
+      "errorListTitle": "Faulty rows will be skipped:",
+      "errorListTruncated": "+ {{count}} more — see job detail",
+      "rowError": "Row {{row}}: {{reason}}",
+      "fileTooLarge": "File too large ({{actualMb}} MB). Maximum: {{maxMb}} MB.",
+      "truncatedTag": "Preview truncated — full list after import",
+      "colExternalId": "Identifier",
+      "colDisplayName": "Name",
+      "confirm": "Import",
+      "submitting": "Importing…",
+      "result": {
+        "succeeded": "Import succeeded",
+        "partial": "Import partially succeeded",
+        "failed": "Import failed",
+        "running": "Import running",
+        "queued": "Import queued"
+      },
+      "resultSummary": "{{processed}} processed, {{failed}} faulty."
+    }
   },
   "auth": {
     "login": {

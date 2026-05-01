@@ -24,6 +24,8 @@ import { Review } from './pages/Review';
 import { Admin } from './pages/Admin';
 import { BillingPage } from './pages/BillingPage';
 import { ExamComposer } from './pages/ExamComposer';
+import Auswertungen from './pages/Auswertungen';
+import AuswertungenExam from './pages/AuswertungenExam';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { SubscriptionManagementPage } from './pages/SubscriptionManagementPage';
@@ -153,6 +155,32 @@ export const AppWithAuth: React.FC = () => {
                     <PermissionGuard requiredPermissions={['create_exams']}>
                       <AppLayout>
                         <ExamComposer />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/auswertungen"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['submissions:read']}>
+                      <AppLayout>
+                        <Auswertungen />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/auswertungen/:examId/submissions"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['submissions:read']}>
+                      <AppLayout>
+                        <AuswertungenExam />
                       </AppLayout>
                     </PermissionGuard>
                   </ProtectedRoute>

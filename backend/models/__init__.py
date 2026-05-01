@@ -45,6 +45,17 @@ from models.email_event import (
     EmailType,
 )
 from models.exam import Exam, ExamQuestion, ExamStatus
+from models.grading_scheme import GradingScheme
+from models.student import Student, StudentClass, StudentClassMembership
+from models.submission import (
+    Submission,
+    Attempt,
+    AttemptAnswer,
+    Grade,
+    GradeHistory,
+    ImportJob,
+    MoodleConnection,
+)
 
 __all__ = [
     "Document",
@@ -82,4 +93,18 @@ __all__ = [
     "Exam",
     "ExamQuestion",
     "ExamStatus",
+    # Grading schemes (system + per-institution)
+    "GradingScheme",
+    # Student master data
+    "Student",
+    "StudentClass",
+    "StudentClassMembership",
+    # Submissions / grades / import
+    "Submission",
+    "Attempt",
+    "AttemptAnswer",
+    "Grade",
+    "GradeHistory",
+    "ImportJob",
+    "MoodleConnection",
 ]

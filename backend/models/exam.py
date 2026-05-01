@@ -45,6 +45,11 @@ class Exam(Base):
     )
     language = Column(String(10), default="de", nullable=False)
     default_document_ids = Column(JSON, nullable=True)  # List[int] | null
+    grading_scheme_id = Column(
+        Integer,
+        ForeignKey("grading_schemes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     institution_id = Column(
         Integer,
@@ -74,6 +79,18 @@ class Exam(Base):
         back_populates="exam",
         cascade="all, delete-orphan",
         order_by="ExamQuestion.position",
+    )
+    submissions = relationship(
+        "Submission",
+        back_populates="exam",
+        cascade="all, delete-orphan",
+        foreign_keys="Submission.exam_id",
+    )
+    import_jobs = relationship(
+        "ImportJob",
+        back_populates="exam",
+        cascade="all, delete-orphan",
+        foreign_keys="ImportJob.exam_id",
     )
 
     __table_args__ = (
@@ -107,6 +124,7 @@ class ExamQuestion(Base):
     position = Column(Integer, nullable=False)
     points = Column(Float, nullable=False)
     section = Column(String(100), nullable=True)
+    external_refs = Column(JSON, nullable=True)
 
     exam = relationship("Exam", back_populates="questions")
     question = relationship("QuestionReview")

@@ -255,6 +255,12 @@ async def lifespan(app: FastAPI):
     exams_api = importlib.util.module_from_spec(spec_exams)
     spec_exams.loader.exec_module(exams_api)
 
+    spec_submissions = importlib.util.spec_from_file_location(
+        "core_api_submissions", os.path.join(core_api_path, "submissions.py")
+    )
+    submissions_api = importlib.util.module_from_spec(spec_submissions)
+    spec_submissions.loader.exec_module(submissions_api)
+
     spec_dashboard = importlib.util.spec_from_file_location(
         "core_api_dashboard", os.path.join(core_api_path, "dashboard.py")
     )
@@ -328,6 +334,8 @@ async def lifespan(app: FastAPI):
     app.include_router(rbac_api.router)
     app.include_router(question_review.router)
     app.include_router(exams_api.router)
+    app.include_router(submissions_api.router)
+    app.include_router(submissions_api.exams_alias_router)
     app.include_router(dashboard_api.router)
     app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["billing"])
     app.include_router(
@@ -475,6 +483,52 @@ async def lifespan(app: FastAPI):
             db.close()
     except Exception as e:
         print(f"❌ Error resetting processing documents: {str(e)}")
+
+    # Startup: Reap stuck ImportJob rows. A worker kill/OOM/deploy
+    # mid-pipeline leaves ``import_jobs.status='running'`` forever
+    # because no code path ever transitions out without the pipeline
+    # finishing. Mark anything older than 30 minutes as FAILED so the
+    # job-list UI shows a terminal state instead of a zombie.
+    try:
+        from datetime import datetime, timedelta, timezone
+
+        from enums import ImportJobStatus
+        from models.submission import ImportJob
+
+        db = SessionLocal()
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+            stuck = (
+                db.query(ImportJob)
+                .filter(
+                    ImportJob.status == ImportJobStatus.RUNNING.value,
+                    ImportJob.started_at < cutoff,
+                )
+                .all()
+            )
+            for job in stuck:
+                job.status = ImportJobStatus.FAILED.value
+                job.finished_at = datetime.now(timezone.utc)
+                existing = list(job.error_log or [])
+                existing.append(
+                    {
+                        "row_index": 0,
+                        "reason": (
+                            "Worker wahrscheinlich vor Abschluss beendet "
+                            "(OOM/Deploy/Kill)."
+                        ),
+                        "step": "watchdog",
+                        "exception_type": "WatchdogTimeout",
+                    }
+                )
+                job.error_log = existing
+            if stuck:
+                db.commit()
+                print(f"✅ Reaped {len(stuck)} stuck import_jobs")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error reaping stuck import jobs: {str(e)}")
 
     yield  # Application is running
 

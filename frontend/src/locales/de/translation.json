@@ -11,6 +11,7 @@
       "questionGeneration": "Fragengenerierung",
       "reviewQueue": "Review Queue",
       "examComposer": "Prüfungskomponist",
+      "auswertungen": "Auswertungen",
       "documentChat": "Dokument-Chat",
       "promptLibrary": "Prompt-Bibliothek",
       "admin": "Admin",
@@ -25,7 +26,97 @@
     "it": "Italiano"
   },
   "common": {
-    "refresh": "Aktualisieren"
+    "refresh": "Aktualisieren",
+    "next": "Weiter",
+    "back": "Zurück",
+    "cancel": "Abbrechen",
+    "close": "Schliessen"
+  },
+  "auswertungen": {
+    "overview": {
+      "title": "Auswertungen",
+      "subtitle": "Importiere Prüfungsresultate und werte sie aus.",
+      "loadError": "Prüfungen konnten nicht geladen werden.",
+      "emptyHint": "Noch keine Prüfungen vorhanden. Erstelle eine Prüfung im Prüfungskomponist.",
+      "colTitle": "Prüfung",
+      "colCourse": "Kurs",
+      "colDate": "Datum",
+      "colStatus": "Status",
+      "colActions": "Aktionen",
+      "actionEvaluate": "Auswerten",
+      "actionImport": "Resultate importieren",
+      "examStatus": {
+        "draft": "Entwurf",
+        "finalized": "Finalisiert",
+        "exported": "Exportiert"
+      }
+    },
+    "exam": {
+      "loadError": "Prüfung oder Submissions konnten nicht geladen werden.",
+      "detailError": "Submission-Detail konnte nicht geladen werden.",
+      "actionImport": "Resultate importieren",
+      "tabSubmissions": "Submissions",
+      "tabReview": "Review",
+      "tabStatistik": "Statistik",
+      "tabExport": "Notenexport",
+      "emptyHint": "Noch keine Resultate importiert. Lade jetzt eine Moodle-CSV hoch.",
+      "colExternalId": "Identifikation",
+      "colDisplayName": "Name",
+      "colAttempts": "Versuche",
+      "colPoints": "Punkte",
+      "colPercentage": "Prozent",
+      "colGradeStatus": "Status",
+      "gradeStatus": {
+        "pending_review": "In Review",
+        "partially_reviewed": "Teilweise reviewt",
+        "fully_reviewed": "Reviewt"
+      },
+      "drawer": {
+        "points": "{{awarded}} / {{max}} Punkte",
+        "attemptHeader": "Versuch {{number}}",
+        "gradedTag": "Wertend",
+        "colQuestion": "Frage",
+        "colAnswer": "Antwort",
+        "colGrade": "Bewertung"
+      }
+    },
+    "importDialog": {
+      "title": "Resultate importieren — {{examTitle}}",
+      "errorPreview": "Vorschau fehlgeschlagen.",
+      "errorCommit": "Import fehlgeschlagen.",
+      "steps": {
+        "source": "Quelle",
+        "upload": "Datei",
+        "preview": "Vorschau",
+        "confirm": "Bestätigen"
+      },
+      "sourceLabel": "Welches Format willst du importieren?",
+      "sourceMoodleCsv": "Moodle CSV-Datei (Quiz Responses Export)",
+      "sourceMoodleApi": "Moodle Web-Service-API",
+      "unavailableTag": "noch nicht verfügbar",
+      "chooseFile": "CSV-Datei wählen",
+      "uploadHint": "UTF-8 mit Trenner ; oder ,. Antwort-Spalten heissen «Antwort N» oder «Response N».",
+      "studentCount": "{{count}} Studierende",
+      "attemptCount": "{{count}} Versuche",
+      "errorCount": "{{count}} fehlerhafte Zeilen",
+      "errorListTitle": "Fehlerhafte Zeilen werden übersprungen:",
+      "errorListTruncated": "+ {{count}} weitere — siehe Job-Detail",
+      "rowError": "Zeile {{row}}: {{reason}}",
+      "fileTooLarge": "Datei zu gross ({{actualMb}} MB). Maximum: {{maxMb}} MB.",
+      "truncatedTag": "Vorschau gekürzt — vollständige Liste nach Import",
+      "colExternalId": "Identifikation",
+      "colDisplayName": "Name",
+      "confirm": "Importieren",
+      "submitting": "Import läuft…",
+      "result": {
+        "succeeded": "Import erfolgreich",
+        "partial": "Import teilweise erfolgreich",
+        "failed": "Import fehlgeschlagen",
+        "running": "Import läuft",
+        "queued": "Import wartet"
+      },
+      "resultSummary": "{{processed}} verarbeitet, {{failed}} fehlerhaft."
+    }
   },
   "auth": {
     "login": {
