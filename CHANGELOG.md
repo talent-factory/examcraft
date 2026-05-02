@@ -9,6 +9,114 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-05-02
+
+### Added
+
+- **TF-333 — Auswertungs-Pipeline Phase 1: Datenmodell + CSV-Import +
+  Submissions-Liste (#48):** Neues Datenmodell für Prüfungsauswertungen
+  (11 neue Tabellen, 3 Spalten-Erweiterungen). Moodle-CSV-Import mit
+  DE/EN-Locale, Pro-Row-Toleranz und Idempotenz (zweiter Import
+  derselben Datei erzeugt keine Duplikate). 8 voreingestellte
+  Noten-Schemata werden geseedet (Swiss, German, Austrian, French,
+  Dutch, ECTS, Prozent, Pass/Fail). Frontend-Seite Auswertungen mit
+  Submissions-Liste und Detail-Drawer. Migration `tf333_phase1`,
+  reversibel und additiv.
+- **TF-334 — Phase 2: LLM-Bewertung offener Fragen + Review-Queue
+  (#49):** `LlmGrader` (Claude Sonnet via Anthropic API mit
+  Prompt-Caching auf System- und Frage/Musterlösung-Block) bewertet
+  offene Antworten. `GradingService` routet MC/W-F → deterministisch,
+  `open_ended` → LLM. Schema- oder API-Fehler fallen auf
+  0-Punkte-Stub mit Konfidenz 0 zurück, damit ein Grading-Lauf nie
+  eine ganze Submission scheitern lässt. Review-Queue im Frontend
+  mit Filter (Konfidenz-Range / Frage / Studierende), pro Karte
+  Frage + Musterlösung + Antwort + Vorschlag mit
+  matched/missing-Aspekten, Aktionen Übernehmen/Anpassen/Im Kontext,
+  Bulk-Approve nach Selektion oder Konfidenz-Schwelle.
+  `grade_history`-Audit-Trail für jede Status-Transition.
+- **TF-335 — Phase 3: Statistik + Notenmodell + Notenexport (#51):**
+  `GradingSchemeEvaluator` als pure Function für die drei
+  Spec-Config-Typen (`linear` / `linear_segments` / `stepped`).
+  GradingSchemes-CRUD-API (`/api/v1/grading-schemes`),
+  System-Schemes read-only, In-Use-Guard auf DELETE,
+  Default-Promotion. `exam.grading_scheme_id` ist aktiv, neue
+  Prüfungen erben den Institution-Default.
+  `StatisticsService` mit 3 Endpoints
+  (`/api/v1/exams/{id}/stats/overview` und `/per-question`,
+  `/api/v1/submissions/{id}/stats`); Trennschärfe als
+  Pearson-Korrelation Item ↔ Submission-Prozent, 10-%-Histogramm,
+  Lerneffekt-Erkennung. `GradeExportService` mit
+  `GET /api/v1/exams/{id}/grades/export/{format}` (csv / moodle_csv /
+  pdf), UTF-8-BOM-CSV (Excel-DE-tauglich), Moodle-Reimport-CSV,
+  reportlab-PDF mit Header/Tabelle/Lehrperson-Footer.
+- **TF-336 — Phase 4: Klassen + Verlauf + Moodle-API-Driver +
+  Subscription-Gating (#52):** Klassen-CRUD mit Auto-Zuordnung,
+  Cross-Exam-Statistik-Endpoints
+  (`/api/v1/student-classes/.../stats`), Klassen- und
+  Studierenden-Pages mit Recharts-Verlaufs-Visualisierung.
+  `MoodleApiDriver` als Web-Service-Driver mit Question-ID-Round-Trip;
+  `moodle_connections`-Tabelle mit Fernet-verschlüsseltem Token
+  (Schlüssel aus `MOODLE_TOKEN_ENCRYPTION_KEY`).
+  Subscription-Tier-Quotas (Free/Starter/Professional/Enterprise) mit
+  HTTP 402 + i18n-Banner. Vollständige RBAC-Integration:
+  `submissions:grade`, `grading_schemes:manage` werden geseedet, die
+  Reviewer-Rolle erhält automatisch `submissions:grade`. Migration
+  `tf336_llm_model` ergänzt `institutions.llm_model_for_grading`.
+- **TF-337 — Dashboard-Aktivitäten Pagination + Privacy-Fix +
+  dedizierte Aktivitäten-Seite (#53):** Neuer Endpoint
+  `GET /api/v1/activity` mit Single-Query auf `audit_logs`,
+  `scope=own|institution`, `types=<csv>`, `limit ≤ 100`. Neue Seite
+  `/aktivitaeten` im Frontend mit echter DB-Pagination
+  (MUI TablePagination 25/50/100), Toggle «Eigene/Alle» und
+  Type-Filter-Chips. Dashboard-Widget zeigt nur noch eigene Events
+  (Privacy-Fix für alle 7 Quellen in `api/dashboard.py`).
+  `AuditService.log_action(action="create_question")` im Retry-Pfad —
+  Retry-Generierungen erscheinen jetzt im Activity-Feed. Migration
+  `tf337_audit_logs_idx` mit Composite Index
+  `(user_id, created_at DESC)` auf `audit_logs`.
+- **TF-332 — Original-Preview-Tab im Dokument-Vorschau-Dialog (#47):**
+  Neuer Tab «Original» (Default) zwischen «Metadaten» und «Chunks».
+  MIME-spezifische Renderer: PDF im Browser-iframe, Markdown- und
+  Chat-Export-Dateien als formatierter Text, Plaintext monospace.
+  Backend-Endpoint `GET /api/v1/documents/{id}/raw` streamt die
+  Original-Datei aus dem Storage mit korrektem MIME-Type und
+  Tenant-Filter.
+
+### Fixed
+
+- **Infra — RabbitMQ 4 + Celery 5 transient_nonexcl_queues
+  Restart-Loop (#50):** RabbitMQ 4 hat `transient_nonexcl_queues` per
+  Default deaktiviert; Celerys pidbox (Reply-Queue für
+  inspect/broadcast/control) nutzt das Feature aber, was den Worker
+  in einen Restart-Loop schickt
+  (`Queue.declare: (541) INTERNAL_ERROR` →
+  `RestartFreqExceeded: 5 in 1s`). Workaround: neue
+  `infra/rabbitmq/rabbitmq.conf` mit
+  `deprecated_features.permit.transient_nonexcl_queues = true`,
+  Bind-Mount in `docker-compose.full.yml`. Worker bekommt zusätzlich
+  `--without-mingle --without-gossip` als Defense-in-Depth.
+- **TF-335 Migration `tf335_fk_restrict` gegen Edge-Cases gehärtet:**
+  Offline-Mode (`--sql`) wird explizit mit aussagekräftigem Fehler
+  abgelehnt statt opaker Inspector-NotImplementedError. Mehrfach-FKs
+  auf gleicher Spalte werden erkennend abgelehnt (vorher konnte stille
+  Erste-Übereinstimmung-gewinnt-Logik einen SET-NULL-FK zurücklassen).
+  Unbenannte FKs werden explizit abgefangen.
+  RuntimeError-Meldung mit gefundenen FKs und drei konkreten
+  Recovery-Szenarien angereichert.
+
+### Voraussetzungen / Verhaltensänderungen
+
+- **Neue Pflicht-Env-Variable bei Moodle-Nutzung:**
+  `MOODLE_TOKEN_ENCRYPTION_KEY` (44-Zeichen Fernet-Key) muss gesetzt
+  sein, damit Moodle-Zugriffs-Tokens entschlüsselt werden können.
+  Fehlt sie, fällt die Anwendung auf einen Default-Mechanismus
+  zurück, der nicht produktionstauglich ist.
+- **RBAC — neue Permissions:** `submissions:grade` und
+  `grading_schemes:manage` werden geseedet. Die Reviewer-Rolle
+  erhält automatisch `submissions:grade`. Wer Bewerten von Review
+  trennen möchte, sollte vor dem Update eine eigene Rolle ohne diese
+  Permission definieren.
+
 ## [1.3.1] - 2026-04-30
 
 ### Fixed
