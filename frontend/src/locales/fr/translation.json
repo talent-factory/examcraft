@@ -7,6 +7,7 @@
     "documentation": "Documentation",
     "sidebar": {
       "dashboard": "Tableau de bord",
+      "aktivitaeten": "Activité",
       "documents": "Documents",
       "questionGeneration": "Génération de questions",
       "reviewQueue": "File de révision",
@@ -23,6 +24,29 @@
     "en": "English",
     "fr": "Français",
     "it": "Italiano"
+  },
+  "aktivitaeten": {
+    "title": "Activité",
+    "subtitle": "Tous les événements en un coup d'œil — choisissez la portée et filtrez par type.",
+    "scopeAria": "Visibilité",
+    "scopeOwn": "Mes activités",
+    "scopeInstitution": "Toutes",
+    "reload": "Recharger",
+    "errorLoad": "Impossible de charger les activités.",
+    "emptyFresh": "Aucune activité pour l'instant — téléchargez un document ou générez des questions.",
+    "emptyFiltered": "Aucune activité correspondant aux filtres.",
+    "resetFilters": "Réinitialiser les filtres",
+    "shortcutDocuments": "Documents",
+    "shortcutGenerate": "Générer des questions",
+    "types": {
+      "document_uploaded": "Document téléchargé",
+      "document_deleted": "Document supprimé",
+      "questions_generated": "Questions générées",
+      "question_approved": "Question validée",
+      "question_rejected": "Question refusée",
+      "exam_created": "Examen créé",
+      "exam_deleted": "Examen supprimé"
+    }
   },
   "auth": {
     "login": {
@@ -137,7 +161,8 @@
       "generatedQuestions": "Questions générées",
       "validatedQuestions": "Questions validées",
       "recentActivity": "Activité récente",
-      "noActivity": "Aucune activité pour le moment. Commencez par télécharger des documents !"
+      "noActivity": "Aucune activité pour le moment. Commencez par télécharger des documents !",
+      "viewAllActivities": "Voir toute l'activité →"
     },
     "documents": {
       "title": "Bibliothèque de documents",

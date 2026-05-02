@@ -7,6 +7,7 @@
     "documentation": "Dokumentation",
     "sidebar": {
       "dashboard": "Dashboard",
+      "aktivitaeten": "Aktivitäten",
       "documents": "Dokumente",
       "questionGeneration": "Fragengenerierung",
       "reviewQueue": "Review Queue",
@@ -335,6 +336,29 @@
       "notVisible": "Quiz {{id}} ist für den gespeicherten Token nicht sichtbar — Token-Berechtigung prüfen."
     }
   },
+  "aktivitaeten": {
+    "title": "Aktivitäten",
+    "subtitle": "Übersicht aller Ereignisse — wähle den Sichtbereich und filtere nach Typ.",
+    "scopeAria": "Sichtbarkeit",
+    "scopeOwn": "Eigene",
+    "scopeInstitution": "Alle",
+    "reload": "Erneut laden",
+    "errorLoad": "Aktivitäten konnten nicht geladen werden.",
+    "emptyFresh": "Noch keine Aktivitäten — lade ein Dokument hoch oder generiere Fragen.",
+    "emptyFiltered": "Keine Aktivitäten zu den gewählten Filtern.",
+    "resetFilters": "Filter zurücksetzen",
+    "shortcutDocuments": "Dokumente",
+    "shortcutGenerate": "Fragen generieren",
+    "types": {
+      "document_uploaded": "Dokument hochgeladen",
+      "document_deleted": "Dokument gelöscht",
+      "questions_generated": "Fragen generiert",
+      "question_approved": "Frage validiert",
+      "question_rejected": "Frage abgelehnt",
+      "exam_created": "Prüfung erstellt",
+      "exam_deleted": "Prüfung gelöscht"
+    }
+  },
   "auth": {
     "login": {
       "title": "Willkommen zurück",
@@ -459,7 +483,8 @@
         "exam_deleted": "Prüfung gelöscht"
       },
       "statsError": "Statistiken konnten nicht geladen werden.",
-      "activityError": "Aktivitäten konnten nicht geladen werden."
+      "activityError": "Aktivitäten konnten nicht geladen werden.",
+      "viewAllActivities": "Alle Aktivitäten anzeigen →"
     },
     "documents": {
       "title": "Dokumentenbibliothek",

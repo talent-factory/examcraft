@@ -228,6 +228,7 @@ export interface BulkApproveResult {
 
 export type ApiErrorKind =
   | 'network'
+  | 'aborted'
   | 'auth'
   | 'permission'
   | 'validation'

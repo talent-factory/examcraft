@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { de, enUS, fr, it } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +16,7 @@ import {
   fetchDashboardStats,
   fetchDashboardActivity,
   DashboardStatsResponse,
-  ActivityItem,
+  DashboardActivityItem,
 } from '../api/dashboard';
 
 const DATE_FNS_LOCALES: Record<string, Locale> = { de, en: enUS, fr, it };
@@ -38,7 +39,7 @@ export const Dashboard: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(false);
 
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [activities, setActivities] = useState<DashboardActivityItem[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [activitiesError, setActivitiesError] = useState(false);
 
@@ -125,22 +126,33 @@ export const Dashboard: React.FC = () => {
               <p className="text-gray-500">{t('pages.dashboard.noActivity')}</p>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-100">
-              {activities.map((item) => (
-                <li key={item.id} className="flex items-center gap-4 py-3">
-                  <span className="text-2xl">{ACTIVITY_ICONS[item.type] ?? '🔔'}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
-                    <p className="text-xs text-gray-500">
-                      {t(`pages.dashboard.activityTypes.${item.type}`)}
-                    </p>
-                  </div>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
-                    {formatRelativeDate(item.timestamp)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="divide-y divide-gray-100">
+                {activities.map((item) => (
+                  <li key={item.id} className="flex items-center gap-4 py-3">
+                    <span className="text-2xl">{ACTIVITY_ICONS[item.type] ?? '🔔'}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
+                      <p className="text-xs text-gray-500">
+                        {t(`pages.dashboard.activityTypes.${item.type}`)}
+                      </p>
+                    </div>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                      {formatRelativeDate(item.timestamp)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 text-right">
+                <Link
+                  to="/aktivitaeten"
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  data-testid="dashboard-view-all-activities"
+                >
+                  {t('pages.dashboard.viewAllActivities')}
+                </Link>
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -325,6 +325,13 @@ async def lifespan(app: FastAPI):
     dashboard_api = importlib.util.module_from_spec(spec_dashboard)
     spec_dashboard.loader.exec_module(dashboard_api)
 
+    # TF-337: paginated activity endpoint (own / institution scope).
+    spec_activity = importlib.util.spec_from_file_location(
+        "core_api_activity", os.path.join(core_api_path, "activity.py")
+    )
+    activity_api = importlib.util.module_from_spec(spec_activity)
+    spec_activity.loader.exec_module(activity_api)
+
     spec_auth = importlib.util.spec_from_file_location(
         "core_api_auth", os.path.join(core_api_path, "auth.py")
     )
@@ -405,6 +412,7 @@ async def lifespan(app: FastAPI):
     app.include_router(stats_api.router_submission_stats)
     app.include_router(grade_export_api.router)
     app.include_router(dashboard_api.router)
+    app.include_router(activity_api.router)
     app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["billing"])
     app.include_router(
         webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"]

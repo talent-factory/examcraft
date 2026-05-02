@@ -18,6 +18,7 @@ import { ProfilePage } from './components/profile/ProfilePage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import RegistrationSuccessPage from './pages/RegistrationSuccessPage';
 import { Dashboard } from './pages/Dashboard';
+import Aktivitaeten from './pages/Aktivitaeten';
 import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
 import { Review } from './pages/Review';
@@ -98,6 +99,17 @@ export const AppWithAuth: React.FC = () => {
                   <ProtectedRoute>
                     <AppLayout>
                       <Dashboard />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/aktivitaeten"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <Aktivitaeten />
                     </AppLayout>
                   </ProtectedRoute>
                 }

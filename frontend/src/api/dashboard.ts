@@ -1,5 +1,7 @@
 // core/frontend/src/api/dashboard.ts
 
+import { ActivityType } from '../types/activity';
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export interface DashboardStatsResponse {
@@ -9,16 +11,16 @@ export interface DashboardStatsResponse {
   exams: number;
 }
 
-export interface ActivityItem {
+export interface DashboardActivityItem {
   id: string;
-  type: 'document_uploaded' | 'document_deleted' | 'questions_generated' | 'exam_created' | 'question_approved' | 'question_rejected' | 'exam_deleted';
+  type: ActivityType;
   title: string;
   timestamp: string;
   metadata?: Record<string, unknown> | null;
 }
 
 export interface DashboardActivityResponse {
-  activities: ActivityItem[];
+  activities: DashboardActivityItem[];
 }
 
 function getAuthHeaders(): HeadersInit {

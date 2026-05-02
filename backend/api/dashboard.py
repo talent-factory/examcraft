@@ -1,7 +1,12 @@
 # core/backend/api/dashboard.py
-"""Dashboard API – Statistiken und Aktivitäten (TF-319)"""
+"""Dashboard API – Statistiken und Aktivitäten.
 
-import json
+Privacy: Lehrpersonen sehen alle Stats ihrer Institution (``/stats``),
+aber im ``/activity``-Feed nur die eigenen Events. Wer alle Institution-
+Events sehen will, nutzt die Seite ``/aktivitaeten`` mit dem Toggle
+"Eigene/Alle" (``GET /api/v1/activity?scope=institution``).
+"""
+
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -10,11 +15,13 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from api.activity import ActivityType
 from database import get_db
 from models.auth import AuditLog, User
 from models.document import Document
 from models.exam import Exam
 from models.question_review import QuestionReview, ReviewStatus
+from utils.audit_title import extract_audit_title
 from utils.auth_utils import get_current_active_user
 
 logger = logging.getLogger(__name__)
@@ -29,37 +36,50 @@ def _to_utc(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
-def _extract_audit_title(
-    log: AuditLog, fallback_title: str, preferred_keys: tuple[str, ...]
-) -> str:
-    """Read a human-readable title from AuditLog.additional_data (JSON).
+def _resolve_review_topic(db: Session, log: AuditLog, default_title: str) -> str:
+    """Resolve a question-review topic from ``additional_data`` with a
+    fallback to a direct ``QuestionReview`` lookup by ``resource_id``.
 
-    Tries ``preferred_keys`` in order; falls back to ``fallback_title``
-    (typically the resource id as string) when the JSON is missing,
-    malformed, or doesn't carry a recognized field. Malformed JSON is
-    logged at WARNING — corrupt audit rows are themselves a security-
-    relevant signal (someone wrote invalid JSON into an audit log) so we
-    surface it rather than silently absorbing.
+    Returns ``default_title`` when the ``resource_id`` is not numeric or
+    the review row is gone — every fallback path is logged so the
+    "why does the dashboard show a dash" question is debuggable.
     """
-    if not log.additional_data:
-        return fallback_title
+    title = extract_audit_title(
+        log,
+        fallback_title=str(log.resource_id),
+        preferred_keys=("topic",),
+    )
+    if title != str(log.resource_id):
+        return title
     try:
-        data = json.loads(log.additional_data)
-    except (json.JSONDecodeError, TypeError):
-        logger.warning(
-            "Corrupt additional_data in audit log id=%s action=%s — "
-            "rendering fallback title",
-            log.id,
-            log.action,
+        q = (
+            db.query(QuestionReview)
+            .filter(QuestionReview.id == int(log.resource_id))
+            .first()
         )
-        return fallback_title
-    if not isinstance(data, dict):
-        return fallback_title
-    for key in preferred_keys:
-        value = data.get(key)
-        if value:
-            return str(value)
-    return fallback_title
+    except (ValueError, TypeError):
+        logger.warning(
+            "Non-int resource_id %r for action=%s log_id=%s — rendering fallback",
+            log.resource_id,
+            log.action,
+            log.id,
+        )
+        return default_title
+    if q is None:
+        logger.warning(
+            "QuestionReview id=%s referenced by audit log id=%s missing — "
+            "rendering fallback",
+            log.resource_id,
+            log.id,
+        )
+        return default_title
+    if not q.topic:
+        logger.info(
+            "QuestionReview id=%s has empty topic — rendering fallback",
+            q.id,
+        )
+        return default_title
+    return q.topic
 
 
 class DashboardStatsResponse(BaseModel):
@@ -69,16 +89,16 @@ class DashboardStatsResponse(BaseModel):
     exams: int
 
 
-class ActivityItem(BaseModel):
+class DashboardActivityItem(BaseModel):
     id: str
-    type: str
+    type: ActivityType
     title: str
     timestamp: datetime
     metadata: Optional[dict] = None
 
 
 class DashboardActivityResponse(BaseModel):
-    activities: list[ActivityItem]
+    activities: list[DashboardActivityItem]
 
 
 @router.get("/stats", response_model=DashboardStatsResponse)
@@ -89,6 +109,11 @@ def get_dashboard_stats(
     institution_id = current_user.institution_id
 
     if not institution_id:
+        logger.info(
+            "Dashboard stats requested by user_id=%s without institution — "
+            "returning zeros",
+            current_user.id,
+        )
         return DashboardStatsResponse(
             generated_questions=0, documents=0, validated_questions=0, exams=0
         )
@@ -125,19 +150,22 @@ def get_dashboard_activity(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    institution_id = current_user.institution_id
+    """Top-25-Glance der eigenen Aktivitäten.
 
-    if not institution_id:
-        return DashboardActivityResponse(activities=[])
+    Per-User scoped: alle 7 Quellen filtern auf
+    ``AuditLog.user_id == current_user.id`` (bzw.
+    ``QuestionReview.created_by == current_user.id`` für die
+    QuestionReview-Quelle). Wer cross-User-Events sehen will, nutzt
+    ``GET /api/v1/activity?scope=institution``.
+    """
+    user_id = current_user.id
 
-    items: list[ActivityItem] = []
+    items: list[DashboardActivityItem] = []
 
-    # 1. Dokumente hochgeladen (aus AuditLog, damit gelöschte Dokumente sichtbar bleiben)
     uploaded_logs = (
         db.query(AuditLog)
-        .join(User, AuditLog.user_id == User.id)
         .filter(
-            User.institution_id == institution_id,
+            AuditLog.user_id == user_id,
             AuditLog.action == "create_document",
             AuditLog.status == "success",
         )
@@ -147,13 +175,13 @@ def get_dashboard_activity(
     )
     for log in uploaded_logs:
         if log.created_at:
-            title = _extract_audit_title(
+            title = extract_audit_title(
                 log,
                 fallback_title=str(log.resource_id),
                 preferred_keys=("original_filename", "filename"),
             )
             items.append(
-                ActivityItem(
+                DashboardActivityItem(
                     id=f"doc_{log.id}",
                     type="document_uploaded",
                     title=title,
@@ -161,10 +189,9 @@ def get_dashboard_activity(
                 )
             )
 
-    # 2. Fragen generiert (QuestionReview-Tabelle, nach Erstellungsdatum)
     questions = (
         db.query(QuestionReview)
-        .filter(QuestionReview.institution_id == institution_id)
+        .filter(QuestionReview.created_by == user_id)
         .order_by(QuestionReview.created_at.desc())
         .limit(25)
         .all()
@@ -172,7 +199,7 @@ def get_dashboard_activity(
     for q in questions:
         if q.created_at:
             items.append(
-                ActivityItem(
+                DashboardActivityItem(
                     id=f"qgen_{q.id}",
                     type="questions_generated",
                     title=q.topic or str(q.id),
@@ -180,12 +207,10 @@ def get_dashboard_activity(
                 )
             )
 
-    # 3. Fragen validiert (aus AuditLog, damit gelöschte Fragen sichtbar bleiben)
     qapproved_logs = (
         db.query(AuditLog)
-        .join(User, AuditLog.user_id == User.id)
         .filter(
-            User.institution_id == institution_id,
+            AuditLog.user_id == user_id,
             AuditLog.action == "approve_question",
             AuditLog.status == "success",
         )
@@ -195,23 +220,9 @@ def get_dashboard_activity(
     )
     for log in qapproved_logs:
         if log.created_at:
-            title = _extract_audit_title(
-                log,
-                fallback_title=str(log.resource_id),
-                preferred_keys=("topic",),
-            )
-            if title == str(log.resource_id):
-                try:
-                    q = (
-                        db.query(QuestionReview)
-                        .filter(QuestionReview.id == int(log.resource_id))
-                        .first()
-                    )
-                    title = q.topic if (q and q.topic) else "–"
-                except (ValueError, TypeError):
-                    title = "–"
+            title = _resolve_review_topic(db, log, default_title="–")
             items.append(
-                ActivityItem(
+                DashboardActivityItem(
                     id=f"qapproved_{log.id}",
                     type="question_approved",
                     title=title,
@@ -219,12 +230,10 @@ def get_dashboard_activity(
                 )
             )
 
-    # 4. Prüfungen erstellt (aus AuditLog, damit gelöschte Prüfungen sichtbar bleiben)
     exam_logs = (
         db.query(AuditLog)
-        .join(User, AuditLog.user_id == User.id)
         .filter(
-            User.institution_id == institution_id,
+            AuditLog.user_id == user_id,
             AuditLog.action == "create_exam",
             AuditLog.status == "success",
         )
@@ -234,13 +243,13 @@ def get_dashboard_activity(
     )
     for log in exam_logs:
         if log.created_at:
-            title = _extract_audit_title(
+            title = extract_audit_title(
                 log,
                 fallback_title=str(log.resource_id),
                 preferred_keys=("title",),
             )
             items.append(
-                ActivityItem(
+                DashboardActivityItem(
                     id=f"exam_{log.id}",
                     type="exam_created",
                     title=title,
@@ -248,12 +257,10 @@ def get_dashboard_activity(
                 )
             )
 
-    # 5. Fragen abgelehnt (aus AuditLog)
     qrejected_logs = (
         db.query(AuditLog)
-        .join(User, AuditLog.user_id == User.id)
         .filter(
-            User.institution_id == institution_id,
+            AuditLog.user_id == user_id,
             AuditLog.action == "reject_question",
             AuditLog.status == "success",
         )
@@ -263,23 +270,9 @@ def get_dashboard_activity(
     )
     for log in qrejected_logs:
         if log.created_at:
-            title = _extract_audit_title(
-                log,
-                fallback_title=str(log.resource_id),
-                preferred_keys=("topic",),
-            )
-            if title == str(log.resource_id):
-                try:
-                    q = (
-                        db.query(QuestionReview)
-                        .filter(QuestionReview.id == int(log.resource_id))
-                        .first()
-                    )
-                    title = q.topic if (q and q.topic) else "–"
-                except (ValueError, TypeError):
-                    title = "–"
+            title = _resolve_review_topic(db, log, default_title="–")
             items.append(
-                ActivityItem(
+                DashboardActivityItem(
                     id=f"qrejected_{log.id}",
                     type="question_rejected",
                     title=title,
@@ -287,12 +280,10 @@ def get_dashboard_activity(
                 )
             )
 
-    # 6. Prüfungen gelöscht (aus AuditLog)
     exam_deleted_logs = (
         db.query(AuditLog)
-        .join(User, AuditLog.user_id == User.id)
         .filter(
-            User.institution_id == institution_id,
+            AuditLog.user_id == user_id,
             AuditLog.action == "delete_exam",
             AuditLog.status == "success",
         )
@@ -302,13 +293,13 @@ def get_dashboard_activity(
     )
     for log in exam_deleted_logs:
         if log.created_at:
-            title = _extract_audit_title(
+            title = extract_audit_title(
                 log,
                 fallback_title=str(log.resource_id),
                 preferred_keys=("title",),
             )
             items.append(
-                ActivityItem(
+                DashboardActivityItem(
                     id=f"examdeleted_{log.id}",
                     type="exam_deleted",
                     title=title,
@@ -316,12 +307,10 @@ def get_dashboard_activity(
                 )
             )
 
-    # 7. Dokumente gelöscht (aus AuditLog, gefiltert über User.institution_id)
     deleted_logs = (
         db.query(AuditLog)
-        .join(User, AuditLog.user_id == User.id)
         .filter(
-            User.institution_id == institution_id,
+            AuditLog.user_id == user_id,
             AuditLog.action == "delete_document",
             AuditLog.status == "success",
         )
@@ -331,13 +320,13 @@ def get_dashboard_activity(
     )
     for log in deleted_logs:
         if log.created_at:
-            title = _extract_audit_title(
+            title = extract_audit_title(
                 log,
                 fallback_title=str(log.resource_id),
                 preferred_keys=("original_filename", "filename"),
             )
             items.append(
-                ActivityItem(
+                DashboardActivityItem(
                     id=f"docdeleted_{log.id}",
                     type="document_deleted",
                     title=title,

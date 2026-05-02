@@ -7,6 +7,7 @@
     "documentation": "Documentation",
     "sidebar": {
       "dashboard": "Dashboard",
+      "aktivitaeten": "Activity",
       "documents": "Documents",
       "questionGeneration": "Question Generation",
       "reviewQueue": "Review Queue",
@@ -335,6 +336,29 @@
       "notVisible": "Quiz {{id}} is not visible to the stored token — check token permissions."
     }
   },
+  "aktivitaeten": {
+    "title": "Activity",
+    "subtitle": "All events at a glance — pick a scope and filter by type.",
+    "scopeAria": "Visibility",
+    "scopeOwn": "Mine",
+    "scopeInstitution": "All",
+    "reload": "Reload",
+    "errorLoad": "Activities could not be loaded.",
+    "emptyFresh": "No activity yet — upload a document or generate questions.",
+    "emptyFiltered": "No activity matches the selected filters.",
+    "resetFilters": "Reset filters",
+    "shortcutDocuments": "Documents",
+    "shortcutGenerate": "Generate questions",
+    "types": {
+      "document_uploaded": "Document uploaded",
+      "document_deleted": "Document deleted",
+      "questions_generated": "Questions generated",
+      "question_approved": "Question approved",
+      "question_rejected": "Question rejected",
+      "exam_created": "Exam created",
+      "exam_deleted": "Exam deleted"
+    }
+  },
   "auth": {
     "login": {
       "title": "Welcome back",
@@ -459,7 +483,8 @@
         "exam_deleted": "Exam deleted"
       },
       "statsError": "Statistics could not be loaded.",
-      "activityError": "Activities could not be loaded."
+      "activityError": "Activities could not be loaded.",
+      "viewAllActivities": "View all activity →"
     },
     "documents": {
       "title": "Document Library",

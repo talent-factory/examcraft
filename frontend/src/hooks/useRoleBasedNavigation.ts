@@ -29,6 +29,11 @@ export const useRoleBasedNavigation = () => {
       icon: '📊',
     },
     {
+      label: t('nav.sidebar.aktivitaeten'),
+      path: '/aktivitaeten',
+      icon: '🔔',
+    },
+    {
       label: t('nav.sidebar.documents'),
       path: '/documents',
       icon: '📄',
