@@ -27,10 +27,22 @@ def upgrade() -> None:
         "wizard_sessions",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("title", sa.String(255), nullable=True, server_default="Neue Session"),
+        sa.Column(
+            "title", sa.String(255), nullable=True, server_default="Neue Session"
+        ),
         sa.Column("status", sa.String(50), nullable=False, server_default="active"),
-        sa.Column("reference_prompt_id", UUID(as_uuid=True), sa.ForeignKey("prompts.id"), nullable=True),
-        sa.Column("generated_prompt_id", UUID(as_uuid=True), sa.ForeignKey("prompts.id"), nullable=True),
+        sa.Column(
+            "reference_prompt_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("prompts.id"),
+            nullable=True,
+        ),
+        sa.Column(
+            "generated_prompt_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("prompts.id"),
+            nullable=True,
+        ),
         sa.Column("collected_parameters", JSONB(), nullable=True),
         sa.Column("generated_template", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=True),
