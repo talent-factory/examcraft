@@ -1,10 +1,21 @@
-"""Unit tests for _normalize_use_case in prompt_wizard_service."""
+"""Unit tests for _normalize_use_case in prompt_wizard_service.
+
+Skipped automatically in the core CI where the premium package is not
+available — runs in the full Docker stack and premium CI.
+"""
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
-from premium.services.prompt_wizard_service import VALID_USE_CASES, _normalize_use_case
+premium_wizard = pytest.importorskip(
+    "premium.services.prompt_wizard_service",
+    reason="premium package not available in core CI",
+)
+VALID_USE_CASES = premium_wizard.VALID_USE_CASES
+_normalize_use_case = premium_wizard._normalize_use_case
 
 
 # ---------------------------------------------------------------------------
@@ -60,8 +71,6 @@ def test_normalize_maps_to_expected_use_case(raw: str, expected: str) -> None:
 
 
 def test_normalize_falls_back_to_question_generation_for_unknown(caplog) -> None:
-    import logging
-
     with caplog.at_level(
         logging.WARNING, logger="premium.services.prompt_wizard_service"
     ):
@@ -73,8 +82,6 @@ def test_normalize_falls_back_to_question_generation_for_unknown(caplog) -> None
 
 
 def test_normalize_falls_back_for_empty_string(caplog) -> None:
-    import logging
-
     with caplog.at_level(
         logging.WARNING, logger="premium.services.prompt_wizard_service"
     ):
