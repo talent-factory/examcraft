@@ -226,6 +226,7 @@ async def lifespan(app: FastAPI):
     # Premium features (vector_search, chat, prompts) are available in Premium package
     # Import from core.api explicitly to avoid conflicts with premium.api
     import importlib
+    import sys
 
     # Get the core backend path
     core_api_path = os.path.join(os.path.dirname(__file__), "api")
@@ -319,18 +320,21 @@ async def lifespan(app: FastAPI):
     grade_export_api = importlib.util.module_from_spec(spec_grade_export)
     spec_grade_export.loader.exec_module(grade_export_api)
 
+    # TF-337: paginated activity endpoint (own / institution scope).
+    # Loaded BEFORE dashboard because dashboard.py imports ActivityType from it.
+    # Registered as "api.activity" so the absolute import in dashboard.py resolves.
+    spec_activity = importlib.util.spec_from_file_location(
+        "api.activity", os.path.join(core_api_path, "activity.py")
+    )
+    activity_api = importlib.util.module_from_spec(spec_activity)
+    sys.modules["api.activity"] = activity_api
+    spec_activity.loader.exec_module(activity_api)
+
     spec_dashboard = importlib.util.spec_from_file_location(
         "core_api_dashboard", os.path.join(core_api_path, "dashboard.py")
     )
     dashboard_api = importlib.util.module_from_spec(spec_dashboard)
     spec_dashboard.loader.exec_module(dashboard_api)
-
-    # TF-337: paginated activity endpoint (own / institution scope).
-    spec_activity = importlib.util.spec_from_file_location(
-        "core_api_activity", os.path.join(core_api_path, "activity.py")
-    )
-    activity_api = importlib.util.module_from_spec(spec_activity)
-    spec_activity.loader.exec_module(activity_api)
 
     spec_auth = importlib.util.spec_from_file_location(
         "core_api_auth", os.path.join(core_api_path, "auth.py")
