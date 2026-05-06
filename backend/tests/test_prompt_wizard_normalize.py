@@ -28,7 +28,10 @@ def test_normalize_returns_valid_values_unchanged(value: str) -> None:
         ("multiple_choice", "question_generation_multiple_choice"),
         ("Multiple Choice", "question_generation_multiple_choice"),
         ("single_choice", "question_generation_multiple_choice"),
-        ("question_generation_multiple_choice_advanced", "question_generation_multiple_choice"),
+        (
+            "question_generation_multiple_choice_advanced",
+            "question_generation_multiple_choice",
+        ),
         ("true_false", "question_generation_true_false"),
         ("True/False", "question_generation_true_false"),
         ("wahr_falsch", "question_generation_true_false"),
@@ -59,7 +62,9 @@ def test_normalize_maps_to_expected_use_case(raw: str, expected: str) -> None:
 def test_normalize_falls_back_to_question_generation_for_unknown(caplog) -> None:
     import logging
 
-    with caplog.at_level(logging.WARNING, logger="premium.services.prompt_wizard_service"):
+    with caplog.at_level(
+        logging.WARNING, logger="premium.services.prompt_wizard_service"
+    ):
         result = _normalize_use_case("completely_unknown_type_xyz")
 
     assert result == "question_generation"
@@ -70,7 +75,9 @@ def test_normalize_falls_back_to_question_generation_for_unknown(caplog) -> None
 def test_normalize_falls_back_for_empty_string(caplog) -> None:
     import logging
 
-    with caplog.at_level(logging.WARNING, logger="premium.services.prompt_wizard_service"):
+    with caplog.at_level(
+        logging.WARNING, logger="premium.services.prompt_wizard_service"
+    ):
         result = _normalize_use_case("")
 
     assert result == "question_generation"

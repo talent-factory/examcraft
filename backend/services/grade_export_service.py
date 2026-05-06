@@ -162,7 +162,13 @@ class GradeCsvExporter:
                     f"{row.total_points_awarded:.2f}",
                     f"{row.total_points_max:.2f}",
                     f"{row.percentage:.2f}",
-                    _csv_safe(_grade_label(row.percentage, data.scheme_config, external_id=row.external_id)),
+                    _csv_safe(
+                        _grade_label(
+                            row.percentage,
+                            data.scheme_config,
+                            external_id=row.external_id,
+                        )
+                    ),
                     _csv_safe(row.grade_status),
                 ]
             )
@@ -302,7 +308,9 @@ class GradePdfExporter:
                     f"{row.total_points_awarded:.2f}",
                     f"{row.total_points_max:.2f}",
                     f"{row.percentage:.1f}%",
-                    _grade_label(row.percentage, data.scheme_config, external_id=row.external_id),
+                    _grade_label(
+                        row.percentage, data.scheme_config, external_id=row.external_id
+                    ),
                     row.grade_status,
                 ]
             )

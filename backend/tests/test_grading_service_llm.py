@@ -496,6 +496,7 @@ def test_resolve_llm_grader_warns_when_exam_not_loaded(
         # Simulate missing exam relationship by using _resolve_llm_grader directly
         # with a submission whose exam attribute is None.
         from unittest.mock import MagicMock as MM
+
         fake_submission = MM()
         fake_submission.id = submission.id
         fake_submission.exam = None
