@@ -332,7 +332,10 @@ def _persist_questions(
             review_ids.append(question_review.id)
 
             # Link to source documents in the normalised join table
-            for fname in question_review.source_documents or []:
+            # RAG returns one entry per chunk, so the same filename can appear
+            # multiple times when a document contributes several chunks.
+            # dict.fromkeys deduplicates while preserving order.
+            for fname in dict.fromkeys(question_review.source_documents or []):
                 doc_id = filename_to_doc_id.get(fname)
                 if doc_id:
                     db.merge(
