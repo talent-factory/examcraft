@@ -166,9 +166,10 @@ class MoodleApiDriver(BaseImportDriver):
                         )
                     )
 
-            # Mark connection.last_used_at — best effort, the driver is
-            # called inside the ImportService transaction so a flush
-            # here is fine.
+            # Mark connection.last_used_at — this mutation lives inside the
+            # outer ImportService savepoint. If that savepoint rolls back
+            # (e.g. on a pipeline failure), this update is also rolled back;
+            # persistence is not guaranteed on every call.
             connection.last_used_at = datetime.now(timezone.utc)
             db.flush()
             return payload

@@ -273,10 +273,17 @@ class LlmGrader:
         stripped = (text or "").strip()
         if not stripped:
             raise ValueError("Leere Modell-Antwort")
-        # Trim Markdown-Code-Blöcke
+        # Trim Markdown-Code-Blöcke — strip fence lines, not characters.
+        # str.strip("`") removes any backtick from both ends of the string,
+        # which corrupts content that legitimately contains backticks (e.g.
+        # rationale: "matches `key criterion`"). Instead, drop the opening
+        # fence line (```json or ```) and the closing fence line (```).
         if stripped.startswith("```"):
-            stripped = stripped.strip("`")
-            # Nach dem Trim können noch ``json\n…\n`` Reste übrig sein.
+            lines = stripped.splitlines()
+            inner = lines[1:]
+            if inner and inner[-1].strip() == "```":
+                inner = inner[:-1]
+            stripped = "\n".join(inner).strip()
             if stripped.lower().startswith("json"):
                 stripped = stripped[4:].lstrip()
         first_brace = stripped.find("{")

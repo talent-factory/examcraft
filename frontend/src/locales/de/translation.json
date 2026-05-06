@@ -1745,7 +1745,8 @@
         "errorGenerating": "Fehler beim Generieren des Templates",
         "generateTemplate": "Template generieren",
         "generating": "Generiere Template...",
-        "placeholder": "Beschreiben Sie, was Ihr Prompt tun soll..."
+        "placeholder": "Beschreiben Sie, was Ihr Prompt tun soll...",
+        "templateSaved": "Template wurde gespeichert"
       },
       "sessionList": {
         "newSession": "Neue Session",

@@ -287,8 +287,8 @@ async def test_connection(
 
     endpoint = connection.base_url.rstrip("/") + "/webservice/rest/server.php"
     try:
-        with httpx.Client(timeout=10.0) as client:
-            response = client.post(
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
                 endpoint,
                 data={
                     "wstoken": token,

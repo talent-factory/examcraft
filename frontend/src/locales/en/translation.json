@@ -1745,7 +1745,8 @@
         "errorGenerating": "Error generating template",
         "generateTemplate": "Generate Template",
         "generating": "Generating template...",
-        "placeholder": "Describe what your prompt should do..."
+        "placeholder": "Describe what your prompt should do...",
+        "templateSaved": "Template has been saved"
       },
       "sessionList": {
         "newSession": "New Session",

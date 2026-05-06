@@ -104,7 +104,12 @@ class GradeExportData:
 # ---------------------------------------------------------------------------
 
 
-def _grade_label(percentage: float, scheme_config: dict[str, Any] | None) -> str:
+def _grade_label(
+    percentage: float,
+    scheme_config: dict[str, Any] | None,
+    *,
+    external_id: str | None = None,
+) -> str:
     """Run the configured scheme; fall back to "—" when no scheme is
     set so a missing skala doesn't crash the export.
     """
@@ -113,7 +118,11 @@ def _grade_label(percentage: float, scheme_config: dict[str, Any] | None) -> str
     try:
         return percentage_to_grade(percentage, scheme_config)
     except GradingSchemeError as exc:
-        logger.warning("Grading-Scheme-Eval fehlgeschlagen, fallback '—': %s", exc)
+        logger.warning(
+            "Grading-Scheme-Eval fehlgeschlagen für %s, fallback '—': %s",
+            external_id or "<unknown>",
+            exc,
+        )
         return "—"
 
 
@@ -153,7 +162,7 @@ class GradeCsvExporter:
                     f"{row.total_points_awarded:.2f}",
                     f"{row.total_points_max:.2f}",
                     f"{row.percentage:.2f}",
-                    _csv_safe(_grade_label(row.percentage, data.scheme_config)),
+                    _csv_safe(_grade_label(row.percentage, data.scheme_config, external_id=row.external_id)),
                     _csv_safe(row.grade_status),
                 ]
             )
@@ -293,7 +302,7 @@ class GradePdfExporter:
                     f"{row.total_points_awarded:.2f}",
                     f"{row.total_points_max:.2f}",
                     f"{row.percentage:.1f}%",
-                    _grade_label(row.percentage, data.scheme_config),
+                    _grade_label(row.percentage, data.scheme_config, external_id=row.external_id),
                     row.grade_status,
                 ]
             )

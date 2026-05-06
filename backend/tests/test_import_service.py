@@ -653,20 +653,66 @@ def test_per_submission_grading_failure_isolates_to_error_log(
         triggered_by=None,
     )
 
-    # Both students grading-failed → job is partial/failed (no rows
-    # processed cleanly) but business data persisted.
     assert job.status in ("partial", "failed")
     assert job.error_log
     grading_entries = [e for e in job.error_log if (e.get("step") == "grading")]
     assert len(grading_entries) == 2
     assert all("RuntimeError" in e["reason"] for e in grading_entries)
 
-    # Students + attempts + answers persisted; Grades absent because
-    # grading itself failed.
     assert test_db.query(Student).count() == 2
     assert test_db.query(Attempt).count() == 2
     assert test_db.query(AttemptAnswer).count() > 0
     assert test_db.query(Grade).count() == 0
+
+    # Submissions must be marked IMPORT_GRADING_FAILED so the UI shows the
+    # failure rather than leaving submissions in an indeterminate state.
+    from enums import SubmissionGradeStatus
+    from models.submission import Submission as Sub
+
+    failed = test_db.query(Sub).all()
+    assert all(
+        s.grade_status == SubmissionGradeStatus.IMPORT_GRADING_FAILED.value
+        for s in failed
+    )
+
+
+def test_sqlalchemy_grading_failure_also_marks_submission_failed(
+    test_db: Session, exam_with_questions: Exam, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SQLAlchemyError during grade_submission is handled identically to
+    unexpected exceptions: the submission is marked IMPORT_GRADING_FAILED and
+    the error is recorded in the job log."""
+    from sqlalchemy.exc import OperationalError
+
+    from enums import SubmissionGradeStatus
+    from models.submission import Submission as Sub
+
+    service = ImportService(test_db)
+
+    def _boom(_self, _submission_id):
+        raise OperationalError("simulated DB error", params=None, orig=None)
+
+    monkeypatch.setattr(
+        "services.grading_service.GradingService.grade_submission", _boom
+    )
+
+    job = service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_csv",
+        source=_csv_two_students(),
+        triggered_by=None,
+    )
+
+    assert job.status in ("partial", "failed")
+    grading_entries = [e for e in (job.error_log or []) if e.get("step") == "grading"]
+    assert len(grading_entries) == 2
+    assert all("OperationalError" in e["reason"] for e in grading_entries)
+
+    failed = test_db.query(Sub).all()
+    assert all(
+        s.grade_status == SubmissionGradeStatus.IMPORT_GRADING_FAILED.value
+        for s in failed
+    )
 
 
 def test_unexpected_pipeline_failure_rolls_back_partial_data(

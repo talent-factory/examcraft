@@ -427,9 +427,20 @@ async def regrade_question(
     if eq_row is None:
         raise HTTPException(status_code=404, detail="Frage nicht gefunden")
 
-    count = GradingService(db).regrade_after_correct_answer_update(
-        exam_question_id=exam_question_id,
-        triggered_by=current_user.id,
-    )
-    db.commit()
+    try:
+        count = GradingService(db).regrade_after_correct_answer_update(
+            exam_question_id=exam_question_id,
+            triggered_by=current_user.id,
+        )
+        db.commit()
+    except Exception:
+        logger.exception(
+            "regrade_question failed: exam_id=%s exam_question_id=%s",
+            exam_id,
+            exam_question_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Re-Grading fehlgeschlagen — siehe Server-Logs.",
+        )
     return RegradeQuestionOut(exam_question_id=exam_question_id, regraded_count=count)

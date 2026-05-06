@@ -139,6 +139,11 @@ def _mark_terminal_failure(
     try:
         job = db.query(ImportJob).filter(ImportJob.id == import_job_id).one_or_none()
         if job is None:
+            logger.error(
+                "_mark_terminal_failure: ImportJob %s not found — "
+                "failure cannot be persisted.",
+                import_job_id,
+            )
             return
         job.status = ImportJobStatus.FAILED.value
         job.finished_at = datetime.now(timezone.utc)
@@ -160,4 +165,7 @@ def _mark_terminal_failure(
         logger.exception(
             "Could not mark ImportJob %s as terminal-failed", import_job_id
         )
-        db.rollback()
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            logger.warning("Rollback also failed for ImportJob %s", import_job_id)

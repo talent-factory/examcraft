@@ -78,6 +78,10 @@ class Exam(Base):
         nullable=False,
     )
 
+    institution = relationship(
+        "Institution",
+        foreign_keys=[institution_id],
+    )
     questions = relationship(
         "ExamQuestion",
         back_populates="exam",

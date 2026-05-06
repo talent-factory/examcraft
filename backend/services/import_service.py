@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from enums import (
@@ -593,10 +593,25 @@ class ImportService:
                 with self.db.begin_nested():
                     self.grading_service.grade_submission(submission.id)
             except Exception as exc:
-                logger.exception(
-                    "Grading failed for submission_id=%s during import",
-                    submission.id,
-                )
+                if not isinstance(exc, SQLAlchemyError):
+                    # Unexpected exception type — likely a bug in the grading
+                    # service (AttributeError, TypeError, etc.) rather than a
+                    # DB or LLM API failure. Log at ERROR so operators can
+                    # distinguish real bugs from expected API degradation.
+                    logger.error(
+                        "Grading failed for submission_id=%s during import — "
+                        "unexpected exception type %s (may indicate a grading "
+                        "service bug): %s",
+                        submission.id,
+                        type(exc).__name__,
+                        exc,
+                        exc_info=True,
+                    )
+                else:
+                    logger.exception(
+                        "Grading failed for submission_id=%s during import",
+                        submission.id,
+                    )
                 tb = "".join(
                     traceback.format_exception(type(exc), exc, exc.__traceback__)
                 )

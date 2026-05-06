@@ -212,6 +212,53 @@ def test_llm_grader_strips_markdown_code_block() -> None:
     assert outcome.confidence == 0.5
 
 
+def test_llm_grader_strips_plain_fence_without_language_tag() -> None:
+    """Plain ``` fence (no 'json' language tag) is also stripped correctly.
+    Some models omit the language annotation.
+    """
+    fenced = (
+        "```\n"
+        '{"points_awarded": 2.0, "confidence": 0.8, '
+        '"rationale": "gut", "matched_aspects": ["A"], '
+        '"missing_aspects": []}\n'
+        "```"
+    )
+    client = _stub_anthropic(fenced)
+    grader = LlmGrader(client=client)
+    outcome = grader.grade(
+        question_text="X",
+        correct_answer="Y",
+        given_answer="Z",
+        points_max=4.0,
+    )
+    assert outcome.points_awarded == 2.0
+    assert outcome.confidence == 0.8
+
+
+def test_llm_grader_fence_preserves_backticks_in_rationale() -> None:
+    """Rationale text containing backticks must not be corrupted by fence stripping.
+    This was the bug the line-based stripping fix addressed.
+    """
+    payload = {
+        "points_awarded": 3.0,
+        "confidence": 0.9,
+        "rationale": "matches `key criterion` and `second criterion`",
+        "matched_aspects": ["key criterion"],
+        "missing_aspects": [],
+    }
+    fenced = f"```json\n{__import__('json').dumps(payload)}\n```"
+    client = _stub_anthropic(fenced)
+    grader = LlmGrader(client=client)
+    outcome = grader.grade(
+        question_text="X",
+        correct_answer="Y",
+        given_answer="Z",
+        points_max=4.0,
+    )
+    assert outcome.points_awarded == 3.0
+    assert "`key criterion`" in outcome.rationale
+
+
 def test_llm_grader_returns_stub_when_correct_answer_missing() -> None:
     """Ohne Musterlösung lohnt sich ein API-Call gar nicht; stattdessen
     klar markieren, dass die Lehrperson manuell ranmuss."""
@@ -391,3 +438,69 @@ def test_grading_service_passes_question_context_to_llm(test_db: Session) -> Non
     assert "Kapselung" in call_kwargs["explanation"]
     assert call_kwargs["points_max"] == 4.0
     assert call_kwargs["difficulty"] == "medium"
+
+
+# ---------------------------------------------------------------------------
+# Enterprise model-override path — _resolve_llm_grader
+# ---------------------------------------------------------------------------
+
+
+def test_enterprise_model_override_is_used_and_cached(
+    test_db: Session, monkeypatch
+) -> None:
+    """Enterprise tier: Institution.llm_model_for_grading is picked up by
+    _resolve_llm_grader via the Exam.institution relationship, a new LlmGrader
+    is built for that model, and the same instance is reused on subsequent calls.
+    """
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    submission, _ = _seed_open_ended_submission(test_db)
+
+    from models.exam import Exam
+
+    exam = test_db.get(Exam, submission.exam_id)
+    inst = test_db.get(Institution, exam.institution_id)
+    inst.llm_model_for_grading = "claude-opus-enterprise"
+    test_db.commit()
+
+    # Verify the Exam.institution relationship exists and is loadable — if
+    # the relationship were missing, _resolve_llm_grader would fall back to
+    # the default model and this assertion would catch it.
+    test_db.expire(exam)
+    assert exam.institution is not None
+    assert exam.institution.llm_model_for_grading == "claude-opus-enterprise"
+
+    service = GradingService(test_db)
+    service.grade_submission(submission.id)
+
+    assert "claude-opus-enterprise" in service._llm_grader_by_model
+    custom_grader = service._llm_grader_by_model["claude-opus-enterprise"]
+    assert custom_grader.model == "claude-opus-enterprise"
+
+    service.grade_submission(submission.id)
+    assert service._llm_grader_by_model["claude-opus-enterprise"] is custom_grader
+
+
+def test_resolve_llm_grader_warns_when_exam_not_loaded(
+    test_db: Session, monkeypatch
+) -> None:
+    """When submission.exam is None, _resolve_llm_grader logs a warning
+    and falls back to the default grader rather than crashing."""
+    from unittest.mock import patch
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    submission, _ = _seed_open_ended_submission(test_db)
+
+    with patch("services.grading_service.logger") as mock_log:
+        service = GradingService(test_db)
+        # Simulate missing exam relationship by using _resolve_llm_grader directly
+        # with a submission whose exam attribute is None.
+        from unittest.mock import MagicMock as MM
+        fake_submission = MM()
+        fake_submission.id = submission.id
+        fake_submission.exam = None
+        result = service._resolve_llm_grader(submission=fake_submission)
+
+    assert result is service.llm_grader
+    mock_log.warning.assert_called_once()
+    assert "no loaded exam relationship" in mock_log.warning.call_args[0][0]

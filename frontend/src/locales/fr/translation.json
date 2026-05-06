@@ -1346,7 +1346,8 @@
         "errorGenerating": "Erreur lors de la génération du template",
         "generateTemplate": "Générer le template",
         "generating": "Génération du template...",
-        "placeholder": "Décrivez ce que votre prompt doit faire..."
+        "placeholder": "Décrivez ce que votre prompt doit faire...",
+        "templateSaved": "Le template a été enregistré"
       },
       "sessionList": {
         "newSession": "Nouvelle session",

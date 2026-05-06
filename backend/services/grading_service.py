@@ -124,6 +124,12 @@ class GradingService:
         if self._explicit_llm_grader is not None:
             return self._explicit_llm_grader
         exam = getattr(submission, "exam", None)
+        if exam is None:
+            logger.warning(
+                "_resolve_llm_grader: submission %s has no loaded exam relationship "
+                "— using default LLM grader; Enterprise model override will not apply.",
+                submission.id,
+            )
         institution = getattr(exam, "institution", None) if exam else None
         model_override = (
             getattr(institution, "llm_model_for_grading", None) if institution else None

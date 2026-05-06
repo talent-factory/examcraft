@@ -144,7 +144,7 @@ def _load_exam(db: Session, user: User, exam_id: int) -> Exam:
     return exam
 
 
-def _verify_moodle_quiz(
+async def _verify_moodle_quiz(
     *,
     base_url: str,
     token: str,
@@ -159,8 +159,8 @@ def _verify_moodle_quiz(
     """
     endpoint = base_url.rstrip("/") + "/webservice/rest/server.php"
     try:
-        with httpx.Client(timeout=15.0) as client:
-            response = client.post(
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
                 endpoint,
                 data={
                     "wstoken": token,
@@ -284,7 +284,7 @@ async def sync_moodle_question_ids(
                 status_code=500,
                 detail=f"Token-Verschlüsselung defekt: {exc}",
             ) from exc
-        quiz_meta = _verify_moodle_quiz(
+        quiz_meta = await _verify_moodle_quiz(
             base_url=connection.base_url,
             token=token,
             quiz_id=body.moodle_quiz_id,
