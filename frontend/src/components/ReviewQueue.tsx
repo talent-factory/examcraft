@@ -192,8 +192,8 @@ const ReviewQueue: React.FC = () => {
     setLoading(true);
     try {
       await ReviewService.editQuestion(questionId, updates);
-      setEditorOpen(false);
-      await loadQuestions();
+      // Modal-Schliessen und Datenneuladung erfolgen einmalig in onClose,
+      // nachdem auch die Tags gespeichert wurden.
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save changes');
       throw err;
@@ -391,7 +391,7 @@ const ReviewQueue: React.FC = () => {
         <QuestionEditor
           question={selectedQuestion}
           open={editorOpen}
-          onClose={() => setEditorOpen(false)}
+          onClose={() => { setEditorOpen(false); loadQuestions(); }}
           onSave={handleSaveEdit}
           loading={loading}
         />

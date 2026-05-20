@@ -3,7 +3,7 @@
  * Role-based navigation sidebar with collapse functionality
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { useRoleBasedNavigation, NavigationItem } from '../../hooks/useRoleBasedNavigation';
@@ -20,11 +20,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
+  useEffect(() => {
+    const autoExpand = new Set<string>();
+    for (const item of navigationItems) {
+      if (item.children?.some((child) => location.pathname.startsWith(child.path))) {
+        autoExpand.add(item.path);
+      }
+    }
+    if (autoExpand.size > 0) {
+      setExpandedItems((prev) => new Set([...prev, ...autoExpand]));
+    }
+  }, [location.pathname, navigationItems]);
+
   const isActivePath = (path: string, hasChildren: boolean) => {
     if (location.pathname === path) return true;
-    // Nur Items mit echten Children dürfen über Prefix-Match aktiv werden.
-    // Sonst lösen flache Geschwister-Routes wie `/auswertungen` und
-    // `/auswertungen/klassen` doppeltes Highlighting aus.
     return hasChildren && location.pathname.startsWith(path + '/');
   };
 

@@ -14,6 +14,8 @@ export interface NavigationItem {
   icon?: string;
   requireSuperuser?: boolean;
   requiredRoles?: UserRole[];
+  excludedRoles?: UserRole[];
+  excludeSuperuser?: boolean;
   requiredPermissions?: string[];
   children?: NavigationItem[];
 }
@@ -95,6 +97,15 @@ export const useRoleBasedNavigation = () => {
       requiredRoles: [UserRole.ADMIN],
     },
     {
+      label: t('nav.sidebar.tagSettings'),
+      path: '/settings/tags',
+      icon: '🏷',
+      requiredRoles: [UserRole.DOZENT, UserRole.ASSISTANT],
+      excludedRoles: [UserRole.ADMIN],
+      excludeSuperuser: true,
+      requiredPermissions: ['create_questions'],
+    },
+    {
       label: t('nav.sidebar.moodleConnection'),
       path: '/admin/integrations/moodle',
       icon: '🔗',
@@ -104,31 +115,31 @@ export const useRoleBasedNavigation = () => {
   ], [t]);
 
   const filterNavigationItems = (items: NavigationItem[]): NavigationItem[] => {
-    return items.filter(item => {
-      // Check superuser-only items
-      if (item.requireSuperuser && !user?.is_superuser) return false;
+    const result: NavigationItem[] = [];
+    for (const item of items) {
+      if (item.requireSuperuser && !user?.is_superuser) continue;
+      if (item.excludeSuperuser && user?.is_superuser) continue;
+      if (item.excludedRoles && item.excludedRoles.some(role => hasRole(role))) continue;
 
-      // Check role requirements
       if (item.requiredRoles && item.requiredRoles.length > 0) {
         const hasRequiredRole = user?.is_superuser || item.requiredRoles.some(role => hasRole(role));
-        if (!hasRequiredRole) return false;
+        if (!hasRequiredRole) continue;
       }
 
-      // Check permission requirements
       if (item.requiredPermissions && item.requiredPermissions.length > 0) {
         const hasRequiredPermission = item.requiredPermissions.some(permission => hasPermission(permission));
-        if (!hasRequiredPermission) return false;
+        if (!hasRequiredPermission) continue;
       }
 
-      // Filter children recursively
       if (item.children) {
-        item.children = filterNavigationItems(item.children);
-        // Remove parent if all children are filtered out
-        if (item.children.length === 0) return false;
+        const filteredChildren = filterNavigationItems(item.children);
+        if (filteredChildren.length === 0) continue;
+        result.push({ ...item, children: filteredChildren });
+      } else {
+        result.push(item);
       }
-
-      return true;
-    });
+    }
+    return result;
   };
 
   const navigationItems = useMemo(() => {

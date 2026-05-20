@@ -71,3 +71,12 @@ export { useRoleBasedNavigation } from './hooks/useRoleBasedNavigation';
 
 export * from './utils/componentLoader';
 export * from './utils/deploymentMode';
+
+// ============================================================================
+// Tags
+// ============================================================================
+
+export { tagsApi } from './api/tagsApi';
+export type { Tag, TagValue, PendingTag } from './api/tagsApi';
+export { isPendingTag } from './api/tagsApi';
+export { default as TagAutocomplete } from './components/shared/TagAutocomplete';

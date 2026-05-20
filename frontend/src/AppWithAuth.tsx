@@ -39,6 +39,7 @@ import { UserRole } from './types/auth';
 import { AppErrorBoundary } from './components/ErrorBoundary';
 import QuestionReviewDetail from './components/QuestionReviewDetail';
 import GenerationTasksBar from './components/GenerationTasksBar';
+import TagSettingsPage from './pages/TagSettingsPage';
 import HelpWidget from './components/help/HelpWidget';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
@@ -327,6 +328,19 @@ export const AppWithAuth: React.FC = () => {
                 }
               />
 
+
+              <Route
+                path="/settings/tags"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['create_questions']}>
+                      <AppLayout>
+                        <TagSettingsPage />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
 
               <Route path="/billing/success" element={<PaymentSuccessPage />} />
               <Route path="/billing/cancel" element={<PaymentCancelPage />} />

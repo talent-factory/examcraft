@@ -18,6 +18,14 @@ jest.mock('../../components/admin/SubscriptionTierOverview', () => ({
   __esModule: true,
   default: () => <div data-testid="subscription-overview" />,
 }));
+jest.mock('../../components/admin/HelpFeedbackQueue', () => ({
+  __esModule: true,
+  default: () => <div data-testid="help-feedback" />,
+}));
+jest.mock('../TagSettingsPage', () => ({
+  __esModule: true,
+  default: () => <div data-testid="tag-settings" />,
+}));
 
 // Mock useAuth
 const mockHasRole = jest.fn();
@@ -37,7 +45,7 @@ describe('Admin Page', () => {
   });
 
   describe('RBAC tab visibility', () => {
-    it('shows only users tab for non-superuser admin', () => {
+    it('shows correct tabs for non-superuser admin', () => {
       mockHasRole.mockReturnValue(true);
 
       render(<Admin />);
@@ -45,11 +53,12 @@ describe('Admin Page', () => {
       expect(screen.getByText('Benutzer-Verwaltung')).toBeInTheDocument();
       expect(screen.getByText('Audit Logs')).toBeInTheDocument();
       expect(screen.getByText('Abonnement')).toBeInTheDocument();
+      expect(screen.getByText('Tag-Verwaltung')).toBeInTheDocument();
       expect(screen.queryByText('Institutionen')).not.toBeInTheDocument();
       expect(screen.queryByText('Rollen & Berechtigungen')).not.toBeInTheDocument();
     });
 
-    it('shows all 5 tabs for superuser', () => {
+    it('shows all tabs for superuser', () => {
       mockUser.is_superuser = true;
 
       render(<Admin />);
@@ -59,6 +68,7 @@ describe('Admin Page', () => {
       expect(screen.getByText('Rollen & Berechtigungen')).toBeInTheDocument();
       expect(screen.getByText('Audit Logs')).toBeInTheDocument();
       expect(screen.getByText('Abonnement')).toBeInTheDocument();
+      expect(screen.getByText('Tag-Verwaltung')).toBeInTheDocument();
     });
   });
 

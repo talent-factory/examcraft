@@ -10,10 +10,11 @@ import { InstitutionManagementPage } from '../components/admin/InstitutionManage
 import RoleManagementPage from '../components/admin/RoleManagementPage';
 import SubscriptionTierOverview from '../components/admin/SubscriptionTierOverview';
 import HelpFeedbackQueue from '../components/admin/HelpFeedbackQueue';
+import TagSettingsPage from './TagSettingsPage';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/auth';
 
-type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback';
+type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags';
 
 interface TabConfig {
   key: AdminTab;
@@ -33,6 +34,7 @@ export const Admin: React.FC = () => {
     { key: 'roles', label: t('pages.admin.tabRoles'), visible: isSuperuser },
     { key: 'audit', label: t('pages.admin.tabAudit'), visible: isAdmin },
     { key: 'subscription', label: t('pages.admin.tabSubscription'), visible: isAdmin },
+    { key: 'tags', label: t('nav.sidebar.tagSettings', 'Tag-Verwaltung'), visible: isAdmin },
     { key: 'help-feedback', label: 'Help Feedback', visible: isSuperuser },
   ].filter((t): t is TabConfig => t.visible);
 
@@ -90,6 +92,11 @@ export const Admin: React.FC = () => {
         {effectiveTab === 'subscription' && (
           <div data-testid="admin-tab-content-subscription">
             <SubscriptionTierOverview />
+          </div>
+        )}
+        {effectiveTab === 'tags' && (
+          <div data-testid="admin-tab-content-tags">
+            <TagSettingsPage />
           </div>
         )}
         {effectiveTab === 'help-feedback' && (

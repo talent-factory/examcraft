@@ -6,6 +6,7 @@ Implementiert Review-Workflow für generierte Prüfungsfragen
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from datetime import datetime
 
@@ -19,8 +20,11 @@ from models.question_review import (
     ReviewStatus,
 )
 from models.auth import User
+from models.tag import Tag, QuestionTag
+from api.tags import TagOut
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_active_user, require_permission
+from utils.tenant_utils import TenantFilter, get_tenant_context
 import logging
 
 logger = logging.getLogger(__name__)
@@ -28,8 +32,32 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/questions", tags=["Question Review"])
 
 
-def _question_to_dict(question: QuestionReview) -> dict:
+def _live_tag_counts(db: Session, tag_ids: list[int]) -> dict[int, int]:
+    if not tag_ids:
+        return {}
+    rows = (
+        db.query(QuestionTag.tag_id, func.count(QuestionTag.question_id))
+        .filter(QuestionTag.tag_id.in_(tag_ids))
+        .group_by(QuestionTag.tag_id)
+        .all()
+    )
+    return dict(rows)
+
+
+def _serialize_tag(tag: Tag, usage_count: int) -> dict:
+    return {
+        "id": tag.id,
+        "name": tag.name,
+        "institution_id": tag.institution_id,
+        "scope": tag.scope,
+        "usage_count": usage_count,
+        "is_archived": tag.is_archived,
+    }
+
+
+def _question_to_dict(question: QuestionReview, counts: dict[int, int] | None = None) -> dict:
     """Convert QuestionReview to dict (without reviewer lookup)."""
+    counts = counts or {}
     return {
         "id": question.id,
         "question_text": question.question_text,
@@ -52,11 +80,13 @@ def _question_to_dict(question: QuestionReview) -> dict:
         "exam_id": question.exam_id,
         "created_at": question.created_at,
         "updated_at": question.updated_at,
+        "tags": [_serialize_tag(t, counts.get(t.id, 0)) for t in question.tags],
     }
 
 
 def _attach_reviewer_info(question: QuestionReview, db: Session) -> dict:
     """Convert QuestionReview to dict with reviewer_info joined."""
+    counts = _live_tag_counts(db, [t.id for t in question.tags])
     data = {
         "id": question.id,
         "question_text": question.question_text,
@@ -79,6 +109,7 @@ def _attach_reviewer_info(question: QuestionReview, db: Session) -> dict:
         "exam_id": question.exam_id,
         "created_at": question.created_at,
         "updated_at": question.updated_at,
+        "tags": [_serialize_tag(t, counts.get(t.id, 0)) for t in question.tags],
     }
     if question.reviewed_by:
         reviewer = db.query(User).filter(User.id == question.reviewed_by).first()
@@ -116,6 +147,7 @@ class QuestionReviewCreate(BaseModel):
     estimated_time_minutes: Optional[int] = Field(None, ge=1, le=180)
     quality_tier: Optional[str] = Field(None, pattern="^[ABC]$")
     exam_id: Optional[str] = None
+    tag_ids: list[int] = Field(default_factory=list)
 
 
 class QuestionReviewUpdate(BaseModel):
@@ -182,6 +214,7 @@ class QuestionReviewResponse(BaseModel):
     exam_id: Optional[str]
     created_at: datetime
     updated_at: datetime
+    tags: List[TagOut] = []
 
     # TF-330: legacy records store ``options`` as a dict keyed by
     # 'A'/'B'/'C'/'D'. Normalize on read so the API never 500s on these rows.
@@ -276,8 +309,11 @@ async def get_review_queue(
     """
     locale = get_request_locale(request, current_user)
     try:
-        # Base Query
-        query = db.query(QuestionReview)
+        # Base Query — institution-scoped
+        tenant_context = get_tenant_context(current_user)
+        query = TenantFilter.filter_by_tenant(
+            db.query(QuestionReview), QuestionReview, tenant_context
+        )
 
         # Apply Filters
         if status:
@@ -289,25 +325,28 @@ async def get_review_queue(
         if exam_id:
             query = query.filter(QuestionReview.exam_id == exam_id)
 
-        # Get Statistics
+        # Get Statistics — ebenfalls institution-scoped
+        base_stats = TenantFilter.filter_by_tenant(
+            db.query(QuestionReview), QuestionReview, tenant_context
+        )
         total = query.count()
         pending = (
-            db.query(QuestionReview)
+            base_stats
             .filter(QuestionReview.review_status == ReviewStatus.PENDING.value)
             .count()
         )
         approved = (
-            db.query(QuestionReview)
+            base_stats
             .filter(QuestionReview.review_status == ReviewStatus.APPROVED.value)
             .count()
         )
         rejected = (
-            db.query(QuestionReview)
+            base_stats
             .filter(QuestionReview.review_status == ReviewStatus.REJECTED.value)
             .count()
         )
         in_review = (
-            db.query(QuestionReview)
+            base_stats
             .filter(QuestionReview.review_status == ReviewStatus.IN_REVIEW.value)
             .count()
         )
@@ -327,9 +366,12 @@ async def get_review_queue(
             reviewers = db.query(User).filter(User.id.in_(reviewer_ids)).all()
             reviewer_map = {r.id: r for r in reviewers}
 
+        tag_ids = {t.id for q in question_list for t in q.tags}
+        counts = _live_tag_counts(db, list(tag_ids))
+
         questions = []
         for q in question_list:
-            data = _question_to_dict(q)
+            data = _question_to_dict(q, counts)
             if q.reviewed_by and q.reviewed_by in reviewer_map:
                 r = reviewer_map[q.reviewed_by]
                 data["reviewer_info"] = {
@@ -445,10 +487,11 @@ async def create_question_review(
         )
 
         db.add(question)
-        db.commit()
-        db.refresh(question)
+        db.flush()
 
-        # Create History Entry
+        if request.tag_ids:
+            _assign_tags_to_question(db, question.id, request.tag_ids, current_user)
+
         history = ReviewHistory(
             question_id=question.id,
             action="created",
@@ -458,6 +501,7 @@ async def create_question_review(
         )
         db.add(history)
         db.commit()
+        db.refresh(question)
 
         # Audit log: Question created
         from services.audit_service import AuditService
@@ -1020,3 +1064,106 @@ async def get_question_history(
             status_code=500,
             detail=t("review_fetch_history_failed", locale=locale),
         )
+
+
+# --- Tag-Endpunkte ---
+
+
+class _SetTagsRequest(BaseModel):
+    tag_ids: list[int]
+
+
+class _QuestionTagsOut(BaseModel):
+    tags: list[TagOut]
+
+
+def _assign_tags_to_question(
+    db: Session,
+    question_id: int,
+    tag_ids: list[int],
+    current_user: User,
+) -> None:
+    """Weist einer Frage Tags zu (ersetzt bestehende vollständig).
+
+    Validiert Institution-Zugehörigkeit und Archiviert-Status. Cross-Tenant-
+    Enumeration wird verhindert: unbekannte und fremde Tag-IDs führen zum
+    gleichen 422-Response, ohne die IDs zu echoen.
+    """
+    # Visible to this user: own institution + global
+    visible = (
+        db.query(Tag)
+        .filter(
+            Tag.id.in_(tag_ids),
+            (Tag.institution_id == current_user.institution_id)
+            | (Tag.scope == "global"),
+        )
+        .all()
+    )
+    if len(visible) != len(set(tag_ids)):
+        raise HTTPException(status_code=422, detail="Ungültige Tag-IDs.")
+
+    for tag in visible:
+        if tag.is_archived:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Tag '{tag.name}' ist archiviert.",
+            )
+
+    db.query(QuestionTag).filter(QuestionTag.question_id == question_id).delete()
+    for tag_id in tag_ids:
+        db.add(QuestionTag(question_id=question_id, tag_id=tag_id))
+
+    db.flush()
+
+
+@router.post("/{question_id}/tags", response_model=_QuestionTagsOut)
+async def set_question_tags(
+    question_id: int,
+    body: _SetTagsRequest,
+    current_user: User = Depends(require_permission("edit_questions")),
+    db: Session = Depends(get_db),
+):
+    """Tags einer Frage setzen (ersetzt bestehende Tags vollständig)."""
+    question = (
+        db.query(QuestionReview)
+        .filter(
+            QuestionReview.id == question_id,
+            QuestionReview.institution_id == current_user.institution_id,
+        )
+        .first()
+    )
+    if not question:
+        raise HTTPException(status_code=404, detail="Frage nicht gefunden.")
+
+    _assign_tags_to_question(db, question_id, body.tag_ids, current_user)
+    db.commit()
+    db.refresh(question)
+    return _QuestionTagsOut(tags=question.tags)
+
+
+@router.delete("/{question_id}/tags/{tag_id}", response_model=_QuestionTagsOut)
+async def remove_question_tag(
+    question_id: int,
+    tag_id: int,
+    current_user: User = Depends(require_permission("edit_questions")),
+    db: Session = Depends(get_db),
+):
+    """Einzelnen Tag von einer Frage entfernen."""
+    question = (
+        db.query(QuestionReview)
+        .filter(
+            QuestionReview.id == question_id,
+            QuestionReview.institution_id == current_user.institution_id,
+        )
+        .first()
+    )
+    if not question:
+        raise HTTPException(status_code=404, detail="Frage nicht gefunden.")
+
+    db.query(QuestionTag).filter(
+        QuestionTag.question_id == question_id,
+        QuestionTag.tag_id == tag_id,
+    ).delete()
+    db.commit()
+    db.refresh(question)
+    return _QuestionTagsOut(tags=question.tags)

@@ -20,6 +20,8 @@ import {
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import TagAutocomplete from '../shared/TagAutocomplete';
+import { type Tag } from '../../api/tagsApi';
 
 interface BasicExamCreatorProps {
   selectedDocuments?: any[];
@@ -40,6 +42,7 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -64,6 +67,7 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
           num_questions: questionCount,
           difficulty,
           document_ids: selectedDocuments.map((doc) => doc.id),
+          tag_ids: selectedTags.map((t) => t.id),
         }),
       });
 
@@ -139,6 +143,13 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
               <MenuItem value="hard">{t('components.basicExamCreator.difficultyHard')}</MenuItem>
             </Select>
           </FormControl>
+
+          <TagAutocomplete
+            value={selectedTags}
+            onChange={setSelectedTags}
+            disabled={loading}
+            label={t('components.basicExamCreator.tagsLabel', 'Tags (optional)')}
+          />
 
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
             {onBack && (

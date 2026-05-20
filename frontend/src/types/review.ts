@@ -3,6 +3,8 @@
  * ExamCraft AI - TF-60
  */
 
+import type { Tag } from '../api/tagsApi';
+
 /**
  * Review Status Enum
  */
@@ -60,6 +62,7 @@ export interface QuestionReview {
   reviewer_info?: ReviewerInfo;
   reviewed_at?: string;
   exam_id?: string;
+  tags?: Tag[];
   created_at: string;
   updated_at: string;
 }

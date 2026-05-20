@@ -15,6 +15,7 @@
       "documentChat": "Chat documenti",
       "promptLibrary": "Libreria prompt",
       "admin": "Admin",
+      "tagSettings": "Gestione tag",
       "pricing": "Prezzi",
       "profile": "Profilo"
     }
@@ -1052,7 +1053,14 @@
       "accept": "Accetta",
       "accepting": "Aggiunta in corso...",
       "generatePreview": "Genera anteprima",
-      "generating": "Generazione..."
+      "generating": "Generazione...",
+      "tagFilterLabel": "Tag",
+      "tagFilterEmpty": "Nessun tag disponibile",
+      "tagFilterRemove": "Rimuovi tag",
+      "tagFilterClear": "Rimuovi tutti",
+      "tagFilterSearch": "Cerca tag…",
+      "tagFilterNoResults": "Nessun tag trovato",
+      "tagsShowLess": "mostra meno"
     }
   },
   "profile": {

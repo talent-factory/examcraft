@@ -16,6 +16,8 @@ from models.exam import Exam, ExamQuestion, ExamStatus
 from models.auth import User
 from models.document import Document
 from models.question_review import QuestionReview, ReviewStatus, QuestionSourceDocument
+from models.tag import QuestionTag
+from api.tags import TagOut
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -361,6 +363,7 @@ class ApprovedQuestionOut(BaseModel):
     estimated_time_minutes: Optional[int] = None
     options: Optional[list]
     usage_count: int = 0
+    tags: List[TagOut] = []
 
     class Config:
         from_attributes = True
@@ -431,9 +434,8 @@ async def list_approved_questions(
         None, pattern="^(multiple_choice|open_ended|true_false)$"
     ),
     search: Optional[str] = Query(None, max_length=500),
-    document_ids: Optional[str] = Query(
-        None, description="Comma-separated document IDs"
-    ),
+    tag_ids: Optional[str] = Query(None, description="Comma-separated tag IDs"),
+    document_ids: Optional[str] = Query(None, description="Comma-separated document IDs"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(require_permission("create_exams")),
@@ -456,6 +458,20 @@ async def list_approved_questions(
         query = query.filter(QuestionReview.question_type == question_type)
     if search:
         query = query.filter(QuestionReview.question_text.ilike(f"%{search}%"))
+    if tag_ids:
+        parsed_tag_ids = [int(i) for i in tag_ids.split(",") if i.strip().isdigit()]
+        if not parsed_tag_ids:
+            raise HTTPException(
+                status_code=422,
+                detail="tag_ids enthält keine gültigen ganzzahligen Werte.",
+            )
+        query = query.filter(
+            QuestionReview.id.in_(
+                db.query(QuestionTag.question_id).filter(
+                    QuestionTag.tag_id.in_(parsed_tag_ids)
+                )
+            )
+        )
     if document_ids:
         parsed_ids = [int(i) for i in document_ids.split(",") if i.strip().isdigit()]
         if parsed_ids:
@@ -484,6 +500,16 @@ async def list_approved_questions(
             .all()
         )
 
+    tag_id_set = {t.id for q in questions for t in q.tags}
+    tag_usage_counts: dict[int, int] = {}
+    if tag_id_set:
+        tag_usage_counts = dict(
+            db.query(QuestionTag.tag_id, sa_func.count(QuestionTag.question_id))
+            .filter(QuestionTag.tag_id.in_(tag_id_set))
+            .group_by(QuestionTag.tag_id)
+            .all()
+        )
+
     result = []
     for q in questions:
         result.append(
@@ -496,6 +522,17 @@ async def list_approved_questions(
                 "bloom_level": q.bloom_level,
                 "options": q.options,
                 "usage_count": usage_counts.get(q.id, 0),
+                "tags": [
+                    {
+                        "id": t.id,
+                        "name": t.name,
+                        "institution_id": t.institution_id,
+                        "scope": t.scope,
+                        "usage_count": tag_usage_counts.get(t.id, 0),
+                        "is_archived": t.is_archived,
+                    }
+                    for t in q.tags
+                ],
             }
         )
 

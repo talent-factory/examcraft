@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from celery.exceptions import Ignore, Reject
 from pydantic import ValidationError
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from celery_app import celery_app
 from models.question_generation_job import QuestionGenerationJob
@@ -219,6 +219,7 @@ def _persist_questions(
     language: str,
     user_id: int,
     institution_id: Optional[int],
+    tag_ids: Optional[List[int]] = None,
 ) -> List[int]:
     """
     Persistiert generierte Fragen in question_reviews mit Status 'pending'.
@@ -297,6 +298,34 @@ def _persist_questions(
             reviews.append(question_review)
 
         db.flush()
+
+        if tag_ids:
+            from models.tag import QuestionTag, Tag
+
+            # Defense in depth: API endpoint validates tag_ids, but the task may
+            # also be triggered via replayed jobs or future callers. Re-validate
+            # against the persisting user's institution scope so a malformed
+            # payload becomes a clean FAILURE instead of an IntegrityError that
+            # the autoretry loop burns Claude credits on.
+            visible = (
+                db.query(Tag.id)
+                .filter(
+                    Tag.id.in_(tag_ids),
+                    Tag.is_archived.is_(False),
+                    (Tag.institution_id == institution_id) | (Tag.scope == "global"),
+                )
+                .all()
+            )
+            visible_ids = {row[0] for row in visible}
+            invalid_ids = set(tag_ids) - visible_ids
+            if invalid_ids:
+                raise ValueError(
+                    f"Ungültige oder unsichtbare Tag-IDs für die Generierung: {sorted(invalid_ids)}"
+                )
+
+            for review in reviews:
+                for tag_id in tag_ids:
+                    db.add(QuestionTag(question_id=review.id, tag_id=tag_id))
 
         # Build filename→document_id lookup for this institution (best-effort)
         if institution_id is not None:
@@ -382,6 +411,8 @@ def _persist_questions(
         ValidationError,  # Ungültige Eingabedaten — Retry ändert nichts
         TypeError,  # Programmierfehler — Retry ändert nichts
         ImportError,  # Deployment-Problem — Retry ändert nichts
+        IntegrityError,  # FK-Verletzung (z. B. Tag-ID) — Retry ändert nichts
+        ValueError,  # Domänenvalidierung (z. B. Tag-Scope) — Retry ändert nichts
     ),
     retry_kwargs={"max_retries": 4},
     retry_backoff=30,
@@ -467,6 +498,7 @@ def generate_questions_task(
             language=rag_request.language,
             user_id=int(user_id),
             institution_id=institution_id,
+            tag_ids=rag_request.tag_ids or [],
         )
         logger.info(
             f"Fragen persistiert: {len(review_question_ids)} Reviews für Exam {result.exam_id}"
@@ -486,7 +518,7 @@ def generate_questions_task(
         }
     except Ignore:
         raise
-    except (Reject, ValidationError, TypeError, ImportError):
+    except (Reject, ValidationError, TypeError, ImportError, IntegrityError, ValueError):
         _safe_update_job_status(self.request.id, "FAILURE")
         raise
     except Exception as generation_err:

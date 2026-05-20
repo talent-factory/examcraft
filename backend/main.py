@@ -5,15 +5,19 @@ KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
 
 import asyncio
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 from typing import List, Optional
 from contextlib import asynccontextmanager
 import os
 import logging
 from dotenv import load_dotenv
 from middleware.rate_limit import RateLimitMiddleware
+from database import get_db
+from models.auth import User
+from utils.auth_utils import get_current_active_user
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -250,6 +254,12 @@ async def lifespan(app: FastAPI):
     question_review = importlib.util.module_from_spec(spec_qr)
     spec_qr.loader.exec_module(question_review)
 
+    spec_tags = importlib.util.spec_from_file_location(
+        "core_api_tags", os.path.join(core_api_path, "tags.py")
+    )
+    tags_api = importlib.util.module_from_spec(spec_tags)
+    spec_tags.loader.exec_module(tags_api)
+
     spec_exams = importlib.util.spec_from_file_location(
         "core_api_exams", os.path.join(core_api_path, "exams.py")
     )
@@ -402,6 +412,7 @@ async def lifespan(app: FastAPI):
     app.include_router(rag_exams.router)
     app.include_router(rbac_api.router)
     app.include_router(question_review.router)
+    app.include_router(tags_api.router)
     app.include_router(exams_api.router)
     app.include_router(submissions_api.router)
     app.include_router(submissions_api.exams_alias_router)
@@ -693,6 +704,7 @@ class ExamRequest(BaseModel):
     question_count: int = 5
     question_types: List[str] = ["multiple_choice", "open_ended"]
     language: str = "de"
+    tag_ids: Optional[List[int]] = None  # TF-320 Iter2: Tags für generierte Fragen
 
 
 class Question(BaseModel):
@@ -929,6 +941,74 @@ async def generate_exam(request: ExamRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating exam: {str(e)}")
+
+
+class GenerateQuestionsRequest(BaseModel):
+    topic: str
+    num_questions: int = Field(default=5, ge=1, le=20)
+    difficulty: str = "medium"
+    document_ids: Optional[List[int]] = None
+    tag_ids: Optional[List[int]] = None  # TF-320 Iter2
+
+
+@app.post("/api/v1/questions/generate")
+async def generate_questions_endpoint(
+    request: GenerateQuestionsRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Fragen generieren und optional Tags zuweisen (TF-320 Iter2)."""
+    from models.question_review import QuestionReview, ReviewStatus
+    from models.tag import Tag, QuestionTag as _QuestionTag
+
+    claude_service = get_claude_service()
+    try:
+        question_data = await claude_service.generate_questions(
+            topic=request.topic,
+            difficulty=request.difficulty,
+            question_count=request.num_questions,
+            question_types=["multiple_choice", "open_ended"],
+            language="de",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fehler bei Generierung: {str(e)}")
+
+    review_ids = []
+    for q_data in question_data:
+        review = QuestionReview(
+            question_text=q_data.get("question", ""),
+            question_type=q_data.get("type", "open_ended"),
+            options=q_data.get("options"),
+            correct_answer=q_data.get("correct_answer"),
+            explanation=q_data.get("explanation"),
+            difficulty=q_data.get("difficulty", request.difficulty),
+            topic=q_data.get("topic", request.topic),
+            language="de",
+            review_status=ReviewStatus.PENDING.value,
+            institution_id=current_user.institution_id,
+            created_by=current_user.id,
+        )
+        db.add(review)
+        db.flush()
+        review_ids.append(review.id)
+
+    if request.tag_ids and review_ids:
+        valid_tags = (
+            db.query(Tag)
+            .filter(
+                Tag.id.in_(request.tag_ids),
+                Tag.is_archived == False,  # noqa: E712
+                (Tag.institution_id == current_user.institution_id)
+                | (Tag.scope == "global"),
+            )
+            .all()
+        )
+        for rid in review_ids:
+            for tag in valid_tags:
+                db.add(_QuestionTag(question_id=rid, tag_id=tag.id))
+
+    db.commit()
+    return {"task_id": None, "question_ids": review_ids, "count": len(review_ids)}
 
 
 @app.get("/api/v1/topics")

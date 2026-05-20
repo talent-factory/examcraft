@@ -37,6 +37,8 @@ import models.email_event  # noqa: F401
 import models.help  # noqa: F401
 import models.feedback_cluster  # noqa: F401
 import models.question_generation_job  # noqa: F401
+import models.tag  # noqa: F401
+import models.tag_merge_log  # noqa: F401
 
 # Skip test files that need major fixture updates for current DB schema
 collect_ignore_glob = [

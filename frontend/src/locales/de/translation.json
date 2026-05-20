@@ -18,6 +18,7 @@
       "documentChat": "Dokument-Chat",
       "promptLibrary": "Prompt-Bibliothek",
       "admin": "Admin",
+      "tagSettings": "Tag-Verwaltung",
       "moodleConnection": "Moodle-Verbindung",
       "pricing": "Preise",
       "profile": "Profil"
@@ -1446,7 +1447,14 @@
       "accept": "Übernehmen",
       "accepting": "Füge hinzu...",
       "generatePreview": "Vorschau generieren",
-      "generating": "Generiere..."
+      "generating": "Generiere...",
+      "tagFilterLabel": "Tags",
+      "tagFilterEmpty": "Keine Tags vorhanden",
+      "tagFilterRemove": "Tag entfernen",
+      "tagFilterClear": "Alle entfernen",
+      "tagFilterSearch": "Tag suchen…",
+      "tagFilterNoResults": "Keine Tags gefunden",
+      "tagsShowLess": "weniger anzeigen"
     }
   },
   "profile": {

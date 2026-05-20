@@ -103,6 +103,11 @@ class QuestionReview(Base):
     history = relationship(
         "ReviewHistory", back_populates="question", cascade="all, delete-orphan"
     )
+    tags = relationship(
+        "Tag",
+        secondary="question_tags",
+        lazy="selectin",
+    )
     source_document_links = relationship(
         "QuestionSourceDocument",
         cascade="all, delete-orphan",

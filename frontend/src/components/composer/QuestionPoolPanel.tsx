@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { tagsApi } from '../../api/tagsApi';
 import {
   Dialog,
   DialogTitle,
@@ -96,7 +97,11 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState('');
-  // Empty by default: pool is implicitly filtered by defaultDocumentIds when no chip is selected.
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [tagFilterOpen, setTagFilterOpen] = useState(false);
+  const [tagSearch, setTagSearch] = useState('');
+  const tagFilterRef = useRef<HTMLDivElement>(null);
+  const tagSearchRef = useRef<HTMLInputElement>(null);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<number[]>([]);
   const [docFilterOpen, setDocFilterOpen] = useState(false);
   const docFilterRef = useRef<HTMLDivElement>(null);
@@ -132,8 +137,28 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   const [preview, setPreview] = useState<AutoComposePreview | null>(null);
   const [lastPreviewRequest, setLastPreviewRequest] = useState<AutoFillRequest | null>(null);
 
-  // Explicit staleTime: 0 and refetchOnMount: 'always' to override the global 5-minute default
-  // (set in AppWithAuth). Both queries must reflect question approvals on navigation back here.
+  const { data: allTagsRaw = [] } = useQuery({
+    queryKey: ['tags', 'includeArchived'],
+    queryFn: () => tagsApi.listTags(true),
+    staleTime: 60_000,
+  });
+  const activeTags = allTagsRaw.filter((t) => !t.is_archived);
+  const archivedTagsWithQuestions = allTagsRaw.filter((t) => t.is_archived && t.usage_count > 0);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tagFilterRef.current && !tagFilterRef.current.contains(event.target as Node)) {
+        setTagFilterOpen(false);
+      }
+    };
+    if (tagFilterOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [tagFilterOpen]);
+
   const {
     data: allDocs = [],
     isError: isDocsError,
@@ -144,8 +169,6 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
     staleTime: 0,
     refetchOnMount: 'always',
   });
-  // When an exam was created with specific documents, restrict the filter to those documents.
-  // Falls back to all institution documents when no default is set.
   const availableDocs = defaultDocumentIds.length > 0
     ? allDocs.filter((d) => defaultDocumentIds.includes(d.id))
     : allDocs;
@@ -156,12 +179,13 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
     isError: isQuestionsError,
     error: questionsError,
   } = useQuery({
-    queryKey: ['approved-questions', search, filterType, filterDifficulty, selectedDocumentIds, defaultDocumentIds],
+    queryKey: ['approved-questions', search, filterType, filterDifficulty, selectedTagIds, selectedDocumentIds, defaultDocumentIds],
     queryFn: () =>
       ComposerService.listApprovedQuestions({
         search: search || undefined,
         question_type: filterType || undefined,
         difficulty: filterDifficulty || undefined,
+        tag_ids: selectedTagIds.length > 0 ? selectedTagIds : undefined,
         document_ids: selectedDocumentIds.length > 0
           ? selectedDocumentIds
           : defaultDocumentIds.length > 0 ? defaultDocumentIds : undefined,
@@ -441,6 +465,198 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
             {DIFFICULTY_LABELS[d]}
           </button>
         ))}
+
+        {/* Tag filter */}
+        <div className="relative" ref={tagFilterRef}>
+          <button
+            type="button"
+            onClick={() => {
+              const opening = !tagFilterOpen;
+              setTagFilterOpen(opening);
+              if (opening) {
+                setTagSearch('');
+                setTimeout(() => tagSearchRef.current?.focus(), 50);
+              }
+            }}
+            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors ${
+              selectedTagIds.length > 0 || tagFilterOpen
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300'
+            }`}
+          >
+            <svg className="w-3 h-3 opacity-70" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 4.5A.5.5 0 0 1 2.5 4h11a.5.5 0 0 1 0 1h-11A.5.5 0 0 1 2 4.5zm2 3A.5.5 0 0 1 4.5 7h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 4 7.5zm2 3a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+            {t('composer.questionPool.tagFilterLabel')}
+            {selectedTagIds.length > 0 && ` (${selectedTagIds.length})`}
+            <svg
+              className={`w-2.5 h-2.5 opacity-60 transition-transform ${tagFilterOpen ? 'rotate-180' : ''}`}
+              viewBox="0 0 16 16" fill="currentColor"
+            >
+              <path d="M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+            </svg>
+          </button>
+
+          {tagFilterOpen && (
+            <div className="absolute z-10 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg w-[280px]">
+              {/* Suchfeld */}
+              <div className="p-2 border-b border-gray-100">
+                <input
+                  ref={tagSearchRef}
+                  type="text"
+                  value={tagSearch}
+                  onChange={(e) => setTagSearch(e.target.value)}
+                  placeholder={t('composer.questionPool.tagFilterSearch', 'Tag suchen…')}
+                  className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:border-purple-300 focus:bg-white transition-colors"
+                />
+              </div>
+
+              {/* Tag-Chips — aktive und archivierte Sektionen */}
+              {(() => {
+                const q = tagSearch.toLowerCase();
+                const filteredActive = activeTags
+                  .filter((tag) => tag.name.toLowerCase().includes(q))
+                  .sort((a, b) => a.name.localeCompare(b.name));
+                const filteredGlobal = filteredActive.filter((t) => t.scope === 'global');
+                const filteredInstitution = filteredActive.filter((t) => t.scope === 'institution');
+                const filteredArchived = archivedTagsWithQuestions
+                  .filter((tag) => tag.name.toLowerCase().includes(q))
+                  .sort((a, b) => a.name.localeCompare(b.name));
+                const hasAny = filteredActive.length > 0 || filteredArchived.length > 0;
+
+                const renderChip = (tag: typeof activeTags[0], archived = false) => {
+                  const active = selectedTagIds.includes(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() =>
+                        setSelectedTagIds((ids) =>
+                          ids.includes(tag.id)
+                            ? ids.filter((id) => id !== tag.id)
+                            : [...ids, tag.id]
+                        )
+                      }
+                      className={`text-xs px-2.5 py-1 rounded-full border transition-all flex items-center gap-1 ${
+                        active
+                          ? archived
+                            ? 'bg-gray-200 text-gray-600 border-gray-400 font-medium shadow-sm'
+                            : 'bg-purple-100 text-purple-700 border-purple-400 font-medium shadow-sm'
+                          : archived
+                          ? 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                      }`}
+                    >
+                      {archived && <span className="opacity-60">📦</span>}
+                      {tag.name}
+                    </button>
+                  );
+                };
+
+                return (
+                  <div className="p-2" style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                    {activeTags.length === 0 && archivedTagsWithQuestions.length === 0 ? (
+                      <p className="text-xs text-gray-400 px-1">
+                        {t('composer.questionPool.tagFilterEmpty')}
+                      </p>
+                    ) : !hasAny ? (
+                      <p className="text-xs text-gray-400 px-1">
+                        {t('composer.questionPool.tagFilterNoResults', 'Keine Tags gefunden')}
+                      </p>
+                    ) : (
+                      <>
+                        {filteredGlobal.length > 0 && (
+                          <>
+                            <div className="flex items-center gap-1.5 mb-1.5 px-1 py-0.5 bg-gray-50 rounded">
+                              <svg className="w-3 h-3 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                              </svg>
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                                Vorgegebene Tags
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                              {filteredGlobal.map((tag) => renderChip(tag, false))}
+                            </div>
+                          </>
+                        )}
+                        {filteredInstitution.length > 0 && (
+                          <>
+                            {filteredGlobal.length > 0 && (
+                              <div className="flex items-center gap-1.5 mb-1.5 px-1 py-0.5 bg-blue-50 rounded">
+                                <svg className="w-3 h-3 text-blue-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
+                                </svg>
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-blue-600">
+                                  Tags dieser Institution
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-1.5">
+                              {filteredInstitution.map((tag) => renderChip(tag, false))}
+                            </div>
+                          </>
+                        )}
+
+                        {filteredArchived.length > 0 && (
+                          <>
+                            <div className="flex items-center gap-2 my-2">
+                              <div className="flex-1 border-t border-gray-100" />
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                                Archiviert
+                              </span>
+                              <div className="flex-1 border-t border-gray-100" />
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {filteredArchived.map((tag) => renderChip(tag, true))}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+
+                    {selectedTagIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTagIds([])}
+                        className="mt-2 w-full text-xs text-gray-400 hover:text-gray-600 transition-colors text-right"
+                      >
+                        {t('composer.questionPool.tagFilterClear', 'Alle entfernen')}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+
+        {/* Aktive Tag-Chips unter dem Button */}
+        {selectedTagIds.map((id) => {
+          const tag = allTagsRaw.find((tag) => tag.id === id);
+          if (!tag) return null;
+          return (
+            <span
+              key={id}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${
+                tag.is_archived
+                  ? 'bg-gray-100 text-gray-500 border-gray-300'
+                  : 'bg-purple-100 text-purple-700 border-purple-200'
+              }`}
+            >
+              {tag.is_archived && <span className="opacity-60 text-[10px]">📦</span>}
+              {tag.name}
+              <button
+                type="button"
+                onClick={() => setSelectedTagIds((ids) => ids.filter((x) => x !== id))}
+                aria-label={t('composer.questionPool.tagFilterRemove')}
+                className={`font-bold leading-none ${tag.is_archived ? 'hover:text-gray-700' : 'hover:text-purple-900'}`}
+              >
+                ×
+              </button>
+            </span>
+          );
+        })}
       </div>
 
       {/* Question list */}
@@ -710,8 +926,11 @@ interface PoolQuestionCardProps {
   onAdd: () => void;
 }
 
+const TAG_LIMIT = 4;
+
 const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({ question, isAdded, disabled, onAdd }) => {
   const { t } = useTranslation();
+  const [tagsExpanded, setTagsExpanded] = useState(false);
 
   const DIFFICULTY_LABELS = useMemo<Record<string, string>>(() => ({
     easy: t('composer.questionPool.difficultyEasy'),
@@ -725,29 +944,104 @@ const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({ question, isAdded, 
     open_ended: t('composer.questionPool.typeOpenEnded'),
   }), [t]);
 
+  const sortedTags = useMemo(
+    () => question.tags ? [...question.tags].sort((a, b) => a.name.localeCompare(b.name)) : [],
+    [question.tags]
+  );
+
+  const visibleTags = sortedTags.slice(0, TAG_LIMIT);
+  const hiddenTags = sortedTags.slice(TAG_LIMIT);
+
+  const tagChipStyle = {
+    backgroundColor: 'rgb(245 243 255)',
+    color: 'rgb(109 40 217)',
+    border: '1px solid rgb(221 214 254)',
+  };
+
   return (
-    <div className={`p-3 rounded-lg border transition-colors ${isAdded ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-      <p className="text-sm text-gray-800 line-clamp-2 mb-2">{question.question_text}</p>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex gap-1 flex-wrap">
-          <span className={`text-xs px-1.5 py-0.5 rounded-full ${DIFFICULTY_COLORS[question.difficulty] || 'bg-gray-100 text-gray-600'}`}>
-            {DIFFICULTY_LABELS[question.difficulty] || question.difficulty}
-          </span>
-          <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
-            {TYPE_ABBREV[question.question_type] || question.question_type}
-          </span>
-          {question.bloom_level && (
-            <span className="text-xs px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">B{question.bloom_level}</span>
+    <div
+      className={`p-3 rounded-lg border transition-colors ${
+        isAdded
+          ? 'bg-gray-50 border-gray-200 opacity-60'
+          : 'bg-white border-gray-200 hover:border-gray-300'
+      }`}
+    >
+      <p className="text-[15px] font-medium text-gray-800 line-clamp-2 mb-3">{question.question_text}</p>
+
+      {/* Zwei-Spalten: links (Badges + Tags), rechts (Button) */}
+      <div className="flex gap-2 items-start">
+
+        {/* Linke Spalte — begrenzt auf Breite vor dem Button */}
+        <div className="flex-1 min-w-0">
+          {/* Badges */}
+          <div className="flex flex-wrap gap-1.5">
+            <span className={`text-[13px] px-2 py-0.5 rounded-full ${DIFFICULTY_COLORS[question.difficulty] || 'bg-gray-100 text-gray-600'}`}>
+              {DIFFICULTY_LABELS[question.difficulty] || question.difficulty}
+            </span>
+            <span className="text-[13px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+              {TYPE_ABBREV[question.question_type] || question.question_type}
+            </span>
+            {question.bloom_level && (
+              <span className="text-[13px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                B{question.bloom_level}
+              </span>
+            )}
+          </div>
+
+          {/* Tags — unterhalb Badges, gleiche Breite wie linke Spalte */}
+          {sortedTags.length > 0 && (
+            <div className="mt-1.5">
+              <div className="flex flex-wrap gap-1">
+                {visibleTags.map((tag) => (
+                  <span key={tag.id} className="text-xs px-1.5 py-0.5 rounded-full" style={tagChipStyle}>
+                    #{tag.name}
+                  </span>
+                ))}
+                {!tagsExpanded && hiddenTags.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setTagsExpanded(true)}
+                    className="text-xs px-1.5 py-0.5 rounded-full transition-colors"
+                    style={{ backgroundColor: 'rgb(237 233 254)', color: 'rgb(109 40 217)', border: '1px solid rgb(221 214 254)' }}
+                  >
+                    +{hiddenTags.length}
+                  </button>
+                )}
+                {tagsExpanded && hiddenTags.map((tag) => (
+                  <span key={tag.id} className="text-xs px-1.5 py-0.5 rounded-full" style={tagChipStyle}>
+                    #{tag.name}
+                  </span>
+                ))}
+              </div>
+              {tagsExpanded && hiddenTags.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTagsExpanded(false)}
+                  className="mt-1 text-xs text-purple-600 hover:text-purple-800 hover:underline transition-colors"
+                >
+                  — {t('composer.questionPool.tagsShowLess', 'weniger anzeigen')}
+                </button>
+              )}
+            </div>
           )}
         </div>
-        {isAdded ? (
-          <span className="text-xs text-green-600 font-medium flex-shrink-0">&#10003; {t('composer.questionPool.added')}</span>
-        ) : (
-          <button onClick={onAdd} disabled={disabled}
-            className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
-            + {t('composer.questionPool.add')}
-          </button>
-        )}
+
+        {/* Rechte Spalte — Button, immer fixiert rechts */}
+        <div className="flex-shrink-0 pt-0.5">
+          {isAdded ? (
+            <span className="text-[13px] text-green-600 font-medium">
+              &#10003; {t('composer.questionPool.added')}
+            </span>
+          ) : (
+            <button
+              onClick={onAdd}
+              disabled={disabled}
+              className="text-[13px] px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              + {t('composer.questionPool.add')}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

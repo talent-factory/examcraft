@@ -34,6 +34,8 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { QuestionReview, QuestionReviewUpdateRequest } from '../types/review';
+import TagAutocomplete from './shared/TagAutocomplete';
+import { tagsApi, type Tag, type TagValue, isPendingTag } from '../api/tagsApi';
 
 interface QuestionEditorProps {
   question: QuestionReview;
@@ -56,6 +58,8 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
   const [newOption, setNewOption] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<TagValue[]>(question.tags ?? []);
 
   // Initialize form data when question changes
   useEffect(() => {
@@ -70,6 +74,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
         estimated_time_minutes: question.estimated_time_minutes,
       });
       setOptions(question.options || []);
+      setSelectedTags((question.tags ?? []) as TagValue[]);
       setHasChanges(false);
       setErrors({});
     }
@@ -135,6 +140,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
       return;
     }
 
+    setSaveError(null);
     try {
       // Only send changed fields
       const updates: QuestionReviewUpdateRequest = {};
@@ -162,9 +168,50 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
       }
 
       await onSave(question.id, updates);
+
+      const pendingTags = selectedTags.filter(isPendingTag);
+      const existingTags = selectedTags.filter((t): t is Tag => !isPendingTag(t));
+
+      const results = await Promise.allSettled(
+        pendingTags.map((p) => tagsApi.createTag(p.name))
+      );
+
+      const createdTags: Tag[] = [];
+      const failed: { name: string; reason: unknown }[] = [];
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled') {
+          createdTags.push(r.value);
+        } else {
+          failed.push({ name: pendingTags[idx].name, reason: r.reason });
+        }
+      });
+
+      // Keep failed-to-create pending tags in the selection so the user can
+      // retry without re-typing them; drop successfully created ones from the
+      // pending bucket (they're now in existingTags via createdTags).
+      if (failed.length > 0) {
+        const failedNames = new Set(failed.map((f) => f.name));
+        setSelectedTags([
+          ...existingTags,
+          ...createdTags,
+          ...pendingTags.filter((p) => failedNames.has(p.name)),
+        ] as TagValue[]);
+        console.error('Failed to create tags:', failed);
+        setSaveError(
+          t('components.questionEditor.tagCreateError', {
+            defaultValue: 'Einige Tags konnten nicht erstellt werden: {{names}}',
+            names: failed.map((f) => `#${f.name}`).join(', '),
+          })
+        );
+        return;
+      }
+
+      const allTagIds = [...existingTags, ...createdTags].map((t) => t.id);
+      await tagsApi.setQuestionTags(question.id, allTagIds);
       onClose();
     } catch (error) {
       console.error('Failed to save question:', error);
+      setSaveError(t('components.questionEditor.saveError', 'Speichern fehlgeschlagen. Bitte versuche es erneut.'));
     }
   };
 
@@ -362,6 +409,23 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
             inputProps={{ min: 1, max: 180 }}
           />
 
+          {/* Tags */}
+          <TagAutocomplete
+            value={selectedTags}
+            onChange={(tags) => {
+              setSelectedTags(tags);
+              setHasChanges(true);
+            }}
+            disabled={loading}
+            label="Tags"
+            deferCreation
+          />
+
+          {/* Save Error */}
+          {saveError && (
+            <Alert severity="error">{saveError}</Alert>
+          )}
+
           {/* Change Indicator */}
           {hasChanges && (
             <Alert severity="info">
@@ -392,4 +456,5 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
   );
 };
 
+export { QuestionEditor };
 export default QuestionEditor;

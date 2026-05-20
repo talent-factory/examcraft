@@ -5,6 +5,22 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import QuestionEditor from '../QuestionEditor';
 import { QuestionReview, ReviewStatus } from '../../types/review';
 
+// Mock tagsApi to avoid ESM axios issues in Jest
+jest.mock('../../api/tagsApi', () => ({
+  tagsApi: {
+    listTags: jest.fn().mockResolvedValue([]),
+    createTag: jest.fn(),
+    setQuestionTags: jest.fn().mockResolvedValue({ tags: [] }),
+    removeQuestionTag: jest.fn(),
+  },
+}));
+
+// Mock TagAutocomplete to avoid dependency on tagsApi in Jest
+jest.mock('../shared/TagAutocomplete', () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
 // Mock theme
 const theme = createTheme();
 

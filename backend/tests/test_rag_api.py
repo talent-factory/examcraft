@@ -539,6 +539,113 @@ class TestRAGAPI:
         # `fallback_enabled` wurde aus dem API-Schema entfernt, als Demo-Mode
         # als Fallback-Pfad gestrichen wurde (siehe claude_service.py:208).
 
+    def test_generate_rag_exam_with_valid_tag_ids_returns_200(
+        self, auth_client, mock_db
+    ):
+        """tag_ids=[1] mit gültigem Tag der eigenen Institution → 200."""
+        mock_tag = Mock()
+        mock_tag.id = 1
+        mock_tag.institution_id = 1  # same as mock_user.institution_id
+        mock_tag.scope = "institution"
+        mock_tag.is_archived = False
+        mock_db.query.return_value.filter.return_value.all.return_value = [mock_tag]
+
+        with (
+            patch("api.rag_exams.generate_questions_task") as mock_task,
+            patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
+            patch("utils.tenant_utils.SubscriptionLimits"),
+        ):
+            mock_task.apply_async.return_value = MagicMock()
+            mock_job_cls.return_value = MagicMock()
+
+            response = auth_client.post(
+                "/api/v1/rag/generate-exam",
+                json={
+                    "topic": "Test",
+                    "question_count": 2,
+                    "question_types": ["multiple_choice"],
+                    "difficulty": "medium",
+                    "language": "de",
+                    "tag_ids": [1],
+                },
+            )
+
+        assert response.status_code == 200
+        assert "task_id" in response.json()
+
+    def test_generate_rag_exam_with_missing_tag_id_returns_404(
+        self, auth_client, mock_db
+    ):
+        """tag_ids=[999] — Tag existiert nicht → 404."""
+        mock_db.query.return_value.filter.return_value.all.return_value = []
+
+        response = auth_client.post(
+            "/api/v1/rag/generate-exam",
+            json={
+                "topic": "Test",
+                "question_count": 2,
+                "question_types": ["multiple_choice"],
+                "difficulty": "medium",
+                "language": "de",
+                "tag_ids": [999],
+            },
+        )
+
+        assert response.status_code == 404
+        assert "999" in response.json()["detail"]
+
+    def test_generate_rag_exam_with_foreign_institution_tag_returns_403(
+        self, auth_client, mock_db
+    ):
+        """tag_ids=[2] — Tag gehört anderer Institution, scope='institution' → 403."""
+        mock_tag = Mock()
+        mock_tag.id = 2
+        mock_tag.institution_id = 99  # different institution
+        mock_tag.scope = "institution"
+        mock_tag.is_archived = False
+        mock_db.query.return_value.filter.return_value.all.return_value = [mock_tag]
+
+        response = auth_client.post(
+            "/api/v1/rag/generate-exam",
+            json={
+                "topic": "Test",
+                "question_count": 2,
+                "question_types": ["multiple_choice"],
+                "difficulty": "medium",
+                "language": "de",
+                "tag_ids": [2],
+            },
+        )
+
+        assert response.status_code == 403
+
+    def test_generate_rag_exam_with_archived_tag_returns_422(
+        self, auth_client, mock_db
+    ):
+        """tag_ids=[3] — Tag ist archiviert → 422."""
+        mock_tag = Mock()
+        mock_tag.id = 3
+        mock_tag.name = "Archiviert"
+        mock_tag.institution_id = 1
+        mock_tag.scope = "institution"
+        mock_tag.is_archived = True
+        mock_db.query.return_value.filter.return_value.all.return_value = [mock_tag]
+
+        response = auth_client.post(
+            "/api/v1/rag/generate-exam",
+            json={
+                "topic": "Test",
+                "question_count": 2,
+                "question_types": ["multiple_choice"],
+                "difficulty": "medium",
+                "language": "de",
+                "tag_ids": [3],
+            },
+        )
+
+        assert response.status_code == 422
+        assert "Archiviert" in response.json()["detail"]
+
 
 class TestRAGAPIIntegration:
     """Integration Tests für RAG API mit echten Services"""

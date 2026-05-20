@@ -71,6 +71,10 @@ class RAGExamRequestModel(BaseModel):
         None,
         description="Prompt-Konfiguration pro Fragetyp (z.B. {'multiple_choice': {...}, 'open_ended': {...}})",
     )
+    tag_ids: List[int] = Field(
+        default_factory=list,
+        description="Tag-IDs, die allen generierten Fragen zugewiesen werden",
+    )
 
 
 class RAGQuestionResponse(BaseModel):
@@ -181,6 +185,30 @@ async def generate_rag_exam(
                         detail=t("rag_invalid_question_type", locale=locale),
                     )
 
+        if request.tag_ids:
+            from models.tag import Tag as TagModel
+
+            visible = (
+                db.query(TagModel)
+                .filter(
+                    TagModel.id.in_(request.tag_ids),
+                    (TagModel.institution_id == current_user.institution_id)
+                    | (TagModel.scope == "global"),
+                )
+                .all()
+            )
+            if len(visible) != len(set(request.tag_ids)):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Ungültige Tag-IDs.",
+                )
+            for tag in visible:
+                if tag.is_archived:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Tag '{tag.name}' ist archiviert.",
+                    )
+
         # Request serialisieren
         prompt_config_dict = None
         if request.prompt_config:
@@ -216,6 +244,7 @@ async def generate_rag_exam(
             language=request.language,
             context_chunks_per_question=request.context_chunks_per_question,
             prompt_config=prompt_config_dict,
+            tag_ids=request.tag_ids,
         )
         request_data = rag_request.model_dump(mode="json")
 

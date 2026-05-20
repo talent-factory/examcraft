@@ -124,14 +124,16 @@ export class ComposerService {
     bloom_level?: number;
     question_type?: string;
     search?: string;
+    tag_ids?: number[];
     document_ids?: number[];
     limit?: number;
     offset?: number;
   }): Promise<ApprovedQuestionsResponse> {
-    const { document_ids, ...rest } = params ?? {};
+    const { tag_ids, document_ids, ...rest } = params ?? {};
     const response = await apiClient.get('/api/v1/exams/approved-questions', {
       params: {
         ...rest,
+        ...(tag_ids?.length ? { tag_ids: tag_ids.join(',') } : {}),
         ...(document_ids?.length ? { document_ids: document_ids.join(',') } : {}),
       },
     });

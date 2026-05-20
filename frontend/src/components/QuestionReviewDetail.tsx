@@ -16,6 +16,7 @@ import { getDateLocale } from '../utils/dateLocale';
 import { ReviewService } from '../services/ReviewService';
 import { useAuth } from '../contexts/AuthContext';
 import MarkdownRenderer from './MarkdownRenderer';
+import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import { QuestionReview, ReviewStatus } from '../types/review';
 
 const QuestionReviewDetail: React.FC = () => {
@@ -41,6 +42,7 @@ const QuestionReviewDetail: React.FC = () => {
     bloom_level: undefined as number | undefined,
     estimated_time_minutes: undefined as number | undefined,
   });
+
 
   const isReviewer = currentUser && question && currentUser.id === question.reviewed_by;
 
@@ -345,6 +347,27 @@ const QuestionReviewDetail: React.FC = () => {
                 <MarkdownRenderer content={question.explanation} variant="compact" />
               </>
             )}
+          </Box>
+        )}
+
+        {/* Tags read-only — Bearbeitung erfolgt im Bearbeitungs-Dialog */}
+        {question.tags && question.tags.length > 0 && (
+          <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {[...question.tags].sort((a, b) => a.name.localeCompare(b.name)).map((tag) => (
+              <Chip
+                key={tag.id}
+                icon={<LocalOfferOutlinedIcon />}
+                label={tag.name}
+                size="small"
+                sx={{
+                  bgcolor: (theme) => `${theme.palette.secondary.light}22`,
+                  color: 'secondary.dark',
+                  border: '1px solid',
+                  borderColor: (theme) => `${theme.palette.secondary.light}66`,
+                  '& .MuiChip-icon': { color: 'secondary.light', fontSize: 14 },
+                }}
+              />
+            ))}
           </Box>
         )}
       </Paper>

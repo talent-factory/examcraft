@@ -72,6 +72,7 @@ export interface RAGExamRequest {
     open_ended?: PromptConfig;
     true_false?: PromptConfig;
   };
+  tag_ids?: number[];
 }
 
 export interface RAGQuestion {
