@@ -1,3 +1,4 @@
+jest.mock('../../../api/apiClient');
 /**
  * Tests for CreateClassDialog (TF-336 G2).
  */

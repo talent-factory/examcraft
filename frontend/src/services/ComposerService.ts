@@ -1,4 +1,3 @@
-import axios from 'axios';
 import type {
   Exam,
   ExamDetail,
@@ -10,8 +9,7 @@ import type {
   AutoComposePreview,
   DocumentWithQuestions,
 } from '../types/composer';
-
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+import { apiClient } from '../api/apiClient';
 
 /**
  * Extracts a human-readable error message from an Axios error response.
@@ -26,20 +24,6 @@ export const getErrorMessage = (error: unknown, fallback: string): string => {
   }
   return fallback;
 };
-
-const apiClient = axios.create({
-  baseURL: API_BASE,
-  timeout: 30000,
-  headers: { 'Content-Type': 'application/json' },
-});
-
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('examcraft_access_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 export class ComposerService {
   static async listExams(params?: {

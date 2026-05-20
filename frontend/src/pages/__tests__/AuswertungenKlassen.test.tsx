@@ -1,3 +1,4 @@
+jest.mock('../../api/apiClient');
 /**
  * Smoke tests for the Klassen list page (TF-336 G2).
  */

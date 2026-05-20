@@ -7,7 +7,7 @@
  * In Full deployment mode, this will dynamically load the Premium implementation.
  */
 
-import axios, { AxiosInstance } from 'axios';
+import { apiClient } from './apiClient';
 import { Prompt } from '../types/prompt';
 
 // Check if Premium package is available
@@ -53,31 +53,12 @@ export interface PromptSearchResult {
 export type { Prompt };
 
 class PromptsApiService {
-  private api: AxiosInstance;
-
-  constructor() {
-    this.api = axios.create({
-      baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    // Add auth token to requests
-    this.api.interceptors.request.use((config) => {
-      const token = localStorage.getItem('examcraft_access_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    });
-  }
 
   async getPrompts(): Promise<Prompt[]> {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    const response = await this.api.get('/api/v1/prompts');
+    const response = await apiClient.get('/api/v1/prompts');
     return response.data;
   }
 
@@ -85,7 +66,7 @@ class PromptsApiService {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    const response = await this.api.get('/api/v1/prompts', { params: filters });
+    const response = await apiClient.get('/api/v1/prompts', { params: filters });
     return response.data;
   }
 
@@ -93,7 +74,7 @@ class PromptsApiService {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    const response = await this.api.get(`/api/v1/prompts/${id}`);
+    const response = await apiClient.get(`/api/v1/prompts/${id}`);
     return response.data;
   }
 
@@ -101,7 +82,7 @@ class PromptsApiService {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    const response = await this.api.post('/api/v1/prompts', prompt);
+    const response = await apiClient.post('/api/v1/prompts', prompt);
     return response.data;
   }
 
@@ -109,7 +90,7 @@ class PromptsApiService {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    const response = await this.api.put(`/api/v1/prompts/${id}`, prompt);
+    const response = await apiClient.put(`/api/v1/prompts/${id}`, prompt);
     return response.data;
   }
 
@@ -117,14 +98,14 @@ class PromptsApiService {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    await this.api.delete(`/api/v1/prompts/${id}`);
+    await apiClient.delete(`/api/v1/prompts/${id}`);
   }
 
   async getVersionHistory(promptName: string): Promise<Prompt[]> {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    const response = await this.api.get(`/api/v1/prompts/${promptName}/versions`);
+    const response = await apiClient.get(`/api/v1/prompts/${promptName}/versions`);
     return response.data;
   }
 
@@ -132,7 +113,7 @@ class PromptsApiService {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    const response = await this.api.get(`/api/v1/prompts/${promptId}/usage`, {
+    const response = await apiClient.get(`/api/v1/prompts/${promptId}/usage`, {
       params: { limit }
     });
     return response.data;
@@ -142,7 +123,7 @@ class PromptsApiService {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    const response = await this.api.post('/api/v1/prompts/search', request);
+    const response = await apiClient.post('/api/v1/prompts/search', request);
     return response.data;
   }
 
@@ -150,7 +131,7 @@ class PromptsApiService {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
-    const response = await this.api.patch(`/api/v1/prompts/${id}/active`, { is_active: isActive });
+    const response = await apiClient.patch(`/api/v1/prompts/${id}/active`, { is_active: isActive });
     return response.data;
   }
 }

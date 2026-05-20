@@ -66,6 +66,12 @@ export { default as useDebounce } from './hooks/useDebounce';
 export { useRoleBasedNavigation } from './hooks/useRoleBasedNavigation';
 
 // ============================================================================
+// API Client
+// ============================================================================
+
+export { apiClient, setTokenRefreshCallback, setLogoutCallback } from './api/apiClient';
+
+// ============================================================================
 // Utils
 // ============================================================================
 

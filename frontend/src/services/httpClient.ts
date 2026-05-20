@@ -17,6 +17,7 @@
 
 import { ApiError } from './submissionsService';
 import type { ApiErrorKind } from '../types/submission';
+import { executeTokenRefresh, triggerAuthLogout } from '../api/apiClient';
 
 export { ApiError };
 
@@ -139,42 +140,64 @@ export async function safeFetch(
 }
 
 
+async function withAuthRetry(makeRequest: () => Promise<Response>): Promise<Response> {
+  const response = await makeRequest();
+  if (response.status !== 401) return response;
+  try {
+    await executeTokenRefresh();
+  } catch (err) {
+    console.error('[httpClient] Refresh failed in withAuthRetry:', err);
+    triggerAuthLogout();
+    return response;
+  }
+  const retried = await makeRequest();
+  if (retried.status === 401) {
+    // Refresh succeeded but retry still 401 — backend rejected the new token
+    // or refresh produced no token. Trigger logout to clear stale state.
+    triggerAuthLogout();
+  }
+  return retried;
+}
+
+
 export async function getJson<T>(path: string): Promise<T> {
-  const response = await safeFetch(`${API_BASE_URL}${path}`, {
-    method: 'GET',
-    headers: authHeaders(),
-  });
+  const response = await withAuthRetry(() =>
+    safeFetch(`${API_BASE_URL}${path}`, { method: 'GET', headers: authHeaders() })
+  );
   await ensureOk(response);
   return (await response.json()) as T;
 }
 
 
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await safeFetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
+  const response = await withAuthRetry(() =>
+    safeFetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+  );
   await ensureOk(response);
   return (await response.json()) as T;
 }
 
 
 export async function patchJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await safeFetch(`${API_BASE_URL}${path}`, {
-    method: 'PATCH',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
+  const response = await withAuthRetry(() =>
+    safeFetch(`${API_BASE_URL}${path}`, {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+  );
   await ensureOk(response);
   return (await response.json()) as T;
 }
 
 
 export async function deleteVoid(path: string): Promise<void> {
-  const response = await safeFetch(`${API_BASE_URL}${path}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  });
+  const response = await withAuthRetry(() =>
+    safeFetch(`${API_BASE_URL}${path}`, { method: 'DELETE', headers: authHeaders() })
+  );
   await ensureOk(response);
 }

@@ -1,3 +1,4 @@
+jest.mock('../../../api/apiClient');
 /**
  * SyncMoodleIdsDialog tests (TF-336 G4 / Subarea D).
  */

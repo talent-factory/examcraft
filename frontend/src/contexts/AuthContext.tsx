@@ -3,7 +3,7 @@
  * Global auth state management with React Context
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   AuthState,
   AuthContextType,
@@ -15,6 +15,7 @@ import {
 import AuthService from '../services/AuthService';
 import i18n from '../i18n';
 import { SubscriptionTier, hasFeature as tierHasFeature, isFeatureName } from '../config/features';
+import { setTokenRefreshCallback, setLogoutCallback, setupFetchInterceptor, executeTokenRefresh } from '../api/apiClient';
 
 // ============================================================================
 // Context Creation
@@ -30,6 +31,16 @@ const ACCESS_TOKEN_KEY = 'examcraft_access_token';
 const REFRESH_TOKEN_KEY = 'examcraft_refresh_token';
 const USER_KEY = 'examcraft_user';
 
+function parseJwt(token: string): { exp: number; [key: string]: unknown } {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch (err) {
+    console.error('[AuthContext] Failed to parse JWT:', err);
+    return { exp: 0 };
+  }
+}
+
 // ============================================================================
 // Auth Provider Component
 // ============================================================================
@@ -44,15 +55,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error: null,
   });
 
-  // Debug logging for state changes
-  useEffect(() => {
-    console.log('[AuthContext] State changed:', {
-      isAuthenticated: state.isAuthenticated,
-      isLoading: state.isLoading,
-      hasUser: !!state.user,
-      hasToken: !!state.accessToken,
-    });
-  }, [state.isAuthenticated, state.isLoading, state.user, state.accessToken]);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshAccessTokenRef = useRef<() => Promise<void>>(async () => {});
+  const scheduleTokenRefreshRef = useRef<(token: string) => void>(() => {});
+
+  const scheduleTokenRefresh = useCallback((accessToken: string) => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+    const fireRefresh = () => {
+      // Route through executeTokenRefresh so the proactive timer shares the
+      // same in-flight promise as the reactive 401 interceptors. Without
+      // this, a 401 arriving while the timer fires would trigger a parallel
+      // refresh and the rotating-refresh-token backend would invalidate one.
+      executeTokenRefresh().catch((err) => {
+        console.error('[AuthContext] Proactive refresh failed:', err);
+      });
+    };
+    const { exp } = parseJwt(accessToken);
+    const delay = exp * 1000 - Date.now() - 2 * 60 * 1000;
+    if (delay > 0) {
+      refreshTimerRef.current = setTimeout(fireRefresh, delay);
+    } else {
+      // Either token already inside the 2-min safety window (exp > 0) or
+      // parse failed (exp === 0). Either way, try to refresh now — the
+      // refresh endpoint is the only authority that can tell us whether
+      // the session is still valid.
+      fireRefresh();
+    }
+  }, []);
 
   /**
    * Load auth state from localStorage on mount
@@ -60,17 +92,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadAuthState = async () => {
       try {
-        console.log('[AuthContext] Loading auth state from localStorage...');
         const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
         const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-
-        console.log('[AuthContext] Tokens present:', !!accessToken, !!refreshToken);
 
         if (accessToken && refreshToken) {
           // Always fetch fresh profile instead of relying on cached user
           try {
-            console.log('[AuthContext] Verifying token with getProfile...');
-
             // Add timeout to prevent spinner from hanging
             const timeoutPromise = new Promise((_, reject) =>
               setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
@@ -80,8 +107,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               AuthService.getProfile(accessToken),
               timeoutPromise
             ]) as any;
-
-            console.log('[AuthContext] Token valid! Setting authenticated state for:', profile.email);
 
             // Update localStorage with fresh user data
             localStorage.setItem(USER_KEY, JSON.stringify(profile));
@@ -100,12 +125,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               isLoading: false,
               error: null,
             });
+            scheduleTokenRefreshRef.current(accessToken);
           } catch (error) {
             console.error('[AuthContext] Token verification failed:', error);
             // Token expired, try to refresh
             try {
-              console.log('[AuthContext] Attempting token refresh...');
-
               // Add timeout for refresh as well
               const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Token refresh timeout')), 5000)
@@ -135,7 +159,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 );
               }
 
-              console.log('[AuthContext] Token refreshed successfully for:', profile.email);
               setState({
                 user: profile,
                 accessToken: tokens.access_token,
@@ -144,14 +167,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isLoading: false,
                 error: null,
               });
+              scheduleTokenRefreshRef.current(tokens.access_token);
             } catch (refreshError) {
               console.error('[AuthContext] Token refresh failed:', refreshError);
-              // Refresh failed, clear auth state
               localStorage.removeItem(ACCESS_TOKEN_KEY);
               localStorage.removeItem(REFRESH_TOKEN_KEY);
               localStorage.removeItem(USER_KEY);
 
-              console.log('[AuthContext] Cleared auth state due to refresh failure');
               setState({
                 user: null,
                 accessToken: null,
@@ -163,7 +185,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         } else {
-          console.log('[AuthContext] No tokens found in localStorage, setting unauthenticated state');
           setState(prev => ({ ...prev, isLoading: false }));
         }
       } catch (error) {
@@ -180,15 +201,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const login = useCallback(async (email: string, password: string) => {
     try {
-      console.log('[AuthContext] login called, setting isLoading: true');
-      setState(prev => {
-        console.log('[AuthContext] Previous state:', prev);
-        return { ...prev, isLoading: true, error: null };
-      });
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-      console.log('[AuthContext] Calling AuthService.login...');
       const tokens = await AuthService.login({ email, password });
-      console.log('[AuthContext] Login successful, fetching profile...');
       const user = await AuthService.getProfile(tokens.access_token);
 
       if (user.preferred_language) {
@@ -201,7 +216,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
 
-      console.log('[AuthContext] Setting authenticated state');
       setState({
         user,
         accessToken: tokens.access_token,
@@ -210,6 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: false,
         error: null,
       });
+      scheduleTokenRefresh(tokens.access_token);
     } catch (error) {
       console.error('[AuthContext] Login error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
@@ -220,7 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
       throw error;
     }
-  }, []);
+  }, [scheduleTokenRefresh]);
 
   /**
    * Login with pre-existing tokens (used by OAuth callback)
@@ -249,6 +264,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: false,
         error: null,
       });
+      scheduleTokenRefresh(accessToken);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Token login failed';
       setState(prev => ({
@@ -258,7 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
       throw error;
     }
-  }, []);
+  }, [scheduleTokenRefresh]);
 
   /**
    * Register new user
@@ -288,6 +304,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: false,
         error: null,
       });
+      scheduleTokenRefresh(tokens.access_token);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
       setState(prev => ({
@@ -297,13 +314,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
       throw error;
     }
-  }, []);
+  }, [scheduleTokenRefresh]);
 
   /**
    * Logout
    */
   const logout = useCallback(async () => {
-    console.log('[AuthContext] Logout called');
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
     try {
       if (state.accessToken) {
         await AuthService.logout(state.accessToken);
@@ -315,7 +335,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem(REFRESH_TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
 
-      console.log('[AuthContext] Cleared auth state and localStorage');
       setState({
         user: null,
         accessToken: null,
@@ -331,30 +350,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Refresh access token
    */
   const refreshAccessToken = useCallback(async () => {
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!refreshToken) {
+      await logout();
+      throw new Error('No refresh token available');
+    }
     try {
-      if (!state.refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      const tokens = await AuthService.refreshToken({ refresh_token: state.refreshToken });
-      const user = await AuthService.getProfile(tokens.access_token);
-
+      const tokens = await AuthService.refreshToken({ refresh_token: refreshToken });
       localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
       localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-
       setState(prev => ({
         ...prev,
-        user,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
       }));
+      scheduleTokenRefreshRef.current(tokens.access_token);
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      console.error('[AuthContext] Token refresh failed:', error);
       await logout();
       throw error;
     }
-  }, [state.refreshToken, logout]);
+  }, [logout]);
+
+  useEffect(() => {
+    refreshAccessTokenRef.current = refreshAccessToken;
+  }, [refreshAccessToken]);
+
+  useEffect(() => {
+    scheduleTokenRefreshRef.current = scheduleTokenRefresh;
+  }, [scheduleTokenRefresh]);
+
+  useEffect(() => {
+    setTokenRefreshCallback(refreshAccessToken);
+    setLogoutCallback(logout);
+    setupFetchInterceptor();
+  }, [refreshAccessToken, logout]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, []);
 
   /**
    * Update user profile

@@ -1,6 +1,8 @@
 import { DocumentService } from '../DocumentService';
 import { Document, DocumentStatus, DocumentUploadResponse, DocumentProcessingResponse } from '../../types/document';
 
+jest.mock('../../api/apiClient');
+
 // Mock fetch
 global.fetch = jest.fn();
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>;

@@ -1,3 +1,4 @@
+jest.mock('../../api/apiClient');
 /**
  * Smoke tests for the Studi-Liste (TF-336 G3).
  */

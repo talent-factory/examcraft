@@ -1,3 +1,4 @@
+jest.mock('../../../api/apiClient');
 /**
  * MoodleConnectionForm tests (TF-336 G4).
  */

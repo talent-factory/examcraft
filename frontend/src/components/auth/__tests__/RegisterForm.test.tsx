@@ -9,6 +9,14 @@ import { BrowserRouter } from 'react-router-dom';
 import { RegisterForm } from '../RegisterForm';
 import { AuthProvider } from '../../../contexts/AuthContext';
 
+// Mock apiClient (uses axios ESM which Jest cannot transform)
+jest.mock('../../../api/apiClient', () => ({
+  setTokenRefreshCallback: jest.fn(),
+  setLogoutCallback: jest.fn(),
+  setupFetchInterceptor: jest.fn(),
+  apiClient: { interceptors: { request: { use: jest.fn() }, response: { use: jest.fn() } } },
+}));
+
 // Mock AuthService
 jest.mock('../../../services/AuthService', () => ({
   __esModule: true,
