@@ -7,7 +7,7 @@ AttributeError/IndexError on incomplete payloads.
 """
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -309,12 +309,26 @@ async def test_subscription_created_missing_status_raises(test_db):
 
 
 @asyncio
-async def test_subscription_created_no_local_sub_logs_warning(test_db, caplog):
-    """If local sub doesn't exist, handler must warn (not crash)."""
+async def test_subscription_created_no_local_sub_logs_warning(test_db):
+    """If local sub doesn't exist, handler must warn (not crash).
+
+    The handler's logger is patched at the module level rather than via
+    caplog. Lifespan in main.py reloads webhooks.py under a different
+    module name via importlib.spec_from_file_location, so by the time this
+    test runs in a full-suite context, two webhooks modules exist with
+    two distinct loggers — caplog can't reliably catch the right one.
+    Replacing the symbol on the imported module avoids that whole class
+    of ordering bugs.
+    """
     incoming = _stripe_sub(sub_id="sub_unknown")
-    with caplog.at_level("WARNING"):
+    mock_logger = MagicMock()
+    with patch("api.v1.webhooks.logger", mock_logger):
         await handle_subscription_created(incoming, test_db)
-    assert any("not found locally" in r.message for r in caplog.records)
+    assert mock_logger.warning.called, "expected a warning log"
+    assert any(
+        "not found locally" in str(call.args[0])
+        for call in mock_logger.warning.call_args_list
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -383,8 +397,15 @@ async def test_subscription_deleted_downgrades_institution(test_db):
 
 
 @asyncio
-async def test_subscription_deleted_unknown_sub_logs_warning(test_db, caplog):
+async def test_subscription_deleted_unknown_sub_logs_warning(test_db):
+    # See test_subscription_created_no_local_sub_logs_warning above for why
+    # we patch the module-level logger instead of using caplog.
     incoming = SimpleNamespace(id="sub_unknown")
-    with caplog.at_level("WARNING"):
+    mock_logger = MagicMock()
+    with patch("api.v1.webhooks.logger", mock_logger):
         await handle_subscription_deleted(incoming, test_db)
-    assert any("not found locally" in r.message for r in caplog.records)
+    assert mock_logger.warning.called, "expected a warning log"
+    assert any(
+        "not found locally" in str(call.args[0])
+        for call in mock_logger.warning.call_args_list
+    )
