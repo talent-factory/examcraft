@@ -767,6 +767,462 @@ def test_persist_questions_preserves_none_options():
     assert persisted is None
 
 
+# ---------------------------------------------------------------------------
+# TF-351 regression: correct_answer serialization
+# ---------------------------------------------------------------------------
+
+
+def _make_open_ended_question(correct_answer):
+    """SimpleNamespace für open_ended-Fragen mit beliebigem correct_answer-Typ."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        question_text="Erläutern Sie den Begriff Kommunikation.",
+        question_type="open_ended",
+        options=None,
+        correct_answer=correct_answer,
+        explanation="Musterlösung.",
+        difficulty="medium",
+        source_chunks=[],
+        source_documents=[],
+        confidence_score=0.85,
+        bloom_level=4,
+    )
+
+
+def _capture_persisted_correct_answer(fake_question):
+    """Führt _persist_questions mit einem einzelnen open_ended-Question aus und
+    gibt den correct_answer-Wert zurück, der auf dem QuestionReview-Row landet."""
+    from tasks.question_tasks import _persist_questions
+
+    captured: list = []
+    captured_objs: list = []
+
+    class _EmptyQuery:
+        def filter(self, *_a, **_kw):
+            return self
+
+        def all(self):
+            return []
+
+    class _StubSession:
+        def add(self, obj):
+            if obj.__class__.__name__ == "QuestionReview":
+                captured.append(obj.correct_answer)
+                captured_objs.append(obj)
+
+        def query(self, *_a, **_kw):
+            return _EmptyQuery()
+
+        def merge(self, obj):  # noqa: ARG002
+            return obj
+
+        def flush(self):
+            for obj in captured_objs:
+                obj.id = 1
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+
+        def close(self):
+            pass
+
+    with patch("database.SessionLocal", return_value=_StubSession()):
+        _persist_questions(
+            questions=[fake_question],
+            exam_id="exam_tf351",
+            topic="Kommunikation",
+            language="de",
+            user_id=42,
+            institution_id=1,
+        )
+
+    assert captured, "QuestionReview row was not added to the session"
+    return captured[0]
+
+
+def test_persist_questions_serializes_dict_correct_answer_to_json():
+    """Premium open_ended rubric dicts must be JSON-serialized before INSERT —
+    psycopg2 cannot adapt a bare dict to the TEXT column."""
+    import json
+
+    rubric = {
+        "overview": "Vollständige Antwort beschreibt Sender-Empfänger-Modell.",
+        "excellent": "Alle drei Komponenten korrekt benannt.",
+        "good": "Zwei Komponenten korrekt.",
+        "satisfactory": "Eine Komponente korrekt.",
+        "insufficient": "Keine korrekte Komponente.",
+    }
+
+    persisted = _capture_persisted_correct_answer(_make_open_ended_question(rubric))
+
+    assert isinstance(persisted, str), "dict must be serialized to str for TEXT column"
+    parsed = json.loads(persisted)
+    assert parsed == rubric
+
+
+def test_persist_questions_serializes_list_correct_answer_to_string():
+    """list correct_answer (grading criteria) becomes semicolon-joined string."""
+    criteria = ["Sachliche Richtigkeit", "Vollständigkeit", "Sprachliche Qualität"]
+
+    persisted = _capture_persisted_correct_answer(_make_open_ended_question(criteria))
+
+    assert isinstance(persisted, str)
+    assert "Sachliche Richtigkeit" in persisted
+    assert "Vollständigkeit" in persisted
+
+
+def test_persist_questions_passes_string_correct_answer_unchanged():
+    """Plain string correct_answer (standard case) round-trips unchanged."""
+    sample = "Das Sender-Empfänger-Modell beschreibt..."
+
+    persisted = _capture_persisted_correct_answer(_make_open_ended_question(sample))
+
+    assert persisted == sample
+
+
+def test_persist_questions_passes_empty_string_correct_answer_unchanged():
+    """Empty-string correct_answer (else-branch with falsy value) stays as empty
+    string — not None — so downstream consumers can distinguish "no answer
+    provided" from "answer was the empty string"."""
+    persisted = _capture_persisted_correct_answer(_make_open_ended_question(""))
+
+    assert persisted == ""
+
+
+def test_persist_questions_serializes_nested_dict_correct_answer_to_json():
+    """Nested rubric dicts (Premium open_ended) must round-trip via JSON, not
+    end up as Python repr (``"{'key': {'nested': ...}}"``) in the TEXT column."""
+    import json
+
+    nested_rubric = {
+        "criteria": {
+            "content_accuracy": {
+                "description": "Sachliche Richtigkeit",
+                "max_points": 5,
+            },
+            "completeness": {"description": "Vollständigkeit", "max_points": 3},
+        },
+        "overview": "Vollständige Antwort beschreibt Sender-Empfänger-Modell.",
+    }
+
+    persisted = _capture_persisted_correct_answer(
+        _make_open_ended_question(nested_rubric)
+    )
+
+    assert isinstance(persisted, str)
+    assert not persisted.startswith("{'"), "Must not be Python repr"
+    parsed = json.loads(persisted)
+    assert parsed == nested_rubric
+
+
+def test_persist_questions_preserves_none_correct_answer():
+    """None correct_answer stays None (open_ended without sample answer)."""
+    persisted = _capture_persisted_correct_answer(_make_open_ended_question(None))
+
+    assert persisted is None
+
+
+# ---------------------------------------------------------------------------
+# TF-351 follow-up: explanation dict serialization
+# ---------------------------------------------------------------------------
+
+
+def _capture_persisted_explanation(fake_question):
+    """Führt _persist_questions aus und gibt den explanation-Wert zurück,
+    der auf dem QuestionReview-Row landet."""
+    from tasks.question_tasks import _persist_questions
+
+    captured: list = []
+    captured_objs: list = []
+
+    class _EmptyQuery:
+        def filter(self, *_a, **_kw):
+            return self
+
+        def all(self):
+            return []
+
+    class _StubSession:
+        def add(self, obj):
+            if obj.__class__.__name__ == "QuestionReview":
+                captured.append(obj.explanation)
+                captured_objs.append(obj)
+
+        def query(self, *_a, **_kw):
+            return _EmptyQuery()
+
+        def merge(self, obj):  # noqa: ARG002
+            return obj
+
+        def flush(self):
+            for obj in captured_objs:
+                obj.id = 1
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+
+        def close(self):
+            pass
+
+    with patch("database.SessionLocal", return_value=_StubSession()):
+        _persist_questions(
+            questions=[fake_question],
+            exam_id="exam_tf351",
+            topic="Kommunikation",
+            language="de",
+            user_id=42,
+            institution_id=1,
+        )
+
+    assert captured, "QuestionReview row was not added to the session"
+    return captured[0]
+
+
+def _make_question_with_explanation(explanation):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        question_text="Erläutern Sie den Begriff Kommunikation.",
+        question_type="open_ended",
+        options=None,
+        correct_answer="Musterlösung",
+        explanation=explanation,
+        difficulty="medium",
+        source_chunks=[],
+        source_documents=[],
+        confidence_score=0.85,
+        bloom_level=4,
+    )
+
+
+def test_persist_questions_serializes_dict_explanation_to_json():
+    """explanation dict (Premium open_ended rubrics) must be JSON-serialized,
+    not str()-repr — same contract as correct_answer above."""
+    import json
+
+    rubric = {
+        "content_accuracy": {"description": "Sachliche Richtigkeit", "max_points": 5},
+        "completeness": {"description": "Vollständigkeit", "max_points": 3},
+    }
+
+    persisted = _capture_persisted_explanation(_make_question_with_explanation(rubric))
+
+    assert isinstance(persisted, str)
+    # Must be valid JSON, not Python repr like "{'key': 'value'}"
+    parsed = json.loads(persisted)
+    assert parsed == rubric
+
+
+def test_persist_questions_explanation_dict_is_not_python_repr():
+    """Ensure we don't produce str(dict) Python-repr in DB — this is the
+    failure mode that triggered TF-351 on the correct_answer column."""
+    rubric = {"overview": "Vollständige Antwort"}
+
+    persisted = _capture_persisted_explanation(_make_question_with_explanation(rubric))
+
+    # Python repr starts with { and uses single quotes — not valid JSON
+    assert not persisted.startswith("{'"), "Must not be Python repr"
+
+
+def test_persist_questions_explanation_list_joined_with_semicolons():
+    """list explanation (grading criteria) becomes semicolon-joined string."""
+    criteria = [
+        "Sender korrekt benannt",
+        "Empfänger korrekt benannt",
+        "Kanal beschrieben",
+    ]
+
+    persisted = _capture_persisted_explanation(
+        _make_question_with_explanation(criteria)
+    )
+
+    assert (
+        persisted
+        == "Sender korrekt benannt; Empfänger korrekt benannt; Kanal beschrieben"
+    )
+
+
+def test_persist_questions_explanation_empty_list_becomes_empty_string():
+    """Empty list explanation joins to empty string (not None) — documents the
+    current contract so future refactors don't silently change it."""
+    persisted = _capture_persisted_explanation(_make_question_with_explanation([]))
+
+    assert persisted == ""
+
+
+def test_persist_questions_preserves_none_explanation():
+    """None explanation stays None — open_ended questions may omit it."""
+    persisted = _capture_persisted_explanation(_make_question_with_explanation(None))
+
+    assert persisted is None
+
+
+# ---------------------------------------------------------------------------
+# TF-351: ProgrammingError must mark the job FAILURE and not loop-retry
+# ---------------------------------------------------------------------------
+
+
+def test_programming_error_marks_job_failure_and_propagates():
+    """End-to-end: when _persist_questions raises ProgrammingError (e.g. psycopg2
+    ``can't adapt type 'dict'``), the task must call _safe_update_job_status
+    with ``FAILURE`` *and* re-raise, so the frontend sees a terminal state
+    instead of a PENDING ghost-task. This is the TF-351 anti-pattern."""
+    import dataclasses
+
+    from sqlalchemy.exc import ProgrammingError
+
+    from tasks.question_tasks import generate_questions_task
+
+    @dataclasses.dataclass
+    class FakeQuestion:
+        question_text: str
+        question_type: str
+
+    @dataclasses.dataclass
+    class FakeContextSummary:
+        query: str
+
+    mock_result = MagicMock()
+    mock_result.exam_id = "exam_e2e"
+    mock_result.topic = "Heapsort"
+    mock_result.questions = [
+        FakeQuestion(question_text="Was ist ein Heap?", question_type="multiple_choice")
+    ]
+    mock_result.context_summary = FakeContextSummary(query="Heapsort")
+    mock_result.generation_time = 1.0
+    mock_result.quality_metrics = {}
+
+    boom = ProgrammingError("INSERT ...", {}, Exception("can't adapt type 'dict'"))
+
+    with (
+        patch("tasks.question_tasks.run_async", return_value=mock_result),
+        patch("tasks.question_tasks.RAGService", return_value=MagicMock()),
+        patch("tasks.question_tasks._persist_questions", side_effect=boom),
+        patch("tasks.question_tasks._safe_update_job_status") as mock_status,
+    ):
+        generate_questions_task.update_state = MagicMock()
+
+        request_data = {
+            "topic": "Heapsort",
+            "question_count": 1,
+            "question_types": ["multiple_choice"],
+            "difficulty": "medium",
+            "language": "de",
+            "document_ids": None,
+            "context_chunks_per_question": 3,
+            "prompt_config": None,
+        }
+
+        try:
+            generate_questions_task.run(request_data, "42")
+        except ProgrammingError:
+            raised = True
+        else:
+            raised = False
+
+    assert raised, "ProgrammingError must propagate so Celery records the failure"
+    # FAILURE must be set unconditionally — not only on the final retry — because
+    # ProgrammingError is in dont_autoretry_for and never retries.
+    failure_calls = [
+        call for call in mock_status.call_args_list if call.args[1] == "FAILURE"
+    ]
+    assert failure_calls, (
+        "Job status must be marked FAILURE so the frontend leaves PENDING — "
+        "otherwise the ghost-task symptom of TF-351 returns."
+    )
+
+
+def test_programming_error_in_dont_autoretry_for():
+    """Sanity guard: keep ProgrammingError in dont_autoretry_for so Celery does
+    not blindly retry a non-recoverable DB error and burn Claude credits."""
+    from sqlalchemy.exc import ProgrammingError
+    from tasks.question_tasks import generate_questions_task
+
+    dont_retry = getattr(generate_questions_task, "dont_autoretry_for", ())
+    assert ProgrammingError in dont_retry
+
+
+# ---------------------------------------------------------------------------
+# TF-351: run_async must use a fresh, isolated event loop
+# ---------------------------------------------------------------------------
+
+
+def test_run_async_creates_fresh_loop_per_call():
+    """run_async must create a new event loop for every call so that stale
+    async state from a prior task or retry cannot leak into the next one."""
+    loops_created = []
+
+    class _FakeLoop:
+        def run_until_complete(self, coro):
+            coro.close()
+            return "result"
+
+        def close(self):
+            pass
+
+    def _fake_new_loop():
+        loop = _FakeLoop()
+        loops_created.append(loop)
+        return loop
+
+    async def _dummy():
+        return "result"
+
+    with (
+        patch(
+            "tasks.document_tasks.asyncio.new_event_loop", side_effect=_fake_new_loop
+        ),
+        patch("tasks.document_tasks.asyncio.set_event_loop"),
+    ):
+        from tasks.document_tasks import run_async
+
+        run_async(_dummy())
+        run_async(_dummy())
+
+    assert len(loops_created) == 2, (
+        "A fresh loop must be created for every run_async call"
+    )
+
+
+def test_run_async_closes_loop_after_exception():
+    """run_async must close the event loop in the finally block even when the
+    coroutine raises, so resources are never leaked across retries."""
+    closed: list = []
+
+    class _TrackingLoop:
+        def run_until_complete(self, coro):
+            coro.close()
+            raise RuntimeError("boom")
+
+        def close(self):
+            closed.append(True)
+
+    with (
+        patch(
+            "tasks.document_tasks.asyncio.new_event_loop", return_value=_TrackingLoop()
+        ),
+        patch("tasks.document_tasks.asyncio.set_event_loop"),
+    ):
+        from tasks.document_tasks import run_async
+
+        async def _failing():
+            raise RuntimeError("boom")
+
+        try:
+            run_async(_failing())
+        except RuntimeError:
+            pass
+
+    assert closed, "Event loop must be closed even when the coroutine raises"
+
+
 # === TF-320: QuestionTag-Zuweisung in _persist_questions ===
 
 

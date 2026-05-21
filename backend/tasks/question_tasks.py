@@ -5,13 +5,14 @@ Persistiert generierte Fragen automatisch in question_reviews (Status: pending).
 """
 
 import dataclasses
+import json
 import logging
 import time
 from typing import Any, Dict, List, Literal, Optional
 
 from celery.exceptions import Ignore, Reject
 from pydantic import ValidationError
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, ProgrammingError, SQLAlchemyError
 
 from celery_app import celery_app
 from models.question_generation_job import QuestionGenerationJob
@@ -242,13 +243,23 @@ def _persist_questions(
     try:
         reviews = []
         for question in questions:
-            # explanation can be str or list — Premium RAG may return a list of grading criteria
+            # explanation can be str, list, or dict — Premium RAG open_ended rubrics
+            # may return a dict. Serialize consistently so the TEXT column always
+            # receives a string; psycopg2 cannot adapt a bare dict.
             explanation_raw = question.explanation
             if isinstance(explanation_raw, str):
                 explanation_text = explanation_raw
             elif isinstance(explanation_raw, list):
                 explanation_text = "; ".join(str(item) for item in explanation_raw)
+            elif isinstance(explanation_raw, dict):
+                explanation_text = json.dumps(explanation_raw, ensure_ascii=False)
             elif explanation_raw is not None:
+                # Unexpected type — fall back to str() but warn so a new
+                # Premium return shape doesn't land silently as "<obj at 0x..>".
+                logger.warning(
+                    "question.explanation.unexpected_type type=%s",
+                    type(explanation_raw).__name__,
+                )
                 explanation_text = str(explanation_raw)
             else:
                 explanation_text = None
@@ -273,11 +284,32 @@ def _persist_questions(
                     f"see question_options.unsafe_dict_keys / "
                     f"question_options.unsupported_type log entry above."
                 )
+            # correct_answer can be str, dict, or list — Premium RAG open_ended
+            # rubrics return a dict. Serialize to JSON so the TEXT column receives
+            # a string; psycopg2 cannot adapt a bare dict.
+            correct_answer_raw = question.correct_answer
+            if isinstance(correct_answer_raw, dict):
+                correct_answer_text = json.dumps(correct_answer_raw, ensure_ascii=False)
+            elif isinstance(correct_answer_raw, list):
+                correct_answer_text = "; ".join(
+                    str(item) for item in correct_answer_raw
+                )
+            elif correct_answer_raw is not None:
+                # Unexpected type — fall back to str() but warn so a new
+                # Premium return shape doesn't land silently as "<obj at 0x..>".
+                logger.warning(
+                    "question.correct_answer.unexpected_type type=%s",
+                    type(correct_answer_raw).__name__,
+                )
+                correct_answer_text = str(correct_answer_raw)
+            else:
+                correct_answer_text = None
+
             question_review = QuestionReview(
                 question_text=question.question_text,
                 question_type=question.question_type,
                 options=normalized_options,
-                correct_answer=question.correct_answer,
+                correct_answer=correct_answer_text,
                 explanation=explanation_text,
                 difficulty=question.difficulty,
                 topic=topic,
@@ -411,6 +443,7 @@ def _persist_questions(
         ValidationError,  # Ungültige Eingabedaten — Retry ändert nichts
         TypeError,  # Programmierfehler — Retry ändert nichts
         ImportError,  # Deployment-Problem — Retry ändert nichts
+        ProgrammingError,  # psycopg2-Adapter-/DDL-Fehler — Retry ändert nichts
         IntegrityError,  # FK-Verletzung (z. B. Tag-ID) — Retry ändert nichts
         ValueError,  # Domänenvalidierung (z. B. Tag-Scope) — Retry ändert nichts
     ),
@@ -523,6 +556,7 @@ def generate_questions_task(
         ValidationError,
         TypeError,
         ImportError,
+        ProgrammingError,
         IntegrityError,
         ValueError,
     ):
