@@ -49,10 +49,31 @@ const GenerationTasksBar: React.FC = () => {
   };
   const [visible, setVisible] = useState(true);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const loggedMissingMessageIds = useRef<Set<string>>(new Set());
 
-  // Auto-hide 30s after all tasks complete
+  // Log once per task when a FAILURE/REVOKED arrives without a usable message
+  // so the i18n fallback "errorOccurred" cannot silently mask a backend bug.
+  // Tracked in a ref to avoid log-spam if completedTasks re-renders.
   useEffect(() => {
-    if (activeTasks.length === 0 && completedTasks.length > 0) {
+    completedTasks.forEach((task) => {
+      const isFailure = task.status === 'FAILURE' || task.status === 'REVOKED';
+      if (isFailure && !task.message && !loggedMissingMessageIds.current.has(task.taskId)) {
+        loggedMissingMessageIds.current.add(task.taskId);
+        console.warn('[GenerationTasks] Terminal task has no error message', {
+          taskId: task.taskId,
+          status: task.status,
+        });
+      }
+    });
+  }, [completedTasks]);
+
+  // Auto-hide 30s after all tasks complete — but never auto-hide when a FAILURE
+  // is present so the user sees the error until they explicitly dismiss it.
+  useEffect(() => {
+    const hasFailures = completedTasks.some(
+      (t) => t.status === 'FAILURE' || t.status === 'REVOKED'
+    );
+    if (activeTasks.length === 0 && completedTasks.length > 0 && !hasFailures) {
       hideTimerRef.current = setTimeout(() => {
         setVisible(false);
       }, AUTO_HIDE_DELAY_MS);

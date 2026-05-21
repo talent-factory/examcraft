@@ -4,13 +4,17 @@ Handles document extraction, RAG embedding, and metadata extraction
 """
 
 import asyncio
-from celery import Task
-from celery_app import celery_app
-from services.document_service import document_service
-from models.document import Document, DocumentStatus
-from database import SessionLocal
-from typing import Dict, Any
 import logging
+from typing import Any, Dict
+
+from celery import Task
+from celery.exceptions import Ignore, Reject
+from sqlalchemy.exc import IntegrityError, ProgrammingError
+
+from celery_app import celery_app
+from database import SessionLocal
+from models.document import Document, DocumentStatus
+from services.document_service import document_service
 
 logger = logging.getLogger(__name__)
 
@@ -47,15 +51,22 @@ class ProgressTask(Task):
 
 
 def run_async(coro):
-    """Führt eine async Coroutine im synchronen Celery Worker aus."""
+    """Führt eine async Coroutine im synchronen Celery Worker aus.
+
+    Erstellt für jeden Aufruf einen frischen Event-Loop und schliesst ihn
+    im finally-Block. Celery prefork-Worker sind langlebige Prozesse, in
+    denen ein wiederverwendeter Loop nach einer geworfenen Coroutine in
+    einem halb-geschlossenen Zustand zurückbleiben und Folge-Tasks
+    silently hängen lassen kann (TF-351-Symptom). Frische Loops eliminieren
+    diesen geteilten Zustand zwischen Tasks und Retries.
+    """
+    loop = asyncio.new_event_loop()
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            raise RuntimeError("Event loop is closed")
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
 
 
 @celery_app.task(
@@ -64,6 +75,15 @@ def run_async(coro):
     name="tasks.document_tasks.process_document",
     priority=5,
     autoretry_for=(Exception,),
+    dont_autoretry_for=(
+        Ignore,
+        Reject,
+        ValueError,  # z. B. "Dokument X nicht gefunden" — Retry findet es auch nicht
+        TypeError,  # Programmierfehler
+        ImportError,  # Deployment-Problem
+        ProgrammingError,  # psycopg2-Adapter-/DDL-Fehler
+        IntegrityError,  # FK-Verletzung
+    ),
     retry_kwargs={"max_retries": 3, "countdown": 60},
     retry_backoff=True,
     retry_jitter=True,

@@ -1,4 +1,5 @@
 import React from 'react';
+import { act } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MemoryRouter } from 'react-router-dom';
@@ -179,6 +180,134 @@ describe('GenerationTasksBar', () => {
     render(<GenerationTasksBar />, { wrapper: Wrapper });
 
     expect(screen.getByText('Timeout erreicht')).toBeInTheDocument();
+  });
+
+  test('auto-hides after 30s when all tasks are SUCCESS', () => {
+    jest.useFakeTimers();
+    const successTask = makeTask({ taskId: 'task-ok', status: 'SUCCESS', progress: 100 });
+
+    mockUseGenerationTasks.mockReturnValue({
+      activeTasks: [],
+      completedTasks: [successTask],
+      dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
+    });
+
+    render(<GenerationTasksBar />, { wrapper: Wrapper });
+    expect(screen.getByText('Test Topic')).toBeInTheDocument();
+
+    act(() => { jest.advanceTimersByTime(30_000); });
+
+    expect(screen.queryByText('Test Topic')).not.toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  test('does NOT auto-hide when a FAILURE task is present', () => {
+    jest.useFakeTimers();
+    const failedTask = makeTask({
+      taskId: 'task-fail',
+      status: 'FAILURE',
+      topic: 'Fehlgeschlagene Generierung',
+      message: 'Verarbeitung fehlgeschlagen',
+    });
+
+    mockUseGenerationTasks.mockReturnValue({
+      activeTasks: [],
+      completedTasks: [failedTask],
+      dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
+    });
+
+    render(<GenerationTasksBar />, { wrapper: Wrapper });
+    expect(screen.getByText('Fehlgeschlagene Generierung')).toBeInTheDocument();
+
+    act(() => { jest.advanceTimersByTime(30_000); });
+
+    // Bar must remain visible — user must dismiss manually
+    expect(screen.getByText('Fehlgeschlagene Generierung')).toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  test('does NOT auto-hide when a REVOKED task is present', () => {
+    jest.useFakeTimers();
+    const revokedTask = makeTask({
+      taskId: 'task-rev',
+      status: 'REVOKED',
+      topic: 'Abgebrochen',
+      message: 'Vom Nutzer abgebrochen',
+    });
+
+    mockUseGenerationTasks.mockReturnValue({
+      activeTasks: [],
+      completedTasks: [revokedTask],
+      dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
+    });
+
+    render(<GenerationTasksBar />, { wrapper: Wrapper });
+
+    act(() => { jest.advanceTimersByTime(30_000); });
+
+    expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  test('does NOT auto-hide when SUCCESS and FAILURE are mixed', () => {
+    jest.useFakeTimers();
+    const successTask = makeTask({
+      taskId: 'task-ok',
+      status: 'SUCCESS',
+      progress: 100,
+      topic: 'Erfolgreich',
+    });
+    const failedTask = makeTask({
+      taskId: 'task-fail',
+      status: 'FAILURE',
+      topic: 'Fehlgeschlagen',
+      message: 'Boom',
+    });
+
+    mockUseGenerationTasks.mockReturnValue({
+      activeTasks: [],
+      completedTasks: [successTask, failedTask],
+      dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
+    });
+
+    render(<GenerationTasksBar />, { wrapper: Wrapper });
+
+    act(() => { jest.advanceTimersByTime(30_000); });
+
+    // A single FAILURE in the mix must keep the whole bar visible so the user
+    // sees and dismisses the error explicitly.
+    expect(screen.getByText('Erfolgreich')).toBeInTheDocument();
+    expect(screen.getByText('Fehlgeschlagen')).toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  test('logs a warning when a FAILURE task arrives without a message', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const failedTask = makeTask({
+      taskId: 'task-silent-fail',
+      status: 'FAILURE',
+      topic: 'Stiller Fehler',
+      message: '',
+    });
+
+    mockUseGenerationTasks.mockReturnValue({
+      activeTasks: [],
+      completedTasks: [failedTask],
+      dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
+    });
+
+    render(<GenerationTasksBar />, { wrapper: Wrapper });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[GenerationTasks] Terminal task has no error message',
+      expect.objectContaining({ taskId: 'task-silent-fail', status: 'FAILURE' }),
+    );
+    warnSpy.mockRestore();
   });
 
   test('collapses and expands on toggle click', () => {
