@@ -7,55 +7,28 @@ import {
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
+/**
+ * Error thrown by document fetches that need to react to HTTP status
+ * (per-status messaging, auth-redirect, retry decisions). Carries the
+ * raw `status` so callers can map to a localized message instead of
+ * showing a stack-trace string. `status === 0` means the network call
+ * itself failed (offline, DNS, CORS) — no HTTP response was received.
+ */
+export class DocumentFetchError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'DocumentFetchError';
+    this.status = status;
+  }
+}
+
 export class DocumentService {
-  /**
-   * Refresh token if expired
-   */
-  private static async refreshTokenIfNeeded(): Promise<string | null> {
-    const token = localStorage.getItem('examcraft_access_token');
-    const refreshToken = localStorage.getItem('examcraft_refresh_token');
-
-    if (!token || !refreshToken) {
-      return null;
-    }
-
-    // Try to use the existing token first
-    return token;
-  }
-
-  /**
-   * Handle 401 errors by refreshing token
-   */
-  private static async handleAuthError(error: any): Promise<void> {
-    if (error.message?.includes('401') || error.message?.includes('Could not validate credentials')) {
-      const refreshToken = localStorage.getItem('examcraft_refresh_token');
-
-      if (refreshToken) {
-        try {
-          // Import AuthService dynamically to avoid circular dependencies
-          const { default: AuthService } = await import('./AuthService');
-          const tokens = await AuthService.refreshToken({ refresh_token: refreshToken });
-
-          // Update tokens in localStorage
-          localStorage.setItem('examcraft_access_token', tokens.access_token);
-          localStorage.setItem('examcraft_refresh_token', tokens.refresh_token);
-
-          // Reload the page to retry with new token
-          window.location.reload();
-        } catch (refreshError) {
-          // Refresh failed, clear auth and redirect to login
-          localStorage.removeItem('examcraft_access_token');
-          localStorage.removeItem('examcraft_refresh_token');
-          localStorage.removeItem('examcraft_user');
-          window.location.href = '/auth';
-        }
-      } else {
-        // No refresh token, redirect to login
-        window.location.href = '/auth';
-      }
-    }
-    throw error;
-  }
+  // 401 handling is delegated to the global fetch interceptor installed by
+  // AuthContext (see apiClient.setupFetchInterceptor). It transparently
+  // refreshes the token and retries through the shared mutex, then triggers
+  // logout if refresh fails. This service must not duplicate that logic —
+  // doing so causes double-refresh races and forces a hard page reload.
 
   /**
    * Get auth headers with token
@@ -73,38 +46,26 @@ export class DocumentService {
    * Upload a document file
    */
   static async uploadDocument(file: File): Promise<DocumentUploadResponse> {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
+    const formData = new FormData();
+    formData.append('file', file);
 
-      // For FormData, we must NOT set Content-Type header
-      // The browser will set it automatically with the correct multipart/form-data boundary
-      const token = localStorage.getItem('examcraft_access_token');
-      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    // For FormData, we must NOT set Content-Type header
+    // The browser will set it automatically with the correct multipart/form-data boundary
+    const token = localStorage.getItem('examcraft_access_token');
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/documents/upload`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const error = new Error(errorData.detail || `Upload failed: ${response.statusText}`);
-
-        // Handle auth errors
-        if (response.status === 401) {
-          await this.handleAuthError(error);
-        }
-
-        throw error;
-      }
-
-      return response.json();
-    } catch (error) {
-      // Re-throw after potential token refresh
-      throw error;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Upload failed: ${response.statusText}`);
     }
+
+    return response.json();
   }
 
   /**
@@ -134,29 +95,18 @@ export class DocumentService {
    * Get all documents for the current user
    */
   static async getDocuments(): Promise<Document[]> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/documents/`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const error = new Error(errorData.detail || `Failed to fetch documents: ${response.statusText}`);
-
-        // Handle auth errors
-        if (response.status === 401) {
-          await this.handleAuthError(error);
-        }
-
-        throw error;
-      }
-
-      const data = await response.json();
-      return data.documents || [];
-    } catch (error) {
-      throw error;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to fetch documents: ${response.statusText}`);
     }
+
+    const data = await response.json();
+    return data.documents || [];
   }
 
   /**
@@ -258,6 +208,60 @@ export class DocumentService {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Fetch raw document bytes with Content-Disposition: inline
+   * (vs. downloadDocument which forces attachment). Caller chooses how
+   * to consume the Response — .blob() for PDF in an iframe, .text() for
+   * Markdown / plain text. Throws `DocumentFetchError` on failure so
+   * callers can branch on `.status` for per-status UI messaging.
+   */
+  static async getDocumentRaw(documentId: number): Promise<Response> {
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}/raw`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+    } catch (e) {
+      throw new DocumentFetchError(
+        e && typeof e === 'object' && 'message' in e ? (e as Error).message : 'Network error',
+        0,
+      );
+    }
+
+    if (!response.ok) {
+      let detail: string | undefined;
+      try {
+        const body = await response.clone().text();
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed && typeof parsed.detail === 'string') {
+            detail = parsed.detail;
+          }
+        } catch {
+          // Backend returned non-JSON (HTML error page from a proxy, etc.).
+          // Surface a snippet to console so a developer reproducing the bug
+          // can recover the body — the user-facing message stays generic.
+          if (body) {
+            // eslint-disable-next-line no-console
+            console.error(
+              `getDocumentRaw: non-JSON ${response.status} body`,
+              body.slice(0, 200),
+            );
+          }
+        }
+      } catch {
+        // Body unavailable — fall through to statusText.
+      }
+      throw new DocumentFetchError(
+        detail || response.statusText || 'Request failed',
+        response.status,
+      );
+    }
+
+    return response;
   }
 
   /**

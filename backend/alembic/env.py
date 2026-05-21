@@ -31,6 +31,7 @@ from models.question_generation_job import QuestionGenerationJob  # noqa: F401, 
 try:
     from premium.models.chat_db import ChatSession, ChatMessage  # noqa: F401
     from premium.models.prompt import Prompt, PromptTemplate, PromptUsageLog  # noqa: F401
+    from premium.models.wizard import WizardSession, WizardMessage  # noqa: F401
 except ImportError:
     pass  # Core mode - premium models not available
 

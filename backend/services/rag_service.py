@@ -50,6 +50,7 @@ class RAGExamRequest(BaseModel):
     language: str = "de"
     context_chunks_per_question: int = Field(default=3, ge=1, le=10)
     prompt_config: Optional[Dict[str, PromptConfig]] = None
+    tag_ids: List[int] = Field(default_factory=list)
 
 
 class RAGExamResponse(BaseModel):

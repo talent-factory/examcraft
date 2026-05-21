@@ -10,8 +10,14 @@ import {
   Button,
   Autocomplete,
   Chip,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  ListSubheader,
 } from '@mui/material';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
+import { GradingSchemesService } from '../../services/gradingSchemesService';
 import { getDateLocale } from '../../utils/dateLocale';
 import type { ExamDetail, UpdateExamRequest, DocumentWithQuestions } from '../../types/composer';
 import { ExamStatus } from '../../types/composer';
@@ -58,6 +64,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
     passing_percentage: '',
   });
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<number[]>([]);
+  const [gradingSchemeId, setGradingSchemeId] = useState<number | null>(null);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
 
   const { data: availableDocuments = [] } = useQuery({
@@ -65,6 +72,18 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
     queryFn: () => ComposerService.listDocumentsWithQuestions(),
     enabled: editOpen,
   });
+
+  // TF-335: Notenskala-Dropdown im Edit-Dialog. Lazy-Load — nur wenn
+  // der Dialog offen ist, sonst hängt jede ExamMetadataBar-Render am
+  // /api/v1/grading-schemes-Call.
+  const { data: gradingSchemesResponse } = useQuery({
+    queryKey: ['grading-schemes'],
+    queryFn: () => GradingSchemesService.list(true),
+    enabled: editOpen,
+  });
+  const gradingSchemes = gradingSchemesResponse?.schemes ?? [];
+  const systemSchemes = gradingSchemes.filter((s) => s.is_system_scheme);
+  const institutionSchemes = gradingSchemes.filter((s) => !s.is_system_scheme);
 
   // Derive full objects from IDs once the query resolves
   const selectedDocuments = availableDocuments.filter((d) =>
@@ -82,6 +101,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       passing_percentage: exam.passing_percentage?.toString() || '50',
     });
     setSelectedDocumentIds(exam.default_document_ids ?? []);
+    setGradingSchemeId(exam.grading_scheme_id ?? null);
     setEditOpen(true);
   };
 
@@ -129,6 +149,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       instructions: form.instructions || undefined,
       passing_percentage: form.passing_percentage ? parseFloat(form.passing_percentage) : undefined,
       default_document_ids: selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined,
+      grading_scheme_id: gradingSchemeId,
     };
     updateMutation.mutate(payload);
   };
@@ -276,6 +297,49 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
               value={form.passing_percentage}
               onChange={(e) => setForm({ ...form, passing_percentage: e.target.value })}
             />
+            <FormControl fullWidth>
+              <InputLabel id="grading-scheme-label">
+                {t('composer.examMetadata.fieldGradingScheme')}
+              </InputLabel>
+              <Select
+                labelId="grading-scheme-label"
+                label={t('composer.examMetadata.fieldGradingScheme')}
+                value={gradingSchemeId ?? ''}
+                onChange={(e) =>
+                  setGradingSchemeId(
+                    e.target.value === '' ? null : Number(e.target.value),
+                  )
+                }
+                data-testid="grading-scheme-select"
+              >
+                <MenuItem value="">
+                  <em>{t('composer.examMetadata.gradingSchemeInherit')}</em>
+                </MenuItem>
+                {systemSchemes.length > 0 && (
+                  <ListSubheader>
+                    {t('composer.examMetadata.gradingSchemeSystemGroup')}
+                  </ListSubheader>
+                )}
+                {systemSchemes.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+                {institutionSchemes.length > 0 && (
+                  <ListSubheader>
+                    {t('composer.examMetadata.gradingSchemeInstitutionGroup')}
+                  </ListSubheader>
+                )}
+                {institutionSchemes.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {s.name}
+                    {s.is_default_for_institution
+                      ? ` ${t('composer.examMetadata.gradingSchemeDefaultMarker')}`
+                      : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <Autocomplete
               multiple
               options={availableDocuments}

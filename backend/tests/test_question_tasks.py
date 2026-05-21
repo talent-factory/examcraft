@@ -765,3 +765,253 @@ def test_persist_questions_preserves_none_options():
     persisted = _capture_persisted_options(_make_fake_question(None))
 
     assert persisted is None
+
+
+# === TF-320: QuestionTag-Zuweisung in _persist_questions ===
+
+
+def _run_persist_with_tags(tag_ids: list):
+    """Run _persist_questions with the given tag_ids against a stub session.
+    Returns (added_question_tags, execute_calls)."""
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from tasks.question_tasks import _persist_questions
+
+    fake_question = SimpleNamespace(
+        question_text="Welche Tags werden zugewiesen?",
+        question_type="multiple_choice",
+        options=["A", "B", "C", "D"],
+        correct_answer="A",
+        explanation="Erklärung.",
+        difficulty="medium",
+        source_chunks=[],
+        source_documents=[],
+        confidence_score=0.9,
+        bloom_level=None,
+    )
+
+    added_question_tags = []
+    execute_calls = []
+
+    class _TagStubSession:
+        def __init__(self):
+            self._objs = []
+
+        def add(self, obj):
+            self._objs.append(obj)
+            if obj.__class__.__name__ == "QuestionTag":
+                added_question_tags.append(obj)
+
+        def query(self, *args, **_kwargs):
+            # Branch on the first column being queried so the Tag visibility
+            # query returns visible IDs while the Document lookup query
+            # returns no document rows (the persist path tolerates an empty
+            # filename→document_id map).
+            first = args[0] if args else None
+            class_name = getattr(getattr(first, "class_", None), "__name__", "")
+            if class_name == "Tag":
+                rows = [(tid,) for tid in tag_ids]
+            else:
+                rows = []
+
+            class _Q:
+                def filter(self, *a, **kw):
+                    return self
+
+                def all(self):
+                    return rows
+
+            return _Q()
+
+        def merge(self, obj):
+            return obj
+
+        def flush(self):
+            counter = [0]
+            for obj in self._objs:
+                if obj.__class__.__name__ == "QuestionReview":
+                    counter[0] += 1
+                    obj.id = counter[0]
+
+        def execute(self, *args, **kwargs):
+            execute_calls.append((args, kwargs))
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+
+        def close(self):
+            pass
+
+    with patch("database.SessionLocal", return_value=_TagStubSession()):
+        _persist_questions(
+            questions=[fake_question],
+            exam_id="exam_tf320",
+            topic="Tags Test",
+            language="de",
+            user_id=1,
+            institution_id=1,
+            tag_ids=tag_ids,
+        )
+
+    return added_question_tags, execute_calls
+
+
+def test_persist_questions_creates_question_tag_rows_for_each_review_and_tag():
+    """Für 1 Frage und 2 Tags → 2 QuestionTag-Rows mit korrekten IDs."""
+    added_tags, _ = _run_persist_with_tags([10, 20])
+
+    assert len(added_tags) == 2
+    tag_id_pairs = {(obj.question_id, obj.tag_id) for obj in added_tags}
+    assert (1, 10) in tag_id_pairs
+    assert (1, 20) in tag_id_pairs
+
+
+def test_persist_questions_does_not_write_denormalised_usage_count():
+    """Regression: usage_count wird nicht mehr per UPDATE geschrieben — live aus QuestionTag."""
+    _, execute_calls = _run_persist_with_tags([10, 20])
+    update_calls = [c for c in execute_calls if "UPDATE tags" in str(c)]
+    assert update_calls == []
+
+
+def test_persist_questions_without_tag_ids_creates_no_question_tags():
+    """Ohne tag_ids → keine QuestionTag-Rows, keine UPDATE tags."""
+    added_tags, execute_calls = _run_persist_with_tags([])
+    update_calls = [c for c in execute_calls if "UPDATE tags" in str(c)]
+
+    assert added_tags == []
+    assert update_calls == []
+
+
+def test_persist_questions_rejects_invisible_tag_ids():
+    """Tag-IDs die NICHT in der visible-Liste sind → ValueError (keine FK-Verletzung)."""
+    import pytest
+    from types import SimpleNamespace
+    from tasks.question_tasks import _persist_questions
+
+    fake_question = SimpleNamespace(
+        question_text="Q?",
+        question_type="multiple_choice",
+        options=["A", "B"],
+        correct_answer="A",
+        explanation="x",
+        difficulty="easy",
+        source_chunks=[],
+        source_documents=[],
+        confidence_score=0.5,
+        bloom_level=None,
+    )
+
+    class _EmptyVisibleSession:
+        def __init__(self):
+            self._objs = []
+
+        def add(self, obj):
+            self._objs.append(obj)
+
+        def query(self, *_a, **_kw):
+            class _Q:
+                def filter(self, *a, **kw):
+                    return self
+
+                def all(self):
+                    return []
+
+            return _Q()
+
+        def merge(self, obj):
+            return obj
+
+        def flush(self):
+            counter = [0]
+            for obj in self._objs:
+                if obj.__class__.__name__ == "QuestionReview":
+                    counter[0] += 1
+                    obj.id = counter[0]
+
+        def execute(self, *_a, **_kw):
+            pass
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+
+        def close(self):
+            pass
+
+    from unittest.mock import patch
+
+    with patch("database.SessionLocal", return_value=_EmptyVisibleSession()):
+        with pytest.raises(ValueError, match="Ungültige oder unsichtbare Tag-IDs"):
+            _persist_questions(
+                questions=[fake_question],
+                exam_id="ex",
+                topic="t",
+                language="de",
+                user_id=1,
+                institution_id=1,
+                tag_ids=[999],
+            )
+
+
+def test_generate_questions_task_passes_tag_ids_from_request_data():
+    """generate_questions_task extrahiert tag_ids aus request_data und gibt sie weiter."""
+    import dataclasses
+    from unittest.mock import MagicMock, patch
+    from tasks.question_tasks import generate_questions_task
+
+    @dataclasses.dataclass
+    class FakeQuestion:
+        question_text: str
+        question_type: str
+
+    @dataclasses.dataclass
+    class FakeContext:
+        query: str
+        total_chunks: int
+
+    mock_result = MagicMock()
+    mock_result.exam_id = "exam_tf320_task"
+    mock_result.topic = "Tags Task Test"
+    mock_result.questions = [FakeQuestion("Q?", "multiple_choice")]
+    mock_result.context_summary = FakeContext("Tags Task Test", 1)
+    mock_result.generation_time = 1.0
+    mock_result.quality_metrics = {}
+
+    mock_persist = MagicMock(return_value=[1])
+
+    with (
+        patch("tasks.question_tasks.run_async", return_value=mock_result),
+        patch("tasks.question_tasks.RAGService"),
+        patch("tasks.question_tasks._persist_questions", mock_persist),
+        patch("tasks.question_tasks._safe_update_job_status"),
+    ):
+        generate_questions_task.update_state = MagicMock()
+
+        request_data = {
+            "topic": "Tags Task Test",
+            "question_count": 1,
+            "question_types": ["multiple_choice"],
+            "difficulty": "medium",
+            "language": "de",
+            "document_ids": None,
+            "context_chunks_per_question": 3,
+            "prompt_config": None,
+            "tag_ids": [5, 7],
+        }
+
+        generate_questions_task.run(request_data, "1", institution_id=1)
+
+    mock_persist.assert_called_once_with(
+        questions=mock_result.questions,
+        exam_id="exam_tf320_task",
+        topic="Tags Task Test",
+        language="de",
+        user_id=1,
+        institution_id=1,
+        tag_ids=[5, 7],
+    )

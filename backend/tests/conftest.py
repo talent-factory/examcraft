@@ -37,6 +37,8 @@ import models.email_event  # noqa: F401
 import models.help  # noqa: F401
 import models.feedback_cluster  # noqa: F401
 import models.question_generation_job  # noqa: F401
+import models.tag  # noqa: F401
+import models.tag_merge_log  # noqa: F401
 
 # Skip test files that need major fixture updates for current DB schema
 collect_ignore_glob = [
@@ -131,25 +133,64 @@ def test_engine():
 @pytest.fixture(scope="function")
 def test_db(test_engine):
     """
-    Erstelle Test-Database Session mit Transaction Rollback
+    Erstelle Test-Database Session mit Savepoint-Isolation.
 
-    Jeder Test läuft in einer eigenen Transaction die nach dem Test
-    zurückgerollt wird. Dadurch bleiben Tests isoliert.
+    Jeder Test läuft in einer äusseren Transaction, die nach dem Test
+    zurückgerollt wird. Damit Produktionscode wie
+    ``audit_service.log_action``, der intern ``session.commit()``
+    aufruft, nicht zwischen Tests leakt, wird das offizielle
+    SQLAlchemy "Joined Session for External Transaction"-Pattern
+    verwendet (siehe
+    https://docs.sqlalchemy.org/en/20/orm/session_transaction.html
+    #joining-a-session-into-an-external-transaction-such-as-for-test-suites):
+
+    - Die Session wird mit ``join_transaction_mode="create_savepoint"``
+      angelegt — jeder Commit innerhalb des Tests wirkt nur auf das
+      Savepoint, nicht auf die äussere Transaction.
+    - Am Test-Ende rollt die äussere Transaction zurück und verwirft
+      alles, was im Test geschrieben wurde.
+
+    Effekt: ``session.commit()`` im Produktivcode wirkt innerhalb des
+    Tests sichtbar, leakt aber nicht über die Test-Grenze hinaus. Die
+    vorherige SAWarning "transaction already deassociated from
+    connection" verschwindet.
     """
     connection = test_engine.connect()
     transaction = connection.begin()
 
     TestingSessionLocal = sessionmaker(
-        autocommit=False, autoflush=False, bind=connection
+        autocommit=False,
+        autoflush=False,
+        bind=connection,
+        join_transaction_mode="create_savepoint",
     )
     session = TestingSessionLocal()
 
     yield session
 
-    # Rollback Transaction nach Test
     session.close()
-    transaction.rollback()
+    if transaction.is_active:
+        transaction.rollback()
     connection.close()
+
+
+@pytest.fixture(autouse=True)
+def _reset_dependency_overrides():
+    """Clear FastAPI dependency overrides after each test.
+
+    Several test modules (test_moodle_connections_api, test_submissions_api,
+    test_subscription_quotas, test_student_classes_api, test_review_queue_api,
+    test_rbac_submissions, test_question_id_roundtrip, test_cross_exam_statistics)
+    set ``app.dependency_overrides[get_current_user]`` etc. via ad-hoc
+    helpers without cleaning up. The next test then inherits a stale User
+    bound to a closed Session — accessing relationships on it raises
+    ``DetachedInstanceError`` (e.g. ``current_user.roles`` in /api/auth/me).
+
+    This autouse teardown guarantees a clean slate per test regardless of
+    which helper a test uses to install overrides.
+    """
+    yield
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture(scope="function")

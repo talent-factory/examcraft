@@ -16,11 +16,10 @@ class MarkdownExporter:
     def export(exam_data: dict, include_solutions: bool = False) -> str:
         try:
             return MarkdownExporter._export(exam_data, include_solutions)
-        except Exception as exc:
-            logger.error(
-                "Export failed for exam '%s': %s",
+        except Exception:
+            logger.exception(
+                "Export failed for exam '%s'",
                 exam_data.get("title", "unknown"),
-                exc,
             )
             raise
 
@@ -83,11 +82,10 @@ class JsonExporter:
     def export(exam_data: dict) -> str:
         try:
             return JsonExporter._export(exam_data)
-        except Exception as exc:
-            logger.error(
-                "Export failed for exam '%s': %s",
+        except Exception:
+            logger.exception(
+                "Export failed for exam '%s'",
                 exam_data.get("title", "unknown"),
-                exc,
             )
             raise
 
@@ -125,21 +123,42 @@ class JsonExporter:
 class MoodleXmlExporter:
     @staticmethod
     def export(exam_data: dict) -> str:
+        """Backwards-compatible: returns just the XML.
+
+        Callers that need the slot mapping for the round-trip (TF-336)
+        use ``export_with_slot_mapping`` instead.
+        """
+        xml, _ = MoodleXmlExporter.export_with_slot_mapping(exam_data)
+        return xml
+
+    @staticmethod
+    def export_with_slot_mapping(
+        exam_data: dict,
+    ) -> tuple[str, list[dict]]:
+        """Return ``(xml, slot_mapping)`` for the round-trip.
+
+        ``slot_mapping`` lists, in export order, dicts with the keys
+        ``exam_question_id``, ``position`` and ``slot`` (which equals
+        ``position`` because Moodle assigns slots 1..N in the order the
+        XML lists them, and we don't reorder). The mapping is the
+        anchor for the later
+        ``POST /api/v1/exams/{id}/sync-moodle-question-ids`` round-trip.
+        """
         try:
-            return MoodleXmlExporter._export(exam_data)
-        except Exception as exc:
-            logger.error(
-                "Export failed for exam '%s': %s",
+            return MoodleXmlExporter._export_with_mapping(exam_data)
+        except Exception:
+            logger.exception(
+                "Export failed for exam '%s'",
                 exam_data.get("title", "unknown"),
-                exc,
             )
             raise
 
     @staticmethod
-    def _export(exam_data: dict) -> str:
+    def _export_with_mapping(exam_data: dict) -> tuple[str, list[dict]]:
         quiz = Element("quiz")
+        slot_mapping: list[dict] = []
 
-        for q in exam_data["questions"]:
+        for slot, q in enumerate(exam_data["questions"], start=1):
             qtype = q["question_type"]
             if qtype == "multiple_choice":
                 _add_mc_question(quiz, q)
@@ -147,6 +166,16 @@ class MoodleXmlExporter:
                 _add_tf_question(quiz, q)
             else:
                 _add_essay_question(quiz, q)
+            # Record the slot the question lands on. Defaults are
+            # forgiving so the exporter still works on payload shapes
+            # that don't include the FK (legacy callers/tests).
+            slot_mapping.append(
+                {
+                    "exam_question_id": q.get("exam_question_id"),
+                    "position": q.get("position", slot),
+                    "slot": slot,
+                }
+            )
 
         raw_xml = tostring(quiz, encoding="unicode")
         dom = parseString(raw_xml)
@@ -155,7 +184,8 @@ class MoodleXmlExporter:
         lines = pretty.split("\n")
         if lines[0].startswith("<?xml"):
             lines = lines[1:]
-        return '<?xml version="1.0" encoding="UTF-8"?>\n' + "\n".join(lines)
+        xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + "\n".join(lines)
+        return xml, slot_mapping
 
 
 def _type_label(question_type: str) -> str:

@@ -115,6 +115,27 @@ class Institution(Base):
     # Review-Workflow
     require_second_reviewer = Column(Boolean, default=False)
 
+    # Institution-wide default grading scheme (FK; per-exam overrides
+    # via Exam.grading_scheme_id). NULL means "use the platform's
+    # built-in defaults".
+    default_grading_scheme_id = Column(
+        Integer,
+        # ON DELETE RESTRICT for the same reason as Exam.grading_scheme_id
+        # — silently nulling an institution's default scheme is a data-
+        # loss surprise. The API's DELETE endpoint pre-checks this so
+        # the user gets a friendly 409, not a 500 from a raw constraint
+        # violation.
+        ForeignKey("grading_schemes.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+
+    # TF-336: Enterprise-Tier kann das Claude-Modell pro Institution
+    # wählen ("claude-sonnet-4-..." oder "claude-opus-4-..."). NULL =
+    # Plattform-Default (Sonnet). Wert-Validierung passiert serviceseitig
+    # (z. B. claude_service.py); die DB hält den String roh, damit ein
+    # Modell-Update keine Schema-Migration erfordert.
+    llm_model_for_grading = Column(String(100), nullable=True)
+
     # Timestamps
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -135,6 +156,30 @@ class Institution(Base):
     )
     resource_usage = relationship(
         "ResourceUsage", back_populates="institution", cascade="all, delete-orphan"
+    )
+    students = relationship(
+        "Student", back_populates="institution", cascade="all, delete-orphan"
+    )
+    student_classes = relationship(
+        "StudentClass", back_populates="institution", cascade="all, delete-orphan"
+    )
+    grading_schemes = relationship(
+        "GradingScheme",
+        back_populates="institution",
+        cascade="all, delete-orphan",
+        foreign_keys="GradingScheme.institution_id",
+    )
+    default_grading_scheme = relationship(
+        "GradingScheme", foreign_keys=[default_grading_scheme_id]
+    )
+    import_jobs = relationship(
+        "ImportJob", back_populates="institution", cascade="all, delete-orphan"
+    )
+    moodle_connection = relationship(
+        "MoodleConnection",
+        back_populates="institution",
+        cascade="all, delete-orphan",
+        uselist=False,
     )
 
     def __repr__(self):

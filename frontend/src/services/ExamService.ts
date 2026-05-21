@@ -1,56 +1,5 @@
-import axios from 'axios';
+import { apiClient } from '../api/apiClient';
 import { ExamRequest, ExamResponse } from '../types/exam';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-
-// Create axios instance with default config
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor for auth token and logging
-apiClient.interceptors.request.use(
-  (config) => {
-    // Add auth token if available
-    const token = localStorage.getItem('examcraft_access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    console.log(`Making ${config.method?.toUpperCase()} request to ${config.url}`);
-    return config;
-  },
-  (error) => {
-    console.error('Request error:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor for error handling
-apiClient.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    console.error('Response error:', error);
-
-    if (error.response) {
-      // Server responded with error status
-      const message = error.response.data?.detail || error.response.data?.message || 'Server error';
-      throw new Error(`${error.response.status}: ${message}`);
-    } else if (error.request) {
-      // Request was made but no response received
-      throw new Error('Keine Verbindung zum Server möglich. Bitte prüfen Sie Ihre Internetverbindung.');
-    } else {
-      // Something else happened
-      throw new Error('Ein unerwarteter Fehler ist aufgetreten.');
-    }
-  }
-);
 
 export class ExamService {
   /**

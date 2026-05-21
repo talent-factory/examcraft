@@ -325,3 +325,128 @@ class TestDashboardActivity:
             assert resp.json()["activities"] == []
         finally:
             app.dependency_overrides.clear()
+
+    def test_activity_isolates_users_in_same_institution(self, test_db: Session):
+        """Lehrperson sieht keine Aktivitäten von Kolleg:innen.
+
+        Pinnt das per-User-Filtering aller 7 Activity-Quellen
+        (create_document, questions_generated via QuestionReview,
+        approve_question, reject_question, create_exam, delete_exam,
+        delete_document). Eine Copy-Paste-Regression auf einer der
+        Quellen würde diesen Test fehlschlagen lassen.
+        """
+        inst = make_institution(test_db, "PrivacyInst")
+        user_a = make_user(test_db, inst.id, "a@privacy.ch")
+        user_b = make_user(test_db, inst.id, "b@privacy.ch")
+
+        # Sources covered via existing helpers:
+        #   create_document, questions_generated, approve_question, create_exam.
+        make_document(test_db, inst.id, user_b.id, "b-confidential.pdf")
+        make_question(
+            test_db, inst.id, user_b.id, ReviewStatus.PENDING.value, "B-Topic"
+        )
+        make_question(
+            test_db, inst.id, user_b.id, ReviewStatus.APPROVED.value, "B-Approved"
+        )
+        make_exam(test_db, inst.id, user_b.id, "B-Exam")
+
+        # Plant explicit audit rows for the remaining sources so all
+        # 7 query blocks are exercised by this regression guard.
+        for action, payload in (
+            ("reject_question", {"topic": "B-Rejected"}),
+            ("delete_exam", {"title": "B-DeletedExam"}),
+            ("delete_document", {"original_filename": "b-deleted.pdf"}),
+        ):
+            test_db.add(
+                AuditLog(
+                    user_id=user_b.id,
+                    action=action,
+                    resource_type="test",
+                    resource_id="999",
+                    status="success",
+                    additional_data=json.dumps(payload),
+                )
+            )
+        test_db.commit()
+
+        client = make_dashboard_client(test_db, inst.id, user_a.id)
+        try:
+            resp = client.get("/api/dashboard/activity")
+            assert resp.status_code == 200
+            data = resp.json()
+            # User A hat keine eigenen Aktivitäten und sieht auch
+            # keine von User B aus irgend einer der 7 Quellen.
+            assert data["activities"] == []
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_activity_resolves_topic_from_question_review_when_audit_payload_empty(
+        self, test_db: Session
+    ):
+        """When ``additional_data`` lacks ``topic``, ``_resolve_review_topic``
+        falls back to a direct ``QuestionReview`` lookup by id. Pin
+        this DB-fallback path so a regression in the helper surfaces."""
+        inst = make_institution(test_db, "FallbackInst")
+        user = make_user(test_db, inst.id, "fb@privacy.ch")
+
+        # Create the QuestionReview row whose topic the helper should
+        # surface, but plant an AuditLog WITHOUT the topic in
+        # additional_data — the path the helper has to fall back through.
+        q = QuestionReview(
+            question_text="Frage?",
+            question_type="open_ended",
+            difficulty="easy",
+            topic="ResolvedTopic",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=inst.id,
+            created_by=user.id,
+        )
+        test_db.add(q)
+        test_db.flush()
+        test_db.add(
+            AuditLog(
+                user_id=user.id,
+                action="approve_question",
+                resource_type="question",
+                resource_id=str(q.id),
+                status="success",
+                additional_data=None,
+            )
+        )
+        test_db.commit()
+
+        client = make_dashboard_client(test_db, inst.id, user.id)
+        try:
+            resp = client.get("/api/dashboard/activity")
+            assert resp.status_code == 200
+            data = resp.json()
+            approved = [
+                a for a in data["activities"] if a["type"] == "question_approved"
+            ]
+            assert len(approved) == 1
+            assert approved[0]["title"] == "ResolvedTopic"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_activity_returns_only_own_events_when_both_users_active(
+        self, test_db: Session
+    ):
+        """User A sieht nur eigene Events, auch wenn beide User
+        Aktivitäten in derselben Institution haben."""
+        inst = make_institution(test_db, "MixedInst")
+        user_a = make_user(test_db, inst.id, "a@mixed.ch")
+        user_b = make_user(test_db, inst.id, "b@mixed.ch")
+
+        make_document(test_db, inst.id, user_a.id, "a-own.pdf")
+        make_document(test_db, inst.id, user_b.id, "b-other.pdf")
+        test_db.commit()
+
+        client = make_dashboard_client(test_db, inst.id, user_a.id)
+        try:
+            resp = client.get("/api/dashboard/activity")
+            data = resp.json()
+            titles = {a["title"] for a in data["activities"]}
+            assert titles == {"a-own.pdf"}
+        finally:
+            app.dependency_overrides.clear()

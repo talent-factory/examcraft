@@ -7,13 +7,19 @@
     "documentation": "Dokumentation",
     "sidebar": {
       "dashboard": "Dashboard",
+      "aktivitaeten": "Aktivitäten",
       "documents": "Dokumente",
       "questionGeneration": "Fragengenerierung",
       "reviewQueue": "Review Queue",
       "examComposer": "Prüfungskomponist",
+      "auswertungen": "Auswertungen",
+      "auswertungenKlassen": "Klassen",
+      "auswertungenStudierende": "Studierende",
       "documentChat": "Dokument-Chat",
       "promptLibrary": "Prompt-Bibliothek",
       "admin": "Admin",
+      "tagSettings": "Tag-Verwaltung",
+      "moodleConnection": "Moodle-Verbindung",
       "pricing": "Preise",
       "profile": "Profil"
     }
@@ -25,7 +31,334 @@
     "it": "Italiano"
   },
   "common": {
-    "refresh": "Aktualisieren"
+    "refresh": "Aktualisieren",
+    "next": "Weiter",
+    "back": "Zurück",
+    "cancel": "Abbrechen",
+    "close": "Schliessen",
+    "invalidNumber": "Ungültige Zahl"
+  },
+  "auswertungen": {
+    "overview": {
+      "title": "Auswertungen",
+      "subtitle": "Importiere Prüfungsresultate und werte sie aus.",
+      "loadError": "Prüfungen konnten nicht geladen werden.",
+      "emptyHint": "Noch keine Prüfungen vorhanden. Erstelle eine Prüfung im Prüfungskomponist.",
+      "colTitle": "Prüfung",
+      "colCourse": "Kurs",
+      "colDate": "Datum",
+      "colStatus": "Status",
+      "colActions": "Aktionen",
+      "actionEvaluate": "Auswerten",
+      "actionImport": "Resultate importieren",
+      "examStatus": {
+        "draft": "Entwurf",
+        "finalized": "Finalisiert",
+        "exported": "Exportiert"
+      }
+    },
+    "exam": {
+      "loadError": "Prüfung oder Submissions konnten nicht geladen werden.",
+      "detailError": "Submission-Detail konnte nicht geladen werden.",
+      "actionImport": "Resultate importieren",
+      "tabSubmissions": "Submissions",
+      "tabReview": "Review",
+      "tabStatistik": "Statistik",
+      "tabExport": "Notenexport",
+      "emptyHint": "Noch keine Resultate importiert. Lade jetzt eine Moodle-CSV hoch.",
+      "colExternalId": "Identifikation",
+      "colDisplayName": "Name",
+      "colAttempts": "Versuche",
+      "colPoints": "Punkte",
+      "colPercentage": "Prozent",
+      "colGradeStatus": "Status",
+      "gradeStatus": {
+        "pending_review": "In Review",
+        "partially_reviewed": "Teilweise reviewt",
+        "fully_reviewed": "Reviewt",
+        "approved": "Übernommen",
+        "manual_override": "Manuell"
+      },
+      "drawer": {
+        "points": "{{awarded}} / {{max}} Punkte",
+        "attemptHeader": "Versuch {{number}}",
+        "gradedTag": "Wertend",
+        "colQuestion": "Frage",
+        "colAnswer": "Antwort",
+        "colGrade": "Bewertung",
+        "actionOverrideMc": "Manuell überstimmen",
+        "actionOverrideOpen": "Anpassen",
+        "rationale": "Claudes Begründung"
+      },
+      "review": {
+        "title": "Review-Queue",
+        "loadError": "Review-Queue konnte nicht geladen werden.",
+        "emptyHint": "Keine offenen Vorschläge — alle offenen Fragen sind reviewt.",
+        "filterConfidence": "Konfidenz",
+        "filterConfidenceFrom": "Min",
+        "filterConfidenceTo": "Max",
+        "filterQuestion": "Frage",
+        "filterStudent": "Studi",
+        "filterClear": "Filter zurücksetzen",
+        "filterAllQuestions": "Alle Fragen",
+        "filterAllStudents": "Alle Studis",
+        "totalCount": "{{count}} offen",
+        "confidenceLabel": "Konfidenz {{value}}%",
+        "noConfidence": "Keine Konfidenz",
+        "rationale": "Begründung",
+        "matchedAspects": "Erfasste Aspekte",
+        "missingAspects": "Fehlende Aspekte",
+        "questionLabel": "Frage",
+        "correctAnswerLabel": "Musterlösung",
+        "studentAnswerLabel": "Studi-Antwort",
+        "proposalLabel": "Vorschlag",
+        "actionApprove": "Übernehmen",
+        "actionOverride": "Anpassen",
+        "actionContext": "Im Kontext",
+        "actionApproveSuccess": "Bewertung übernommen.",
+        "actionOverrideSuccess": "Bewertung gespeichert.",
+        "actionFailure": "Aktion fehlgeschlagen.",
+        "overrideDialog": {
+          "title": "Bewertung anpassen",
+          "pointsLabel": "Punkte",
+          "pointsHelp": "0 bis {{max}}",
+          "outOfBounds": "Punkte müssen zwischen 0 und {{max}} liegen.",
+          "noteLabel": "Notiz für Audit-Trail (optional)",
+          "submit": "Speichern",
+          "cancel": "Abbrechen"
+        },
+        "bulk": {
+          "title": "Bulk-Übernehmen",
+          "thresholdLabel": "Konfidenz ≥",
+          "applyByThreshold": "Alle ab Schwelle übernehmen",
+          "applyBySelection": "Auswahl übernehmen ({{count}})",
+          "selectAll": "Alle auswählen",
+          "clearSelection": "Auswahl aufheben",
+          "confirmThreshold": "{{count}} Vorschläge mit Konfidenz ≥ {{threshold}}% übernehmen?",
+          "success": "{{count}} Bewertungen übernommen."
+        }
+      }
+    },
+    "importDialog": {
+      "title": "Resultate importieren — {{examTitle}}",
+      "errorPreview": "Vorschau fehlgeschlagen.",
+      "errorCommit": "Import fehlgeschlagen.",
+      "steps": {
+        "source": "Quelle",
+        "upload": "Datei",
+        "preview": "Vorschau",
+        "confirm": "Bestätigen"
+      },
+      "sourceLabel": "Welches Format willst du importieren?",
+      "sourceMoodleCsv": "Moodle CSV-Datei (Quiz Responses Export)",
+      "sourceMoodleApi": "Moodle Web-Service-API",
+      "unavailableTag": "noch nicht verfügbar",
+      "moodleProbeError": "Konnte Moodle-Verbindung nicht prüfen — bitte später erneut versuchen.",
+      "chooseFile": "CSV-Datei wählen",
+      "uploadHint": "UTF-8 mit Trenner ; oder ,. Antwort-Spalten heissen «Antwort N» oder «Response N».",
+      "studentCount": "{{count}} Studierende",
+      "attemptCount": "{{count}} Versuche",
+      "errorCount": "{{count}} fehlerhafte Zeilen",
+      "errorListTitle": "Fehlerhafte Zeilen werden übersprungen:",
+      "errorListTruncated": "+ {{count}} weitere — siehe Job-Detail",
+      "rowError": "Zeile {{row}}: {{reason}}",
+      "fileTooLarge": "Datei zu gross ({{actualMb}} MB). Maximum: {{maxMb}} MB.",
+      "truncatedTag": "Vorschau gekürzt — vollständige Liste nach Import",
+      "colExternalId": "Identifikation",
+      "colDisplayName": "Name",
+      "confirm": "Importieren",
+      "submitting": "Import läuft…",
+      "result": {
+        "succeeded": "Import erfolgreich",
+        "partial": "Import teilweise erfolgreich",
+        "failed": "Import fehlgeschlagen",
+        "running": "Import läuft",
+        "queued": "Import wartet"
+      },
+      "resultSummary": "{{processed}} verarbeitet, {{failed}} fehlerhaft."
+    },
+    "stats": {
+      "loadError": "Statistiken konnten nicht geladen werden.",
+      "empty": "Noch keine Submissions importiert — Statistik wird verfügbar, sobald Resultate vorliegen.",
+      "kpiSubmissions": "Submissions",
+      "kpiReviewed": "{{count}} reviewt",
+      "kpiAvg": "Ø Punkte",
+      "kpiMedian": "Median {{value}}",
+      "kpiPassRate": "Erfolgsquote",
+      "kpiAvgDuration": "Ø Bearbeitungszeit",
+      "histogramTitle": "Punkteverteilung",
+      "perQuestionTitle": "Pro Frage",
+      "colPosition": "Pos.",
+      "colQuestion": "Frage",
+      "colSuccessRate": "Erfolgsquote",
+      "colDifficulty": "Schwierigkeit",
+      "colDiscrimination": "Trennschärfe",
+      "colLearning": "Lerneffekt"
+    },
+    "export": {
+      "title": "Notenexport",
+      "formatLabel": "Format wählen",
+      "format": {
+        "csv": "CSV (Excel-friendly)",
+        "moodle_csv": "Moodle-Grades-Reimport CSV",
+        "pdf": "PDF Notenliste"
+      },
+      "downloadButton": "Herunterladen",
+      "summary": "{{total}} Submissions, {{pending}} noch offen.",
+      "noSubmissionsHint": "Noch keine Submissions importiert.",
+      "pendingReviewHint": "Notenexport gesperrt — {{count}} Bewertungen müssen noch reviewt werden.",
+      "openReviewQueue": "Zur Review-Queue",
+      "unexpectedError": "Notenexport fehlgeschlagen.",
+      "errorAuth": "Sitzung abgelaufen — bitte erneut anmelden.",
+      "errorPermission": "Keine Berechtigung für den Notenexport.",
+      "errorNotFound": "Prüfung nicht gefunden.",
+      "errorServer": "Notenexport fehlgeschlagen — bitte erneut versuchen oder Support kontaktieren."
+    },
+    "statistik": {
+      "errorAuth": "Sitzung abgelaufen — bitte erneut anmelden.",
+      "errorPermission": "Keine Berechtigung für die Statistik-Ansicht.",
+      "errorNotFound": "Prüfung nicht gefunden.",
+      "errorServer": "Statistik konnte nicht geladen werden — bitte später erneut versuchen.",
+      "errorPartial": "Statistik teilweise nicht geladen — einzelne Bereiche fehlen."
+    },
+    "klassen": {
+      "title": "Klassen",
+      "subtitle": "Pflege deine Klassen und ordne Studierende zu.",
+      "loadError": "Klassen konnten nicht geladen werden.",
+      "emptyHint": "Noch keine Klassen angelegt. Eine Klasse legst du beim Import an oder hier manuell.",
+      "colName": "Name",
+      "colMembers": "Mitglieder",
+      "colCreated": "Angelegt",
+      "colActions": "Aktionen",
+      "actionCreate": "Klasse anlegen",
+      "actionDetail": "Detail",
+      "actionRename": "Umbenennen",
+      "actionDelete": "Löschen",
+      "createDialog": {
+        "title": "Klasse anlegen",
+        "nameLabel": "Klassenname",
+        "nameHelper": "z. B. INF-23a",
+        "submit": "Anlegen",
+        "cancel": "Abbrechen",
+        "error": "Klasse konnte nicht angelegt werden.",
+        "duplicate": "Eine Klasse mit diesem Namen existiert bereits."
+      },
+      "renameDialog": {
+        "title": "Klasse umbenennen",
+        "submit": "Speichern"
+      },
+      "deleteConfirm": {
+        "title": "Klasse löschen?",
+        "body": "Die Klasse \"{{name}}\" und alle Mitgliedschaften werden entfernt. Studierende selbst bleiben erhalten.",
+        "submit": "Löschen",
+        "cancel": "Abbrechen"
+      },
+      "detail": {
+        "loadError": "Klassen-Detail konnte nicht geladen werden.",
+        "membersTitle": "Mitglieder",
+        "memberCount": "{{count}} Mitglied(er)",
+        "emptyMembers": "Noch keine Studierenden zugewiesen.",
+        "actionAssign": "Studi zuweisen",
+        "actionRemoveMember": "Aus Klasse entfernen",
+        "memberRemoveSuccess": "Mitglied entfernt.",
+        "memberAddSuccess": "Studi der Klasse zugewiesen.",
+        "tabHistory": "Verlauf",
+        "tabMembers": "Mitglieder",
+        "examTrendTitle": "Klassen-Durchschnitt pro Prüfung",
+        "examTrendNoData": "Noch keine Submissions in dieser Klasse — Verlauf erscheint nach dem ersten Import.",
+        "topicCoverageTitle": "Topic-Abdeckung",
+        "topicCoverageNoData": "Keine Topic-Daten verfügbar.",
+        "memberPerformanceTitle": "Performance pro Studi",
+        "colSubmissions": "Submissions",
+        "colAvg": "Durchschnitt"
+      },
+      "assignDialog": {
+        "title": "Studi zuweisen",
+        "searchLabel": "Suche nach E-Mail / Name",
+        "loading": "Suche läuft...",
+        "noMatch": "Keine Treffer.",
+        "submit": "Zuweisen",
+        "cancel": "Abbrechen",
+        "duplicate": "Studi ist bereits Mitglied dieser Klasse.",
+        "searchError": "Suche fehlgeschlagen — bitte erneut versuchen.",
+        "assignError": "Zuweisen fehlgeschlagen — bitte erneut versuchen."
+      }
+    },
+    "studierende": {
+      "title": "Studierende",
+      "subtitle": "Stammdaten und Cross-Exam-Verlauf einzelner Studierender.",
+      "loadError": "Studierende konnten nicht geladen werden.",
+      "emptyHint": "Noch keine Studierenden vorhanden.",
+      "searchLabel": "Suche nach E-Mail / Name",
+      "filterClass": "Klassenfilter",
+      "filterAllClasses": "Alle Klassen",
+      "colExternalId": "Identifikation",
+      "colDisplayName": "Name",
+      "colClasses": "Klassen",
+      "colSubmissions": "Prüfungen",
+      "colAvg": "Durchschnitt",
+      "colActions": "Aktionen",
+      "actionDetail": "Detail",
+      "noClasses": "—",
+      "detail": {
+        "loadError": "Studi-Detail konnte nicht geladen werden.",
+        "submissionsTitle": "Submissions chronologisch",
+        "noSubmissions": "Noch keine Submissions für diesen Studi.",
+        "bloomTitle": "Bloom-Mix",
+        "bloomNoData": "Bloom-Daten fehlen — Fragen ohne Bloom-Level werden nicht aggregiert.",
+        "topicHeatmapTitle": "Topic-Heatmap",
+        "topicHeatmapNoData": "Keine Topic-Daten verfügbar.",
+        "classesTitle": "Klassenzugehörigkeit",
+        "noClasses": "Keine Klassen zugewiesen.",
+        "avgSummary": "{{count}} Prüfung(en) — Durchschnitt {{percentage}}%"
+      }
+    },
+    "tierBanner": {
+      "title": "Tier-Limit erreicht",
+      "upgradeAction": "Upgrade auf {{tier}}",
+      "auswertung_driver_not_in_tier": "Tier {{tier}} schaltet den Driver \"{{driver}}\" nicht frei. Upgrade auf Professional oder höher.",
+      "auswertung_class_history_enterprise_only": "Klassen- und Studi-Verlauf ist nur im Enterprise-Tier enthalten.",
+      "auswertung_review_bulk_pro_only": "Bulk-Review-Aktionen sind erst ab Professional verfügbar.",
+      "auswertung_custom_grading_schemes_enterprise_only": "Eigene Notenmodelle sind Teil des Enterprise-Tiers.",
+      "auswertung_exam_monthly_quota_exceeded": "Monatslimit erreicht: {{used}} von {{limit}} Auswertungen genutzt. Upgrade auf Starter oder höher.",
+      "auswertung_submission_quota_exceeded": "Submission-Limit pro Prüfung erreicht ({{limit}}). Upgrade auf Professional."
+    },
+    "moodleSync": {
+      "actionLabel": "Moodle-IDs erfassen",
+      "dialogTitle": "Moodle-Quiz-IDs synchronisieren",
+      "quizIdLabel": "Moodle-Quiz-ID",
+      "quizIdHelper": "Aus der URL der Quiz-Settings-Seite, z. B. ../mod/quiz/view.php?id=42",
+      "questionIdsLabel": "Question-IDs (optional, Slot-Reihenfolge)",
+      "questionIdsHelper": "Komma-getrennt — wenn leer, wird nur Slot=Position geschrieben.",
+      "submit": "Synchronisieren",
+      "cancel": "Abbrechen",
+      "success": "{{count}} Frage(n) verknüpft mit Moodle-Quiz {{quiz}}.",
+      "error": "Sync fehlgeschlagen.",
+      "notVisible": "Quiz {{id}} ist für den gespeicherten Token nicht sichtbar — Token-Berechtigung prüfen."
+    }
+  },
+  "aktivitaeten": {
+    "title": "Aktivitäten",
+    "subtitle": "Übersicht aller Ereignisse — wähle den Sichtbereich und filtere nach Typ.",
+    "scopeAria": "Sichtbarkeit",
+    "scopeOwn": "Eigene",
+    "scopeInstitution": "Alle",
+    "reload": "Erneut laden",
+    "errorLoad": "Aktivitäten konnten nicht geladen werden.",
+    "emptyFresh": "Noch keine Aktivitäten — lade ein Dokument hoch oder generiere Fragen.",
+    "emptyFiltered": "Keine Aktivitäten zu den gewählten Filtern.",
+    "resetFilters": "Filter zurücksetzen",
+    "shortcutDocuments": "Dokumente",
+    "shortcutGenerate": "Fragen generieren",
+    "types": {
+      "document_uploaded": "Dokument hochgeladen",
+      "document_deleted": "Dokument gelöscht",
+      "questions_generated": "Fragen generiert",
+      "question_approved": "Frage validiert",
+      "question_rejected": "Frage abgelehnt",
+      "exam_created": "Prüfung erstellt",
+      "exam_deleted": "Prüfung gelöscht"
+    }
   },
   "auth": {
     "login": {
@@ -151,7 +484,8 @@
         "exam_deleted": "Prüfung gelöscht"
       },
       "statsError": "Statistiken konnten nicht geladen werden.",
-      "activityError": "Aktivitäten konnten nicht geladen werden."
+      "activityError": "Aktivitäten konnten nicht geladen werden.",
+      "viewAllActivities": "Alle Aktivitäten anzeigen →"
     },
     "documents": {
       "title": "Dokumentenbibliothek",
@@ -262,6 +596,35 @@
     }
   },
   "admin": {
+    "moodle": {
+      "title": "Moodle-Verbindung",
+      "subtitle": "Token und Base-URL für den Moodle-Web-Service-Driver.",
+      "loadError": "Verbindungen konnten nicht geladen werden.",
+      "saveError": "Speichern fehlgeschlagen — bitte nochmals versuchen.",
+      "deleteError": "Entfernen fehlgeschlagen — bitte nochmals versuchen.",
+      "testError": "Test fehlgeschlagen — bitte nochmals versuchen.",
+      "validationError": "Bitte Base-URL und Token ausfüllen.",
+      "noConnection": "Noch keine Verbindung eingerichtet.",
+      "baseUrlLabel": "Base-URL",
+      "baseUrlHelper": "z. B. https://moodle.deine-schule.ch",
+      "tokenLabel": "Web-Service-Token",
+      "tokenHelper": "Aus Moodle: Site-Administration → Server → Web-Services → Tokens verwalten.",
+      "tokenRotateLabel": "Neuer Token (optional)",
+      "tokenRotateHelper": "Leer lassen, um den bestehenden Token zu behalten.",
+      "actionSave": "Speichern",
+      "actionUpdate": "Aktualisieren",
+      "actionTest": "Verbindung testen",
+      "actionDelete": "Verbindung entfernen",
+      "createSuccess": "Verbindung gespeichert.",
+      "updateSuccess": "Verbindung aktualisiert.",
+      "deleteSuccess": "Verbindung entfernt.",
+      "testRunning": "Teste …",
+      "testSuccess": "Verbindung OK — {{site}} (User: {{user}})",
+      "testFailure": "Verbindungstest fehlgeschlagen: {{error}}",
+      "lastUsedNever": "noch nie genutzt",
+      "lastUsedAt": "zuletzt genutzt: {{when}}",
+      "tokenMaskedHint": "Token wird verschlüsselt gespeichert und nur maskiert angezeigt."
+    },
     "userManagement": {
       "title": "Benutzerverwaltung",
       "subtitle": "Benutzer verwalten, Rollen zuweisen und Zugriffsberechtigungen steuern"
@@ -531,7 +894,8 @@
       "versionHistoryTitle": "Version History",
       "currentVersion": "Aktuelle Version: v{{version}}",
       "btnShowVersions": "Versionen anzeigen",
-      "validationRequired": "Name, Content und Category sind Pflichtfelder",
+      "validationRequired": "Name, Content, Category und Use Case sind Pflichtfelder",
+      "useCaseRequired": "Bitte wählen Sie einen Fragetyp (Use Case) aus.",
       "successUpdated": "Prompt erfolgreich aktualisiert",
       "successVersionCreated": "Neue Version v{{version}} erstellt",
       "successCreated": "Prompt erfolgreich erstellt",
@@ -658,7 +1022,21 @@
       "close": "Schließen",
       "previewTitle": "Dokument-Vorschau: {{title}}",
       "tabMetadata": "Metadaten",
-      "tabContent": "Inhalt",
+      "tabOriginal": "Original",
+      "tabChunks": "Chunks",
+      "originalLoading": "Original wird geladen…",
+      "originalError": "Original konnte nicht geladen werden: {{error}}",
+      "originalErrorNetwork": "Netzwerkfehler — bitte Verbindung prüfen und erneut versuchen.",
+      "originalErrorAuth": "Sitzung abgelaufen — bitte neu anmelden.",
+      "originalErrorPermission": "Keine Berechtigung, dieses Dokument anzuzeigen.",
+      "originalErrorMissing": "Originaldatei nicht gefunden — eventuell wurde sie gelöscht.",
+      "originalErrorThrottled": "Speicherdienst überlastet — bitte in wenigen Sekunden erneut versuchen.",
+      "originalErrorServer": "Serverfehler beim Laden der Vorschau — bitte erneut versuchen oder herunterladen.",
+      "originalPdfFallback": "Das eingebettete PDF wird von diesem Browser nicht unterstützt.",
+      "originalOpenInNewTab": "PDF in neuem Tab öffnen",
+      "originalDocxPending": "Eine eingebettete Vorschau für DOCX-Dateien folgt in einem späteren Release. Den extrahierten Text findest du im Tab Chunks.",
+      "originalUnsupported": "Für diesen Dateityp ist keine direkte Vorschau verfügbar. Inhalt siehe Tab Chunks.",
+      "chunksLoadError": "Chunks konnten nicht geladen werden: {{error}}",
       "docInfo": "Dokument-Informationen",
       "originalFile": "Originaldatei:",
       "fileSize": "Dateigröße:",
@@ -856,7 +1234,9 @@
       "validationQuestionLength": "Der Fragetext muss mindestens 10 Zeichen lang sein",
       "validationMinOptions": "Multiple-Choice-Fragen benötigen mindestens 2 Optionen",
       "validationSelectAnswer": "Bitte wählen Sie eine korrekte Antwort",
-      "validationAnswerInOptions": "Die korrekte Antwort muss eine der Optionen sein"
+      "validationAnswerInOptions": "Die korrekte Antwort muss eine der Optionen sein",
+      "tagCreateError": "Einige Tags konnten nicht erstellt werden: {{names}}",
+      "saveError": "Speichern fehlgeschlagen. Bitte versuche es erneut."
     },
     "errorBoundary": {
       "title": "Ein Fehler ist aufgetreten",
@@ -882,7 +1262,8 @@
       "difficultyMedium": "Mittel",
       "difficultyHard": "Schwer",
       "back": "Zurück",
-      "generate": "Generieren"
+      "generate": "Generieren",
+      "tagsLabel": "Tags (optional)"
     },
     "questionReviewDetail": {
       "errorLoad": "Fehler beim Laden der Frage",
@@ -968,6 +1349,11 @@
       "fieldAllowedAids": "Erlaubte Hilfsmittel",
       "fieldInstructions": "Hinweise / Anweisungen",
       "fieldPassingPercentage": "Bestehensprozentsatz (%)",
+      "fieldGradingScheme": "Notenskala",
+      "gradingSchemeInherit": "Institution-Default verwenden",
+      "gradingSchemeSystemGroup": "System-Skalen",
+      "gradingSchemeInstitutionGroup": "Eigene Skalen",
+      "gradingSchemeDefaultMarker": "(Default)",
       "cancel": "Abbrechen",
       "saving": "Speichere...",
       "save": "Speichern",
@@ -1064,7 +1450,14 @@
       "accept": "Übernehmen",
       "accepting": "Füge hinzu...",
       "generatePreview": "Vorschau generieren",
-      "generating": "Generiere..."
+      "generating": "Generiere...",
+      "tagFilterLabel": "Tags",
+      "tagFilterEmpty": "Keine Tags vorhanden",
+      "tagFilterRemove": "Tag entfernen",
+      "tagFilterClear": "Alle entfernen",
+      "tagFilterSearch": "Tag suchen…",
+      "tagFilterNoResults": "Keine Tags gefunden",
+      "tagsShowLess": "weniger anzeigen"
     }
   },
   "profile": {
@@ -1268,7 +1661,9 @@
       "pendingReview": "Pending Review",
       "pendingReviewInfo": "Die Fragen befinden sich im Status Pending und müssen im Review-Workflow überprüft und genehmigt werden.",
       "goToReview": "Zum Review-Workflow",
-      "createNewExam": "Neue Prüfung erstellen"
+      "createNewExam": "Neue Prüfung erstellen",
+      "errorTagCreation": "Einige Tags konnten nicht erstellt werden: {{names}}",
+      "tagsLabel": "Tags (optional)"
     },
     "ragExamDisplay": {
       "questions": "{{count}} Fragen",
@@ -1363,7 +1758,8 @@
         "errorGenerating": "Fehler beim Generieren des Templates",
         "generateTemplate": "Template generieren",
         "generating": "Generiere Template...",
-        "placeholder": "Beschreiben Sie, was Ihr Prompt tun soll..."
+        "placeholder": "Beschreiben Sie, was Ihr Prompt tun soll...",
+        "templateSaved": "Template wurde gespeichert"
       },
       "sessionList": {
         "newSession": "Neue Session",

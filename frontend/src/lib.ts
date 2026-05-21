@@ -66,8 +66,23 @@ export { default as useDebounce } from './hooks/useDebounce';
 export { useRoleBasedNavigation } from './hooks/useRoleBasedNavigation';
 
 // ============================================================================
+// API Client
+// ============================================================================
+
+export { apiClient, setTokenRefreshCallback, setLogoutCallback } from './api/apiClient';
+
+// ============================================================================
 // Utils
 // ============================================================================
 
 export * from './utils/componentLoader';
 export * from './utils/deploymentMode';
+
+// ============================================================================
+// Tags
+// ============================================================================
+
+export { tagsApi } from './api/tagsApi';
+export type { Tag, TagValue, PendingTag } from './api/tagsApi';
+export { isPendingTag } from './api/tagsApi';
+export { default as TagAutocomplete } from './components/shared/TagAutocomplete';

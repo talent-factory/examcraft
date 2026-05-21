@@ -7,6 +7,7 @@
     "documentation": "Documentation",
     "sidebar": {
       "dashboard": "Tableau de bord",
+      "aktivitaeten": "Activité",
       "documents": "Documents",
       "questionGeneration": "Génération de questions",
       "reviewQueue": "File de révision",
@@ -14,6 +15,7 @@
       "documentChat": "Chat de documents",
       "promptLibrary": "Bibliothèque de prompts",
       "admin": "Admin",
+      "tagSettings": "Gestion des tags",
       "pricing": "Tarifs",
       "profile": "Profil"
     }
@@ -23,6 +25,29 @@
     "en": "English",
     "fr": "Français",
     "it": "Italiano"
+  },
+  "aktivitaeten": {
+    "title": "Activité",
+    "subtitle": "Tous les événements en un coup d'œil — choisissez la portée et filtrez par type.",
+    "scopeAria": "Visibilité",
+    "scopeOwn": "Mes activités",
+    "scopeInstitution": "Toutes",
+    "reload": "Recharger",
+    "errorLoad": "Impossible de charger les activités.",
+    "emptyFresh": "Aucune activité pour l'instant — téléchargez un document ou générez des questions.",
+    "emptyFiltered": "Aucune activité correspondant aux filtres.",
+    "resetFilters": "Réinitialiser les filtres",
+    "shortcutDocuments": "Documents",
+    "shortcutGenerate": "Générer des questions",
+    "types": {
+      "document_uploaded": "Document téléchargé",
+      "document_deleted": "Document supprimé",
+      "questions_generated": "Questions générées",
+      "question_approved": "Question validée",
+      "question_rejected": "Question refusée",
+      "exam_created": "Examen créé",
+      "exam_deleted": "Examen supprimé"
+    }
   },
   "auth": {
     "login": {
@@ -137,7 +162,8 @@
       "generatedQuestions": "Questions générées",
       "validatedQuestions": "Questions validées",
       "recentActivity": "Activité récente",
-      "noActivity": "Aucune activité pour le moment. Commencez par télécharger des documents !"
+      "noActivity": "Aucune activité pour le moment. Commencez par télécharger des documents !",
+      "viewAllActivities": "Voir toute l'activité →"
     },
     "documents": {
       "title": "Bibliothèque de documents",
@@ -483,7 +509,8 @@
       "versionHistoryTitle": "Historique des versions",
       "currentVersion": "Version actuelle : v{{version}}",
       "btnShowVersions": "Afficher les versions",
-      "validationRequired": "Le nom, le contenu et la catégorie sont obligatoires",
+      "validationRequired": "Le nom, le contenu, la catégorie et le cas d'utilisation sont obligatoires",
+      "useCaseRequired": "Veuillez sélectionner un type de question (cas d'utilisation).",
       "successUpdated": "Prompt mis à jour avec succès",
       "successVersionCreated": "Nouvelle version v{{version}} créée",
       "successCreated": "Prompt créé avec succès",
@@ -610,7 +637,21 @@
       "close": "Fermer",
       "previewTitle": "Aperçu du document : {{title}}",
       "tabMetadata": "Métadonnées",
-      "tabContent": "Contenu",
+      "tabOriginal": "Original",
+      "tabChunks": "Chunks",
+      "originalLoading": "Chargement de l'original…",
+      "originalError": "Impossible de charger l'original : {{error}}",
+      "originalErrorNetwork": "Erreur réseau — vérifiez votre connexion et réessayez.",
+      "originalErrorAuth": "Session expirée — veuillez vous reconnecter.",
+      "originalErrorPermission": "Vous n'avez pas l'autorisation de consulter ce document.",
+      "originalErrorMissing": "Fichier original introuvable — il a peut-être été supprimé.",
+      "originalErrorThrottled": "Service de stockage saturé — réessayez dans quelques secondes.",
+      "originalErrorServer": "Erreur serveur lors du chargement de l'aperçu — réessayez ou téléchargez le fichier.",
+      "originalPdfFallback": "L'aperçu PDF intégré n'est pas pris en charge par ce navigateur.",
+      "originalOpenInNewTab": "Ouvrir le PDF dans un nouvel onglet",
+      "originalDocxPending": "Un aperçu intégré pour les fichiers DOCX arrive dans une version ultérieure. Le texte extrait se trouve dans l'onglet Chunks.",
+      "originalUnsupported": "Aucun aperçu direct n'est disponible pour ce type de fichier. Voir l'onglet Chunks pour le contenu.",
+      "chunksLoadError": "Échec du chargement des chunks : {{error}}",
       "docInfo": "Informations sur le document",
       "originalFile": "Fichier original :",
       "fileSize": "Taille du fichier :",
@@ -804,7 +845,9 @@
       "validationQuestionLength": "Le texte de la question doit contenir au moins 10 caractères",
       "validationMinOptions": "Les questions à choix multiple nécessitent au moins 2 options",
       "validationSelectAnswer": "Veuillez sélectionner une réponse correcte",
-      "validationAnswerInOptions": "La réponse correcte doit être l'une des options"
+      "validationAnswerInOptions": "La réponse correcte doit être l'une des options",
+      "tagCreateError": "Certains tags n'ont pas pu être créés : {{names}}",
+      "saveError": "Échec de l'enregistrement. Veuillez réessayer."
     },
     "errorBoundary": {
       "title": "Une erreur s'est produite",
@@ -830,7 +873,8 @@
       "difficultyMedium": "Moyen",
       "difficultyHard": "Difficile",
       "back": "Retour",
-      "generate": "Générer"
+      "generate": "Générer",
+      "tagsLabel": "Tags (optionnel)"
     },
     "questionReviewDetail": {
       "errorLoad": "Erreur lors du chargement de la question",
@@ -1012,7 +1056,14 @@
       "accept": "Accepter",
       "accepting": "Ajout en cours...",
       "generatePreview": "Générer un aperçu",
-      "generating": "Génération..."
+      "generating": "Génération...",
+      "tagFilterLabel": "Tags",
+      "tagFilterEmpty": "Aucun tag disponible",
+      "tagFilterRemove": "Supprimer le tag",
+      "tagFilterClear": "Tout effacer",
+      "tagFilterSearch": "Rechercher un tag…",
+      "tagFilterNoResults": "Aucun tag trouvé",
+      "tagsShowLess": "voir moins"
     }
   },
   "profile": {
@@ -1216,7 +1267,9 @@
       "pendingReview": "En attente de révision",
       "pendingReviewInfo": "Les questions sont en statut En attente et doivent être vérifiées et approuvées dans le workflow de révision.",
       "goToReview": "Aller au workflow de révision",
-      "createNewExam": "Créer un nouvel examen"
+      "createNewExam": "Créer un nouvel examen",
+      "errorTagCreation": "Certains tags n'ont pas pu être créés : {{names}}",
+      "tagsLabel": "Tags (optionnel)"
     },
     "ragExamDisplay": {
       "questions": "{{count}} Questions",
@@ -1306,7 +1359,8 @@
         "errorGenerating": "Erreur lors de la génération du template",
         "generateTemplate": "Générer le template",
         "generating": "Génération du template...",
-        "placeholder": "Décrivez ce que votre prompt doit faire..."
+        "placeholder": "Décrivez ce que votre prompt doit faire...",
+        "templateSaved": "Le template a été enregistré"
       },
       "sessionList": {
         "newSession": "Nouvelle session",

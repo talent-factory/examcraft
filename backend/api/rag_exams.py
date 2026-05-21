@@ -71,6 +71,10 @@ class RAGExamRequestModel(BaseModel):
         None,
         description="Prompt-Konfiguration pro Fragetyp (z.B. {'multiple_choice': {...}, 'open_ended': {...}})",
     )
+    tag_ids: List[int] = Field(
+        default_factory=list,
+        description="Tag-IDs, die allen generierten Fragen zugewiesen werden",
+    )
 
 
 class RAGQuestionResponse(BaseModel):
@@ -181,6 +185,30 @@ async def generate_rag_exam(
                         detail=t("rag_invalid_question_type", locale=locale),
                     )
 
+        if request.tag_ids:
+            from models.tag import Tag as TagModel
+
+            visible = (
+                db.query(TagModel)
+                .filter(
+                    TagModel.id.in_(request.tag_ids),
+                    (TagModel.institution_id == current_user.institution_id)
+                    | (TagModel.scope == "global"),
+                )
+                .all()
+            )
+            if len(visible) != len(set(request.tag_ids)):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Ungültige Tag-IDs.",
+                )
+            for tag in visible:
+                if tag.is_archived:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Tag '{tag.name}' ist archiviert.",
+                    )
+
         # Request serialisieren
         prompt_config_dict = None
         if request.prompt_config:
@@ -216,6 +244,7 @@ async def generate_rag_exam(
             language=request.language,
             context_chunks_per_question=request.context_chunks_per_question,
             prompt_config=prompt_config_dict,
+            tag_ids=request.tag_ids,
         )
         request_data = rag_request.model_dump(mode="json")
 
@@ -401,6 +430,48 @@ async def retry_generation(
             raise HTTPException(
                 status_code=503,
                 detail=t("rag_task_queue_unavailable", locale=locale),
+            )
+
+        # Audit-log the retry trigger so it appears in the dashboard
+        # widget and ``/aktivitaeten``. ``user_id`` stays the job owner
+        # (also on superuser-bypass retries); ``retry_of_task_id`` lets
+        # consumers distinguish original generations from retries.
+        # AuditService.log_action swallows its own DB errors and
+        # returns None — a None return means the activity feed will be
+        # missing this entry, but the Celery task is already enqueued
+        # so a 500 here would prompt the user to retry and double-
+        # charge quota. The narrow try/except handles the unlikely
+        # case where AuditService itself is unimportable.
+        from services.audit_service import AuditService
+
+        audit_log = None
+        try:
+            audit_log = AuditService.log_action(
+                db,
+                action="create_question",
+                status=AuditService.STATUS_SUCCESS,
+                user_id=owner_user.id,
+                resource_type="question",
+                resource_id=new_task_id,
+                request=http_request,
+                additional_data={
+                    "topic": original_job.topic,
+                    "question_count": original_job.question_count,
+                    "retry_of_task_id": task_id,
+                },
+            )
+        except Exception as audit_error:
+            logger.error(
+                "Retry audit log raised for new_task_id=%s (job already enqueued): %s",
+                new_task_id,
+                audit_error,
+                exc_info=True,
+            )
+        if audit_log is None:
+            logger.error(
+                "Retry audit log returned None for new_task_id=%s — "
+                "activity feed will be missing this retry. Job already enqueued.",
+                new_task_id,
             )
 
         logger.info(

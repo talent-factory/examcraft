@@ -38,6 +38,7 @@ import {
   Lightbulb,
   RateReview,
   Visibility,
+  LocalOfferOutlined,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -285,6 +286,26 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             />
           </Tooltip>
         </Stack>
+
+        {question.tags && question.tags.length > 0 && (
+          <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {[...question.tags].sort((a, b) => a.name.localeCompare(b.name)).map((tag) => (
+              <Chip
+                key={tag.id}
+                icon={<LocalOfferOutlined />}
+                label={tag.name}
+                size="small"
+                sx={{
+                  bgcolor: (theme) => `${theme.palette.secondary.light}22`,
+                  color: 'secondary.dark',
+                  border: '1px solid',
+                  borderColor: (theme) => `${theme.palette.secondary.light}66`,
+                  '& .MuiChip-icon': { color: 'secondary.light', fontSize: 14 },
+                }}
+              />
+            ))}
+          </Box>
+        )}
 
         {/* Source Citations */}
         {question.source_documents && question.source_documents.length > 0 && (

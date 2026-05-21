@@ -47,15 +47,264 @@ import {
   Check,
   Close
 } from '@mui/icons-material';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../utils/dateLocale';
 import { DocumentService } from '../services/DocumentService';
 import { Document, DocumentStatus } from '../types/document';
 
+const READY_STATUSES: ReadonlyArray<string> = ['processed', 'completed'];
+const isDocumentReady = (status: string | undefined | null): boolean =>
+  status != null && READY_STATUSES.includes(status);
+
+/**
+ * Pick a localized error key for the ORIGINAL preview based on the HTTP
+ * status of a `DocumentFetchError`. Falls back to the generic
+ * `originalError` key (which interpolates the raw message) for unmapped
+ * statuses so the user still sees something actionable.
+ */
+const errorKeyForStatus = (status: number): string => {
+  if (status === 0) return 'components.documentLibrary.originalErrorNetwork';
+  if (status === 401) return 'components.documentLibrary.originalErrorAuth';
+  if (status === 403) return 'components.documentLibrary.originalErrorPermission';
+  if (status === 404) return 'components.documentLibrary.originalErrorMissing';
+  if (status === 429 || status === 503) return 'components.documentLibrary.originalErrorThrottled';
+  if (status >= 500) return 'components.documentLibrary.originalErrorServer';
+  return 'components.documentLibrary.originalError';
+};
+
 interface DocumentLibraryProps {
   onCreateRAGExam?: (documentIds: number[]) => void;
   refreshTrigger?: number;
 }
+
+/**
+ * Renders the ORIGINAL preview tab. Dispatches on MIME type / source:
+ *   - PDF        -> <object> with blob URL + anchor fallback (Safari)
+ *   - Markdown   -> react-markdown + remark-gfm (also chat exports)
+ *   - Plain text -> monospace <Paper>
+ *   - DOCX       -> info alert; extracted text lives in the CHUNKS tab
+ *   - Unknown    -> info alert
+ *
+ * Bytes come from GET /api/v1/documents/{id}/raw (Content-Disposition: inline).
+ * Prop is named `doc` to avoid shadowing the DOM `document` global.
+ */
+interface OriginalDocumentContentProps {
+  doc: Document;
+}
+
+const OriginalDocumentContent: React.FC<OriginalDocumentContentProps> = ({ doc }) => {
+  const { t } = useTranslation();
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string>('');
+
+  const mime = doc.mime_type || '';
+  const isChatExport = doc.metadata?.source === 'chat_export';
+  const isPdf = mime === 'application/pdf';
+  const isMarkdown =
+    mime === 'text/markdown' || mime === 'text/x-markdown' || isChatExport;
+  const isPlainText = mime === 'text/plain';
+  // Match all Word-family MIMEs: classic .doc, .docx, .docm (macro-enabled),
+  // .dotx (template). Anything containing 'wordprocessingml' is a Word doc.
+  const isDocx = mime.includes('wordprocessingml') || mime === 'application/msword';
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    let createdBlobUrl: string | null = null;
+
+    if (isDocx) {
+      setLoading(false);
+      return () => {
+        controller.abort();
+      };
+    }
+
+    setLoading(true);
+    setErrorKey(null);
+    setErrorDetail('');
+
+    (async () => {
+      try {
+        const response = await DocumentService.getDocumentRaw(doc.id);
+        if (cancelled) return;
+
+        if (isPdf) {
+          const blob = await response.blob();
+          if (cancelled) return;
+          const url = URL.createObjectURL(blob);
+          createdBlobUrl = url;
+          setBlobUrl(url);
+        } else {
+          const text = await response.text();
+          if (cancelled) return;
+          setTextContent(text);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        // AbortError is the expected outcome of unmount/document switch —
+        // never surface it as an error to the user.
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+        // Duck-type DocumentFetchError so the check survives jest auto-mocks
+        // (where the module-scope class identity may diverge between
+        // component and test imports).
+        const maybeFetchErr = e as { name?: string; status?: number; message?: string };
+        if (
+          maybeFetchErr?.name === 'DocumentFetchError' &&
+          typeof maybeFetchErr.status === 'number'
+        ) {
+          setErrorKey(errorKeyForStatus(maybeFetchErr.status));
+          setErrorDetail(maybeFetchErr.message ?? '');
+        } else {
+          setErrorKey('components.documentLibrary.originalError');
+          setErrorDetail(
+            e && typeof e === 'object' && 'message' in e
+              ? (e as Error).message
+              : 'Unknown error',
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (createdBlobUrl) {
+        URL.revokeObjectURL(createdBlobUrl);
+      }
+    };
+  }, [doc.id, isPdf, isDocx]);
+
+  if (isDocx) {
+    return (
+      <Alert severity="info">
+        {t('components.documentLibrary.originalDocxPending')}
+      </Alert>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4, gap: 1 }}>
+        <CircularProgress />
+        <Typography variant="caption" color="text.secondary">
+          {t('components.documentLibrary.originalLoading')}
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (errorKey) {
+    return (
+      <Alert severity="error">
+        {t(errorKey, { error: errorDetail })}
+      </Alert>
+    );
+  }
+
+  if (isPdf && blobUrl) {
+    // <object> renders PDFs in Chrome/Firefox/Edge and degrades to the
+    // fallback <a> on Safari (which refuses to render `blob:` PDFs in an
+    // embedded viewer). `sandbox` is intentionally omitted: an empty
+    // sandbox blocks PDF.js scripts in Firefox and blanks the viewer.
+    return (
+      <Box
+        sx={{
+          height: 600,
+          border: 1,
+          borderColor: 'divider',
+          borderRadius: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <object
+          data={blobUrl}
+          type="application/pdf"
+          aria-label={doc.original_filename}
+          style={{ width: '100%', flex: 1 }}
+        >
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="body2" gutterBottom>
+              {t('components.documentLibrary.originalPdfFallback')}
+            </Typography>
+            <Button
+              variant="outlined"
+              component="a"
+              href={blobUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download={doc.original_filename}
+            >
+              {t('components.documentLibrary.originalOpenInNewTab')}
+            </Button>
+          </Box>
+        </object>
+      </Box>
+    );
+  }
+
+  if (isMarkdown && textContent !== null) {
+    return (
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 3,
+          maxHeight: 600,
+          overflow: 'auto',
+          '& pre': {
+            bgcolor: 'grey.100',
+            p: 1,
+            borderRadius: 1,
+            overflow: 'auto',
+          },
+          '& code': {
+            bgcolor: 'grey.100',
+            px: 0.5,
+            borderRadius: 0.5,
+            fontSize: '0.875em',
+          },
+        }}
+      >
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{textContent}</ReactMarkdown>
+      </Paper>
+    );
+  }
+
+  if (isPlainText && textContent !== null) {
+    return (
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 3,
+          maxHeight: 600,
+          overflow: 'auto',
+          fontFamily: 'monospace',
+          fontSize: '0.875rem',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}
+      >
+        {textContent}
+      </Paper>
+    );
+  }
+
+  return (
+    <Alert severity="info">
+      {t('components.documentLibrary.originalUnsupported')}
+    </Alert>
+  );
+};
 
 const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   onCreateRAGExam,
@@ -93,6 +342,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [totalChunks, setTotalChunks] = useState(0);
   const [chunksPageSize] = useState(10); // Chunks pro Seite
   const [chunksLoading, setChunksLoading] = useState(false);
+  const [chunksError, setChunksError] = useState<string | null>(null);
 
   // Define loadDocuments before useEffect hooks that use it
   const loadDocuments = useCallback(async (showLoading: boolean = true) => {
@@ -226,15 +476,17 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
   const handlePreview = async (document: Document) => {
     setPreviewDialog({ open: true, document });
-    setPreviewTab(0);
+    // Open ORIGINAL by default when the document is ready; the tab itself
+    // is disabled (and METADATEN is opened) until processing finishes.
+    setPreviewTab(isDocumentReady(document.status) ? 1 : 0);
     setDocumentContent(null);
     setDocumentChunks([]);
+    setChunksError(null);
     setCurrentPage(1);
     handleMenuClose();
 
-    // Load content if document is processed
-    if (document.status === 'processed') {
-      // Try to load chunks with pagination first (for large documents)
+    // Pre-fetch chunks so switching to the CHUNKS tab feels instant.
+    if (isDocumentReady(document.status)) {
       await loadDocumentChunksPaginated(document.id, 1);
     }
   };
@@ -242,6 +494,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const loadDocumentChunksPaginated = async (documentId: number, page: number) => {
     try {
       setChunksLoading(true);
+      setChunksError(null);
       const response = await DocumentService.getDocumentChunksPaginated(
         documentId,
         page,
@@ -253,8 +506,17 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       setTotalPages(response.total_pages);
       setTotalChunks(response.total_chunks);
     } catch (err) {
+      // Default tab is ORIGINAL, so a chunk-load failure would otherwise be
+      // invisible until the user clicks CHUNKS. Surface it via state so the
+      // CHUNKS tab can show an Alert instead of an empty list.
+      // eslint-disable-next-line no-console
       console.error('Failed to load document chunks:', err);
       setDocumentChunks([]);
+      setChunksError(
+        err && typeof err === 'object' && 'message' in err
+          ? (err as Error).message
+          : 'Unknown error',
+      );
     } finally {
       setChunksLoading(false);
     }
@@ -796,8 +1058,12 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
               >
                 <Tab label={t('components.documentLibrary.tabMetadata')} />
                 <Tab
-                  label={t('components.documentLibrary.tabContent')}
-                  disabled={previewDialog.document.status !== 'processed'}
+                  label={t('components.documentLibrary.tabOriginal')}
+                  disabled={!isDocumentReady(previewDialog.document.status)}
+                />
+                <Tab
+                  label={t('components.documentLibrary.tabChunks')}
+                  disabled={!isDocumentReady(previewDialog.document.status)}
                 />
               </Tabs>
 
@@ -918,7 +1184,20 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
 
                 {previewTab === 1 && (
                   <Box>
-                    {/* Check if document has full_content in metadata (e.g., chat export) */}
+                    <OriginalDocumentContent doc={previewDialog.document} />
+                  </Box>
+                )}
+
+                {previewTab === 2 && (
+                  <Box>
+                    {chunksError && (
+                      <Alert severity="error" sx={{ mb: 2 }} onClose={() => setChunksError(null)}>
+                        {t('components.documentLibrary.chunksLoadError', { error: chunksError })}
+                      </Alert>
+                    )}
+                    {/* Fallback for non-chat-export documents that happen to
+                        populate metadata.full_content. Chat exports are
+                        rendered in the ORIGINAL tab. */}
                     {previewDialog.document.metadata?.full_content ? (
                       <Box>
                         <Typography variant="h6" gutterBottom>
@@ -1044,7 +1323,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                       </Box>
                     ) : (
                       <Alert severity="info">
-                        {previewDialog.document.status !== 'processed'
+                        {!isDocumentReady(previewDialog.document.status)
                           ? t('components.documentLibrary.needsProcessing')
                           : t('components.documentLibrary.noContent')
                         }

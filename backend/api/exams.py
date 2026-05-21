@@ -16,6 +16,8 @@ from models.exam import Exam, ExamQuestion, ExamStatus
 from models.auth import User
 from models.document import Document
 from models.question_review import QuestionReview, ReviewStatus, QuestionSourceDocument
+from models.tag import QuestionTag
+from api.tags import TagOut
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -52,6 +54,8 @@ class ExamCreate(BaseModel):
     passing_percentage: float = Field(50.0, ge=0, le=100)
     language: str = Field("de", pattern="^(de|en)$")
     default_document_ids: Optional[List[int]] = None
+    # TF-335: omit ⇒ inherit Institution-Default at create time.
+    grading_scheme_id: Optional[int] = None
 
 
 class ExamUpdate(BaseModel):
@@ -64,6 +68,28 @@ class ExamUpdate(BaseModel):
     passing_percentage: Optional[float] = Field(None, ge=0, le=100)
     language: Optional[str] = Field(None, pattern="^(de|en)$")
     default_document_ids: Optional[List[int]] = None
+    grading_scheme_id: Optional[int] = None
+    updated_at: datetime = Field(..., description="For optimistic locking")
+
+
+class ExamGradingSchemeUpdate(BaseModel):
+    """Body for the dedicated PATCH that changes only the grading scheme.
+
+    Lives on its own endpoint (``PATCH /{exam_id}/grading-scheme``) so
+    the grading scheme can be reassigned even on finalized exams —
+    ``ExamUpdate`` requires draft status because it can change question
+    content, but reassigning the noten-skala is metadata-only and the
+    lehrperson must be able to fix it post-finalization (e.g. when the
+    import inherited a wrong institution-default).
+    """
+
+    grading_scheme_id: Optional[int] = Field(
+        None,
+        description=(
+            "None entfernt die Zuordnung; Exam fällt zurück auf "
+            "Institution-Default beim Notenexport."
+        ),
+    )
     updated_at: datetime = Field(..., description="For optimistic locking")
 
 
@@ -103,6 +129,7 @@ class ExamOut(BaseModel):
     updated_at: datetime
     question_count: int = 0
     default_document_ids: Optional[List[int]] = None
+    grading_scheme_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -161,7 +188,53 @@ def _exam_to_out(exam: Exam) -> dict:
         "updated_at": exam.updated_at,
         "question_count": len(exam.questions) if exam.questions else 0,
         "default_document_ids": exam.default_document_ids,
+        "grading_scheme_id": exam.grading_scheme_id,
     }
+
+
+def _resolve_grading_scheme_id(
+    *,
+    db: Session,
+    user: User,
+    explicit_id: Optional[int],
+    fall_back_to_institution_default: bool,
+) -> Optional[int]:
+    """Validate an explicit ``grading_scheme_id`` or inherit the
+    institution default. Returns the id to persist on the exam.
+
+    Validation rules (Spec 4.6 + 7.6):
+
+    * a system scheme (``institution_id IS NULL``) is always allowed;
+    * an institution-scoped scheme must belong to the caller's
+      institution; cross-tenant ids return 422 to keep the existence
+      side-channel closed (``404`` would also leak the scheme to a
+      caller in an unrelated institution).
+    """
+    from models.grading_scheme import GradingScheme as _GS
+
+    if explicit_id is not None:
+        scheme = db.query(_GS).filter(_GS.id == explicit_id).one_or_none()
+        if scheme is None or (
+            scheme.institution_id is not None
+            and scheme.institution_id != user.institution_id
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="Ungültige grading_scheme_id für diese Institution",
+            )
+        return explicit_id
+
+    if not fall_back_to_institution_default or user.institution_id is None:
+        return None
+
+    from models.auth import Institution
+
+    institution = (
+        db.query(Institution)
+        .filter(Institution.id == user.institution_id)
+        .one_or_none()
+    )
+    return institution.default_grading_scheme_id if institution else None
 
 
 def _exam_detail_to_out(exam: Exam) -> dict:
@@ -200,6 +273,12 @@ async def create_exam(
 ):
     """Create a new exam (draft status)."""
     locale = get_request_locale(http_request, current_user)
+    grading_scheme_id = _resolve_grading_scheme_id(
+        db=db,
+        user=current_user,
+        explicit_id=request.grading_scheme_id,
+        fall_back_to_institution_default=True,
+    )
     exam = Exam(
         title=request.title,
         course=request.course,
@@ -212,6 +291,7 @@ async def create_exam(
         institution_id=current_user.institution_id,
         created_by=current_user.id,
         default_document_ids=request.default_document_ids,
+        grading_scheme_id=grading_scheme_id,
     )
     db.add(exam)
     try:
@@ -247,7 +327,7 @@ async def create_exam(
 async def list_exams(
     status: Optional[str] = Query(None, pattern="^(draft|finalized|exported)$"),
     search: Optional[str] = Query(None, max_length=200),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
@@ -283,6 +363,7 @@ class ApprovedQuestionOut(BaseModel):
     estimated_time_minutes: Optional[int] = None
     options: Optional[list]
     usage_count: int = 0
+    tags: List[TagOut] = []
 
     class Config:
         from_attributes = True
@@ -353,6 +434,7 @@ async def list_approved_questions(
         None, pattern="^(multiple_choice|open_ended|true_false)$"
     ),
     search: Optional[str] = Query(None, max_length=500),
+    tag_ids: Optional[str] = Query(None, description="Comma-separated tag IDs"),
     document_ids: Optional[str] = Query(
         None, description="Comma-separated document IDs"
     ),
@@ -378,6 +460,20 @@ async def list_approved_questions(
         query = query.filter(QuestionReview.question_type == question_type)
     if search:
         query = query.filter(QuestionReview.question_text.ilike(f"%{search}%"))
+    if tag_ids:
+        parsed_tag_ids = [int(i) for i in tag_ids.split(",") if i.strip().isdigit()]
+        if not parsed_tag_ids:
+            raise HTTPException(
+                status_code=422,
+                detail="tag_ids enthält keine gültigen ganzzahligen Werte.",
+            )
+        query = query.filter(
+            QuestionReview.id.in_(
+                db.query(QuestionTag.question_id).filter(
+                    QuestionTag.tag_id.in_(parsed_tag_ids)
+                )
+            )
+        )
     if document_ids:
         parsed_ids = [int(i) for i in document_ids.split(",") if i.strip().isdigit()]
         if parsed_ids:
@@ -406,6 +502,16 @@ async def list_approved_questions(
             .all()
         )
 
+    tag_id_set = {t.id for q in questions for t in q.tags}
+    tag_usage_counts: dict[int, int] = {}
+    if tag_id_set:
+        tag_usage_counts = dict(
+            db.query(QuestionTag.tag_id, sa_func.count(QuestionTag.question_id))
+            .filter(QuestionTag.tag_id.in_(tag_id_set))
+            .group_by(QuestionTag.tag_id)
+            .all()
+        )
+
     result = []
     for q in questions:
         result.append(
@@ -418,6 +524,17 @@ async def list_approved_questions(
                 "bloom_level": q.bloom_level,
                 "options": q.options,
                 "usage_count": usage_counts.get(q.id, 0),
+                "tags": [
+                    {
+                        "id": t.id,
+                        "name": t.name,
+                        "institution_id": t.institution_id,
+                        "scope": t.scope,
+                        "usage_count": tag_usage_counts.get(t.id, 0),
+                        "is_archived": t.is_archived,
+                    }
+                    for t in q.tags
+                ],
             }
         )
 
@@ -459,6 +576,13 @@ async def update_exam(
             )
 
     update_data = request.model_dump(exclude_unset=True, exclude={"updated_at"})
+    if "grading_scheme_id" in update_data:
+        update_data["grading_scheme_id"] = _resolve_grading_scheme_id(
+            db=db,
+            user=current_user,
+            explicit_id=update_data["grading_scheme_id"],
+            fall_back_to_institution_default=False,
+        )
     for field, value in update_data.items():
         setattr(exam, field, value)
 
@@ -474,6 +598,78 @@ async def update_exam(
         logger.error("Database error in update_exam for exam %s: %s", exam_id, exc)
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
     logger.info(f"Updated exam {exam_id} by user {current_user.id}")
+    return _exam_to_out(exam)
+
+
+@router.patch("/{exam_id}/grading-scheme", response_model=ExamOut)
+async def update_exam_grading_scheme(
+    exam_id: int,
+    request: ExamGradingSchemeUpdate,
+    http_request: Request,
+    current_user: User = Depends(require_permission("create_exams")),
+    db: Session = Depends(get_db),
+):
+    """Reassign or clear the grading scheme on any exam (incl. finalized).
+
+    Bypasses ``_require_draft`` because reassigning the noten-skala is
+    metadata-only and the lehrperson must be able to fix a wrong
+    institution-default after finalisation. ``None`` clears the field
+    so the export falls back to the institution default at render time.
+    """
+    locale = get_request_locale(http_request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+
+    # Optimistic locking — same shape as PUT /{exam_id}. Reassignment
+    # is rare but two lehrpersons editing in parallel must not silently
+    # overwrite each other.
+    if exam.updated_at and request.updated_at:
+        if _to_utc(exam.updated_at) != _to_utc(request.updated_at):
+            raise HTTPException(
+                status_code=409,
+                detail=t("exams_conflict", locale=locale),
+            )
+
+    previous_id = exam.grading_scheme_id
+    new_id = _resolve_grading_scheme_id(
+        db=db,
+        user=current_user,
+        explicit_id=request.grading_scheme_id,
+        fall_back_to_institution_default=False,
+    )
+    exam.grading_scheme_id = new_id
+
+    try:
+        db.commit()
+        db.refresh(exam)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.error(
+            "Database error in update_exam_grading_scheme for exam %s: %s",
+            exam_id,
+            exc,
+        )
+        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+
+    # Audit trail mirrors create/finalize/delete on this resource. The
+    # noten-skala is the load-bearing input for export, so any change
+    # to it on a finalized exam must be reconstructable.
+    from services.audit_service import AuditService
+
+    AuditService.log_action(
+        db,
+        action="update_exam_grading_scheme",
+        status=AuditService.STATUS_SUCCESS,
+        user_id=current_user.id,
+        resource_type="exam",
+        resource_id=str(exam.id),
+        request=http_request,
+        additional_data={
+            "previous_grading_scheme_id": previous_id,
+            "new_grading_scheme_id": new_id,
+            "exam_status": exam.status,
+        },
+    )
+
     return _exam_to_out(exam)
 
 

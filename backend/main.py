@@ -5,15 +5,19 @@ KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
 
 import asyncio
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 from typing import List, Optional
 from contextlib import asynccontextmanager
 import os
 import logging
 from dotenv import load_dotenv
 from middleware.rate_limit import RateLimitMiddleware
+from database import get_db
+from models.auth import User
+from utils.auth_utils import get_current_active_user
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -226,6 +230,7 @@ async def lifespan(app: FastAPI):
     # Premium features (vector_search, chat, prompts) are available in Premium package
     # Import from core.api explicitly to avoid conflicts with premium.api
     import importlib
+    import sys
 
     # Get the core backend path
     core_api_path = os.path.join(os.path.dirname(__file__), "api")
@@ -249,11 +254,91 @@ async def lifespan(app: FastAPI):
     question_review = importlib.util.module_from_spec(spec_qr)
     spec_qr.loader.exec_module(question_review)
 
+    spec_tags = importlib.util.spec_from_file_location(
+        "core_api_tags", os.path.join(core_api_path, "tags.py")
+    )
+    tags_api = importlib.util.module_from_spec(spec_tags)
+    spec_tags.loader.exec_module(tags_api)
+
     spec_exams = importlib.util.spec_from_file_location(
         "core_api_exams", os.path.join(core_api_path, "exams.py")
     )
     exams_api = importlib.util.module_from_spec(spec_exams)
     spec_exams.loader.exec_module(exams_api)
+
+    spec_submissions = importlib.util.spec_from_file_location(
+        "core_api_submissions", os.path.join(core_api_path, "submissions.py")
+    )
+    submissions_api = importlib.util.module_from_spec(spec_submissions)
+    spec_submissions.loader.exec_module(submissions_api)
+
+    # TF-336: Klassen-CRUD + Mitglieder.
+    spec_student_classes = importlib.util.spec_from_file_location(
+        "core_api_student_classes",
+        os.path.join(core_api_path, "student_classes.py"),
+    )
+    student_classes_api = importlib.util.module_from_spec(spec_student_classes)
+    spec_student_classes.loader.exec_module(student_classes_api)
+
+    # TF-336: Studi-Verlauf-Endpoints.
+    spec_students = importlib.util.spec_from_file_location(
+        "core_api_students",
+        os.path.join(core_api_path, "students.py"),
+    )
+    students_api = importlib.util.module_from_spec(spec_students)
+    spec_students.loader.exec_module(students_api)
+
+    # TF-336: Moodle-Connections (Token-verschlüsselt).
+    spec_moodle_connections = importlib.util.spec_from_file_location(
+        "core_api_moodle_connections",
+        os.path.join(core_api_path, "moodle_connections.py"),
+    )
+    moodle_connections_api = importlib.util.module_from_spec(spec_moodle_connections)
+    spec_moodle_connections.loader.exec_module(moodle_connections_api)
+
+    # TF-336: Question-ID-Round-Trip (Export → Sync → API-Re-Import).
+    spec_moodle_roundtrip = importlib.util.spec_from_file_location(
+        "core_api_moodle_roundtrip",
+        os.path.join(core_api_path, "moodle_roundtrip.py"),
+    )
+    moodle_roundtrip_api = importlib.util.module_from_spec(spec_moodle_roundtrip)
+    spec_moodle_roundtrip.loader.exec_module(moodle_roundtrip_api)
+
+    spec_grades = importlib.util.spec_from_file_location(
+        "core_api_grades", os.path.join(core_api_path, "grades.py")
+    )
+    grades_api = importlib.util.module_from_spec(spec_grades)
+    spec_grades.loader.exec_module(grades_api)
+
+    spec_grading_schemes = importlib.util.spec_from_file_location(
+        "core_api_grading_schemes",
+        os.path.join(core_api_path, "grading_schemes.py"),
+    )
+    grading_schemes_api = importlib.util.module_from_spec(spec_grading_schemes)
+    spec_grading_schemes.loader.exec_module(grading_schemes_api)
+
+    spec_stats = importlib.util.spec_from_file_location(
+        "core_api_stats", os.path.join(core_api_path, "stats.py")
+    )
+    stats_api = importlib.util.module_from_spec(spec_stats)
+    spec_stats.loader.exec_module(stats_api)
+
+    spec_grade_export = importlib.util.spec_from_file_location(
+        "core_api_grade_export",
+        os.path.join(core_api_path, "grade_export.py"),
+    )
+    grade_export_api = importlib.util.module_from_spec(spec_grade_export)
+    spec_grade_export.loader.exec_module(grade_export_api)
+
+    # TF-337: paginated activity endpoint (own / institution scope).
+    # Loaded BEFORE dashboard because dashboard.py imports ActivityType from it.
+    # Registered as "api.activity" so the absolute import in dashboard.py resolves.
+    spec_activity = importlib.util.spec_from_file_location(
+        "api.activity", os.path.join(core_api_path, "activity.py")
+    )
+    activity_api = importlib.util.module_from_spec(spec_activity)
+    sys.modules["api.activity"] = activity_api
+    spec_activity.loader.exec_module(activity_api)
 
     spec_dashboard = importlib.util.spec_from_file_location(
         "core_api_dashboard", os.path.join(core_api_path, "dashboard.py")
@@ -327,8 +412,22 @@ async def lifespan(app: FastAPI):
     app.include_router(rag_exams.router)
     app.include_router(rbac_api.router)
     app.include_router(question_review.router)
+    app.include_router(tags_api.router)
     app.include_router(exams_api.router)
+    app.include_router(submissions_api.router)
+    app.include_router(submissions_api.exams_alias_router)
+    app.include_router(student_classes_api.router)
+    app.include_router(students_api.router)
+    app.include_router(moodle_connections_api.router)
+    app.include_router(moodle_roundtrip_api.router)
+    app.include_router(grades_api.router_grades)
+    app.include_router(grades_api.router_exams_review_queue)
+    app.include_router(grading_schemes_api.router)
+    app.include_router(stats_api.router_exam_stats)
+    app.include_router(stats_api.router_submission_stats)
+    app.include_router(grade_export_api.router)
     app.include_router(dashboard_api.router)
+    app.include_router(activity_api.router)
     app.include_router(billing_api.router, prefix="/api/v1/billing", tags=["billing"])
     app.include_router(
         webhooks_api.router, prefix="/api/v1/webhooks", tags=["webhooks"]
@@ -476,6 +575,52 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Error resetting processing documents: {str(e)}")
 
+    # Startup: Reap stuck ImportJob rows. A worker kill/OOM/deploy
+    # mid-pipeline leaves ``import_jobs.status='running'`` forever
+    # because no code path ever transitions out without the pipeline
+    # finishing. Mark anything older than 30 minutes as FAILED so the
+    # job-list UI shows a terminal state instead of a zombie.
+    try:
+        from datetime import datetime, timedelta, timezone
+
+        from enums import ImportJobStatus
+        from models.submission import ImportJob
+
+        db = SessionLocal()
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+            stuck = (
+                db.query(ImportJob)
+                .filter(
+                    ImportJob.status == ImportJobStatus.RUNNING.value,
+                    ImportJob.started_at < cutoff,
+                )
+                .all()
+            )
+            for job in stuck:
+                job.status = ImportJobStatus.FAILED.value
+                job.finished_at = datetime.now(timezone.utc)
+                existing = list(job.error_log or [])
+                existing.append(
+                    {
+                        "row_index": 0,
+                        "reason": (
+                            "Worker wahrscheinlich vor Abschluss beendet "
+                            "(OOM/Deploy/Kill)."
+                        ),
+                        "step": "watchdog",
+                        "exception_type": "WatchdogTimeout",
+                    }
+                )
+                job.error_log = existing
+            if stuck:
+                db.commit()
+                print(f"✅ Reaped {len(stuck)} stuck import_jobs")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Error reaping stuck import jobs: {str(e)}")
+
     yield  # Application is running
 
     # Shutdown: Give in-flight docs indexing a bounded chance to finish so
@@ -559,6 +704,7 @@ class ExamRequest(BaseModel):
     question_count: int = 5
     question_types: List[str] = ["multiple_choice", "open_ended"]
     language: str = "de"
+    tag_ids: Optional[List[int]] = None  # TF-320 Iter2: Tags für generierte Fragen
 
 
 class Question(BaseModel):
@@ -795,6 +941,74 @@ async def generate_exam(request: ExamRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating exam: {str(e)}")
+
+
+class GenerateQuestionsRequest(BaseModel):
+    topic: str
+    num_questions: int = Field(default=5, ge=1, le=20)
+    difficulty: str = "medium"
+    document_ids: Optional[List[int]] = None
+    tag_ids: Optional[List[int]] = None  # TF-320 Iter2
+
+
+@app.post("/api/v1/questions/generate")
+async def generate_questions_endpoint(
+    request: GenerateQuestionsRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Fragen generieren und optional Tags zuweisen (TF-320 Iter2)."""
+    from models.question_review import QuestionReview, ReviewStatus
+    from models.tag import Tag, QuestionTag as _QuestionTag
+
+    claude_service = get_claude_service()
+    try:
+        question_data = await claude_service.generate_questions(
+            topic=request.topic,
+            difficulty=request.difficulty,
+            question_count=request.num_questions,
+            question_types=["multiple_choice", "open_ended"],
+            language="de",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fehler bei Generierung: {str(e)}")
+
+    review_ids = []
+    for q_data in question_data:
+        review = QuestionReview(
+            question_text=q_data.get("question", ""),
+            question_type=q_data.get("type", "open_ended"),
+            options=q_data.get("options"),
+            correct_answer=q_data.get("correct_answer"),
+            explanation=q_data.get("explanation"),
+            difficulty=q_data.get("difficulty", request.difficulty),
+            topic=q_data.get("topic", request.topic),
+            language="de",
+            review_status=ReviewStatus.PENDING.value,
+            institution_id=current_user.institution_id,
+            created_by=current_user.id,
+        )
+        db.add(review)
+        db.flush()
+        review_ids.append(review.id)
+
+    if request.tag_ids and review_ids:
+        valid_tags = (
+            db.query(Tag)
+            .filter(
+                Tag.id.in_(request.tag_ids),
+                Tag.is_archived == False,  # noqa: E712
+                (Tag.institution_id == current_user.institution_id)
+                | (Tag.scope == "global"),
+            )
+            .all()
+        )
+        for rid in review_ids:
+            for tag in valid_tags:
+                db.add(_QuestionTag(question_id=rid, tag_id=tag.id))
+
+    db.commit()
+    return {"task_id": None, "question_ids": review_ids, "count": len(review_ids)}
 
 
 @app.get("/api/v1/topics")

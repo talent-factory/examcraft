@@ -3,7 +3,7 @@
  * Role-based navigation sidebar with collapse functionality
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { useRoleBasedNavigation, NavigationItem } from '../../hooks/useRoleBasedNavigation';
@@ -20,8 +20,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
   const location = useLocation();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
-  const isActivePath = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(path + '/');
+  useEffect(() => {
+    const autoExpand = new Set<string>();
+    for (const item of navigationItems) {
+      if (item.children?.some((child) => location.pathname.startsWith(child.path))) {
+        autoExpand.add(item.path);
+      }
+    }
+    if (autoExpand.size > 0) {
+      setExpandedItems((prev) => new Set([...prev, ...autoExpand]));
+    }
+  }, [location.pathname, navigationItems]);
+
+  const isActivePath = (path: string, hasChildren: boolean) => {
+    if (location.pathname === path) return true;
+    return hasChildren && location.pathname.startsWith(path + '/');
   };
 
   const toggleExpanded = (path: string) => {
@@ -40,8 +53,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onToggle }) => 
   };
 
   const renderNavItem = (item: NavigationItem, isChild = false) => {
-    const isActive = isActivePath(item.path);
-    const hasChildren = item.children && item.children.length > 0;
+    const hasChildren = !!(item.children && item.children.length > 0);
+    const isActive = isActivePath(item.path, hasChildren);
     const isExpanded = expandedItems.has(item.path);
 
     return (

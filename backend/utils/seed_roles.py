@@ -1,12 +1,42 @@
-"""
-Seed default roles into the database
+"""Seed default roles into the database.
+
+Re-running this seeder is safe: existing roles get a set-merge of
+permissions (defaults are added without removing any admin-added extras
+from the live DB). Display name and description are kept in sync with
+the seed data so a renamed role label updates on next deploy.
 """
 
-from sqlalchemy.orm import Session
-from models.auth import Role, UserRole
+import json
 import logging
 
+from sqlalchemy.orm import Session
+
+from models.auth import Role, UserRole
+
 logger = logging.getLogger(__name__)
+
+
+def _parse_existing_permissions(value) -> list[str]:
+    """Parse the on-disk permissions blob into a list.
+
+    Roles stored in PG carry permissions either as a JSON array string
+    or, in some legacy installs, as a Postgres ``set``-formatted string
+    (``{a,b,c}``). Both shapes round-trip through this helper.
+    """
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return list(value)
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+            if isinstance(decoded, list):
+                return decoded
+        except (json.JSONDecodeError, TypeError):
+            pass
+        if value.startswith("{") and value.endswith("}"):
+            return [p.strip() for p in value[1:-1].split(",") if p.strip()]
+    return []
 
 
 def seed_default_roles(db: Session):
@@ -47,6 +77,16 @@ def seed_default_roles(db: Session):
                 "prompt:read",
                 "prompt:update",
                 "prompt:delete",
+                "submissions:read",
+                "submissions:import",
+                "submissions:grade",
+                # TF-335: Admin manages institution-scoped Grading-
+                # Schemes; System schemes stay read-only via the API.
+                "grading_schemes:manage",
+                # TF-336: Admin pflegt Studierenden-Stammdaten und Klassen
+                # sowie Moodle-Web-Service-Verbindungen.
+                "students:manage",
+                "moodle:configure",
             ],
             "is_system_role": True,
         },
@@ -72,6 +112,10 @@ def seed_default_roles(db: Session):
                 "prompt:read",
                 "prompt:update",
                 "prompt:delete",
+                # Lehrperson can import results and approve grades.
+                "submissions:read",
+                "submissions:import",
+                "submissions:grade",
             ],
             "is_system_role": True,
         },
@@ -89,6 +133,11 @@ def seed_default_roles(db: Session):
                 "delete_documents",
                 "prompt:create",
                 "prompt:read",
+                # TF-336: Reviewer-Rolle bekommt Lese- + Bewertungs-
+                # Permission. Importieren bleibt der Lehrperson
+                # vorbehalten, weil dort auch das Quota-Buchen passiert.
+                "submissions:read",
+                "submissions:grade",
             ],
             "is_system_role": True,
         },
@@ -115,15 +164,28 @@ def seed_default_roles(db: Session):
         existing_role = db.query(Role).filter(Role.name == role_data["name"]).first()
 
         if existing_role:
-            # Update existing role
             existing_role.display_name = role_data["display_name"]
             existing_role.description = role_data["description"]
-            existing_role.permissions = role_data["permissions"]
             existing_role.is_system_role = role_data["is_system_role"]
+
+            # Set-merge permissions: defaults become a floor, extras
+            # added by an admin via the management UI survive re-seeds.
+            existing_perms = set(_parse_existing_permissions(existing_role.permissions))
+            seed_perms = set(role_data["permissions"])
+            added = seed_perms - existing_perms
+            preserved_extras = existing_perms - seed_perms
+            merged = sorted(existing_perms | seed_perms)
+            existing_role.permissions = merged
+
             updated_count += 1
-            logger.info(f"Updated role: {role_data['name']}")
+            logger.info(
+                "Updated role %s — added %d default(s), preserved %d "
+                "admin-added permission(s)",
+                role_data["name"],
+                len(added),
+                len(preserved_extras),
+            )
         else:
-            # Create new role
             new_role = Role(
                 name=role_data["name"],
                 display_name=role_data["display_name"],

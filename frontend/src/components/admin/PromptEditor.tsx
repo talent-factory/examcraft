@@ -31,7 +31,7 @@ import MarkdownRenderer from '../MarkdownRenderer';
 function extractErrorMessage(
   err: unknown,
   fallback: string,
-  labels: { validationError: string; fieldDefault: string; invalidDefault: string }
+  labels: { validationError: string; fieldDefault: string; invalidDefault: string; useCaseRequired: string }
 ): string {
   if (axios.isAxiosError(err)) {
     const detail = err.response?.data?.detail;
@@ -40,8 +40,12 @@ function extractErrorMessage(
       const messages = details.map((d: unknown) => {
         if (typeof d === 'object' && d !== null && 'msg' in d) {
           const entry = d as { loc?: unknown; msg?: unknown; message?: unknown };
-          const field = (Array.isArray(entry.loc) ? entry.loc.slice(1).join('.') : '') || labels.fieldDefault;
+          const loc = Array.isArray(entry.loc) ? entry.loc : [];
+          const field = (loc.slice(1).join('.')) || labels.fieldDefault;
           const msg = String(entry.msg || entry.message || labels.invalidDefault);
+          if (field === 'use_case' && msg.includes('match pattern')) {
+            return labels.useCaseRequired;
+          }
           return `${field}: ${msg}`;
         }
         return String(d);
@@ -83,6 +87,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     validationError: t('admin.promptEditor.validationError'),
     fieldDefault: t('admin.promptEditor.fieldDefault'),
     invalidDefault: t('admin.promptEditor.invalidDefault'),
+    useCaseRequired: t('admin.promptEditor.useCaseRequired'),
   };
 
   const [loading, setLoading] = useState(false);
@@ -130,7 +135,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
   }, [promptId, initialData]);
 
   const handleSave = async () => {
-    if (!formData.name || !formData.content || !formData.category) {
+    if (!formData.name || !formData.content || !formData.category || !formData.use_case) {
       setError(t('admin.promptEditor.validationRequired'));
       return;
     }
@@ -348,7 +353,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
             </FormControl>
 
             {/* Use Case - Fragetyp Dropdown */}
-            <FormControl fullWidth sx={{ mb: 3 }}>
+            <FormControl fullWidth sx={{ mb: 3 }} required error={!!error && !formData.use_case}>
               <InputLabel id="use-case-label">{t('admin.promptEditor.useCaseLabel')}</InputLabel>
               <Select
                 labelId="use-case-label"
@@ -359,9 +364,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                   setFormData({ ...formData, use_case: e.target.value })
                 }
               >
-                <MenuItem value="">
-                  <em>{t('admin.promptEditor.useCaseNone')}</em>
-                </MenuItem>
                 {Object.entries(USE_CASE_LABELS).map(([value, label]) => (
                   <MenuItem key={value} value={value}>
                     {label}

@@ -1,0 +1,6 @@
+Vorname;Nachname;E-Mail-Adresse;Status;Begonnen am;Beendet;Aufgewendete Zeit;Note/10,00;Antwort 1;Antwort 2;Antwort 3
+Anna;Beispiel;anna.beispiel@example.org;Beendet;2026-05-15 09:00:00;2026-05-15 09:32:14;32 Min. 14 Sek.;9,00;Bern;Wahr;Föderalismus bedeutet, dass Bund, Kantone und Gemeinden je eigene Aufgaben und Steuerhoheit haben.
+Bruno;Muster;bruno.muster@example.org;Beendet;2026-05-15 09:00:00;2026-05-15 09:28:01;28 Min. 1 Sek.;3,00;Zürich;Falsch;Föderalismus heisst Zentralisierung der Macht in Bern.
+Cécile;Dupont;cecile.dupont@example.org;Beendet;2026-05-15 09:00:00;2026-05-15 09:42:00;42 Min. 0 Sek.;7,00;Bern;Wahr;
+Daniel;Senften;daniel.senften@example.org;Beendet;2026-05-15 09:01:00;2026-05-15 09:35:30;34 Min. 30 Sek.;8,00;Bern;Falsch;Föderalismus = drei Staatsebenen mit eigenen Kompetenzen.
+Erika;Mustermann;erika.mustermann@example.org;Beendet;2026-05-15 09:02:00;2026-05-15 09:33:00;31 Min. 0 Sek.;5,00;Genf;Wahr;Bundesstaat.

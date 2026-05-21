@@ -7,6 +7,7 @@
     "documentation": "Documentazione",
     "sidebar": {
       "dashboard": "Dashboard",
+      "aktivitaeten": "Attività",
       "documents": "Documenti",
       "questionGeneration": "Generazione domande",
       "reviewQueue": "Coda di revisione",
@@ -14,6 +15,7 @@
       "documentChat": "Chat documenti",
       "promptLibrary": "Libreria prompt",
       "admin": "Admin",
+      "tagSettings": "Gestione tag",
       "pricing": "Prezzi",
       "profile": "Profilo"
     }
@@ -23,6 +25,29 @@
     "en": "English",
     "fr": "Français",
     "it": "Italiano"
+  },
+  "aktivitaeten": {
+    "title": "Attività",
+    "subtitle": "Tutti gli eventi a colpo d'occhio — scegli l'ambito e filtra per tipo.",
+    "scopeAria": "Visibilità",
+    "scopeOwn": "Le mie",
+    "scopeInstitution": "Tutte",
+    "reload": "Ricarica",
+    "errorLoad": "Impossibile caricare le attività.",
+    "emptyFresh": "Nessuna attività ancora — carica un documento o genera domande.",
+    "emptyFiltered": "Nessuna attività corrispondente ai filtri selezionati.",
+    "resetFilters": "Reimposta filtri",
+    "shortcutDocuments": "Documenti",
+    "shortcutGenerate": "Genera domande",
+    "types": {
+      "document_uploaded": "Documento caricato",
+      "document_deleted": "Documento eliminato",
+      "questions_generated": "Domande generate",
+      "question_approved": "Domanda approvata",
+      "question_rejected": "Domanda rifiutata",
+      "exam_created": "Esame creato",
+      "exam_deleted": "Esame eliminato"
+    }
   },
   "auth": {
     "login": {
@@ -137,7 +162,8 @@
       "generatedQuestions": "Domande generate",
       "validatedQuestions": "Domande validate",
       "recentActivity": "Attività recente",
-      "noActivity": "Nessuna attività presente. Inizia caricando dei documenti!"
+      "noActivity": "Nessuna attività presente. Inizia caricando dei documenti!",
+      "viewAllActivities": "Vedi tutte le attività →"
     },
     "documents": {
       "title": "Libreria documenti",
@@ -483,7 +509,8 @@
       "versionHistoryTitle": "Cronologia versioni",
       "currentVersion": "Versione attuale: v{{version}}",
       "btnShowVersions": "Mostra versioni",
-      "validationRequired": "Nome, contenuto e categoria sono campi obbligatori",
+      "validationRequired": "Nome, contenuto, categoria e caso d'uso sono campi obbligatori",
+      "useCaseRequired": "Seleziona un tipo di domanda (caso d'uso).",
       "successUpdated": "Prompt aggiornato con successo",
       "successVersionCreated": "Nuova versione v{{version}} creata",
       "successCreated": "Prompt creato con successo",
@@ -610,7 +637,21 @@
       "close": "Chiudi",
       "previewTitle": "Anteprima documento: {{title}}",
       "tabMetadata": "Metadati",
-      "tabContent": "Contenuto",
+      "tabOriginal": "Originale",
+      "tabChunks": "Chunks",
+      "originalLoading": "Caricamento dell'originale…",
+      "originalError": "Impossibile caricare l'originale: {{error}}",
+      "originalErrorNetwork": "Errore di rete — verifica la connessione e riprova.",
+      "originalErrorAuth": "Sessione scaduta — accedi di nuovo.",
+      "originalErrorPermission": "Non hai il permesso di visualizzare questo documento.",
+      "originalErrorMissing": "File originale non trovato — potrebbe essere stato eliminato.",
+      "originalErrorThrottled": "Servizio di archiviazione occupato — riprova tra qualche secondo.",
+      "originalErrorServer": "Errore del server durante il caricamento dell'anteprima — riprova o scarica il file.",
+      "originalPdfFallback": "L'anteprima PDF integrata non è supportata da questo browser.",
+      "originalOpenInNewTab": "Apri il PDF in una nuova scheda",
+      "originalDocxPending": "Un'anteprima integrata per i file DOCX arriverà in una versione successiva. Il testo estratto è disponibile nella scheda Chunks.",
+      "originalUnsupported": "Nessuna anteprima diretta disponibile per questo tipo di file. Vedi la scheda Chunks per il contenuto.",
+      "chunksLoadError": "Impossibile caricare i chunks: {{error}}",
       "docInfo": "Informazioni sul documento",
       "originalFile": "File originale:",
       "fileSize": "Dimensione file:",
@@ -804,7 +845,9 @@
       "validationQuestionLength": "Il testo della domanda deve contenere almeno 10 caratteri",
       "validationMinOptions": "Le domande a scelta multipla richiedono almeno 2 opzioni",
       "validationSelectAnswer": "Seleziona una risposta corretta",
-      "validationAnswerInOptions": "La risposta corretta deve essere una delle opzioni"
+      "validationAnswerInOptions": "La risposta corretta deve essere una delle opzioni",
+      "tagCreateError": "Alcuni tag non sono stati creati: {{names}}",
+      "saveError": "Salvataggio non riuscito. Riprova."
     },
     "errorBoundary": {
       "title": "Si è verificato un errore",
@@ -830,7 +873,8 @@
       "difficultyMedium": "Medio",
       "difficultyHard": "Difficile",
       "back": "Indietro",
-      "generate": "Genera"
+      "generate": "Genera",
+      "tagsLabel": "Tag (opzionale)"
     },
     "questionReviewDetail": {
       "errorLoad": "Errore nel caricamento della domanda",
@@ -1012,7 +1056,14 @@
       "accept": "Accetta",
       "accepting": "Aggiunta in corso...",
       "generatePreview": "Genera anteprima",
-      "generating": "Generazione..."
+      "generating": "Generazione...",
+      "tagFilterLabel": "Tag",
+      "tagFilterEmpty": "Nessun tag disponibile",
+      "tagFilterRemove": "Rimuovi tag",
+      "tagFilterClear": "Rimuovi tutti",
+      "tagFilterSearch": "Cerca tag…",
+      "tagFilterNoResults": "Nessun tag trovato",
+      "tagsShowLess": "mostra meno"
     }
   },
   "profile": {
@@ -1216,7 +1267,9 @@
       "pendingReview": "In attesa di revisione",
       "pendingReviewInfo": "Le domande sono in stato In attesa e devono essere verificate e approvate nel workflow di revisione.",
       "goToReview": "Vai al workflow di revisione",
-      "createNewExam": "Crea nuovo esame"
+      "createNewExam": "Crea nuovo esame",
+      "errorTagCreation": "Alcuni tag non sono stati creati: {{names}}",
+      "tagsLabel": "Tag (opzionale)"
     },
     "ragExamDisplay": {
       "questions": "{{count}} Domande",
@@ -1306,7 +1359,8 @@
         "errorGenerating": "Errore nella generazione del template",
         "generateTemplate": "Genera template",
         "generating": "Generazione del template...",
-        "placeholder": "Descrivi cosa deve fare il tuo prompt..."
+        "placeholder": "Descrivi cosa deve fare il tuo prompt...",
+        "templateSaved": "Il template è stato salvato"
       },
       "sessionList": {
         "newSession": "Nuova sessione",

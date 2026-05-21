@@ -18,12 +18,20 @@ import { ProfilePage } from './components/profile/ProfilePage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import RegistrationSuccessPage from './pages/RegistrationSuccessPage';
 import { Dashboard } from './pages/Dashboard';
+import Aktivitaeten from './pages/Aktivitaeten';
 import { Documents } from './pages/Documents';
 import { Exams } from './pages/Exams';
 import { Review } from './pages/Review';
 import { Admin } from './pages/Admin';
 import { BillingPage } from './pages/BillingPage';
 import { ExamComposer } from './pages/ExamComposer';
+import Auswertungen from './pages/Auswertungen';
+import AuswertungenExam from './pages/AuswertungenExam';
+import AuswertungenKlassen from './pages/AuswertungenKlassen';
+import AuswertungenKlassenDetail from './pages/AuswertungenKlassenDetail';
+import AuswertungenStudierende from './pages/AuswertungenStudierende';
+import AuswertungenStudiDetail from './pages/AuswertungenStudiDetail';
+import MoodleConnectionPage from './pages/MoodleConnectionPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { SubscriptionManagementPage } from './pages/SubscriptionManagementPage';
@@ -31,6 +39,7 @@ import { UserRole } from './types/auth';
 import { AppErrorBoundary } from './components/ErrorBoundary';
 import QuestionReviewDetail from './components/QuestionReviewDetail';
 import GenerationTasksBar from './components/GenerationTasksBar';
+import TagSettingsPage from './pages/TagSettingsPage';
 import HelpWidget from './components/help/HelpWidget';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
@@ -91,6 +100,17 @@ export const AppWithAuth: React.FC = () => {
                   <ProtectedRoute>
                     <AppLayout>
                       <Dashboard />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/aktivitaeten"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <Aktivitaeten />
                     </AppLayout>
                   </ProtectedRoute>
                 }
@@ -160,6 +180,94 @@ export const AppWithAuth: React.FC = () => {
               />
 
               <Route
+                path="/auswertungen"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['submissions:read']}>
+                      <AppLayout>
+                        <Auswertungen />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/auswertungen/:examId/submissions"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['submissions:read']}>
+                      <AppLayout>
+                        <AuswertungenExam />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* TF-336: Klassen-Pages (students:manage). */}
+              <Route
+                path="/auswertungen/klassen"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['students:manage']}>
+                      <AppLayout>
+                        <AuswertungenKlassen />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/auswertungen/klassen/:classId"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['students:manage']}>
+                      <AppLayout>
+                        <AuswertungenKlassenDetail />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/auswertungen/studierende"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['students:manage']}>
+                      <AppLayout>
+                        <AuswertungenStudierende />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/auswertungen/studierende/:studentId"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['students:manage']}>
+                      <AppLayout>
+                        <AuswertungenStudiDetail />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/integrations/moodle"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['moodle:configure']}>
+                      <AppLayout>
+                        <MoodleConnectionPage />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/chat"
                 element={
                   <ProtectedRoute>
@@ -220,6 +328,19 @@ export const AppWithAuth: React.FC = () => {
                 }
               />
 
+
+              <Route
+                path="/settings/tags"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['create_questions']}>
+                      <AppLayout>
+                        <TagSettingsPage />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
 
               <Route path="/billing/success" element={<PaymentSuccessPage />} />
               <Route path="/billing/cancel" element={<PaymentCancelPage />} />

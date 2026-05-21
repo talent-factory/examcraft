@@ -210,6 +210,18 @@ class TestPermissionConsistency:
             "prompt:read",
             "prompt:update",
             "prompt:delete",
+            # Submissions / results-import permissions use the
+            # namespace form (mirrored in api/submissions.py,
+            # useRoleBasedNavigation.ts, AppWithAuth.tsx, and
+            # utils/seed_roles.py).
+            "submissions:read",
+            "submissions:import",
+            "submissions:grade",
+            # TF-335 — Custom Grading-Schemes management permission.
+            "grading_schemes:manage",
+            # TF-336 — Klassen-/Studi-Stammdaten und Moodle-Connections.
+            "students:manage",
+            "moodle:configure",
         }
 
         frontend_perms = _get_frontend_required_permissions()
