@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/v1/tags", tags=["Tags"])
 # Schemas
 # ---------------------------------------------------------------------------
 
+
 class TagOut(BaseModel):
     id: int
     name: str
@@ -55,11 +56,11 @@ class MergeRequest(BaseModel):
 # Helper
 # ---------------------------------------------------------------------------
 
+
 def _visible_tags_query(db: Session, current_user: User):
     """Gibt die Query für sichtbare Tags zurück (eigene Institution + global)."""
     return db.query(Tag).filter(
-        (Tag.institution_id == current_user.institution_id)
-        | (Tag.scope == "global")
+        (Tag.institution_id == current_user.institution_id) | (Tag.scope == "global")
     )
 
 
@@ -71,7 +72,9 @@ def _get_tag_for_write(tag_id: int, current_user: User, db: Session) -> Tag:
     if tag.scope == "institution" and tag.institution_id != current_user.institution_id:
         raise HTTPException(status_code=403, detail="Zugriff verweigert.")
     if tag.scope == "global" and not current_user.is_superuser:
-        raise HTTPException(status_code=403, detail="Nur superuser darf globale Tags bearbeiten.")
+        raise HTTPException(
+            status_code=403, detail="Nur superuser darf globale Tags bearbeiten."
+        )
     return tag
 
 
@@ -126,13 +129,17 @@ async def create_tag(
     Globale Tags nur für superuser.
     """
     if body.scope == "global" and not current_user.is_superuser:
-        raise HTTPException(status_code=403, detail="Nur superuser darf globale Tags erstellen.")
+        raise HTTPException(
+            status_code=403, detail="Nur superuser darf globale Tags erstellen."
+        )
 
     name = body.name.strip()
     name_lower = name.lower()
     institution_id = None if body.scope == "global" else current_user.institution_id
 
-    q = db.query(Tag).filter(func.lower(Tag.name) == name_lower, Tag.scope == body.scope)
+    q = db.query(Tag).filter(
+        func.lower(Tag.name) == name_lower, Tag.scope == body.scope
+    )
     if body.scope == "institution":
         q = q.filter(Tag.institution_id == institution_id)
     existing = q.first()
@@ -150,9 +157,13 @@ async def create_tag(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Tag mit diesem Namen existiert bereits.")
+        raise HTTPException(
+            status_code=409, detail="Tag mit diesem Namen existiert bereits."
+        )
     db.refresh(tag)
-    logger.info("Tag %r (scope=%s) created by user_id=%s", tag.name, tag.scope, current_user.id)
+    logger.info(
+        "Tag %r (scope=%s) created by user_id=%s", tag.name, tag.scope, current_user.id
+    )
     return tag
 
 
@@ -184,14 +195,18 @@ async def rename_tag(
         .first()
     )
     if duplicate:
-        raise HTTPException(status_code=409, detail="Ein Tag mit diesem Namen existiert bereits.")
+        raise HTTPException(
+            status_code=409, detail="Ein Tag mit diesem Namen existiert bereits."
+        )
 
     tag.name = new_name
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Tag mit diesem Namen existiert bereits.")
+        raise HTTPException(
+            status_code=409, detail="Tag mit diesem Namen existiert bereits."
+        )
     db.refresh(tag)
     return tag
 
@@ -267,7 +282,9 @@ async def delete_tag(
 
     db.delete(tag)
     db.commit()
-    logger.info("Tag %r (id=%s) gelöscht von user_id=%s", tag.name, tag_id, current_user.id)
+    logger.info(
+        "Tag %r (id=%s) gelöscht von user_id=%s", tag.name, tag_id, current_user.id
+    )
 
 
 @router.post("/merge", response_model=List[TagOut])
@@ -283,7 +300,9 @@ async def merge_tags(
     - Pro Quell-Tag wird ein TagMergeLog-Eintrag erstellt
     """
     if body.target_id in body.source_ids:
-        raise HTTPException(status_code=422, detail="Ziel-Tag darf nicht unter den Quell-Tags sein.")
+        raise HTTPException(
+            status_code=422, detail="Ziel-Tag darf nicht unter den Quell-Tags sein."
+        )
 
     target = _get_tag_for_write(body.target_id, current_user, db)
 

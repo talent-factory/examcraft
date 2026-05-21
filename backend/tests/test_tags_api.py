@@ -187,7 +187,9 @@ class TestCreateTag:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["name"] == "Neuer Tag"  # Original-Schreibweise erhalten (case-preserving)
+        assert (
+            data["name"] == "Neuer Tag"
+        )  # Original-Schreibweise erhalten (case-preserving)
         assert data["institution_id"] == inst.id
         assert "id" in data
 
@@ -268,7 +270,9 @@ class TestCreateTag:
 from models.question_review import QuestionReview, ReviewStatus  # noqa: E402
 
 
-def make_question(test_db: Session, institution_id: int, created_by: int) -> QuestionReview:
+def make_question(
+    test_db: Session, institution_id: int, created_by: int
+) -> QuestionReview:
     q = QuestionReview(
         question_text="Was ist eine Klasse in Python?",
         question_type="open_ended",
@@ -321,8 +325,12 @@ class TestQuestionTagEndpoints:
         user.has_permission = Mock(return_value=True)
         tags_client.app.dependency_overrides[get_current_user] = lambda: user
 
-        tags_client.post(f"/api/v1/questions/{question.id}/tags", json={"tag_ids": [tag_old.id]})
-        resp = tags_client.post(f"/api/v1/questions/{question.id}/tags", json={"tag_ids": [tag_new.id]})
+        tags_client.post(
+            f"/api/v1/questions/{question.id}/tags", json={"tag_ids": [tag_old.id]}
+        )
+        resp = tags_client.post(
+            f"/api/v1/questions/{question.id}/tags", json={"tag_ids": [tag_new.id]}
+        )
 
         assert resp.status_code == 200
         tag_ids_returned = [t["id"] for t in resp.json()["tags"]]
@@ -341,7 +349,9 @@ class TestQuestionTagEndpoints:
         user.has_permission = Mock(return_value=True)
         tags_client.app.dependency_overrides[get_current_user] = lambda: user
 
-        tags_client.post(f"/api/v1/questions/{question.id}/tags", json={"tag_ids": [tag.id]})
+        tags_client.post(
+            f"/api/v1/questions/{question.id}/tags", json={"tag_ids": [tag.id]}
+        )
         resp = tags_client.delete(f"/api/v1/questions/{question.id}/tags/{tag.id}")
 
         assert resp.status_code == 200

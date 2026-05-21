@@ -518,7 +518,14 @@ def generate_questions_task(
         }
     except Ignore:
         raise
-    except (Reject, ValidationError, TypeError, ImportError, IntegrityError, ValueError):
+    except (
+        Reject,
+        ValidationError,
+        TypeError,
+        ImportError,
+        IntegrityError,
+        ValueError,
+    ):
         _safe_update_job_status(self.request.id, "FAILURE")
         raise
     except Exception as generation_err:

@@ -15,6 +15,29 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 router = APIRouter()
 
 
+def _extract_price_id(stripe_sub: stripe.Subscription, sub_id: str) -> str:
+    """Pull the first item's price id off a Stripe Subscription, with explicit errors."""
+    items = getattr(stripe_sub, "items", None)
+    items_data = getattr(items, "data", None) or []
+    if not items_data:
+        raise ValueError(
+            f"Stripe subscription {sub_id} has no items — cannot determine price"
+        )
+    price = getattr(items_data[0], "price", None)
+    price_id = getattr(price, "id", None) if price is not None else None
+    if not price_id:
+        raise ValueError(f"Stripe subscription {sub_id} item has no price id")
+    return price_id
+
+
+def _require_status(stripe_obj, sub_id: str) -> str:
+    """Read a Stripe Subscription's status attribute, raising a clean ValueError if missing."""
+    status_value = getattr(stripe_obj, "status", None)
+    if not status_value:
+        raise ValueError(f"Stripe subscription {sub_id} is missing status")
+    return status_value
+
+
 @router.post("/stripe")
 async def stripe_webhook(
     request: Request,
@@ -40,36 +63,39 @@ async def stripe_webhook(
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    logger.info(f"Received Stripe event: {event['type']}")
+    event_type = event.type
+    event_object = event.data.object
+
+    logger.info(f"Received Stripe event: {event_type}")
 
     try:
-        if event["type"] == "checkout.session.completed":
-            await handle_checkout_session_completed(event["data"]["object"], db)
-        elif event["type"] == "customer.subscription.created":
-            await handle_subscription_created(event["data"]["object"], db)
-        elif event["type"] == "customer.subscription.updated":
-            await handle_subscription_updated(event["data"]["object"], db)
-        elif event["type"] == "customer.subscription.deleted":
-            await handle_subscription_deleted(event["data"]["object"], db)
+        if event_type == "checkout.session.completed":
+            await handle_checkout_session_completed(event_object, db)
+        elif event_type == "customer.subscription.created":
+            await handle_subscription_created(event_object, db)
+        elif event_type == "customer.subscription.updated":
+            await handle_subscription_updated(event_object, db)
+        elif event_type == "customer.subscription.deleted":
+            await handle_subscription_deleted(event_object, db)
     except ValueError as e:
         # Return 200 to prevent Stripe from retrying — this is a config/data error
         # that won't resolve on retry (e.g., unknown price_id, missing metadata)
         logger.critical(
             "Webhook data error for %s (acknowledged, no retry): %s",
-            event["type"],
+            event_type,
             e,
             exc_info=True,
         )
         return {"status": "error", "message": str(e)}
     except stripe.error.StripeError as e:
         logger.error(
-            "Stripe API error during webhook %s: %s", event["type"], e, exc_info=True
+            "Stripe API error during webhook %s: %s", event_type, e, exc_info=True
         )
         raise HTTPException(status_code=502, detail="Upstream payment provider error")
     except Exception as e:
         logger.error(
             "Unexpected error handling webhook %s: %s: %s",
-            event["type"],
+            event_type,
             type(e).__name__,
             e,
             exc_info=True,
@@ -79,7 +105,9 @@ async def stripe_webhook(
     return {"status": "success"}
 
 
-async def handle_checkout_session_completed(session: dict, db: Session):
+async def handle_checkout_session_completed(
+    session: stripe.checkout.Session, db: Session
+):
     """
     Handle successful checkout
     Create/Update subscription and link to Institution
@@ -87,7 +115,7 @@ async def handle_checkout_session_completed(session: dict, db: Session):
 
     logger.info("handle_checkout_session_completed() called")
 
-    metadata = session.get("metadata", {})
+    metadata = session.metadata or {}
     institution_id = metadata.get("institution_id")
     user_id = metadata.get("user_id")
 
@@ -97,12 +125,12 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         logger.error("No institution_id in session metadata")
         raise ValueError("No institution_id in session metadata")
 
-    session_mode = session.get("mode")
+    session_mode = session.mode
     logger.debug(f"Session mode: {session_mode}")
 
     if session_mode == "subscription":
-        subscription_id = session.get("subscription")
-        customer_id = session.get("customer")
+        subscription_id = session.subscription
+        customer_id = session.customer
         logger.debug(f"Subscription ID: {subscription_id}, Customer ID: {customer_id}")
 
         institution = (
@@ -124,9 +152,11 @@ async def handle_checkout_session_completed(session: dict, db: Session):
                 exc_info=True,
             )
             raise
-        price_id = stripe_sub["items"]["data"][0]["price"]["id"]
 
-        logger.debug(f"Stripe subscription status: {stripe_sub.get('status')}")
+        price_id = _extract_price_id(stripe_sub, subscription_id)
+        status_value = _require_status(stripe_sub, subscription_id)
+
+        logger.debug(f"Stripe subscription status: {status_value}")
 
         existing_sub = (
             db.query(Subscription)
@@ -134,45 +164,42 @@ async def handle_checkout_session_completed(session: dict, db: Session):
             .first()
         )
 
+        period_start_ts = getattr(stripe_sub, "current_period_start", None)
+        period_end_ts = getattr(stripe_sub, "current_period_end", None)
+        cancel_at_period_end = bool(getattr(stripe_sub, "cancel_at_period_end", False))
+        period_start = (
+            datetime.fromtimestamp(period_start_ts, tz=timezone.utc)
+            if period_start_ts is not None
+            else None
+        )
+        period_end = (
+            datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
+            if period_end_ts is not None
+            else None
+        )
+
         if existing_sub:
-            existing_sub.status = SubscriptionStatus(stripe_sub["status"])
+            existing_sub.status = SubscriptionStatus(status_value)
             existing_sub.stripe_price_id = price_id
             if not existing_sub.billing_owner_id and user_id:
                 existing_sub.billing_owner_id = int(user_id)
-            if "current_period_start" in stripe_sub:
-                existing_sub.current_period_start = datetime.fromtimestamp(
-                    stripe_sub["current_period_start"], tz=timezone.utc
-                )
-            if "current_period_end" in stripe_sub:
-                existing_sub.current_period_end = datetime.fromtimestamp(
-                    stripe_sub["current_period_end"], tz=timezone.utc
-                )
-            existing_sub.cancel_at_period_end = stripe_sub.get(
-                "cancel_at_period_end", False
-            )
+            if period_start is not None:
+                existing_sub.current_period_start = period_start
+            if period_end is not None:
+                existing_sub.current_period_end = period_end
+            existing_sub.cancel_at_period_end = cancel_at_period_end
             logger.info(f"Updated existing subscription {subscription_id}")
         else:
-            period_start = None
-            period_end = None
-            if "current_period_start" in stripe_sub:
-                period_start = datetime.fromtimestamp(
-                    stripe_sub["current_period_start"], tz=timezone.utc
-                )
-            if "current_period_end" in stripe_sub:
-                period_end = datetime.fromtimestamp(
-                    stripe_sub["current_period_end"], tz=timezone.utc
-                )
-
             new_sub = Subscription(
                 institution_id=institution.id,
                 billing_owner_id=int(user_id) if user_id else None,
                 stripe_subscription_id=subscription_id,
                 stripe_customer_id=customer_id,
                 stripe_price_id=price_id,
-                status=SubscriptionStatus(stripe_sub["status"]),
+                status=SubscriptionStatus(status_value),
                 current_period_start=period_start,
                 current_period_end=period_end,
-                cancel_at_period_end=stripe_sub.get("cancel_at_period_end", False),
+                cancel_at_period_end=cancel_at_period_end,
             )
             db.add(new_sub)
             logger.info(f"Created new subscription {subscription_id}")
@@ -210,12 +237,12 @@ async def handle_checkout_session_completed(session: dict, db: Session):
         logger.warning(f"Session mode is not 'subscription': {session_mode}")
 
 
-async def handle_subscription_created(subscription: dict, db: Session):
+async def handle_subscription_created(subscription: stripe.Subscription, db: Session):
     """
     Handle new subscription creation.
     Update period fields that may not be available in checkout.session.completed.
     """
-    sub_id = subscription["id"]
+    sub_id = subscription.id
     local_sub = (
         db.query(Subscription)
         .filter(Subscription.stripe_subscription_id == sub_id)
@@ -223,22 +250,27 @@ async def handle_subscription_created(subscription: dict, db: Session):
     )
 
     if local_sub:
-        if "current_period_start" in subscription:
+        status_value = _require_status(subscription, sub_id)
+        period_start_ts = getattr(subscription, "current_period_start", None)
+        period_end_ts = getattr(subscription, "current_period_end", None)
+
+        if period_start_ts is not None:
             local_sub.current_period_start = datetime.fromtimestamp(
-                subscription["current_period_start"], tz=timezone.utc
+                period_start_ts, tz=timezone.utc
             )
-        if "current_period_end" in subscription:
+        if period_end_ts is not None:
             local_sub.current_period_end = datetime.fromtimestamp(
-                subscription["current_period_end"], tz=timezone.utc
+                period_end_ts, tz=timezone.utc
             )
 
-        local_sub.status = SubscriptionStatus(subscription["status"])
-        local_sub.cancel_at_period_end = subscription.get("cancel_at_period_end", False)
+        local_sub.status = SubscriptionStatus(status_value)
+        local_sub.cancel_at_period_end = bool(
+            getattr(subscription, "cancel_at_period_end", False)
+        )
 
         logger.info(
-            f"Subscription created {sub_id}: status={subscription['status']}, "
-            f"period_start={subscription.get('current_period_start')}, "
-            f"period_end={subscription.get('current_period_end')}"
+            f"Subscription created {sub_id}: status={status_value}, "
+            f"period_start={period_start_ts}, period_end={period_end_ts}"
         )
 
         db.commit()
@@ -249,9 +281,9 @@ async def handle_subscription_created(subscription: dict, db: Session):
         )
 
 
-async def handle_subscription_updated(subscription: dict, db: Session):
+async def handle_subscription_updated(subscription: stripe.Subscription, db: Session):
     """Sync subscription status updates"""
-    sub_id = subscription["id"]
+    sub_id = subscription.id
     local_sub = (
         db.query(Subscription)
         .filter(Subscription.stripe_subscription_id == sub_id)
@@ -259,30 +291,34 @@ async def handle_subscription_updated(subscription: dict, db: Session):
     )
 
     if local_sub:
-        local_sub.status = SubscriptionStatus(subscription["status"])
+        status_value = _require_status(subscription, sub_id)
+        period_start_ts = getattr(subscription, "current_period_start", None)
+        period_end_ts = getattr(subscription, "current_period_end", None)
 
-        if "current_period_start" in subscription:
+        local_sub.status = SubscriptionStatus(status_value)
+        if period_start_ts is not None:
             local_sub.current_period_start = datetime.fromtimestamp(
-                subscription["current_period_start"], tz=timezone.utc
+                period_start_ts, tz=timezone.utc
             )
-        if "current_period_end" in subscription:
+        if period_end_ts is not None:
             local_sub.current_period_end = datetime.fromtimestamp(
-                subscription["current_period_end"], tz=timezone.utc
+                period_end_ts, tz=timezone.utc
             )
-
-        local_sub.cancel_at_period_end = subscription.get("cancel_at_period_end", False)
+        local_sub.cancel_at_period_end = bool(
+            getattr(subscription, "cancel_at_period_end", False)
+        )
 
         logger.info(
-            f"Updated subscription {sub_id}: status={subscription['status']}, "
-            f"period_start={subscription.get('current_period_start')}, "
-            f"period_end={subscription.get('current_period_end')}"
+            f"Updated subscription {sub_id}: status={status_value}, "
+            f"period_start={period_start_ts}, period_end={period_end_ts}"
         )
 
         # Sync tier from price_id
-
-        items_data = subscription.get("items", {}).get("data", [])
+        items = getattr(subscription, "items", None)
+        items_data = getattr(items, "data", None) or []
         if items_data:
-            price_id = items_data[0].get("price", {}).get("id")
+            first_price = getattr(items_data[0], "price", None)
+            price_id = getattr(first_price, "id", None) if first_price else None
             if price_id:
                 new_tier = get_tier_from_price_id(price_id)
                 institution = local_sub.institution
@@ -311,9 +347,9 @@ async def handle_subscription_updated(subscription: dict, db: Session):
         )
 
 
-async def handle_subscription_deleted(subscription: dict, db: Session):
+async def handle_subscription_deleted(subscription: stripe.Subscription, db: Session):
     """Handle subscription cancellation"""
-    sub_id = subscription["id"]
+    sub_id = subscription.id
     local_sub = (
         db.query(Subscription)
         .filter(Subscription.stripe_subscription_id == sub_id)

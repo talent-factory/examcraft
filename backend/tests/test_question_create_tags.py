@@ -1,4 +1,5 @@
 """Tests für tag_ids in create_question_review."""
+
 import pytest
 from unittest.mock import Mock
 from fastapi.testclient import TestClient
@@ -16,9 +17,11 @@ from database import get_db
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def qct_db(test_engine):
     from sqlalchemy.orm import sessionmaker
+
     Session_ = sessionmaker(bind=test_engine)
     session = Session_()
     yield session
@@ -28,6 +31,7 @@ def qct_db(test_engine):
 @pytest.fixture()
 def qct_client(qct_db: Session):
     import api.question_review as qr_module
+
     app.include_router(qr_module.router)
 
     def override_get_db():
@@ -42,6 +46,7 @@ def qct_client(qct_db: Session):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_institution(db, suffix):
     inst = Institution(
@@ -97,6 +102,7 @@ QUESTION_PAYLOAD = {
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestCreateQuestionWithTags:
     def test_create_with_valid_tag_ids_assigns_tags(self, qct_db, qct_client):
         inst = make_institution(qct_db, "c1")
@@ -117,7 +123,9 @@ class TestCreateQuestionWithTags:
         assert tag1.id in returned_tag_ids
         assert tag2.id in returned_tag_ids
 
-    def test_create_with_valid_tag_id_creates_question_tag_row(self, qct_db, qct_client):
+    def test_create_with_valid_tag_id_creates_question_tag_row(
+        self, qct_db, qct_client
+    ):
         inst = make_institution(qct_db, "c2")
         user = make_user(qct_db, inst.id, "c2")
         tag = make_tag(qct_db, inst.id, "algorithmen")

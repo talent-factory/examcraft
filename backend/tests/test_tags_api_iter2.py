@@ -1,5 +1,6 @@
 """Tests for the extended Tags API — visibility, archive/unarchive, merge,
 ownership permissions, case-insensitive uniqueness and global-tag scoping."""
+
 import pytest
 from unittest.mock import Mock
 from fastapi.testclient import TestClient
@@ -18,10 +19,12 @@ from database import get_db
 # Fixtures (analog zu test_tags_api.py)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def tags_db(test_engine):
     """Plain committable session (no wrapping transaction)."""
     from sqlalchemy.orm import sessionmaker
+
     TestSession = sessionmaker(bind=test_engine)
     session = TestSession()
     yield session
@@ -49,6 +52,7 @@ def tags_client(tags_db: Session):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_institution(db: Session, suffix: str) -> Institution:
     inst = Institution(
@@ -78,7 +82,9 @@ def make_user(db: Session, institution_id: int, suffix: str) -> User:
     return user
 
 
-def make_tag(db: Session, institution_id: int, name: str, scope: str = "institution") -> Tag:
+def make_tag(
+    db: Session, institution_id: int, name: str, scope: str = "institution"
+) -> Tag:
     tag = Tag(
         name=name,
         institution_id=institution_id if scope == "institution" else None,
@@ -114,6 +120,7 @@ def make_question(db: Session, institution_id: int, created_by: int) -> Question
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestListTagsExtended:
     def test_list_tags_excludes_archived_by_default(self, tags_db, tags_client):
@@ -321,7 +328,11 @@ class TestMergeTags:
         )
         assert target_qt_count == 2
 
-        logs = tags_db.query(TagMergeLog).filter(TagMergeLog.target_tag_id == target.id).all()
+        logs = (
+            tags_db.query(TagMergeLog)
+            .filter(TagMergeLog.target_tag_id == target.id)
+            .all()
+        )
         assert len(logs) == 2
         assert sum(lg.questions_migrated for lg in logs) == 2
         # Beide source_tag_ids einzeln im Audit-Trail vorhanden

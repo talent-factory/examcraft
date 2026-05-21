@@ -55,7 +55,9 @@ def _serialize_tag(tag: Tag, usage_count: int) -> dict:
     }
 
 
-def _question_to_dict(question: QuestionReview, counts: dict[int, int] | None = None) -> dict:
+def _question_to_dict(
+    question: QuestionReview, counts: dict[int, int] | None = None
+) -> dict:
     """Convert QuestionReview to dict (without reviewer lookup)."""
     counts = counts or {}
     return {
@@ -330,26 +332,18 @@ async def get_review_queue(
             db.query(QuestionReview), QuestionReview, tenant_context
         )
         total = query.count()
-        pending = (
-            base_stats
-            .filter(QuestionReview.review_status == ReviewStatus.PENDING.value)
-            .count()
-        )
-        approved = (
-            base_stats
-            .filter(QuestionReview.review_status == ReviewStatus.APPROVED.value)
-            .count()
-        )
-        rejected = (
-            base_stats
-            .filter(QuestionReview.review_status == ReviewStatus.REJECTED.value)
-            .count()
-        )
-        in_review = (
-            base_stats
-            .filter(QuestionReview.review_status == ReviewStatus.IN_REVIEW.value)
-            .count()
-        )
+        pending = base_stats.filter(
+            QuestionReview.review_status == ReviewStatus.PENDING.value
+        ).count()
+        approved = base_stats.filter(
+            QuestionReview.review_status == ReviewStatus.APPROVED.value
+        ).count()
+        rejected = base_stats.filter(
+            QuestionReview.review_status == ReviewStatus.REJECTED.value
+        ).count()
+        in_review = base_stats.filter(
+            QuestionReview.review_status == ReviewStatus.IN_REVIEW.value
+        ).count()
 
         # Get Questions with Pagination
         question_list = (

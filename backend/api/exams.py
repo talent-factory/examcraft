@@ -435,7 +435,9 @@ async def list_approved_questions(
     ),
     search: Optional[str] = Query(None, max_length=500),
     tag_ids: Optional[str] = Query(None, description="Comma-separated tag IDs"),
-    document_ids: Optional[str] = Query(None, description="Comma-separated document IDs"),
+    document_ids: Optional[str] = Query(
+        None, description="Comma-separated document IDs"
+    ),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(require_permission("create_exams")),

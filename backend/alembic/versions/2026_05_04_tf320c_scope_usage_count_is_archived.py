@@ -16,9 +16,18 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("tags", sa.Column("scope", sa.String(20), nullable=False, server_default="institution"))
-    op.add_column("tags", sa.Column("usage_count", sa.Integer(), nullable=False, server_default="0"))
-    op.add_column("tags", sa.Column("is_archived", sa.Boolean(), nullable=False, server_default="false"))
+    op.add_column(
+        "tags",
+        sa.Column("scope", sa.String(20), nullable=False, server_default="institution"),
+    )
+    op.add_column(
+        "tags",
+        sa.Column("usage_count", sa.Integer(), nullable=False, server_default="0"),
+    )
+    op.add_column(
+        "tags",
+        sa.Column("is_archived", sa.Boolean(), nullable=False, server_default="false"),
+    )
     # institution_id darf nun NULL sein (für globale Tags)
     op.alter_column("tags", "institution_id", nullable=True)
 

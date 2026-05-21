@@ -22,7 +22,9 @@ def upgrade() -> None:
         sa.Column("source_tag_id", sa.Integer(), nullable=True),
         sa.Column("target_tag_id", sa.Integer(), nullable=True),
         sa.Column("merged_by", sa.Integer(), nullable=True),
-        sa.Column("merged_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "merged_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
+        ),
         sa.Column("questions_migrated", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(["merged_by"], ["users.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["source_tag_id"], ["tags.id"], ondelete="SET NULL"),
