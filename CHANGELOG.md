@@ -161,6 +161,50 @@ and this project adheres to
   versioniert; bestehende Einträge gruppiert (Build-Artefakte, IDE,
   Logs, Caches, Secrets) für bessere Wartbarkeit.
 
+## [1.3.1] - 2026-04-30
+
+### Fixed
+
+- **TF-331 — DOCX-Vektorisierung extrahiert Tabellen, Header und Footer
+  (#44):** `PyMuPDFProcessor._process_docx` iterierte bisher nur
+  `doc.paragraphs` (Top-Level-Body) — Tabellen, geschachtelte Tabellen,
+  Header, Footer, Textfelder und Fussnoten wurden übersprungen.
+  Tabellenlastige `.docx`-Dateien lieferten 0 Chunks → Qdrant
+  HTTP 400 "Empty update request" → stiller Fehlschlag mit
+  `has_vectors=False`. Neue `_iter_docx_text_blocks()`-Funktion walkt
+  alle `<w:t>`-Elemente plus Section-Header/Footer.
+  Defense-in-Depth: `process_document_content` und
+  `add_document_chunks` lösen jetzt bei 0 Chunks eine Exception aus,
+  statt still fehlzuschlagen. Begleitend: `.doc` (OLE2/CFB) wird klar
+  abgewiesen ("Bitte als .docx speichern"), `.md`-MIME-Detection
+  priorisiert die Datei-Endung über libmagic, `.txt`/`.md`-Encoding-Fallback
+  (UTF-8 → Latin-1) mit Mojibake-Schutz.
+  Title-Resolver filtert Office-Defaults (`"1"`, `"Untitled"`,
+  `Document1`, `Mappe1`, `Tabelle1`, `Sheet1`, …) und User können
+  Dokumenten-Titel via Inline-Edit überschreiben (neue
+  `documents.display_name`-Spalte, `PATCH /api/v1/documents/{id}`).
+  Strukturierte Error-Codes (`legacy_doc_format`, `empty_document`,
+  `binary_content`, `unsupported_format`, `vectorization_failed`,
+  `file_corrupt`, `unknown_error`) liefern lokalisierte UI-Meldungen
+  in DE/EN/FR/IT statt englischer Raw-Strings. Migrationsskript
+  `scripts/reprocess_documents_without_vectors.py` reprozessiert
+  bestehende ungesicherte Dokumente. ~80 neue Tests, 214 grün.
+- **Release-Pipeline überschreibt `http.extraheader` für
+  Public-Repo-Pushes (#43):** Beim v1.3.0-Release schlug der Push des
+  Tags zum Public-Repo mit 403 fehl, weil der `extraheader`, den
+  `actions/checkout` mit dem privaten `github.token` setzt, die
+  URL-eingebetteten `MIRROR_GITHUB_TOKEN`-Credentials überschreibt.
+  Lösung: `git -c http.https://github.com/.extraheader=` pro
+  Push-Kommando — bewahrt den `Create Git Tag`-Step zum privaten
+  Repo, fixt aber den Public-Push.
+
+### Changed
+
+- **`.gitignore` neu strukturiert + `scheduled_tasks.lock` ergänzt:**
+  Lock-File von Celery-Beat-Singleton-Tasks wird nicht mehr
+  versioniert; bestehende Einträge gruppiert (Build-Artefakte, IDE,
+  Logs, Caches, Secrets) für bessere Wartbarkeit.
+
 ## [1.3.0] - 2026-04-29
 
 ### Added
