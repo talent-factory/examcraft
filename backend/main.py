@@ -248,17 +248,24 @@ async def lifespan(app: FastAPI):
     rag_exams = importlib.util.module_from_spec(spec_rag)
     spec_rag.loader.exec_module(rag_exams)
 
+    # TF-320 hotfix: load tags BEFORE question_review and exams because both
+    # do ``from api.tags import TagOut``. Register as "api.tags" (same pattern
+    # as api.activity below) so the absolute import resolves through
+    # sys.modules — the importlib.spec_from_file_location loader machinery
+    # breaks the bare filesystem-based package lookup that would otherwise
+    # find /app/api/tags.py via sys.path.
+    spec_tags = importlib.util.spec_from_file_location(
+        "api.tags", os.path.join(core_api_path, "tags.py")
+    )
+    tags_api = importlib.util.module_from_spec(spec_tags)
+    sys.modules["api.tags"] = tags_api
+    spec_tags.loader.exec_module(tags_api)
+
     spec_qr = importlib.util.spec_from_file_location(
         "core_api_question_review", os.path.join(core_api_path, "question_review.py")
     )
     question_review = importlib.util.module_from_spec(spec_qr)
     spec_qr.loader.exec_module(question_review)
-
-    spec_tags = importlib.util.spec_from_file_location(
-        "core_api_tags", os.path.join(core_api_path, "tags.py")
-    )
-    tags_api = importlib.util.module_from_spec(spec_tags)
-    spec_tags.loader.exec_module(tags_api)
 
     spec_exams = importlib.util.spec_from_file_location(
         "core_api_exams", os.path.join(core_api_path, "exams.py")
