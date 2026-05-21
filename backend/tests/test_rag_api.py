@@ -550,12 +550,18 @@ class TestRAGAPI:
         mock_tag.is_archived = False
         mock_db.query.return_value.filter.return_value.all.return_value = [mock_tag]
 
+        # The route loaded via lifespan may live in module 'core_api_rag_exams',
+        # so patching by string path can miss. Patch the underlying Celery task
+        # object's apply_async — every importer sees the patched method.
+        from tasks.question_tasks import generate_questions_task
+
         with (
-            patch("api.rag_exams.generate_questions_task") as mock_task,
+            patch.object(
+                generate_questions_task, "apply_async", return_value=MagicMock()
+            ),
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
         ):
-            mock_task.apply_async.return_value = MagicMock()
             mock_job_cls.return_value = MagicMock()
 
             response = auth_client.post(
@@ -573,10 +579,10 @@ class TestRAGAPI:
         assert response.status_code == 200
         assert "task_id" in response.json()
 
-    def test_generate_rag_exam_with_missing_tag_id_returns_404(
+    def test_generate_rag_exam_with_missing_tag_id_returns_422(
         self, auth_client, mock_db
     ):
-        """tag_ids=[999] — Tag existiert nicht → 404."""
+        """tag_ids=[999] — Tag existiert nicht → uniform 422 (Enumeration-Prevention)."""
         mock_db.query.return_value.filter.return_value.all.return_value = []
 
         response = auth_client.post(
@@ -591,19 +597,16 @@ class TestRAGAPI:
             },
         )
 
-        assert response.status_code == 404
-        assert "999" in response.json()["detail"]
+        assert response.status_code == 422
 
-    def test_generate_rag_exam_with_foreign_institution_tag_returns_403(
+    def test_generate_rag_exam_with_foreign_institution_tag_returns_422(
         self, auth_client, mock_db
     ):
-        """tag_ids=[2] — Tag gehört anderer Institution, scope='institution' → 403."""
-        mock_tag = Mock()
-        mock_tag.id = 2
-        mock_tag.institution_id = 99  # different institution
-        mock_tag.scope = "institution"
-        mock_tag.is_archived = False
-        mock_db.query.return_value.filter.return_value.all.return_value = [mock_tag]
+        """tag_ids=[2] — Tag gehört anderer Institution, scope='institution' →
+        uniform 422 (Cross-Tenant-Enumeration-Prevention)."""
+        # Route's visibility query already filters out foreign-institution tags,
+        # so it returns the same 422 as for missing IDs — no echo of the ID.
+        mock_db.query.return_value.filter.return_value.all.return_value = []
 
         response = auth_client.post(
             "/api/v1/rag/generate-exam",
@@ -617,7 +620,7 @@ class TestRAGAPI:
             },
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 422
 
     def test_generate_rag_exam_with_archived_tag_returns_422(
         self, auth_client, mock_db

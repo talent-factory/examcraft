@@ -845,7 +845,9 @@
       "validationQuestionLength": "Le texte de la question doit contenir au moins 10 caractères",
       "validationMinOptions": "Les questions à choix multiple nécessitent au moins 2 options",
       "validationSelectAnswer": "Veuillez sélectionner une réponse correcte",
-      "validationAnswerInOptions": "La réponse correcte doit être l'une des options"
+      "validationAnswerInOptions": "La réponse correcte doit être l'une des options",
+      "tagCreateError": "Certains tags n'ont pas pu être créés : {{names}}",
+      "saveError": "Échec de l'enregistrement. Veuillez réessayer."
     },
     "errorBoundary": {
       "title": "Une erreur s'est produite",
@@ -871,7 +873,8 @@
       "difficultyMedium": "Moyen",
       "difficultyHard": "Difficile",
       "back": "Retour",
-      "generate": "Générer"
+      "generate": "Générer",
+      "tagsLabel": "Tags (optionnel)"
     },
     "questionReviewDetail": {
       "errorLoad": "Erreur lors du chargement de la question",
@@ -1264,7 +1267,9 @@
       "pendingReview": "En attente de révision",
       "pendingReviewInfo": "Les questions sont en statut En attente et doivent être vérifiées et approuvées dans le workflow de révision.",
       "goToReview": "Aller au workflow de révision",
-      "createNewExam": "Créer un nouvel examen"
+      "createNewExam": "Créer un nouvel examen",
+      "errorTagCreation": "Certains tags n'ont pas pu être créés : {{names}}",
+      "tagsLabel": "Tags (optionnel)"
     },
     "ragExamDisplay": {
       "questions": "{{count}} Questions",

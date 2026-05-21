@@ -1234,7 +1234,9 @@
       "validationQuestionLength": "Question text must be at least 10 characters long",
       "validationMinOptions": "Multiple choice questions need at least 2 options",
       "validationSelectAnswer": "Please select a correct answer",
-      "validationAnswerInOptions": "The correct answer must be one of the options"
+      "validationAnswerInOptions": "The correct answer must be one of the options",
+      "tagCreateError": "Some tags could not be created: {{names}}",
+      "saveError": "Save failed. Please try again."
     },
     "errorBoundary": {
       "title": "An error occurred",
@@ -1260,7 +1262,8 @@
       "difficultyMedium": "Medium",
       "difficultyHard": "Hard",
       "back": "Back",
-      "generate": "Generate"
+      "generate": "Generate",
+      "tagsLabel": "Tags (optional)"
     },
     "questionReviewDetail": {
       "errorLoad": "Error loading question",
@@ -1658,7 +1661,9 @@
       "pendingReview": "Pending Review",
       "pendingReviewInfo": "The questions are in Pending status and need to be reviewed and approved in the review workflow.",
       "goToReview": "Go to Review Workflow",
-      "createNewExam": "Create New Exam"
+      "createNewExam": "Create New Exam",
+      "errorTagCreation": "Some tags could not be created: {{names}}",
+      "tagsLabel": "Tags (optional)"
     },
     "ragExamDisplay": {
       "questions": "{{count}} Questions",

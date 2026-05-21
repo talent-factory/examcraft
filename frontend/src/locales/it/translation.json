@@ -845,7 +845,9 @@
       "validationQuestionLength": "Il testo della domanda deve contenere almeno 10 caratteri",
       "validationMinOptions": "Le domande a scelta multipla richiedono almeno 2 opzioni",
       "validationSelectAnswer": "Seleziona una risposta corretta",
-      "validationAnswerInOptions": "La risposta corretta deve essere una delle opzioni"
+      "validationAnswerInOptions": "La risposta corretta deve essere una delle opzioni",
+      "tagCreateError": "Alcuni tag non sono stati creati: {{names}}",
+      "saveError": "Salvataggio non riuscito. Riprova."
     },
     "errorBoundary": {
       "title": "Si è verificato un errore",
@@ -871,7 +873,8 @@
       "difficultyMedium": "Medio",
       "difficultyHard": "Difficile",
       "back": "Indietro",
-      "generate": "Genera"
+      "generate": "Genera",
+      "tagsLabel": "Tag (opzionale)"
     },
     "questionReviewDetail": {
       "errorLoad": "Errore nel caricamento della domanda",
@@ -1264,7 +1267,9 @@
       "pendingReview": "In attesa di revisione",
       "pendingReviewInfo": "Le domande sono in stato In attesa e devono essere verificate e approvate nel workflow di revisione.",
       "goToReview": "Vai al workflow di revisione",
-      "createNewExam": "Crea nuovo esame"
+      "createNewExam": "Crea nuovo esame",
+      "errorTagCreation": "Alcuni tag non sono stati creati: {{names}}",
+      "tagsLabel": "Tag (opzionale)"
     },
     "ragExamDisplay": {
       "questions": "{{count}} Domande",

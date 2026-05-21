@@ -46,16 +46,18 @@ beforeEach(() => {
   mockListTags.mockResolvedValue(makeTags());
 });
 
+// Section headers render with a count suffix, e.g. "Meine Tags (1)". Tests
+// match the header text via regex so they don't break when the count changes.
 describe('Nicht-Admin Dozent', () => {
   it('zeigt Sektion "Meine Tags" für eigene Tags', async () => {
     renderPage();
-    expect(await screen.findByText('Meine Tags')).toBeInTheDocument();
+    expect(await screen.findByText(/Meine Tags/)).toBeInTheDocument();
     expect(await screen.findByText('#EigenTag')).toBeInTheDocument();
   });
 
   it('zeigt Sektion "Tags der Institution" für fremde Tags', async () => {
     renderPage();
-    expect(await screen.findByText('Tags der Institution')).toBeInTheDocument();
+    expect(await screen.findByText(/Tags der Institution/)).toBeInTheDocument();
     expect(await screen.findByText('#KollegeTag')).toBeInTheDocument();
   });
 
@@ -72,7 +74,7 @@ describe('Nicht-Admin Dozent', () => {
     ]);
     renderPage();
     await screen.findByText('#EigenTag');
-    expect(screen.queryByText('Tags der Institution')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tags der Institution/)).not.toBeInTheDocument();
   });
 });
 
@@ -82,8 +84,8 @@ describe('Admin', () => {
   it('zeigt NICHT die Meine-Tags/Institution-Aufteilung sondern klassische Ansicht', async () => {
     renderPage();
     await screen.findByText('#EigenTag');
-    expect(screen.queryByText('Meine Tags')).not.toBeInTheDocument();
-    expect(screen.queryByText('Tags der Institution')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Meine Tags/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tags der Institution/)).not.toBeInTheDocument();
   });
 });
 
@@ -106,6 +108,6 @@ describe('Superuser', () => {
   it('zeigt normale Admin-Sektionsstruktur (keine Meine-Tags-Aufteilung)', async () => {
     renderPage();
     await screen.findByText('#EigenTag');
-    expect(screen.queryByText('Meine Tags')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Meine Tags/)).not.toBeInTheDocument();
   });
 });

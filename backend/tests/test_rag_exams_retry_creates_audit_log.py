@@ -72,10 +72,16 @@ def test_retry_writes_create_question_audit_log(stage, test_db, mocker):
     s = stage
     mocker.patch("api.rag_exams.generate_questions_task")
 
-    # Sanity: no create_question logs exist yet.
-    assert (
-        test_db.query(AuditLog).filter(AuditLog.action == "create_question").count()
-        == 0
+    # audit_service.log_action commits, so earlier tests in the same run can
+    # leak rows past the test_db rollback boundary. Use delta-based counting
+    # scoped to this owner instead of an absolute zero baseline.
+    rows_before = (
+        test_db.query(AuditLog)
+        .filter(
+            AuditLog.action == "create_question",
+            AuditLog.user_id == s.owner.id,
+        )
+        .count()
     )
 
     response = _run(
@@ -89,12 +95,29 @@ def test_retry_writes_create_question_audit_log(stage, test_db, mocker):
     new_task_id = response.task_id
     assert new_task_id != s.job.task_id
 
-    logs = test_db.query(AuditLog).filter(AuditLog.action == "create_question").all()
+    logs = (
+        test_db.query(AuditLog)
+        .filter(
+            AuditLog.action == "create_question",
+            AuditLog.resource_id == new_task_id,
+        )
+        .all()
+    )
     assert len(logs) == 1
     log = logs[0]
     assert log.user_id == s.owner.id
     assert log.resource_id == new_task_id
     assert log.status == "success"
+
+    rows_after = (
+        test_db.query(AuditLog)
+        .filter(
+            AuditLog.action == "create_question",
+            AuditLog.user_id == s.owner.id,
+        )
+        .count()
+    )
+    assert rows_after == rows_before + 1
 
     # additional_data carries the topic + question_count so the
     # activity-feed title resolution works without an extra DB hop,
@@ -137,8 +160,15 @@ def test_retry_succeeds_when_audit_write_fails(stage, test_db, mocker):
         .count()
         == 1
     )
-    # No audit row was written (the patched call raised).
+    # No audit row was written for THIS retry's new task (the patched call
+    # raised). Earlier tests in the run can leak older create_question rows
+    # through audit_service's internal commit, so scope to the new task_id.
     assert (
-        test_db.query(AuditLog).filter(AuditLog.action == "create_question").count()
+        test_db.query(AuditLog)
+        .filter(
+            AuditLog.action == "create_question",
+            AuditLog.resource_id == response.task_id,
+        )
+        .count()
         == 0
     )

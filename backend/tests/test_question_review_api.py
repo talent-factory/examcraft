@@ -14,6 +14,17 @@ from models.question_review import ReviewStatus
 class TestQuestionReviewAPI:
     """Test Suite für Question Review API Endpoints"""
 
+    @pytest.fixture(autouse=True)
+    def ensure_question_review_router(self):
+        """Routes are normally registered by main.py's lifespan; when tests
+        run this file in isolation lifespan never fires, so register the
+        router directly. Mirrors test_rag_api.ensure_rag_router."""
+        import api.question_review as qr_module
+
+        route_paths = [r.path for r in app.routes]
+        if "/api/v1/questions/review" not in route_paths:
+            app.include_router(qr_module.router)
+
     @pytest.fixture
     def mock_user(self):
         """Mock authenticated user"""
@@ -83,6 +94,7 @@ class TestQuestionReviewAPI:
         mock.exam_id = "exam_123"
         mock.created_at = datetime.now()
         mock.updated_at = datetime.now()
+        mock.tags = []  # TF-320: route iterates q.tags — must be a real iterable
         return mock
 
     # ==================== GET /api/v1/questions/review ====================

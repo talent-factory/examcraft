@@ -359,6 +359,9 @@ class TestQuestionTagEndpoints:
         assert tag.id not in tag_ids_returned
 
     def test_set_tags_foreign_institution_tag_rejected(self, tags_db, tags_client):
+        # Cross-tenant enumeration is intentionally hidden: unknown and foreign
+        # tag IDs both surface as a uniform 422 without echoing the IDs back.
+        # See _assign_tags_to_question in api/question_review.py.
         inst_a = make_institution(tags_db, "qta")
         inst_b = make_institution(tags_db, "qtb")
         user_a = make_user(tags_db, inst_a.id, "qta")
@@ -375,9 +378,11 @@ class TestQuestionTagEndpoints:
             f"/api/v1/questions/{question.id}/tags",
             json={"tag_ids": [foreign_tag.id]},
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 422
+        assert str(foreign_tag.id) not in resp.text  # no enumeration
 
-    def test_set_nonexistent_tag_id_returns_404(self, tags_db, tags_client):
+    def test_set_nonexistent_tag_id_returns_422(self, tags_db, tags_client):
+        # Cross-tenant enumeration prevention: missing IDs return 422 too.
         inst = make_institution(tags_db, "qt404")
         user = make_user(tags_db, inst.id, "qt404")
         question = make_question(tags_db, inst.id, user.id)
@@ -393,7 +398,7 @@ class TestQuestionTagEndpoints:
             f"/api/v1/questions/{question.id}/tags",
             json={"tag_ids": [99999]},  # ID existiert nicht
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 422
 
 
 class TestApprovedQuestionsTagFilter:
