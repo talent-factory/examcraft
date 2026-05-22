@@ -68,6 +68,41 @@ export interface ListUsersParams {
   institution_id?: number;
 }
 
+export interface TransferUserRequest {
+  target_institution_id: number;
+  transfer_documents?: boolean;
+  transfer_exams?: boolean;
+  transfer_questions?: boolean;
+  transfer_tags?: boolean;
+}
+
+export interface TransferPreviewCounts {
+  documents: number;
+  exams: number;
+  questions: number;
+  tags: number;
+}
+
+export interface TransferExcludedCounts {
+  students: number;
+  classes: number;
+  submissions: number;
+}
+
+export interface TransferPreviewResponse {
+  source_institution_id: number;
+  source_institution_name: string;
+  target_institution_id: number;
+  target_institution_name: string;
+  transferable: TransferPreviewCounts;
+  excluded: TransferExcludedCounts;
+}
+
+export interface TransferUserResponse {
+  user: UserDetailResponse;
+  transferred: TransferPreviewCounts;
+}
+
 class AdminService {
   private getAuthHeaders(): HeadersInit {
     const token = localStorage.getItem('examcraft_access_token');
@@ -165,6 +200,51 @@ class AdminService {
       throw new Error(error.detail || 'Failed to update user status');
     }
 
+    return response.json();
+  }
+
+  /**
+   * Preview which artifacts would transfer if user is moved to target institution.
+   * SuperAdmin only.
+   */
+  async previewTransfer(
+    userId: number,
+    targetInstitutionId: number,
+  ): Promise<TransferPreviewResponse> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/admin/users/${userId}/transfer-preview` +
+        `?target_institution_id=${targetInstitutionId}`,
+      {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      },
+    );
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to fetch transfer preview');
+    }
+    return response.json();
+  }
+
+  /**
+   * Execute institution transfer for a user. SuperAdmin only.
+   */
+  async transferUser(
+    userId: number,
+    body: TransferUserRequest,
+  ): Promise<TransferUserResponse> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/admin/users/${userId}/transfer`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(body),
+      },
+    );
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to transfer user');
+    }
     return response.json();
   }
 

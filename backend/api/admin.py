@@ -167,6 +167,43 @@ class UserListResponse(BaseModel):
     can_edit: bool = False
 
 
+class TransferUserRequest(BaseModel):
+    """Body for POST /api/admin/users/{user_id}/transfer."""
+
+    target_institution_id: int = Field(..., gt=0)
+    transfer_documents: bool = True
+    transfer_exams: bool = True
+    transfer_questions: bool = True
+    transfer_tags: bool = True
+
+
+class TransferPreviewCountsModel(BaseModel):
+    documents: int
+    exams: int
+    questions: int
+    tags: int
+
+
+class TransferExcludedCountsModel(BaseModel):
+    students: int
+    classes: int
+    submissions: int
+
+
+class TransferPreviewResponse(BaseModel):
+    source_institution_id: int
+    source_institution_name: str
+    target_institution_id: int
+    target_institution_name: str
+    transferable: TransferPreviewCountsModel
+    excluded: TransferExcludedCountsModel
+
+
+class TransferUserResponse(BaseModel):
+    user: UserDetailResponse
+    transferred: TransferPreviewCountsModel
+
+
 # ============================================================================
 # API Endpoints
 # ============================================================================
@@ -908,4 +945,162 @@ async def create_institution(
         is_active=institution.is_active,
         require_second_reviewer=institution.require_second_reviewer,
         created_at=institution.created_at.isoformat(),
+    )
+
+
+@router.get(
+    "/users/{user_id}/transfer-preview",
+    response_model=TransferPreviewResponse,
+)
+async def preview_user_transfer(
+    user_id: int,
+    request: Request,
+    target_institution_id: int = Query(..., gt=0),
+    current_user: User = Depends(get_current_superuser),
+    db: Session = Depends(get_db),
+):
+    """Preview which artifacts would move if user is transferred (SuperAdmin only).
+
+    Counts are scoped to the user's *current* institution. Excluded counts
+    (students/classes/submissions) are informational.
+    """
+    from services.user_institution_transfer_service import (
+        preview_transfer,
+        TransferError,
+    )
+
+    locale = get_request_locale(request, current_user)
+    try:
+        preview = preview_transfer(db, user_id, target_institution_id)
+    except TransferError as e:
+        raise HTTPException(status_code=e.http_status, detail=t(e.code, locale=locale))
+
+    return TransferPreviewResponse(
+        source_institution_id=preview.source_institution_id,
+        source_institution_name=preview.source_institution_name,
+        target_institution_id=preview.target_institution_id,
+        target_institution_name=preview.target_institution_name,
+        transferable=TransferPreviewCountsModel(
+            documents=preview.transferable.documents,
+            exams=preview.transferable.exams,
+            questions=preview.transferable.questions,
+            tags=preview.transferable.tags,
+        ),
+        excluded=TransferExcludedCountsModel(
+            students=preview.excluded.students,
+            classes=preview.excluded.classes,
+            submissions=preview.excluded.submissions,
+        ),
+    )
+
+
+@router.post(
+    "/users/{user_id}/transfer",
+    response_model=TransferUserResponse,
+)
+async def transfer_user_to_institution(
+    user_id: int,
+    body: TransferUserRequest,
+    request: Request,
+    current_user: User = Depends(get_current_superuser),
+    db: Session = Depends(get_db),
+):
+    """Move user (and optionally artifacts) to another institution (SuperAdmin only).
+
+    Validation order (mirrors service-layer pre-condition checks):
+    1. Authorization (SuperAdmin) — enforced by `Depends(get_current_superuser)`
+    2. User exists — 404 admin_user_not_found
+    3. user_id != current_user.id (self-move forbidden) — 400 admin_transfer_self_forbidden
+    4. Target institution exists — 404 admin_institution_not_found
+    5. target != source — 400 admin_transfer_same_institution
+    """
+    from services.user_institution_transfer_service import (
+        transfer_user,
+        TransferError,
+        TransferFlags,
+    )
+    import tasks.rag_tasks as _rag_tasks
+
+    locale = get_request_locale(request, current_user)
+    flags = TransferFlags(
+        documents=body.transfer_documents,
+        exams=body.transfer_exams,
+        questions=body.transfer_questions,
+        tags=body.transfer_tags,
+    )
+
+    try:
+        stats = transfer_user(
+            db=db,
+            user_id=user_id,
+            target_institution_id=body.target_institution_id,
+            flags=flags,
+            actor=current_user,
+        )
+    except TransferError as e:
+        raise HTTPException(status_code=e.http_status, detail=t(e.code, locale=locale))
+
+    # Dispatch Qdrant re-index tasks AFTER commit. Service already committed.
+    # If dispatch itself fails (broker outage, etc.), `documents.pending_reindex`
+    # remains True as a future operational marker — there is no automatic
+    # sweeper today; recovery is currently manual (TF-352 follow-up).
+    for doc_id in stats.document_ids:
+        try:
+            _rag_tasks.reindex_document_to_institution.delay(doc_id)
+        except Exception as exc:
+            logger.error(
+                "Failed to dispatch reindex for document %s: %s",
+                doc_id,
+                exc,
+            )
+
+    # Reload user for response (institution_id is now fresh after commit)
+    user = db.query(User).filter(User.id == user_id).first()
+
+    role_responses = []
+    for role in user.roles:
+        permissions = role.permissions
+        if isinstance(permissions, str):
+            try:
+                permissions = json.loads(permissions)
+            except json.JSONDecodeError:
+                permissions = []
+        elif not isinstance(permissions, list):
+            permissions = []
+
+        role_responses.append(
+            RoleResponse(
+                id=role.id,
+                name=role.name,
+                display_name=role.display_name,
+                description=role.description,
+                permissions=permissions,
+                is_system_role=role.is_system_role,
+                created_at=role.created_at.isoformat(),
+            )
+        )
+
+    return TransferUserResponse(
+        user=UserDetailResponse(
+            id=user.id,
+            email=user.email,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            institution_id=user.institution_id,
+            institution_name=user.institution.name if user.institution else "N/A",
+            roles=role_responses,
+            status=user.status,
+            is_superuser=user.is_superuser,
+            last_login_at=user.last_login_at.isoformat()
+            if user.last_login_at
+            else None,
+            created_at=user.created_at.isoformat(),
+            updated_at=user.updated_at.isoformat() if user.updated_at else None,
+        ),
+        transferred=TransferPreviewCountsModel(
+            documents=stats.documents,
+            exams=stats.exams,
+            questions=stats.questions,
+            tags=stats.tags,
+        ),
     )

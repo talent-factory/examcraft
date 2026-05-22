@@ -15,6 +15,7 @@ from sqlalchemy import (
     Enum,
     Boolean,
     ForeignKey,
+    false,
 )
 from sqlalchemy.sql import func
 import enum
@@ -118,6 +119,16 @@ class Document(Base):
         index=True,
     )
 
+    # Qdrant re-index marker (TF-352): set to True when institution_id changes
+    # via the SuperAdmin transfer flow. A Celery task picks it up and re-uploads
+    # the document's vector payload to Qdrant with the new institution_id.
+    pending_reindex = Column(
+        Boolean,
+        nullable=False,
+        server_default=false(),
+        default=False,
+    )
+
     # Extracted metadata from document processing
     doc_metadata = Column(JSON, nullable=True)
 
@@ -207,4 +218,5 @@ class Document(Base):
             "processed_at": self.processed_at.isoformat()
             if self.processed_at
             else None,
+            # pending_reindex omitted — internal Celery marker, not exposed to API clients
         }

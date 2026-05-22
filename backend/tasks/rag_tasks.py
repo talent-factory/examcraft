@@ -3,6 +3,8 @@ Celery Tasks for RAG (Retrieval-Augmented Generation) Operations
 Handles vector embedding and semantic search indexing
 """
 
+from __future__ import annotations
+
 from celery_app import celery_app
 from database import SessionLocal
 from models.document import Document
@@ -156,3 +158,80 @@ def delete_embeddings(document_id: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error deleting embeddings for {document_id}: {str(e)}")
         raise
+
+
+def _reindex_document_payload(document: "Document") -> bool:
+    """Re-upload the document's vector payload to Qdrant with the current
+    institution_id.
+
+    STUB (TF-352): not yet implemented. The real upsert needs the RAG team
+    to confirm the correct API and payload shape (see services/rag_service.py
+    add_document_chunks and services/docs_indexer_service.py for existing
+    upsert patterns). Until then, this raises NotImplementedError so the
+    caller (`reindex_document_to_institution`) can leave `pending_reindex=True`
+    as a truthful marker rather than falsely claim Qdrant was updated.
+    """
+    raise NotImplementedError(
+        f"Qdrant re-index not yet implemented for document {document.id} "
+        f"(institution_id={document.institution_id}); pending_reindex remains True. "
+        f"See TF-352 follow-up."
+    )
+
+
+@celery_app.task(
+    name="tasks.rag_tasks.reindex_document_to_institution",
+    priority=3,
+    max_retries=3,
+    default_retry_delay=30,
+)
+def reindex_document_to_institution(document_id: int) -> "dict | None":
+    """Re-index a document in Qdrant with its current institution_id (TF-352).
+
+    Triggered after a SuperAdmin transfers a user with documents. On success,
+    clears `documents.pending_reindex`. On a NotImplementedError from the
+    stub helper, leaves the flag True and returns None — the document is
+    still observably "needs reindex" so a future implementation / operator
+    tool can pick it up.
+
+    On any other exception, rolls back and re-raises so Celery's retry
+    handles transient failures (Qdrant outage, broker hiccup) per the
+    decorator's max_retries.
+    """
+    db = SessionLocal()
+    try:
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if doc is None:
+            logger.warning(
+                "reindex_document_to_institution: document %s not found "
+                "(transfer rolled back?)",
+                document_id,
+            )
+            return None
+
+        try:
+            _reindex_document_payload(doc)
+        except NotImplementedError as exc:
+            # Stub is still in place — document remains marked for reindex.
+            # Loud per-invocation warning so operators see the gap.
+            logger.warning(
+                "Document %s pending_reindex stays True — Qdrant upsert stub "
+                "still active. %s",
+                document_id,
+                exc,
+            )
+            return None
+
+        doc.pending_reindex = False
+        db.commit()
+
+        logger.info(
+            "Document %s re-indexed to institution %s",
+            document_id,
+            doc.institution_id,
+        )
+        return {"document_id": document_id, "institution_id": doc.institution_id}
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
