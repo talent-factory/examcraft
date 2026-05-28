@@ -29,15 +29,22 @@ from sqlalchemy import text
 
 from api.documents import (
     DocumentPatchRequest,
+    download_document,
     get_document,
+    get_document_chunks,
+    get_document_content,
+    get_document_raw,
     get_document_status,
     update_document,
     upload_document,
 )
+from api.exams import list_documents_with_questions
 from api.rag_exams import (
+    ContextRetrievalRequest,
     RAGExamRequestModel,
     generate_rag_exam,
     get_available_documents,
+    retrieve_context,
 )
 from models.auth import AuditLog, Institution, User, UserStatus
 from models.document import Document, DocumentStatus, DocumentVisibility
@@ -525,3 +532,142 @@ def test_rag_generate_rejects_foreign_private_doc(vis_data, test_db):
             )
         )
     assert exc.value.status_code == 404
+
+
+def test_rag_retrieve_context_rejects_foreign_private_doc(vis_data, test_db):
+    # retrieve-context returns document *text* — at least as sensitive as
+    # generation. A colleague's private doc id must 404 before any vector lookup.
+    request_model = ContextRetrievalRequest(query="leak attempt", document_ids=[700])
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            retrieve_context(
+                request=request_model,
+                http_request=None,
+                current_user=vis_data.colleague,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Additional review gaps: content endpoints, 404 indistinguishability,
+# SuperUser PATCH, institution-without-institution PATCH, explicit-null PATCH,
+# and the exam-composer document list.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [download_document, get_document_raw, get_document_content, get_document_chunks],
+)
+def test_content_endpoints_404_for_foreign_private(vis_data, test_db, endpoint):
+    # The file/content/chunk endpoints are the actual exfiltration paths. Each
+    # shares assert_document_visible_for, so a foreigner hitting the owner's
+    # private doc must 404 *before* any storage / content access.
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            endpoint(
+                document_id=700,
+                request=None,
+                current_user=vis_data.foreigner,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 404
+
+
+def test_hidden_doc_404_is_indistinguishable_from_missing(vis_data, test_db):
+    # A hidden doc and a truly missing doc must return the SAME 404 detail, so a
+    # colleague cannot infer existence from the error body.
+    with pytest.raises(HTTPException) as hidden:
+        _run(
+            get_document(
+                document_id=700,
+                request=None,
+                current_user=vis_data.colleague,
+                db=test_db,
+            )
+        )
+    with pytest.raises(HTTPException) as missing:
+        _run(
+            get_document(
+                document_id=999999,
+                request=None,
+                current_user=vis_data.colleague,
+                db=test_db,
+            )
+        )
+    assert hidden.value.status_code == missing.value.status_code == 404
+    assert hidden.value.detail == missing.value.detail
+
+
+def test_superuser_can_change_visibility_of_foreign_doc(vis_data, test_db):
+    # SuperUser bypasses the owner-only rule (deliberately preserved).
+    payload = DocumentPatchRequest(visibility=DocumentVisibility.INSTITUTION)
+    resp = _run(
+        update_document(
+            document_id=700,
+            payload=payload,
+            request=None,
+            current_user=vis_data.superuser,
+            db=test_db,
+        )
+    )
+    assert resp.visibility == "institution"
+    test_db.refresh(vis_data.doc_private)
+    assert vis_data.doc_private.visibility == DocumentVisibility.INSTITUTION
+
+
+def test_patch_institution_on_doc_without_institution_returns_400(vis_data, test_db):
+    # Sharing a doc that has no institution is rejected at PATCH too (mirrors the
+    # upload guard); the document stays private.
+    orphan = Document(
+        id=720,
+        filename="orphan.pdf",
+        original_filename="orphan.pdf",
+        file_path="/tmp/orphan.pdf",
+        file_size=10,
+        mime_type="application/pdf",
+        status=DocumentStatus.PROCESSED,
+        institution_id=None,
+        user_id=vis_data.owner.id,
+        visibility=DocumentVisibility.PRIVATE,
+    )
+    test_db.add(orphan)
+    test_db.commit()
+
+    payload = DocumentPatchRequest(visibility=DocumentVisibility.INSTITUTION)
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            update_document(
+                document_id=720,
+                payload=payload,
+                request=None,
+                current_user=vis_data.owner,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 400
+    test_db.refresh(orphan)
+    assert orphan.visibility == DocumentVisibility.PRIVATE
+
+
+def test_patch_explicit_null_visibility_is_rejected():
+    # A body of {"visibility": null} alone is a no-op, not an instruction → 422.
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        DocumentPatchRequest(visibility=None)
+
+
+def test_exam_composer_list_hides_colleague_private_doc(vis_data, test_db):
+    # GET /exams/documents-with-questions must not leak a colleague's private
+    # doc to other institution members; the institution-shared one stays visible.
+    # (The existing exam-API tests run as a SuperUser, so they cannot catch this.)
+    result = _run(
+        list_documents_with_questions(current_user=vis_data.colleague, db=test_db)
+    )
+    ids = {entry["id"] for entry in result}
+    assert 701 in ids  # institution-shared doc visible
+    assert 700 not in ids  # owner's private doc hidden

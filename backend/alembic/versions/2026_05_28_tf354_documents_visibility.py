@@ -17,9 +17,14 @@ Steps:
 5. Composite ``ix_documents_inst_vis_created`` on
    ``(institution_id, visibility, created_at DESC)`` — backs the main list
    query (filter by institution + visibility, ORDER BY created_at DESC).
+6. CHECK constraint ``ck_documents_institution_visibility_requires_institution``
+   (``visibility <> 'institution' OR institution_id IS NOT NULL``) — makes the
+   "shared ⇒ has institution" invariant unrepresentable at the DB level. Added
+   after the backfill, when every row is ``private``, so nothing violates it.
 
-Additive and idempotent (enum guarded by a DO block, column/indexes guarded
-by ``IF NOT EXISTS``). Safe for ``AUTO_MIGRATE=true`` deploys — no manual step.
+Additive and idempotent (enum + constraint guarded by DO blocks, column/indexes
+guarded by ``IF NOT EXISTS``). Safe for ``AUTO_MIGRATE=true`` deploys — no manual
+step.
 
 Revision ID: tf354_documents_visibility
 Revises: tf352_documents_pending_reindex
@@ -74,8 +79,33 @@ def upgrade() -> None:
         "ON documents (institution_id, visibility, created_at DESC)"
     )
 
+    # 6. Invariant: an institution-visible document must belong to an institution.
+    #    Postgres has no ADD CONSTRAINT IF NOT EXISTS, so guard with a DO block.
+    #    Every row is 'private' after steps 2/3, so none violate it.
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname =
+                    'ck_documents_institution_visibility_requires_institution'
+            ) THEN
+                ALTER TABLE documents
+                    ADD CONSTRAINT
+                        ck_documents_institution_visibility_requires_institution
+                    CHECK (visibility <> 'institution' OR institution_id IS NOT NULL);
+            END IF;
+        END$$;
+        """
+    )
+
 
 def downgrade() -> None:
+    op.execute(
+        "ALTER TABLE documents DROP CONSTRAINT IF EXISTS "
+        "ck_documents_institution_visibility_requires_institution"
+    )
     op.execute("DROP INDEX IF EXISTS ix_documents_inst_vis_created")
     op.execute("DROP INDEX IF EXISTS ix_documents_visibility")
     op.execute("ALTER TABLE documents DROP COLUMN IF EXISTS visibility")

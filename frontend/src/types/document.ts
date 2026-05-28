@@ -1,8 +1,13 @@
 import { PromptConfig } from './prompt';
 
 export enum DocumentStatus {
-  UPLOADED = 'uploaded',
+  // Async-processing lifecycle (mirrors backend models.document.DocumentStatus).
+  QUEUED = 'queued',
   PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  // Legacy statuses kept for backward compatibility with older rows.
+  UPLOADED = 'uploaded',
   PROCESSED = 'processed',
   ERROR = 'error'
 }

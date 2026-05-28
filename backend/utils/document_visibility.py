@@ -73,8 +73,9 @@ def assert_document_visible_for(
     if is_document_visible_for(user, document):
         return
 
-    # Imported lazily to avoid a circular import at module load
-    # (translation_service pulls in models that import this module).
+    # Imported lazily (not at module top) to keep this low-level helper free of a
+    # module-load dependency on the services layer; t() is only needed here, on
+    # the error path.
     from services.translation_service import t
 
     raise HTTPException(

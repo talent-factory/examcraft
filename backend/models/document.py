@@ -7,6 +7,7 @@ import logging
 import re
 from sqlalchemy import (
     Column,
+    CheckConstraint,
     Integer,
     String,
     DateTime,
@@ -108,6 +109,18 @@ class DocumentVisibility(enum.Enum):
 
 class Document(Base):
     __tablename__ = "documents"
+
+    # An institution-visible document MUST belong to an institution: "shared with
+    # my institution" is meaningless without one, and the read filter only treats
+    # such a row consistently when institution_id is set. Enforced in the DB so no
+    # write path (current or future) can create the illegal state (TF-354). After
+    # migration A every row is 'private', so none violate this.
+    __table_args__ = (
+        CheckConstraint(
+            "visibility <> 'institution' OR institution_id IS NOT NULL",
+            name="ck_documents_institution_visibility_requires_institution",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String(255), nullable=False)

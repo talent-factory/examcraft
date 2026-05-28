@@ -115,7 +115,16 @@ class DocumentPatchRequest(BaseModel):
 
     @model_validator(mode="after")
     def _require_at_least_one(self):
-        if not self.model_fields_set & {"display_name", "visibility"}:
+        # ``display_name`` counts even when explicitly null (null clears the
+        # override). An explicit ``visibility: null`` does NOT count: the
+        # endpoint skips a null visibility, so a body of ``{"visibility": null}``
+        # would be a silent 200 no-op. Requiring a non-null visibility here turns
+        # that dead request into a 422 instead.
+        has_display = "display_name" in self.model_fields_set
+        has_visibility = (
+            "visibility" in self.model_fields_set and self.visibility is not None
+        )
+        if not (has_display or has_visibility):
             raise ValueError(
                 "At least one of 'display_name' or 'visibility' must be provided"
             )
@@ -341,8 +350,7 @@ async def get_document(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
-        # hidden document so its existence is not leaked to non-owners.
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
         doc_dict = document.to_dict()
@@ -395,8 +403,7 @@ async def update_document(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Visibility-aware existence gate (TF-354): 404 (not 403) so a foreign
-        # private document's existence is not leaked to a non-owner.
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
         fields_set = payload.model_fields_set
@@ -430,18 +437,23 @@ async def update_document(
                 visibility_change = (document.visibility, new_visibility)
                 document.visibility = new_visibility
 
-        # Build the response dict BEFORE committing so a serialisation failure
+        # Build the response dict BEFORE persisting so a serialisation failure
         # cannot mask an already-persisted change as a generic 500.
         response_payload = document.to_dict()
-        db.commit()
 
-        # Audit every effective visibility change (TF-354). Non-blocking — same
-        # contract as create/delete-document logging.
         if visibility_change is not None:
+            # A visibility flip is a DSGVO-relevant privileged action: it must
+            # never persist without an audit row. log_document_action adds the
+            # audit row and commits it together with the pending visibility
+            # change in ONE transaction; on failure it rolls back BOTH and
+            # returns None. Treating None as a hard 500 (same fail-loud contract
+            # as log_admin_cross_owner / log_superuser_bypass) keeps the change
+            # and its audit atomic — we never report success on an un-audited
+            # flip, nor a 500 on a change that already landed.
             from services.audit_service import AuditService
 
             old_vis, new_vis = visibility_change
-            AuditService.log_document_action(
+            audit_log = AuditService.log_document_action(
                 db,
                 AuditService.ACTION_UPDATE_DOCUMENT,
                 current_user.id,
@@ -453,6 +465,14 @@ async def update_document(
                     "new_visibility": new_vis.value,
                 },
             )
+            if audit_log is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail=t("documents_rename_failed", locale=locale),
+                )
+        else:
+            # display_name-only change — rename was never audited; just persist.
+            db.commit()
 
         return DocumentResponse(**response_payload)
 
@@ -661,8 +681,7 @@ async def download_document(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
-        # hidden document so its existence is not leaked to non-owners.
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
         return _build_document_file_response(
@@ -708,8 +727,7 @@ async def get_document_raw(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
-        # hidden document so its existence is not leaked to non-owners.
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
         return _build_document_file_response(
@@ -755,8 +773,7 @@ async def get_document_status(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
-        # hidden document so its existence is not leaked to non-owners.
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
         # Get Celery task status if task_id exists
@@ -1005,8 +1022,7 @@ async def get_document_content(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
-        # hidden document so its existence is not leaked to non-owners.
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
         # Hole vollständigen Inhalt vom Document Service
@@ -1068,8 +1084,7 @@ async def get_document_chunks(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
-        # hidden document so its existence is not leaked to non-owners.
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
         if document.status != DocumentStatus.PROCESSED:
@@ -1135,8 +1150,7 @@ async def get_document_chunks_paginated(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
-        # hidden document so its existence is not leaked to non-owners.
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
         if document.status != DocumentStatus.PROCESSED:
