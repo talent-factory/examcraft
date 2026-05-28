@@ -34,6 +34,14 @@ jest.mock('../../services/DocumentService', () => {
   };
 });
 
+// DocumentLibrary consumes useAuth (owner detection, TF-354). Mock it so these
+// tests render without wrapping in an AuthProvider — same pattern as
+// DocumentLibrary.visibility.test.tsx.
+const mockUseAuth = jest.fn();
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DocumentService, DocumentFetchError } = require('../../services/DocumentService');
 const mockDocumentService = DocumentService as jest.Mocked<typeof DocumentService>;
@@ -57,6 +65,9 @@ beforeAll(() => {
 beforeEach(() => {
   jest.clearAllMocks();
   blobCounter = 0;
+  mockUseAuth.mockReturnValue({
+    user: { id: 1, institution_id: 7, institution: { id: 7, name: 'Test University' } },
+  });
 });
 
 const theme = createTheme();
