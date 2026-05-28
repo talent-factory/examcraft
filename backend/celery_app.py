@@ -4,11 +4,33 @@ Handles asynchronous task processing with RabbitMQ broker
 """
 
 from celery import Celery
+from celery.signals import celeryd_init
 from kombu import Exchange, Queue
 import os
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+@celeryd_init.connect
+def _init_worker_sentry(**_kwargs):
+    """Initialize Sentry in the Celery worker process (TF-359).
+
+    The FastAPI process calls ``init_sentry()`` in ``main.py``; the worker
+    runs ``celery -A celery_app worker`` and never imports ``main``, so without
+    this hook the worker was blind to all task exceptions.
+
+    ``celeryd_init`` fires once when the worker daemon boots, before the prefork
+    pool spawns its children — the fork-safe entry point. ``CeleryIntegration``
+    (added in ``config/sentry.py``) then propagates the SDK across forked
+    children and on ``worker_max_tasks_per_child`` recycles. ``init_sentry()``
+    is a no-op unless ``ENABLE_SENTRY=true`` and ``SENTRY_DSN`` are set, so
+    booting a worker locally without those stays silent.
+    """
+    from config.sentry import init_sentry
+
+    init_sentry()
+
 
 # Celery App Initialization
 celery_app = Celery(
@@ -27,6 +49,7 @@ celery_app = Celery(
         "tasks.session_cleanup",
         "tasks.feedback_tasks",
         "tasks.maintenance_tasks",
+        "tasks.diagnostics_tasks",  # TF-359 Sentry worker-pipeline verification
     ],
 )
 

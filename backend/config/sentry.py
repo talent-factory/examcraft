@@ -13,6 +13,7 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration
 
 
 def filter_errors(event, hint):
@@ -64,7 +65,19 @@ def init_sentry():
 
     # Only initialize if DSN is provided and Sentry is enabled
     if not dsn or not enable_sentry:
-        logging.info(f"[Sentry] Disabled in {environment}")
+        # TF-359: surface a disabled-in-prod state loudly. Under uvicorn/celery
+        # the root logger sits at WARNING, so an INFO line would be invisible
+        # exactly where a misconfigured ENABLE_SENTRY/SENTRY_DSN matters most.
+        level = (
+            logging.WARNING
+            if environment in ("staging", "production")
+            else logging.INFO
+        )
+        logging.log(
+            level,
+            f"[Sentry] Disabled in {environment} "
+            f"(dsn_set={bool(dsn)}, enable_sentry={enable_sentry})",
+        )
         return
 
     # Configure logging integration
@@ -87,6 +100,11 @@ def init_sentry():
             SqlalchemyIntegration(),
             RedisIntegration(),
             logging_integration,
+            # Captures unhandled task exceptions and creates a transaction per
+            # task run. Harmless in the FastAPI process (also instruments
+            # .delay() dispatch); load-bearing in the Celery worker, where this
+            # is the only thing that surfaces task failures to Sentry.
+            CeleryIntegration(),
         ],
         # GDPR Compliance: Don't send PII by default
         send_default_pii=False,

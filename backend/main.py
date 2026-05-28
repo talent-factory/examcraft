@@ -457,6 +457,11 @@ async def lifespan(app: FastAPI):
     if os.getenv("ENVIRONMENT", "development") == "development":
         app.include_router(sentry_test.router)
 
+    # SuperAdmin Sentry worker-pipeline trigger (TF-359): registered in ALL
+    # environments so the worker -> Sentry path can be verified in production.
+    # Access is locked to SuperAdmins via get_current_superuser.
+    app.include_router(sentry_test.admin_router)
+
     # Premium/Enterprise Features: Load additional Premium APIs
     if is_full_deployment:
         # Create premium tables if they don't exist

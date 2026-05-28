@@ -10,6 +10,7 @@ import logging
 import time
 from typing import Any, Dict, List, Literal, Optional
 
+import sentry_sdk
 from celery.exceptions import Ignore, Reject
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, ProgrammingError, SQLAlchemyError
@@ -469,6 +470,14 @@ def generate_questions_task(
     Returns:
         Dict mit exam_id, topic, questions, generation_time, quality_metrics, review_question_ids
     """
+    # TF-359: tag the Sentry scope so a generation failure lands in Sentry with
+    # the task context the on-call needs to triage. CeleryIntegration already
+    # attaches the task id; user_id/topic do not (send_default_pii=False keeps
+    # task kwargs off the event). No-op when Sentry is disabled. user_id is set
+    # first so even an early Reject (Premium RAGService missing) or a
+    # ValidationError on request_data carries it; topic follows once parsed.
+    sentry_sdk.set_tag("user_id", str(user_id))
+
     if RAGService is None:
         _safe_update_job_status(self.request.id, "FAILURE")
         raise Reject(
@@ -480,6 +489,10 @@ def generate_questions_task(
 
     rag_request = RAGExamRequest(**request_data)
     question_count = rag_request.question_count
+
+    # Re-raised "No context available" ValueError from TF-358 is raised later in
+    # the service call below; topic is known now, so tag it here.
+    sentry_sdk.set_tag("topic", rag_request.topic)
     # Fortschritt in N+2 Schritten:
     #   Step 0:      Task-Start (emittiert vom Task)
     #   Step 1:      Context geladen (emittiert via Callback)
