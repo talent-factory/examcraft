@@ -22,7 +22,7 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from api.documents import DocumentRenameRequest, rename_document
+from api.documents import DocumentPatchRequest, update_document
 from models.auth import Institution, User, UserStatus
 from models.document import Document, DocumentStatus
 
@@ -99,7 +99,7 @@ def _run(coro):
 def _call(payload, *, document_id, current_user, db):
     """Invoke the rename endpoint directly with the given payload."""
     return _run(
-        rename_document(
+        update_document(
             document_id=document_id,
             payload=payload,
             request=None,
@@ -117,25 +117,25 @@ def _call(payload, *, document_id, current_user, db):
 def test_pydantic_rejects_string_over_255_chars():
     """Pydantic raises before the handler runs."""
     with pytest.raises(ValidationError, match="(?i)255"):
-        DocumentRenameRequest(display_name="x" * 256)
+        DocumentPatchRequest(display_name="x" * 256)
 
 
 def test_pydantic_rejects_control_characters():
     """ASCII control chars must not enter the DB."""
     with pytest.raises(ValidationError, match="(?i)control"):
-        DocumentRenameRequest(display_name="hello\x00world")
+        DocumentPatchRequest(display_name="hello\x00world")
 
 
 def test_pydantic_normalises_whitespace_to_none():
     """Whitespace-only is the clear-override signal."""
-    assert DocumentRenameRequest(display_name="   ").display_name is None
-    assert DocumentRenameRequest(display_name="\t\n").display_name is None
-    assert DocumentRenameRequest(display_name="").display_name is None
+    assert DocumentPatchRequest(display_name="   ").display_name is None
+    assert DocumentPatchRequest(display_name="\t\n").display_name is None
+    assert DocumentPatchRequest(display_name="").display_name is None
 
 
 def test_pydantic_strips_surrounding_whitespace():
     """Trim padding so cosmetic whitespace doesn't pollute storage."""
-    assert DocumentRenameRequest(display_name="  My Doc  ").display_name == "My Doc"
+    assert DocumentPatchRequest(display_name="  My Doc  ").display_name == "My Doc"
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ def test_pydantic_strips_surrounding_whitespace():
 def test_owner_sets_display_name_returns_200_and_persists(stage_data, test_db):
     """Happy path: rename succeeds, response and DB both updated."""
     s = stage_data
-    payload = DocumentRenameRequest(display_name="Pareto-Cheatsheet")
+    payload = DocumentPatchRequest(display_name="Pareto-Cheatsheet")
     result = _call(payload, document_id=s.doc.id, current_user=s.owner, db=test_db)
 
     # Pydantic response
@@ -164,7 +164,7 @@ def test_clear_override_via_null_falls_back_to_filename(stage_data, test_db):
     s.doc.display_name = "Old Name"
     test_db.commit()
 
-    payload = DocumentRenameRequest(display_name=None)
+    payload = DocumentPatchRequest(display_name=None)
     result = _call(payload, document_id=s.doc.id, current_user=s.owner, db=test_db)
 
     assert result.display_name is None
@@ -180,7 +180,7 @@ def test_clear_override_via_empty_string_works_too(stage_data, test_db):
     s.doc.display_name = "Old Name"
     test_db.commit()
 
-    payload = DocumentRenameRequest(display_name="   ")
+    payload = DocumentPatchRequest(display_name="   ")
     result = _call(payload, document_id=s.doc.id, current_user=s.owner, db=test_db)
 
     assert result.display_name is None
@@ -189,7 +189,7 @@ def test_clear_override_via_empty_string_works_too(stage_data, test_db):
 def test_idempotent_rename_keeps_state_stable(stage_data, test_db):
     """Two PATCH calls with the same value end at the same state."""
     s = stage_data
-    payload = DocumentRenameRequest(display_name="Stable Name")
+    payload = DocumentPatchRequest(display_name="Stable Name")
 
     _call(payload, document_id=s.doc.id, current_user=s.owner, db=test_db)
     result = _call(payload, document_id=s.doc.id, current_user=s.owner, db=test_db)
@@ -199,14 +199,15 @@ def test_idempotent_rename_keeps_state_stable(stage_data, test_db):
     assert s.doc.display_name == "Stable Name"
 
 
-def test_foreign_institution_user_gets_403(stage_data, test_db):
-    """TenantFilter blocks cross-institution rename."""
+def test_foreign_institution_user_gets_404(stage_data, test_db):
+    """Visibility gate (TF-354) hides a foreign private doc — 404, not 403, so
+    its existence is not leaked across institutions."""
     s = stage_data
-    payload = DocumentRenameRequest(display_name="Hacked")
+    payload = DocumentPatchRequest(display_name="Hacked")
 
     with pytest.raises(HTTPException) as exc:
         _call(payload, document_id=s.doc.id, current_user=s.foreign, db=test_db)
-    assert exc.value.status_code == 403
+    assert exc.value.status_code == 404
 
     # DB unchanged
     test_db.refresh(s.doc)
@@ -216,7 +217,7 @@ def test_foreign_institution_user_gets_403(stage_data, test_db):
 def test_missing_document_returns_404(stage_data, test_db):
     """Non-existent ID surfaces as a clean 404."""
     s = stage_data
-    payload = DocumentRenameRequest(display_name="Anything")
+    payload = DocumentPatchRequest(display_name="Anything")
 
     with pytest.raises(HTTPException) as exc:
         _call(payload, document_id=99999, current_user=s.owner, db=test_db)
@@ -226,7 +227,7 @@ def test_missing_document_returns_404(stage_data, test_db):
 def test_response_includes_both_title_and_display_name(stage_data, test_db):
     """API contract: clients get the resolved title AND the raw override."""
     s = stage_data
-    payload = DocumentRenameRequest(display_name="Override Name")
+    payload = DocumentPatchRequest(display_name="Override Name")
     result = _call(payload, document_id=s.doc.id, current_user=s.owner, db=test_db)
 
     # Both fields are populated — the FE relies on display_name to seed

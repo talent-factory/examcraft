@@ -1101,7 +1101,12 @@
       "renameError": "Rename failed",
       "renameSave": "Save",
       "renameCancel": "Cancel",
-      "renameTooltip": "Rename"
+      "renameTooltip": "Rename",
+      "visibilityPrivate": "Private — only me",
+      "visibilityInstitution": "Institution — shared",
+      "visibilityClickToChange": "Click to change",
+      "visibilityEditAria": "Change visibility",
+      "menuChangeVisibility": "Change visibility…"
     },
     "documentUpload": {
       "dropActive": "Drop files here...",
@@ -1134,7 +1139,23 @@
       "statsErrors": "Errors",
       "timeHours": "~{{h}}h {{m}}m remaining",
       "timeMinutes": "~{{m}}m {{s}}s remaining",
-      "timeSeconds": "~{{s}}s remaining"
+      "timeSeconds": "~{{s}}s remaining",
+      "visibilityTitle": "Visibility",
+      "visibilityPrivate": "Private — only I can see this document",
+      "visibilityInstitution": "Institution — all members of {{institution}} can see this document",
+      "visibilityNoInstitution": "No institution assigned"
+    },
+    "documentVisibility": {
+      "title": "Change visibility",
+      "private": "Private — only me",
+      "institution": "Institution — all members of {{institution}}",
+      "noInstitution": "No institution assigned",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saveError": "Could not change visibility"
+    },
+    "documentPrivacyBanner": {
+      "message": "ExamCraft has improved its visibility model: the documents you've uploaded so far are now visible only to you. If you'd like to share documents with your institution, you can switch them individually in the library."
     },
     "reviewQueue": {
       "title": "Question Review Queue",

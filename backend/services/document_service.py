@@ -270,17 +270,6 @@ class DocumentService:
         """Hole Dokument nach ID"""
         return db.query(Document).filter(Document.id == document_id).first()
 
-    def get_documents_by_user(
-        self, user_id: str, db: Session, status: Optional[DocumentStatus] = None
-    ) -> List[Document]:
-        """Hole alle Dokumente eines Users"""
-        query = db.query(Document).filter(Document.user_id == user_id)
-
-        if status:
-            query = query.filter(Document.status == status)
-
-        return query.order_by(Document.created_at.desc()).all()
-
     def update_document_status(
         self,
         document_id: int,

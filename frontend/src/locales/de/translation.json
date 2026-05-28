@@ -1101,7 +1101,12 @@
       "renameError": "Umbenennen fehlgeschlagen",
       "renameSave": "Speichern",
       "renameCancel": "Abbrechen",
-      "renameTooltip": "Umbenennen"
+      "renameTooltip": "Umbenennen",
+      "visibilityPrivate": "Privat — nur ich",
+      "visibilityInstitution": "Institution — geteilt",
+      "visibilityClickToChange": "Klicken zum Ändern",
+      "visibilityEditAria": "Sichtbarkeit ändern",
+      "menuChangeVisibility": "Sichtbarkeit ändern…"
     },
     "documentUpload": {
       "dropActive": "Dateien hier ablegen...",
@@ -1134,7 +1139,23 @@
       "statsErrors": "Fehler",
       "timeHours": "~{{h}}h {{m}}m verbleibend",
       "timeMinutes": "~{{m}}m {{s}}s verbleibend",
-      "timeSeconds": "~{{s}}s verbleibend"
+      "timeSeconds": "~{{s}}s verbleibend",
+      "visibilityTitle": "Sichtbarkeit",
+      "visibilityPrivate": "Privat — nur ich sehe dieses Dokument",
+      "visibilityInstitution": "Institution — alle Mitglieder von {{institution}} sehen dieses Dokument",
+      "visibilityNoInstitution": "Keine Institution zugeordnet"
+    },
+    "documentVisibility": {
+      "title": "Sichtbarkeit ändern",
+      "private": "Privat — nur ich",
+      "institution": "Institution — alle Mitglieder von {{institution}}",
+      "noInstitution": "Keine Institution zugeordnet",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "saveError": "Sichtbarkeit konnte nicht geändert werden"
+    },
+    "documentPrivacyBanner": {
+      "message": "ExamCraft hat das Sichtbarkeitsmodell verbessert: Deine bisher hochgeladenen Dokumente sind ab jetzt nur noch für dich sichtbar. Falls du Dokumente mit deiner Institution teilen möchtest, kannst du sie in der Bibliothek einzeln umstellen."
     },
     "reviewQueue": {
       "title": "Fragen-Review Queue",

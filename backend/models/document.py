@@ -90,6 +90,22 @@ class DocumentStatus(enum.Enum):
     ERROR = "error"
 
 
+class DocumentVisibility(enum.Enum):
+    """Who may see a document (TF-354 privacy fix).
+
+    - ``PRIVATE``: only the owner (``user_id``) sees the document.
+    - ``INSTITUTION``: every member of the owner's institution sees it.
+
+    The DB enum stores the lowercase *values* ("private"/"institution"),
+    not the member names — see ``values_callable`` on the column. This is a
+    deliberate divergence from ``DocumentStatus`` (which stores names) so the
+    on-disk labels match the spec and the API/UI contract.
+    """
+
+    PRIVATE = "private"
+    INSTITUTION = "institution"
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -116,6 +132,21 @@ class Document(Base):
         Integer,
         ForeignKey("institutions.id", ondelete="CASCADE"),
         nullable=True,
+        index=True,
+    )
+
+    # Visibility (TF-354): default ``private`` so an upload is only visible to
+    # its owner until explicitly shared with the institution. ``values_callable``
+    # stores the lowercase enum *values* as the PG enum labels.
+    visibility = Column(
+        Enum(
+            DocumentVisibility,
+            name="documentvisibility",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        server_default=DocumentVisibility.PRIVATE.value,
+        default=DocumentVisibility.PRIVATE,
         index=True,
     )
 
@@ -206,6 +237,7 @@ class Document(Base):
             "file_size": self.file_size,
             "mime_type": self.mime_type,
             "status": self.status.value if self.status else None,
+            "visibility": self.visibility.value if self.visibility else None,
             "user_id": self.user_id,
             "metadata": self.doc_metadata,
             "content_preview": self.content_preview[:200] + "..."

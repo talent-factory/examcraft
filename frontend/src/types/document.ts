@@ -7,6 +7,12 @@ export enum DocumentStatus {
   ERROR = 'error'
 }
 
+/** Document sharing scope (TF-354). Mirrors the backend DocumentVisibility enum. */
+export enum DocumentVisibility {
+  PRIVATE = 'private',
+  INSTITUTION = 'institution'
+}
+
 export interface Document {
   id: number;
   filename: string;
@@ -15,11 +21,13 @@ export interface Document {
   display_name?: string | null;
   mime_type: string;
   status: DocumentStatus;
+  visibility?: DocumentVisibility;
   created_at: string;
   processed_at?: string;
   file_size?: number;
   has_vectors: boolean;
-  user_id?: string;
+  // Owner user id. Backend returns an int (DocumentResponse.user_id: Optional[int]).
+  user_id?: number;
   content_preview?: string;
   vector_collection?: string;
   updated_at?: string;

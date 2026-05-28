@@ -2,7 +2,8 @@ import {
   Document,
   DocumentUploadResponse,
   DocumentProcessingResponse,
-  AvailableDocumentsResponse
+  AvailableDocumentsResponse,
+  DocumentVisibility
 } from '../types/document';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -43,11 +44,18 @@ export class DocumentService {
   }
 
   /**
-   * Upload a document file
+   * Upload a document file.
+   *
+   * @param visibility Sharing scope (TF-354). Defaults to `private` so an
+   *   upload is owner-only unless the user explicitly shares it.
    */
-  static async uploadDocument(file: File): Promise<DocumentUploadResponse> {
+  static async uploadDocument(
+    file: File,
+    visibility: DocumentVisibility = DocumentVisibility.PRIVATE,
+  ): Promise<DocumentUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('visibility', visibility);
 
     // For FormData, we must NOT set Content-Type header
     // The browser will set it automatically with the correct multipart/form-data boundary
@@ -164,6 +172,27 @@ export class DocumentService {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.detail || `Failed to rename document: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Update a document's visibility (TF-354). Owner-only on the backend.
+   */
+  static async updateVisibility(
+    documentId: number,
+    visibility: DocumentVisibility,
+  ): Promise<Document> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}`, {
+      method: 'PATCH',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ visibility }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to update visibility: ${response.statusText}`);
     }
 
     return response.json();

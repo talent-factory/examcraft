@@ -45,14 +45,18 @@ import {
   PlayArrow,
   Edit,
   Check,
-  Close
+  Close,
+  LockOutlined,
+  Business
 } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../utils/dateLocale';
+import { useAuth } from '../contexts/AuthContext';
 import { DocumentService } from '../services/DocumentService';
-import { Document, DocumentStatus } from '../types/document';
+import { Document, DocumentStatus, DocumentVisibility } from '../types/document';
+import DocumentVisibilityDialog from './DocumentVisibilityDialog';
 
 const READY_STATUSES: ReadonlyArray<string> = ['processed', 'completed'];
 const isDocumentReady = (status: string | undefined | null): boolean =>
@@ -311,6 +315,11 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   refreshTrigger
 }) => {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const hasInstitution = Boolean(user?.institution_id);
+  const institutionName = user?.institution?.name ?? '';
+  const isOwner = (document: Document): boolean =>
+    user != null && document.user_id != null && document.user_id === user.id;
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -334,6 +343,14 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [editingDocumentId, setEditingDocumentId] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [renaming, setRenaming] = useState(false);
+
+  // Visibility quick-edit state (TF-354)
+  const [visibilityDialog, setVisibilityDialog] = useState<{ open: boolean; document: Document | null }>({
+    open: false,
+    document: null,
+  });
+  const [savingVisibility, setSavingVisibility] = useState(false);
+  const [visibilityError, setVisibilityError] = useState<string | null>(null);
 
   // Pagination state for large documents
   const [documentChunks, setDocumentChunks] = useState<any[]>([]);
@@ -587,6 +604,40 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     }
   };
 
+  const handleOpenVisibility = (document: Document) => {
+    setVisibilityError(null);
+    setVisibilityDialog({ open: true, document });
+    handleMenuClose();
+  };
+
+  const handleCloseVisibility = () => {
+    if (savingVisibility) return;
+    setVisibilityDialog({ open: false, document: null });
+    setVisibilityError(null);
+  };
+
+  const handleSaveVisibility = async (newVisibility: DocumentVisibility) => {
+    const target = visibilityDialog.document;
+    if (!target) return;
+    try {
+      setSavingVisibility(true);
+      setVisibilityError(null);
+      const updated = await DocumentService.updateVisibility(target.id, newVisibility);
+      setDocuments(prev =>
+        prev.map(d => (d.id === updated.id ? { ...d, ...updated } : d)),
+      );
+      setVisibilityDialog({ open: false, document: null });
+    } catch (err) {
+      setVisibilityError(
+        err && typeof err === 'object' && 'message' in err
+          ? (err as Error).message
+          : t('components.documentVisibility.saveError', 'Sichtbarkeit konnte nicht geändert werden'),
+      );
+    } finally {
+      setSavingVisibility(false);
+    }
+  };
+
   const handleProcess = async (document: Document) => {
     try {
       setProcessingDocumentId(document.id);
@@ -650,6 +701,43 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     if (onCreateRAGExam && selectedDocuments.length > 0) {
       onCreateRAGExam(selectedDocuments);
     }
+  };
+
+  // Visibility indicator next to the title (TF-354). 🔒 private / 🏢 institution.
+  // Owners get a clickable button that opens the quick-edit dialog; everyone
+  // else sees a static informational icon.
+  const renderVisibilityIcon = (document: Document) => {
+    const isInstitution = document.visibility === DocumentVisibility.INSTITUTION;
+    const VisIcon = isInstitution ? Business : LockOutlined;
+    const label = isInstitution
+      ? t('components.documentLibrary.visibilityInstitution')
+      : t('components.documentLibrary.visibilityPrivate');
+    const owner = isOwner(document);
+    const tooltip = owner
+      ? `${label} — ${t('components.documentLibrary.visibilityClickToChange')}`
+      : label;
+    const icon = <VisIcon fontSize="small" color={isInstitution ? 'primary' : 'action'} />;
+    return (
+      <Tooltip title={tooltip}>
+        {owner ? (
+          <IconButton
+            size="small"
+            aria-label={t('components.documentLibrary.visibilityEditAria')}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenVisibility(document);
+            }}
+            sx={{ p: 0.25 }}
+          >
+            {icon}
+          </IconButton>
+        ) : (
+          <Box component="span" sx={{ display: 'inline-flex', p: 0.25 }}>
+            {icon}
+          </Box>
+        )}
+      </Tooltip>
+    );
   };
 
   const processedDocuments = documents?.filter(doc => doc.status === DocumentStatus.PROCESSED) || [];
@@ -865,6 +953,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     </Stack>
                   ) : (
                     <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+                      {renderVisibilityIcon(document)}
                       <Typography
                         variant="subtitle1"
                         noWrap
@@ -972,6 +1061,24 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           </ListItemIcon>
           <ListItemText>{t('components.documentLibrary.menuDownload')}</ListItemText>
         </MenuItem>
+
+        {/* Change visibility — owner-only (TF-354), redundant with the
+            clickable card icon for discoverability. */}
+        {(() => {
+          const doc = menuAnchor
+            ? documents.find(d => d.id === menuAnchor.documentId)
+            : undefined;
+          if (!doc || !isOwner(doc)) return null;
+          const isInst = doc.visibility === DocumentVisibility.INSTITUTION;
+          return (
+            <MenuItem onClick={() => handleOpenVisibility(doc)}>
+              <ListItemIcon>
+                {isInst ? <Business fontSize="small" /> : <LockOutlined fontSize="small" />}
+              </ListItemIcon>
+              <ListItemText>{t('components.documentLibrary.menuChangeVisibility')}</ListItemText>
+            </MenuItem>
+          );
+        })()}
 
         {/* Process button - only show for UPLOADED documents */}
         {menuAnchor && documents.find(d => d.id === menuAnchor.documentId)?.status === DocumentStatus.UPLOADED && (
@@ -1343,6 +1450,18 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Visibility quick-edit dialog (TF-354) */}
+      <DocumentVisibilityDialog
+        open={visibilityDialog.open}
+        current={visibilityDialog.document?.visibility ?? DocumentVisibility.PRIVATE}
+        institutionName={institutionName}
+        hasInstitution={hasInstitution}
+        saving={savingVisibility}
+        error={visibilityError}
+        onClose={handleCloseVisibility}
+        onSave={handleSaveVisibility}
+      />
     </Box>
   );
 };

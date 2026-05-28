@@ -712,7 +712,12 @@
       "loadError": "Errore durante il caricamento dei documenti",
       "deleteError": "Errore durante l'eliminazione",
       "downloadError": "Errore durante il download",
-      "processError": "Errore durante l'elaborazione del documento"
+      "processError": "Errore durante l'elaborazione del documento",
+      "visibilityPrivate": "Privato — solo io",
+      "visibilityInstitution": "Istituzione — condiviso",
+      "visibilityClickToChange": "Clicca per modificare",
+      "visibilityEditAria": "Modifica visibilità",
+      "menuChangeVisibility": "Modifica visibilità…"
     },
     "documentUpload": {
       "dropActive": "Rilascia i file qui...",
@@ -745,7 +750,23 @@
       "statsErrors": "Errori",
       "timeHours": "~{{h}}h {{m}}m rimanenti",
       "timeMinutes": "~{{m}}m {{s}}s rimanenti",
-      "timeSeconds": "~{{s}}s rimanenti"
+      "timeSeconds": "~{{s}}s rimanenti",
+      "visibilityTitle": "Visibilità",
+      "visibilityPrivate": "Privato — solo io posso vedere questo documento",
+      "visibilityInstitution": "Istituzione — tutti i membri di {{institution}} possono vedere questo documento",
+      "visibilityNoInstitution": "Nessuna istituzione assegnata"
+    },
+    "documentVisibility": {
+      "title": "Modifica visibilità",
+      "private": "Privato — solo io",
+      "institution": "Istituzione — tutti i membri di {{institution}}",
+      "noInstitution": "Nessuna istituzione assegnata",
+      "cancel": "Annulla",
+      "save": "Salva",
+      "saveError": "Impossibile modificare la visibilità"
+    },
+    "documentPrivacyBanner": {
+      "message": "ExamCraft ha migliorato il suo modello di visibilità: i documenti caricati finora sono ora visibili solo a te. Se desideri condividere documenti con la tua istituzione, puoi modificarli singolarmente nella biblioteca."
     },
     "reviewQueue": {
       "title": "Coda di revisione domande",

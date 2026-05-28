@@ -15,7 +15,13 @@ import {
   IconButton,
   Chip,
   Grid,
-  Paper
+  Paper,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  Tooltip
 } from '@mui/material';
 import {
   CloudUpload,
@@ -25,12 +31,15 @@ import {
   Schedule,
   PictureAsPdf,
   TextSnippet,
-  Cancel
+  Cancel,
+  LockOutlined,
+  Business
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../contexts/AuthContext';
 import { DocumentService } from '../services/DocumentService';
-import { DocumentUploadResponse, DocumentProcessingResponse } from '../types/document';
+import { DocumentUploadResponse, DocumentProcessingResponse, DocumentVisibility } from '../types/document';
 
 interface UploadFile {
   file: File;
@@ -62,9 +71,16 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   acceptedFileTypes = ['.pdf', '.doc', '.docx', '.txt', '.md']
 }) => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  // Visibility for this upload batch (TF-354). Default private; the backend
+  // also defaults to private (defense in depth). 'institution' is only
+  // available when the user belongs to an institution.
+  const hasInstitution = Boolean(user?.institution_id);
+  const institutionName = user?.institution?.name ?? '';
+  const [visibility, setVisibility] = useState<DocumentVisibility>(DocumentVisibility.PRIVATE);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles: UploadFile[] = acceptedFiles.map(file => ({
@@ -187,8 +203,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           : f
       ));
 
-      // Upload file
-      const uploadResult = await DocumentService.uploadDocument(file);
+      // Upload file with the batch visibility selection (TF-354)
+      const uploadResult = await DocumentService.uploadDocument(file, visibility);
 
       // Check if cancelled
       if (abortController.signal.aborted) {
@@ -325,6 +341,49 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           {t('components.documentUpload.dropFormats', { formats: acceptedFileTypes.join(', '), max: maxFiles })}
         </Typography>
       </Paper>
+
+      {/* Visibility selection (TF-354) — applies to this upload batch */}
+      <FormControl sx={{ mt: 3, display: 'block' }}>
+        <FormLabel id="upload-visibility-label" sx={{ mb: 1 }}>
+          {t('components.documentUpload.visibilityTitle')}
+        </FormLabel>
+        <RadioGroup
+          aria-labelledby="upload-visibility-label"
+          value={visibility}
+          onChange={(e) => setVisibility(e.target.value as DocumentVisibility)}
+        >
+          <FormControlLabel
+            value={DocumentVisibility.PRIVATE}
+            control={<Radio />}
+            disabled={isUploading}
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LockOutlined fontSize="small" />
+                {t('components.documentUpload.visibilityPrivate')}
+              </Box>
+            }
+          />
+          <Tooltip
+            title={hasInstitution ? '' : t('components.documentUpload.visibilityNoInstitution')}
+            placement="right"
+          >
+            {/* span keeps the tooltip working while the control is disabled */}
+            <span>
+              <FormControlLabel
+                value={DocumentVisibility.INSTITUTION}
+                control={<Radio />}
+                disabled={!hasInstitution || isUploading}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Business fontSize="small" />
+                    {t('components.documentUpload.visibilityInstitution', { institution: institutionName })}
+                  </Box>
+                }
+              />
+            </span>
+          </Tooltip>
+        </RadioGroup>
+      </FormControl>
 
       {/* Upload Queue */}
       {uploadFiles.length > 0 && (

@@ -7,6 +7,7 @@ from fastapi import (
     APIRouter,
     UploadFile,
     File,
+    Form,
     HTTPException,
     Depends,
     Query,
@@ -17,7 +18,7 @@ from fastapi.responses import JSONResponse, FileResponse, Response, StreamingRes
 from typing import List, Optional
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 import mimetypes
 import os
 import io
@@ -33,10 +34,14 @@ from services.storage_service import (
 )
 from services.translation_service import t, get_request_locale
 from services.vector_service_factory import vector_service
-from models.document import Document, DocumentStatus
+from models.document import Document, DocumentStatus, DocumentVisibility
 from models.auth import User
 from database import get_db
 from utils.auth_utils import get_current_active_user, require_permission
+from utils.document_visibility import (
+    assert_document_visible_for,
+    filter_documents_for_user,
+)
 from tasks.document_tasks import process_document as celery_process_document
 import logging
 
@@ -56,6 +61,7 @@ class DocumentResponse(BaseModel):
     file_size: int
     mime_type: str
     status: str
+    visibility: Optional[str] = None  # 'private' | 'institution' (TF-354)
     user_id: Optional[int]  # Fixed: user_id is Integer in database, not String
     metadata: Optional[dict]
     content_preview: Optional[str]
@@ -66,17 +72,26 @@ class DocumentResponse(BaseModel):
     processed_at: Optional[str]
 
 
-class DocumentRenameRequest(BaseModel):
-    """Body for PATCH /documents/{id} — set or clear the user-editable title.
+class DocumentPatchRequest(BaseModel):
+    """Body for PATCH /documents/{id} — update display name and/or visibility.
 
-    ``display_name=None`` (or an empty/whitespace string) clears the override
-    and falls back to the resolver chain (filtered metadata title → original
-    filename). Otherwise the value is trimmed and must be 1–255 characters of
-    printable text — control characters are rejected to prevent storing
-    invisible/garbage names.
+    At least one field must be provided (enforced by ``_require_at_least_one``).
+
+    ``display_name`` keeps the original rename semantics: a non-empty string
+    overrides the auto-extracted title; ``None``/empty/whitespace clears the
+    override and falls back to the resolver chain (filtered metadata title →
+    original filename). Trimmed to 1–255 chars; control characters rejected.
+
+    ``visibility`` is owner-only — the ownership check lives in the endpoint,
+    not here, because it needs the loaded document and the current user.
+
+    The endpoint distinguishes "field omitted" from "field set to null" via
+    ``model_fields_set``, so a passed-but-null ``display_name`` still counts as
+    a (clearing) rename rather than a no-op.
     """
 
     display_name: Optional[str] = None
+    visibility: Optional[DocumentVisibility] = None
 
     @field_validator("display_name")
     @classmethod
@@ -98,6 +113,14 @@ class DocumentRenameRequest(BaseModel):
             raise ValueError("display_name contains invalid control characters")
         return trimmed
 
+    @model_validator(mode="after")
+    def _require_at_least_one(self):
+        if not self.model_fields_set & {"display_name", "visibility"}:
+            raise ValueError(
+                "At least one of 'display_name' or 'visibility' must be provided"
+            )
+        return self
+
 
 class DocumentListResponse(BaseModel):
     documents: List[DocumentResponse]
@@ -114,6 +137,7 @@ class UploadResponse(BaseModel):
 @router.post("/upload", response_model=UploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
+    visibility: DocumentVisibility = Form(DocumentVisibility.PRIVATE),
     http_request: Request = None,
     current_user: User = Depends(require_permission("create_documents")),
     db: Session = Depends(get_db),
@@ -124,6 +148,8 @@ async def upload_document(
     **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
 
     - **file**: Dokument zum Upload (PDF, DOC, DOCX, TXT, MD)
+    - **visibility**: `private` (nur ich, Default) oder `institution` (geteilt).
+      `institution` ist nur erlaubt, wenn der User einer Institution angehört.
 
     Returns:
         UploadResponse mit Document ID und Status
@@ -131,6 +157,15 @@ async def upload_document(
     **Note:** Document wird asynchron verarbeitet. Status kann via GET /documents/{id} abgerufen werden.
     """
     locale = get_request_locale(http_request, current_user)
+
+    # Visibility (TF-354): validate up front so we never persist a file we
+    # then reject. 'institution' requires the user to belong to one.
+    if visibility == DocumentVisibility.INSTITUTION and not current_user.institution_id:
+        raise HTTPException(
+            status_code=400,
+            detail=t("documents_visibility_no_institution", locale=locale),
+        )
+
     try:
         # Check document limit for institution
         from utils.tenant_utils import SubscriptionLimits
@@ -157,8 +192,9 @@ async def upload_document(
             file=file, user_id=current_user.id, db=db
         )
 
-        # Set institution_id for multi-tenancy
+        # Set institution_id for multi-tenancy + visibility (TF-354)
         document.institution_id = current_user.institution_id
+        document.visibility = visibility
         document.status = DocumentStatus.QUEUED  # Set to QUEUED for async processing
         db.commit()
         db.refresh(document)
@@ -235,13 +271,10 @@ async def list_documents(
                     detail=t("documents_invalid_status", locale=locale),
                 )
 
-        # Tenant-aware query: Filter by institution_id
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-
+        # Visibility-aware query (TF-354): owner's docs + institution-shared
+        # docs in the user's institution (SuperUser bypass inside the helper).
         query = db.query(Document)
-        query = TenantFilter.filter_by_tenant(query, Document, tenant_context)
+        query = filter_documents_for_user(query, current_user)
 
         if status_filter:
             query = query.filter(Document.status == status_filter)
@@ -308,11 +341,9 @@ async def get_document(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
+        # hidden document so its existence is not leaked to non-owners.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         doc_dict = document.to_dict()
         return DocumentResponse(**doc_dict)
@@ -331,27 +362,32 @@ async def get_document(
 
 
 @router.patch("/{document_id}", response_model=DocumentResponse)
-async def rename_document(
+async def update_document(
     document_id: int,
-    payload: DocumentRenameRequest,
+    payload: DocumentPatchRequest,
     request: Request,
     current_user: User = Depends(require_permission("create_documents")),
     db: Session = Depends(get_db),
 ):
-    """Set or clear a user-editable display name for a document.
+    """Update a document's display name and/or visibility.
 
-    Pass ``display_name`` as a non-empty string to override the auto-extracted
-    title, or as ``null``/empty/whitespace to fall back to the metadata-then-
-    filename resolver chain. Auto-extracted titles like "1" or "Untitled" are
-    filtered by the resolver, so clearing the override usually surfaces the
-    original filename automatically.
+    - **display_name**: rename behaviour unchanged — a non-empty string
+      overrides the auto-extracted title; ``null``/empty/whitespace clears the
+      override (falls back to the metadata-then-filename resolver). Allowed for
+      any document the caller can see.
+    - **visibility**: ``private``/``institution``. **Owner-only** (SuperUser may
+      also change it) — a non-owner gets 403 even within the same institution.
+      ``institution`` requires the document to belong to an institution. Every
+      effective change is written to the audit log.
 
-    Validation (length, control characters) happens in
-    ``DocumentRenameRequest`` and surfaces as 422 errors automatically.
+    At least one field must be provided (422 otherwise). Field-level validation
+    (length, control characters, enum membership) happens in
+    ``DocumentPatchRequest`` and surfaces as 422.
 
     **Required Permission:** ``create_documents``
     """
     locale = get_request_locale(request, current_user)
+    visibility_change = None
     try:
         document = document_service.get_document_by_id(document_id, db)
         if not document:
@@ -359,31 +395,76 @@ async def rename_document(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant + ownership check (raises HTTPException(403) on mismatch)
-        from utils.tenant_utils import TenantFilter, get_tenant_context
+        # Visibility-aware existence gate (TF-354): 404 (not 403) so a foreign
+        # private document's existence is not leaked to a non-owner.
+        assert_document_visible_for(current_user, document, locale=locale)
 
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        fields_set = payload.model_fields_set
 
-        # Pydantic validator already normalised empty/whitespace to None
-        # and enforced the 255-char + no-control-chars invariant.
-        document.display_name = payload.display_name
+        # --- Rename (display_name): behaviour unchanged, visibility-scoped. ---
+        # The Pydantic validator already normalised empty/whitespace to None and
+        # enforced the 255-char + no-control-chars invariant.
+        if "display_name" in fields_set:
+            document.display_name = payload.display_name
+
+        # --- Visibility: stricter — owner-only (SuperUser bypass preserved). ---
+        if "visibility" in fields_set and payload.visibility is not None:
+            new_visibility = payload.visibility
+            is_owner = (
+                document.user_id is not None and document.user_id == current_user.id
+            )
+            if not is_owner and not current_user.is_superuser:
+                raise HTTPException(
+                    status_code=403,
+                    detail=t("documents_visibility_owner_only", locale=locale),
+                )
+            if (
+                new_visibility == DocumentVisibility.INSTITUTION
+                and document.institution_id is None
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=t("documents_visibility_no_institution", locale=locale),
+                )
+            if document.visibility != new_visibility:
+                visibility_change = (document.visibility, new_visibility)
+                document.visibility = new_visibility
 
         # Build the response dict BEFORE committing so a serialisation failure
         # cannot mask an already-persisted change as a generic 500.
         response_payload = document.to_dict()
         db.commit()
+
+        # Audit every effective visibility change (TF-354). Non-blocking — same
+        # contract as create/delete-document logging.
+        if visibility_change is not None:
+            from services.audit_service import AuditService
+
+            old_vis, new_vis = visibility_change
+            AuditService.log_document_action(
+                db,
+                AuditService.ACTION_UPDATE_DOCUMENT,
+                current_user.id,
+                document_id,
+                request=request,
+                additional_data={
+                    "field": "visibility",
+                    "old_visibility": old_vis.value if old_vis else None,
+                    "new_visibility": new_vis.value,
+                },
+            )
+
         return DocumentResponse(**response_payload)
 
     except HTTPException:
         raise
     except SQLAlchemyError as e:
         # DB-level failure (constraint, connection, …) — roll back the open
-        # transaction and report a rename-specific error so the user knows
+        # transaction and report an update-specific error so the user knows
         # which action failed and can retry.
         db.rollback()
         logger.error(
-            f"DB error renaming document {document_id} for user {current_user.id}: {e}",
+            f"DB error updating document {document_id} for user {current_user.id}: {e}",
             exc_info=True,
         )
         raise HTTPException(
@@ -395,7 +476,7 @@ async def rename_document(
         # We deliberately do NOT swallow these as a generic "load failed".
         db.rollback()
         logger.error(
-            f"Unexpected error renaming document {document_id} for user {current_user.id}: {e}",
+            f"Unexpected error updating document {document_id} for user {current_user.id}: {e}",
             exc_info=True,
         )
         raise HTTPException(
@@ -580,11 +661,9 @@ async def download_document(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
+        # hidden document so its existence is not leaked to non-owners.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         return _build_document_file_response(
             document, locale=locale, inline=False, caller_id=current_user.id
@@ -629,11 +708,9 @@ async def get_document_raw(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
+        # hidden document so its existence is not leaked to non-owners.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         return _build_document_file_response(
             document, locale=locale, inline=True, caller_id=current_user.id
@@ -678,11 +755,9 @@ async def get_document_status(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
+        # hidden document so its existence is not leaked to non-owners.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         # Get Celery task status if task_id exists
         task_status = None
@@ -930,11 +1005,9 @@ async def get_document_content(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
+        # hidden document so its existence is not leaked to non-owners.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         # Hole vollständigen Inhalt vom Document Service
         content = await document_service.get_full_document_content(document_id, db)
@@ -995,11 +1068,9 @@ async def get_document_chunks(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
+        # hidden document so its existence is not leaked to non-owners.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(
@@ -1064,11 +1135,9 @@ async def get_document_chunks_paginated(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # Visibility-aware access control (TF-354): raise 404 (not 403) on a
+        # hidden document so its existence is not leaked to non-owners.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(

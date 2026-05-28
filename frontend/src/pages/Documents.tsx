@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import DocumentUpload from '../components/DocumentUpload';
 import DocumentLibrary from '../components/DocumentLibrary';
+import DocumentPrivacyBanner from '../components/DocumentPrivacyBanner';
 
 export const Documents: React.FC = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -37,6 +38,9 @@ export const Documents: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Privacy roll-out banner (TF-354) */}
+      <DocumentPrivacyBanner />
+
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">
