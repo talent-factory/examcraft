@@ -480,22 +480,23 @@ def generate_questions_task(
 
     rag_request = RAGExamRequest(**request_data)
     question_count = rag_request.question_count
-    # total_steps = N + 2:
-    #   Step 0:     Task-Start (emittiert vom Task)
-    #   Step 1:     Context geladen (emittiert via Callback)
+    # Fortschritt in N+2 Schritten:
+    #   Step 0:      Task-Start (emittiert vom Task)
+    #   Step 1:      Context geladen (emittiert via Callback)
     #   Steps 2..N+1: Fragen 1..N (emittiert via Callback)
-    # Der Sprung von Step N+1 (letztes PROGRESS) auf 100% erfolgt durch den SUCCESS-State im WebSocket.
-    total_steps = question_count + 2
+    # WICHTIG (TF-358): Der Service koppelt die Fragenanzahl ggf. ans verfügbare
+    # Chunk-Material und emittiert dann gegen die EFFEKTIVE Anzahl. Der Callback
+    # reicht das `total` des Service deshalb durch, statt es auf die ursprünglich
+    # angeforderte Anzahl zu fixieren — sonst bliebe der Balken beim Capping
+    # hängen. Der initiale total ist nur eine Schätzung; der SUCCESS-State im
+    # WebSocket setzt am Ende ohnehin 100%.
+    initial_total_steps = question_count + 2
 
     # Step 0: Emittiert vom Task selbst (nicht vom Callback)
-    self.update_progress(0, total_steps, "Starte Fragengenerierung...")
+    self.update_progress(0, initial_total_steps, "Starte Fragengenerierung...")
 
-    # Progress-Callback delegiert an bestehende update_progress-Abstraktion.
-    # Der `total`-Parameter vom Service (question_count + 2) ist identisch mit
-    # `total_steps` und wird daher durch den Closure-Wert ersetzt — so bleibt
-    # total_steps als Single Source of Truth im Task.
-    def progress_callback(current: int, total: int, message: str) -> None:  # noqa: ARG001
-        self.update_progress(current, total_steps, message)
+    def progress_callback(current: int, total: int, message: str) -> None:
+        self.update_progress(current, total, message)
 
     logger.info(
         f"Starte Fragengenerierung für User {user_id}: "

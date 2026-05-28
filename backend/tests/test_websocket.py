@@ -322,3 +322,114 @@ class TestWebSocketDisconnect:
                     ws.send_json({"token": "valid-token"})
             except Exception:
                 pass  # Disconnect is OK
+
+
+@pytest.fixture
+def ws_module():
+    """Lädt das websocket-Modul (wie ws_app) und gibt es zurück, damit reine
+    Hilfsfunktionen wie _user_facing_error direkt getestet werden können."""
+    import sys
+
+    ws_path = os.path.join(os.path.dirname(__file__), "..", "api", "v1", "websocket.py")
+    spec = importlib.util.spec_from_file_location("ws_module", ws_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["api.v1.websocket"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestUserFacingError:
+    """TF-358: Der echte Task-Fehler wird geloggt, dem User aber eine sichere,
+    handlungsleitende Meldung gezeigt — bekannte Fehlerklassen konkret,
+    Unbekanntes generisch (kein Info-Leak)."""
+
+    def test_no_context_maps_to_actionable_message(self, ws_module):
+        # Genau der Prod-Fehler aus TF-358.
+        msg = ws_module._user_facing_error(
+            ValueError("No context available for question generation")
+        )
+        assert "durchsuchbaren Inhalt" in msg
+        assert msg != ws_module._GENERIC_TASK_ERROR
+
+    def test_no_relevant_context_maps_to_actionable_message(self, ws_module):
+        msg = ws_module._user_facing_error(
+            ValueError("No relevant context found for topic: Foo")
+        )
+        assert "durchsuchbaren Inhalt" in msg
+
+    def test_unknown_question_type_maps_to_actionable_message(self, ws_module):
+        msg = ws_module._user_facing_error(ValueError("Unknown question type: xyz"))
+        assert "Fragetyp" in msg
+        assert msg != ws_module._GENERIC_TASK_ERROR
+
+    def test_unknown_error_falls_back_to_generic_no_leak(self, ws_module):
+        # Interna (Tabellennamen, Stacktrace-Fragmente) dürfen NICHT durchsickern.
+        leaky = ValueError(
+            "IntegrityError: duplicate key value violates unique constraint "
+            '"question_source_doc_pkey" DETAIL: Key (id)=(42) at /app/secret.py'
+        )
+        msg = ws_module._user_facing_error(leaky)
+        assert msg == ws_module._GENERIC_TASK_ERROR
+        assert "question_source_doc" not in msg
+        assert "secret" not in msg
+
+    def test_none_info_falls_back_to_generic(self, ws_module):
+        assert ws_module._user_facing_error(None) == ws_module._GENERIC_TASK_ERROR
+
+    def test_maps_via_stable_code_independent_of_message(self, ws_module):
+        # TF-358: Mapping muss über den stabilen .code greifen, auch wenn die
+        # Roh-Message den englischen Substring NICHT enthält (Robustheit gegen
+        # Umformulierung/Lokalisierung). Die typisierten Fehler leben in core.
+        from services.rag_errors import NoContextError, UnknownQuestionTypeError
+
+        no_ctx = ws_module._user_facing_error(
+            NoContextError("völlig andere Formulierung ohne Schlüsselwörter")
+        )
+        assert "durchsuchbaren Inhalt" in no_ctx
+
+        unknown_type = ws_module._user_facing_error(
+            UnknownQuestionTypeError("anderer Text")
+        )
+        assert "Fragetyp" in unknown_type
+
+
+class TestFailureMessageMapping:
+    """Integrationstest: der FAILURE-Frame trägt die handlungsleitende Meldung
+    statt der pauschalen — der Test schlägt ohne den TF-358-Fix fehl."""
+
+    def test_no_context_failure_sends_actionable_error(
+        self, ws_app, valid_token_payload, mock_user, mock_document
+    ):
+        with (
+            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.SessionLocal") as mock_session,
+            patch("api.v1.websocket.AsyncResult") as mock_result,
+        ):
+            mock_auth.decode_token.return_value = valid_token_payload
+            mock_auth.is_token_revoked.return_value = False
+
+            mock_db = MagicMock()
+            mock_session.return_value = mock_db
+            mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_user
+            mock_db.query.return_value.filter.return_value.first.return_value = (
+                mock_document
+            )
+
+            mock_task_result = MagicMock()
+            mock_task_result.state = "FAILURE"
+            mock_task_result.info = ValueError(
+                "No context available for question generation"
+            )
+            mock_task_result.result = None
+            mock_result.return_value = mock_task_result
+
+            client = TestClient(ws_app)
+            with client.websocket_connect("/ws/tasks/test-task-id") as ws:
+                ws.send_json({"token": "valid-token"})
+                data = ws.receive_json()
+                assert data["status"] == "FAILURE"
+                assert "durchsuchbaren Inhalt" in data["error"]
+                assert (
+                    data["error"]
+                    != "Verarbeitung fehlgeschlagen. Bitte erneut versuchen."
+                )

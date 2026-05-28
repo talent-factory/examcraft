@@ -121,6 +121,14 @@ export interface RAGExamResponse {
     context_chunks_used: number;
     total_context_length: number;
     average_similarity_score: number;
+    // TF-358: requested_/generated_question_count werden bei jeder
+    // RAG-Generierung gesetzt. context_limited(_notice) nur, wenn die
+    // Fragenanzahl ans verfügbare Chunk-Material gekoppelt wurde (weniger
+    // Fragen erzeugt als angefordert). Alle optional (Backward-Compat).
+    requested_question_count?: number;
+    generated_question_count?: number;
+    context_limited?: boolean;
+    context_limited_notice?: string;
   };
 }
 

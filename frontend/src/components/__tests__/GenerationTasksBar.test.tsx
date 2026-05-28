@@ -116,6 +116,55 @@ describe('GenerationTasksBar', () => {
     expect(screen.getByText('Klicken zum Anzeigen')).toBeInTheDocument();
   });
 
+  // TF-358: Wenn die Fragenanzahl ans verfügbare Dokumenten-Material gekoppelt
+  // wurde, trägt das Result eine context_limited_notice, die im Erfolgs-Eintrag
+  // angezeigt werden muss (zusätzlich zum Klick-Hinweis).
+  test('shows context-limited notice on SUCCESS when result carries one', () => {
+    const notice =
+      'Es konnten nur 3 von 5 angeforderten Fragen erstellt werden, weil die ausgewählten Dokumente zu wenig durchsuchbaren Inhalt enthalten.';
+    const cappedTask = makeTask({
+      taskId: 'task-capped',
+      status: 'SUCCESS',
+      progress: 100,
+      topic: 'Knappes Material',
+      result: { quality_metrics: { context_limited_notice: notice } } as any,
+    });
+
+    mockUseGenerationTasks.mockReturnValue({
+      activeTasks: [],
+      completedTasks: [cappedTask],
+      dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
+    });
+
+    render(<GenerationTasksBar />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Klicken zum Anzeigen')).toBeInTheDocument();
+    expect(screen.getByText(/nur 3 von 5 angeforderten Fragen/)).toBeInTheDocument();
+  });
+
+  test('does NOT show a notice on a normal SUCCESS without context_limited_notice', () => {
+    const okTask = makeTask({
+      taskId: 'task-ok-nonotice',
+      status: 'SUCCESS',
+      progress: 100,
+      topic: 'Genug Material',
+      result: { quality_metrics: { total_questions: 5 } } as any,
+    });
+
+    mockUseGenerationTasks.mockReturnValue({
+      activeTasks: [],
+      completedTasks: [okTask],
+      dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
+    });
+
+    render(<GenerationTasksBar />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Klicken zum Anzeigen')).toBeInTheDocument();
+    expect(screen.queryByText(/angeforderten Fragen/)).not.toBeInTheDocument();
+  });
+
   test('navigates to /questions/generate on completed task click', () => {
     const completedTask = makeTask({
       taskId: 'task-nav',
