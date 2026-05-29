@@ -44,7 +44,7 @@ class TestDocumentProcessingTask:
 
             # Mock document_service.process_document_with_vectors
             mock_run_async.return_value = {
-                "docling_processing": {"pages": 10},
+                "extraction": {"pages": 10},
                 "vector_embeddings": {"count": 2},
             }
 

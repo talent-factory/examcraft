@@ -41,16 +41,17 @@ class ProcessedDocument:
 
 class DoclingService:
     """
-    Modernisierter Service für strukturierte Dokumentenverarbeitung
+    Service-Fassade für strukturierte Dokumentenverarbeitung.
 
-    Verwendet:
-    - IBM Docling für erweiterte Features (Tabellen, Layout, OCR)
-    - Legacy Processor als Fallback (PyPDF, python-docx)
+    Hinweis: Der Name ist historisch — IBM Docling wird nicht mehr verwendet
+    (bewusst entfernt, zu langsam). Die Fassade delegiert an den per Factory
+    konfigurierten Processor; Standard ist PyMuPDF, Fallback der Legacy-Processor
+    (pypdf/python-docx).
 
-    Processor-Auswahl via Environment Variable:
-    - DOCUMENT_PROCESSOR_TYPE=docling (Standard, wenn verfügbar)
-    - DOCUMENT_PROCESSOR_TYPE=legacy (Fallback)
-    - DOCUMENT_PROCESSOR_TYPE=auto (Auto-Detection)
+    Processor-Auswahl via Environment Variable DOCUMENT_PROCESSOR_TYPE:
+    - "pymupdf" (Standard)
+    - "legacy" (Fallback)
+    - "auto" (Auto-Detection)
     """
 
     def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):

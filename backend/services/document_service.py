@@ -601,7 +601,7 @@ class DocumentService:
             return {
                 "document_id": document_id,
                 "quality": info["quality"],
-                "docling_processing": {
+                "extraction": {
                     "total_chunks": processed_doc.total_chunks,
                     "processing_time": processed_doc.processing_time,
                     "total_pages": processed_doc.total_pages,
@@ -640,7 +640,7 @@ class DocumentService:
                 flag_modified(document, "doc_metadata")
                 db.commit()
 
-            docling_stats = (
+            extraction_stats = (
                 {
                     "total_chunks": processed_doc.total_chunks,
                     "processing_time": processed_doc.processing_time,
@@ -651,7 +651,7 @@ class DocumentService:
             )
             return {
                 "document_id": document_id,
-                "docling_processing": docling_stats,
+                "extraction": extraction_stats,
                 "vector_embeddings": {"error": str(e)},
             }
         finally:

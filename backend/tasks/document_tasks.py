@@ -194,7 +194,7 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
             "title": document.original_filename,
             "status": document.status.value,
             "has_vectors": document.has_vectors,
-            "docling_processing": result.get("docling_processing", {}),
+            "extraction": result.get("extraction", {}),
             "vector_embeddings": result.get("vector_embeddings", {}),
         }
 

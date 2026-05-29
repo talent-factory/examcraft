@@ -1,6 +1,6 @@
 """
 Document Processor Factory
-Dynamische Auswahl zwischen PyMuPDF, Docling und Legacy Processor
+Dynamische Auswahl zwischen PyMuPDF und Legacy Processor
 """
 
 import os
@@ -10,7 +10,6 @@ from typing import Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .pymupdf_processor import PyMuPDFProcessor
-    from .docling_processor import DoclingProcessor
     from .legacy_processor import LegacyProcessor
 
 logger = logging.getLogger(__name__)
@@ -21,23 +20,20 @@ class DocumentProcessorFactory:
     Factory für dynamische Processor-Auswahl
 
     Environment Variables:
-    - DOCUMENT_PROCESSOR_TYPE: "pymupdf" (default), "docling", "legacy", or "auto"
+    - DOCUMENT_PROCESSOR_TYPE: "pymupdf" (default), "legacy", or "auto"
 
     Default: PyMuPDF (fast and efficient)
     - PyMuPDF: Schnelle PDF-Verarbeitung mit fitz
-    - Docling: IBM Docling (deprecated, langsam)
     - Legacy: pypdf + python-docx (deprecated)
     """
 
     @staticmethod
-    def create_processor() -> Union[
-        "PyMuPDFProcessor", "DoclingProcessor", "LegacyProcessor"
-    ]:
+    def create_processor() -> Union["PyMuPDFProcessor", "LegacyProcessor"]:
         """
         Erstelle Document Processor basierend auf Konfiguration
 
         Returns:
-            PyMuPDFProcessor (default), DoclingProcessor oder LegacyProcessor
+            PyMuPDFProcessor (default) oder LegacyProcessor
         """
         processor_type = os.getenv("DOCUMENT_PROCESSOR_TYPE", "pymupdf").lower().strip()
 
@@ -60,27 +56,6 @@ class DocumentProcessorFactory:
                     "Install with: pip install PyMuPDF"
                 ) from e
 
-        # Explizit Docling angefordert (deprecated)
-        if processor_type == "docling":
-            logger.warning(
-                "Docling processor is deprecated due to performance issues. "
-                "Consider using PyMuPDF instead."
-            )
-            try:
-                from .docling_processor import DoclingProcessor
-
-                logger.info("Using DoclingProcessor (explicitly requested, deprecated)")
-                return DoclingProcessor()
-            except ImportError as e:
-                logger.error(
-                    f"Docling explicitly requested but not available: {e}. "
-                    "Install with: pip install docling docling-core docling-ibm-models"
-                )
-                raise ImportError(
-                    "Docling processor requested but dependencies not installed. "
-                    "Install with: pip install docling docling-core docling-ibm-models"
-                ) from e
-
         # Explizit Legacy angefordert (deprecated)
         if processor_type == "legacy":
             logger.warning(
@@ -91,7 +66,7 @@ class DocumentProcessorFactory:
             logger.info("Using LegacyProcessor (explicitly requested, deprecated)")
             return LegacyProcessor()
 
-        # Auto-Detection (versucht PyMuPDF, dann Docling, dann Legacy)
+        # Auto-Detection (versucht PyMuPDF, dann Legacy)
         if processor_type == "auto":
             # Versuche PyMuPDF zuerst
             try:
@@ -99,18 +74,6 @@ class DocumentProcessorFactory:
 
                 logger.info("Using PyMuPDFProcessor (auto-detected)")
                 return PyMuPDFProcessor()
-            except ImportError:
-                pass
-
-            # Fallback: Docling
-            try:
-                from .docling_processor import DoclingProcessor
-
-                logger.warning(
-                    "Using DoclingProcessor (auto-detected). "
-                    "Install PyMuPDF for better performance: pip install PyMuPDF"
-                )
-                return DoclingProcessor()
             except ImportError:
                 pass
 
@@ -126,7 +89,7 @@ class DocumentProcessorFactory:
         # Unbekannter Typ
         raise ValueError(
             f"Unknown processor type: {processor_type}. "
-            "Valid options: 'pymupdf' (default), 'docling', 'legacy', 'auto'"
+            "Valid options: 'pymupdf' (default), 'legacy', 'auto'"
         )
 
 
