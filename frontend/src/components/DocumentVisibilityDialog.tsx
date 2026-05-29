@@ -19,8 +19,8 @@ import { DocumentVisibility } from '../types/document';
 
 interface DocumentVisibilityDialogProps {
   open: boolean;
-  /** Current visibility of the document being edited. */
-  current: DocumentVisibility;
+  /** Current visibility of the document being edited. Null means no pre-selection (bulk mode). */
+  current: DocumentVisibility | null;
   /** Institution name, interpolated into the "institution" option label. */
   institutionName?: string;
   /** Whether the user belongs to an institution; gates the institution option. */
@@ -48,7 +48,7 @@ export const DocumentVisibilityDialog: React.FC<DocumentVisibilityDialogProps> =
   onSave,
 }) => {
   const { t } = useTranslation();
-  const [value, setValue] = useState<DocumentVisibility>(current);
+  const [value, setValue] = useState<DocumentVisibility | null>(current);
 
   // Re-seed the selection whenever the dialog (re)opens on a new document.
   useEffect(() => {
@@ -67,7 +67,7 @@ export const DocumentVisibilityDialog: React.FC<DocumentVisibilityDialogProps> =
           </Alert>
         )}
         <RadioGroup
-          value={value}
+          value={value ?? ''}
           onChange={(e) => setValue(e.target.value as DocumentVisibility)}
         >
           <FormControlLabel
@@ -110,8 +110,8 @@ export const DocumentVisibilityDialog: React.FC<DocumentVisibilityDialogProps> =
         </Button>
         <Button
           variant="contained"
-          onClick={() => onSave(value)}
-          disabled={saving || value === current}
+          onClick={() => value && onSave(value)}
+          disabled={saving || value === null || value === current}
         >
           {saving ? (
             <CircularProgress size={20} />

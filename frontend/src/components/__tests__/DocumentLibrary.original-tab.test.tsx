@@ -3,6 +3,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { MemoryRouter } from 'react-router-dom';
 import DocumentLibrary from '../DocumentLibrary';
 import { Document, DocumentStatus } from '../../types/document';
 
@@ -15,6 +16,8 @@ jest.mock('../../services/DocumentService', () => {
     ...actual,
     DocumentService: {
       getDocuments: jest.fn(),
+      listDocuments: jest.fn(),
+      listDocumentTags: jest.fn(),
       getDocument: jest.fn(),
       getDocumentRaw: jest.fn(),
       getDocumentChunksPaginated: jest.fn(),
@@ -72,7 +75,9 @@ beforeEach(() => {
 
 const theme = createTheme();
 const Wrap: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ThemeProvider theme={theme}>{children}</ThemeProvider>
+  <ThemeProvider theme={theme}>
+    <MemoryRouter>{children}</MemoryRouter>
+  </ThemeProvider>
 );
 
 const baseDoc = (overrides: Partial<Document> = {}): Document => ({
@@ -95,7 +100,15 @@ const openPreview = async (doc: Document) => {
   // the preview imperatively by stubbing getDocuments and triggering
   // handlePreview via the menu item. Easier path: render with a single doc
   // and click the doc card → menu → preview.
-  mockDocumentService.getDocuments.mockResolvedValue([doc]);
+  mockDocumentService.listDocuments.mockResolvedValue({
+    documents: [doc],
+    total: 1,
+    page: 1,
+    page_size: 24,
+    total_pages: 1,
+    stats: { total: 1, processed: 1, with_vectors: 1, in_progress: 0 },
+  });
+  mockDocumentService.listDocumentTags.mockResolvedValue([]);
   mockDocumentService.getDocumentChunksPaginated.mockResolvedValue({
     document_id: doc.id,
     total_chunks: 0,

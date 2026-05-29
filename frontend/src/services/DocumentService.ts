@@ -3,7 +3,10 @@ import {
   DocumentUploadResponse,
   DocumentProcessingResponse,
   AvailableDocumentsResponse,
-  DocumentVisibility
+  DocumentVisibility,
+  DocumentListParams,
+  DocumentListResponse,
+  DocumentTag,
 } from '../types/document';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -433,6 +436,85 @@ export class DocumentService {
     }
 
     return results;
+  }
+
+  /**
+   * List documents with filters, pagination and stats (TF-355).
+   */
+  static async listDocuments(params: DocumentListParams): Promise<DocumentListResponse> {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set('q', params.q);
+    if (params.visibility) qs.set('visibility', params.visibility);
+    (params.status ?? []).forEach((s) => qs.append('status', s));
+    (params.mime_family ?? []).forEach((m) => qs.append('mime_family', m));
+    (params.tag_ids ?? []).forEach((id) => qs.append('tag_ids', String(id)));
+    if (params.sort) qs.set('sort', params.sort);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.page_size) qs.set('page_size', String(params.page_size));
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/?${qs.toString()}`, {
+      method: 'GET', headers: this.getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to fetch documents: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * List all document tags visible to the current user.
+   */
+  static async listDocumentTags(): Promise<DocumentTag[]> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/tags`, {
+      method: 'GET', headers: this.getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({}));
+      throw new Error(e.detail || `Failed to fetch tags: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Create a new document tag.
+   */
+  static async createDocumentTag(name: string, scope: 'user' | 'institution' = 'user'): Promise<DocumentTag> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/tags`, {
+      method: 'POST', headers: this.getAuthHeaders(), body: JSON.stringify({ name, scope }),
+    });
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({}));
+      throw new Error(e.detail || `Failed to create tag: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Attach tags to a document.
+   */
+  static async attachDocumentTags(documentId: number, tagIds: number[]): Promise<Document> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}/tags`, {
+      method: 'POST', headers: this.getAuthHeaders(), body: JSON.stringify({ tag_ids: tagIds }),
+    });
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({}));
+      throw new Error(e.detail || `Failed to attach tags: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Detach a single tag from a document.
+   */
+  static async detachDocumentTag(documentId: number, tagId: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}/tags/${tagId}`, {
+      method: 'DELETE', headers: this.getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({}));
+      throw new Error(e.detail || `Failed to detach tag: ${response.statusText}`);
+    }
   }
 
   /**

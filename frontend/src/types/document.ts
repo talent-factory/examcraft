@@ -36,6 +36,7 @@ export interface Document {
   content_preview?: string;
   vector_collection?: string;
   updated_at?: string;
+  tags?: DocumentTag[];
   metadata?: {
     total_chunks?: number;
     embedding_model?: string;
@@ -46,6 +47,50 @@ export interface Document {
     vector_embedding_error?: string;
     [key: string]: any;
   };
+}
+
+export interface DocumentTag {
+  id: number;
+  name: string;
+  scope: 'user' | 'institution' | 'global';
+  is_own: boolean;
+}
+
+export interface DocumentStats {
+  total: number;
+  processed: number;
+  with_vectors: number;
+  in_progress: number;
+}
+
+export type DocumentSort =
+  | 'created_at_desc' | 'created_at_asc'
+  | 'title_asc' | 'title_desc'
+  | 'size_desc' | 'size_asc';
+
+export type MimeFamily = 'pdf' | 'word' | 'markdown' | 'text' | 'chat';
+export type StatusGroup = 'uploaded' | 'processing' | 'processed' | 'error';
+export type VisibilityFilter = 'own' | 'shared';
+export type ViewMode = 'cards' | 'list';
+
+export interface DocumentListParams {
+  q?: string;
+  visibility?: VisibilityFilter;
+  status?: StatusGroup[];
+  mime_family?: MimeFamily[];
+  tag_ids?: number[];
+  sort?: DocumentSort;
+  page?: number;
+  page_size?: number;
+}
+
+export interface DocumentListResponse {
+  documents: Document[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  stats: DocumentStats;
 }
 
 export interface DocumentUploadResponse {

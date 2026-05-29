@@ -201,9 +201,10 @@ def _list_ids(user, db):
 
 def get_document_list(user, db):
     # Thin wrapper so the parametrized helper reads cleanly.
+    # TF-355: status is now List[str] (default=[]), not Optional[str].
     from api.documents import list_documents
 
-    return list_documents(status=None, request=None, current_user=user, db=db)
+    return list_documents(request=None, current_user=user, db=db)
 
 
 def test_list_owner_sees_both(vis_data, test_db):

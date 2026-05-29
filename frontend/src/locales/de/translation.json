@@ -1106,7 +1106,85 @@
       "visibilityInstitution": "Institution — geteilt",
       "visibilityClickToChange": "Klicken zum Ändern",
       "visibilityEditAria": "Sichtbarkeit ändern",
-      "menuChangeVisibility": "Sichtbarkeit ändern…"
+      "menuChangeVisibility": "Sichtbarkeit ändern…",
+      "toolbar": {
+        "searchPlaceholder": "Suchen…",
+        "visibility": "Sichtbarkeit",
+        "visibilityAll": "Alle",
+        "visibilityOwn": "Eigene",
+        "visibilityShared": "Geteilte",
+        "status": "Status",
+        "type": "Typ",
+        "tags": "Tags",
+        "viewCards": "Karten",
+        "viewList": "Liste",
+        "labelVisibility": "Sichtbarkeit",
+        "labelStatus": "Status",
+        "labelType": "Typ",
+        "resetAll": "Alle zurücksetzen",
+        "statusGroups": {
+          "uploaded": "Hochgeladen",
+          "processing": "In Bearbeitung",
+          "processed": "Verarbeitet",
+          "error": "Fehler"
+        },
+        "mimeFamilies": {
+          "pdf": "PDF",
+          "word": "Word",
+          "markdown": "Markdown",
+          "text": "Text",
+          "chat": "Chat"
+        }
+      },
+      "pagination": {
+        "pageSizeLabel": "Pro Seite",
+        "of": "von"
+      },
+      "empty": {
+        "searchNoHits": "Keine Treffer für „{{query}}“",
+        "clearSearch": "Suche löschen",
+        "filterNoHits": "Keine Dokumente entsprechen den aktiven Filtern",
+        "resetFilters": "Alle Filter zurücksetzen"
+      },
+      "autoRefresh": {
+        "processingOnOtherPages": "{{count}} weitere in Bearbeitung (andere Seiten)"
+      },
+      "tagEditor": {
+        "label": "Tags",
+        "heading": "Tags"
+      },
+      "list": {
+        "colVisibility": "Sichtbarkeit",
+        "colTitle": "Titel",
+        "colTags": "Tags",
+        "colStatus": "Status",
+        "colType": "Typ",
+        "colSize": "Grösse",
+        "colUploaded": "Hochgeladen",
+        "selectAll": "Alle auswählen"
+      },
+      "bulk": {
+        "selected": "{{count}} ausgewählt",
+        "ragExam": "RAG-Prüfung erstellen",
+        "tags": "Tags…",
+        "visibility": "Sichtbarkeit…",
+        "delete": "Löschen",
+        "deleteConfirmButton": "Löschen",
+        "deleteTitle": "Dokumente löschen",
+        "deleteConfirm": "Möchten Sie {{count}} Dokument(e) wirklich löschen?",
+        "deleteSummary": "{{deleted}} Dokument(e) gelöscht",
+        "deleteSummaryWithErrors": "{{deleted}} Dokument(e) gelöscht, {{failed}} fehlgeschlagen",
+        "visibilitySummary": "{{changed}} von {{total}} geändert, {{skipped}} übersprungen",
+        "visibilitySummaryWithErrors": "{{changed}} von {{total}} geändert, {{skipped}} übersprungen, {{failed}} Fehler",
+        "tagsDialogTitle": "Tags bearbeiten",
+        "tagsMode": "Aktion",
+        "tagsAdd": "Hinzufügen",
+        "tagsRemove": "Entfernen",
+        "tagsSelect": "Tags auswählen",
+        "tagsApply": "Anwenden",
+        "tagsSummary": "Tags aktualisiert für {{changed}} Dokumente, {{skipped}} übersprungen",
+        "tagsSummaryWithErrors": "Tags aktualisiert für {{changed}} Dokumente, {{skipped}} übersprungen, {{failed}} Fehler"
+      }
     },
     "documentUpload": {
       "dropActive": "Dateien hier ablegen...",

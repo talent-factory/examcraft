@@ -15,13 +15,15 @@ from fastapi import (
     BackgroundTasks,
 )
 from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
-from typing import List, Optional
+from typing import Annotated, List, Literal, Optional
+from sqlalchemy import func, or_, and_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 import mimetypes
 import os
 import io
+from math import ceil
 from urllib.parse import quote
 
 from services.document_service import DocumentService
@@ -36,6 +38,14 @@ from services.translation_service import t, get_request_locale
 from services.vector_service_factory import vector_service
 from models.document import Document, DocumentStatus, DocumentVisibility
 from models.auth import User
+from models.tag import Tag, DocumentTag
+from utils.document_tags import (
+    visible_tags_for_user,
+    attach_tags_to_document,
+    detach_tag_from_document,
+    STATUS_GROUPS,
+    MIME_FAMILIES,
+)
 from database import get_db
 from utils.auth_utils import get_current_active_user, require_permission
 from utils.document_visibility import (
@@ -52,6 +62,23 @@ document_service = DocumentService()
 
 
 # Pydantic Models für API Responses
+class DocumentTagOut(BaseModel):
+    id: int
+    name: str
+    scope: Literal["user", "institution", "global"]
+    is_own: bool = False
+    model_config = {"from_attributes": True}
+
+
+class DocumentTagCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50)
+    scope: Literal["user", "institution"] = "user"
+
+
+class AttachTagsRequest(BaseModel):
+    tag_ids: List[int] = Field(..., min_length=1)
+
+
 class DocumentResponse(BaseModel):
     id: int
     filename: str
@@ -70,6 +97,7 @@ class DocumentResponse(BaseModel):
     created_at: Optional[str]
     updated_at: Optional[str]
     processed_at: Optional[str]
+    tags: List[DocumentTagOut] = []
 
 
 class DocumentPatchRequest(BaseModel):
@@ -131,9 +159,20 @@ class DocumentPatchRequest(BaseModel):
         return self
 
 
+class DocumentStats(BaseModel):
+    total: int
+    processed: int
+    with_vectors: int
+    in_progress: int
+
+
 class DocumentListResponse(BaseModel):
     documents: List[DocumentResponse]
     total: int
+    page: int
+    page_size: int
+    total_pages: int
+    stats: DocumentStats
 
 
 class UploadResponse(BaseModel):
@@ -250,56 +289,158 @@ async def upload_document(
         )
 
 
+def _apply_sort(query, sort: str):
+    title_col = func.coalesce(Document.display_name, Document.original_filename)
+    mapping = {
+        "created_at_desc": Document.created_at.desc(),
+        "created_at_asc": Document.created_at.asc(),
+        "title_asc": title_col.asc(),
+        "title_desc": title_col.desc(),
+        "size_desc": Document.file_size.desc(),
+        "size_asc": Document.file_size.asc(),
+    }
+    return query.order_by(mapping.get(sort, Document.created_at.desc()))
+
+
+def _compute_stats(base_query) -> "DocumentStats":
+    """Stats over the visibility-scoped base query (ignores content filters).
+    Passes enum members (not raw strings) to .in_() so SQLAlchemy maps them
+    to the stored column values.
+    base_query is a generative Query; each .filter() returns a new query."""
+    total = base_query.count()
+    processed = base_query.filter(
+        Document.status.in_([DocumentStatus.COMPLETED, DocumentStatus.PROCESSED])
+    ).count()
+    in_progress = base_query.filter(
+        Document.status.in_([DocumentStatus.QUEUED, DocumentStatus.PROCESSING])
+    ).count()
+    with_vectors = base_query.filter(Document.has_vectors.is_(True)).count()
+    return DocumentStats(
+        total=total,
+        processed=processed,
+        with_vectors=with_vectors,
+        in_progress=in_progress,
+    )
+
+
 @router.get("/", response_model=DocumentListResponse)
 async def list_documents(
-    status: Optional[str] = Query(None, description="Filter by status"),
+    q: Annotated[Optional[str], Query()] = None,
+    visibility: Annotated[Optional[Literal["own", "shared"]], Query()] = None,
+    status: Annotated[
+        List[Literal["uploaded", "processing", "processed", "error"]], Query()
+    ] = None,
+    mime_family: Annotated[
+        List[Literal["pdf", "word", "markdown", "text", "chat"]], Query()
+    ] = None,
+    tag_ids: Annotated[List[int], Query()] = None,
+    sort: Literal[
+        "created_at_desc",
+        "created_at_asc",
+        "title_asc",
+        "title_desc",
+        "size_desc",
+        "size_asc",
+    ] = "created_at_desc",
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=96)] = 24,
     request: Request = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Liste alle Dokumente des aktuellen Users
-
-    **Required:** Authenticated user
-
-    - **status**: Optional filter by document status
-
-    Returns:
-        Liste aller Dokumente mit Metadaten
-    """
+    """Paginated, filterable, sortable document list with embedded stats (TF-355)."""
     locale = get_request_locale(request, current_user)
     try:
-        # Convert status string to enum if provided
-        status_filter = None
-        if status:
-            try:
-                status_filter = DocumentStatus(status)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=t("documents_invalid_status", locale=locale),
+        base = filter_documents_for_user(db.query(Document), current_user)
+        if visibility == "own":
+            base = base.filter(Document.user_id == current_user.id)
+        elif visibility == "shared":
+            base = base.filter(Document.user_id != current_user.id)
+
+        # Stats: from the visibility-scoped base, IGNORING q/status/mime/tag filters.
+        stats = _compute_stats(base)
+
+        # Document query: base + content filters.
+        query = base
+        if q:
+            # Escape ILIKE wildcards so a literal "_"/"%" (common in filenames)
+            # is matched literally, not as a pattern.
+            escaped = (
+                q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            pattern = f"%{escaped}%"
+            query = query.filter(
+                or_(
+                    Document.display_name.ilike(pattern, escape="\\"),
+                    Document.original_filename.ilike(pattern, escape="\\"),
+                    Document.content_preview.ilike(pattern, escape="\\"),
                 )
+            )
+        if status:
+            statuses = []
+            for group in status:
+                if group not in STATUS_GROUPS:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=t("documents_invalid_status", locale=locale),
+                    )
+                statuses.extend(STATUS_GROUPS[group])
+            query = query.filter(Document.status.in_(statuses))
+        if mime_family:
+            clauses = []
+            chat_flag = Document.doc_metadata["source"].as_string() == "chat_export"
+            # NULL-safe: doc_metadata is None OR source key absent (SQL NULL) OR
+            # source != "chat_export". Without the is_(None) check on the key the
+            # `not_(chat_flag)` expression is SQL NULL for docs whose metadata dict
+            # exists but lacks a "source" key — those rows would be silently dropped.
+            not_chat_flag = or_(
+                Document.doc_metadata.is_(None),
+                Document.doc_metadata["source"].as_string().is_(None),
+                Document.doc_metadata["source"].as_string() != "chat_export",
+            )
+            for fam in mime_family:
+                if fam == "chat":
+                    clauses.append(chat_flag)
+                elif fam == "text":
+                    clauses.append(
+                        and_(Document.mime_type == "text/plain", not_chat_flag)
+                    )
+                elif fam in MIME_FAMILIES:
+                    clauses.append(Document.mime_type.in_(MIME_FAMILIES[fam]))
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=t("documents_invalid_filter", locale=locale),
+                    )
+            query = query.filter(or_(*clauses))
+        if tag_ids:
+            unique_tag_ids = list(dict.fromkeys(tag_ids))
+            query = (
+                query.join(DocumentTag, DocumentTag.document_id == Document.id)
+                .filter(DocumentTag.tag_id.in_(unique_tag_ids))
+                .group_by(Document.id)
+                .having(
+                    func.count(func.distinct(DocumentTag.tag_id)) == len(unique_tag_ids)
+                )
+            )
 
-        # Visibility-aware query (TF-354): owner's docs + institution-shared
-        # docs in the user's institution (SuperUser bypass inside the helper).
-        query = db.query(Document)
-        query = filter_documents_for_user(query, current_user)
+        query = _apply_sort(query, sort)
 
-        if status_filter:
-            query = query.filter(Document.status == status_filter)
+        total = db.query(func.count()).select_from(query.subquery()).scalar() or 0
+        total_pages = ceil(total / page_size) if total else 0
+        rows = query.offset((page - 1) * page_size).limit(page_size).all()
 
-        documents = query.order_by(Document.created_at.desc()).all()
-
-        # Convert to response format
-        document_responses = []
-        for doc in documents:
-            doc_dict = doc.to_dict()
-            document_responses.append(DocumentResponse(**doc_dict))
-
+        documents = [
+            _document_response_with_tags(doc, current_user, db) for doc in rows
+        ]
         return DocumentListResponse(
-            documents=document_responses, total=len(document_responses)
+            documents=documents,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
+            stats=stats,
         )
-
     except HTTPException:
         raise
     except Exception as e:
@@ -307,8 +448,7 @@ async def list_documents(
             f"Failed to list documents for user {current_user.id}: {e}", exc_info=True
         )
         raise HTTPException(
-            status_code=500,
-            detail=t("documents_list_failed", locale=locale),
+            status_code=500, detail=t("documents_list_failed", locale=locale)
         )
 
 
@@ -322,6 +462,95 @@ async def health_check():
         "supported_formats": list(document_service.supported_formats.values()),
         "max_file_size_mb": document_service.max_file_size // (1024 * 1024),
     }
+
+
+@router.get("/tags", response_model=List[DocumentTagOut])
+async def list_document_tags(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Tags the user may attach to documents (own user-tags + institution + global)."""
+    tags = visible_tags_for_user(db, current_user).order_by(func.lower(Tag.name)).all()
+    return [
+        DocumentTagOut(
+            id=t.id,
+            name=t.name,
+            scope=t.scope,
+            is_own=(t.created_by == current_user.id),
+        )
+        for t in tags
+    ]
+
+
+@router.post(
+    "/tags", response_model=DocumentTagOut, status_code=200
+)  # get-or-create: returns existing tag on name match, so 200 (not 201)
+async def create_document_tag(
+    body: DocumentTagCreate,
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Create (or return existing) a document tag. ``user`` scope for everyone;
+    ``institution`` scope requires the ``manage_settings`` permission."""
+    locale = get_request_locale(request, current_user)
+    if body.scope == "institution" and not current_user.has_permission(
+        "manage_settings"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=t("documents_tag_institution_admin_only", locale=locale),
+        )
+
+    name = body.name.strip()
+    name_lower = name.lower()
+    if body.scope == "user":
+        existing = (
+            db.query(Tag)
+            .filter(
+                Tag.scope == "user",
+                Tag.created_by == current_user.id,
+                func.lower(Tag.name) == name_lower,
+            )
+            .first()
+        )
+        institution_id = None
+    else:  # institution
+        existing = (
+            db.query(Tag)
+            .filter(
+                Tag.scope == "institution",
+                Tag.institution_id == current_user.institution_id,
+                func.lower(Tag.name) == name_lower,
+            )
+            .first()
+        )
+        institution_id = current_user.institution_id
+
+    if existing:
+        return DocumentTagOut(
+            id=existing.id,
+            name=existing.name,
+            scope=existing.scope,
+            is_own=(existing.created_by == current_user.id),
+        )
+
+    tag = Tag(
+        name=name,
+        scope=body.scope,
+        institution_id=institution_id,
+        created_by=current_user.id,
+    )
+    db.add(tag)
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail=t("documents_tag_exists", locale=locale)
+        )
+    db.refresh(tag)
+    return DocumentTagOut(id=tag.id, name=tag.name, scope=tag.scope, is_own=True)
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
@@ -353,8 +582,7 @@ async def get_document(
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
-        doc_dict = document.to_dict()
-        return DocumentResponse(**doc_dict)
+        return _document_response_with_tags(document, current_user, db)
 
     except HTTPException:
         raise
@@ -438,8 +666,10 @@ async def update_document(
                 document.visibility = new_visibility
 
         # Build the response dict BEFORE persisting so a serialisation failure
-        # cannot mask an already-persisted change as a generic 500.
+        # cannot mask an already-persisted change as a generic 500. Tags are
+        # unchanged by a patch, so loading them here (pre-commit) is safe.
         response_payload = document.to_dict()
+        response_payload["tags"] = _document_tag_outs(document, current_user, db)
 
         if visibility_change is not None:
             # A visibility flip is a DSGVO-relevant privileged action: it must
@@ -503,6 +733,89 @@ async def update_document(
             status_code=500,
             detail=t("documents_rename_failed", locale=locale),
         )
+
+
+def _load_owned_document(document_id: int, current_user: User, db: Session, locale):
+    """Load a doc the caller can see; require ownership (SuperUser bypass)."""
+    document = document_service.get_document_by_id(document_id, db)
+    if not document:
+        raise HTTPException(
+            status_code=404, detail=t("documents_not_found", locale=locale)
+        )
+    assert_document_visible_for(current_user, document, locale=locale)
+    is_owner = document.user_id is not None and document.user_id == current_user.id
+    if not is_owner and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=403, detail=t("documents_tag_owner_only", locale=locale)
+        )
+    return document
+
+
+def _document_response_with_tags(
+    document, current_user: User, db: Session
+) -> DocumentResponse:
+    doc_dict = document.to_dict()
+    doc_dict["tags"] = _document_tag_outs(document, current_user, db)
+    return DocumentResponse(**doc_dict)
+
+
+def _document_tag_outs(
+    document, current_user: User, db: Session
+) -> List[DocumentTagOut]:
+    """Load a document's tags as DocumentTagOut, alphabetically by name."""
+    tag_rows = (
+        db.query(Tag)
+        .join(DocumentTag, DocumentTag.tag_id == Tag.id)
+        .filter(DocumentTag.document_id == document.id)
+        .order_by(func.lower(Tag.name))
+        .all()
+    )
+    return [
+        DocumentTagOut(
+            id=t.id,
+            name=t.name,
+            scope=t.scope,
+            is_own=(t.created_by == current_user.id),
+        )
+        for t in tag_rows
+    ]
+
+
+@router.post("/{document_id}/tags", response_model=DocumentResponse)
+async def attach_document_tags(
+    document_id: int,
+    body: AttachTagsRequest,
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Attach tags to a document. Owner-only. Enforces the institution-tag block rule."""
+    locale = get_request_locale(request, current_user)
+    document = _load_owned_document(document_id, current_user, db, locale)
+    try:
+        attach_tags_to_document(db, document, body.tag_ids, current_user)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    db.refresh(document)
+    return _document_response_with_tags(document, current_user, db)
+
+
+@router.delete("/{document_id}/tags/{tag_id}", status_code=204)
+async def detach_document_tag(
+    document_id: int,
+    tag_id: int,
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Detach a tag from a document. Owner-only."""
+    locale = get_request_locale(request, current_user)
+    document = _load_owned_document(document_id, current_user, db, locale)
+    detach_tag_from_document(db, document, tag_id)
+    db.commit()
+    return Response(status_code=204)
 
 
 def _content_disposition(filename: str, inline: bool) -> str:

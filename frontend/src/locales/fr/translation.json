@@ -717,7 +717,85 @@
       "visibilityInstitution": "Institution — partagé",
       "visibilityClickToChange": "Cliquer pour modifier",
       "visibilityEditAria": "Modifier la visibilité",
-      "menuChangeVisibility": "Modifier la visibilité…"
+      "menuChangeVisibility": "Modifier la visibilité…",
+      "toolbar": {
+        "searchPlaceholder": "Rechercher…",
+        "visibility": "Visibilité",
+        "visibilityAll": "Tous",
+        "visibilityOwn": "Les miens",
+        "visibilityShared": "Partagés",
+        "status": "Statut",
+        "type": "Type",
+        "tags": "Étiquettes",
+        "viewCards": "Cartes",
+        "viewList": "Liste",
+        "labelVisibility": "Visibilité",
+        "labelStatus": "Statut",
+        "labelType": "Type",
+        "resetAll": "Tout réinitialiser",
+        "statusGroups": {
+          "uploaded": "Téléversé",
+          "processing": "En cours",
+          "processed": "Traité",
+          "error": "Erreur"
+        },
+        "mimeFamilies": {
+          "pdf": "PDF",
+          "word": "Word",
+          "markdown": "Markdown",
+          "text": "Texte",
+          "chat": "Chat"
+        }
+      },
+      "pagination": {
+        "pageSizeLabel": "Par page",
+        "of": "sur"
+      },
+      "empty": {
+        "searchNoHits": "Aucun résultat pour „{{query}}“",
+        "clearSearch": "Effacer la recherche",
+        "filterNoHits": "Aucun document ne correspond aux filtres actifs",
+        "resetFilters": "Réinitialiser tous les filtres"
+      },
+      "autoRefresh": {
+        "processingOnOtherPages": "{{count}} autre(s) en cours (autres pages)"
+      },
+      "tagEditor": {
+        "label": "Tags",
+        "heading": "Tags"
+      },
+      "list": {
+        "colVisibility": "Visibilité",
+        "colTitle": "Titre",
+        "colTags": "Tags",
+        "colStatus": "Statut",
+        "colType": "Type",
+        "colSize": "Taille",
+        "colUploaded": "Téléversé",
+        "selectAll": "Tout sélectionner"
+      },
+      "bulk": {
+        "selected": "{{count}} sélectionné(s)",
+        "ragExam": "Créer un examen RAG",
+        "tags": "Tags…",
+        "visibility": "Visibilité…",
+        "delete": "Supprimer",
+        "deleteConfirmButton": "Supprimer",
+        "deleteTitle": "Supprimer des documents",
+        "deleteConfirm": "Voulez-vous vraiment supprimer {{count}} document(s) ?",
+        "deleteSummary": "{{deleted}} document(s) supprimé(s)",
+        "deleteSummaryWithErrors": "{{deleted}} document(s) supprimé(s), {{failed}} échoué(s)",
+        "visibilitySummary": "{{changed}} sur {{total}} modifié(s), {{skipped}} ignoré(s)",
+        "visibilitySummaryWithErrors": "{{changed}} sur {{total}} modifié(s), {{skipped}} ignoré(s), {{failed}} erreur(s)",
+        "tagsDialogTitle": "Modifier les tags",
+        "tagsMode": "Action",
+        "tagsAdd": "Ajouter",
+        "tagsRemove": "Supprimer",
+        "tagsSelect": "Sélectionner des tags",
+        "tagsApply": "Appliquer",
+        "tagsSummary": "Tags mis à jour pour {{changed}} document(s), {{skipped}} ignoré(s)",
+        "tagsSummaryWithErrors": "Tags mis à jour pour {{changed}} document(s), {{skipped}} ignoré(s), {{failed}} erreur(s)"
+      }
     },
     "documentUpload": {
       "dropActive": "Déposez les fichiers ici...",

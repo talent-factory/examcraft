@@ -7,6 +7,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { MemoryRouter } from 'react-router-dom';
 import DocumentLibrary from '../DocumentLibrary';
 import { DocumentService } from '../../services/DocumentService';
 import { Document, DocumentStatus, DocumentVisibility } from '../../types/document';
@@ -30,7 +31,21 @@ jest.mock('../../services/DocumentService');
 const mockDocumentService = DocumentService as jest.Mocked<typeof DocumentService>;
 
 const theme = createTheme();
-const wrap = (ui: React.ReactElement) => <ThemeProvider theme={theme}>{ui}</ThemeProvider>;
+const wrap = (ui: React.ReactElement) => (
+  <ThemeProvider theme={theme}>
+    <MemoryRouter>{ui}</MemoryRouter>
+  </ThemeProvider>
+);
+
+// TF-355: DocumentLibrary now loads via the paginated `listDocuments` contract.
+const paged = (docs: Document[]) => ({
+  documents: docs,
+  total: docs.length,
+  page: 1,
+  page_size: 24,
+  total_pages: 1,
+  stats: { total: docs.length, processed: docs.length, with_vectors: 0, in_progress: 0 },
+});
 
 const makeDoc = (overrides: Partial<Document>): Document => ({
   id: 1,
@@ -51,27 +66,28 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({
     user: { id: 42, institution_id: 7, institution: { id: 7, name: 'Test University' } },
   });
+  mockDocumentService.listDocumentTags.mockResolvedValue([]);
 });
 
 describe('DocumentLibrary visibility (TF-354)', () => {
   it('renders the lock icon for a private document', async () => {
-    mockDocumentService.getDocuments.mockResolvedValue([makeDoc({ visibility: DocumentVisibility.PRIVATE })]);
+    mockDocumentService.listDocuments.mockResolvedValue(paged([makeDoc({ visibility: DocumentVisibility.PRIVATE })]));
     render(wrap(<DocumentLibrary />));
     await screen.findByText('My Document');
     expect(screen.getByTestId('LockOutlinedIcon')).toBeInTheDocument();
   });
 
   it('renders the business icon for an institution document', async () => {
-    mockDocumentService.getDocuments.mockResolvedValue([
+    mockDocumentService.listDocuments.mockResolvedValue(paged([
       makeDoc({ visibility: DocumentVisibility.INSTITUTION }),
-    ]);
+    ]));
     render(wrap(<DocumentLibrary />));
     await screen.findByText('My Document');
     expect(screen.getByTestId('BusinessIcon')).toBeInTheDocument();
   });
 
   it('owner clicking the icon opens the visibility edit dialog and saves', async () => {
-    mockDocumentService.getDocuments.mockResolvedValue([makeDoc({})]);
+    mockDocumentService.listDocuments.mockResolvedValue(paged([makeDoc({})]));
     mockDocumentService.updateVisibility.mockResolvedValue(
       makeDoc({ visibility: DocumentVisibility.INSTITUTION }),
     );
@@ -100,9 +116,9 @@ describe('DocumentLibrary visibility (TF-354)', () => {
     mockUseAuth.mockReturnValue({
       user: { id: 99, institution_id: 7, institution: { id: 7, name: 'Test University' } },
     });
-    mockDocumentService.getDocuments.mockResolvedValue([
+    mockDocumentService.listDocuments.mockResolvedValue(paged([
       makeDoc({ visibility: DocumentVisibility.INSTITUTION, user_id: 42 }),
-    ]);
+    ]));
     render(wrap(<DocumentLibrary />));
     await screen.findByText('My Document');
     expect(
