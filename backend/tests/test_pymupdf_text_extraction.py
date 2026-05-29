@@ -249,3 +249,55 @@ async def test_empty_file_marks_document_as_error(
     assert document.doc_metadata is not None
     assert "error" in document.doc_metadata
     assert "no extractable text" in document.doc_metadata["error"].lower()
+
+
+def test_pymupdf_processor_ocr_disabled_by_default():
+    from services.document_processors.pymupdf_processor import PyMuPDFProcessor
+
+    proc = PyMuPDFProcessor()
+    assert proc.enable_ocr is False
+
+
+def test_pymupdf_processor_ocr_flag_enabled():
+    from services.document_processors.pymupdf_processor import PyMuPDFProcessor
+
+    proc = PyMuPDFProcessor(enable_ocr=True)
+    assert proc.enable_ocr is True
+    assert proc.ocr_language == "deu+eng"
+
+
+def test_is_ocr_available_requires_env_binary_and_traineddata(monkeypatch):
+    from services.document_processors import processor_factory
+
+    # Voll verfügbar: Env gesetzt + Binary im PATH + Sprachpaket vorhanden.
+    monkeypatch.setenv("TESSDATA_PREFIX", "/fake/tessdata")
+    monkeypatch.setattr(
+        processor_factory.shutil, "which", lambda _: "/usr/bin/tesseract"
+    )
+    monkeypatch.setattr(processor_factory.os.path, "isfile", lambda _: True)
+    assert processor_factory.is_ocr_available() is True
+
+    # Env fehlt -> nicht verfügbar.
+    monkeypatch.delenv("TESSDATA_PREFIX", raising=False)
+    assert processor_factory.is_ocr_available() is False
+
+    # Env gesetzt, aber Tesseract-Binary fehlt -> nicht verfügbar.
+    monkeypatch.setenv("TESSDATA_PREFIX", "/fake/tessdata")
+    monkeypatch.setattr(processor_factory.shutil, "which", lambda _: None)
+    assert processor_factory.is_ocr_available() is False
+
+    # Binary da, aber traineddata fehlt -> nicht verfügbar.
+    monkeypatch.setattr(
+        processor_factory.shutil, "which", lambda _: "/usr/bin/tesseract"
+    )
+    monkeypatch.setattr(processor_factory.os.path, "isfile", lambda _: False)
+    assert processor_factory.is_ocr_available() is False
+
+
+def test_create_ocr_processor_enables_ocr():
+    from services.document_processors.pymupdf_processor import PyMuPDFProcessor
+    from services.document_processors.processor_factory import create_ocr_processor
+
+    proc = create_ocr_processor()
+    assert isinstance(proc, PyMuPDFProcessor)
+    assert proc.enable_ocr is True

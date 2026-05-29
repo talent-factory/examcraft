@@ -44,6 +44,11 @@ class VectorServicePlaceholder:
             "Vector search is only available in the Premium package."
         )
 
+    async def delete_document_chunks(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Vector search is only available in the Premium package."
+        )
+
     async def get_collection_info(self, *args, **kwargs):
         raise NotImplementedError(
             "Vector search is only available in the Premium package."

@@ -25,6 +25,7 @@ class TestDocumentProcessingTask:
             patch("tasks.document_tasks.SessionLocal") as mock_session_local,
             patch("tasks.document_tasks.document_service"),
             patch("tasks.document_tasks.run_async") as mock_run_async,
+            patch("tasks.document_tasks.flag_modified"),
         ):
             # Setup mocks
             mock_db = MagicMock()

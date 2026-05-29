@@ -125,6 +125,10 @@ celery_app.conf.task_routes = {
         "queue": "document_processing",
         "routing_key": "document.process",
     },
+    "tasks.document_tasks.reprocess_document_ocr": {
+        "queue": "document_processing",
+        "routing_key": "document.process",
+    },
     "tasks.rag_tasks.create_embeddings": {
         "queue": "rag_embedding",
         "routing_key": "rag.embed",

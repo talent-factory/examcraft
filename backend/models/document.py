@@ -263,5 +263,11 @@ class Document(Base):
             "processed_at": self.processed_at.isoformat()
             if self.processed_at
             else None,
+            # Qualitäts-Eskalation (TF-360): kuratierte Felder aus processing_info
+            # (interne Marker wie escalation/ocr_attempted bleiben intern).
+            "quality": (self.processing_info or {}).get("quality"),
+            "processed_with_ocr": (self.processing_info or {}).get(
+                "processed_with_ocr", False
+            ),
             # pending_reindex omitted — internal Celery marker, not exposed to API clients
         }

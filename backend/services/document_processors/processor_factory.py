@@ -4,6 +4,7 @@ Dynamische Auswahl zwischen PyMuPDF, Docling und Legacy Processor
 """
 
 import os
+import shutil
 import logging
 from typing import Union, TYPE_CHECKING
 
@@ -127,6 +128,35 @@ class DocumentProcessorFactory:
             f"Unknown processor type: {processor_type}. "
             "Valid options: 'pymupdf' (default), 'docling', 'legacy', 'auto'"
         )
+
+
+def is_ocr_available() -> bool:
+    """True, wenn PyMuPDF-OCR tatsächlich nutzbar ist.
+
+    Prüft drei Bedingungen, statt nur die Env-Var — sonst meldete OCR sich
+    als verfügbar (``TESSDATA_PREFIX`` wird im Image unbedingt gesetzt),
+    obwohl Tesseract gar nicht installiert ist, und ``get_textpage_ocr``
+    würde erst zur Laufzeit krachen statt sauber auf ``unavailable`` zu fallen:
+
+    1. ``TESSDATA_PREFIX`` ist gesetzt (PyMuPDF verlangt das),
+    2. das ``tesseract``-Binary ist im PATH,
+    3. mindestens ein konfiguriertes Sprachpaket (``<lang>.traineddata``) liegt
+       im tessdata-Verzeichnis.
+    """
+    prefix = os.environ.get("TESSDATA_PREFIX")
+    if not prefix:
+        return False
+    if shutil.which("tesseract") is None:
+        return False
+    primary_lang = os.getenv("OCR_LANGUAGE", "deu+eng").split("+")[0]
+    return os.path.isfile(os.path.join(prefix, f"{primary_lang}.traineddata"))
+
+
+def create_ocr_processor() -> "PyMuPDFProcessor":
+    """Erzeuge einen PyMuPDF-Prozessor mit aktiviertem Tesseract-OCR (TF-360)."""
+    from .pymupdf_processor import PyMuPDFProcessor
+
+    return PyMuPDFProcessor(enable_ocr=True)
 
 
 # Global Processor Instance
