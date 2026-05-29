@@ -1040,6 +1040,20 @@
       "noDocumentsHint": "Upload documents to start creating RAG-based exams.",
       "vectorsAvailable": "Vector Embeddings available",
       "processingRunning": "Processing running...",
+      "ocr": {
+        "badge": "OCR",
+        "badgeTooltip": "Processed with text recognition (OCR)",
+        "reprocessing": "OCR reprocessing",
+        "reprocessingTooltip": "The document is being reprocessed with text recognition (OCR)."
+      },
+      "quality": {
+        "limited": "Limited text quality",
+        "limitedTooltip": "Automatic text extraction was insufficient.",
+        "reasonScannedLowText": "Almost no extractable text — likely a scan. Text recognition (OCR) is being applied.",
+        "reasonSingleChunkLargeFile": "Large file, but almost no text content extracted.",
+        "reasonGarbageExtraction": "Extracted text appears unusable (many unreadable characters).",
+        "reasonUnknown": "Limited text quality detected."
+      },
       "sizeLabel": "Size: {{size}}",
       "uploadedLabel": "Uploaded: {{date}}",
       "processedLabel": "Processed: {{date}}",

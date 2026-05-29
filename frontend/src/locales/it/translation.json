@@ -655,6 +655,20 @@
       "noDocumentsHint": "Carica documenti per iniziare a creare esami basati su RAG.",
       "vectorsAvailable": "Embeddings vettoriali disponibili",
       "processingRunning": "Elaborazione in corso...",
+      "ocr": {
+        "badge": "OCR",
+        "badgeTooltip": "Elaborato con riconoscimento del testo (OCR)",
+        "reprocessing": "Rielaborazione OCR",
+        "reprocessingTooltip": "Il documento è in fase di rielaborazione tramite riconoscimento del testo (OCR)."
+      },
+      "quality": {
+        "limited": "Qualità del testo limitata",
+        "limitedTooltip": "L'estrazione automatica del testo è stata insufficiente.",
+        "reasonScannedLowText": "Quasi nessun testo estraibile — probabilmente una scansione. Viene applicato il riconoscimento del testo (OCR).",
+        "reasonSingleChunkLargeFile": "File di grandi dimensioni, ma quasi nessun contenuto testuale estratto.",
+        "reasonGarbageExtraction": "Il testo estratto sembra inutilizzabile (molti caratteri illeggibili).",
+        "reasonUnknown": "Rilevata qualità del testo limitata."
+      },
       "sizeLabel": "Dimensione: {{size}}",
       "uploadedLabel": "Caricato: {{date}}",
       "processedLabel": "Elaborato: {{date}}",

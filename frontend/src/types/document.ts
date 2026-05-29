@@ -18,6 +18,28 @@ export enum DocumentVisibility {
   INSTITUTION = 'institution'
 }
 
+/**
+ * Quality verdict reasons (TF-360). Mirrors backend
+ * services.quality_assessor.QualityReason. Kept as a string union for
+ * exhaustive UI mapping; `string` fallback tolerates future backend reasons.
+ */
+export type QualityReason =
+  | 'ok'
+  | 'scanned_low_text'
+  | 'single_chunk_large_file'
+  | 'garbage_extraction';
+
+/**
+ * Extraction-quality verdict exposed by the backend (TF-360) via
+ * `Document.to_dict().quality`. `null` when no verdict was computed
+ * (e.g. vectorisation failed before assessment).
+ */
+export interface DocumentQuality {
+  ok: boolean;
+  reason: QualityReason | string;
+  signals?: Record<string, unknown>;
+}
+
 export interface Document {
   id: number;
   filename: string;
@@ -37,6 +59,10 @@ export interface Document {
   vector_collection?: string;
   updated_at?: string;
   tags?: DocumentTag[];
+  // OCR-/Qualitäts-Eskalation (TF-360/TF-361). Backend befüllt diese Felder
+  // dateiformat-unabhängig (PDF + gescanntes DOCX) via Document.to_dict.
+  processed_with_ocr?: boolean;
+  quality?: DocumentQuality | null;
   metadata?: {
     total_chunks?: number;
     embedding_model?: string;

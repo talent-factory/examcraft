@@ -38,6 +38,7 @@ import {
   DocumentVisibility,
 } from '../../types/document';
 import { getDateLocale } from '../../utils/dateLocale';
+import DocumentOcrQualityBadges from './DocumentOcrQualityBadges';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -434,9 +435,12 @@ const DocumentList: React.FC<DocumentListProps> = ({
                   ) : null}
                 </TableCell>
 
-                {/* Status */}
+                {/* Status + OCR-/Qualitäts-Badges (TF-361) */}
                 <TableCell>
-                  {renderStatusChip(doc)}
+                  <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                    {renderStatusChip(doc)}
+                    <DocumentOcrQualityBadges document={doc} />
+                  </Stack>
                 </TableCell>
 
                 {/* Typ */}

@@ -1040,6 +1040,20 @@
       "noDocumentsHint": "Laden Sie Dokumente hoch, um mit der RAG-basierten Prüfungserstellung zu beginnen.",
       "vectorsAvailable": "Vector Embeddings verfügbar",
       "processingRunning": "Verarbeitung läuft...",
+      "ocr": {
+        "badge": "OCR",
+        "badgeTooltip": "Mit Texterkennung (OCR) verarbeitet",
+        "reprocessing": "OCR-Neuverarbeitung",
+        "reprocessingTooltip": "Das Dokument wird per Texterkennung (OCR) neu verarbeitet."
+      },
+      "quality": {
+        "limited": "Eingeschränkte Textqualität",
+        "limitedTooltip": "Die automatische Textextraktion war unzureichend.",
+        "reasonScannedLowText": "Kaum extrahierbarer Text — vermutlich ein Scan. Texterkennung (OCR) wird angewandt.",
+        "reasonSingleChunkLargeFile": "Grosse Datei, aber kaum Textinhalt extrahiert.",
+        "reasonGarbageExtraction": "Der extrahierte Text wirkt unbrauchbar (viele unlesbare Zeichen).",
+        "reasonUnknown": "Eingeschränkte Textqualität festgestellt."
+      },
       "sizeLabel": "Größe: {{size}}",
       "uploadedLabel": "Hochgeladen: {{date}}",
       "processedLabel": "Verarbeitet: {{date}}",

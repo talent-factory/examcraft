@@ -66,6 +66,7 @@ import DocumentTagEditor from './documents/DocumentTagEditor';
 import DocumentList from './documents/DocumentList';
 import BulkActionsBar from './documents/BulkActionsBar';
 import BulkTagsDialog from './documents/BulkTagsDialog';
+import DocumentOcrQualityBadges from './documents/DocumentOcrQualityBadges';
 
 const READY_STATUSES: ReadonlyArray<string> = ['processed', 'completed'];
 const isDocumentReady = (status: string | undefined | null): boolean =>
@@ -1330,9 +1331,10 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     </Stack>
                   )}
 
-                  {/* Status */}
-                  <Box sx={{ mb: 2 }}>
+                  {/* Status + OCR-/Qualitäts-Badges (TF-361) */}
+                  <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
                     {getStatusChip(document.status, document)}
+                    <DocumentOcrQualityBadges document={document} />
                   </Box>
 
                   {/* Tag chips (read-only, TF-355 Phase 3) */}
