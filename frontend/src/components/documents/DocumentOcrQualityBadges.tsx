@@ -15,7 +15,7 @@
  */
 import React from 'react';
 import { Chip, Stack, Tooltip } from '@mui/material';
-import { DocumentScanner, WarningAmber } from '@mui/icons-material';
+import { DocumentScanner, WarningAmber, ErrorOutline } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { Document, DocumentStatus } from '../../types/document';
 
@@ -43,14 +43,44 @@ const DocumentOcrQualityBadges: React.FC<DocumentOcrQualityBadgesProps> = ({
 
   const quality = document.quality;
   const qualityFailed = quality != null && quality.ok === false;
+  const escalation = document.escalation;
 
-  // OCR-Neuverarbeitung erkennen, ohne den internen `escalation`-Marker (der
-  // bewusst NICHT exponiert wird): Dokument steht auf PROCESSING, der Erstlauf
-  // lieferte ein negatives Verdict und es wurde noch nicht OCR-verarbeitet.
+  // OCR-Nachbearbeitung fehlgeschlagen (TF-365): der Reprocess-Job hat das
+  // Dokument auf ERROR gesetzt. Eigener Hinweis, damit der für den Nutzer sonst
+  // unerklärliche PROCESSED→ERROR-Übergang nachvollziehbar wird.
+  if (escalation === 'failed') {
+    return (
+      <Tooltip
+        title={t(
+          'components.documentLibrary.ocr.failedTooltip',
+          'Die automatische Texterkennung (OCR) ist fehlgeschlagen. Das Dokument konnte nicht verarbeitet werden.',
+        )}
+      >
+        <Chip
+          icon={<ErrorOutline />}
+          label={t(
+            'components.documentLibrary.ocr.failed',
+            'OCR-Nachbearbeitung fehlgeschlagen',
+          )}
+          color="error"
+          size={size}
+          variant="outlined"
+          data-testid="ocr-failed-badge"
+        />
+      </Tooltip>
+    );
+  }
+
+  // OCR-Neuverarbeitung läuft (TF-360/TF-365): bevorzugt am exponierten
+  // `escalation`-Marker erkannt. `queued` deckt sowohl das Warten in der Celery-
+  // Queue (Dokument noch PROCESSED — Fenster A, sonst unsichtbar) als auch den
+  // bereits laufenden Reprocess (PROCESSING) ab. Die Status-Heuristik bleibt als
+  // Fallback für Altrows, deren processing_info noch keinen Marker trägt.
   const ocrReprocessing =
-    document.status === DocumentStatus.PROCESSING &&
-    qualityFailed &&
-    !document.processed_with_ocr;
+    escalation === 'queued' ||
+    (document.status === DocumentStatus.PROCESSING &&
+      qualityFailed &&
+      !document.processed_with_ocr);
 
   if (ocrReprocessing) {
     // Während der Neuverarbeitung nur diesen Hinweis zeigen — der widersprüchliche

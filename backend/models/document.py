@@ -263,11 +263,16 @@ class Document(Base):
             "processed_at": self.processed_at.isoformat()
             if self.processed_at
             else None,
-            # Qualitäts-Eskalation (TF-360): kuratierte Felder aus processing_info
-            # (interne Marker wie escalation/ocr_attempted bleiben intern).
+            # Qualitäts-Eskalation (TF-360/TF-365): kuratierte Felder aus
+            # processing_info. ``escalation`` wird seit TF-365 exponiert, damit das
+            # UI laufende (``queued``), erschöpfte (``exhausted``), nicht verfügbare
+            # (``unavailable``) oder fehlgeschlagene (``failed``) OCR-Nachbearbeitung
+            # darstellen kann. Rein interne Marker (ocr_attempted, processor_chain)
+            # bleiben intern.
             "quality": (self.processing_info or {}).get("quality"),
             "processed_with_ocr": (self.processing_info or {}).get(
                 "processed_with_ocr", False
             ),
+            "escalation": (self.processing_info or {}).get("escalation"),
             # pending_reindex omitted — internal Celery marker, not exposed to API clients
         }

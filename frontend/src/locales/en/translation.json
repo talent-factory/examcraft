@@ -1106,7 +1106,9 @@
         "badge": "OCR",
         "badgeTooltip": "Processed with text recognition (OCR)",
         "reprocessing": "OCR reprocessing",
-        "reprocessingTooltip": "The document is being reprocessed with text recognition (OCR)."
+        "reprocessingTooltip": "The document is being reprocessed with text recognition (OCR).",
+        "failed": "OCR reprocessing failed",
+        "failedTooltip": "Automatic text recognition (OCR) failed. The document could not be processed."
       },
       "quality": {
         "limited": "Limited text quality",

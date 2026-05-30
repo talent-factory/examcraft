@@ -98,6 +98,14 @@ class DocumentResponse(BaseModel):
     updated_at: Optional[str]
     processed_at: Optional[str]
     tags: List[DocumentTagOut] = []
+    # OCR-/Qualitäts-Eskalation (TF-360/TF-361/TF-365). Ohne diese Felder verwirft
+    # Pydantic per Default (``extra`` ist nicht auf ``'allow'`` gesetzt) die von
+    # Document.to_dict() gelieferten Werte still, wodurch die Frontend-Badges nie
+    # Daten erhielten. ``escalation`` macht eine laufende/fehlgeschlagene
+    # OCR-Nachbearbeitung für den Nutzer sichtbar.
+    quality: Optional[dict] = None
+    processed_with_ocr: bool = False
+    escalation: Optional[str] = None
 
 
 class DocumentPatchRequest(BaseModel):

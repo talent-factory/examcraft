@@ -721,7 +721,9 @@
         "badge": "OCR",
         "badgeTooltip": "Elaborato con riconoscimento del testo (OCR)",
         "reprocessing": "Rielaborazione OCR",
-        "reprocessingTooltip": "Il documento è in fase di rielaborazione tramite riconoscimento del testo (OCR)."
+        "reprocessingTooltip": "Il documento è in fase di rielaborazione tramite riconoscimento del testo (OCR).",
+        "failed": "Rielaborazione OCR non riuscita",
+        "failedTooltip": "Il riconoscimento automatico del testo (OCR) non è riuscito. Impossibile elaborare il documento."
       },
       "quality": {
         "limited": "Qualità del testo limitata",

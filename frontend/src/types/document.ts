@@ -40,6 +40,28 @@ export interface DocumentQuality {
   signals?: Record<string, unknown>;
 }
 
+/**
+ * OCR-Eskalations-State (TF-360/TF-365). Mirrors backend
+ * services.quality_assessor.EscalationState. Exposed via
+ * `Document.to_dict().escalation` so the UI can surface an in-flight or failed
+ * OCR re-processing pass:
+ *   - `queued`       — OCR re-processing queued/running (document still PROCESSED)
+ *   - `failed`       — OCR re-processing failed (document flipped to ERROR)
+ *   - `exhausted`    — OCR ran, quality still insufficient
+ *   - `unavailable`  — escalation needed but OCR not available
+ *   - `completed` / `not_needed` / `no_verdict` — no user-facing action
+ * Closed union mirroring the backend Literal; an unknown value (deploy skew)
+ * simply matches no badge branch and falls through to the default badges.
+ */
+export type DocumentEscalation =
+  | 'queued'
+  | 'completed'
+  | 'exhausted'
+  | 'unavailable'
+  | 'failed'
+  | 'not_needed'
+  | 'no_verdict';
+
 export interface Document {
   id: number;
   filename: string;
@@ -59,10 +81,13 @@ export interface Document {
   vector_collection?: string;
   updated_at?: string;
   tags?: DocumentTag[];
-  // OCR-/Qualitäts-Eskalation (TF-360/TF-361). Backend befüllt diese Felder
+  // OCR-/Qualitäts-Eskalation (TF-360/TF-361/TF-365). Backend befüllt diese Felder
   // dateiformat-unabhängig (PDF + gescanntes DOCX) via Document.to_dict.
   processed_with_ocr?: boolean;
   quality?: DocumentQuality | null;
+  // OCR-Eskalations-State (TF-365): macht laufende (`queued`) oder fehlgeschlagene
+  // (`failed`) OCR-Nachbearbeitung im UI sichtbar. `null`/undefined bei Altrows.
+  escalation?: DocumentEscalation | null;
   metadata?: {
     total_chunks?: number;
     embedding_model?: string;

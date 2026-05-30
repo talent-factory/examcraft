@@ -103,6 +103,67 @@ describe('DocumentOcrQualityBadges', () => {
     expect(screen.getByTestId('quality-warning-badge')).toBeInTheDocument();
   });
 
+  it('zeigt den Reprocessing-Hinweis bei escalation "queued", auch wenn der Status noch PROCESSED ist (TF-365 Fenster A)', () => {
+    // Zwischen Einreihen der Eskalation und Start des Reprocess-Jobs steht das
+    // Dokument noch auf PROCESSED — ohne escalation würde nur ein grüner Status
+    // ohne Reprocess-Hinweis erscheinen.
+    render(
+      wrap(
+        <DocumentOcrQualityBadges
+          document={makeDoc({
+            status: DocumentStatus.PROCESSED,
+            quality: badQuality('scanned_low_text'),
+            processed_with_ocr: false,
+            escalation: 'queued',
+          })}
+        />,
+      ),
+    );
+    expect(screen.getByTestId('ocr-reprocessing-badge')).toBeInTheDocument();
+    expect(screen.queryByTestId('quality-warning-badge')).not.toBeInTheDocument();
+  });
+
+  it('zeigt einen Fehlschlag-Hinweis bei escalation "failed" (TF-365 PROCESSED→ERROR nachvollziehbar)', () => {
+    render(
+      wrap(
+        <DocumentOcrQualityBadges
+          document={makeDoc({
+            status: DocumentStatus.ERROR,
+            quality: badQuality('scanned_low_text'),
+            processed_with_ocr: false,
+            escalation: 'failed',
+          })}
+        />,
+      ),
+    );
+    expect(screen.getByTestId('ocr-failed-badge')).toBeInTheDocument();
+    // Early-Return: kein widersprüchlicher Qualitäts-/OCR-Chip neben dem Fehler.
+    expect(screen.queryByTestId('quality-warning-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ocr-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ocr-reprocessing-badge')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei escalation "exhausted" die bestehenden OCR-+Qualitäts-Badges (kein Reprocessing/Fehler)', () => {
+    // OCR lief, Qualität weiter ungenügend: keine weitere Eskalation, daher kein
+    // Reprocessing-Hinweis und kein Fehler-Chip — nur OCR-Badge + Qualitätswarnung.
+    render(
+      wrap(
+        <DocumentOcrQualityBadges
+          document={makeDoc({
+            status: DocumentStatus.PROCESSED,
+            processed_with_ocr: true,
+            quality: badQuality('garbage_extraction'),
+            escalation: 'exhausted',
+          })}
+        />,
+      ),
+    );
+    expect(screen.getByTestId('ocr-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('quality-warning-badge')).toBeInTheDocument();
+    expect(screen.queryByTestId('ocr-reprocessing-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ocr-failed-badge')).not.toBeInTheDocument();
+  });
+
   it('rendert nichts, wenn weder OCR noch ein negatives Verdict vorliegt', () => {
     const { container } = render(
       wrap(<DocumentOcrQualityBadges document={makeDoc({ quality: okQuality })} />),

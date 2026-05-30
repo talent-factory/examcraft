@@ -1106,7 +1106,9 @@
         "badge": "OCR",
         "badgeTooltip": "Mit Texterkennung (OCR) verarbeitet",
         "reprocessing": "OCR-Neuverarbeitung",
-        "reprocessingTooltip": "Das Dokument wird per Texterkennung (OCR) neu verarbeitet."
+        "reprocessingTooltip": "Das Dokument wird per Texterkennung (OCR) neu verarbeitet.",
+        "failed": "OCR-Nachbearbeitung fehlgeschlagen",
+        "failedTooltip": "Die automatische Texterkennung (OCR) ist fehlgeschlagen. Das Dokument konnte nicht verarbeitet werden."
       },
       "quality": {
         "limited": "Eingeschränkte Textqualität",

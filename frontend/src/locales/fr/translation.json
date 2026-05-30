@@ -721,7 +721,9 @@
         "badge": "OCR",
         "badgeTooltip": "Traité avec reconnaissance de texte (OCR)",
         "reprocessing": "Retraitement OCR",
-        "reprocessingTooltip": "Le document est en cours de retraitement par reconnaissance de texte (OCR)."
+        "reprocessingTooltip": "Le document est en cours de retraitement par reconnaissance de texte (OCR).",
+        "failed": "Échec du retraitement OCR",
+        "failedTooltip": "La reconnaissance automatique de texte (OCR) a échoué. Le document n'a pas pu être traité."
       },
       "quality": {
         "limited": "Qualité de texte limitée",

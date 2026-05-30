@@ -141,6 +141,53 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
         # 3. Dokument aus DB neu laden
         db.refresh(document)
 
+        # TF-364: Vektorisierung fehlgeschlagen -> process_document_with_vectors
+        # hat das Dokument als ERROR markiert und ein dict (kein None) mit
+        # vector_embeddings.error zurückgegeben. Der None-Guard oben griff daher
+        # nicht. Konsistentes Fehler-Envelope zurückgeben statt durch den
+        # Eskalations-Zweig zu fallen (sonst success=True bei status="error").
+        vector_error = (
+            result.get("vector_embeddings", {}).get("error")
+            if isinstance(result, dict)
+            else None
+        )
+        if document.status == DocumentStatus.ERROR or vector_error:
+            metadata = document.doc_metadata or {}
+            error_code = metadata.get("error_code")
+            if error_code is None:
+                # process_document_with_vectors persistiert sonst immer einen
+                # klassifizierten Code; fehlt er, stammt die ERROR-Markierung aus
+                # einer anderen Quelle -> sichtbar machen statt still als
+                # vectorization_failed zu defaulten.
+                error_code = "vectorization_failed"
+                logger.warning(
+                    f"Kein error_code in doc_metadata für {document_id}; "
+                    f"Default '{error_code}'."
+                )
+            # Fehlermeldung möglichst spezifisch: Vektor-Fehler aus dem Result,
+            # sonst error_message, sonst die in doc_metadata persistierte Ursache —
+            # nie ein leeres (None) Fehler-Envelope.
+            error_message = (
+                vector_error
+                or document.error_message
+                or metadata.get("vector_embedding_error")
+                or metadata.get("error")
+            )
+            logger.error(
+                f"Vektorisierung fehlgeschlagen für {document_id} "
+                f"(error_code={error_code}); melde success=False."
+            )
+            return {
+                "success": False,
+                "document_id": document_id,
+                "title": document.original_filename,
+                "status": document.status.value,
+                "error_code": error_code,
+                "error": error_message,
+                "extraction": result.get("extraction", {}),
+                "vector_embeddings": result.get("vector_embeddings", {}),
+            }
+
         # Qualitäts-Eskalation (TF-360): bei negativem Verdict ggf. einen
         # separaten OCR-Reprocess-Job einreihen. reprocess_document_ocr selbst
         # eskaliert nie weiter -> struktureller Loop-Schutz.
@@ -225,23 +272,31 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
         db.close()
 
 
+# Exceptions, die der OCR-Reprocess NICHT auto-retried (terminal beim ersten
+# Auftreten). Als Konstante geführt, weil der except-Block dieselbe Menge braucht,
+# um zu entscheiden, ob ein Fehler endgültig ist und als escalation='failed'/ERROR
+# persistiert werden darf — sonst driften Decorator und Handler auseinander.
+_REPROCESS_NON_RETRYABLE = (
+    Ignore,
+    Reject,
+    ValueError,
+    TypeError,
+    ImportError,
+    NotImplementedError,  # Core-Tier-Placeholder-Vektorservice
+    ProgrammingError,
+    IntegrityError,
+)
+REPROCESS_MAX_RETRIES = 2
+
+
 @celery_app.task(
     bind=True,
     base=ProgressTask,
     name="tasks.document_tasks.reprocess_document_ocr",
     priority=4,
     autoretry_for=(Exception,),
-    dont_autoretry_for=(
-        Ignore,
-        Reject,
-        ValueError,
-        TypeError,
-        ImportError,
-        NotImplementedError,  # Core-Tier-Placeholder-Vektorservice
-        ProgrammingError,
-        IntegrityError,
-    ),
-    retry_kwargs={"max_retries": 2, "countdown": 120},
+    dont_autoretry_for=_REPROCESS_NON_RETRYABLE,
+    retry_kwargs={"max_retries": REPROCESS_MAX_RETRIES, "countdown": 120},
     retry_backoff=True,
     retry_jitter=True,
 )
@@ -316,7 +371,16 @@ def reprocess_document_ocr(self, document_id: str, user_id: str) -> Dict[str, An
         logger.error(
             f"Fehler bei OCR-Neuverarbeitung {document_id}: {str(e)}", exc_info=True
         )
-        if document:
+        # TF-365 (Review): Nur bei terminalem Fehler (kein weiterer Retry folgt) als
+        # escalation='failed'/ERROR persistieren. Sonst sähe der Nutzer im
+        # Retry-Fenster (~120 s) den roten 'failed'-Chip, obwohl der Retry noch
+        # erfolgreich werden kann. Terminal = nicht auto-retried ODER Retries
+        # erschöpft. Bei transientem Fehler bleibt der queued/PROCESSING-Zustand
+        # bestehen und der Reprocessing-Hinweis weiter sichtbar.
+        terminal = isinstance(e, _REPROCESS_NON_RETRYABLE) or (
+            self.request.retries >= REPROCESS_MAX_RETRIES
+        )
+        if document and terminal:
             try:
                 info = dict(document.processing_info or {})
                 info["ocr_attempted"] = True
@@ -336,6 +400,12 @@ def reprocess_document_ocr(self, document_id: str, user_id: str) -> Dict[str, An
                     logger.error(
                         f"DB-Rollback fehlgeschlagen für {document_id}: {rb_err}"
                     )
+        elif document:
+            logger.info(
+                f"OCR-Neuverarbeitung für {document_id} fehlgeschlagen "
+                f"(Versuch {self.request.retries + 1}/{REPROCESS_MAX_RETRIES + 1}); "
+                f"Retry folgt, Status/Eskalation bleiben unverändert."
+            )
         raise
 
     finally:
