@@ -638,7 +638,25 @@ class DocumentService:
                 from sqlalchemy.orm.attributes import flag_modified
 
                 flag_modified(document, "doc_metadata")
-                db.commit()
+                try:
+                    db.commit()
+                except Exception as commit_err:
+                    # Persistieren des ERROR-Status fehlgeschlagen (z. B. DB nicht
+                    # erreichbar). Zurückrollen, damit der Aufrufer keine
+                    # vergiftete Transaktion erbt; das Fehler-Envelope unten wird
+                    # trotzdem zurückgegeben (vector_embeddings.error), sodass der
+                    # Task success=False meldet statt das Dokument still als
+                    # "Verarbeitet" ohne Vektoren zu hinterlassen.
+                    logger.error(
+                        f"Persistieren des ERROR-Status fehlgeschlagen für "
+                        f"{document_id}: {commit_err}"
+                    )
+                    try:
+                        db.rollback()
+                    except Exception as rb_err:
+                        logger.error(
+                            f"DB-Rollback fehlgeschlagen für {document_id}: {rb_err}"
+                        )
 
             extraction_stats = (
                 {

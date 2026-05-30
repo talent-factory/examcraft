@@ -30,6 +30,10 @@ def create_embeddings(document_id: str, chunks: List[str]) -> Dict[str, Any]:
         Dict with embedding status and statistics
     """
     db = SessionLocal()
+    # Vor dem try binden: schlägt die Query unten fehl (z. B. DB nicht
+    # erreichbar), referenziert der except-Block `document` sonst ungebunden
+    # (UnboundLocalError) und verdeckt den eigentlichen Fehler.
+    document = None
 
     try:
         # Verify document exists

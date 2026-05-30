@@ -76,6 +76,52 @@ def run_async(coro):
         asyncio.set_event_loop(None)
 
 
+def _detect_vector_failure(document, document_id, result):
+    """Erkennt eine fehlgeschlagene Vektorisierung im Result-Envelope.
+
+    ``process_document_with_vectors`` markiert das Dokument bei Vektor-Fehlern
+    als ERROR und liefert ein dict (kein None) mit ``vector_embeddings.error`` —
+    der ``result is None``-Guard der Tasks greift dann NICHT. Ohne diese
+    gemeinsame Prüfung fiele der Code durch den Quality-/Eskalations-Zweig und
+    meldete ``success=True`` trotz ``status="error"`` (TF-364). Als Helper
+    geführt, damit ``process_document`` und ``reprocess_document_ocr`` dieselbe
+    Erkennung nutzen und nicht auseinanderdriften.
+
+    Returns:
+        ``(error_code, error_message)`` bei Vektor-Fehler, sonst ``None``.
+    """
+    vector_error = (
+        result.get("vector_embeddings", {}).get("error")
+        if isinstance(result, dict)
+        else None
+    )
+    if document.status != DocumentStatus.ERROR and not vector_error:
+        return None
+
+    metadata = document.doc_metadata or {}
+    error_code = metadata.get("error_code")
+    if error_code is None:
+        # process_document_with_vectors persistiert sonst immer einen
+        # klassifizierten Code; fehlt er, stammt die ERROR-Markierung aus einer
+        # anderen Quelle -> sichtbar machen statt still als vectorization_failed
+        # zu defaulten.
+        error_code = "vectorization_failed"
+        logger.warning(
+            f"Kein error_code in doc_metadata für {document_id}; "
+            f"Default '{error_code}'."
+        )
+    # Fehlermeldung möglichst spezifisch: Vektor-Fehler aus dem Result, sonst
+    # error_message, sonst die in doc_metadata persistierte Ursache — nie ein
+    # leeres (None) Fehler-Envelope.
+    error_message = (
+        vector_error
+        or document.error_message
+        or metadata.get("vector_embedding_error")
+        or metadata.get("error")
+    )
+    return error_code, error_message
+
+
 @celery_app.task(
     bind=True,
     base=ProgressTask,
@@ -146,33 +192,9 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
         # vector_embeddings.error zurückgegeben. Der None-Guard oben griff daher
         # nicht. Konsistentes Fehler-Envelope zurückgeben statt durch den
         # Eskalations-Zweig zu fallen (sonst success=True bei status="error").
-        vector_error = (
-            result.get("vector_embeddings", {}).get("error")
-            if isinstance(result, dict)
-            else None
-        )
-        if document.status == DocumentStatus.ERROR or vector_error:
-            metadata = document.doc_metadata or {}
-            error_code = metadata.get("error_code")
-            if error_code is None:
-                # process_document_with_vectors persistiert sonst immer einen
-                # klassifizierten Code; fehlt er, stammt die ERROR-Markierung aus
-                # einer anderen Quelle -> sichtbar machen statt still als
-                # vectorization_failed zu defaulten.
-                error_code = "vectorization_failed"
-                logger.warning(
-                    f"Kein error_code in doc_metadata für {document_id}; "
-                    f"Default '{error_code}'."
-                )
-            # Fehlermeldung möglichst spezifisch: Vektor-Fehler aus dem Result,
-            # sonst error_message, sonst die in doc_metadata persistierte Ursache —
-            # nie ein leeres (None) Fehler-Envelope.
-            error_message = (
-                vector_error
-                or document.error_message
-                or metadata.get("vector_embedding_error")
-                or metadata.get("error")
-            )
+        vector_failure = _detect_vector_failure(document, document_id, result)
+        if vector_failure is not None:
+            error_code, error_message = vector_failure
             logger.error(
                 f"Vektorisierung fehlgeschlagen für {document_id} "
                 f"(error_code={error_code}); melde success=False."
@@ -346,6 +368,41 @@ def reprocess_document_ocr(self, document_id: str, user_id: str) -> Dict[str, An
 
         # 3. Loop-Schutz- und Status-Flags setzen
         db.refresh(document)
+
+        # TF-364 (Review): Identische Vektor-Fehler-Prüfung wie in
+        # process_document. process_document_with_vectors liefert bei
+        # Vektorisierungs-Fehlern ein dict (kein None) mit vector_embeddings.error
+        # und markiert das Dokument als ERROR — der None-Guard oben greift dann
+        # nicht. Ohne diese Prüfung fiele der OCR-Reprocess in den
+        # 'exhausted'-Quality-Zweig und meldete success=True trotz status="error"
+        # (derselbe Bug, den TF-364 in process_document behoben hat). Terminaler
+        # Fehler: kein weiterer Reprocess (ocr_attempted) und im UI als 'failed'
+        # sichtbar. Wie in process_document wird der Vektor-Fehler NICHT erneut
+        # versucht (process_document_with_vectors hat ihn bereits klassifiziert).
+        vector_failure = _detect_vector_failure(document, document_id, result)
+        if vector_failure is not None:
+            error_code, error_message = vector_failure
+            info = dict(document.processing_info or {})
+            info["ocr_attempted"] = True
+            info["processed_with_ocr"] = True
+            info["escalation"] = "failed"
+            document.processing_info = info
+            flag_modified(document, "processing_info")
+            db.commit()
+            logger.error(
+                f"Vektorisierung bei OCR-Neuverarbeitung fehlgeschlagen für "
+                f"{document_id} (error_code={error_code}); melde success=False."
+            )
+            return {
+                "success": False,
+                "document_id": document_id,
+                "status": document.status.value,
+                "error_code": error_code,
+                "error": error_message,
+                "escalation": "failed",
+                "quality": result.get("quality", {}),
+            }
+
         quality = result.get("quality", {})
         info = dict(document.processing_info or {})
         info["ocr_attempted"] = True
