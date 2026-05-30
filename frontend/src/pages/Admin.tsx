@@ -13,8 +13,9 @@ import HelpFeedbackQueue from '../components/admin/HelpFeedbackQueue';
 import TagSettingsPage from './TagSettingsPage';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/auth';
+import AdminGradingSchemes from './AdminGradingSchemes';
 
-type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags';
+type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'grading-schemes';
 
 interface TabConfig {
   key: AdminTab;
@@ -23,10 +24,11 @@ interface TabConfig {
 }
 
 export const Admin: React.FC = () => {
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, hasPermission } = useAuth();
   const { t } = useTranslation();
   const isSuperuser = user?.is_superuser ?? false;
   const isAdmin = isSuperuser || hasRole(UserRole.ADMIN);
+  const canManageGradingSchemes = hasPermission('grading_schemes:manage');
 
   const tabs: TabConfig[] = [
     { key: 'users', label: t('pages.admin.tabUsers'), visible: true },
@@ -35,6 +37,7 @@ export const Admin: React.FC = () => {
     { key: 'audit', label: t('pages.admin.tabAudit'), visible: isAdmin },
     { key: 'subscription', label: t('pages.admin.tabSubscription'), visible: isAdmin },
     { key: 'tags', label: t('nav.sidebar.tagSettings', 'Tag-Verwaltung'), visible: isAdmin },
+    { key: 'grading-schemes', label: t('pages.admin.tabGradingSchemes'), visible: canManageGradingSchemes },
     { key: 'help-feedback', label: 'Help Feedback', visible: isSuperuser },
   ].filter((t): t is TabConfig => t.visible);
 
@@ -97,6 +100,11 @@ export const Admin: React.FC = () => {
         {effectiveTab === 'tags' && (
           <div data-testid="admin-tab-content-tags">
             <TagSettingsPage />
+          </div>
+        )}
+        {effectiveTab === 'grading-schemes' && (
+          <div data-testid="admin-tab-content-grading-schemes">
+            <AdminGradingSchemes />
           </div>
         )}
         {effectiveTab === 'help-feedback' && (
