@@ -10,17 +10,21 @@ Steps:
 1. Create the ``documentvisibility`` enum (``private``/``institution``).
 2. Add ``documents.visibility`` NOT NULL DEFAULT ``private``. Existing rows
    inherit the default — security-first: nothing becomes more visible by the
-   migration.
-3. Explicit ``UPDATE ... = 'private'`` — redundant given the default, but the
-   spec wants the privacy reset to be an explicit, auditable migration step.
-4. Single-column index ``ix_documents_visibility``.
-5. Composite ``ix_documents_inst_vis_created`` on
-   ``(institution_id, visibility, created_at DESC)`` — backs the main list
-   query (filter by institution + visibility, ORDER BY created_at DESC).
-6. CHECK constraint ``ck_documents_institution_visibility_requires_institution``
+   migration. On PG 11+ a constant-DEFAULT column add is metadata-only (no
+   table rewrite), so the backfill is cheap; no explicit ``UPDATE`` is issued
+   (the default already sets every existing row to ``private``).
+3. CHECK constraint ``ck_documents_institution_visibility_requires_institution``
    (``visibility <> 'institution' OR institution_id IS NOT NULL``) — makes the
    "shared ⇒ has institution" invariant unrepresentable at the DB level. Added
-   after the backfill, when every row is ``private``, so nothing violates it.
+   while every row is ``private``, so nothing violates it.
+4. Single-column index ``ix_documents_visibility`` and composite
+   ``ix_documents_inst_vis_created`` on
+   ``(institution_id, visibility, created_at DESC)`` — backs the main list
+   query (filter by institution + visibility, ORDER BY created_at DESC). Plain
+   (non-CONCURRENTLY) ``CREATE INDEX`` — same call made in
+   ``tf337_audit_logs_idx``: the build takes a brief write lock, acceptable
+   because ``documents`` is small in prod. If the table grows by orders of
+   magnitude, reissue these CONCURRENTLY in a hand-rolled SQL step.
 
 Additive and idempotent (enum + constraint guarded by DO blocks, column/indexes
 guarded by ``IF NOT EXISTS``). Safe for ``AUTO_MIGRATE=true`` deploys — no manual
@@ -58,30 +62,17 @@ def upgrade() -> None:
     )
 
     # 2. Column — NOT NULL with a server default backfills existing rows to
-    #    'private' atomically.
+    #    'private'. On PG 11+ this is a metadata-only operation (no rewrite);
+    #    the default covers every existing row, so no explicit UPDATE is needed.
     op.execute(
         "ALTER TABLE documents "
         "ADD COLUMN IF NOT EXISTS visibility documentvisibility "
         "NOT NULL DEFAULT 'private'"
     )
 
-    # 3. Explicit privacy reset (auditable step; default already covers it).
-    op.execute("UPDATE documents SET visibility = 'private'")
-
-    # 4. Single-column index.
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_documents_visibility ON documents (visibility)"
-    )
-
-    # 5. Composite index for the main list query.
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_documents_inst_vis_created "
-        "ON documents (institution_id, visibility, created_at DESC)"
-    )
-
-    # 6. Invariant: an institution-visible document must belong to an institution.
+    # 3. Invariant: an institution-visible document must belong to an institution.
     #    Postgres has no ADD CONSTRAINT IF NOT EXISTS, so guard with a DO block.
-    #    Every row is 'private' after steps 2/3, so none violate it.
+    #    Every row is 'private' after step 2, so none violate it.
     op.execute(
         """
         DO $$
@@ -98,6 +89,18 @@ def upgrade() -> None:
             END IF;
         END$$;
         """
+    )
+
+    # 4. Indexes. Plain CREATE INDEX (runs inside the migration transaction),
+    #    matching tf337_audit_logs_idx: ``documents`` is small in prod, so the
+    #    brief write lock is acceptable. Reissue CONCURRENTLY by hand if the
+    #    table ever grows by orders of magnitude.
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_documents_visibility ON documents (visibility)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_documents_inst_vis_created "
+        "ON documents (institution_id, visibility, created_at DESC)"
     )
 
 
