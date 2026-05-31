@@ -402,26 +402,45 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const paramsRef = React.useRef(params);
   paramsRef.current = params;
 
+  // Monotonic request token guarding against stale-response races (TF-366):
+  // every loadDocuments call claims the next id, and only the most recent
+  // request may apply its result. A slow earlier request (e.g. page N) that
+  // resolves after a newer filter/page request is discarded, so it can never
+  // overwrite fresh documents/total/stats with outdated ones.
+  const requestIdRef = React.useRef(0);
+
   // Define loadDocuments before useEffect hooks that use it
   const loadDocuments = useCallback(async (showLoading: boolean = true) => {
+    const requestId = ++requestIdRef.current;
     try {
       if (showLoading && !hasLoadedOnce) {
         setLoading(true);
       }
       setError(null);
       const res = await DocumentService.listDocuments(paramsRef.current);
+      // Discard the response if a newer request has superseded this one.
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
       setDocuments(res.documents);
       setStats(res.stats);
       setTotal(res.total);
       setLibTotalPages(res.total_pages);
     } catch (err) {
+      // Only surface errors from the most recent request; a stale failure
+      // must not replace fresh data with an error banner.
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.loadError'));
     } finally {
-      // ALWAYS set loading to false after load completes
-      setLoading(false);
-      // Mark that we've loaded at least once
-      if (!hasLoadedOnce) {
-        setHasLoadedOnce(true);
+      // Only the most recent request controls the loading / initial-load flags.
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        // Mark that we've loaded at least once
+        if (!hasLoadedOnce) {
+          setHasLoadedOnce(true);
+        }
       }
     }
   }, [hasLoadedOnce, t]);

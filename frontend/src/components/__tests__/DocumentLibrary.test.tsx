@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -360,5 +360,81 @@ describe('DocumentLibrary TF-355 paginated', () => {
     await screen.findByText(/aktualisiert/i);
     // attachDocumentTags should NOT be called for doc 10 because it already has tag 5
     expect(DS.attachDocumentTags).not.toHaveBeenCalledWith(10, expect.any(Array));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TF-366: Stale-response race on rapid filter/page changes
+// ---------------------------------------------------------------------------
+
+describe('DocumentLibrary TF-366 stale-response race', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  // Build a single-document page response keyed by the document title.
+  const pageWith = (title: string, id: number) => ({
+    documents: [{
+      id,
+      filename: `${title}.pdf`,
+      original_filename: `${title}.pdf`,
+      title,
+      mime_type: 'application/pdf',
+      status: 'completed',
+      has_vectors: false,
+      created_at: '2026-01-01T00:00:00Z',
+      user_id: 1,
+      tags: [],
+    }],
+    total: 1,
+    page: 1,
+    page_size: 24,
+    total_pages: 1,
+    stats: { total: 1, processed: 1, with_vectors: 0, in_progress: 0 },
+  });
+
+  it('discards a stale in-flight response that resolves after a newer request', async () => {
+    const { DocumentService: DS } = require('../../services/DocumentService');
+
+    // Two deferred responses whose resolution order we control explicitly:
+    // `first` belongs to the older request, `second` to the newer one.
+    let resolveFirst!: (value: unknown) => void;
+    let resolveSecond!: (value: unknown) => void;
+    const first = new Promise((resolve) => { resolveFirst = resolve; });
+    const second = new Promise((resolve) => { resolveSecond = resolve; });
+
+    DS.listDocuments = jest.fn()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(second);
+    DS.listDocumentTags = jest.fn().mockResolvedValue([]);
+
+    const ui = (refreshTrigger: number) => (
+      <MemoryRouter initialEntries={['/documents']}>
+        <ThemeProvider theme={createTheme()}>
+          <DocumentLibrary refreshTrigger={refreshTrigger} />
+        </ThemeProvider>
+      </MemoryRouter>
+    );
+
+    // Mount fires the first (older) request — it stays in-flight.
+    const { rerender } = render(ui(0));
+
+    // Bumping refreshTrigger fires a second (newer) request while the first
+    // is still pending — exactly the rapid filter/page change scenario.
+    rerender(ui(1));
+
+    // The NEWER request resolves first with fresh data...
+    await act(async () => {
+      resolveSecond(pageWith('Fresh', 2));
+      await Promise.resolve();
+    });
+    // ...then the OLDER request resolves last with now-stale data.
+    await act(async () => {
+      resolveFirst(pageWith('Stale', 1));
+      await Promise.resolve();
+    });
+
+    // The request-sequence guard must keep the fresh result and drop the
+    // stale one, even though the stale response arrived last.
+    expect(await screen.findByText('Fresh')).toBeInTheDocument();
+    expect(screen.queryByText('Stale')).not.toBeInTheDocument();
   });
 });
