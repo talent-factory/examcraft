@@ -1116,6 +1116,8 @@
         "reasonScannedLowText": "Almost no extractable text — likely a scan. Text recognition (OCR) is being applied.",
         "reasonSingleChunkLargeFile": "Large file, but almost no text content extracted.",
         "reasonGarbageExtraction": "Extracted text appears unusable (many unreadable characters).",
+        "reasonOcrPagesDiscarded_one": "OCR partially failed — {{count}} page could not be recognised.",
+        "reasonOcrPagesDiscarded_other": "OCR partially failed — {{count}} pages could not be recognised.",
         "reasonUnknown": "Limited text quality detected."
       },
       "sizeLabel": "Size: {{size}}",

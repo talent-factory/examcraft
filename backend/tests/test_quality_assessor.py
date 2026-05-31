@@ -19,6 +19,8 @@ def _stats(**overrides) -> DocumentQualityStats:
         chunk_count=12,
         garbage_char_ratio=0.0,
         file_size=500_000,
+        ocr_pages_attempted=0,
+        ocr_pages_discarded=0,
     )
     base.update(overrides)
     return DocumentQualityStats(**base)
@@ -177,3 +179,87 @@ def test_document_quality_stats_rejects_out_of_range_ratio():
             garbage_char_ratio=1.5,
             file_size=1,
         )
+
+
+def test_ocr_pages_discarded_above_ratio_fails():
+    # 2 von 4 OCR-Seiten verworfen = 0.5 > 0.20 -> Verdict not-ok.
+    verdict = assess_quality(
+        _stats(page_count=4, ocr_pages_attempted=4, ocr_pages_discarded=2)
+    )
+    assert verdict.ok is False
+    assert verdict.reason == "ocr_pages_discarded"
+    assert verdict.signals["ocr_pages_discarded"] == 2
+    assert verdict.signals["ocr_pages_attempted"] == 4
+
+
+def test_ocr_pages_discarded_below_ratio_does_not_flip():
+    # 1 von 10 = 0.1 < 0.20 -> Verdict bleibt ok, Signal aber vorhanden.
+    verdict = assess_quality(
+        _stats(page_count=10, ocr_pages_attempted=10, ocr_pages_discarded=1)
+    )
+    assert verdict.ok is True
+    assert verdict.reason == "ok"
+    assert verdict.signals["ocr_pages_discarded"] == 1
+
+
+def test_ocr_pages_discarded_ratio_boundary_is_strict():
+    # Genau 0.20 (2 von 10) -> Bedingung ist > 0.20 -> kein Flip.
+    verdict = assess_quality(
+        _stats(page_count=10, ocr_pages_attempted=10, ocr_pages_discarded=2)
+    )
+    assert verdict.reason == "ok"
+
+
+def test_no_ocr_attempted_is_noop():
+    # Erstlauf ohne OCR: attempted == 0 -> kein Signal, kein Flip.
+    verdict = assess_quality(_stats(ocr_pages_attempted=0, ocr_pages_discarded=0))
+    assert verdict.ok is True
+    assert "ocr_pages_discarded" not in verdict.signals
+
+
+def test_ocr_discarded_takes_precedence_over_scanned_low_text():
+    # Wenig Text/Seite UND hohe Verwurf-Quote: ehrlicher Reason gewinnt.
+    verdict = assess_quality(
+        _stats(
+            page_count=4,
+            total_chars=40,
+            chunk_count=1,
+            ocr_pages_attempted=4,
+            ocr_pages_discarded=3,
+        )
+    )
+    assert verdict.reason == "ocr_pages_discarded"
+
+
+def test_compute_quality_stats_reads_discard_metadata():
+    chunks = [DocumentChunk(content="Hallo Welt", chunk_index=0)]
+    doc = ProcessedDocument(
+        document_id=1,
+        filename="x.pdf",
+        mime_type="application/pdf",
+        total_pages=4,
+        total_chunks=1,
+        chunks=chunks,
+        metadata={"ocr_pages_attempted": 4, "ocr_pages_discarded": 2},
+        processing_time=0.1,
+    )
+    stats = compute_quality_stats(doc, file_size=2048)
+    assert stats.ocr_pages_attempted == 4
+    assert stats.ocr_pages_discarded == 2
+
+
+def test_compute_quality_stats_defaults_discard_to_zero():
+    chunks = [DocumentChunk(content="x", chunk_index=0)]
+    doc = ProcessedDocument(
+        document_id=1,
+        filename="x.pdf",
+        mime_type="application/pdf",
+        total_pages=1,
+        total_chunks=1,
+        chunks=chunks,
+        metadata={},
+        processing_time=0.1,
+    )
+    stats = compute_quality_stats(doc, file_size=10)
+    assert stats.ocr_pages_attempted == 0
+    assert stats.ocr_pages_discarded == 0

@@ -177,4 +177,25 @@ describe('DocumentOcrQualityBadges', () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('zeigt bei reason "ocr_pages_discarded" den Warnchip mit der Seitenanzahl', () => {
+    render(
+      wrap(
+        <DocumentOcrQualityBadges
+          document={makeDoc({
+            status: DocumentStatus.PROCESSED,
+            processed_with_ocr: true,
+            quality: {
+              ok: false,
+              reason: 'ocr_pages_discarded',
+              signals: { ocr_pages_discarded: 3, ocr_pages_attempted: 8 },
+            },
+          })}
+        />,
+      ),
+    );
+    const badge = screen.getByTestId('quality-warning-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute('data-ocr-discarded', '3');
+  });
 });

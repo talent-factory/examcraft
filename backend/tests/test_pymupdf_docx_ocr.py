@@ -200,3 +200,29 @@ async def test_docx_ocr_skips_unreadable_image_but_keeps_text(tmp_path, monkeypa
 
     full_text = " ".join(c.content for c in result.chunks)
     assert "Erhaltener Textinhalt" in full_text
+
+
+@pytest.mark.asyncio
+async def test_docx_ocr_discarded_images_counted(tmp_path, monkeypatch):
+    """Nicht-fataler OCR-Abbruch auf einem von zwei Bildern wird gezählt."""
+    processor = PyMuPDFProcessor(enable_ocr=True)
+    path = _scanned_docx(tmp_path, n_images=2, text="")
+
+    counter = {"n": 0}
+
+    def _fake(image_bytes, ext, page_label):
+        counter["n"] += 1
+        if counter["n"] == 1:
+            raise ValueError("OOM-killed / malformed textpage")
+        return "ZWEITES BILD"
+
+    monkeypatch.setattr(processor, "_ocr_image_bytes", _fake)
+
+    result = await processor.process_document(
+        document_id=10, file_path=path, filename="scanned.docx", mime_type=DOCX_MIME
+    )
+
+    full_text = " ".join(c.content for c in result.chunks)
+    assert "ZWEITES BILD" in full_text  # überlebendes Bild erhalten
+    assert result.metadata["ocr_pages_attempted"] == 2
+    assert result.metadata["ocr_pages_discarded"] == 1

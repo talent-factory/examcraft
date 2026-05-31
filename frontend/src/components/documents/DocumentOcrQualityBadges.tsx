@@ -27,6 +27,7 @@ const QUALITY_REASON_KEY: Record<string, string> = {
   single_chunk_large_file:
     'components.documentLibrary.quality.reasonSingleChunkLargeFile',
   garbage_extraction: 'components.documentLibrary.quality.reasonGarbageExtraction',
+  ocr_pages_discarded: 'components.documentLibrary.quality.reasonOcrPagesDiscarded',
 };
 
 export interface DocumentOcrQualityBadgesProps {
@@ -131,10 +132,16 @@ const DocumentOcrQualityBadges: React.FC<DocumentOcrQualityBadgesProps> = ({
     const reasonKey =
       QUALITY_REASON_KEY[quality!.reason] ??
       'components.documentLibrary.quality.reasonUnknown';
+    const discardedRaw = quality!.signals?.ocr_pages_discarded;
+    const discardedCount =
+      typeof discardedRaw === 'number' ? discardedRaw : Number(discardedRaw) || 0;
     badges.push(
       <Tooltip
         key="quality"
-        title={t(reasonKey, 'Eingeschränkte Textqualität festgestellt.')}
+        title={t(reasonKey, {
+          count: discardedCount,
+          defaultValue: 'Eingeschränkte Textqualität festgestellt.',
+        })}
       >
         <Chip
           icon={<WarningAmber />}
@@ -143,6 +150,11 @@ const DocumentOcrQualityBadges: React.FC<DocumentOcrQualityBadgesProps> = ({
           size={size}
           variant="outlined"
           data-testid="quality-warning-badge"
+          data-ocr-discarded={
+            quality!.reason === 'ocr_pages_discarded' && discardedCount > 0
+              ? discardedCount
+              : undefined
+          }
         />
       </Tooltip>,
     );

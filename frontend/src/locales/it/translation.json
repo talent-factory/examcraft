@@ -731,6 +731,8 @@
         "reasonScannedLowText": "Quasi nessun testo estraibile — probabilmente una scansione. Viene applicato il riconoscimento del testo (OCR).",
         "reasonSingleChunkLargeFile": "File di grandi dimensioni, ma quasi nessun contenuto testuale estratto.",
         "reasonGarbageExtraction": "Il testo estratto sembra inutilizzabile (molti caratteri illeggibili).",
+        "reasonOcrPagesDiscarded_one": "OCR parzialmente fallito — {{count}} pagina non riconosciuta.",
+        "reasonOcrPagesDiscarded_other": "OCR parzialmente fallito — {{count}} pagine non riconosciute.",
         "reasonUnknown": "Rilevata qualità del testo limitata."
       },
       "sizeLabel": "Dimensione: {{size}}",

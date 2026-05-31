@@ -27,7 +27,8 @@ export type QualityReason =
   | 'ok'
   | 'scanned_low_text'
   | 'single_chunk_large_file'
-  | 'garbage_extraction';
+  | 'garbage_extraction'
+  | 'ocr_pages_discarded';
 
 /**
  * Extraction-quality verdict exposed by the backend (TF-360) via

@@ -22,6 +22,7 @@ QualityReason = Literal[
     "scanned_low_text",
     "single_chunk_large_file",
     "garbage_extraction",
+    "ocr_pages_discarded",
 ]
 EscalationState = Literal[
     "queued",
@@ -38,6 +39,7 @@ _DEFAULT_MIN_CHARS_PER_PAGE = 100
 _DEFAULT_LOW_CHUNK_FILE_SIZE = 200 * 1024
 _DEFAULT_LOW_CHUNK_MIN_PAGES = 2
 _DEFAULT_MAX_GARBAGE_RATIO = 0.30
+_DEFAULT_MAX_OCR_DISCARD_RATIO = 0.20
 
 
 @dataclass(frozen=True)
@@ -49,13 +51,25 @@ class DocumentQualityStats:
     chunk_count: int
     garbage_char_ratio: float  # muss in [0.0, 1.0] liegen
     file_size: int
+    ocr_pages_attempted: int = 0
+    ocr_pages_discarded: int = 0
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.garbage_char_ratio <= 1.0:
             raise ValueError(
                 f"garbage_char_ratio muss in [0,1] liegen, war {self.garbage_char_ratio}"
             )
-        if min(self.page_count, self.total_chars, self.chunk_count, self.file_size) < 0:
+        if (
+            min(
+                self.page_count,
+                self.total_chars,
+                self.chunk_count,
+                self.file_size,
+                self.ocr_pages_attempted,
+                self.ocr_pages_discarded,
+            )
+            < 0
+        ):
             raise ValueError("Zähl-/Grössenfelder müssen >= 0 sein")
 
 
@@ -80,12 +94,15 @@ def compute_quality_stats(
     else:
         garbage_ratio = 0.0
 
+    meta = processed_doc.metadata or {}
     return DocumentQualityStats(
         page_count=processed_doc.total_pages or 0,
         total_chars=total_chars,
         chunk_count=processed_doc.total_chunks,
         garbage_char_ratio=garbage_ratio,
         file_size=file_size,
+        ocr_pages_attempted=int(meta.get("ocr_pages_attempted", 0)),
+        ocr_pages_discarded=int(meta.get("ocr_pages_discarded", 0)),
     )
 
 
@@ -103,6 +120,9 @@ def assess_quality(stats: DocumentQualityStats) -> QualityVerdict:
     max_garbage_ratio = float(
         os.getenv("QUALITY_MAX_GARBAGE_RATIO", str(_DEFAULT_MAX_GARBAGE_RATIO))
     )
+    max_ocr_discard_ratio = float(
+        os.getenv("QUALITY_MAX_OCR_DISCARD_RATIO", str(_DEFAULT_MAX_OCR_DISCARD_RATIO))
+    )
 
     chars_per_page = (
         stats.total_chars / stats.page_count
@@ -116,6 +136,18 @@ def assess_quality(stats: DocumentQualityStats) -> QualityVerdict:
         "file_size": stats.file_size,
         "page_count": stats.page_count,
     }
+
+    if stats.ocr_pages_attempted > 0:
+        signals["ocr_pages_attempted"] = stats.ocr_pages_attempted
+        signals["ocr_pages_discarded"] = stats.ocr_pages_discarded
+
+    discard_ratio = (
+        stats.ocr_pages_discarded / stats.ocr_pages_attempted
+        if stats.ocr_pages_attempted
+        else 0.0
+    )
+    if stats.ocr_pages_discarded >= 1 and discard_ratio > max_ocr_discard_ratio:
+        return QualityVerdict(False, "ocr_pages_discarded", signals)
 
     if stats.page_count >= 1 and chars_per_page < min_chars_per_page:
         return QualityVerdict(False, "scanned_low_text", signals)

@@ -13,8 +13,10 @@ durch die Pipeline laufen. Konkret:
 * End-to-End: Beide Formate müssen non-leere Chunks plus Metadaten produzieren.
 """
 
+import fitz
 import pytest
 
+from services.document_errors import OCR_ENGINE_FAILURE, DocumentProcessingError
 from services.document_processors.pymupdf_processor import PyMuPDFProcessor
 
 
@@ -301,3 +303,104 @@ def test_create_ocr_processor_enables_ocr():
     proc = create_ocr_processor()
     assert isinstance(proc, PyMuPDFProcessor)
     assert proc.enable_ocr is True
+
+
+def _make_pdf(tmp_path, n_pages: int = 2, name: str = "scan.pdf") -> str:
+    """Erzeuge ein mehrseitiges PDF (Inhalt egal — OCR-Aufruf wird gemockt)."""
+    doc = fitz.open()
+    for _ in range(n_pages):
+        doc.new_page()
+    path = tmp_path / name
+    doc.save(str(path))
+    doc.close()
+    return str(path)
+
+
+@pytest.mark.asyncio
+async def test_pdf_ocr_page_failure_counted_not_fatal(tmp_path, monkeypatch):
+    """Nicht-RuntimeError-Abbruch auf einer OCR-Seite: zählen, nicht fatal."""
+    processor = PyMuPDFProcessor(enable_ocr=True)
+    path = _make_pdf(tmp_path, n_pages=2)
+
+    def _fake_ocr(page, page_num, filename):
+        if page_num == 1:
+            raise ValueError("malformed textpage / OOM-killed subprocess")
+        return f"SEITENTEXT {page_num}"
+
+    monkeypatch.setattr(processor, "_ocr_pdf_page", _fake_ocr)
+
+    result = await processor.process_document(
+        document_id=1, file_path=path, filename="scan.pdf", mime_type="application/pdf"
+    )
+
+    full_text = " ".join(c.content for c in result.chunks)
+    assert "SEITENTEXT 0" in full_text  # überlebende Seite erhalten
+    assert result.metadata["ocr_pages_attempted"] == 2
+    assert result.metadata["ocr_pages_discarded"] == 1
+
+
+@pytest.mark.asyncio
+async def test_pdf_ocr_engine_failure_still_fatal(tmp_path, monkeypatch):
+    """RuntimeError-Pfad bleibt fatal: DocumentProcessingError(OCR_ENGINE_FAILURE)."""
+    processor = PyMuPDFProcessor(enable_ocr=True)
+    path = _make_pdf(tmp_path, n_pages=2)
+
+    def _boom(page, page_num, filename):
+        raise DocumentProcessingError(
+            OCR_ENGINE_FAILURE, "Tesseract kaputt", filename=filename
+        )
+
+    monkeypatch.setattr(processor, "_ocr_pdf_page", _boom)
+
+    with pytest.raises(DocumentProcessingError) as exc_info:
+        await processor.process_document(
+            document_id=2,
+            file_path=path,
+            filename="scan.pdf",
+            mime_type="application/pdf",
+        )
+    assert exc_info.value.code == OCR_ENGINE_FAILURE
+
+
+@pytest.mark.asyncio
+async def test_ocr_pdf_page_converts_runtimeerror_to_engine_failure():
+    """Der Helper wandelt RuntimeError aus get_textpage_ocr in OCR_ENGINE_FAILURE."""
+    processor = PyMuPDFProcessor(enable_ocr=True)
+
+    class _FakePage:
+        def get_textpage_ocr(self, **kwargs):
+            raise RuntimeError("tesseract not found")
+
+    with pytest.raises(DocumentProcessingError) as exc_info:
+        processor._ocr_pdf_page(_FakePage(), page_num=0, filename="x.pdf")
+    assert exc_info.value.code == OCR_ENGINE_FAILURE
+
+
+@pytest.mark.asyncio
+async def test_ocr_pdf_page_returns_text_on_success():
+    """Erfolgsfall: Helper liefert den OCR-Text der Textpage zurück."""
+    processor = PyMuPDFProcessor(enable_ocr=True)
+
+    sentinel_tp = object()
+
+    class _FakePage:
+        def get_textpage_ocr(self, **kwargs):
+            return sentinel_tp
+
+        def get_text(self, mode, textpage=None):
+            assert textpage is sentinel_tp
+            return "OK TEXT"
+
+    assert processor._ocr_pdf_page(_FakePage(), 0, "x.pdf") == "OK TEXT"
+
+
+@pytest.mark.asyncio
+async def test_pdf_no_discard_metadata_when_ocr_disabled(tmp_path):
+    """Erstlauf ohne OCR setzt keine Discard-Metadaten."""
+    processor = PyMuPDFProcessor(enable_ocr=False)
+    path = _make_pdf(tmp_path, n_pages=1)
+    result = await processor.process_document(
+        document_id=3, file_path=path, filename="scan.pdf", mime_type="application/pdf"
+    )
+    assert "ocr_pages_attempted" not in result.metadata
+    assert "ocr_pages_discarded" not in result.metadata

@@ -1116,6 +1116,8 @@
         "reasonScannedLowText": "Kaum extrahierbarer Text — vermutlich ein Scan. Texterkennung (OCR) wird angewandt.",
         "reasonSingleChunkLargeFile": "Grosse Datei, aber kaum Textinhalt extrahiert.",
         "reasonGarbageExtraction": "Der extrahierte Text wirkt unbrauchbar (viele unlesbare Zeichen).",
+        "reasonOcrPagesDiscarded_one": "OCR teilweise fehlgeschlagen — {{count}} Seite ohne Texterkennung.",
+        "reasonOcrPagesDiscarded_other": "OCR teilweise fehlgeschlagen — {{count}} Seiten ohne Texterkennung.",
         "reasonUnknown": "Eingeschränkte Textqualität festgestellt."
       },
       "sizeLabel": "Größe: {{size}}",
