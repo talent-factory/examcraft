@@ -122,21 +122,65 @@ def create_ocr_processor() -> "PyMuPDFProcessor":
     return PyMuPDFProcessor(enable_ocr=True)
 
 
+def _init_document_processor() -> Union["PyMuPDFProcessor", "LegacyProcessor"]:
+    """Erzeuge die globale Processor-Instanz beim Import (TF-368).
+
+    Verhalten bei Fehlern:
+
+    * **Fehlkonfiguration** (``ValueError`` aus ``create_processor`` — ein
+      ungültiges ``DOCUMENT_PROCESSOR_TYPE``): fail-fast. Wir degradieren
+      *nicht* still auf einen deprecateten Processor, sondern lassen den
+      Boot mit dem Original-Fehler abbrechen, damit die Fehlkonfiguration
+      operator-sichtbar und debuggbar ist statt unbemerkt.
+    * **Laufzeit-/Import-Fehler** (z. B. PyMuPDF nicht installiert): Resilienz
+      bleibt akzeptabel — wir fallen auf PyMuPDF, dann Legacy zurück. Anders
+      als bisher (``logger.warning``) wird der Downgrade aber auf ``ERROR``
+      *mit dem Original-Exception-Typ* geloggt, sodass ein degradierter
+      Worker nicht in einer einzelnen Warnzeile untergeht.
+    """
+    try:
+        processor = DocumentProcessorFactory.create_processor()
+        logger.info(f"Document processor initialized: {type(processor).__name__}")
+        return processor
+    except ValueError:
+        # Misconfiguration (unknown DOCUMENT_PROCESSOR_TYPE). Never silently
+        # degrade to a deprecated processor — re-raise so the boot fails loud.
+        logger.error(
+            "Invalid DOCUMENT_PROCESSOR_TYPE — refusing to start with a "
+            "silently degraded processor. Set it to 'pymupdf', 'legacy', "
+            "or 'auto'."
+        )
+        raise
+    except Exception as e:
+        # Genuine runtime failure (e.g. PyMuPDF dependency missing). Resilient
+        # fallback is acceptable, but surface it at ERROR with the original
+        # exception type so the degradation is operator-visible.
+        logger.error(
+            "Failed to initialize configured document processor "
+            "(%s: %s); attempting fallback.",
+            type(e).__name__,
+            e,
+        )
+        try:
+            from .pymupdf_processor import PyMuPDFProcessor
+
+            logger.error(
+                "Document processor degraded to PyMuPDFProcessor fallback after %s.",
+                type(e).__name__,
+            )
+            return PyMuPDFProcessor()
+        except ImportError as import_exc:
+            from .legacy_processor import LegacyProcessor
+
+            logger.error(
+                "Document processor degraded to deprecated LegacyProcessor "
+                "(final fallback) after %s / %s.",
+                type(e).__name__,
+                type(import_exc).__name__,
+            )
+            return LegacyProcessor()
+
+
 # Global Processor Instance
 # Wird beim ersten Import erstellt
-try:
-    document_processor = DocumentProcessorFactory.create_processor()
-    logger.info(f"Document processor initialized: {type(document_processor).__name__}")
-except Exception as e:
-    logger.error(f"Failed to initialize document processor: {e}")
-    # Fallback auf PyMuPDF, dann Legacy
-    try:
-        from .pymupdf_processor import PyMuPDFProcessor
-
-        document_processor = PyMuPDFProcessor()
-        logger.warning("Using PyMuPDFProcessor as fallback")
-    except ImportError:
-        from .legacy_processor import LegacyProcessor
-
-        document_processor = LegacyProcessor()
-        logger.warning("Using LegacyProcessor as final fallback")
+document_processor = _init_document_processor()

@@ -188,14 +188,24 @@ def _reindex_document_payload(document: "Document") -> bool:
     max_retries=3,
     default_retry_delay=30,
 )
-def reindex_document_to_institution(document_id: int) -> "dict | None":
+def reindex_document_to_institution(document_id: int) -> "dict[str, object]":
     """Re-index a document in Qdrant with its current institution_id (TF-352).
 
     Triggered after a SuperAdmin transfers a user with documents. On success,
-    clears `documents.pending_reindex`. On a NotImplementedError from the
-    stub helper, leaves the flag True and returns None — the document is
-    still observably "needs reindex" so a future implementation / operator
-    tool can pick it up.
+    clears `documents.pending_reindex`.
+
+    Returns a structured result whose ``status`` field disambiguates the
+    three non-raising outcomes (TF-370) — previously two of them returned a
+    bare ``None``, so a caller could not tell "reindex still deferred" from
+    "document no longer exists":
+
+    * ``{"status": "reindexed", "document_id": ..., "institution_id": ...}``
+      — payload re-indexed and ``pending_reindex`` cleared.
+    * ``{"status": "deferred", "document_id": ...}`` — the Qdrant upsert stub
+      raised ``NotImplementedError``; ``pending_reindex`` stays True so a
+      future implementation / operator tool can pick the document up.
+    * ``{"status": "not_found", "document_id": ...}`` — the document is gone
+      (e.g. the transfer was rolled back after dispatch).
 
     On any other exception, rolls back and re-raises so Celery's retry
     handles transient failures (Qdrant outage, broker hiccup) per the
@@ -210,7 +220,7 @@ def reindex_document_to_institution(document_id: int) -> "dict | None":
                 "(transfer rolled back?)",
                 document_id,
             )
-            return None
+            return {"document_id": document_id, "status": "not_found"}
 
         try:
             _reindex_document_payload(doc)
@@ -223,7 +233,7 @@ def reindex_document_to_institution(document_id: int) -> "dict | None":
                 document_id,
                 exc,
             )
-            return None
+            return {"document_id": document_id, "status": "deferred"}
 
         doc.pending_reindex = False
         db.commit()
@@ -233,7 +243,11 @@ def reindex_document_to_institution(document_id: int) -> "dict | None":
             document_id,
             doc.institution_id,
         )
-        return {"document_id": document_id, "institution_id": doc.institution_id}
+        return {
+            "document_id": document_id,
+            "institution_id": doc.institution_id,
+            "status": "reindexed",
+        }
     except Exception:
         db.rollback()
         raise

@@ -1056,6 +1056,15 @@ async def transfer_user_to_institution(
 
     # Reload user for response (institution_id is now fresh after commit)
     user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        # Defensive (TF-371): transfer_user already proved the user exists
+        # within the same transaction, so this is currently unreachable. Guard
+        # anyway so a future refactor that weakens that transactional guarantee
+        # fails loud with a 404 instead of an opaque AttributeError on
+        # `user.roles` / `user.institution` below.
+        raise HTTPException(
+            status_code=404, detail=t("admin_user_not_found", locale=locale)
+        )
 
     role_responses = []
     for role in user.roles:

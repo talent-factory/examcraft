@@ -1076,3 +1076,208 @@ def test_transfer_tag_only_flag(test_db, test_institution):
     assert user.institution_id == target.id
     assert doc.institution_id == test_institution.id  # stayed
     assert tag.institution_id == target.id
+
+
+def _make_institution(test_db, name, slug):
+    from models.auth import Institution
+
+    inst = Institution(
+        name=name,
+        slug=slug,
+        domain=f"{slug}.local",
+        subscription_tier="free",
+        max_users=10,
+        max_documents=10,
+        max_questions_per_month=10,
+        is_active=True,
+    )
+    test_db.add(inst)
+    test_db.commit()
+    return inst
+
+
+def test_transfer_dedups_duplicate_institution_tag(test_db, test_institution):
+    """TF-369: a source tag whose name already exists (case-insensitively) in
+    the target institution must NOT create a duplicate. The source tag is
+    merged into the existing target tag and its question/document links are
+    re-pointed onto that target tag."""
+    from sqlalchemy import func, text
+    from models.auth import User
+    from models.document import Document, DocumentStatus
+    from models.question_review import QuestionReview
+    from models.tag import Tag, QuestionTag, DocumentTag
+    from services.user_institution_transfer_service import (
+        transfer_user,
+        TransferFlags,
+    )
+
+    test_db.execute(
+        text(
+            "SELECT setval('institutions_id_seq', "
+            "GREATEST((SELECT MAX(id) FROM institutions), 1))"
+        )
+    )
+
+    target = _make_institution(test_db, "DedupTarget", "deduptarget")
+
+    actor = User(
+        email="dedup-admin@x",
+        first_name="a",
+        last_name="d",
+        password_hash="x",
+        institution_id=test_institution.id,
+        status="active",
+        is_superuser=True,
+    )
+    user = User(
+        email="dedup-user@x",
+        first_name="u",
+        last_name="u",
+        password_hash="x",
+        institution_id=test_institution.id,
+        status="active",
+    )
+    test_db.add_all([actor, user])
+    test_db.commit()
+
+    # Source tag "Algebra" in the source institution, and a pre-existing
+    # target tag "algebra" (different case) in the target institution.
+    source_tag = Tag(
+        name="Algebra", created_by=user.id, institution_id=test_institution.id
+    )
+    target_tag = Tag(name="algebra", created_by=actor.id, institution_id=target.id)
+    test_db.add_all([source_tag, target_tag])
+    test_db.commit()
+
+    # Link the source tag to a question and a document.
+    review = QuestionReview(
+        question_text="q",
+        question_type="multiple_choice",
+        difficulty="easy",
+        topic="t",
+        created_by=user.id,
+        institution_id=test_institution.id,
+    )
+    doc = Document(
+        original_filename="d.pdf",
+        filename="d.pdf",
+        file_path="/tmp/d.pdf",
+        file_size=100,
+        mime_type="application/pdf",
+        user_id=user.id,
+        institution_id=test_institution.id,
+        status=DocumentStatus.UPLOADED,
+    )
+    test_db.add_all([review, doc])
+    test_db.commit()
+    test_db.add(QuestionTag(question_id=review.id, tag_id=source_tag.id))
+    test_db.add(DocumentTag(document_id=doc.id, tag_id=source_tag.id))
+    test_db.commit()
+
+    source_tag_id = source_tag.id
+    target_tag_id = target_tag.id
+
+    flags = TransferFlags(documents=False, exams=False, questions=False, tags=True)
+    stats = transfer_user(test_db, user.id, target.id, flags, actor)
+
+    assert stats.tags == 1, "One source tag was processed"
+
+    # Source tag is gone, target tag survives.
+    assert test_db.query(Tag).filter(Tag.id == source_tag_id).first() is None
+    assert test_db.query(Tag).filter(Tag.id == target_tag_id).first() is not None
+
+    # Exactly one institution tag named "algebra" exists in the target.
+    dupes = (
+        test_db.query(Tag)
+        .filter(
+            Tag.institution_id == target.id,
+            func.lower(Tag.name) == "algebra",
+        )
+        .count()
+    )
+    assert dupes == 1, "No duplicate institution tag in the target"
+
+    # Links were re-pointed onto the surviving target tag.
+    q_link = (
+        test_db.query(QuestionTag).filter(QuestionTag.question_id == review.id).one()
+    )
+    assert q_link.tag_id == target_tag_id
+    d_link = test_db.query(DocumentTag).filter(DocumentTag.document_id == doc.id).one()
+    assert d_link.tag_id == target_tag_id
+
+
+def test_transfer_dedup_avoids_duplicate_link(test_db, test_institution):
+    """TF-369: when a question is already tagged with BOTH the source tag and
+    the colliding target tag, merging must not create a duplicate
+    (question_id, tag_id) link — the redundant source link is dropped."""
+    from sqlalchemy import text
+    from models.auth import User
+    from models.question_review import QuestionReview
+    from models.tag import Tag, QuestionTag
+    from services.user_institution_transfer_service import (
+        transfer_user,
+        TransferFlags,
+    )
+
+    test_db.execute(
+        text(
+            "SELECT setval('institutions_id_seq', "
+            "GREATEST((SELECT MAX(id) FROM institutions), 1))"
+        )
+    )
+
+    target = _make_institution(test_db, "DedupTarget2", "deduptarget2")
+
+    actor = User(
+        email="dedup2-admin@x",
+        first_name="a",
+        last_name="d",
+        password_hash="x",
+        institution_id=test_institution.id,
+        status="active",
+        is_superuser=True,
+    )
+    user = User(
+        email="dedup2-user@x",
+        first_name="u",
+        last_name="u",
+        password_hash="x",
+        institution_id=test_institution.id,
+        status="active",
+    )
+    test_db.add_all([actor, user])
+    test_db.commit()
+
+    source_tag = Tag(
+        name="Shared", created_by=user.id, institution_id=test_institution.id
+    )
+    target_tag = Tag(name="shared", created_by=actor.id, institution_id=target.id)
+    test_db.add_all([source_tag, target_tag])
+    test_db.commit()
+
+    review = QuestionReview(
+        question_text="q",
+        question_type="multiple_choice",
+        difficulty="easy",
+        topic="t",
+        created_by=user.id,
+        institution_id=test_institution.id,
+    )
+    test_db.add(review)
+    test_db.commit()
+    # The same question is already linked to BOTH tags.
+    test_db.add(QuestionTag(question_id=review.id, tag_id=source_tag.id))
+    test_db.add(QuestionTag(question_id=review.id, tag_id=target_tag.id))
+    test_db.commit()
+
+    target_tag_id = target_tag.id
+
+    flags = TransferFlags(documents=False, exams=False, questions=False, tags=True)
+    transfer_user(test_db, user.id, target.id, flags, actor)
+
+    # Exactly one link remains for the question, pointing at the target tag.
+    links = (
+        test_db.query(QuestionTag).filter(QuestionTag.question_id == review.id).all()
+    )
+    assert len(links) == 1
+    assert links[0].tag_id == target_tag_id

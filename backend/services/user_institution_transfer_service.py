@@ -23,13 +23,104 @@ from models.exam import Exam
 from models.question_review import QuestionReview
 from models.student import Student, StudentClass
 from models.submission import Attempt
-from models.tag import Tag
+from models.tag import DocumentTag, QuestionTag, Tag
 from services.audit_service import AuditService
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+
+def _repoint_tag_links(
+    db: "Session",
+    link_model: type,
+    other_column_name: str,
+    old_tag_id: int,
+    new_tag_id: int,
+) -> None:
+    """Move a tag's link rows (QuestionTag / DocumentTag) from one tag to another.
+
+    Used when merging a duplicate institution tag into an existing one (TF-369).
+    Each link's composite PK is ``(<other_column>, tag_id)``. For every link
+    currently pointing at ``old_tag_id`` we either re-point it to ``new_tag_id``
+    or — if the target already carries that exact link — drop it, so we never
+    violate the composite primary key.
+    """
+    other_column = getattr(link_model, other_column_name)
+    existing_targets = {
+        row[0]
+        for row in db.query(other_column).filter(link_model.tag_id == new_tag_id).all()
+    }
+    links = db.query(link_model).filter(link_model.tag_id == old_tag_id).all()
+    for link in links:
+        other_value = getattr(link, other_column_name)
+        # Delete the old link first; recreate under the new tag only if the
+        # target doesn't already have it. Delete+insert (instead of mutating the
+        # PK column in place) keeps the unit-of-work ordering unambiguous.
+        db.delete(link)
+        if other_value not in existing_targets:
+            db.add(link_model(**{other_column_name: other_value, "tag_id": new_tag_id}))
+            existing_targets.add(other_value)
+    db.flush()
+
+
+def _transfer_tags_with_dedup(
+    db: "Session",
+    user_id: int,
+    source_institution_id: int,
+    target_institution_id: int,
+) -> int:
+    """Move the user's institution-scoped tags to the target, deduplicating.
+
+    Institution-scoped tags have no uniqueness constraint (unlike ``scope='user'``
+    tags, which carry the ``ux_tags_user_name`` partial unique index). A blind
+    bulk ``UPDATE`` of ``institution_id`` could therefore create duplicate
+    ``(name, target_institution_id)`` institution tags (TF-369).
+
+    Instead, for each source tag we look for an existing institution tag with the
+    same case-insensitive name already in the target institution:
+
+    * **No collision** → move the tag (set ``institution_id = target``).
+    * **Collision** → re-point the source tag's Question/Document links onto the
+      existing target tag and delete the now-redundant source tag.
+
+    Returns the number of source tags handled (moved + merged), preserving the
+    pre-existing ``stats.tags`` semantics of "institution tags processed".
+    """
+    source_tags = (
+        db.query(Tag)
+        .filter(
+            Tag.created_by == user_id,
+            Tag.institution_id == source_institution_id,
+            Tag.institution_id.isnot(None),
+        )
+        .all()
+    )
+
+    handled = 0
+    for tag in source_tags:
+        existing = (
+            db.query(Tag)
+            .filter(
+                Tag.institution_id == target_institution_id,
+                func.lower(Tag.name) == tag.name.lower(),
+                Tag.id != tag.id,
+            )
+            .first()
+        )
+        if existing is None:
+            # No name collision in the target — a plain move is safe.
+            tag.institution_id = target_institution_id
+        else:
+            # Reuse the target's tag: re-point links, then drop the duplicate.
+            _repoint_tag_links(db, QuestionTag, "question_id", tag.id, existing.id)
+            _repoint_tag_links(db, DocumentTag, "document_id", tag.id, existing.id)
+            db.delete(tag)
+        handled += 1
+
+    db.flush()
+    return handled
 
 
 @dataclass(frozen=True)
@@ -274,20 +365,13 @@ def transfer_user(
                 )
             )
 
-        # 5. Tags — skip global (institution_id IS NULL)
+        # 5. Tags — skip global (institution_id IS NULL); dedup against the
+        # target institution so the transfer can't create duplicate
+        # (name, target_institution_id) institution tags (TF-369).
         tags_moved = 0
         if flags.tags:
-            tags_moved = (
-                db.query(Tag)
-                .filter(
-                    Tag.created_by == user_id,
-                    Tag.institution_id == old_iid,
-                    Tag.institution_id.isnot(None),
-                )
-                .update(
-                    {"institution_id": target_institution_id},
-                    synchronize_session=False,
-                )
+            tags_moved = _transfer_tags_with_dedup(
+                db, user_id, old_iid, target_institution_id
             )
 
         # 6. Audit log — AuditService.log_action runs db.commit() internally as

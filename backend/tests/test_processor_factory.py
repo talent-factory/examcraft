@@ -135,6 +135,63 @@ class TestProcessorFactoryGlobalInstance:
         assert proc1 is proc2
 
 
+class TestProcessorFactoryGlobalInit:
+    """Tests für _init_document_processor (TF-368).
+
+    Eine Fehlkonfiguration darf den Worker NICHT still auf einen
+    deprecateten Processor degradieren; ein echter Laufzeitfehler darf
+    zwar zurückfallen, muss aber auf ERROR mit Original-Exception-Typ
+    geloggt werden.
+    """
+
+    def test_init_fails_fast_on_misconfiguration(self):
+        """Ungültiges DOCUMENT_PROCESSOR_TYPE → ValueError statt stillem Downgrade."""
+        from services.document_processors.processor_factory import (
+            _init_document_processor,
+        )
+
+        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "invalid"}):
+            with pytest.raises(ValueError) as exc_info:
+                _init_document_processor()
+
+        assert "Unknown processor type" in str(exc_info.value)
+
+    def test_init_logs_error_on_misconfiguration(self):
+        """Die Fehlkonfiguration wird auf ERROR geloggt (operator-sichtbar).
+
+        Wir prüfen den gemockten Modul-Logger statt caplog: die App
+        rekonfiguriert Logging (Sentry-Integration u. a.), wodurch
+        Propagation an caplog im Gesamt-Suite-Lauf nicht zuverlässig ist.
+        """
+        from services.document_processors import processor_factory as pf
+
+        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "invalid"}):
+            with patch.object(pf, "logger") as mock_logger:
+                with pytest.raises(ValueError):
+                    pf._init_document_processor()
+
+        logged = " ".join(str(call) for call in mock_logger.error.call_args_list)
+        assert "DOCUMENT_PROCESSOR_TYPE" in logged
+
+    def test_init_falls_back_with_error_log_on_runtime_failure(self):
+        """Echter Laufzeitfehler → Fallback, aber ERROR-Log mit Exception-Typ."""
+        from services.document_processors import processor_factory as pf
+
+        with patch.object(
+            pf.DocumentProcessorFactory,
+            "create_processor",
+            side_effect=RuntimeError("boom"),
+        ):
+            with patch.object(pf, "logger") as mock_logger:
+                processor = pf._init_document_processor()
+
+        # Fallback liefert PyMuPDF (im Test-Env verfügbar), kein stiller Abbruch.
+        assert isinstance(processor, PyMuPDFProcessor)
+        # Der Original-Exception-Typ wird als Logging-Argument mitgegeben.
+        logged = " ".join(str(call) for call in mock_logger.error.call_args_list)
+        assert "RuntimeError" in logged
+
+
 class TestProcessorFactoryEnvironmentVariables:
     """Tests für Environment Variable Handling"""
 

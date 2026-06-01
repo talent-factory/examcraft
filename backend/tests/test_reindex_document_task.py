@@ -43,7 +43,11 @@ def test_reindex_task_clears_pending_flag_on_success(test_db, test_institution):
     with patch("tasks.rag_tasks.SessionLocal", mock_session_local):
         with patch("tasks.rag_tasks._reindex_document_payload") as mock_reindex:
             mock_reindex.return_value = True
-            reindex_document_to_institution(doc.id)
+            result = reindex_document_to_institution(doc.id)
+
+    # Structured result disambiguates the outcome (TF-370).
+    assert result["status"] == "reindexed"
+    assert result["document_id"] == doc.id
 
     # Refresh from DB; the Celery task used test_db so changes are visible
     test_db.expire_all()
@@ -80,13 +84,16 @@ def test_reindex_task_leaves_flag_on_failure(test_db, test_institution):
 
 
 def test_reindex_task_skips_unknown_document(test_db):
-    """Document missing means transfer was rolled back — task must not raise."""
+    """Document missing means transfer was rolled back — task must not raise.
+
+    TF-370: the "not_found" outcome is now distinguishable from "deferred".
+    """
     mock_session_local = _make_task_session(test_db)
 
     with patch("tasks.rag_tasks.SessionLocal", mock_session_local):
         result = reindex_document_to_institution(999_999)
 
-    assert result is None or result is False
+    assert result == {"document_id": 999_999, "status": "not_found"}
 
 
 def test_reindex_task_handles_stub_not_implemented_error(test_db, test_institution):
@@ -112,7 +119,9 @@ def test_reindex_task_handles_stub_not_implemented_error(test_db, test_instituti
     with patch("tasks.rag_tasks.SessionLocal", mock_session_local):
         result = reindex_document_to_institution(doc.id)
 
-    assert result is None, "Stub path must return None"
+    # TF-370: the stub path returns a distinct "deferred" status (not a bare
+    # None shared with the "not_found" outcome).
+    assert result == {"document_id": doc.id, "status": "deferred"}
 
     # pending_reindex must still be True — stub did not clear it
     test_db.expire_all()
