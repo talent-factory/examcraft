@@ -45,6 +45,11 @@ failed (Qdrant unavailable, dimension mismatch, …)."""
 FILE_CORRUPT = "file_corrupt"
 """File could not be opened or parsed — likely corrupt upload."""
 
+OCR_ENGINE_FAILURE = "ocr_engine_failure"
+"""Tesseract OCR engine failed at runtime (binary/tessdata missing or
+misconfigured, language pack absent, version mismatch). Distinct from
+``empty_document`` so the operator sees the real cause (TF-360)."""
+
 UNKNOWN_ERROR = "unknown_error"
 """Catch-all fallback when no other code applies. The frontend renders the
 raw error string for these so the user still sees *something*."""
@@ -91,6 +96,7 @@ def known_codes() -> tuple[str, ...]:
         UNSUPPORTED_FORMAT,
         VECTORIZATION_FAILED,
         FILE_CORRUPT,
+        OCR_ENGINE_FAILURE,
         UNKNOWN_ERROR,
     )
 

@@ -6,6 +6,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService, { UserDetailResponse, UpdateUserRequest } from '../../services/AdminService';
+import { Institution } from '../../types/auth';
+import { useAuth } from '../../contexts/AuthContext';
+import { InstitutionTransferDialog } from './InstitutionTransferDialog';
 
 interface UserEditDialogProps {
   userId: number | null;
@@ -21,10 +24,14 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
   onSuccess,
 }) => {
   const { t } = useTranslation();
+  const { user: currentUser } = useAuth();
   const [user, setUser] = useState<UserDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [institutionsError, setInstitutionsError] = useState<string | null>(null);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -57,6 +64,25 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
       loadUser();
     }
   }, [isOpen, userId, loadUser]);
+
+  const loadInstitutions = useCallback(async () => {
+    try {
+      const list = await AdminService.listInstitutions();
+      setInstitutions(list);
+      setInstitutionsError(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load institutions';
+      console.error('[UserEditDialog] loadInstitutions failed:', err);
+      setInstitutionsError(msg);
+      setInstitutions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && currentUser?.is_superuser) {
+      loadInstitutions();
+    }
+  }, [isOpen, currentUser, loadInstitutions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,6 +130,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
   if (!isOpen) return null;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
@@ -187,10 +214,29 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
                       {user && (
                         <div className="bg-gray-50 p-3 rounded-lg text-sm">
                           <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <span className="text-gray-500">{t('admin.userEditDialog.institutionLabel')}:</span>
-                              <span className="ml-2 font-medium">{user.institution_name}</span>
+                            <div className="col-span-2 flex items-center justify-between">
+                              <div>
+                                <span className="text-gray-500">
+                                  {t('admin.userEditDialog.institutionLabel')}:
+                                </span>
+                                <span className="ml-2 font-medium">{user.institution_name}</span>
+                              </div>
+                              {currentUser?.is_superuser && currentUser.id !== user.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowTransferDialog(true)}
+                                  disabled={institutionsError !== null || institutions.length === 0}
+                                  className="text-sm text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                                >
+                                  {t('admin.institutionTransfer.button')}
+                                </button>
+                              )}
                             </div>
+                            {institutionsError && (
+                              <div className="col-span-2 text-xs text-red-600 mt-1">
+                                {t('admin.institutionTransfer.institutionsLoadFailed')}
+                              </div>
+                            )}
                             <div>
                               <span className="text-gray-500">{t('admin.userEditDialog.statusLabel')}:</span>
                               <span className="ml-2 font-medium">{user.status}</span>
@@ -232,5 +278,19 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
         </div>
       </div>
     </div>
+
+    {showTransferDialog && user && currentUser?.id !== user.id && (
+      <InstitutionTransferDialog
+        user={user}
+        institutions={institutions}
+        isOpen={showTransferDialog}
+        onClose={() => setShowTransferDialog(false)}
+        onSuccess={(_toast) => {
+          onSuccess();
+          setShowTransferDialog(false);
+        }}
+      />
+    )}
+    </>
   );
 };

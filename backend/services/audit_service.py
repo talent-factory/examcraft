@@ -35,6 +35,7 @@ class AuditService:
     ACTION_OAUTH_LOGIN = "oauth_login"
 
     ACTION_CREATE_DOCUMENT = "create_document"
+    ACTION_UPDATE_DOCUMENT = "update_document"
     ACTION_DELETE_DOCUMENT = "delete_document"
     ACTION_PROCESS_DOCUMENT = "process_document"
 

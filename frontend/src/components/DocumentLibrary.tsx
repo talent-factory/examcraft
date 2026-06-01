@@ -25,7 +25,8 @@ import {
   Tab,
   Paper,
   TextField,
-  Stack
+  Stack,
+  Snackbar
 } from '@mui/material';
 import {
   Description,
@@ -36,7 +37,6 @@ import {
   Visibility,
   Delete,
   Download,
-  Psychology,
   Timeline,
   CheckCircle,
   Error as ErrorIcon,
@@ -45,14 +45,28 @@ import {
   PlayArrow,
   Edit,
   Check,
-  Close
+  Close,
+  LockOutlined,
+  Business,
+  SearchOff,
+  FilterAltOff
 } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../utils/dateLocale';
+import { useAuth } from '../contexts/AuthContext';
 import { DocumentService } from '../services/DocumentService';
-import { Document, DocumentStatus } from '../types/document';
+import { Document, DocumentStatus, DocumentVisibility, DocumentStats, DocumentTag, DocumentListParams } from '../types/document';
+import DocumentVisibilityDialog from './DocumentVisibilityDialog';
+import { useDocumentLibraryParams } from './documents/useDocumentLibraryParams';
+import DocumentLibraryToolbar from './documents/DocumentLibraryToolbar';
+import DocumentPagination from './documents/DocumentPagination';
+import DocumentTagEditor from './documents/DocumentTagEditor';
+import DocumentList from './documents/DocumentList';
+import BulkActionsBar from './documents/BulkActionsBar';
+import BulkTagsDialog from './documents/BulkTagsDialog';
+import DocumentOcrQualityBadges from './documents/DocumentOcrQualityBadges';
 
 const READY_STATUSES: ReadonlyArray<string> = ['processed', 'completed'];
 const isDocumentReady = (status: string | undefined | null): boolean =>
@@ -311,11 +325,30 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   refreshTrigger
 }) => {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const hasInstitution = Boolean(user?.institution_id);
+  const institutionName = user?.institution?.name ?? '';
+  const isOwner = (document: Document): boolean =>
+    user != null && document.user_id != null && document.user_id === user.id;
+
+  // --- TF-355: server-side pagination + filtering ---
+  // `view` drives the toolbar toggle; card-vs-list rendering is Phase 3
+  const { params, view, setParam, resetFilters } = useDocumentLibraryParams();
+
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
+
+  // Server-side stats, total count and page count
+  const [stats, setStats] = useState<DocumentStats | null>(null);
+  const [total, setTotal] = useState(0);
+  const [libTotalPages, setLibTotalPages] = useState(0);
+
+  // Available tags for the toolbar autocomplete
+  const [availableTags, setAvailableTags] = useState<DocumentTag[]>([]);
+
   const [menuAnchor, setMenuAnchor] = useState<{ element: HTMLElement; documentId: number } | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; document: Document | null }>({
     open: false,
@@ -335,6 +368,26 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [editingValue, setEditingValue] = useState('');
   const [renaming, setRenaming] = useState(false);
 
+  // Visibility quick-edit state (TF-354)
+  const [visibilityDialog, setVisibilityDialog] = useState<{ open: boolean; document: Document | null }>({
+    open: false,
+    document: null,
+  });
+  const [savingVisibility, setSavingVisibility] = useState(false);
+  const [visibilityError, setVisibilityError] = useState<string | null>(null);
+
+  // --- Bulk action state (TF-355 Phase 3, Task 4) ---
+  const [bulkVisibilityDialog, setBulkVisibilityDialog] = useState<{ open: boolean }>({ open: false });
+  const [bulkVisibilitySaving, setBulkVisibilitySaving] = useState(false);
+  const [bulkTagsDialog, setBulkTagsDialog] = useState<{ open: boolean }>({ open: false });
+  const [bulkTagsSaving, setBulkTagsSaving] = useState(false);
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState<{ open: boolean }>({ open: false });
+  const [bulkDeleteSaving, setBulkDeleteSaving] = useState(false); // double-submit guard
+  const [bulkMessage, setBulkMessage] = useState<{
+    text: string;
+    severity: 'success' | 'warning' | 'info' | 'error';
+  } | null>(null);
+
   // Pagination state for large documents
   const [documentChunks, setDocumentChunks] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -344,31 +397,60 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [chunksLoading, setChunksLoading] = useState(false);
   const [chunksError, setChunksError] = useState<string | null>(null);
 
+  // paramsRef keeps loadDocuments stable across params changes while still
+  // accessing the latest params at call time.
+  const paramsRef = React.useRef(params);
+  paramsRef.current = params;
+
+  // Monotonic request token guarding against stale-response races (TF-366):
+  // every loadDocuments call claims the next id, and only the most recent
+  // request may apply its result. A slow earlier request (e.g. page N) that
+  // resolves after a newer filter/page request is discarded, so it can never
+  // overwrite fresh documents/total/stats with outdated ones.
+  const requestIdRef = React.useRef(0);
+
   // Define loadDocuments before useEffect hooks that use it
   const loadDocuments = useCallback(async (showLoading: boolean = true) => {
+    const requestId = ++requestIdRef.current;
     try {
       if (showLoading && !hasLoadedOnce) {
         setLoading(true);
       }
       setError(null);
-      const docs = await DocumentService.getDocuments();
-      setDocuments(docs);
+      const res = await DocumentService.listDocuments(paramsRef.current);
+      // Discard the response if a newer request has superseded this one.
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+      setDocuments(res.documents);
+      setStats(res.stats);
+      setTotal(res.total);
+      setLibTotalPages(res.total_pages);
     } catch (err) {
+      // Only surface errors from the most recent request; a stale failure
+      // must not replace fresh data with an error banner.
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
       setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.loadError'));
     } finally {
-      // ALWAYS set loading to false after load completes
-      setLoading(false);
-      // Mark that we've loaded at least once
-      if (!hasLoadedOnce) {
-        setHasLoadedOnce(true);
+      // Only the most recent request controls the loading / initial-load flags.
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        // Mark that we've loaded at least once
+        if (!hasLoadedOnce) {
+          setHasLoadedOnce(true);
+        }
       }
     }
   }, [hasLoadedOnce, t]);
 
-  // Initial load and refresh trigger
+  // Re-fetch whenever params change (search, filters, page, page_size) or refresh is triggered.
+  // JSON.stringify(params) is used as dependency for stable deep comparison of the params object.
   useEffect(() => {
-    loadDocuments(true); // Initial load with loading state
-  }, [refreshTrigger, loadDocuments]);
+    loadDocuments(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(params), refreshTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh for documents with status "processing"
   useEffect(() => {
@@ -388,6 +470,14 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       clearInterval(intervalId);
     };
   }, [documents, loadDocuments]); // Re-run when documents change
+
+  // Fetch available tags once on mount for toolbar autocomplete
+  useEffect(() => {
+    DocumentService.listDocumentTags()
+      .then(setAvailableTags)
+      // eslint-disable-next-line no-console
+      .catch((err) => { console.error('Failed to load document tags:', err); setAvailableTags([]); });
+  }, []);
 
   const getFileIcon = (mimeType: string) => {
     if (mimeType.includes('pdf')) return <PictureAsPdf color="error" />;
@@ -464,6 +554,32 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         ? prev.filter(id => id !== documentId)
         : [...prev, documentId]
     );
+  };
+
+  // TF-355 Phase 3: select-all for list view
+  const handleToggleSelectAll = () => {
+    setSelectedDocuments(prev =>
+      documents.length > 0 && documents.every(d => prev.includes(d.id))
+        ? prev.filter(id => !documents.some(d => d.id === id))
+        : Array.from(new Set([...prev, ...documents.map(d => d.id)]))
+    );
+  };
+
+  // TF-355 Phase 3: rename handler for list view (independent of card-view state)
+  const handleRenameDocument = async (id: number, name: string) => {
+    const trimmed = name.trim();
+    const payload = trimmed.length === 0 ? null : trimmed;
+    try {
+      const updated = await DocumentService.renameDocument(id, payload);
+      setDocuments(prev => prev.map(d => (d.id === updated.id ? { ...d, ...updated } : d)));
+      setError(null);
+    } catch (err) {
+      setError(
+        err && typeof err === 'object' && 'message' in err
+          ? (err as Error).message
+          : t('components.documentLibrary.renameError', 'Umbenennen fehlgeschlagen'),
+      );
+    }
   };
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, documentId: number) => {
@@ -587,6 +703,40 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     }
   };
 
+  const handleOpenVisibility = (document: Document) => {
+    setVisibilityError(null);
+    setVisibilityDialog({ open: true, document });
+    handleMenuClose();
+  };
+
+  const handleCloseVisibility = () => {
+    if (savingVisibility) return;
+    setVisibilityDialog({ open: false, document: null });
+    setVisibilityError(null);
+  };
+
+  const handleSaveVisibility = async (newVisibility: DocumentVisibility) => {
+    const target = visibilityDialog.document;
+    if (!target) return;
+    try {
+      setSavingVisibility(true);
+      setVisibilityError(null);
+      const updated = await DocumentService.updateVisibility(target.id, newVisibility);
+      setDocuments(prev =>
+        prev.map(d => (d.id === updated.id ? { ...d, ...updated } : d)),
+      );
+      setVisibilityDialog({ open: false, document: null });
+    } catch (err) {
+      setVisibilityError(
+        err && typeof err === 'object' && 'message' in err
+          ? (err as Error).message
+          : t('components.documentVisibility.saveError', 'Sichtbarkeit konnte nicht geändert werden'),
+      );
+    } finally {
+      setSavingVisibility(false);
+    }
+  };
+
   const handleProcess = async (document: Document) => {
     try {
       setProcessingDocumentId(document.id);
@@ -652,7 +802,207 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     }
   };
 
-  const processedDocuments = documents?.filter(doc => doc.status === DocumentStatus.PROCESSED) || [];
+  // --- Bulk helpers (TF-355 Phase 3, Task 4) ---
+  // selectedDocs: docs on the current page that are in the selection set.
+  // bulk visibility/tags act on the current page only (cross-page is out of scope).
+  const selectedDocs = () => documents.filter((d) => selectedDocuments.includes(d.id));
+
+  // Bulk Visibility
+  const openBulkVisibility = () => setBulkVisibilityDialog({ open: true });
+  const handleCloseBulkVisibility = () => {
+    if (bulkVisibilitySaving) return;
+    setBulkVisibilityDialog({ open: false });
+  };
+  const handleBulkVisibilitySave = async (v: DocumentVisibility) => {
+    // base counts on current page's selection only — cross-page bulk is out of scope
+    const onPageSelected = selectedDocs();
+    const owned = onPageSelected.filter(isOwner);
+    const total = onPageSelected.length;
+    const skipped = total - owned.length;
+    let changed = 0;
+    let failed = 0; // track real API failures separately from owner-skips
+    setBulkVisibilitySaving(true);
+    for (const d of owned) {
+      try {
+        await DocumentService.updateVisibility(d.id, v);
+        changed++;
+      } catch (err) {
+        failed++;
+        console.error(`[BulkVisibility] failed for doc ${d.id}:`, err);
+      }
+    }
+    setBulkVisibilityDialog({ open: false });
+    setBulkVisibilitySaving(false);
+    await loadDocuments(false);
+    setSelectedDocuments([]); // clear selection once the bulk run finishes (including partial failures)
+    const summaryText = failed > 0
+      ? t(
+          'components.documentLibrary.bulk.visibilitySummaryWithErrors',
+          `${changed} von ${total} geändert, ${skipped} übersprungen, ${failed} Fehler`,
+          { changed, total, skipped, failed },
+        )
+      : t(
+          'components.documentLibrary.bulk.visibilitySummary',
+          `${changed} von ${total} geändert, ${skipped} übersprungen`,
+          { changed, total, skipped },
+        );
+    setBulkMessage({
+      text: summaryText,
+      severity: failed > 0 ? 'error' : skipped > 0 && changed === 0 ? 'warning' : 'success',
+    });
+  };
+
+  // Bulk Tags
+  const openBulkTags = () => setBulkTagsDialog({ open: true });
+  const handleCloseBulkTags = () => {
+    if (bulkTagsSaving) return;
+    setBulkTagsDialog({ open: false });
+  };
+  const handleBulkTagsApply = async (mode: 'add' | 'remove', tagIds: number[]) => {
+    // base counts on current page's selection only — cross-page bulk is out of scope
+    const onPageSelected = selectedDocs();
+    const owned = onPageSelected.filter(isOwner);
+    const skipped = onPageSelected.length - owned.length;
+    let changed = 0;
+    let failed = 0; // track real API failures separately from owner-skips
+    setBulkTagsSaving(true);
+    for (const d of owned) {
+      try {
+        if (mode === 'add') {
+          // Filter out tagIds the doc already has to avoid redundant calls
+          const idsToAdd = tagIds.filter(
+            (tid) => !(d.tags ?? []).some((t) => t.id === tid),
+          );
+          if (idsToAdd.length > 0) {
+            await DocumentService.attachDocumentTags(d.id, idsToAdd);
+            changed++; // only count doc if at least one tag operation ran
+          }
+          // else: no-op (all tags already present) — do NOT increment changed
+        } else {
+          // Remove only tags the doc actually has
+          const idsToRemove = tagIds.filter((tid) =>
+            (d.tags ?? []).some((t) => t.id === tid),
+          );
+          if (idsToRemove.length > 0) {
+            for (const tid of idsToRemove) {
+              await DocumentService.detachDocumentTag(d.id, tid);
+            }
+            changed++; // only count doc if at least one tag operation ran
+          }
+          // else: no-op (none of the tags present) — do NOT increment changed
+        }
+      } catch (err) {
+        failed++;
+        console.error(`[BulkTags] failed for doc ${d.id}:`, err);
+      }
+    }
+    setBulkTagsDialog({ open: false });
+    setBulkTagsSaving(false);
+    await loadDocuments(false);
+    setSelectedDocuments([]); // clear selection once the bulk run finishes (including partial failures)
+    const summaryText = failed > 0
+      ? t(
+          'components.documentLibrary.bulk.tagsSummaryWithErrors',
+          `Tags aktualisiert für ${changed} Dokumente, ${skipped} übersprungen, ${failed} Fehler`,
+          { changed, skipped, failed },
+        )
+      : t(
+          'components.documentLibrary.bulk.tagsSummary',
+          `Tags aktualisiert für ${changed} Dokumente, ${skipped} übersprungen`,
+          { changed, skipped },
+        );
+    setBulkMessage({
+      text: summaryText,
+      severity: failed > 0 ? 'error' : skipped > 0 && changed === 0 ? 'warning' : 'success',
+    });
+  };
+
+  // Bulk Delete
+  const openBulkDelete = () => setBulkDeleteDialog({ open: true });
+  // prevent closing while delete is in-flight (mirrors handleCloseVisibility pattern)
+  const handleCloseBulkDelete = () => {
+    if (bulkDeleteSaving) return;
+    setBulkDeleteDialog({ open: false });
+  };
+  const handleBulkDeleteConfirm = async () => {
+    if (bulkDeleteSaving) return; // double-submit guard
+    // Delete genuinely handles cross-page: deleteDocument only needs the id,
+    // not the full doc object, so selectedDocuments (all pages) is correct here.
+    const ids = [...selectedDocuments];
+    let deleted = 0;
+    let failed = 0;
+    setBulkDeleteSaving(true);
+    try {
+      for (const id of ids) {
+        try {
+          await DocumentService.deleteDocument(id);
+          deleted++;
+        } catch (err) {
+          failed++;
+          // eslint-disable-next-line no-console
+          console.error(`[BulkDelete] failed for doc ${id}:`, err);
+        }
+      }
+    } finally {
+      setBulkDeleteSaving(false);
+    }
+    setSelectedDocuments([]);
+    setBulkDeleteDialog({ open: false });
+    await loadDocuments(false);
+    const deleteText = failed > 0
+      ? t(
+          'components.documentLibrary.bulk.deleteSummaryWithErrors',
+          `${deleted} Dokument(e) gelöscht, ${failed} fehlgeschlagen`,
+          { deleted, failed },
+        )
+      : t(
+          'components.documentLibrary.bulk.deleteSummary',
+          `${deleted} Dokument(e) gelöscht`,
+          { deleted },
+        );
+    setBulkMessage({
+      text: deleteText,
+      severity: failed > 0 ? 'error' : 'success',
+    });
+  };
+
+  // Visibility indicator next to the title (TF-354). 🔒 private / 🏢 institution.
+  // Owners get a clickable button that opens the quick-edit dialog; everyone
+  // else sees a static informational icon.
+  const renderVisibilityIcon = (document: Document) => {
+    const isInstitution = document.visibility === DocumentVisibility.INSTITUTION;
+    const VisIcon = isInstitution ? Business : LockOutlined;
+    const label = isInstitution
+      ? t('components.documentLibrary.visibilityInstitution')
+      : t('components.documentLibrary.visibilityPrivate');
+    const owner = isOwner(document);
+    const tooltip = owner
+      ? `${label} — ${t('components.documentLibrary.visibilityClickToChange')}`
+      : label;
+    const icon = <VisIcon fontSize="small" color={isInstitution ? 'primary' : 'action'} />;
+    return (
+      <Tooltip title={tooltip}>
+        {owner ? (
+          <IconButton
+            size="small"
+            aria-label={t('components.documentLibrary.visibilityEditAria')}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenVisibility(document);
+            }}
+            sx={{ p: 0.25 }}
+          >
+            {icon}
+          </IconButton>
+        ) : (
+          <Box component="span" sx={{ display: 'inline-flex', p: 0.25 }}>
+            {icon}
+          </Box>
+        )}
+      </Tooltip>
+    );
+  };
+
   const canCreateRAGExam = selectedDocuments.length > 0 &&
     selectedDocuments.every(id => {
       const doc = documents?.find(d => d.id === id);
@@ -669,95 +1019,26 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     );
   }
 
-  return (
-    <Box>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h6">
-          {t('components.documentLibrary.title', { count: documents.length })}
-        </Typography>
+  // TF-355 Phase 6: Page-aware auto-refresh helpers.
+  // pageHasProcessing: true only when a PROCESSING doc exists on the *current* page —
+  // the polling effect (above) uses the same condition, so polls only when this is true.
+  // processingOnOtherPages: in_progress > 0 but none on this page → show hint badge,
+  // do NOT poll (polling an unchanged page would be futile).
+  const pageHasProcessing = documents.some((d) => d.status === DocumentStatus.PROCESSING);
+  const processingOnOtherPages = !!stats && stats.in_progress > 0 && !pageHasProcessing;
 
-        {selectedDocuments.length > 0 && (
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              {t('components.documentLibrary.selected', { count: selectedDocuments.length })}
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<Psychology />}
-              onClick={handleCreateRAGExam}
-              disabled={!canCreateRAGExam}
-              size="small"
-            >
-              {t('components.documentLibrary.createRAGExam')}
-            </Button>
-          </Box>
-        )}
-      </Box>
-
-      {/* Error Alert */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Statistics */}
-      <Box sx={{ mb: 3 }}>
-        <Grid container spacing={2}>
-          <Grid item xs={6} sm={3}>
-            <Card variant="outlined">
-              <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" color="primary">
-                  {documents.length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {t('components.documentLibrary.statsTotal')}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={6} sm={3}>
-            <Card variant="outlined">
-              <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" color="success.main">
-                  {processedDocuments.length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {t('components.documentLibrary.statsProcessed')}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={6} sm={3}>
-            <Card variant="outlined">
-              <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" color="info.main">
-                  {documents.filter(doc => doc.has_vectors).length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {t('components.documentLibrary.statsWithVectors')}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={6} sm={3}>
-            <Card variant="outlined">
-              <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" color="warning.main">
-                  {documents.filter(doc => doc.status === DocumentStatus.PROCESSING).length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {t('components.documentLibrary.statsInProgress')}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </Box>
-
-      {/* Document Grid */}
-      {documents.length === 0 ? (
+  // TF-355 Phase 3: Three-way empty state (hoisted for readability)
+  const hasFiltersOrSearch = !!(
+    params.q ||
+    params.status.length ||
+    params.mime_family.length ||
+    params.tag_ids.length ||
+    params.visibility
+  );
+  const emptyState = (() => {
+    if (!hasFiltersOrSearch && total === 0) {
+      // No-upload state: genuinely empty library
+      return (
         <Card>
           <CardContent sx={{ textAlign: 'center', py: 6 }}>
             <Description sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
@@ -769,6 +1050,186 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
             </Typography>
           </CardContent>
         </Card>
+      );
+    }
+    if (params.q) {
+      // Search-no-hits state: search term active but no results
+      return (
+        <Card>
+          <CardContent sx={{ textAlign: 'center', py: 6 }}>
+            <SearchOff sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              {t('components.documentLibrary.empty.searchNoHits', { query: params.q })}
+            </Typography>
+            <Button
+              variant="outlined"
+              onClick={() => setParam('q', undefined)}
+              sx={{ mt: 1 }}
+            >
+              {t('components.documentLibrary.empty.clearSearch')}
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+    // Filter-no-hits state: active filters (or stale high page) but no results
+    return (
+      <Card>
+        <CardContent sx={{ textAlign: 'center', py: 6 }}>
+          <FilterAltOff sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            {t('components.documentLibrary.empty.filterNoHits')}
+          </Typography>
+          <Button
+            variant="outlined"
+            onClick={resetFilters}
+            sx={{ mt: 1 }}
+          >
+            {t('components.documentLibrary.empty.resetFilters')}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  })();
+
+  return (
+    <Box>
+      {/* Header */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6">
+          {t('components.documentLibrary.title', { count: documents.length })}
+        </Typography>
+      </Box>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      {/* TF-355: Toolbar (search, filters, view toggle) */}
+      <Box sx={{ mb: 3 }}>
+        <DocumentLibraryToolbar
+          params={params}
+          view={view}
+          availableTags={availableTags}
+          onChange={(k, v) => setParam(k as keyof DocumentListParams | 'view', v)}
+          onReset={resetFilters}
+        />
+      </Box>
+
+      {/* Statistics — driven from server-side stats (TF-355) */}
+      <Box sx={{ mb: 3 }}>
+        <Grid container spacing={2}>
+          <Grid item xs={6} sm={3}>
+            <Card
+              variant="outlined"
+              onClick={resetFilters}
+              sx={{ cursor: 'pointer', '&:hover': { boxShadow: 2 } }}
+            >
+              <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                <Typography variant="h4" color="primary">
+                  {stats?.total ?? 0}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {t('components.documentLibrary.statsTotal')}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Card
+              variant="outlined"
+              onClick={() => setParam('status', ['processed'])}
+              sx={{
+                cursor: 'pointer',
+                '&:hover': { boxShadow: 2 },
+                ...(params.status?.includes('processed') && {
+                  borderColor: 'success.main',
+                  borderWidth: 2,
+                }),
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                <Typography variant="h4" color="success.main">
+                  {stats?.processed ?? 0}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {t('components.documentLibrary.statsProcessed')}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Card variant="outlined">
+              <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                <Typography variant="h4" color="info.main">
+                  {stats?.with_vectors ?? 0}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {t('components.documentLibrary.statsWithVectors')}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Card
+              variant="outlined"
+              onClick={() => setParam('status', ['processing'])}
+              sx={{
+                cursor: 'pointer',
+                '&:hover': { boxShadow: 2 },
+                ...(params.status?.includes('processing') && {
+                  borderColor: 'warning.main',
+                  borderWidth: 2,
+                }),
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                <Typography variant="h4" color="warning.main">
+                  {stats?.in_progress ?? 0}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {t('components.documentLibrary.statsInProgress')}
+                </Typography>
+                {processingOnOtherPages && (
+                  <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
+                    {t('components.documentLibrary.autoRefresh.processingOnOtherPages', { count: stats!.in_progress })}
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* TF-355 Phase 3: Bulk Actions Bar */}
+      <BulkActionsBar
+        count={selectedDocuments.length}
+        canRag={canCreateRAGExam}
+        onRagExam={handleCreateRAGExam}
+        onTags={openBulkTags}
+        onVisibility={openBulkVisibility}
+        onDelete={openBulkDelete}
+      />
+
+      {/* Document Grid */}
+      {documents.length === 0 ? (
+        emptyState
+      ) : view === 'list' ? (
+        <DocumentList
+          documents={documents}
+          selectedDocuments={selectedDocuments}
+          sort={params.sort}
+          onToggleSelect={handleDocumentSelect}
+          onToggleSelectAll={handleToggleSelectAll}
+          onSortChange={(s) => setParam('sort', s)}
+          onPreview={handlePreview}
+          onRename={handleRenameDocument}
+          onMenu={handleMenuOpen}
+          isOwner={isOwner}
+        />
       ) : (
         <Grid container spacing={2}>
           {documents.map((document) => (
@@ -865,6 +1326,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     </Stack>
                   ) : (
                     <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+                      {renderVisibilityIcon(document)}
                       <Typography
                         variant="subtitle1"
                         noWrap
@@ -888,10 +1350,28 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     </Stack>
                   )}
 
-                  {/* Status */}
-                  <Box sx={{ mb: 2 }}>
+                  {/* Status + OCR-/Qualitäts-Badges (TF-361) */}
+                  <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
                     {getStatusChip(document.status, document)}
+                    <DocumentOcrQualityBadges document={document} />
                   </Box>
+
+                  {/* Tag chips (read-only, TF-355 Phase 3) */}
+                  {document.tags && document.tags.length > 0 && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                      {document.tags.slice(0, 3).map((tag) => (
+                        <Chip key={tag.id} label={tag.name} size="small" variant="outlined" />
+                      ))}
+                      {document.tags.length > 3 && (
+                        <Chip
+                          label={`+${document.tags.length - 3}`}
+                          size="small"
+                          variant="outlined"
+                          title={document.tags.slice(3).map((t) => t.name).join(', ')}
+                        />
+                      )}
+                    </Box>
+                  )}
 
                   {/* Localised error detail — only when status === ERROR.
                       Tooltip on the chip shows the machine-readable code +
@@ -947,6 +1427,20 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         </Grid>
       )}
 
+      {/* TF-355: Server-side pagination */}
+      {libTotalPages > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <DocumentPagination
+            page={params.page}
+            totalPages={libTotalPages}
+            pageSize={params.page_size}
+            total={total}
+            onPageChange={(p) => setParam('page', p)}
+            onPageSizeChange={(s) => setParam('page_size', s)}
+          />
+        </Box>
+      )}
+
       {/* Context Menu */}
       <Menu
         anchorEl={menuAnchor?.element}
@@ -972,6 +1466,24 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           </ListItemIcon>
           <ListItemText>{t('components.documentLibrary.menuDownload')}</ListItemText>
         </MenuItem>
+
+        {/* Change visibility — owner-only (TF-354), redundant with the
+            clickable card icon for discoverability. */}
+        {(() => {
+          const doc = menuAnchor
+            ? documents.find(d => d.id === menuAnchor.documentId)
+            : undefined;
+          if (!doc || !isOwner(doc)) return null;
+          const isInst = doc.visibility === DocumentVisibility.INSTITUTION;
+          return (
+            <MenuItem onClick={() => handleOpenVisibility(doc)}>
+              <ListItemIcon>
+                {isInst ? <Business fontSize="small" /> : <LockOutlined fontSize="small" />}
+              </ListItemIcon>
+              <ListItemText>{t('components.documentLibrary.menuChangeVisibility')}</ListItemText>
+            </MenuItem>
+          );
+        })()}
 
         {/* Process button - only show for UPLOADED documents */}
         {menuAnchor && documents.find(d => d.id === menuAnchor.documentId)?.status === DocumentStatus.UPLOADED && (
@@ -1113,6 +1625,23 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                         </Grid>
                       )}
                     </Grid>
+
+                    {previewDialog.document && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          {t('components.documentLibrary.tagEditor.heading', 'Tags')}
+                        </Typography>
+                        <DocumentTagEditor
+                          document={previewDialog.document}
+                          availableTags={availableTags}
+                          canEdit={isOwner(previewDialog.document)}
+                          onChanged={(updated) => {
+                            setPreviewDialog({ open: true, document: updated });
+                            setDocuments((docs) => docs.map((d) => (d.id === updated.id ? updated : d)));
+                          }}
+                        />
+                      </Box>
+                    )}
 
                     {previewDialog.document.content_preview && (
                       <Box sx={{ mb: 3 }}>
@@ -1343,6 +1872,97 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Visibility quick-edit dialog (TF-354) */}
+      <DocumentVisibilityDialog
+        open={visibilityDialog.open}
+        current={visibilityDialog.document?.visibility ?? DocumentVisibility.PRIVATE}
+        institutionName={institutionName}
+        hasInstitution={hasInstitution}
+        saving={savingVisibility}
+        error={visibilityError}
+        onClose={handleCloseVisibility}
+        onSave={handleSaveVisibility}
+      />
+
+      {/* Bulk Visibility Dialog (TF-355 Phase 3) */}
+      {/* Null so no radio is pre-selected, enabling Save once the user picks any option.
+          Without this, current=PRIVATE would disable Save when the user picks PRIVATE
+          (value === current). */}
+      <DocumentVisibilityDialog
+        open={bulkVisibilityDialog.open}
+        current={null}
+        institutionName={institutionName}
+        hasInstitution={hasInstitution}
+        saving={bulkVisibilitySaving}
+        onClose={handleCloseBulkVisibility}
+        onSave={handleBulkVisibilitySave}
+      />
+
+      {/* Bulk Tags Dialog (TF-355 Phase 3) */}
+      <BulkTagsDialog
+        open={bulkTagsDialog.open}
+        availableTags={availableTags}
+        saving={bulkTagsSaving}
+        onClose={handleCloseBulkTags}
+        onApply={handleBulkTagsApply}
+      />
+
+      {/* Bulk Delete Confirm Dialog (TF-355 Phase 3) */}
+      {/* onClose=undefined while saving prevents backdrop/ESC from closing */}
+      <Dialog
+        open={bulkDeleteDialog.open}
+        onClose={bulkDeleteSaving ? undefined : handleCloseBulkDelete}
+      >
+        <DialogTitle>
+          {t('components.documentLibrary.bulk.deleteTitle', 'Dokumente löschen')}
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            {t(
+              'components.documentLibrary.bulk.deleteConfirm',
+              `Möchten Sie ${selectedDocuments.length} Dokument(e) wirklich löschen?`,
+              { count: selectedDocuments.length },
+            )}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          {/* cancel disabled while save in-flight */}
+          <Button onClick={handleCloseBulkDelete} disabled={bulkDeleteSaving}>
+            {t('components.documentLibrary.cancel', 'Abbrechen')}
+          </Button>
+          {/* own key so bar's 'bulk.delete' and this button can diverge later */}
+          <Button
+            onClick={handleBulkDeleteConfirm}
+            color="error"
+            variant="contained"
+            disabled={bulkDeleteSaving}
+          >
+            {/* show spinner while in-flight */}
+            {bulkDeleteSaving ? (
+              <CircularProgress size={20} />
+            ) : (
+              t('components.documentLibrary.bulk.deleteConfirmButton', 'Löschen')
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk feedback snackbar (TF-355 Phase 3) */}
+      <Snackbar
+        open={!!bulkMessage}
+        autoHideDuration={6000}
+        onClose={() => setBulkMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setBulkMessage(null)}
+          severity={bulkMessage?.severity ?? 'info'}
+          sx={{ width: '100%' }}
+        >
+          {bulkMessage?.text}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

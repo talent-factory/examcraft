@@ -4,8 +4,9 @@ Schnelle und effiziente PDF-Verarbeitung mit PyMuPDF (fitz)
 """
 
 import logging
+import os
 import time
-from typing import Dict, Iterable, List, Any, Tuple
+from typing import Dict, Iterable, List, Any, Optional, Tuple
 import fitz  # PyMuPDF
 from docx import Document as DocxDocument
 from docx.oxml.ns import qn
@@ -17,6 +18,7 @@ from services.document_errors import (
     BINARY_CONTENT,
     EMPTY_DOCUMENT,
     LEGACY_DOC_FORMAT,
+    OCR_ENGINE_FAILURE,
     UNSUPPORTED_FORMAT,
     DocumentProcessingError,
 )
@@ -68,6 +70,61 @@ def _iter_docx_text_blocks(doc) -> Iterable[str]:
                     yield paragraph.text
 
 
+def _iter_docx_image_blobs(doc) -> Iterable[Tuple[str, bytes]]:
+    """Yield ``(ext, image_bytes)`` for each distinct body image, in order.
+
+    A „scanned" DOCX stores its pages as embedded raster images. We walk
+    ``<a:blip r:embed=...>`` in document order so OCR'd text keeps the visual
+    reading order, and deduplicate on relationship id (Word reuses one image
+    part for byte-identical pictures) so a repeated image is OCR'd only once.
+
+    Header/footer images live on separate parts and are intentionally skipped —
+    they are typically logos, not scanned content, and would add OCR noise.
+    """
+    body = doc.element.body
+    rels = doc.part.rels
+    seen: set = set()
+    for blip in body.iter(qn("a:blip")):
+        rid = blip.get(qn("r:embed"))
+        if not rid or rid in seen:
+            continue
+        try:
+            rel = rels[rid]
+        except KeyError:
+            continue
+        # reltype is readable without touching target_part; external rels have
+        # no local blob, so guard before dereferencing target_part.
+        if rel.is_external or not rel.reltype.endswith("/image"):
+            continue
+        seen.add(rid)
+        partname = str(rel.target_part.partname)
+        ext = partname.rsplit(".", 1)[-1].lower() if "." in partname else "png"
+        yield ext, rel.target_part.blob
+
+
+def _read_docx_page_count(doc) -> Optional[int]:
+    """Best-effort rendered page count from ``docProps/app.xml``.
+
+    Word records the last-saved page count as ``<Pages>`` in the extended-
+    properties part. python-docx does not model that part, so we read it
+    straight from the package blob via a byte-level regex (namespace-agnostic,
+    no XML parse needed). Returns ``None`` when absent.
+
+    The quality gate (TF-360) gates both escalation heuristics on page_count;
+    without it a scanned DOCX (page_count=0) silently passed as 'ok'.
+    """
+    try:
+        for part in doc.part.package.iter_parts():
+            if str(part.partname).endswith("/app.xml"):
+                match = re.search(rb"<Pages>\s*(\d+)\s*</Pages>", part.blob)
+                if match:
+                    return int(match.group(1))
+                break
+    except Exception as exc:  # defensive: page count is best-effort, never fatal
+        logger.debug(f"Could not read DOCX page count from app.xml: {exc}")
+    return None
+
+
 class PyMuPDFProcessor:
     """
     Modern Document Processor basierend auf PyMuPDF
@@ -80,16 +137,28 @@ class PyMuPDFProcessor:
     - Optimiert für Performance und Geschwindigkeit
     """
 
-    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+    def __init__(
+        self,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200,
+        enable_ocr: bool = False,
+    ):
         """
         Initialize PyMuPDF Processor
 
         Args:
             chunk_size: Maximale Anzahl Wörter pro Chunk
             chunk_overlap: Überlappung zwischen Chunks in Wörtern
+            enable_ocr: Wenn True, wird für gescannte Seiten Tesseract-OCR
+                aktiviert (erfordert ein installiertes Tesseract + TESSDATA_PREFIX).
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        # OCR-Eskalation (TF-360): wenn aktiviert, extrahiert _process_pdf den
+        # Text gescannter Seiten via Tesseract (PyMuPDF get_textpage_ocr).
+        self.enable_ocr = enable_ocr
+        self.ocr_language = os.getenv("OCR_LANGUAGE", "deu+eng")
+        self.ocr_dpi = int(os.getenv("OCR_DPI", "200"))
         self.supported_types = {
             "application/pdf": self._process_pdf,
             "application/msword": self._process_doc,
@@ -126,7 +195,8 @@ class PyMuPDFProcessor:
                     mime_type=mime_type,
                 )
 
-            logger.info(f"Processing document with PyMuPDF: {filename}")
+            ocr_state = "OCR enabled" if self.enable_ocr else "no OCR"
+            logger.info(f"Processing document with PyMuPDF ({ocr_state}): {filename}")
 
             # Verarbeite Dokument basierend auf MIME-Type
             processor = self.supported_types[mime_type]
@@ -141,6 +211,7 @@ class PyMuPDFProcessor:
             # Erweitere Metadaten
             doc_metadata["processing_method"] = "pymupdf"
             doc_metadata["processor_type"] = "PyMuPDF"
+            doc_metadata["ocr_enabled"] = self.enable_ocr
 
             # Erstelle ProcessedDocument
             processed_doc = ProcessedDocument(
@@ -155,7 +226,7 @@ class PyMuPDFProcessor:
             )
 
             logger.info(
-                f"PyMuPDF processing completed: {filename} "
+                f"PyMuPDF processing completed ({ocr_state}): {filename} "
                 f"({len(chunks)} chunks, {processing_time:.2f}s)"
             )
 
@@ -228,14 +299,41 @@ class PyMuPDFProcessor:
             metadata["pages"] = doc.page_count
 
             # Extrahiere Text von allen Seiten
+            ocr_pages_attempted = 0
+            ocr_pages_discarded = 0
             for page_num in range(doc.page_count):
                 try:
                     page = doc[page_num]
-                    page_text = page.get_text("text")  # Plain text extraction
+                    if self.enable_ocr:
+                        # full=False -> Tesseract läuft nur auf Seiten ohne
+                        # Textebene (gescannte Seiten); vorhandener Text bleibt.
+                        ocr_pages_attempted += 1
+                        try:
+                            page_text = self._ocr_pdf_page(page, page_num, filename)
+                        except DocumentProcessingError:
+                            # Fatale Engine-Fehler laut propagieren.
+                            raise
+                        except Exception as ocr_page_err:
+                            # Nicht-fataler Per-Seite-OCR-Abbruch (OOM-gekillter
+                            # Subprozess, malformed Textpage). Zählen, damit das
+                            # Quality-Gate die Lücke sieht (TF-367), Seite aber
+                            # überspringen statt das ganze Doc zu verlieren.
+                            ocr_pages_discarded += 1
+                            logger.warning(
+                                f"OCR auf Seite {page_num + 1} verworfen "
+                                f"(nicht-fataler Abbruch): {ocr_page_err}"
+                            )
+                            continue
+                    else:
+                        page_text = page.get_text("text")  # Plain text extraction
 
                     if page_text.strip():
                         text_content.append(f"[Seite {page_num + 1}]\n{page_text}")
+                except DocumentProcessingError:
+                    # Fatale OCR-Fehler propagieren (loud), nicht überspringen.
+                    raise
                 except Exception as e:
+                    # Seiten-lokale Decode-Fehler (PDF-Korruption) sind tolerierbar.
                     logger.warning(
                         f"Could not extract text from page {page_num + 1}: {str(e)}"
                     )
@@ -243,6 +341,11 @@ class PyMuPDFProcessor:
 
             # Schließe PDF
             doc.close()
+
+            # OCR-Verwurf-Zähler für das Quality-Gate sichtbar machen (TF-367).
+            if self.enable_ocr:
+                metadata["ocr_pages_attempted"] = ocr_pages_attempted
+                metadata["ocr_pages_discarded"] = ocr_pages_discarded
 
             # Extrahiere Headings aus Text (einfache Heuristik)
             full_text = "\n\n".join(text_content)
@@ -313,18 +416,109 @@ class PyMuPDFProcessor:
 
         return headings
 
+    def _ocr_image_bytes(self, image_bytes: bytes, ext: str, page_label: str) -> str:
+        """OCR ein einzelnes eingebettetes Rasterbild via PyMuPDF + Tesseract.
+
+        Öffnet das Bild als einseitiges PyMuPDF-Dokument und OCR't die ganze
+        Seite (``full=True`` — ein eingebettetes Bild hat keine Textebene, die
+        man erhalten müsste). Engine-Fehler werden als fatal markiert.
+        """
+        image_doc = fitz.open(stream=image_bytes, filetype=ext)
+        try:
+            page = image_doc[0]
+            try:
+                ocr_tp = page.get_textpage_ocr(
+                    language=self.ocr_language, dpi=self.ocr_dpi, full=True
+                )
+            except RuntimeError as ocr_err:
+                # Engine-Fehler (Tesseract fehlt/falsch konfiguriert,
+                # Sprachpaket fehlt) ist fürs ganze Dokument fatal — laut
+                # propagieren, nicht still als leeres Doc verschlucken (TF-360).
+                raise DocumentProcessingError(
+                    OCR_ENGINE_FAILURE,
+                    f"Tesseract-OCR fehlgeschlagen für {page_label}: {ocr_err}",
+                    filename=page_label,
+                ) from ocr_err
+            return page.get_text("text", textpage=ocr_tp)
+        finally:
+            image_doc.close()
+
+    def _ocr_pdf_page(self, page, page_num: int, filename: str) -> str:
+        """OCR eine einzelne PDF-Seite via PyMuPDF/Tesseract.
+
+        Engine-Fehler (``RuntimeError``: Tesseract fehlt/fehlkonfiguriert,
+        Sprachpaket fehlt) sind fürs ganze Dokument fatal und werden als
+        ``DocumentProcessingError(OCR_ENGINE_FAILURE)`` gemeldet. Alle anderen
+        Ausnahmen (OOM-gekillter Subprozess, malformed Textpage) propagieren
+        roh — die aufrufende Schleife zählt sie als verworfene Seite (TF-367)
+        und überspringt sie, statt das ganze Dokument scheitern zu lassen.
+        """
+        try:
+            ocr_tp = page.get_textpage_ocr(
+                language=self.ocr_language, dpi=self.ocr_dpi, full=False
+            )
+        except RuntimeError as ocr_err:
+            raise DocumentProcessingError(
+                OCR_ENGINE_FAILURE,
+                f"Tesseract-OCR fehlgeschlagen auf Seite {page_num + 1}: {ocr_err}",
+                filename=filename,
+            ) from ocr_err
+        return page.get_text("text", textpage=ocr_tp)
+
     async def _process_docx(
         self, file_path: str, filename: str
     ) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite DOCX-Datei (Body + Tabellen + Header/Footer)."""
+        """Verarbeite DOCX-Datei (Body + Tabellen + Header/Footer + OCR).
+
+        Bei aktiviertem OCR (Eskalation, TF-360) werden zusätzlich eingebettete
+        Bilder via Tesseract erkannt — so wird ein „gescanntes" DOCX (Seiten als
+        Bilder, kaum ``<w:t>``-Text) nutzbar, analog zur PDF-Eskalation. Der
+        Erstlauf (``enable_ocr=False``) extrahiert nur die Textebene; der
+        Quality-Gate flaggt das dünne Ergebnis (siehe ``pages`` unten) und der
+        Reprocess kommt mit ``enable_ocr=True`` hierher zurück.
+        """
         try:
             doc = DocxDocument(file_path)
 
             text_content = list(_iter_docx_text_blocks(doc))
 
+            # Eingebettete Bilder erfassen (Reihenfolge, dedupliziert). Immer
+            # zählen — die Anzahl dient als Seiten-Fallback für den
+            # Quality-Gate; OCR läuft aber nur bei aktivierter Eskalation.
+            image_blobs = list(_iter_docx_image_blobs(doc))
+
+            ocr_pages_attempted = 0
+            ocr_pages_discarded = 0
+            if self.enable_ocr and image_blobs:
+                for idx, (ext, blob) in enumerate(image_blobs, start=1):
+                    ocr_pages_attempted += 1
+                    label = f"{filename}#Bild{idx}"
+                    try:
+                        ocr_text = self._ocr_image_bytes(blob, ext, label)
+                    except DocumentProcessingError:
+                        # Fatale OCR-Engine-Fehler laut propagieren.
+                        raise
+                    except Exception as img_err:
+                        # Nicht-fataler Per-Bild-OCR-Abbruch (nicht
+                        # rasterisierbares Bild, OOM, malformed Textpage):
+                        # zählen (TF-367) und überspringen.
+                        ocr_pages_discarded += 1
+                        logger.warning(f"OCR übersprungen für {label}: {img_err}")
+                        continue
+                    if ocr_text.strip():
+                        text_content.append(f"[Bild {idx}]\n{ocr_text.strip()}")
+
             title = doc.core_properties.title or ""
             if not title:
                 title = filename.rsplit(".", 1)[0] if "." in filename else filename
+
+            # Seitenzahl für den Quality-Gate: echte gerenderte Seitenzahl aus
+            # app.xml, sonst Anzahl eingebetteter Bilder (Scan-Proxy: ~1/Seite).
+            # Ohne page_count blieben scanned_low_text UND
+            # single_chunk_large_file für DOCX wirkungslos (TF-360).
+            page_count = _read_docx_page_count(doc)
+            if not page_count and image_blobs:
+                page_count = len(image_blobs)
 
             metadata = {
                 "title": title,
@@ -338,7 +532,15 @@ class PyMuPDFProcessor:
                 else None,
                 "paragraphs": len(doc.paragraphs),
                 "text_blocks": len(text_content),
+                "image_count": len(image_blobs),
             }
+            if page_count:
+                metadata["pages"] = page_count
+
+            # OCR-Verwurf-Zähler fürs Quality-Gate sichtbar machen (TF-367).
+            if self.enable_ocr:
+                metadata["ocr_pages_attempted"] = ocr_pages_attempted
+                metadata["ocr_pages_discarded"] = ocr_pages_discarded
 
             full_text = "\n\n".join(text_content)
 

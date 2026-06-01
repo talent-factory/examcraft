@@ -324,15 +324,19 @@ def test_raw_404_local_file_missing_on_disk(stage_data):
     assert exc.value.status_code == 404
 
 
-def test_raw_403_foreign_tenant(stage_data):
-    """User aus anderer Institution darf nicht zugreifen (kein Superuser)."""
+def test_raw_404_foreign_tenant(stage_data):
+    """User aus anderer Institution darf nicht zugreifen (kein Superuser).
+
+    TF-354: Das Dokument ist ``private`` (Default). Der visibility-Gate liefert
+    404 statt 403, damit die Existenz des fremden Dokuments nicht leakt.
+    """
     with pytest.raises(HTTPException) as exc:
         _call_raw(
             document_id=stage_data.pdf.id,
             current_user=stage_data.foreign,
             db=_db_from_stage(stage_data),
         )
-    assert exc.value.status_code == 403
+    assert exc.value.status_code == 404
 
 
 # ---------------------------------------------------------------------------

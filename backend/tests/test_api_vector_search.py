@@ -364,7 +364,7 @@ class TestVectorSearchAPI:
 
         mock_processing_result = {
             "document_id": 123,
-            "docling_processing": {"total_chunks": 5},
+            "extraction": {"total_chunks": 5},
             "vector_embeddings": {"total_chunks": 5, "embedding_dimension": 384},
         }
         mock_doc_service.process_document_with_vectors = AsyncMock(

@@ -7,6 +7,7 @@ import logging
 import re
 from sqlalchemy import (
     Column,
+    CheckConstraint,
     Integer,
     String,
     DateTime,
@@ -15,6 +16,7 @@ from sqlalchemy import (
     Enum,
     Boolean,
     ForeignKey,
+    false,
 )
 from sqlalchemy.sql import func
 import enum
@@ -89,8 +91,36 @@ class DocumentStatus(enum.Enum):
     ERROR = "error"
 
 
+class DocumentVisibility(enum.Enum):
+    """Who may see a document (TF-354 privacy fix).
+
+    - ``PRIVATE``: only the owner (``user_id``) sees the document.
+    - ``INSTITUTION``: every member of the owner's institution sees it.
+
+    The DB enum stores the lowercase *values* ("private"/"institution"),
+    not the member names — see ``values_callable`` on the column. This is a
+    deliberate divergence from ``DocumentStatus`` (which stores names) so the
+    on-disk labels match the spec and the API/UI contract.
+    """
+
+    PRIVATE = "private"
+    INSTITUTION = "institution"
+
+
 class Document(Base):
     __tablename__ = "documents"
+
+    # An institution-visible document MUST belong to an institution: "shared with
+    # my institution" is meaningless without one, and the read filter only treats
+    # such a row consistently when institution_id is set. Enforced in the DB so no
+    # write path (current or future) can create the illegal state (TF-354). After
+    # migration A every row is 'private', so none violate this.
+    __table_args__ = (
+        CheckConstraint(
+            "visibility <> 'institution' OR institution_id IS NOT NULL",
+            name="ck_documents_institution_visibility_requires_institution",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String(255), nullable=False)
@@ -116,6 +146,31 @@ class Document(Base):
         ForeignKey("institutions.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
+    )
+
+    # Visibility (TF-354): default ``private`` so an upload is only visible to
+    # its owner until explicitly shared with the institution. ``values_callable``
+    # stores the lowercase enum *values* as the PG enum labels.
+    visibility = Column(
+        Enum(
+            DocumentVisibility,
+            name="documentvisibility",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        server_default=DocumentVisibility.PRIVATE.value,
+        default=DocumentVisibility.PRIVATE,
+        index=True,
+    )
+
+    # Qdrant re-index marker (TF-352): set to True when institution_id changes
+    # via the SuperAdmin transfer flow. A Celery task picks it up and re-uploads
+    # the document's vector payload to Qdrant with the new institution_id.
+    pending_reindex = Column(
+        Boolean,
+        nullable=False,
+        server_default=false(),
+        default=False,
     )
 
     # Extracted metadata from document processing
@@ -195,6 +250,7 @@ class Document(Base):
             "file_size": self.file_size,
             "mime_type": self.mime_type,
             "status": self.status.value if self.status else None,
+            "visibility": self.visibility.value if self.visibility else None,
             "user_id": self.user_id,
             "metadata": self.doc_metadata,
             "content_preview": self.content_preview[:200] + "..."
@@ -207,4 +263,16 @@ class Document(Base):
             "processed_at": self.processed_at.isoformat()
             if self.processed_at
             else None,
+            # Qualitäts-Eskalation (TF-360/TF-365): kuratierte Felder aus
+            # processing_info. ``escalation`` wird seit TF-365 exponiert, damit das
+            # UI laufende (``queued``), erschöpfte (``exhausted``), nicht verfügbare
+            # (``unavailable``) oder fehlgeschlagene (``failed``) OCR-Nachbearbeitung
+            # darstellen kann. Rein interne Marker (ocr_attempted, processor_chain)
+            # bleiben intern.
+            "quality": (self.processing_info or {}).get("quality"),
+            "processed_with_ocr": (self.processing_info or {}).get(
+                "processed_with_ocr", False
+            ),
+            "escalation": (self.processing_info or {}).get("escalation"),
+            # pending_reindex omitted — internal Celery marker, not exposed to API clients
         }

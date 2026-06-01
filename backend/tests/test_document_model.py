@@ -122,6 +122,49 @@ class TestDocumentModel:
         assert "full_content" in doc.doc_metadata
         assert doc.has_vectors is False
 
+    def test_to_dict_exposes_escalation_state(self, test_db):
+        """TF-365: Der escalation-State muss über to_dict() exponiert werden.
+
+        TF-361 hielt ``escalation`` bewusst intern; dadurch war eine laufende
+        (``queued``) oder fehlgeschlagene (``failed``) OCR-Nachbearbeitung für den
+        Nutzer unsichtbar (PROCESSED-Dokument, das später unerklärt auf ERROR
+        kippt). Der State muss serialisiert werden, damit das UI ihn darstellen kann.
+        """
+        doc = Document(
+            filename="scan.pdf",
+            original_filename="scan.pdf",
+            file_path="/tmp/scan.pdf",
+            file_size=100,
+            mime_type="application/pdf",
+            status=DocumentStatus.PROCESSED,
+            processing_info={
+                "escalation": "queued",
+                "quality": {"ok": False, "reason": "scanned_low_text"},
+            },
+        )
+        test_db.add(doc)
+        test_db.commit()
+
+        result = doc.to_dict()
+
+        assert result["escalation"] == "queued"
+
+    def test_to_dict_escalation_none_without_processing_info(self, test_db):
+        """to_dict() liefert escalation=None, wenn kein processing_info vorliegt."""
+        doc = Document(
+            filename="plain.pdf",
+            original_filename="plain.pdf",
+            file_path="/tmp/plain.pdf",
+            file_size=100,
+            mime_type="application/pdf",
+            status=DocumentStatus.PROCESSED,
+            processing_info=None,
+        )
+        test_db.add(doc)
+        test_db.commit()
+
+        assert doc.to_dict()["escalation"] is None
+
     def test_document_status_enum(self, test_db):
         """Test DocumentStatus Enum Werte"""
         doc = Document(

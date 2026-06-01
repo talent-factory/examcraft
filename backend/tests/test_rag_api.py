@@ -165,6 +165,7 @@ class TestRAGAPI:
         doc.processed_at = None
         doc.file_size = 1024
         doc.institution_id = 1
+        doc.user_id = 42  # == mock_user.id → owner-visible (TF-354 filter)
         return doc
 
     @pytest.mark.skipif(
@@ -187,8 +188,6 @@ class TestRAGAPI:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
-            patch("api.rag_exams.TenantFilter"),
-            patch("api.rag_exams.get_tenant_context"),
         ):
             mock_doc_service.get_document_by_id.return_value = mock_processed_document
             mock_task.apply_async.return_value = MagicMock()
@@ -307,8 +306,6 @@ class TestRAGAPI:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
-            patch("api.rag_exams.TenantFilter"),
-            patch("api.rag_exams.get_tenant_context"),
         ):
             mock_doc_service.get_document_by_id.return_value = mock_processed_document
             mock_task.apply_async.return_value = MagicMock()
@@ -389,9 +386,11 @@ class TestRAGAPI:
         ]
         mock_context.context_length = 180
 
-        # Document mock needs institution_id for tenant check
+        # Document mock needs institution_id + owner user_id for the
+        # visibility check (TF-354): owned by the auth user → visible.
         mock_doc = Mock()
         mock_doc.institution_id = 1
+        mock_doc.user_id = 42
 
         with (
             patch.object(
@@ -678,6 +677,7 @@ class TestRAGAPIIntegration:
         mock_doc.processed_at = None
         mock_doc.mime_type = "text/plain"
         mock_doc.institution_id = 1
+        mock_doc.user_id = 42  # owner-visible (TF-354 filter)
         mock_doc.file_size = 2048
 
         mock_query = Mock()
@@ -702,7 +702,7 @@ class TestRAGAPIIntegration:
             patch.object(
                 actual_document_service,
                 "get_document_by_id",
-                return_value=Mock(institution_id=1),
+                return_value=Mock(institution_id=1, user_id=42),
             ),
             patch("services.rag_service.rag_service") as mock_rag_service,
         ):
@@ -723,8 +723,6 @@ class TestRAGAPIIntegration:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
-            patch("api.rag_exams.TenantFilter"),
-            patch("api.rag_exams.get_tenant_context"),
         ):
             mock_doc_service.get_document_by_id.return_value = mock_doc
             mock_task.apply_async.return_value = MagicMock()
@@ -836,8 +834,6 @@ class TestRAGQuestionPersistence:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
-            patch("api.rag_exams.TenantFilter"),
-            patch("api.rag_exams.get_tenant_context"),
         ):
             mock_doc_svc.get_document_by_id.return_value = None
             mock_task.apply_async.return_value = MagicMock()
@@ -863,8 +859,6 @@ class TestRAGQuestionPersistence:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
-            patch("api.rag_exams.TenantFilter"),
-            patch("api.rag_exams.get_tenant_context"),
         ):
             mock_doc_svc.get_document_by_id.return_value = None
             mock_task.apply_async.return_value = MagicMock()

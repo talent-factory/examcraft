@@ -180,17 +180,23 @@ def test_delete_foreign_doc_as_same_institution_admin_logs_admin_cross_owner(
     """Same-institution-Admin (kein Superuser) darf löschen, wird aber auditiert."""
     s = stage_data
 
-    # Add admin role to `other` user, same institution as the doc owner
+    # Add admin role to `other` user, same institution as the doc owner.
+    # The lifespan seeder (triggered by TestClient fixtures in earlier test
+    # files) may have already inserted a Role(name="admin") into the shared
+    # test DB outside our savepoint boundary.  Look it up first to avoid a
+    # UniqueViolation on ix_roles_name.
     from models.auth import Role
 
-    admin_role = Role(
-        id=900,
-        name="admin",
-        display_name="Admin",
-        permissions='["delete_documents"]',
-    )
-    test_db.add(admin_role)
-    test_db.flush()
+    admin_role = test_db.query(Role).filter_by(name="admin").first()
+    if admin_role is None:
+        admin_role = Role(
+            id=900,
+            name="admin",
+            display_name="Admin",
+            permissions='["delete_documents"]',
+        )
+        test_db.add(admin_role)
+        test_db.flush()
     s.other.roles.append(admin_role)
     test_db.commit()
 
@@ -274,14 +280,20 @@ def test_delete_foreign_doc_as_admin_aborts_when_audit_fails(
     from models.auth import Role
 
     s = stage_data
-    admin_role = Role(
-        id=901,
-        name="admin",
-        display_name="Admin",
-        permissions='["delete_documents"]',
-    )
-    test_db.add(admin_role)
-    test_db.flush()
+    # The lifespan seeder (triggered by TestClient fixtures in earlier test
+    # files) may have already inserted a Role(name="admin") into the shared
+    # test DB outside our savepoint boundary.  Look it up first to avoid a
+    # UniqueViolation on ix_roles_name.
+    admin_role = test_db.query(Role).filter_by(name="admin").first()
+    if admin_role is None:
+        admin_role = Role(
+            id=901,
+            name="admin",
+            display_name="Admin",
+            permissions='["delete_documents"]',
+        )
+        test_db.add(admin_role)
+        test_db.flush()
     s.other.roles.append(admin_role)
     test_db.commit()
 

@@ -29,12 +29,14 @@ jest.mock('../TagSettingsPage', () => ({
 
 // Mock useAuth
 const mockHasRole = jest.fn();
+const mockHasPermission = jest.fn();
 const mockUser = { is_superuser: false };
 
 jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: mockUser,
     hasRole: mockHasRole,
+    hasPermission: mockHasPermission,
   }),
 }));
 
@@ -42,6 +44,7 @@ describe('Admin Page', () => {
   beforeEach(() => {
     mockUser.is_superuser = false;
     mockHasRole.mockReturnValue(false);
+    mockHasPermission.mockReturnValue(false);
   });
 
   describe('RBAC tab visibility', () => {

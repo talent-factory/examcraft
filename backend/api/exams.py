@@ -21,6 +21,7 @@ from api.tags import TagOut
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
+from utils.document_visibility import filter_documents_for_user
 from services.point_utils import suggest_points
 from services.exam_export_service import (
     MarkdownExporter,
@@ -389,7 +390,7 @@ async def list_documents_with_questions(
     approved_question_count is 0 for documents with no approved questions yet."""
     from sqlalchemy import case as sa_case
 
-    results = (
+    query = (
         db.query(
             Document,
             sa_func.count(
@@ -408,11 +409,11 @@ async def list_documents_with_questions(
         .outerjoin(
             QuestionReview, QuestionReview.id == QuestionSourceDocument.question_id
         )
-        .filter(Document.institution_id == current_user.institution_id)
-        .group_by(Document.id)
-        .order_by(Document.original_filename)
-        .all()
     )
+    # Visibility-aware (TF-354): don't leak titles of colleagues' private docs
+    # to other institution members. SuperUser bypass handled in the helper.
+    query = filter_documents_for_user(query, current_user)
+    results = query.group_by(Document.id).order_by(Document.original_filename).all()
     # Use Document.title resolver so users see display_name overrides + the
     # filtered metadata title instead of "1" / "Untitled" leftovers.
     return [

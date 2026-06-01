@@ -235,12 +235,25 @@ const GenerationTasksBar: React.FC = () => {
 
                 {/* Completed task: green checkmark */}
                 {isSuccess && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <CheckCircleIcon fontSize="small" color="success" />
-                    <Typography variant="caption" color="success.main">
-                      {t('components.generationTasks.clickToView')}
-                    </Typography>
-                  </Box>
+                  <>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <CheckCircleIcon fontSize="small" color="success" />
+                      <Typography variant="caption" color="success.main">
+                        {t('components.generationTasks.clickToView')}
+                      </Typography>
+                    </Box>
+                    {/* TF-358: Hinweis, wenn die Fragenanzahl ans verfügbare
+                        Dokumenten-Material gekoppelt wurde (weniger Fragen als
+                        angefordert). Text kommt vom Backend. */}
+                    {task.result?.quality_metrics?.context_limited_notice && (
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mt: 0.5 }}>
+                        <WarningIcon fontSize="small" color="warning" sx={{ mt: '2px' }} />
+                        <Typography variant="caption" color="warning.main">
+                          {task.result.quality_metrics.context_limited_notice}
+                        </Typography>
+                      </Box>
+                    )}
+                  </>
                 )}
 
                 {/* Failed task: red X + error message + retry button */}

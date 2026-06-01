@@ -29,6 +29,24 @@ E2E_TEST_USER = {
     "last_name": "Testuser",
 }
 
+# Second user in the SAME institution as E2E_TEST_USER — used by the document
+# visibility E2E (TF-354) to prove a colleague cannot see a private upload.
+E2E_TEST_USER_B = {
+    "email": "e2e-test-b@example.com",
+    "password": "E2ETestPassword123",  # pragma: allowlist secret
+    "first_name": "E2E",
+    "last_name": "Colleague",
+}
+
+# User in a DIFFERENT institution — proves cross-institution isolation.
+E2E_OTHER_INSTITUTION_SLUG = "e2e-test-other"
+E2E_TEST_USER_C = {
+    "email": "e2e-test-c@example.com",
+    "password": "E2ETestPassword123",  # pragma: allowlist secret
+    "first_name": "E2E",
+    "last_name": "Outsider",
+}
+
 
 def setup_e2e_institution(db):
     """Create E2E Test Institution"""
@@ -101,6 +119,64 @@ def setup_e2e_user(db, institution):
     return user
 
 
+def _create_dozent_user(db, creds, institution):
+    """Create (or refresh) a dozent user in ``institution`` — idempotent."""
+    existing = db.query(User).filter(User.email == creds["email"]).first()
+    if existing:
+        existing.password_hash = AuthService.get_password_hash(creds["password"])
+        existing.institution_id = institution.id
+        db.commit()
+        logger.info(f"   User already exists: {existing.email}")
+        return existing
+
+    dozent_role = db.query(Role).filter(Role.name == "dozent").first()
+    user = User(
+        email=creds["email"],
+        password_hash=AuthService.get_password_hash(creds["password"]),
+        first_name=creds["first_name"],
+        last_name=creds["last_name"],
+        institution_id=institution.id,
+        status=UserStatus.ACTIVE.value,
+        is_superuser=False,
+        is_email_verified=True,
+    )
+    db.add(user)
+    db.flush()
+    if dozent_role:
+        user.roles.append(dozent_role)
+    db.commit()
+    db.refresh(user)
+    logger.info(f"   Created user: {user.email} (ID: {user.id})")
+    return user
+
+
+def setup_e2e_other_institution(db):
+    """Second institution for the cross-institution visibility test."""
+    existing = (
+        db.query(Institution)
+        .filter(Institution.slug == E2E_OTHER_INSTITUTION_SLUG)
+        .first()
+    )
+    if existing:
+        logger.info(f"   Institution already exists: {existing.name}")
+        return existing
+    institution = Institution(
+        name="E2E Other Institution",
+        slug=E2E_OTHER_INSTITUTION_SLUG,
+        domain="other.examcraft.test",
+        subscription_tier="professional",
+        max_users=-1,
+        max_documents=-1,
+        max_questions_per_month=-1,
+        is_active=True,
+    )
+    db.add(institution)
+    db.commit()
+    db.refresh(institution)
+    logger.info(f"   Created institution: {institution.name} (ID: {institution.id})")
+    return institution
+
+
 def setup_e2e_documents(db, user, institution):
     """Create test documents for E2E tests"""
     logger.info("Setting up E2E Test Documents...")
@@ -147,16 +223,23 @@ def cleanup_e2e_data(db):
     """Remove all E2E test data (optional cleanup)"""
     logger.info("Cleaning up E2E Test Data...")
 
-    user = db.query(User).filter(User.email == E2E_TEST_USER["email"]).first()
-    if user:
-        # Delete user's documents
-        db.query(Document).filter(Document.user_id == user.id).delete()
-        # Delete user
-        db.delete(user)
+    emails = [
+        E2E_TEST_USER["email"],
+        E2E_TEST_USER_B["email"],
+        E2E_TEST_USER_C["email"],
+    ]
+    for email in emails:
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            # Delete user's documents
+            db.query(Document).filter(Document.user_id == user.id).delete()
+            # Delete user
+            db.delete(user)
 
-    institution = db.query(Institution).filter(Institution.slug == "e2e-test").first()
-    if institution:
-        db.delete(institution)
+    for slug in ("e2e-test", E2E_OTHER_INSTITUTION_SLUG):
+        institution = db.query(Institution).filter(Institution.slug == slug).first()
+        if institution:
+            db.delete(institution)
 
     db.commit()
     logger.info("   E2E data cleaned up")
@@ -175,6 +258,12 @@ def main():
 
         # 2. Setup User
         user = setup_e2e_user(db, institution)
+
+        # 2b. Setup additional users for the visibility E2E (TF-354):
+        #     a same-institution colleague + a cross-institution outsider.
+        _create_dozent_user(db, E2E_TEST_USER_B, institution)
+        other_institution = setup_e2e_other_institution(db)
+        _create_dozent_user(db, E2E_TEST_USER_C, other_institution)
 
         # 3. Setup Documents
         documents = setup_e2e_documents(db, user, institution)

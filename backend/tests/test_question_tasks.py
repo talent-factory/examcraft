@@ -141,11 +141,19 @@ def test_generate_questions_task_returns_correct_format():
 
     mock_rag_service = MagicMock()
 
+    # TF-359: capture the Sentry scope tags set by the task so a regression that
+    # drops user_id/topic tagging fails here (the lines execute either way).
+    captured_tags: dict[str, str] = {}
+
     with (
         patch("tasks.question_tasks.run_async", return_value=mock_result),
         patch("tasks.question_tasks.RAGService", return_value=mock_rag_service),
         patch("tasks.question_tasks._persist_questions", return_value=[1]),
         patch("tasks.question_tasks._safe_update_job_status"),
+        patch(
+            "tasks.question_tasks.sentry_sdk.set_tag",
+            side_effect=lambda key, value: captured_tags.__setitem__(key, value),
+        ),
     ):
         generate_questions_task.update_state = MagicMock()
 
@@ -170,6 +178,8 @@ def test_generate_questions_task_returns_correct_format():
     assert result["context_summary"]["total_chunks"] == 3
     assert result["generation_time"] == 5.0
     assert "total_questions" in result["quality_metrics"]
+    assert captured_tags["user_id"] == "42"
+    assert captured_tags["topic"] == "Heapsort"
 
 
 def test_generate_questions_task_rejects_when_rag_service_unavailable():

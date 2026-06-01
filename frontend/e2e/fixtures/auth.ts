@@ -17,6 +17,18 @@ export const E2E_TEST_USER = {
   lastName: 'Testuser',
 };
 
+// Colleague in the SAME institution as E2E_TEST_USER (TF-354 visibility E2E).
+export const E2E_TEST_USER_B = {
+  email: 'e2e-test-b@example.com',
+  password: 'E2ETestPassword123',  // pragma: allowlist secret
+};
+
+// User in a DIFFERENT institution (cross-institution isolation).
+export const E2E_TEST_USER_C = {
+  email: 'e2e-test-c@example.com',
+  password: 'E2ETestPassword123',  // pragma: allowlist secret
+};
+
 // Storage state file for authenticated sessions
 const AUTH_STATE_PATH = path.join(__dirname, '../.auth/user.json');
 

@@ -215,20 +215,6 @@ class TestDocumentService:
         assert result == "test_document"
         mock_db.query.assert_called_once()
 
-    def test_get_documents_by_user(self, document_service):
-        """Test Dokumente nach User holen"""
-        mock_db = Mock()
-        mock_query = Mock()
-        mock_db.query.return_value = mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.all.return_value = ["doc1", "doc2"]
-
-        result = document_service.get_documents_by_user("test_user", mock_db)
-
-        assert result == ["doc1", "doc2"]
-        mock_db.query.assert_called_once()
-
     def test_update_document_status(self, document_service):
         """Test Dokument Status Update"""
         mock_db = Mock()

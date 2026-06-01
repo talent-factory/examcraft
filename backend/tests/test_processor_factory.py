@@ -1,30 +1,25 @@
 """
 Integration Tests für Processor Factory
-Tests für dynamische Processor-Auswahl
+Tests für dynamische Processor-Auswahl (PyMuPDF / Legacy).
 """
 
 import pytest
 import os
 from unittest.mock import patch
 
-docling = pytest.importorskip("docling", reason="docling not installed")
-from services.document_processors.processor_factory import DocumentProcessorFactory  # noqa: E402
-from services.document_processors.docling_processor import DoclingProcessor  # noqa: E402
-from services.document_processors.legacy_processor import LegacyProcessor  # noqa: E402
+from services.document_processors.processor_factory import DocumentProcessorFactory
+from services.document_processors.pymupdf_processor import PyMuPDFProcessor
+from services.document_processors.legacy_processor import LegacyProcessor
 
 
 class TestProcessorFactoryCreation:
     """Tests für Processor-Erstellung"""
 
-    def test_factory_creates_docling_processor_explicit(self):
-        """Test: Factory erstellt DoclingProcessor wenn explizit angefordert"""
-        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "docling"}):
-            try:
-                processor = DocumentProcessorFactory.create_processor()
-                assert isinstance(processor, DoclingProcessor)
-            except ImportError:
-                # Docling nicht verfügbar - erwartetes Verhalten
-                pytest.skip("Docling not available")
+    def test_factory_creates_pymupdf_processor_explicit(self):
+        """Test: Factory erstellt PyMuPDFProcessor wenn explizit angefordert"""
+        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "pymupdf"}):
+            processor = DocumentProcessorFactory.create_processor()
+            assert isinstance(processor, PyMuPDFProcessor)
 
     def test_factory_creates_legacy_processor_explicit(self):
         """Test: Factory erstellt LegacyProcessor wenn explizit angefordert"""
@@ -32,36 +27,29 @@ class TestProcessorFactoryCreation:
             processor = DocumentProcessorFactory.create_processor()
             assert isinstance(processor, LegacyProcessor)
 
-    def test_factory_auto_detection_with_docling(self):
-        """Test: Auto-Detection wählt Docling wenn verfügbar"""
+    def test_factory_auto_detection_prefers_pymupdf(self):
+        """Test: Auto-Detection bevorzugt PyMuPDF"""
         with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "auto"}):
-            try:
-                processor = DocumentProcessorFactory.create_processor()
-                # Sollte DoclingProcessor sein wenn verfügbar
-                assert isinstance(processor, (DoclingProcessor, LegacyProcessor))
-            except ImportError:
-                pytest.skip("Docling not available")
+            processor = DocumentProcessorFactory.create_processor()
+            assert isinstance(processor, (PyMuPDFProcessor, LegacyProcessor))
 
-    def test_factory_auto_detection_fallback(self):
-        """Test: Auto-Detection fällt auf Legacy zurück wenn Docling nicht verfügbar"""
+    def test_factory_auto_detection_fallback_to_legacy(self):
+        """Test: Auto fällt auf Legacy zurück, wenn PyMuPDF nicht verfügbar ist"""
         with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "auto"}):
             with patch(
-                "services.document_processors.processor_factory.DoclingProcessor"
-            ) as mock_docling:
-                mock_docling.side_effect = ImportError("Docling not available")
+                "services.document_processors.pymupdf_processor.PyMuPDFProcessor"
+            ) as mock_pymupdf:
+                mock_pymupdf.side_effect = ImportError("PyMuPDF not available")
 
                 processor = DocumentProcessorFactory.create_processor()
                 assert isinstance(processor, LegacyProcessor)
 
-    def test_factory_default_is_auto(self):
-        """Test: Standard-Modus ist 'auto'"""
+    def test_factory_default_is_pymupdf(self):
+        """Test: Standard-Processor (ohne Env-Var) ist PyMuPDF"""
         with patch.dict(os.environ, {}, clear=True):
-            # Entferne DOCUMENT_PROCESSOR_TYPE aus Environment
-            if "DOCUMENT_PROCESSOR_TYPE" in os.environ:
-                del os.environ["DOCUMENT_PROCESSOR_TYPE"]
-
+            os.environ.pop("DOCUMENT_PROCESSOR_TYPE", None)
             processor = DocumentProcessorFactory.create_processor()
-            assert isinstance(processor, (DoclingProcessor, LegacyProcessor))
+            assert isinstance(processor, (PyMuPDFProcessor, LegacyProcessor))
 
 
 class TestProcessorFactoryErrorHandling:
@@ -75,19 +63,19 @@ class TestProcessorFactoryErrorHandling:
 
             assert "Unknown processor type" in str(exc_info.value)
 
-    def test_factory_raises_error_when_docling_requested_but_unavailable(self):
-        """Test: Factory wirft Fehler wenn Docling explizit angefordert aber nicht verfügbar"""
-        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "docling"}):
+    def test_factory_raises_error_when_pymupdf_requested_but_unavailable(self):
+        """Test: Factory wirft Fehler wenn PyMuPDF explizit angefordert, aber nicht verfügbar"""
+        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "pymupdf"}):
             with patch(
-                "services.document_processors.docling_processor.DoclingProcessor"
-            ) as mock_docling:
-                mock_docling.side_effect = ImportError("Docling not installed")
+                "services.document_processors.pymupdf_processor.PyMuPDFProcessor"
+            ) as mock_pymupdf:
+                mock_pymupdf.side_effect = ImportError("PyMuPDF not installed")
 
                 with pytest.raises(ImportError) as exc_info:
                     DocumentProcessorFactory.create_processor()
 
                 assert (
-                    "Docling processor requested but dependencies not installed"
+                    "PyMuPDF processor requested but dependencies not installed"
                     in str(exc_info.value)
                 )
 
@@ -98,7 +86,6 @@ class TestProcessorFactoryIntegration:
     @pytest.mark.asyncio
     async def test_factory_processor_can_process_document(self, tmp_path):
         """Test: Von Factory erstellter Processor kann Dokumente verarbeiten"""
-        # Erstelle Test-Datei
         test_file = tmp_path / "test.txt"
         test_file.write_text("This is a test document for integration testing.")
 
@@ -122,7 +109,6 @@ class TestProcessorFactoryIntegration:
         with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "legacy"}):
             processor = DocumentProcessorFactory.create_processor()
 
-            # Standard-Werte sollten gesetzt sein
             assert processor.chunk_size == 1000
             assert processor.chunk_overlap == 200
 
@@ -135,7 +121,7 @@ class TestProcessorFactoryGlobalInstance:
         from services.document_processors.processor_factory import document_processor
 
         assert document_processor is not None
-        assert isinstance(document_processor, (DoclingProcessor, LegacyProcessor))
+        assert isinstance(document_processor, (PyMuPDFProcessor, LegacyProcessor))
 
     def test_global_processor_is_singleton(self):
         """Test: Globale Processor-Instanz ist Singleton"""
@@ -149,12 +135,103 @@ class TestProcessorFactoryGlobalInstance:
         assert proc1 is proc2
 
 
+class TestProcessorFactoryGlobalInit:
+    """Tests für _init_document_processor (TF-368).
+
+    Eine Fehlkonfiguration darf den Worker NICHT still auf einen
+    deprecateten Processor degradieren; ein echter Laufzeitfehler darf
+    zwar zurückfallen, muss aber auf ERROR mit Original-Exception-Typ
+    geloggt werden.
+    """
+
+    def test_init_fails_fast_on_misconfiguration(self):
+        """Ungültiges DOCUMENT_PROCESSOR_TYPE → ValueError statt stillem Downgrade."""
+        from services.document_processors.processor_factory import (
+            _init_document_processor,
+        )
+
+        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "invalid"}):
+            with pytest.raises(ValueError) as exc_info:
+                _init_document_processor()
+
+        assert "Unknown processor type" in str(exc_info.value)
+
+    def test_init_logs_error_on_misconfiguration(self):
+        """Die Fehlkonfiguration wird auf ERROR geloggt (operator-sichtbar).
+
+        Wir prüfen den gemockten Modul-Logger statt caplog: die App
+        rekonfiguriert Logging (Sentry-Integration u. a.), wodurch
+        Propagation an caplog im Gesamt-Suite-Lauf nicht zuverlässig ist.
+        """
+        from services.document_processors import processor_factory as pf
+
+        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "invalid"}):
+            with patch.object(pf, "logger") as mock_logger:
+                with pytest.raises(ValueError):
+                    pf._init_document_processor()
+
+        logged = " ".join(str(call) for call in mock_logger.error.call_args_list)
+        assert "DOCUMENT_PROCESSOR_TYPE" in logged
+
+    def test_init_falls_back_with_error_log_on_runtime_failure(self):
+        """Echter Laufzeitfehler → Fallback, aber ERROR-Log mit Exception-Typ."""
+        from services.document_processors import processor_factory as pf
+
+        with patch.object(
+            pf.DocumentProcessorFactory,
+            "create_processor",
+            side_effect=RuntimeError("boom"),
+        ):
+            with patch.object(pf, "logger") as mock_logger:
+                processor = pf._init_document_processor()
+
+        # Fallback liefert PyMuPDF (im Test-Env verfügbar), kein stiller Abbruch.
+        assert isinstance(processor, PyMuPDFProcessor)
+        # Der Original-Exception-Typ wird als Logging-Argument mitgegeben.
+        logged = " ".join(str(call) for call in mock_logger.error.call_args_list)
+        assert "RuntimeError" in logged
+
+    def test_unknown_type_raises_dedicated_subclass(self):
+        """TF-372: Unbekannter Typ wirft die dedizierte
+        UnknownProcessorTypeError (Subklasse von ValueError), damit der
+        Fail-fast-Pfad sie von einem beliebigen ValueError aus einem
+        Processor-Konstruktor unterscheiden kann."""
+        from services.document_processors.processor_factory import (
+            UnknownProcessorTypeError,
+        )
+
+        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "invalid"}):
+            with pytest.raises(UnknownProcessorTypeError):
+                DocumentProcessorFactory.create_processor()
+
+    def test_non_type_value_error_does_not_fail_fast_as_misconfig(self):
+        """TF-372: Ein ValueError, der NICHT vom Typ-Check stammt (z. B. ein
+        kaputtes numerisches Env wie OCR_DPI, hier durch einen Konstruktor-Mock
+        simuliert), wird NICHT als 'Invalid DOCUMENT_PROCESSOR_TYPE' fehlgemeldet,
+        sondern läuft in den Resilienz-Fallback."""
+        from services.document_processors import processor_factory as pf
+
+        with patch.object(
+            pf.DocumentProcessorFactory,
+            "create_processor",
+            side_effect=ValueError("invalid literal for int() with base 10: 'abc'"),
+        ):
+            with patch.object(pf, "logger") as mock_logger:
+                processor = pf._init_document_processor()
+
+        # Kein Fail-fast: Fallback greift (kein Re-raise).
+        assert processor is not None
+        logged = " ".join(str(call) for call in mock_logger.error.call_args_list)
+        # Die irreführende Typ-Fehlkonfigurations-Meldung darf NICHT erscheinen.
+        assert "Invalid DOCUMENT_PROCESSOR_TYPE" not in logged
+
+
 class TestProcessorFactoryEnvironmentVariables:
     """Tests für Environment Variable Handling"""
 
     def test_factory_respects_env_var_case_insensitive(self):
         """Test: Factory akzeptiert case-insensitive Environment Variables"""
-        test_cases = ["LEGACY", "legacy", "Legacy", "DOCLING", "docling", "Docling"]
+        test_cases = ["LEGACY", "legacy", "Legacy", "PYMUPDF", "pymupdf", "PyMuPDF"]
 
         for test_case in test_cases:
             with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": test_case}):
@@ -172,57 +249,17 @@ class TestProcessorFactoryEnvironmentVariables:
             assert isinstance(processor, LegacyProcessor)
 
 
-class TestProcessorFactoryLogging:
-    """Tests für Logging"""
-
-    def test_factory_logs_processor_creation(self, caplog):
-        """Test: Factory loggt Processor-Erstellung"""
-        import logging
-
-        caplog.set_level(logging.INFO)
-
-        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "legacy"}):
-            DocumentProcessorFactory.create_processor()
-
-            # Prüfe ob Log-Nachricht vorhanden ist
-            assert any(
-                "Creating document processor" in record.message
-                for record in caplog.records
-            )
-
-    def test_factory_logs_fallback_warning(self, caplog):
-        """Test: Factory loggt Warnung bei Fallback"""
-        import logging
-
-        caplog.set_level(logging.WARNING)
-
-        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "auto"}):
-            with patch(
-                "services.document_processors.processor_factory.DoclingProcessor"
-            ) as mock_docling:
-                mock_docling.side_effect = ImportError("Docling not available")
-
-                DocumentProcessorFactory.create_processor()
-
-                # Prüfe ob Warnung geloggt wurde
-                assert any(
-                    "Docling not available" in record.message
-                    for record in caplog.records
-                )
-
-
 class TestProcessorFactoryBackwardsCompatibility:
     """Tests für Backwards Compatibility"""
 
     @pytest.mark.asyncio
-    async def test_factory_processor_compatible_with_docling_service(self, tmp_path):
-        """Test: Factory-Processor ist kompatibel mit DoclingService"""
+    async def test_factory_processor_compatible_with_service_facade(self, tmp_path):
+        """Test: Factory-Processor ist kompatibel mit der DoclingService-Fassade"""
         from services.docling_service import DoclingService
 
-        # DoclingService sollte Factory-Processor verwenden können
+        # Die (historisch benannte) Fassade soll den Factory-Processor nutzen.
         service = DoclingService()
 
-        # Erstelle Test-Datei
         test_file = tmp_path / "test.txt"
         test_file.write_text("Test content for backwards compatibility.")
 
@@ -241,7 +278,6 @@ class TestProcessorFactoryBackwardsCompatibility:
         with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "legacy"}):
             processor = DocumentProcessorFactory.create_processor()
 
-            # Prüfe ob erforderliche Methoden vorhanden sind
             assert hasattr(processor, "process_document")
             assert callable(processor.process_document)
             assert hasattr(processor, "chunk_size")

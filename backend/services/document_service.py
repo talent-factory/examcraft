@@ -270,17 +270,6 @@ class DocumentService:
         """Hole Dokument nach ID"""
         return db.query(Document).filter(Document.id == document_id).first()
 
-    def get_documents_by_user(
-        self, user_id: str, db: Session, status: Optional[DocumentStatus] = None
-    ) -> List[Document]:
-        """Hole alle Dokumente eines Users"""
-        query = db.query(Document).filter(Document.user_id == user_id)
-
-        if status:
-            query = query.filter(Document.status == status)
-
-        return query.order_by(Document.created_at.desc()).all()
-
     def update_document_status(
         self,
         document_id: int,
@@ -385,7 +374,10 @@ class DocumentService:
                     logger.warning(f"Failed to cleanup temp file {file_path}: {e}")
 
     async def process_document_content(
-        self, document_id: int, db: Optional[Session] = None
+        self,
+        document_id: int,
+        db: Optional[Session] = None,
+        processor: Optional[Any] = None,
     ) -> Optional[ProcessedDocument]:
         """
         Verarbeite Dokumenteninhalt mit Docling Service
@@ -393,6 +385,8 @@ class DocumentService:
         Args:
             document_id: ID des zu verarbeitenden Dokuments
             db: Database Session (optional - erstellt neue Session wenn nicht vorhanden)
+            processor: Optionaler Prozessor-Override (z. B. PyMuPDF mit OCR);
+                fällt auf den konfigurierten Default-Service zurück
 
         Returns:
             ProcessedDocument oder None bei Fehlern
@@ -422,8 +416,11 @@ class DocumentService:
             # Get local file path (downloads from S3 if needed)
             local_file_path = self._get_local_file_path(document)
 
-            # Verarbeite Dokument mit Docling
-            processed_doc = await self.docling_service.process_document(
+            # Prozessor-Override für die OCR-Eskalation (TF-360): wenn ein
+            # expliziter Prozessor übergeben wird (PyMuPDF mit OCR), diesen
+            # nutzen, sonst den konfigurierten Default-Service (PyMuPDF).
+            active_processor = processor or self.docling_service
+            processed_doc = await active_processor.process_document(
                 document_id=document.id,
                 file_path=local_file_path,
                 filename=document.original_filename,
@@ -488,14 +485,20 @@ class DocumentService:
                 db.close()
 
     async def process_document_with_vectors(
-        self, document_id: int, db: Optional[Session] = None
+        self,
+        document_id: int,
+        db: Optional[Session] = None,
+        processor: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        Verarbeite Dokument mit Docling UND erstelle Vector Embeddings
+        Verarbeite Dokument UND erstelle Vector Embeddings (prozessor-agnostisch)
 
         Args:
             document_id: ID des zu verarbeitenden Dokuments
             db: Database Session (optional - erstellt neue Session wenn nicht vorhanden)
+            processor: Optionaler Prozessor-Override (z. B. PyMuPDF mit OCR);
+                fällt auf den konfigurierten Default-Prozessor zurück
+                (siehe process_document_content).
 
         Returns:
             Dictionary mit Processing- und Embedding-Statistiken
@@ -511,8 +514,10 @@ class DocumentService:
 
         processed_doc = None
         try:
-            # Erst normale Dokumentenverarbeitung
-            processed_doc = await self.process_document_content(document_id, db)
+            # Erst normale Dokumentenverarbeitung (ggf. mit OCR-Prozessor)
+            processed_doc = await self.process_document_content(
+                document_id, db, processor=processor
+            )
 
             if not processed_doc:
                 logger.error(f"Document processing failed for {document_id}")
@@ -524,6 +529,7 @@ class DocumentService:
             embedding_stats = await vector_service.add_document_chunks(processed_doc)
 
             # Aktualisiere Dokument mit Vector Collection Info
+            info: Dict[str, Any] = {}
             document = self.get_document_by_id(document_id, db)
             if document:
                 # Setze Vector Collection Name
@@ -554,14 +560,48 @@ class DocumentService:
 
                 flag_modified(document, "doc_metadata")
 
+                # Qualitäts-Verdict berechnen und in processing_info ablegen
+                # (separate Spalte von doc_metadata; keine Migration nötig).
+                from services.quality_assessor import (
+                    assess_quality,
+                    compute_quality_stats,
+                )
+
+                stats = compute_quality_stats(processed_doc, document.file_size or 0)
+                verdict = assess_quality(stats)
+
+                info = dict(document.processing_info or {})
+                info["quality"] = {
+                    "ok": verdict.ok,
+                    "reason": verdict.reason,
+                    "signals": verdict.signals,
+                }
+                chain = list(info.get("processor_chain", []))
+                chain.append(processed_doc.metadata.get("processing_method", "unknown"))
+                info["processor_chain"] = chain
+                info["processed_with_ocr"] = bool(
+                    processed_doc.metadata.get("ocr_enabled", False)
+                ) or info.get("processed_with_ocr", False)
+                document.processing_info = info
+                flag_modified(document, "processing_info")
+
                 db.commit()
                 db.refresh(document)
+
+            # Dokument zwischen Embedding und Reload verschwunden: sauberes None
+            # statt KeyError auf info["quality"] (TF-360 Review-Fix).
+            if document is None:
+                logger.error(
+                    f"Document {document_id} disappeared after embedding; aborting"
+                )
+                return None
 
             logger.info(f"Vector embeddings created for document {document_id}")
 
             return {
                 "document_id": document_id,
-                "docling_processing": {
+                "quality": info["quality"],
+                "extraction": {
                     "total_chunks": processed_doc.total_chunks,
                     "processing_time": processed_doc.processing_time,
                     "total_pages": processed_doc.total_pages,
@@ -598,9 +638,27 @@ class DocumentService:
                 from sqlalchemy.orm.attributes import flag_modified
 
                 flag_modified(document, "doc_metadata")
-                db.commit()
+                try:
+                    db.commit()
+                except Exception as commit_err:
+                    # Persistieren des ERROR-Status fehlgeschlagen (z. B. DB nicht
+                    # erreichbar). Zurückrollen, damit der Aufrufer keine
+                    # vergiftete Transaktion erbt; das Fehler-Envelope unten wird
+                    # trotzdem zurückgegeben (vector_embeddings.error), sodass der
+                    # Task success=False meldet statt das Dokument still als
+                    # "Verarbeitet" ohne Vektoren zu hinterlassen.
+                    logger.error(
+                        f"Persistieren des ERROR-Status fehlgeschlagen für "
+                        f"{document_id}: {commit_err}"
+                    )
+                    try:
+                        db.rollback()
+                    except Exception as rb_err:
+                        logger.error(
+                            f"DB-Rollback fehlgeschlagen für {document_id}: {rb_err}"
+                        )
 
-            docling_stats = (
+            extraction_stats = (
                 {
                     "total_chunks": processed_doc.total_chunks,
                     "processing_time": processed_doc.processing_time,
@@ -611,7 +669,7 @@ class DocumentService:
             )
             return {
                 "document_id": document_id,
-                "docling_processing": docling_stats,
+                "extraction": extraction_stats,
                 "vector_embeddings": {"error": str(e)},
             }
         finally:

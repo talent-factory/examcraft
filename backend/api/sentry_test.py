@@ -1,16 +1,30 @@
 """
 Sentry Test Endpoints
 
-Endpoints to test Sentry integration (only available in development).
+Two routers:
+- ``router``: public dev-only smoke tests (API process), 403 outside development.
+  Registered in main.py only when ENVIRONMENT == development.
+- ``admin_router``: SuperAdmin-gated, registered in ALL environments. Lets the
+  team verify the Celery worker -> Sentry pipeline in production (TF-359), which
+  the dev-only endpoints above cannot do.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+import logging
 import os
 import sentry_sdk
 from config.sentry import capture_exception_with_context, capture_message_with_context
+from models.auth import User
+from utils.auth_utils import get_current_superuser
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sentry-test", tags=["Sentry Test"])
+
+# Always registered (see main.py) but locked to SuperAdmins, so it is safe to
+# expose in production where ``router`` above is not mounted.
+admin_router = APIRouter(prefix="/api/admin/sentry-test", tags=["Admin: Sentry Test"])
 
 
 class SentryTestResponse(BaseModel):
@@ -156,4 +170,67 @@ async def trigger_performance():
         message="Performance transaction sent to Sentry successfully",
         sentry_enabled=True,
         environment=environment,
+    )
+
+
+class WorkerErrorResponse(BaseModel):
+    """Response model for the SuperAdmin worker-error trigger."""
+
+    message: str
+    task_id: str
+    environment: str
+
+
+@admin_router.post("/worker-error", response_model=WorkerErrorResponse)
+async def trigger_worker_error(
+    current_user: User = Depends(get_current_superuser),
+) -> WorkerErrorResponse:
+    """Dispatch a Celery task that fails on purpose, to verify worker -> Sentry.
+
+    SuperAdmin-only and available in production (TF-359 acceptance criterion:
+    "ein absichtlich provozierter Worker-Fehler erscheint in Sentry mit
+    Stacktrace + Task-Kontext"). The dispatched task raises
+    ``SentryPipelineTestError`` in the worker; ``CeleryIntegration`` captures it.
+
+    Returns the Celery task id so the resulting Sentry event can be correlated
+    (search ``diagnostic:true`` or the task id in the Sentry issue).
+    """
+    from celery_app import celery_app
+
+    # Route explicitly onto a queue the worker actually consumes — the task is
+    # intentionally absent from task_routes, so without this it would land on
+    # the unconsumed default queue and never run.
+    try:
+        result = celery_app.send_task(
+            "tasks.diagnostics_tasks.trigger_test_error",
+            kwargs={
+                "user_id": current_user.id,
+                "message": (
+                    f"TF-359 Sentry worker pipeline verification "
+                    f"(triggered by SuperAdmin user {current_user.id})"
+                ),
+            },
+            queue="question_generation",
+        )
+    except Exception as broker_error:
+        # A diagnostic endpoint is most likely to be hit when the broker is
+        # already degraded — return an actionable 503 (mirrors the production
+        # dispatch path in api/rag_exams.py) instead of an opaque 500 that
+        # can't be told apart from a broken Sentry pipeline.
+        logger.error(
+            "Sentry worker-test dispatch failed (broker unreachable?): %s",
+            broker_error,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Task-Queue nicht erreichbar — Broker/Worker prüfen.",
+        ) from broker_error
+
+    return WorkerErrorResponse(
+        message=(
+            "Worker error dispatched. Check Sentry for a SentryPipelineTestError "
+            "event tagged diagnostic=true with this task_id."
+        ),
+        task_id=result.id,
+        environment=os.getenv("ENVIRONMENT", "development"),
     )

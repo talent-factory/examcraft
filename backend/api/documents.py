@@ -7,6 +7,7 @@ from fastapi import (
     APIRouter,
     UploadFile,
     File,
+    Form,
     HTTPException,
     Depends,
     Query,
@@ -14,13 +15,15 @@ from fastapi import (
     BackgroundTasks,
 )
 from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
-from typing import List, Optional
+from typing import Annotated, List, Literal, Optional
+from sqlalchemy import func, or_, and_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 import mimetypes
 import os
 import io
+from math import ceil
 from urllib.parse import quote
 
 from services.document_service import DocumentService
@@ -32,11 +35,25 @@ from services.storage_service import (
     StorageUnavailableError,
 )
 from services.translation_service import t, get_request_locale
+from services.quality_assessor import EscalationState
 from services.vector_service_factory import vector_service
-from models.document import Document, DocumentStatus
+from models.document import Document, DocumentStatus, DocumentVisibility
 from models.auth import User
+from models.tag import Tag, DocumentTag
+from utils.document_tags import (
+    visible_tags_for_user,
+    attach_tags_to_document,
+    detach_tag_from_document,
+    detach_institution_tags,
+    STATUS_GROUPS,
+    MIME_FAMILIES,
+)
 from database import get_db
 from utils.auth_utils import get_current_active_user, require_permission
+from utils.document_visibility import (
+    assert_document_visible_for,
+    filter_documents_for_user,
+)
 from tasks.document_tasks import process_document as celery_process_document
 import logging
 
@@ -47,6 +64,23 @@ document_service = DocumentService()
 
 
 # Pydantic Models für API Responses
+class DocumentTagOut(BaseModel):
+    id: int
+    name: str
+    scope: Literal["user", "institution", "global"]
+    is_own: bool = False
+    model_config = {"from_attributes": True}
+
+
+class DocumentTagCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50)
+    scope: Literal["user", "institution"] = "user"
+
+
+class AttachTagsRequest(BaseModel):
+    tag_ids: List[int] = Field(..., min_length=1)
+
+
 class DocumentResponse(BaseModel):
     id: int
     filename: str
@@ -56,6 +90,7 @@ class DocumentResponse(BaseModel):
     file_size: int
     mime_type: str
     status: str
+    visibility: Optional[str] = None  # 'private' | 'institution' (TF-354)
     user_id: Optional[int]  # Fixed: user_id is Integer in database, not String
     metadata: Optional[dict]
     content_preview: Optional[str]
@@ -64,19 +99,40 @@ class DocumentResponse(BaseModel):
     created_at: Optional[str]
     updated_at: Optional[str]
     processed_at: Optional[str]
+    tags: List[DocumentTagOut] = []
+    # OCR-/Qualitäts-Eskalation (TF-360/TF-361/TF-365). Ohne diese Felder verwirft
+    # Pydantic per Default (``extra`` ist nicht auf ``'allow'`` gesetzt) die von
+    # Document.to_dict() gelieferten Werte still, wodurch die Frontend-Badges nie
+    # Daten erhielten. ``escalation`` macht eine laufende/fehlgeschlagene
+    # OCR-Nachbearbeitung für den Nutzer sichtbar.
+    quality: Optional[dict] = None
+    processed_with_ocr: bool = False
+    # ``escalation`` trägt dieselbe geschlossene Wertemenge wie upstream in
+    # quality_assessor.EscalationState — als Literal getypt, statt die Garantie
+    # an der API-Grenze auf ``str`` zu verwässern (TF-365 follow-up).
+    escalation: Optional[EscalationState] = None
 
 
-class DocumentRenameRequest(BaseModel):
-    """Body for PATCH /documents/{id} — set or clear the user-editable title.
+class DocumentPatchRequest(BaseModel):
+    """Body for PATCH /documents/{id} — update display name and/or visibility.
 
-    ``display_name=None`` (or an empty/whitespace string) clears the override
-    and falls back to the resolver chain (filtered metadata title → original
-    filename). Otherwise the value is trimmed and must be 1–255 characters of
-    printable text — control characters are rejected to prevent storing
-    invisible/garbage names.
+    At least one field must be provided (enforced by ``_require_at_least_one``).
+
+    ``display_name`` keeps the original rename semantics: a non-empty string
+    overrides the auto-extracted title; ``None``/empty/whitespace clears the
+    override and falls back to the resolver chain (filtered metadata title →
+    original filename). Trimmed to 1–255 chars; control characters rejected.
+
+    ``visibility`` is owner-only — the ownership check lives in the endpoint,
+    not here, because it needs the loaded document and the current user.
+
+    The endpoint distinguishes "field omitted" from "field set to null" via
+    ``model_fields_set``, so a passed-but-null ``display_name`` still counts as
+    a (clearing) rename rather than a no-op.
     """
 
     display_name: Optional[str] = None
+    visibility: Optional[DocumentVisibility] = None
 
     @field_validator("display_name")
     @classmethod
@@ -98,10 +154,38 @@ class DocumentRenameRequest(BaseModel):
             raise ValueError("display_name contains invalid control characters")
         return trimmed
 
+    @model_validator(mode="after")
+    def _require_at_least_one(self):
+        # ``display_name`` counts even when explicitly null (null clears the
+        # override). An explicit ``visibility: null`` does NOT count: the
+        # endpoint skips a null visibility, so a body of ``{"visibility": null}``
+        # would be a silent 200 no-op. Requiring a non-null visibility here turns
+        # that dead request into a 422 instead.
+        has_display = "display_name" in self.model_fields_set
+        has_visibility = (
+            "visibility" in self.model_fields_set and self.visibility is not None
+        )
+        if not (has_display or has_visibility):
+            raise ValueError(
+                "At least one of 'display_name' or 'visibility' must be provided"
+            )
+        return self
+
+
+class DocumentStats(BaseModel):
+    total: int
+    processed: int
+    with_vectors: int
+    in_progress: int
+
 
 class DocumentListResponse(BaseModel):
     documents: List[DocumentResponse]
     total: int
+    page: int
+    page_size: int
+    total_pages: int
+    stats: DocumentStats
 
 
 class UploadResponse(BaseModel):
@@ -114,6 +198,7 @@ class UploadResponse(BaseModel):
 @router.post("/upload", response_model=UploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
+    visibility: DocumentVisibility = Form(DocumentVisibility.PRIVATE),
     http_request: Request = None,
     current_user: User = Depends(require_permission("create_documents")),
     db: Session = Depends(get_db),
@@ -124,6 +209,8 @@ async def upload_document(
     **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
 
     - **file**: Dokument zum Upload (PDF, DOC, DOCX, TXT, MD)
+    - **visibility**: `private` (nur ich, Default) oder `institution` (geteilt).
+      `institution` ist nur erlaubt, wenn der User einer Institution angehört.
 
     Returns:
         UploadResponse mit Document ID und Status
@@ -131,6 +218,15 @@ async def upload_document(
     **Note:** Document wird asynchron verarbeitet. Status kann via GET /documents/{id} abgerufen werden.
     """
     locale = get_request_locale(http_request, current_user)
+
+    # Visibility (TF-354): validate up front so we never persist a file we
+    # then reject. 'institution' requires the user to belong to one.
+    if visibility == DocumentVisibility.INSTITUTION and not current_user.institution_id:
+        raise HTTPException(
+            status_code=400,
+            detail=t("documents_visibility_no_institution", locale=locale),
+        )
+
     try:
         # Check document limit for institution
         from utils.tenant_utils import SubscriptionLimits
@@ -157,8 +253,9 @@ async def upload_document(
             file=file, user_id=current_user.id, db=db
         )
 
-        # Set institution_id for multi-tenancy
+        # Set institution_id for multi-tenancy + visibility (TF-354)
         document.institution_id = current_user.institution_id
+        document.visibility = visibility
         document.status = DocumentStatus.QUEUED  # Set to QUEUED for async processing
         db.commit()
         db.refresh(document)
@@ -205,59 +302,165 @@ async def upload_document(
         )
 
 
+def _apply_sort(query, sort: str):
+    title_col = func.coalesce(Document.display_name, Document.original_filename)
+    mapping = {
+        "created_at_desc": Document.created_at.desc(),
+        "created_at_asc": Document.created_at.asc(),
+        "title_asc": title_col.asc(),
+        "title_desc": title_col.desc(),
+        "size_desc": Document.file_size.desc(),
+        "size_asc": Document.file_size.asc(),
+    }
+    return query.order_by(mapping.get(sort, Document.created_at.desc()))
+
+
+def _compute_stats(base_query) -> "DocumentStats":
+    """Stats over the visibility-scoped base query (ignores content filters).
+    Passes enum members (not raw strings) to .in_() so SQLAlchemy maps them
+    to the stored column values.
+    base_query is a generative Query; each .filter() returns a new query."""
+    total = base_query.count()
+    processed = base_query.filter(
+        Document.status.in_([DocumentStatus.COMPLETED, DocumentStatus.PROCESSED])
+    ).count()
+    in_progress = base_query.filter(
+        Document.status.in_([DocumentStatus.QUEUED, DocumentStatus.PROCESSING])
+    ).count()
+    with_vectors = base_query.filter(Document.has_vectors.is_(True)).count()
+    return DocumentStats(
+        total=total,
+        processed=processed,
+        with_vectors=with_vectors,
+        in_progress=in_progress,
+    )
+
+
 @router.get("/", response_model=DocumentListResponse)
 async def list_documents(
-    status: Optional[str] = Query(None, description="Filter by status"),
+    q: Annotated[Optional[str], Query()] = None,
+    visibility: Annotated[Optional[Literal["own", "shared"]], Query()] = None,
+    status: Annotated[
+        List[Literal["uploaded", "processing", "processed", "error"]], Query()
+    ] = None,
+    mime_family: Annotated[
+        List[Literal["pdf", "word", "markdown", "text", "chat"]], Query()
+    ] = None,
+    tag_ids: Annotated[List[int], Query()] = None,
+    sort: Literal[
+        "created_at_desc",
+        "created_at_asc",
+        "title_asc",
+        "title_desc",
+        "size_desc",
+        "size_asc",
+    ] = "created_at_desc",
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=96)] = 24,
     request: Request = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Liste alle Dokumente des aktuellen Users
-
-    **Required:** Authenticated user
-
-    - **status**: Optional filter by document status
-
-    Returns:
-        Liste aller Dokumente mit Metadaten
-    """
+    """Paginated, filterable, sortable document list with embedded stats (TF-355)."""
     locale = get_request_locale(request, current_user)
     try:
-        # Convert status string to enum if provided
-        status_filter = None
-        if status:
-            try:
-                status_filter = DocumentStatus(status)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=t("documents_invalid_status", locale=locale),
+        base = filter_documents_for_user(db.query(Document), current_user)
+        if visibility == "own":
+            base = base.filter(Document.user_id == current_user.id)
+        elif visibility == "shared":
+            base = base.filter(Document.user_id != current_user.id)
+
+        # Stats: from the visibility-scoped base, IGNORING q/status/mime/tag filters.
+        stats = _compute_stats(base)
+
+        # Document query: base + content filters.
+        query = base
+        if q:
+            # Escape ILIKE wildcards so a literal "_"/"%" (common in filenames)
+            # is matched literally, not as a pattern.
+            escaped = (
+                q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            pattern = f"%{escaped}%"
+            query = query.filter(
+                or_(
+                    Document.display_name.ilike(pattern, escape="\\"),
+                    Document.original_filename.ilike(pattern, escape="\\"),
+                    Document.content_preview.ilike(pattern, escape="\\"),
                 )
+            )
+        if status:
+            statuses = []
+            for group in status:
+                if group not in STATUS_GROUPS:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=t("documents_invalid_status", locale=locale),
+                    )
+                statuses.extend(STATUS_GROUPS[group])
+            query = query.filter(Document.status.in_(statuses))
+        if mime_family:
+            clauses = []
+            chat_flag = Document.doc_metadata["source"].as_string() == "chat_export"
+            # NULL-safe: doc_metadata is None OR source key absent (SQL NULL) OR
+            # source != "chat_export". Without the is_(None) check on the key the
+            # `not_(chat_flag)` expression is SQL NULL for docs whose metadata dict
+            # exists but lacks a "source" key — those rows would be silently dropped.
+            not_chat_flag = or_(
+                Document.doc_metadata.is_(None),
+                Document.doc_metadata["source"].as_string().is_(None),
+                Document.doc_metadata["source"].as_string() != "chat_export",
+            )
+            for fam in mime_family:
+                if fam == "chat":
+                    clauses.append(chat_flag)
+                elif fam == "text":
+                    clauses.append(
+                        and_(Document.mime_type == "text/plain", not_chat_flag)
+                    )
+                elif fam in MIME_FAMILIES:
+                    clauses.append(Document.mime_type.in_(MIME_FAMILIES[fam]))
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=t("documents_invalid_filter", locale=locale),
+                    )
+            query = query.filter(or_(*clauses))
+        if tag_ids:
+            unique_tag_ids = list(dict.fromkeys(tag_ids))
+            query = (
+                query.join(DocumentTag, DocumentTag.document_id == Document.id)
+                .filter(DocumentTag.tag_id.in_(unique_tag_ids))
+                .group_by(Document.id)
+                .having(
+                    func.count(func.distinct(DocumentTag.tag_id)) == len(unique_tag_ids)
+                )
+            )
 
-        # Tenant-aware query: Filter by institution_id
-        from utils.tenant_utils import TenantFilter, get_tenant_context
+        query = _apply_sort(query, sort)
 
-        tenant_context = get_tenant_context(current_user)
+        total = db.query(func.count()).select_from(query.subquery()).scalar() or 0
+        total_pages = ceil(total / page_size) if total else 0
+        rows = query.offset((page - 1) * page_size).limit(page_size).all()
 
-        query = db.query(Document)
-        query = TenantFilter.filter_by_tenant(query, Document, tenant_context)
-
-        if status_filter:
-            query = query.filter(Document.status == status_filter)
-
-        documents = query.order_by(Document.created_at.desc()).all()
-
-        # Convert to response format
-        document_responses = []
-        for doc in documents:
+        # Batch-load every page row's tags in ONE query (was an N+1: one Tag
+        # join per document, up to page_size round-trips). _document_tags_map
+        # groups the rows in Python; _document_response_with_tags is reused for
+        # the single-document endpoints.
+        tags_by_doc = _document_tags_map([doc.id for doc in rows], current_user, db)
+        documents = []
+        for doc in rows:
             doc_dict = doc.to_dict()
-            document_responses.append(DocumentResponse(**doc_dict))
-
+            doc_dict["tags"] = tags_by_doc.get(doc.id, [])
+            documents.append(DocumentResponse(**doc_dict))
         return DocumentListResponse(
-            documents=document_responses, total=len(document_responses)
+            documents=documents,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
+            stats=stats,
         )
-
     except HTTPException:
         raise
     except Exception as e:
@@ -265,8 +468,7 @@ async def list_documents(
             f"Failed to list documents for user {current_user.id}: {e}", exc_info=True
         )
         raise HTTPException(
-            status_code=500,
-            detail=t("documents_list_failed", locale=locale),
+            status_code=500, detail=t("documents_list_failed", locale=locale)
         )
 
 
@@ -280,6 +482,95 @@ async def health_check():
         "supported_formats": list(document_service.supported_formats.values()),
         "max_file_size_mb": document_service.max_file_size // (1024 * 1024),
     }
+
+
+@router.get("/tags", response_model=List[DocumentTagOut])
+async def list_document_tags(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Tags the user may attach to documents (own user-tags + institution + global)."""
+    tags = visible_tags_for_user(db, current_user).order_by(func.lower(Tag.name)).all()
+    return [
+        DocumentTagOut(
+            id=t.id,
+            name=t.name,
+            scope=t.scope,
+            is_own=(t.created_by == current_user.id),
+        )
+        for t in tags
+    ]
+
+
+@router.post(
+    "/tags", response_model=DocumentTagOut, status_code=200
+)  # get-or-create: returns existing tag on name match, so 200 (not 201)
+async def create_document_tag(
+    body: DocumentTagCreate,
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Create (or return existing) a document tag. ``user`` scope for everyone;
+    ``institution`` scope requires the ``manage_settings`` permission."""
+    locale = get_request_locale(request, current_user)
+    if body.scope == "institution" and not current_user.has_permission(
+        "manage_settings"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=t("documents_tag_institution_admin_only", locale=locale),
+        )
+
+    name = body.name.strip()
+    name_lower = name.lower()
+    if body.scope == "user":
+        existing = (
+            db.query(Tag)
+            .filter(
+                Tag.scope == "user",
+                Tag.created_by == current_user.id,
+                func.lower(Tag.name) == name_lower,
+            )
+            .first()
+        )
+        institution_id = None
+    else:  # institution
+        existing = (
+            db.query(Tag)
+            .filter(
+                Tag.scope == "institution",
+                Tag.institution_id == current_user.institution_id,
+                func.lower(Tag.name) == name_lower,
+            )
+            .first()
+        )
+        institution_id = current_user.institution_id
+
+    if existing:
+        return DocumentTagOut(
+            id=existing.id,
+            name=existing.name,
+            scope=existing.scope,
+            is_own=(existing.created_by == current_user.id),
+        )
+
+    tag = Tag(
+        name=name,
+        scope=body.scope,
+        institution_id=institution_id,
+        created_by=current_user.id,
+    )
+    db.add(tag)
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail=t("documents_tag_exists", locale=locale)
+        )
+    db.refresh(tag)
+    return DocumentTagOut(id=tag.id, name=tag.name, scope=tag.scope, is_own=True)
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
@@ -308,14 +599,10 @@ async def get_document(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
+        assert_document_visible_for(current_user, document, locale=locale)
 
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
-
-        doc_dict = document.to_dict()
-        return DocumentResponse(**doc_dict)
+        return _document_response_with_tags(document, current_user, db)
 
     except HTTPException:
         raise
@@ -331,27 +618,32 @@ async def get_document(
 
 
 @router.patch("/{document_id}", response_model=DocumentResponse)
-async def rename_document(
+async def update_document(
     document_id: int,
-    payload: DocumentRenameRequest,
+    payload: DocumentPatchRequest,
     request: Request,
     current_user: User = Depends(require_permission("create_documents")),
     db: Session = Depends(get_db),
 ):
-    """Set or clear a user-editable display name for a document.
+    """Update a document's display name and/or visibility.
 
-    Pass ``display_name`` as a non-empty string to override the auto-extracted
-    title, or as ``null``/empty/whitespace to fall back to the metadata-then-
-    filename resolver chain. Auto-extracted titles like "1" or "Untitled" are
-    filtered by the resolver, so clearing the override usually surfaces the
-    original filename automatically.
+    - **display_name**: rename behaviour unchanged — a non-empty string
+      overrides the auto-extracted title; ``null``/empty/whitespace clears the
+      override (falls back to the metadata-then-filename resolver). Allowed for
+      any document the caller can see.
+    - **visibility**: ``private``/``institution``. **Owner-only** (SuperUser may
+      also change it) — a non-owner gets 403 even within the same institution.
+      ``institution`` requires the document to belong to an institution. Every
+      effective change is written to the audit log.
 
-    Validation (length, control characters) happens in
-    ``DocumentRenameRequest`` and surfaces as 422 errors automatically.
+    At least one field must be provided (422 otherwise). Field-level validation
+    (length, control characters, enum membership) happens in
+    ``DocumentPatchRequest`` and surfaces as 422.
 
     **Required Permission:** ``create_documents``
     """
     locale = get_request_locale(request, current_user)
+    visibility_change = None
     try:
         document = document_service.get_document_by_id(document_id, db)
         if not document:
@@ -359,31 +651,98 @@ async def rename_document(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant + ownership check (raises HTTPException(403) on mismatch)
-        from utils.tenant_utils import TenantFilter, get_tenant_context
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
+        assert_document_visible_for(current_user, document, locale=locale)
 
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        fields_set = payload.model_fields_set
 
-        # Pydantic validator already normalised empty/whitespace to None
-        # and enforced the 255-char + no-control-chars invariant.
-        document.display_name = payload.display_name
+        # --- Rename (display_name): behaviour unchanged, visibility-scoped. ---
+        # The Pydantic validator already normalised empty/whitespace to None and
+        # enforced the 255-char + no-control-chars invariant.
+        if "display_name" in fields_set:
+            document.display_name = payload.display_name
 
-        # Build the response dict BEFORE committing so a serialisation failure
-        # cannot mask an already-persisted change as a generic 500.
+        # --- Visibility: stricter — owner-only (SuperUser bypass preserved). ---
+        if "visibility" in fields_set and payload.visibility is not None:
+            new_visibility = payload.visibility
+            is_owner = (
+                document.user_id is not None and document.user_id == current_user.id
+            )
+            if not is_owner and not current_user.is_superuser:
+                raise HTTPException(
+                    status_code=403,
+                    detail=t("documents_visibility_owner_only", locale=locale),
+                )
+            if (
+                new_visibility == DocumentVisibility.INSTITUTION
+                and document.institution_id is None
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=t("documents_visibility_no_institution", locale=locale),
+                )
+            if document.visibility != new_visibility:
+                visibility_change = (document.visibility, new_visibility)
+                document.visibility = new_visibility
+                # Leaving institution visibility: institution-scope tags may no
+                # longer be attached (attach block rule). Detach them in the
+                # same transaction so we never persist a private doc carrying
+                # institution tags — a state the attach path rejects (TF-369
+                # follow-up). Runs before the response is built below so the
+                # returned tag list reflects the removal.
+                if new_visibility != DocumentVisibility.INSTITUTION:
+                    detach_institution_tags(db, document)
+
+        # Build the response dict BEFORE persisting so a serialisation failure
+        # cannot mask an already-persisted change as a generic 500. Tags are
+        # unchanged by a patch, so loading them here (pre-commit) is safe.
         response_payload = document.to_dict()
-        db.commit()
+        response_payload["tags"] = _document_tag_outs(document, current_user, db)
+
+        if visibility_change is not None:
+            # A visibility flip is a DSGVO-relevant privileged action: it must
+            # never persist without an audit row. log_document_action adds the
+            # audit row and commits it together with the pending visibility
+            # change in ONE transaction; on failure it rolls back BOTH and
+            # returns None. Treating None as a hard 500 (same fail-loud contract
+            # as log_admin_cross_owner / log_superuser_bypass) keeps the change
+            # and its audit atomic — we never report success on an un-audited
+            # flip, nor a 500 on a change that already landed.
+            from services.audit_service import AuditService
+
+            old_vis, new_vis = visibility_change
+            audit_log = AuditService.log_document_action(
+                db,
+                AuditService.ACTION_UPDATE_DOCUMENT,
+                current_user.id,
+                document_id,
+                request=request,
+                additional_data={
+                    "field": "visibility",
+                    "old_visibility": old_vis.value if old_vis else None,
+                    "new_visibility": new_vis.value,
+                },
+            )
+            if audit_log is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail=t("documents_rename_failed", locale=locale),
+                )
+        else:
+            # display_name-only change — rename was never audited; just persist.
+            db.commit()
+
         return DocumentResponse(**response_payload)
 
     except HTTPException:
         raise
     except SQLAlchemyError as e:
         # DB-level failure (constraint, connection, …) — roll back the open
-        # transaction and report a rename-specific error so the user knows
+        # transaction and report an update-specific error so the user knows
         # which action failed and can retry.
         db.rollback()
         logger.error(
-            f"DB error renaming document {document_id} for user {current_user.id}: {e}",
+            f"DB error updating document {document_id} for user {current_user.id}: {e}",
             exc_info=True,
         )
         raise HTTPException(
@@ -395,13 +754,127 @@ async def rename_document(
         # We deliberately do NOT swallow these as a generic "load failed".
         db.rollback()
         logger.error(
-            f"Unexpected error renaming document {document_id} for user {current_user.id}: {e}",
+            f"Unexpected error updating document {document_id} for user {current_user.id}: {e}",
             exc_info=True,
         )
         raise HTTPException(
             status_code=500,
             detail=t("documents_rename_failed", locale=locale),
         )
+
+
+def _load_owned_document(document_id: int, current_user: User, db: Session, locale):
+    """Load a doc the caller can see; require ownership (SuperUser bypass)."""
+    document = document_service.get_document_by_id(document_id, db)
+    if not document:
+        raise HTTPException(
+            status_code=404, detail=t("documents_not_found", locale=locale)
+        )
+    assert_document_visible_for(current_user, document, locale=locale)
+    is_owner = document.user_id is not None and document.user_id == current_user.id
+    if not is_owner and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=403, detail=t("documents_tag_owner_only", locale=locale)
+        )
+    return document
+
+
+def _document_response_with_tags(
+    document, current_user: User, db: Session
+) -> DocumentResponse:
+    doc_dict = document.to_dict()
+    doc_dict["tags"] = _document_tag_outs(document, current_user, db)
+    return DocumentResponse(**doc_dict)
+
+
+def _document_tag_outs(
+    document, current_user: User, db: Session
+) -> List[DocumentTagOut]:
+    """Load a single document's tags as DocumentTagOut, alphabetically by name."""
+    tag_rows = (
+        db.query(Tag)
+        .join(DocumentTag, DocumentTag.tag_id == Tag.id)
+        .filter(DocumentTag.document_id == document.id)
+        .order_by(func.lower(Tag.name))
+        .all()
+    )
+    return [
+        DocumentTagOut(
+            id=t.id,
+            name=t.name,
+            scope=t.scope,
+            is_own=(t.created_by == current_user.id),
+        )
+        for t in tag_rows
+    ]
+
+
+def _document_tags_map(
+    document_ids: List[int], current_user: User, db: Session
+) -> "dict[int, List[DocumentTagOut]]":
+    """Load tags for many documents in one query, grouped by document id.
+
+    Avoids the N+1 that calling ``_document_tag_outs`` per row would incur on a
+    paginated listing. Tags within each document are alphabetical by name; the
+    global ordering by ``lower(name)`` keeps that order stable per group.
+    """
+    if not document_ids:
+        return {}
+    rows = (
+        db.query(DocumentTag.document_id, Tag)
+        .join(Tag, Tag.id == DocumentTag.tag_id)
+        .filter(DocumentTag.document_id.in_(document_ids))
+        .order_by(func.lower(Tag.name))
+        .all()
+    )
+    result: "dict[int, List[DocumentTagOut]]" = {}
+    for document_id, tag in rows:
+        result.setdefault(document_id, []).append(
+            DocumentTagOut(
+                id=tag.id,
+                name=tag.name,
+                scope=tag.scope,
+                is_own=(tag.created_by == current_user.id),
+            )
+        )
+    return result
+
+
+@router.post("/{document_id}/tags", response_model=DocumentResponse)
+async def attach_document_tags(
+    document_id: int,
+    body: AttachTagsRequest,
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Attach tags to a document. Owner-only. Enforces the institution-tag block rule."""
+    locale = get_request_locale(request, current_user)
+    document = _load_owned_document(document_id, current_user, db, locale)
+    try:
+        attach_tags_to_document(db, document, body.tag_ids, current_user)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    db.refresh(document)
+    return _document_response_with_tags(document, current_user, db)
+
+
+@router.delete("/{document_id}/tags/{tag_id}", status_code=204)
+async def detach_document_tag(
+    document_id: int,
+    tag_id: int,
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Detach a tag from a document. Owner-only."""
+    locale = get_request_locale(request, current_user)
+    document = _load_owned_document(document_id, current_user, db, locale)
+    detach_tag_from_document(db, document, tag_id)
+    db.commit()
+    return Response(status_code=204)
 
 
 def _content_disposition(filename: str, inline: bool) -> str:
@@ -580,11 +1053,8 @@ async def download_document(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         return _build_document_file_response(
             document, locale=locale, inline=False, caller_id=current_user.id
@@ -629,11 +1099,8 @@ async def get_document_raw(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         return _build_document_file_response(
             document, locale=locale, inline=True, caller_id=current_user.id
@@ -678,11 +1145,8 @@ async def get_document_status(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         # Get Celery task status if task_id exists
         task_status = None
@@ -930,11 +1394,8 @@ async def get_document_content(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         # Hole vollständigen Inhalt vom Document Service
         content = await document_service.get_full_document_content(document_id, db)
@@ -995,11 +1456,8 @@ async def get_document_chunks(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(
@@ -1064,11 +1522,8 @@ async def get_document_chunks_paginated(
                 status_code=404, detail=t("documents_not_found", locale=locale)
             )
 
-        # Tenant-aware access control
-        from utils.tenant_utils import TenantFilter, get_tenant_context
-
-        tenant_context = get_tenant_context(current_user)
-        TenantFilter.verify_tenant_access(document, tenant_context)
+        # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
+        assert_document_visible_for(current_user, document, locale=locale)
 
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(

@@ -7,7 +7,8 @@ ARG BUILD_TIMESTAMP
 ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 
 # Install system dependencies
-# Note: PyMuPDF (fitz) requires mupdf libraries for PDF processing
+# Note: PyMuPDF (fitz) requires mupdf libraries for PDF processing.
+# Tesseract (+ deu/eng) enables PyMuPDF OCR for scanned PDFs (TF-360).
 RUN apt-get update && apt-get install -y \
     gcc \
     git \
@@ -17,7 +18,15 @@ RUN apt-get update && apt-get install -y \
     libmagic1 \
     libmupdf-dev \
     mupdf \
+    tesseract-ocr \
+    tesseract-ocr-deu \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
+
+# Tesseract tessdata für PyMuPDF-OCR (TF-360). PyMuPDFs get_textpage_ocr
+# verlangt eine gesetzte TESSDATA_PREFIX. Pfad gilt für Debian Bookworm
+# (Tesseract 5). Beim Build verifiziert; bei abweichender Distro anpassen.
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
 
 # Add GitHub SSH host key to known_hosts
 RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts

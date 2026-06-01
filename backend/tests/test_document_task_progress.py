@@ -71,7 +71,7 @@ class TestProgressTask:
             mock_db.query.return_value.filter.return_value.first.return_value = mock_doc
 
             mock_run_async.return_value = {
-                "docling_processing": {},
+                "extraction": {},
                 "vector_embeddings": {},
             }
 
@@ -104,7 +104,7 @@ class TestProgressTask:
             mock_doc.has_vectors = True
             mock_db.query.return_value.filter.return_value.first.return_value = mock_doc
             mock_run_async.return_value = {
-                "docling_processing": {},
+                "extraction": {},
                 "vector_embeddings": {},
             }
 

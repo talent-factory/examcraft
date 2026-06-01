@@ -28,7 +28,10 @@ from utils.auth_utils import (
     get_current_active_user,
     require_permission,
 )
-from utils.tenant_utils import TenantFilter, get_tenant_context
+from utils.document_visibility import (
+    filter_documents_for_user,
+    is_document_visible_for,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -156,17 +159,15 @@ async def generate_rag_exam(
     try:
         # Validiere Document IDs falls angegeben
         if request.document_ids:
-            tenant_context = get_tenant_context(current_user)
             for doc_id in request.document_ids:
                 document = document_service.get_document_by_id(doc_id, db)
-                if not document:
+                # Visibility-Check (TF-354): 404 statt 403 — ein fremdes
+                # privates Dokument darf nicht über den RAG-Pfad leaken.
+                if not document or not is_document_visible_for(current_user, document):
                     raise HTTPException(
                         status_code=404,
                         detail=t("rag_document_not_found", locale=locale),
                     )
-
-                # Tenant-Check: Dokument muss zur Institution des Users gehoeren
-                TenantFilter.verify_tenant_access(document, tenant_context)
 
                 # Prüfe ob Dokument verarbeitet ist
                 if document.status != DocumentStatus.PROCESSED:
@@ -517,17 +518,15 @@ async def retrieve_context(
     try:
         # Validiere Document IDs falls angegeben
         if request.document_ids:
-            tenant_context = get_tenant_context(current_user)
             for doc_id in request.document_ids:
                 document = document_service.get_document_by_id(doc_id, db)
-                if not document:
+                # Visibility-Check (TF-354): 404 statt 403 — ein fremdes
+                # privates Dokument darf nicht über den RAG-Pfad leaken.
+                if not document or not is_document_visible_for(current_user, document):
                     raise HTTPException(
                         status_code=404,
                         detail=t("rag_document_not_found", locale=locale),
                     )
-
-                # Tenant-Check: Dokument muss zur Institution des Users gehoeren
-                TenantFilter.verify_tenant_access(document, tenant_context)
 
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
         context = await rag_service_module.rag_service.retrieve_context(
@@ -582,10 +581,10 @@ async def get_available_documents(
                 detail=t("rag_no_institution", locale=locale),
             )
 
-        # Tenant-aware: Alle Dokumente der Institution (konsistent mit list_documents)
-        tenant_context = get_tenant_context(current_user)
+        # Visibility-aware (TF-354): konsistent mit list_documents — eigene
+        # Docs + institution-geteilte Docs der eigenen Institution.
         query = db.query(Document)
-        query = TenantFilter.filter_by_tenant(query, Document, tenant_context)
+        query = filter_documents_for_user(query, current_user)
 
         if processed_only:
             query = query.filter(Document.status == DocumentStatus.PROCESSED)
