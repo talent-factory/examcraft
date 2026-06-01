@@ -263,3 +263,36 @@ def test_compute_quality_stats_defaults_discard_to_zero():
     stats = compute_quality_stats(doc, file_size=10)
     assert stats.ocr_pages_attempted == 0
     assert stats.ocr_pages_discarded == 0
+
+
+def test_empty_extraction_with_unknown_page_count_fails():
+    """TF-367-Nachzügler: ein Dokument ohne nutzbare Extraktion (0 chars / 0
+    chunks) darf NICHT als 'ok' durchgehen, auch wenn page_count unbekannt (0)
+    ist — z. B. ein gescanntes DOCX ohne <Pages>-Metadaten und ohne Body-Bilder.
+    Vorher übersprang das page_count>=1-Gate die Low-Text-Heuristik."""
+    verdict = assess_quality(
+        _stats(page_count=0, total_chars=0, chunk_count=0, file_size=300_000)
+    )
+    assert verdict.ok is False
+    assert verdict.reason == "scanned_low_text"
+
+
+def test_zero_chunks_with_unknown_page_count_fails():
+    """Auch 0 Chunks (selbst bei >0 chars-Artefakten) ist kein verwertbares
+    Ergebnis und darf nicht still als 'ok' gelten."""
+    verdict = assess_quality(
+        _stats(page_count=0, total_chars=0, chunk_count=0, file_size=1_000)
+    )
+    assert verdict.ok is False
+    assert verdict.reason == "scanned_low_text"
+
+
+def test_small_text_file_with_unknown_page_count_still_ok():
+    """Gegenprobe: eine echte, kleine Text-/Markdown-Datei (page_count=0, aber
+    nicht-leere Extraktion) bleibt 'ok' — wir eskalieren nur leere Extraktion,
+    nicht jedes kurze paginierungslose Dokument."""
+    verdict = assess_quality(
+        _stats(page_count=0, total_chars=40, chunk_count=1, file_size=40)
+    )
+    assert verdict.ok is True
+    assert verdict.reason == "ok"

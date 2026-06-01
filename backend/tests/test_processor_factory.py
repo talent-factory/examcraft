@@ -191,6 +191,40 @@ class TestProcessorFactoryGlobalInit:
         logged = " ".join(str(call) for call in mock_logger.error.call_args_list)
         assert "RuntimeError" in logged
 
+    def test_unknown_type_raises_dedicated_subclass(self):
+        """TF-372: Unbekannter Typ wirft die dedizierte
+        UnknownProcessorTypeError (Subklasse von ValueError), damit der
+        Fail-fast-Pfad sie von einem beliebigen ValueError aus einem
+        Processor-Konstruktor unterscheiden kann."""
+        from services.document_processors.processor_factory import (
+            UnknownProcessorTypeError,
+        )
+
+        with patch.dict(os.environ, {"DOCUMENT_PROCESSOR_TYPE": "invalid"}):
+            with pytest.raises(UnknownProcessorTypeError):
+                DocumentProcessorFactory.create_processor()
+
+    def test_non_type_value_error_does_not_fail_fast_as_misconfig(self):
+        """TF-372: Ein ValueError, der NICHT vom Typ-Check stammt (z. B. ein
+        kaputtes numerisches Env wie OCR_DPI, hier durch einen Konstruktor-Mock
+        simuliert), wird NICHT als 'Invalid DOCUMENT_PROCESSOR_TYPE' fehlgemeldet,
+        sondern läuft in den Resilienz-Fallback."""
+        from services.document_processors import processor_factory as pf
+
+        with patch.object(
+            pf.DocumentProcessorFactory,
+            "create_processor",
+            side_effect=ValueError("invalid literal for int() with base 10: 'abc'"),
+        ):
+            with patch.object(pf, "logger") as mock_logger:
+                processor = pf._init_document_processor()
+
+        # Kein Fail-fast: Fallback greift (kein Re-raise).
+        assert processor is not None
+        logged = " ".join(str(call) for call in mock_logger.error.call_args_list)
+        # Die irreführende Typ-Fehlkonfigurations-Meldung darf NICHT erscheinen.
+        assert "Invalid DOCUMENT_PROCESSOR_TYPE" not in logged
+
 
 class TestProcessorFactoryEnvironmentVariables:
     """Tests für Environment Variable Handling"""

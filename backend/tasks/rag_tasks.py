@@ -8,10 +8,15 @@ from __future__ import annotations
 from celery_app import celery_app
 from database import SessionLocal
 from models.document import Document
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Literal
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Geschlossene Wertemenge für das ``status``-Feld des reindex-Result-Envelopes
+# (TF-370). Als Literal getypt, damit Tippfehler an Schreib-/Lesestellen
+# statisch auffallen statt erst im Consumer zu einem stillen Mismatch zu werden.
+ReindexStatus = Literal["reindexed", "deferred", "not_found"]
 
 
 @celery_app.task(name="tasks.rag_tasks.create_embeddings", priority=3, max_retries=3)
@@ -68,11 +73,25 @@ def create_embeddings(document_id: str, chunks: List[str]) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error creating embeddings for {document_id}: {str(e)}")
 
-        # Update document with error status
-        if document:
-            document.embedding_status = "failed"
-            document.embedding_error = str(e)
-            db.commit()
+        # Persist the failure status, but guard the commit: the original
+        # exception may have poisoned the transaction (common for
+        # SQLAlchemyError). An unguarded commit here would raise a *second*
+        # exception that replaces the real one in the traceback and hides the
+        # root cause in Sentry. Roll back first, then write + commit the status
+        # in its own try (same pattern as document_service vector-error path).
+        if document is not None:
+            try:
+                db.rollback()
+                document.embedding_status = "failed"
+                document.embedding_error = str(e)
+                db.commit()
+            except Exception as commit_err:
+                db.rollback()
+                logger.error(
+                    "Failed to persist embedding-failure status for %s: %s",
+                    document_id,
+                    commit_err,
+                )
 
         raise
 
@@ -226,8 +245,12 @@ def reindex_document_to_institution(document_id: int) -> "dict[str, object]":
             _reindex_document_payload(doc)
         except NotImplementedError as exc:
             # Stub is still in place — document remains marked for reindex.
-            # Loud per-invocation warning so operators see the gap.
-            logger.warning(
+            # Logged at ERROR (not WARNING) so the Sentry logging integration
+            # captures it and on-call is actually alerted: a deferred reindex
+            # leaves the document's Qdrant payload pointing at the *old*
+            # institution_id (cross-tenant search-visibility gap) until a manual
+            # reindex runs. There is no automatic sweeper today (TF-352 follow-up).
+            logger.error(
                 "Document %s pending_reindex stays True — Qdrant upsert stub "
                 "still active. %s",
                 document_id,

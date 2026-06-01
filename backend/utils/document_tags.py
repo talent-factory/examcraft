@@ -91,3 +91,32 @@ def detach_tag_from_document(db: Session, document: Document, tag_id: int) -> No
     db.query(DocumentTag).filter(
         DocumentTag.document_id == document.id, DocumentTag.tag_id == tag_id
     ).delete(synchronize_session=False)
+
+
+def detach_institution_tags(db: Session, document: Document) -> int:
+    """Remove all ``institution``-scope tag links from a document.
+
+    Used when a document leaves ``institution`` visibility (e.g. an owner flips
+    it back to ``private``): ``attach_tags_to_document`` forbids attaching an
+    institution tag to a non-shared doc, so retaining such tags after a
+    downgrade would persist a state the attach path rejects. Detaching keeps
+    tag scope and document visibility coherent (TF-369 follow-up). Caller
+    commits. Returns the number of links removed.
+    """
+    inst_tag_ids = [
+        row.tag_id
+        for row in (
+            db.query(DocumentTag.tag_id)
+            .join(Tag, Tag.id == DocumentTag.tag_id)
+            .filter(
+                DocumentTag.document_id == document.id,
+                Tag.scope == "institution",
+            )
+        )
+    ]
+    if inst_tag_ids:
+        db.query(DocumentTag).filter(
+            DocumentTag.document_id == document.id,
+            DocumentTag.tag_id.in_(inst_tag_ids),
+        ).delete(synchronize_session=False)
+    return len(inst_tag_ids)

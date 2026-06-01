@@ -423,3 +423,89 @@ def test_document_response_has_tags_field_default_empty():
         processed_at=None,
     )
     assert dr.tags == []
+
+
+# ---------------------------------------------------------------------------
+# TF-372: scope CHECK constraint + institution/global name uniqueness
+# ---------------------------------------------------------------------------
+
+
+def test_tags_scope_check_constraint_rejects_invalid_scope(test_db):
+    """The DB CHECK ``ck_tags_scope_valid`` makes an illegal scope value
+    unrepresentable — not merely discouraged by convention at the write sites."""
+    from sqlalchemy.exc import IntegrityError
+
+    test_db.add(Tag(name="Bad", scope="bogus", created_by=1))
+    with pytest.raises(IntegrityError):
+        test_db.commit()
+    test_db.rollback()
+
+
+def test_ux_tags_institution_name_enforces_uniqueness_per_institution(test_db):
+    """Institution tag names are case-insensitively unique per institution, but
+    the same name in a *different* institution is fine."""
+    from sqlalchemy.exc import IntegrityError
+
+    # Second institution for the cross-institution assertion (FK target).
+    test_db.merge(
+        Institution(
+            id=9002,
+            name="TF-372 Second Institution",
+            slug="tf372-second-institution",
+            subscription_tier="free",
+            max_users=100,
+            max_documents=100,
+            max_questions_per_month=1000,
+        )
+    )
+    test_db.commit()
+
+    test_db.add(Tag(name="Fach", scope="institution", institution_id=9001))
+    test_db.commit()
+    test_db.add(Tag(name="fach", scope="institution", institution_id=9001))  # dup
+    with pytest.raises(IntegrityError):
+        test_db.commit()
+    test_db.rollback()
+    # Different institution → allowed.
+    test_db.add(Tag(name="Fach", scope="institution", institution_id=9002))
+    test_db.commit()
+
+
+def test_ux_tags_global_name_enforces_uniqueness(test_db):
+    """Global tag names are case-insensitively unique."""
+    from sqlalchemy.exc import IntegrityError
+
+    test_db.add(Tag(name="Welt", scope="global", institution_id=None))
+    test_db.commit()
+    test_db.add(Tag(name="welt", scope="global", institution_id=None))  # dup
+    with pytest.raises(IntegrityError):
+        test_db.commit()
+    test_db.rollback()
+
+
+def test_detach_institution_tags_removes_only_institution_scope(
+    tag_scope_data, test_db
+):
+    """detach_institution_tags drops institution-scope links but keeps user/global
+    ones — the helper used when a doc leaves institution visibility (TF-369)."""
+    from utils.document_tags import detach_institution_tags
+
+    d = tag_scope_data
+    doc = _doc(test_db, 9300, d.me.id, DocumentVisibility.INSTITUTION)
+    test_db.add_all(
+        [
+            DocumentTag(document_id=doc.id, tag_id=d.inst_tag.id),
+            DocumentTag(document_id=doc.id, tag_id=d.my_user_tag.id),
+            DocumentTag(document_id=doc.id, tag_id=d.global_tag.id),
+        ]
+    )
+    test_db.commit()
+
+    removed = detach_institution_tags(test_db, doc)
+    test_db.commit()
+
+    assert removed == 1
+    remaining = {
+        r.tag_id for r in test_db.query(DocumentTag).filter_by(document_id=doc.id).all()
+    }
+    assert remaining == {d.my_user_tag.id, d.global_tag.id}

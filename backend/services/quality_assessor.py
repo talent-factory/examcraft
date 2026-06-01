@@ -149,6 +149,14 @@ def assess_quality(stats: DocumentQualityStats) -> QualityVerdict:
     if stats.ocr_pages_discarded >= 1 and discard_ratio > max_ocr_discard_ratio:
         return QualityVerdict(False, "ocr_pages_discarded", signals)
 
+    # Zero usable extraction must never pass as "ok", auch wenn page_count
+    # unbekannt (0) ist — z. B. ein gescanntes DOCX ohne <Pages>-Metadaten und
+    # ohne Body-Bilder. Ohne diese Prüfung überspränge das ``page_count >= 1``-
+    # Gate unten die Low-Text-Heuristik und liesse ein leeres Dokument still als
+    # "Verarbeitet" durch (TF-367-Nachzügler).
+    if stats.total_chars == 0 or stats.chunk_count == 0:
+        return QualityVerdict(False, "scanned_low_text", signals)
+
     if stats.page_count >= 1 and chars_per_page < min_chars_per_page:
         return QualityVerdict(False, "scanned_low_text", signals)
 

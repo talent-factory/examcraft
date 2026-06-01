@@ -35,6 +35,7 @@ from services.storage_service import (
     StorageUnavailableError,
 )
 from services.translation_service import t, get_request_locale
+from services.quality_assessor import EscalationState
 from services.vector_service_factory import vector_service
 from models.document import Document, DocumentStatus, DocumentVisibility
 from models.auth import User
@@ -43,6 +44,7 @@ from utils.document_tags import (
     visible_tags_for_user,
     attach_tags_to_document,
     detach_tag_from_document,
+    detach_institution_tags,
     STATUS_GROUPS,
     MIME_FAMILIES,
 )
@@ -105,7 +107,10 @@ class DocumentResponse(BaseModel):
     # OCR-Nachbearbeitung für den Nutzer sichtbar.
     quality: Optional[dict] = None
     processed_with_ocr: bool = False
-    escalation: Optional[str] = None
+    # ``escalation`` trägt dieselbe geschlossene Wertemenge wie upstream in
+    # quality_assessor.EscalationState — als Literal getypt, statt die Garantie
+    # an der API-Grenze auf ``str`` zu verwässern (TF-365 follow-up).
+    escalation: Optional[EscalationState] = None
 
 
 class DocumentPatchRequest(BaseModel):
@@ -438,9 +443,16 @@ async def list_documents(
         total_pages = ceil(total / page_size) if total else 0
         rows = query.offset((page - 1) * page_size).limit(page_size).all()
 
-        documents = [
-            _document_response_with_tags(doc, current_user, db) for doc in rows
-        ]
+        # Batch-load every page row's tags in ONE query (was an N+1: one Tag
+        # join per document, up to page_size round-trips). _document_tags_map
+        # groups the rows in Python; _document_response_with_tags is reused for
+        # the single-document endpoints.
+        tags_by_doc = _document_tags_map([doc.id for doc in rows], current_user, db)
+        documents = []
+        for doc in rows:
+            doc_dict = doc.to_dict()
+            doc_dict["tags"] = tags_by_doc.get(doc.id, [])
+            documents.append(DocumentResponse(**doc_dict))
         return DocumentListResponse(
             documents=documents,
             total=total,
@@ -672,6 +684,14 @@ async def update_document(
             if document.visibility != new_visibility:
                 visibility_change = (document.visibility, new_visibility)
                 document.visibility = new_visibility
+                # Leaving institution visibility: institution-scope tags may no
+                # longer be attached (attach block rule). Detach them in the
+                # same transaction so we never persist a private doc carrying
+                # institution tags — a state the attach path rejects (TF-369
+                # follow-up). Runs before the response is built below so the
+                # returned tag list reflects the removal.
+                if new_visibility != DocumentVisibility.INSTITUTION:
+                    detach_institution_tags(db, document)
 
         # Build the response dict BEFORE persisting so a serialisation failure
         # cannot mask an already-persisted change as a generic 500. Tags are
@@ -770,7 +790,7 @@ def _document_response_with_tags(
 def _document_tag_outs(
     document, current_user: User, db: Session
 ) -> List[DocumentTagOut]:
-    """Load a document's tags as DocumentTagOut, alphabetically by name."""
+    """Load a single document's tags as DocumentTagOut, alphabetically by name."""
     tag_rows = (
         db.query(Tag)
         .join(DocumentTag, DocumentTag.tag_id == Tag.id)
@@ -787,6 +807,37 @@ def _document_tag_outs(
         )
         for t in tag_rows
     ]
+
+
+def _document_tags_map(
+    document_ids: List[int], current_user: User, db: Session
+) -> "dict[int, List[DocumentTagOut]]":
+    """Load tags for many documents in one query, grouped by document id.
+
+    Avoids the N+1 that calling ``_document_tag_outs`` per row would incur on a
+    paginated listing. Tags within each document are alphabetical by name; the
+    global ordering by ``lower(name)`` keeps that order stable per group.
+    """
+    if not document_ids:
+        return {}
+    rows = (
+        db.query(DocumentTag.document_id, Tag)
+        .join(Tag, Tag.id == DocumentTag.tag_id)
+        .filter(DocumentTag.document_id.in_(document_ids))
+        .order_by(func.lower(Tag.name))
+        .all()
+    )
+    result: "dict[int, List[DocumentTagOut]]" = {}
+    for document_id, tag in rows:
+        result.setdefault(document_id, []).append(
+            DocumentTagOut(
+                id=tag.id,
+                name=tag.name,
+                scope=tag.scope,
+                is_own=(tag.created_by == current_user.id),
+            )
+        )
+    return result
 
 
 @router.post("/{document_id}/tags", response_model=DocumentResponse)

@@ -1281,3 +1281,80 @@ def test_transfer_dedup_avoids_duplicate_link(test_db, test_institution):
     )
     assert len(links) == 1
     assert links[0].tag_id == target_tag_id
+
+
+def test_transfer_dedup_avoids_duplicate_document_link(test_db, test_institution):
+    """TF-369: the DocumentTag branch of _repoint_tag_links must drop a redundant
+    link too — a document already linked to BOTH the source and colliding target
+    tag must end with a single (document_id, tag_id) row. Mirrors the QuestionTag
+    case so a future divergence between the two composite-PK link tables is caught.
+    """
+    from sqlalchemy import text
+    from models.auth import User
+    from models.tag import Tag, DocumentTag
+    from services.user_institution_transfer_service import (
+        transfer_user,
+        TransferFlags,
+    )
+
+    test_db.execute(
+        text(
+            "SELECT setval('institutions_id_seq', "
+            "GREATEST((SELECT MAX(id) FROM institutions), 1))"
+        )
+    )
+
+    target = _make_institution(test_db, "DedupDocTarget", "dearmingdoctarget")
+
+    actor = User(
+        email="dedupdoc-admin@x",
+        first_name="a",
+        last_name="d",
+        password_hash="x",
+        institution_id=test_institution.id,
+        status="active",
+        is_superuser=True,
+    )
+    user = User(
+        email="dedupdoc-user@x",
+        first_name="u",
+        last_name="u",
+        password_hash="x",
+        institution_id=test_institution.id,
+        status="active",
+    )
+    test_db.add_all([actor, user])
+    test_db.commit()
+
+    source_tag = Tag(
+        name="Shared", created_by=user.id, institution_id=test_institution.id
+    )
+    target_tag = Tag(name="shared", created_by=actor.id, institution_id=target.id)
+    test_db.add_all([source_tag, target_tag])
+    test_db.commit()
+
+    doc = Document(
+        original_filename="d.pdf",
+        filename="d.pdf",
+        file_path="/tmp/d.pdf",
+        file_size=100,
+        mime_type="application/pdf",
+        user_id=user.id,
+        institution_id=test_institution.id,
+        status=DocumentStatus.UPLOADED,
+    )
+    test_db.add(doc)
+    test_db.commit()
+    # The same document is already linked to BOTH tags.
+    test_db.add(DocumentTag(document_id=doc.id, tag_id=source_tag.id))
+    test_db.add(DocumentTag(document_id=doc.id, tag_id=target_tag.id))
+    test_db.commit()
+
+    target_tag_id = target_tag.id
+
+    flags = TransferFlags(documents=False, exams=False, questions=False, tags=True)
+    transfer_user(test_db, user.id, target.id, flags, actor)
+
+    links = test_db.query(DocumentTag).filter(DocumentTag.document_id == doc.id).all()
+    assert len(links) == 1
+    assert links[0].tag_id == target_tag_id

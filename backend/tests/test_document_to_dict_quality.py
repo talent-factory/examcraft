@@ -18,6 +18,9 @@ def test_to_dict_exposes_quality_and_ocr_flag():
         "signals": {},
     }
     assert payload["processed_with_ocr"] is True
+    # TF-365-Nachzügler: das escalation-Feld (das die UI-Badges erst wirksam
+    # macht) muss to_dict ebenfalls durchreichen, nicht nur das Response-Schema.
+    assert payload["escalation"] == "completed"
 
 
 def test_to_dict_quality_defaults_when_processing_info_missing():

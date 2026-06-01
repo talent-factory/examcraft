@@ -1,6 +1,7 @@
 """Tag Models für ExamCraft AI."""
 
 from sqlalchemy import (
+    CheckConstraint,
     Column,
     Boolean,
     DateTime,
@@ -26,6 +27,8 @@ class Tag(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False)
+    # Geschlossene Wertemenge — per DB-CHECK durchgesetzt (s. __table_args__),
+    # nicht bloss per Konvention an den Schreibstellen (TF-372).
     scope = Column(String(20), default="institution", nullable=False)
     institution_id = Column(
         Integer,
@@ -52,6 +55,30 @@ class Tag(Base):
             text("lower(name)"),
             unique=True,
             postgresql_where=text("scope = 'user'"),
+        ),
+        # TF-372: case-insensitive uniqueness of institution-scoped tag names
+        # per institution, and of global-scoped tag names. Without these the
+        # get-or-create endpoint's 409-on-duplicate branch was dead for those
+        # scopes (the pre-check is a TOCTOU race with no DB backstop). Declared
+        # here so create_all() builds them for tests; mirrored in the migration.
+        Index(
+            "ux_tags_institution_name",
+            "institution_id",
+            text("lower(name)"),
+            unique=True,
+            postgresql_where=text("scope = 'institution'"),
+        ),
+        Index(
+            "ux_tags_global_name",
+            text("lower(name)"),
+            unique=True,
+            postgresql_where=text("scope = 'global'"),
+        ),
+        # TF-372: the scope value set is closed — enforce it at the DB, not just
+        # by convention at the (scattered) write sites.
+        CheckConstraint(
+            "scope IN ('user', 'institution', 'global')",
+            name="ck_tags_scope_valid",
         ),
     )
 

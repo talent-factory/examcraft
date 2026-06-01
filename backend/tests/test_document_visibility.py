@@ -309,6 +309,46 @@ def test_owner_changes_visibility_and_audit_logged(vis_data, test_db):
     assert extra["new_visibility"] == "institution"
 
 
+def test_flip_to_private_detaches_institution_tags(vis_data, test_db):
+    """TF-369-Nachzügler: flippt der Owner ein institution-sichtbares Dokument
+    zurück auf private, müssen institution-scope Tags mit-entfernt werden —
+    sonst bliebe ein Zustand bestehen, den der Attach-Pfad verbietet. User-Tags
+    bleiben unangetastet."""
+    from models.tag import DocumentTag, Tag
+
+    inst_tag = Tag(name="Abteilung-X", scope="institution", institution_id=700)
+    user_tag = Tag(name="Mein-Tag", scope="user", created_by=700)
+    test_db.add_all([inst_tag, user_tag])
+    test_db.flush()
+    test_db.add_all(
+        [
+            DocumentTag(document_id=701, tag_id=inst_tag.id),
+            DocumentTag(document_id=701, tag_id=user_tag.id),
+        ]
+    )
+    test_db.commit()
+
+    payload = DocumentPatchRequest(visibility=DocumentVisibility.PRIVATE)
+    resp = _run(
+        update_document(
+            document_id=701,
+            payload=payload,
+            request=None,
+            current_user=vis_data.owner,
+            db=test_db,
+        )
+    )
+
+    assert resp.visibility == "private"
+    remaining = {
+        r.tag_id for r in test_db.query(DocumentTag).filter_by(document_id=701).all()
+    }
+    assert inst_tag.id not in remaining  # institution tag detached
+    assert user_tag.id in remaining  # user tag retained
+    # The response tag list also reflects the detach (built pre-commit).
+    assert all(tag.scope != "institution" for tag in resp.tags)
+
+
 def test_non_owner_cannot_change_visibility_of_shared_doc(vis_data, test_db):
     # colleague CAN see the institution-shared doc but is not its owner → 403.
     payload = DocumentPatchRequest(visibility=DocumentVisibility.PRIVATE)
@@ -672,3 +712,32 @@ def test_exam_composer_list_hides_colleague_private_doc(vis_data, test_db):
     ids = {entry["id"] for entry in result}
     assert 701 in ids  # institution-shared doc visible
     assert 700 not in ids  # owner's private doc hidden
+
+
+def test_db_check_constraint_blocks_institution_without_institution(vis_data, test_db):
+    """TF-354 last line of defense: the DB CHECK constraint
+    ``ck_documents_institution_visibility_requires_institution`` must reject an
+    ``institution``-visible row with a NULL ``institution_id`` even when the
+    application-layer 400 guards are bypassed (direct write). Without this, a
+    future write path could re-open the privacy gap the enum closed.
+
+    Goes through the ORM (so enum serialization is handled) but bypasses the
+    endpoint's 400 guards — the CHECK lives on the table, so a NULL
+    institution_id with ``institution`` visibility must fail at flush."""
+    from sqlalchemy.exc import IntegrityError
+
+    bad = Document(
+        filename="x.pdf",
+        original_filename="x.pdf",
+        file_path="/tmp/x.pdf",
+        file_size=1,
+        mime_type="application/pdf",
+        status=DocumentStatus.PROCESSED,
+        visibility=DocumentVisibility.INSTITUTION,
+        institution_id=None,
+        user_id=700,
+    )
+    test_db.add(bad)
+    with pytest.raises(IntegrityError):
+        test_db.flush()
+    test_db.rollback()

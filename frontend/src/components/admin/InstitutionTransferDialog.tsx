@@ -71,20 +71,32 @@ export const InstitutionTransferDialog: React.FC<InstitutionTransferDialogProps>
     // Debounce: avoid hammering the preview API while the user toggles through
     // the institution dropdown. 300ms is fast enough to feel instant but
     // slow enough to absorb keyboard scroll-through of the options list.
+    //
+    // `cancelled` guards against an in-flight stale response: clearing the
+    // timeout cancels a not-yet-fired request, but a request already dispatched
+    // for an older target could resolve *after* a newer one and overwrite the
+    // preview with stale counts (which then flow into the confirm step + toast).
+    // Bail before touching state if this effect run has been superseded.
+    let cancelled = false;
     const handle = setTimeout(async () => {
       setPreviewLoading(true);
       setError(null);
       try {
         const p = await AdminService.previewTransfer(user.id, targetId);
+        if (cancelled) return;
         setPreview(p);
       } catch (err) {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : t('admin.institutionTransfer.previewError'));
         setPreview(null);
       } finally {
-        setPreviewLoading(false);
+        if (!cancelled) setPreviewLoading(false);
       }
     }, 300);
-    return () => clearTimeout(handle);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [targetId, user.id, user.institution_id, t]);
 
   const handleSubmit = useCallback(async () => {
