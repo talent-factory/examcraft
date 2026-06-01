@@ -5,6 +5,13 @@
     "logout": "Abmelden",
     "language": "Sprache",
     "documentation": "Dokumentation",
+    "groups": {
+      "overview": "Überblick",
+      "content": "Inhalte & Fragen",
+      "evaluation": "Auswertung",
+      "tools": "Werkzeuge",
+      "administration": "Administration"
+    },
     "sidebar": {
       "dashboard": "Dashboard",
       "aktivitaeten": "Aktivitäten",

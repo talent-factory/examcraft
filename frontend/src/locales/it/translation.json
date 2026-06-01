@@ -5,6 +5,13 @@
     "logout": "Esci",
     "language": "Lingua",
     "documentation": "Documentazione",
+    "groups": {
+      "overview": "Panoramica",
+      "content": "Contenuti e domande",
+      "evaluation": "Valutazione",
+      "tools": "Strumenti",
+      "administration": "Amministrazione"
+    },
     "sidebar": {
       "dashboard": "Dashboard",
       "aktivitaeten": "Attività",

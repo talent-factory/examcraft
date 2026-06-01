@@ -5,6 +5,13 @@
     "logout": "Déconnexion",
     "language": "Langue",
     "documentation": "Documentation",
+    "groups": {
+      "overview": "Aperçu",
+      "content": "Contenu et questions",
+      "evaluation": "Évaluation",
+      "tools": "Outils",
+      "administration": "Administration"
+    },
     "sidebar": {
       "dashboard": "Tableau de bord",
       "aktivitaeten": "Activité",
