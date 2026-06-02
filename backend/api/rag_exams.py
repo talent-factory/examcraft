@@ -23,6 +23,7 @@ from models.question_generation_job import QuestionGenerationJob
 from tasks.question_tasks import generate_questions_task
 from schemas.task import GenerateExamTaskResponse
 from schemas.active_tasks import ActiveTaskInfo, ActiveTasksResponse
+from schemas.generation_metadata import GenerationMetadata
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import (
     get_current_active_user,
@@ -92,6 +93,8 @@ class RAGQuestionResponse(BaseModel):
     source_chunks: List[str]
     source_documents: List[str]
     confidence_score: float
+    # TF-383: Provenance-Snapshot der verwendeten Vorlage (optional).
+    generation_metadata: Optional[GenerationMetadata] = None
 
 
 class RAGContextResponse(BaseModel):

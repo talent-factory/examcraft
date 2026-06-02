@@ -1481,3 +1481,113 @@ def test_generate_questions_task_passes_tag_ids_from_request_data():
         institution_id=1,
         tag_ids=[5, 7],
     )
+
+
+# === TF-383: generation_metadata (Prompt-/Template-Herkunft) im Write-Path ===
+
+
+def _capture_persisted_question(fake_question):
+    """Run ``_persist_questions`` against a stubbed SessionLocal and return the
+    QuestionReview object that was added — used to assert provenance fields."""
+    from tasks.question_tasks import _persist_questions
+
+    captured_objs: list = []
+
+    class _EmptyQuery:
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def all(self):
+            return []
+
+    class _StubSession:
+        def add(self, obj):
+            if obj.__class__.__name__ == "QuestionReview":
+                captured_objs.append(obj)
+
+        def query(self, *_args, **_kwargs):
+            return _EmptyQuery()
+
+        def merge(self, obj):
+            return obj
+
+        def flush(self):
+            for obj in captured_objs:
+                obj.id = 1
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+
+        def close(self):
+            pass
+
+    with patch("database.SessionLocal", return_value=_StubSession()):
+        _persist_questions(
+            questions=[fake_question],
+            exam_id="exam_demo",
+            topic="Kommunikation",
+            language="de",
+            user_id=42,
+            institution_id=1,
+        )
+
+    assert captured_objs, "QuestionReview row was not added to the session"
+    return captured_objs[0]
+
+
+def test_persist_questions_stores_generation_metadata():
+    """TF-383: Der Provenance-Snapshot der Premium-Frage wird auf der
+    QuestionReview-Zeile persistiert."""
+    from types import SimpleNamespace
+
+    snapshot = {
+        "prompt_id": "uuid-1",
+        "prompt_name": "universal_multiple_choice_generator",
+        "prompt_version": 3,
+        "is_default_template": False,
+        "variables": {"topic": "Heaps", "difficulty": "medium"},
+    }
+    fake_question = SimpleNamespace(
+        question_text="Was ist ein Heap?",
+        question_type="multiple_choice",
+        options=["A", "B", "C", "D"],
+        correct_answer="A",
+        explanation="…",
+        difficulty="medium",
+        source_chunks=[],
+        source_documents=[],
+        confidence_score=0.9,
+        bloom_level=3,
+        generation_metadata=snapshot,
+    )
+
+    persisted = _capture_persisted_question(fake_question)
+
+    assert persisted.generation_metadata == snapshot
+
+
+def test_persist_questions_generation_metadata_defaults_to_none():
+    """Fragequellen ohne Herkunft (z. B. manuell, kein Premium-Snapshot) dürfen
+    nicht crashen — getattr liefert None."""
+    from types import SimpleNamespace
+
+    # Bewusst KEIN generation_metadata-Attribut → testet das getattr(..., None).
+    fake_question = SimpleNamespace(
+        question_text="Frage ohne Herkunft",
+        question_type="open_ended",
+        options=None,
+        correct_answer="Antwort",
+        explanation="…",
+        difficulty="easy",
+        source_chunks=[],
+        source_documents=[],
+        confidence_score=0.5,
+        bloom_level=2,
+    )
+
+    persisted = _capture_persisted_question(fake_question)
+
+    assert persisted.generation_metadata is None

@@ -67,6 +67,17 @@ class QuestionReview(Base):
     estimated_time_minutes = Column(Integer, nullable=True)
     quality_tier = Column(String(1), nullable=True)  # A, B, C
 
+    # Generation provenance (TF-383): Snapshot der Vorlage/des Prompts, mit dem
+    # diese Frage erzeugt wurde. Eingefroren zum Generierungszeitpunkt, damit
+    # spätere Template-Änderungen die Herkunft alter Fragen nicht verfälschen.
+    # Form: {"prompt_id", "prompt_name", "prompt_version", "is_default_template",
+    #        "fallback_to_default", "variables": {...}} — siehe das Envelope in
+    #        schemas/generation_metadata.py. "fallback_to_default" ist IMMER
+    #        präsent (Default false; true nur, wenn ein Custom-Prompt-Render
+    #        fehlschlug und aufs Default-Template zurückfiel). NULL für Altbestand
+    #        (Daten existierten nie).
+    generation_metadata = Column(JSON, nullable=True)
+
     # Review Status (String mit CHECK Constraint statt Enum)
     review_status = Column(
         String(20), default=ReviewStatus.PENDING.value, nullable=False, index=True

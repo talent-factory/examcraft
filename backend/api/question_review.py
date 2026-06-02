@@ -22,6 +22,7 @@ from models.question_review import (
 from models.auth import User
 from models.tag import Tag, QuestionTag
 from api.tags import TagOut
+from schemas.generation_metadata import GenerationMetadata
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_active_user, require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -76,6 +77,7 @@ def _question_to_dict(
         "bloom_level": question.bloom_level,
         "estimated_time_minutes": question.estimated_time_minutes,
         "quality_tier": question.quality_tier,
+        "generation_metadata": question.generation_metadata,
         "review_status": question.review_status,
         "reviewed_by": question.reviewed_by,
         "reviewed_at": question.reviewed_at,
@@ -105,6 +107,7 @@ def _attach_reviewer_info(question: QuestionReview, db: Session) -> dict:
         "bloom_level": question.bloom_level,
         "estimated_time_minutes": question.estimated_time_minutes,
         "quality_tier": question.quality_tier,
+        "generation_metadata": question.generation_metadata,
         "review_status": question.review_status,
         "reviewed_by": question.reviewed_by,
         "reviewed_at": question.reviewed_at,
@@ -128,6 +131,26 @@ def _attach_reviewer_info(question: QuestionReview, db: Session) -> dict:
                 question.id,
             )
     return data
+
+
+def _get_scoped_question(
+    db: Session, question_id: int, current_user: User
+) -> QuestionReview | None:
+    """Fetch a QuestionReview by id, scoped to the caller's institution.
+
+    Mirrors the queue endpoint's tenant filtering (superusers bypass). Returns
+    ``None`` for questions outside the caller's institution so by-id endpoints
+    answer 404 instead of leaking/mutating cross-tenant data (TF-383 review:
+    the detail/edit/review endpoints previously fetched by id only).
+    """
+    tenant_context = get_tenant_context(current_user)
+    return (
+        TenantFilter.filter_by_tenant(
+            db.query(QuestionReview), QuestionReview, tenant_context
+        )
+        .filter(QuestionReview.id == question_id)
+        .first()
+    )
 
 
 # Pydantic Models
@@ -209,6 +232,7 @@ class QuestionReviewResponse(BaseModel):
     bloom_level: Optional[int]
     estimated_time_minutes: Optional[int]
     quality_tier: Optional[str]
+    generation_metadata: Optional[GenerationMetadata] = None
     review_status: str
     reviewed_by: Optional[int]
     reviewer_info: Optional[ReviewerInfo] = None
@@ -411,9 +435,7 @@ async def get_question_review(
     """
     locale = get_request_locale(request, current_user)
     try:
-        question = (
-            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
-        )
+        question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
             raise HTTPException(
@@ -543,9 +565,7 @@ async def edit_question(
     """
     locale = get_request_locale(http_request, current_user)
     try:
-        question = (
-            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
-        )
+        question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
             raise HTTPException(
@@ -677,9 +697,7 @@ async def start_review(
     """
     locale = get_request_locale(request, current_user)
     try:
-        question = (
-            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
-        )
+        question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
             raise HTTPException(
@@ -746,9 +764,7 @@ async def approve_question(
     """
     locale = get_request_locale(http_request, current_user)
     try:
-        question = (
-            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
-        )
+        question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
             raise HTTPException(
@@ -852,9 +868,7 @@ async def reject_question(
     """
     locale = get_request_locale(http_request, current_user)
     try:
-        question = (
-            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
-        )
+        question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
             raise HTTPException(
@@ -934,9 +948,7 @@ async def get_comments(
     locale = get_request_locale(request, current_user)
     try:
         # Check if question exists
-        question = (
-            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
-        )
+        question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
             raise HTTPException(
@@ -978,9 +990,7 @@ async def add_comment(
     locale = get_request_locale(http_request, current_user)
     try:
         # Check if question exists
-        question = (
-            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
-        )
+        question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
             raise HTTPException(
@@ -1030,9 +1040,7 @@ async def get_question_history(
     locale = get_request_locale(request, current_user)
     try:
         # Check if question exists
-        question = (
-            db.query(QuestionReview).filter(QuestionReview.id == question_id).first()
-        )
+        question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
             raise HTTPException(
