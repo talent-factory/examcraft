@@ -1126,14 +1126,7 @@ async def set_question_tags(
     db: Session = Depends(get_db),
 ):
     """Tags einer Frage setzen (ersetzt bestehende Tags vollständig)."""
-    question = (
-        db.query(QuestionReview)
-        .filter(
-            QuestionReview.id == question_id,
-            QuestionReview.institution_id == current_user.institution_id,
-        )
-        .first()
-    )
+    question = _get_scoped_question(db, question_id, current_user)
     if not question:
         raise HTTPException(status_code=404, detail="Frage nicht gefunden.")
 
@@ -1151,14 +1144,7 @@ async def remove_question_tag(
     db: Session = Depends(get_db),
 ):
     """Einzelnen Tag von einer Frage entfernen."""
-    question = (
-        db.query(QuestionReview)
-        .filter(
-            QuestionReview.id == question_id,
-            QuestionReview.institution_id == current_user.institution_id,
-        )
-        .first()
-    )
+    question = _get_scoped_question(db, question_id, current_user)
     if not question:
         raise HTTPException(status_code=404, detail="Frage nicht gefunden.")
 

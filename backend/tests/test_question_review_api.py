@@ -215,6 +215,10 @@ class TestQuestionReviewAPI:
         ("post", "/api/v1/questions/777/comments", {"comment_text": "hi"}, True),
         ("get", "/api/v1/questions/777/comments", None, False),
         ("get", "/api/v1/questions/777/history", None, False),
+        # TF-387: tag endpoints must also route through _get_scoped_question
+        # (previously used a raw institution_id == filter without superuser bypass).
+        ("post", "/api/v1/questions/777/tags", {"tag_ids": [1]}, True),
+        ("delete", "/api/v1/questions/777/tags/5", None, True),
     ]
 
     @pytest.mark.parametrize("method,path,body,mutates", _BY_ID_ENDPOINTS)
