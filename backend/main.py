@@ -7,6 +7,7 @@ import asyncio
 
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -685,6 +686,11 @@ app.add_middleware(
 from middleware.i18n_middleware import I18nMiddleware  # noqa: E402
 
 app.add_middleware(I18nMiddleware)
+
+# GZip-Kompression für grössere Responses (Auswertungen, Dokumentlisten).
+# Vor CORS hinzugefügt, damit CORS die äusserste Schicht bleibt (siehe unten).
+# minimum_size=1000: kleine Responses bleiben unkomprimiert (kein Overhead).
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS middleware - must be added LAST so it becomes the outermost layer.
 # In Starlette, add_middleware() prepends — last added = outermost.
