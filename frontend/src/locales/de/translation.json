@@ -1194,6 +1194,7 @@
       "visibilityClickToChange": "Klicken zum Ändern",
       "visibilityEditAria": "Sichtbarkeit ändern",
       "menuChangeVisibility": "Sichtbarkeit ändern…",
+      "menuEditTags": "Tags bearbeiten…",
       "toolbar": {
         "searchPlaceholder": "Suchen…",
         "visibility": "Sichtbarkeit",

@@ -805,6 +805,7 @@
       "visibilityClickToChange": "Cliquer pour modifier",
       "visibilityEditAria": "Modifier la visibilité",
       "menuChangeVisibility": "Modifier la visibilité…",
+      "menuEditTags": "Modifier les tags…",
       "toolbar": {
         "searchPlaceholder": "Rechercher…",
         "visibility": "Visibilité",
