@@ -849,7 +849,9 @@
       },
       "tagEditor": {
         "label": "Tag",
-        "heading": "Tag"
+        "heading": "Tag",
+        "createHint": "Crea un nuovo tag: digita e premi Invio.",
+        "institutionTagDisabled": "Solo per documenti condivisi con l'istituzione"
       },
       "list": {
         "colVisibility": "Visibilità",

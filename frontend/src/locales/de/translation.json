@@ -1238,7 +1238,9 @@
       },
       "tagEditor": {
         "label": "Tags",
-        "heading": "Tags"
+        "heading": "Tags",
+        "createHint": "Neuen Tag erstellen: einfach tippen und mit Enter bestätigen.",
+        "institutionTagDisabled": "Nur für institutionsweit geteilte Dokumente"
       },
       "list": {
         "colVisibility": "Sichtbarkeit",

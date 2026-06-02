@@ -1238,7 +1238,9 @@
       },
       "tagEditor": {
         "label": "Tags",
-        "heading": "Tags"
+        "heading": "Tags",
+        "createHint": "Create a new tag: just type and press Enter.",
+        "institutionTagDisabled": "Only for institution-shared documents"
       },
       "list": {
         "colVisibility": "Visibility",

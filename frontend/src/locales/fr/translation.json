@@ -849,7 +849,9 @@
       },
       "tagEditor": {
         "label": "Tags",
-        "heading": "Tags"
+        "heading": "Tags",
+        "createHint": "Créer une nouvelle étiquette : saisissez-la et appuyez sur Entrée.",
+        "institutionTagDisabled": "Uniquement pour les documents partagés avec l'institution"
       },
       "list": {
         "colVisibility": "Visibilité",
