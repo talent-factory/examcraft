@@ -53,7 +53,7 @@ Cela dépend de votre plan d'abonnement:
 **Où trouver la Bibliothèque de prompts?**
 
 La Bibliothèque de prompts est accessible via la navigation sous **Prompts** (Route: `/prompts`).
-Elle est disponible pour les utilisateurs avec les rôles ADMIN et PROFESSEUR.
+Elle est disponible pour les utilisateurs avec les rôles ADMIN et ENSEIGNANT.
 
 → En savoir plus: [Bibliothèque de prompts](../user-guide/prompt-library.md)
 

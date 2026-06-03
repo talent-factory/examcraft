@@ -1,5 +1,7 @@
 # Upload and Manage Documents
 
+![Documents Overview](../screenshots/documents/documents-overview.png)
+
 ## Supported File Formats
 
 | Format | Extension | Max. Size | Special Features |
@@ -85,6 +87,32 @@ Enter search terms in the search field. Results are filtered in real-time (filen
 
 !!! warning "Attention"
     Deleted documents cannot be recovered.
+
+## Document Preview
+
+Click on the filename of a document in the library to open the preview dialog. It consists of three tabs:
+
+| Tab | Content |
+|-----|---------|
+| **Metadata** | Filename, upload date, file size, processing status, tags |
+| **Original** (default) | The original document depending on type: PDF rendered directly in the browser, Markdown and chat exports as formatted text, plain text in monospace |
+| **Chunks** | Internal processing chunks for technical diagnostics |
+
+![Document Preview — Metadata Tab](../screenshots/documents/documents-preview-dialog.png)
+
+![Document Preview — Tab Original (PDF)](../screenshots/documents/documents-preview-original-pdf.png)
+
+![Document Preview — Tab Original (Markdown)](../screenshots/documents/documents-preview-original-md.png)
+
+### Error States
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| Network Error | Connection interrupted | Reload the page |
+| 403 Forbidden | No access to this document | Contact administrator |
+| 404 Not Found | Document has been deleted | Remove from library |
+| 429 Too Many Requests | Rate limit reached | Wait briefly and try again |
+| 500 Server Error | Internal error | Contact administrator |
 
 ## Next Steps
 

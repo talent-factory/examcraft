@@ -2,7 +2,7 @@
 
 Le Dashboard est la page d'accueil d'ExamCraft AI après la connexion. Il offre un aperçu rapide de vos activités et un accès direct à toutes les fonctionnalités principales de la plateforme.
 
-<!-- screenshot: dashboard-overview.png -->
+![Dashboard Overview](../screenshots/dashboard/dashboard-overview.png)
 
 ## Statistiques
 
@@ -17,7 +17,7 @@ En haut du Dashboard, vous voyez quatre indicateurs d'un coup d'œil:
 
 Ces chiffres se mettent à jour en temps réel et vous aident à garder une vue d'ensemble de votre travail.
 
-<!-- screenshot: dashboard-statistics.png -->
+![Dashboard Statistics](../screenshots/dashboard/dashboard-statistics.png)
 
 ## Tuiles d'accès rapide
 
@@ -41,7 +41,14 @@ La section «Activités récentes» montre vos questions générées récemment 
 - **Questions générées récemment**: Cliquez sur une question pour l'ouvrir dans la Review Queue
 - **Documents téléchargés récemment**: Cliquez sur un document pour l'ouvrir dans la bibliothèque de documents
 
-<!-- screenshot: dashboard-recent-activity.png -->
+!!! note "Protection des données"
+    Le widget du Dashboard affiche exclusivement vos propres activités. Cliquez sur **Voir toutes les activités →** pour afficher optionnellement les événements à l'échelle de l'institution sur la [page Activités](aktivitaeten.md).
+
+![Dashboard Recent Activity](../screenshots/dashboard/dashboard-recent-activity.png)
+
+Cliquez sur **Voir toutes les activités →** en bas du widget pour accéder à la [page Activités](aktivitaeten.md) complète.
+
+![Dashboard — Lien widget Activités](../screenshots/aktivitaeten/dashboard-widget-link.png)
 
 ## Badge d'abonnement
 
@@ -57,3 +64,4 @@ Cliquez sur le badge pour accéder à la [page d'abonnement](subscription.md) et
 - [:octicons-arrow-right-24: Télécharger des documents](documents.md)
 - [:octicons-arrow-right-24: Créer votre premier examen](exam-create.md)
 - [:octicons-arrow-right-24: Gérer l'abonnement](subscription.md)
+- [:octicons-arrow-right-24: Voir toutes les activités](aktivitaeten.md)

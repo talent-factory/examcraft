@@ -3,7 +3,7 @@
 La Bibliothèque de prompts permet la gestion des prompts AI réutilisables pour la génération de questions. Au lieu de taper le même prompt chaque fois, vous sauvegardez les prompts éprouvés de façon centralisée et les utilisez directement lors de la création d'examens.
 
 !!! note "Accès"
-    La Bibliothèque de prompts est disponible pour les utilisateurs ayant les rôles **ADMIN** et **PROFESSEUR**.
+    La Bibliothèque de prompts est disponible pour les utilisateurs ayant les rôles **ADMIN** et **ENSEIGNANT**.
     Route: `/prompts`
 
 ## Aperçu

@@ -53,7 +53,7 @@ That depends on your subscription plan:
 **Where do I find the Prompt Library?**
 
 The Prompt Library is accessible via the navigation under **Prompts** (route: `/prompts`).
-It is available to users with the ADMIN and DOZENT roles.
+It is available to users with the ADMIN and INSTRUCTOR roles.
 
 → More details: [Prompt Library](../user-guide/prompt-library.md)
 

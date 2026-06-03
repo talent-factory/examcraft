@@ -11,7 +11,7 @@ Come amministratore gestite tutti gli utenti della vostra istituzione tramite il
 |-------|-------------|:-----------:|
 | Nome e cognome | Nome completo della persona | ✓ |
 | Indirizzo e-mail | Viene utilizzato come nome di login | ✓ |
-| Ruolo | ADMIN o DOZENT (vedere sotto) | ✓ |
+| Ruolo | ADMIN o DOCENTE (vedere sotto) | ✓ |
 | Istituzione | Assegnazione all'istituzione | ✓ |
 | Password temporanea | Prima password (l'utente può cambiarla) | ✓ |
 
@@ -28,8 +28,8 @@ ExamCraft AI conosce due ruoli:
 
 | Ruolo | Permessi |
 |-------|----------|
-| **DOZENT** | Caricamento documenti, generazione domande, Review Queue, Exam Composer, Libreria Prompt |
-| **ADMIN** | Tutti i permessi DOZENT + Gestione utenti, Istituzioni, Pannello Admin |
+| **DOCENTE** | Caricamento documenti, generazione domande, Review Queue, Exam Composer, Libreria Prompt |
+| **ADMIN** | Tutti i permessi DOCENTE + Gestione utenti, Istituzioni, Pannello Admin |
 
 Assegnate il ruolo ADMIN solo a persone che effettivamente dovranno gestire gli utenti.
 

@@ -36,14 +36,14 @@ def seed_talent_factory_institution(db):
 
     if existing:
         logger.info(f"   ✅ Institution already exists: {existing.name}")
-        # Update to ensure Premium tier
-        if existing.subscription_tier != "professional":
-            existing.subscription_tier = "professional"
+        # Update to ensure Enterprise tier (matches the create path below)
+        if existing.subscription_tier != "enterprise":
+            existing.subscription_tier = "enterprise"
             existing.max_users = -1  # Unlimited
             existing.max_documents = -1  # Unlimited
             existing.max_questions_per_month = 1000
             db.commit()
-            logger.info("   ✅ Updated to Professional tier")
+            logger.info("   ✅ Updated to Enterprise tier")
         return existing
 
     # Create new institution
@@ -51,7 +51,7 @@ def seed_talent_factory_institution(db):
         name="Talent Factory",
         slug="talent-factory",
         domain="talent-factory.ch",  # Auto-assign users with @talent-factory.ch
-        subscription_tier="professional",  # Premium tier
+        subscription_tier="enterprise",  # Enterprise tier
         max_users=-1,  # Unlimited
         max_documents=-1,  # Unlimited
         max_questions_per_month=1000,

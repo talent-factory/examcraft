@@ -73,7 +73,7 @@ Nella sezione **Account** vedete un riepilogo dei dettagli dell'account:
 
 | Informazione | Descrizione |
 |---|---|
-| Ruolo | Il vostro ruolo utente (ADMIN o DOZENT) – determina i vostri permessi |
+| Ruolo | Il vostro ruolo utente (ADMIN o DOCENTE) – determina i vostri permessi |
 | Istituzione | L'istituzione a cui siete assegnati |
 | Abbonamento | Il vostro piano abbonamento attuale e limiti |
 | Membro da | Data e ora della creazione dell'account |
@@ -85,7 +85,7 @@ Queste informazioni sono di sola lettura e possono essere modificate da un ammin
 Il ruolo determina quali funzioni potete utilizzare:
 
 - **ADMIN** – Accesso completo a tutte le funzioni, gestione utenti, impostazioni istituzionali
-- **DOZENT** – Accesso a generazione domande, gestione Prompt, esami RAG
+- **DOCENTE** – Accesso a generazione domande, gestione Prompt, esami RAG
 
 ### Istituzione
 

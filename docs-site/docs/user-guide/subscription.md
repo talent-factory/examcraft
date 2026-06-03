@@ -159,6 +159,23 @@ Wenn Sie Ihre Limits erreichen:
 
 Sie können sofort upgraden, um die Limits zu erhöhen.
 
+### Auswertungs-Pipeline-Quotas
+
+Die neuen Auswertungs-Funktionen sind an Subscription-Tiers gebunden:
+
+| Feature | Free | Starter | Professional | Enterprise |
+|---------|:----:|:-------:|:------------:|:----------:|
+| Auswertbare Prüfungen/Monat | 3 | Unbegrenzt | Unbegrenzt | Unbegrenzt |
+| Max. Submissions pro Prüfung | 30 | 50 | Unbegrenzt | Unbegrenzt |
+| LLM-Bewertung offener Fragen | — | ✓ | ✓ | ✓ |
+| Notenexport-Formate | Nur CSV | CSV | CSV + Moodle-CSV + PDF | Alle + Custom |
+| Moodle-API-Import | — | — | ✓ | ✓ |
+| Bulk-Aktionen | — | — | ✓ | ✓ |
+| Klassen + Verlaufsstatistik | — | — | — | ✓ |
+| Eigene Notenschemata | — | — | — | ✓ |
+
+Bei Erreichen einer Quota erscheint ein mehrsprachiger Hinweis-Banner mit Upgrade-Pfad. Der [Notenexport](notenexport.md) ist zusätzlich blockiert, solange offene Reviews ausstehen — unabhängig vom Tier.
+
 ## Nächste Schritte
 
 - [:octicons-arrow-right-24: Zurück zum Dashboard](dashboard.md)

@@ -2,7 +2,7 @@
 
 Il Dashboard è la home page di ExamCraft AI dopo l'accesso. Offre una rapida panoramica delle vostre attività e accesso diretto a tutte le funzioni principali della piattaforma.
 
-<!-- screenshot: dashboard-overview.png -->
+![Dashboard Overview](../screenshots/dashboard/dashboard-overview.png)
 
 ## Statistiche
 
@@ -17,7 +17,7 @@ Nella parte superiore del Dashboard vedete quattro metriche a colpo d'occhio:
 
 Questi numeri si aggiornano in tempo reale e vi aiutano a mantenere una panoramica del vostro lavoro.
 
-<!-- screenshot: dashboard-statistics.png -->
+![Dashboard Statistics](../screenshots/dashboard/dashboard-statistics.png)
 
 ## Riquadri di accesso rapido
 
@@ -41,7 +41,14 @@ L'area "Attività recenti" mostra le domande generate più di recente e i docume
 - **Domande generate di recente**: Fate clic su una domanda per aprirla nella Review Queue
 - **Documenti caricati di recente**: Fate clic su un documento per aprirlo nella libreria documenti
 
-<!-- screenshot: dashboard-recent-activity.png -->
+!!! note "Privacy"
+    Il widget del Dashboard mostra esclusivamente le vostre attività personali. Fate clic su **Mostra tutte le attività →** per visualizzare facoltativamente sulla [pagina Attività](aktivitaeten.md) anche gli eventi a livello di istituzione.
+
+![Dashboard Recent Activity](../screenshots/dashboard/dashboard-recent-activity.png)
+
+Fate clic su **Mostra tutte le attività →** in fondo al widget per navigare alla [pagina Attività](aktivitaeten.md) completa.
+
+![Dashboard — Widget-Link Attività](../screenshots/aktivitaeten/dashboard-widget-link.png)
 
 ## Badge abbonamento
 
@@ -58,3 +65,4 @@ Fate clic sul badge per accedere alla [pagina Abbonamento](subscription.md) e co
 - [:octicons-arrow-right-24: Carica documento](documents.md)
 - [:octicons-arrow-right-24: Crea il primo esame](exam-create.md)
 - [:octicons-arrow-right-24: Gestisci abbonamento](subscription.md)
+- [:octicons-arrow-right-24: Visualizza tutte le attività](aktivitaeten.md)

@@ -88,6 +88,32 @@ Geben Sie Suchbegriffe in das Suchfeld ein. Ergebnisse werden in Echtzeit gefilt
 !!! warning "Achtung"
     Gelöschte Dokumente können nicht wiederhergestellt werden.
 
+## Dokument-Vorschau
+
+Klicken Sie auf den Dateinamen eines Dokuments in der Bibliothek um den Vorschau-Dialog zu öffnen. Er besteht aus drei Tabs:
+
+| Tab | Inhalt |
+|-----|--------|
+| **Metadaten** | Dateiname, Upload-Datum, Dateigrösse, Verarbeitungsstatus, Tags |
+| **Original** (Standard) | Das Originaldokument je nach Typ: PDF direkt im Browser, Markdown und Chat-Exporte als formatierter Text, Plaintext in monospace |
+| **Chunks** | Interne Verarbeitungs-Chunks für technische Diagnose |
+
+![Dokument-Vorschau — Tab Metadaten](../screenshots/documents/documents-preview-dialog.png)
+
+![Dokument-Vorschau — Tab Original (PDF)](../screenshots/documents/documents-preview-original-pdf.png)
+
+![Dokument-Vorschau — Tab Original (Markdown)](../screenshots/documents/documents-preview-original-md.png)
+
+### Fehler-States
+
+| Fehler | Ursache | Lösung |
+|--------|---------|--------|
+| Netzwerkfehler | Verbindungsunterbruch | Seite neu laden |
+| 403 Forbidden | Kein Zugriff auf dieses Dokument | Admin kontaktieren |
+| 404 Not Found | Dokument wurde gelöscht | Aus Bibliothek entfernen |
+| 429 Too Many Requests | Rate-Limit erreicht | Kurz warten und erneut versuchen |
+| 500 Server Error | Interner Fehler | Admin kontaktieren |
+
 ## Nächste Schritte
 
 Nach dem Hochladen können Sie direkt mit der Fragengenerierung beginnen:

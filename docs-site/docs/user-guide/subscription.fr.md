@@ -2,6 +2,8 @@
 
 Sur la page d'abonnement, vous voyez votre plan actuel, votre utilisation et pouvez gérer votre abonnement. ExamCraft AI offre quatre plans d'abonnement flexibles et évolutifs pour différents besoins.
 
+![Page d'abonnement](../screenshots/subscription/subscription-page.png)
+
 ## Plans disponibles
 
 ExamCraft AI offre quatre plans d'abonnement avec des fonctionnalités croissantes et des limites plus élevées:
@@ -72,6 +74,8 @@ La facturation se fait le même jour du mois suivant. Pour les plans mensuels, v
     au prorata pour les jours restants. Vous ne payez pas deux fois.
 
 ## Factures et détails de paiement
+
+![Page de facturation](../screenshots/subscription/billing-page.png)
 
 Gérez votre mode de paiement et téléchargez les factures.
 
@@ -154,6 +158,24 @@ Lorsque vous atteignez vos limites:
 3. **Limite RAG** – La recherche sémantique ne fonctionne plus
 
 Vous pouvez mettre à niveau immédiatement pour augmenter les limites.
+
+### Quotas pipeline d'évaluation
+
+Les nouvelles fonctionnalités d'évaluation sont liées aux tiers d'abonnement:
+
+| Fonctionnalité | Free | Starter | Professional | Enterprise |
+|----------------|:----:|:-------:|:------------:|:----------:|
+| Examens évaluables/mois | 3 | Illimité | Illimité | Illimité |
+| Submissions max. par examen | 30 | 50 | Illimité | Illimité |
+| Évaluation LLM questions ouvertes | — | ✓ | ✓ | ✓ |
+| Formats d'export des notes | CSV uniquement | CSV | CSV + Moodle-CSV + PDF | Tous + Personnalisé |
+| Import API Moodle | — | — | ✓ | ✓ |
+| Actions en masse | — | — | ✓ | ✓ |
+| Classes + statistiques historiques | — | — | — | ✓ |
+| Schémas de notation personnalisés | — | — | — | ✓ |
+
+!!! note "Bannière de quota"
+    Lorsqu'un quota est atteint, une bannière multilingue s'affiche avec un chemin de mise à niveau. L'[export des notes](notenexport.md) est en outre bloqué tant que des révisions sont en attente — indépendamment du tier.
 
 ## Étapes suivantes
 

@@ -2,7 +2,7 @@
 
 The Dashboard is your home page in ExamCraft AI after login. It provides a quick overview of your activities and direct access to all the main features of the platform.
 
-<!-- screenshot: dashboard-overview.png -->
+![Dashboard Overview](../screenshots/dashboard/dashboard-overview.png)
 
 ## Statistics
 
@@ -17,7 +17,7 @@ In the top area of the Dashboard, you see four key metrics at a glance:
 
 These numbers update in real-time and help you keep track of your work.
 
-<!-- screenshot: dashboard-statistics.png -->
+![Dashboard Statistics](../screenshots/dashboard/dashboard-statistics.png)
 
 ## Quick Access Tiles
 
@@ -41,7 +41,14 @@ The "Recent Activities" section shows you the most recently generated questions 
 - **Recently generated questions**: Click on a question to open it in the Review Queue
 - **Recently uploaded documents**: Click on a document to open it in the document library
 
-<!-- screenshot: dashboard-recent-activity.png -->
+!!! note "Privacy"
+    The dashboard widget shows exclusively your own activities. Click on **Show all activities →** to optionally display institution-wide events on the [Activities page](aktivitaeten.md).
+
+![Dashboard Recent Activity](../screenshots/dashboard/dashboard-recent-activity.png)
+
+Click on **Show all activities →** at the bottom of the widget to navigate to the full [Activities page](aktivitaeten.md).
+
+![Dashboard — Widget Link Activities](../screenshots/aktivitaeten/dashboard-widget-link.png)
 
 ## Subscription Badge
 
@@ -57,3 +64,4 @@ Click on the badge to navigate to the [Subscription page](subscription.md) and v
 - [:octicons-arrow-right-24: Upload Document](documents.md)
 - [:octicons-arrow-right-24: Create Your First Exam](exam-create.md)
 - [:octicons-arrow-right-24: Manage Subscription](subscription.md)
+- [:octicons-arrow-right-24: Show All Activities](aktivitaeten.md)

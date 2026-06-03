@@ -2,6 +2,8 @@
 
 Nella pagina Abbonamento vedete il vostro piano attuale, il vostro utilizzo e potete gestire il vostro abbonamento. ExamCraft AI offre quattro piani di abbonamento flessibilmente scalabili per diverse esigenze.
 
+![Pagina Abbonamento](../screenshots/subscription/subscription-page.png)
+
 ## Piani disponibili
 
 ExamCraft AI offre quattro piani di abbonamento con caratteristiche crescenti e limiti superiori:
@@ -72,6 +74,8 @@ La fatturazione avviene nello stesso giorno del mese successivo. Per piani mensi
     per i giorni rimanenti. Non pagate due volte.
 
 ## Fatture e dettagli di pagamento
+
+![Pagina Fatturazione](../screenshots/subscription/billing-page.png)
 
 Gestite il vostro metodo di pagamento e scaricate fatture.
 
@@ -154,6 +158,24 @@ Se raggiungete i vostri limiti:
 3. **Limite RAG** – La ricerca semantica non funziona più
 
 Potete eseguire immediatamente un upgrade per aumentare i limiti.
+
+### Quote pipeline di valutazione
+
+Le nuove funzioni di valutazione sono legate ai tier di abbonamento:
+
+| Funzione | Free | Starter | Professional | Enterprise |
+|---------|:----:|:-------:|:------------:|:----------:|
+| Esami valutabili/mese | 3 | Illimitati | Illimitati | Illimitati |
+| Max. Submissions per esame | 30 | 50 | Illimitate | Illimitate |
+| Valutazione LLM domande aperte | — | ✓ | ✓ | ✓ |
+| Formati esportazione voti | Solo CSV | CSV | CSV + Moodle-CSV + PDF | Tutti + Custom |
+| Importazione API Moodle | — | — | ✓ | ✓ |
+| Azioni in blocco | — | — | ✓ | ✓ |
+| Classi + statistiche cronologiche | — | — | — | ✓ |
+| Schemi di voto personalizzati | — | — | — | ✓ |
+
+!!! note "Banner quota"
+    Al raggiungimento di una quota compare un banner informativo multilingue con percorso di upgrade. L'[esportazione voti](notenexport.md) è inoltre bloccata finché esistono revisioni in sospeso — indipendentemente dal tier.
 
 ## Passaggi successivi
 

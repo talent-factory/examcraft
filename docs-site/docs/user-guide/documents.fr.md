@@ -1,5 +1,7 @@
 # Télécharger et gérer les documents
 
+![Documents Overview](../screenshots/documents/documents-overview.png)
+
 ## Formats de fichiers supportés
 
 | Format | Extension | Taille max. | Particularités |
@@ -85,6 +87,32 @@ Entrez les termes de recherche dans le champ de recherche. Les résultats sont f
 
 !!! warning "Attention"
     Les documents supprimés ne peuvent pas être récupérés.
+
+## Aperçu du document
+
+Cliquez sur le nom d'un document dans la bibliothèque pour ouvrir la boîte de dialogue de prévisualisation. Elle se compose de trois onglets:
+
+| Onglet | Contenu |
+|--------|---------|
+| **Métadonnées** | Nom du fichier, date de téléchargement, taille du fichier, statut de traitement, étiquettes |
+| **Original** (par défaut) | Le document original selon son type: PDF directement dans le navigateur, Markdown et exports de chat en texte formaté, texte brut en monospace |
+| **Fragments** | Fragments de traitement internes pour diagnostic technique |
+
+![Aperçu du document — Onglet Métadonnées](../screenshots/documents/documents-preview-dialog.png)
+
+![Aperçu du document — Onglet Original (PDF)](../screenshots/documents/documents-preview-original-pdf.png)
+
+![Aperçu du document — Onglet Original (Markdown)](../screenshots/documents/documents-preview-original-md.png)
+
+### États d'erreur
+
+| Erreur | Cause | Solution |
+|--------|-------|----------|
+| Erreur réseau | Interruption de connexion | Recharger la page |
+| 403 Forbidden | Pas d'accès à ce document | Contacter l'administrateur |
+| 404 Not Found | Le document a été supprimé | Retirer de la bibliothèque |
+| 429 Too Many Requests | Limite de taux atteinte | Attendre un moment et réessayer |
+| 500 Server Error | Erreur interne | Contacter l'administrateur |
 
 ## Étapes suivantes
 

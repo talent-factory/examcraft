@@ -3,7 +3,7 @@
 La Libreria Prompt consente la gestione di Prompt IA riutilizzabili per la generazione di domande. Anziché inserire manualmente lo stesso Prompt ogni volta, salvate i Prompt collaudati centralmente e utilizzateli direttamente durante la creazione di esami.
 
 !!! note "Accesso"
-    La Libreria Prompt è disponibile per utenti con i ruoli **ADMIN** e **DOZENT**.
+    La Libreria Prompt è disponibile per utenti con i ruoli **ADMIN** e **DOCENTE**.
     Rotta: `/prompts`
 
 ## Panoramica

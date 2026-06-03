@@ -1,5 +1,7 @@
 # Subscription
 
+![Subscription Page](../screenshots/subscription/subscription-page.png)
+
 On the Subscription page, you see your current plan, your usage, and can manage your subscription. ExamCraft AI offers four flexibly scalable subscription plans for different needs.
 
 ## Available Plans
@@ -69,6 +71,8 @@ Billing occurs on the same day in the next month. For monthly plans you pay per 
     When upgrading from a monthly plan, the new plan fee is charged proportionally for the remaining days. You do not pay double.
 
 ## Invoices and Payment Details
+
+![Billing Page](../screenshots/subscription/billing-page.png)
 
 Manage your payment method and download invoices.
 
@@ -149,6 +153,23 @@ When you reach your limits:
 3. **RAG Limit** – Semantic Search no longer works
 
 You can upgrade immediately to increase the limits.
+
+### Assessment Pipeline Quotas
+
+The assessment features are tied to subscription tiers:
+
+| Feature | Free | Starter | Professional | Enterprise |
+|---------|:----:|:-------:|:------------:|:----------:|
+| Assessable Exams/Month | 3 | Unlimited | Unlimited | Unlimited |
+| Max. Submissions per Exam | 30 | 50 | Unlimited | Unlimited |
+| LLM Grading of Open Questions | — | ✓ | ✓ | ✓ |
+| Grade Export Formats | CSV only | CSV | CSV + Moodle CSV + PDF | All + Custom |
+| Moodle API Import | — | — | ✓ | ✓ |
+| Bulk Actions | — | — | ✓ | ✓ |
+| Class + Historical Statistics | — | — | — | ✓ |
+| Custom Grade Schemas | — | — | — | ✓ |
+
+When a quota is reached, a multilingual banner appears with an upgrade path. The [grade export](notenexport.md) is additionally blocked as long as open reviews are pending — regardless of tier.
 
 ## Next Steps
 

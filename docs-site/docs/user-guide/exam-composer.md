@@ -27,6 +27,20 @@ Klicken Sie auf **Neue Prüfung erstellen** und füllen Sie die folgenden Felder
 
 Der Titel ist das Schlüsselelement, das Ihre Prüfung eindeutig identifiziert. Wählen Sie eine aussagekräftige Bezeichnung, die Fach, Kurs und zeitliche Einordnung deutlich macht. Die Beschreibung bietet zusätzlichen Kontext für Sie und Ihre Kolleginnen und Kollegen — etwa Informationen zum Schwierigkeitsgrad, der Zielgruppe oder speziellen Schwerpunkten.
 
+### Notenskala wählen
+
+Im `ExamMetadataBar` oben auf der Seite finden Sie den **Notenskala**-Selector. Wählen Sie das gewünschte Notenschema für diese Prüfung:
+
+![Prüfungskomponist — Notenskala-Selector](../screenshots/exam-composer/exam-composer-grading-scheme.png)
+
+| Option | Beschreibung |
+|--------|-------------|
+| Institutions-Standard | Voreingestelltes Schema Ihrer Institution (Standard) |
+| System-Schemata | 8 vorinstallierte Schemata (Swiss, German, ECTS, etc.) |
+| Eigene Schemata | Von Ihrer Institution definierte Schemata (Enterprise) |
+
+Die Notenskala beeinflusst den [Notenexport](notenexport.md). Sie kann jederzeit geändert werden, solange noch kein Export erstellt wurde.
+
 ### Schritt 3: Fragen auswählen
 
 ![Prüfungskomponist — Fragenauswahl](../screenshots/exam-composer/exam-composer-question-selection.png)

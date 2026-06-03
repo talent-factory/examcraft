@@ -31,6 +31,12 @@ ExamCraft AI kennt zwei Rollen:
 | **Nutzungsübersicht einsehen** | — | ✓ |
 | **Rollen zuweisen** | — | ✓ |
 | **Abonnement und Quotas verwalten** | — | ✓ |
+| Auswertungen einsehen (`submissions:read`) | ✓ | ✓ |
+| Submissions importieren (`submissions:import`) | ✓ | ✓ |
+| Submissions bewerten (`submissions:grade`) | ✓ | ✓ |
+| Studierende verwalten (`students:manage`) | — | ✓ |
+| Moodle-Connection konfigurieren (`moodle:configure`) | — | ✓ |
+| Notenschemata verwalten (`grading_schemes:manage`) | — | ✓ (Enterprise) |
 
 ## Rolle zuweisen oder ändern
 
@@ -53,6 +59,21 @@ Die neue Rolle ist sofort wirksam — der Benutzer sieht beim nächsten Seitenau
 Die Rolle (DOZENT / ADMIN) steuert, **wer** auf welche Funktionen zugreifen darf. Das [Abonnement-Tier](subscription.md) (Free, Starter, Professional, Enterprise) steuert zusätzlich, **wie viel** ein Benutzer nutzen darf — etwa die Anzahl der Dokumente oder generierbaren Fragen pro Monat.
 
 Beide Mechanismen greifen unabhängig voneinander: Ein ADMIN mit Free-Tier hat Zugang zum Admin-Panel, aber dieselben Nutzungslimits wie ein DOZENT mit Free-Tier.
+
+## Update-Hinweis v1.4 — Neue Permissions
+
+!!! warning "Automatische Zuweisung an Reviewer-Rolle"
+    Mit dem v1.4-Update erhält die Reviewer-Rolle automatisch die Permission `submissions:grade`. Wer das Bewerten (Grading) von der reinen Review-Tätigkeit trennen möchte, sollte **vor dem Update** eine eigene Rolle ohne diese Permission definieren.
+
+    Die Permission `grading_schemes:manage` wird **nicht** automatisch vergeben — sie ist ausschliesslich Admin- und Institution-Owner-Rollen im Enterprise-Tier vorbehalten.
+
+### Default-Rollen-Mapping (ab v1.4)
+
+| Rolle | Neue Permissions |
+|-------|-----------------|
+| DOZENT | `submissions:read`, `submissions:import`, `submissions:grade` |
+| ADMIN | Alle obigen + `students:manage`, `moodle:configure` |
+| Institution Owner | Zusätzlich `grading_schemes:manage` (Enterprise) |
 
 ## Nächste Schritte
 
