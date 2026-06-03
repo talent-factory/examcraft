@@ -5,6 +5,9 @@ präsente fallback_to_default-Flag, den offenen variables-Payload und die
 bewusst nachsichtige Read-Validierung (kein 500 bei Teil-/Altdaten).
 """
 
+import pytest
+from pydantic import ValidationError
+
 from schemas.generation_metadata import GenerationMetadata
 
 
@@ -67,8 +70,9 @@ def test_stored_dict_roundtrips_unchanged():
 
 def test_partial_dict_fills_defaults_without_raising():
     """Read-Robustheit: ein Teil-Dict (z. B. Altbestand) fällt auf Defaults
-    zurück statt ein 500 zu werfen. Bewusste Entscheidung gegen strikte
-    Validierung auf dem Read-Pfad."""
+    zurück statt ein 500 zu werfen. Der Konsistenz-Validator verbietet nur
+    *widersprüchliche* Zustände, nicht das Auffüllen fehlender Felder — dieses
+    Teil-Dict ist ein gültiger custom-Zustand (prompt_id vorhanden)."""
     gm = GenerationMetadata.model_validate(
         {"prompt_id": "u1", "is_default_template": False}
     )
@@ -76,3 +80,31 @@ def test_partial_dict_fills_defaults_without_raising():
     assert gm.prompt_version is None
     assert gm.fallback_to_default is False
     assert gm.variables == {}
+
+
+def test_custom_without_prompt_id_rejected():
+    """Widersprüchlicher Zustand: custom (is_default_template=False) ohne
+    prompt_id ist nicht konstruierbar (TF-383-Review-Härtung)."""
+    with pytest.raises(ValidationError):
+        GenerationMetadata(is_default_template=False)
+
+
+def test_fallback_without_default_flag_rejected():
+    """fallback_to_default impliziert is_default_template=True."""
+    with pytest.raises(ValidationError):
+        GenerationMetadata(
+            prompt_id="u1", is_default_template=False, fallback_to_default=True
+        )
+
+
+def test_negative_prompt_version_rejected():
+    """Versionen sind positiv (ge=1)."""
+    with pytest.raises(ValidationError):
+        GenerationMetadata(prompt_id="u1", is_default_template=False, prompt_version=0)
+
+
+def test_snapshot_is_frozen():
+    """Snapshot ist nach Konstruktion unveränderlich (eingefroren)."""
+    gm = GenerationMetadata(prompt_id="u1", is_default_template=False)
+    with pytest.raises(ValidationError):
+        gm.prompt_id = "u2"
