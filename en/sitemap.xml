@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:html="http://www.w3.org/1999/xhtml"><url>
         <loc>https://docs.examcraft.ch/en/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/" />
@@ -10,7 +10,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/changelog/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/changelog/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/changelog/" />
@@ -19,7 +19,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/admin-guide/deployment/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/admin-guide/deployment/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/admin-guide/deployment/" />
@@ -27,8 +27,17 @@
         <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/admin-guide/deployment/" />
     </url>
     <url>
+        <loc>https://docs.examcraft.ch/en/admin-guide/grading-schemes/</loc>
+        <lastmod>2026-06-03</lastmod>
+        <changefreq>daily</changefreq>
+        <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/admin-guide/grading-schemes/" />
+        <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/admin-guide/grading-schemes/" />
+        <html:link rel="alternate" hreflang="fr" href="https://docs.examcraft.ch/fr/admin-guide/grading-schemes/" />
+        <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/admin-guide/grading-schemes/" />
+    </url>
+    <url>
         <loc>https://docs.examcraft.ch/en/admin-guide/institutions/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/admin-guide/institutions/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/admin-guide/institutions/" />
@@ -37,7 +46,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/admin-guide/monitoring/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/admin-guide/monitoring/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/admin-guide/monitoring/" />
@@ -45,8 +54,17 @@
         <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/admin-guide/monitoring/" />
     </url>
     <url>
+        <loc>https://docs.examcraft.ch/en/admin-guide/moodle/</loc>
+        <lastmod>2026-06-03</lastmod>
+        <changefreq>daily</changefreq>
+        <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/admin-guide/moodle/" />
+        <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/admin-guide/moodle/" />
+        <html:link rel="alternate" hreflang="fr" href="https://docs.examcraft.ch/fr/admin-guide/moodle/" />
+        <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/admin-guide/moodle/" />
+    </url>
+    <url>
         <loc>https://docs.examcraft.ch/en/admin-guide/prompts/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/admin-guide/prompts/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/admin-guide/prompts/" />
@@ -55,7 +73,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/admin-guide/roles/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/admin-guide/roles/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/admin-guide/roles/" />
@@ -64,7 +82,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/admin-guide/subscription/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/admin-guide/subscription/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/admin-guide/subscription/" />
@@ -73,7 +91,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/admin-guide/user-mgmt/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/admin-guide/user-mgmt/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/admin-guide/user-mgmt/" />
@@ -82,7 +100,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/faq/general/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/faq/general/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/faq/general/" />
@@ -91,7 +109,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/faq/troubleshooting/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/faq/troubleshooting/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/faq/troubleshooting/" />
@@ -100,7 +118,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/getting-started/quickstart/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/getting-started/quickstart/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/getting-started/quickstart/" />
@@ -109,7 +127,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/getting-started/registration/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/getting-started/registration/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/getting-started/registration/" />
@@ -118,7 +136,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/getting-started/requirements/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/getting-started/requirements/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/getting-started/requirements/" />
@@ -126,8 +144,26 @@
         <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/getting-started/requirements/" />
     </url>
     <url>
+        <loc>https://docs.examcraft.ch/en/user-guide/aktivitaeten/</loc>
+        <lastmod>2026-06-03</lastmod>
+        <changefreq>daily</changefreq>
+        <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/aktivitaeten/" />
+        <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/aktivitaeten/" />
+        <html:link rel="alternate" hreflang="fr" href="https://docs.examcraft.ch/fr/user-guide/aktivitaeten/" />
+        <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/user-guide/aktivitaeten/" />
+    </url>
+    <url>
+        <loc>https://docs.examcraft.ch/en/user-guide/auswertungen/</loc>
+        <lastmod>2026-06-03</lastmod>
+        <changefreq>daily</changefreq>
+        <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/auswertungen/" />
+        <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/auswertungen/" />
+        <html:link rel="alternate" hreflang="fr" href="https://docs.examcraft.ch/fr/user-guide/auswertungen/" />
+        <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/user-guide/auswertungen/" />
+    </url>
+    <url>
         <loc>https://docs.examcraft.ch/en/user-guide/best-practices/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/best-practices/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/best-practices/" />
@@ -136,7 +172,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/user-guide/chatbot/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/chatbot/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/chatbot/" />
@@ -145,7 +181,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/user-guide/dashboard/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/dashboard/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/dashboard/" />
@@ -154,7 +190,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/user-guide/documents/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/documents/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/documents/" />
@@ -163,7 +199,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/user-guide/exam-composer/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/exam-composer/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/exam-composer/" />
@@ -172,7 +208,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/user-guide/exam-create/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/exam-create/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/exam-create/" />
@@ -181,7 +217,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/user-guide/exam-export/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/exam-export/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/exam-export/" />
@@ -189,8 +225,35 @@
         <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/user-guide/exam-export/" />
     </url>
     <url>
+        <loc>https://docs.examcraft.ch/en/user-guide/klassen/</loc>
+        <lastmod>2026-06-03</lastmod>
+        <changefreq>daily</changefreq>
+        <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/klassen/" />
+        <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/klassen/" />
+        <html:link rel="alternate" hreflang="fr" href="https://docs.examcraft.ch/fr/user-guide/klassen/" />
+        <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/user-guide/klassen/" />
+    </url>
+    <url>
+        <loc>https://docs.examcraft.ch/en/user-guide/moodle-integration/</loc>
+        <lastmod>2026-06-03</lastmod>
+        <changefreq>daily</changefreq>
+        <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/moodle-integration/" />
+        <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/moodle-integration/" />
+        <html:link rel="alternate" hreflang="fr" href="https://docs.examcraft.ch/fr/user-guide/moodle-integration/" />
+        <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/user-guide/moodle-integration/" />
+    </url>
+    <url>
+        <loc>https://docs.examcraft.ch/en/user-guide/notenexport/</loc>
+        <lastmod>2026-06-03</lastmod>
+        <changefreq>daily</changefreq>
+        <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/notenexport/" />
+        <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/notenexport/" />
+        <html:link rel="alternate" hreflang="fr" href="https://docs.examcraft.ch/fr/user-guide/notenexport/" />
+        <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/user-guide/notenexport/" />
+    </url>
+    <url>
         <loc>https://docs.examcraft.ch/en/user-guide/profile/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/profile/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/profile/" />
@@ -199,7 +262,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/user-guide/prompt-library/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/prompt-library/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/prompt-library/" />
@@ -208,7 +271,7 @@
     </url>
     <url>
         <loc>https://docs.examcraft.ch/en/user-guide/rag-exam/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/rag-exam/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/rag-exam/" />
@@ -216,8 +279,17 @@
         <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/user-guide/rag-exam/" />
     </url>
     <url>
+        <loc>https://docs.examcraft.ch/en/user-guide/review-grading/</loc>
+        <lastmod>2026-06-03</lastmod>
+        <changefreq>daily</changefreq>
+        <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/review-grading/" />
+        <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/review-grading/" />
+        <html:link rel="alternate" hreflang="fr" href="https://docs.examcraft.ch/fr/user-guide/review-grading/" />
+        <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/user-guide/review-grading/" />
+    </url>
+    <url>
         <loc>https://docs.examcraft.ch/en/user-guide/review-queue/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/review-queue/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/review-queue/" />
@@ -225,8 +297,17 @@
         <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/user-guide/review-queue/" />
     </url>
     <url>
+        <loc>https://docs.examcraft.ch/en/user-guide/statistik/</loc>
+        <lastmod>2026-06-03</lastmod>
+        <changefreq>daily</changefreq>
+        <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/statistik/" />
+        <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/statistik/" />
+        <html:link rel="alternate" hreflang="fr" href="https://docs.examcraft.ch/fr/user-guide/statistik/" />
+        <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/user-guide/statistik/" />
+    </url>
+    <url>
         <loc>https://docs.examcraft.ch/en/user-guide/subscription/</loc>
-        <lastmod>2026-04-29</lastmod>
+        <lastmod>2026-06-03</lastmod>
         <changefreq>daily</changefreq>
         <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/user-guide/subscription/" />
         <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/user-guide/subscription/" />
