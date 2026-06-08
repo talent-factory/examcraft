@@ -1,6 +1,11 @@
 /**
  * Role-Based Navigation Hook
- * Provides navigation items based on user roles and permissions
+ * Provides navigation items based on user roles and permissions.
+ *
+ * Items are organised into logical, collapsible groups (TF-372). RBAC is
+ * applied per item; a group whose items are all filtered out is dropped
+ * entirely (header included). The flat `navigationItems` list is derived from
+ * the filtered groups and kept for backward compatibility.
  */
 
 import { useMemo } from 'react';
@@ -20,99 +25,153 @@ export interface NavigationItem {
   children?: NavigationItem[];
 }
 
-export const useRoleBasedNavigation = () => {
+/** Closed set of group identifiers — fixed in source, not data-driven. */
+export type NavigationGroupId =
+  | 'overview'
+  | 'content'
+  | 'evaluation'
+  | 'tools'
+  | 'administration';
+
+export interface NavigationGroup {
+  /** Stable identifier — the persisted expanded-state value and toggle handle. */
+  id: NavigationGroupId;
+  label: string;
+  items: NavigationItem[];
+}
+
+export interface RoleBasedNavigation {
+  navigationGroups: NavigationGroup[];
+  navigationItems: NavigationItem[];
+  hasAccess: (path: string) => boolean;
+}
+
+export const useRoleBasedNavigation = (): RoleBasedNavigation => {
   const { user, hasRole, hasPermission } = useAuth();
   const { t } = useTranslation();
 
-  const allNavigationItems: NavigationItem[] = useMemo(() => [
-    {
-      label: t('nav.sidebar.dashboard'),
-      path: '/dashboard',
-      icon: '📊',
-    },
-    {
-      label: t('nav.sidebar.aktivitaeten'),
-      path: '/aktivitaeten',
-      icon: '🔔',
-    },
-    {
-      label: t('nav.sidebar.documents'),
-      path: '/documents',
-      icon: '📄',
-      requiredPermissions: ['documents:read'],
-    },
-    {
-      label: t('nav.sidebar.questionGeneration'),
-      path: '/questions/generate',
-      icon: '✨',
-      requiredPermissions: ['create_questions'],
-    },
-    {
-      label: t('nav.sidebar.reviewQueue'),
-      path: '/questions/review',
-      icon: '✅',
-      requiredPermissions: ['review_questions'],
-    },
-    {
-      label: t('nav.sidebar.examComposer'),
-      path: '/exams/compose',
-      icon: '📝',
-      requiredPermissions: ['create_exams'],
-    },
-    {
-      label: t('nav.sidebar.auswertungen'),
-      path: '/auswertungen',
-      icon: '📈',
-      requiredPermissions: ['submissions:read'],
-    },
-    {
-      label: t('nav.sidebar.auswertungenKlassen'),
-      path: '/auswertungen/klassen',
-      icon: '🎓',
-      requiredPermissions: ['students:manage'],
-    },
-    {
-      label: t('nav.sidebar.auswertungenStudierende'),
-      path: '/auswertungen/studierende',
-      icon: '👥',
-      requiredPermissions: ['students:manage'],
-    },
-    {
-      label: t('nav.sidebar.documentChat'),
-      path: '/chat',
-      icon: '💬',
-      requiredPermissions: ['document_chatbot'],
-    },
-    {
-      label: t('nav.sidebar.promptLibrary'),
-      path: '/prompts',
-      icon: '💬',
-      requiredRoles: [UserRole.ADMIN, UserRole.DOZENT],
-      requiredPermissions: ['prompt_templates'],
-    },
-    {
-      label: t('nav.sidebar.admin'),
-      path: '/admin',
-      icon: '⚙️',
-      requiredRoles: [UserRole.ADMIN],
-    },
-    {
-      label: t('nav.sidebar.tagSettings'),
-      path: '/settings/tags',
-      icon: '🏷',
-      requiredRoles: [UserRole.DOZENT, UserRole.ASSISTANT],
-      excludedRoles: [UserRole.ADMIN],
-      excludeSuperuser: true,
-      requiredPermissions: ['create_questions'],
-    },
-    {
-      label: t('nav.sidebar.moodleConnection'),
-      path: '/admin/integrations/moodle',
-      icon: '🔗',
-      requiredRoles: [UserRole.ADMIN],
-      requiredPermissions: ['moodle:configure'],
-    },
-  ], [t]);
+  const allNavigationGroups: NavigationGroup[] = useMemo(
+    () => [
+      {
+        id: 'overview',
+        label: t('nav.groups.overview'),
+        items: [
+          {
+            label: t('nav.sidebar.dashboard'),
+            path: '/dashboard',
+            icon: '📊',
+          },
+          {
+            label: t('nav.sidebar.aktivitaeten'),
+            path: '/aktivitaeten',
+            icon: '🔔',
+          },
+        ],
+      },
+      {
+        id: 'content',
+        label: t('nav.groups.content'),
+        items: [
+          {
+            label: t('nav.sidebar.documents'),
+            path: '/documents',
+            icon: '📄',
+            requiredPermissions: ['documents:read'],
+          },
+          {
+            label: t('nav.sidebar.questionGeneration'),
+            path: '/questions/generate',
+            icon: '✨',
+            requiredPermissions: ['create_questions'],
+          },
+          {
+            label: t('nav.sidebar.reviewQueue'),
+            path: '/questions/review',
+            icon: '✅',
+            requiredPermissions: ['review_questions'],
+          },
+          {
+            label: t('nav.sidebar.examComposer'),
+            path: '/exams/compose',
+            icon: '📝',
+            requiredPermissions: ['create_exams'],
+          },
+        ],
+      },
+      {
+        id: 'evaluation',
+        label: t('nav.groups.evaluation'),
+        items: [
+          {
+            label: t('nav.sidebar.auswertungen'),
+            path: '/auswertungen',
+            icon: '📈',
+            requiredPermissions: ['submissions:read'],
+          },
+          {
+            label: t('nav.sidebar.auswertungenKlassen'),
+            path: '/auswertungen/klassen',
+            icon: '🎓',
+            requiredPermissions: ['students:manage'],
+          },
+          {
+            label: t('nav.sidebar.auswertungenStudierende'),
+            path: '/auswertungen/studierende',
+            icon: '👥',
+            requiredPermissions: ['students:manage'],
+          },
+        ],
+      },
+      {
+        id: 'tools',
+        label: t('nav.groups.tools'),
+        items: [
+          {
+            label: t('nav.sidebar.documentChat'),
+            path: '/chat',
+            icon: '💬',
+            requiredPermissions: ['document_chatbot'],
+          },
+          {
+            label: t('nav.sidebar.promptLibrary'),
+            path: '/prompts',
+            icon: '💬',
+            requiredRoles: [UserRole.ADMIN, UserRole.DOZENT],
+            requiredPermissions: ['prompt_templates'],
+          },
+        ],
+      },
+      {
+        id: 'administration',
+        label: t('nav.groups.administration'),
+        items: [
+          {
+            label: t('nav.sidebar.admin'),
+            path: '/admin',
+            icon: '⚙️',
+            requiredRoles: [UserRole.ADMIN],
+          },
+          {
+            label: t('nav.sidebar.tagSettings'),
+            path: '/settings/tags',
+            icon: '🏷',
+            requiredRoles: [UserRole.DOZENT, UserRole.ASSISTANT],
+            excludedRoles: [UserRole.ADMIN],
+            excludeSuperuser: true,
+            requiredPermissions: ['create_questions'],
+          },
+          {
+            label: t('nav.sidebar.moodleConnection'),
+            path: '/admin/integrations/moodle',
+            icon: '🔗',
+            requiredRoles: [UserRole.ADMIN],
+            requiredPermissions: ['moodle:configure'],
+          },
+        ],
+      },
+    ],
+    [t],
+  );
 
   const filterNavigationItems = (items: NavigationItem[]): NavigationItem[] => {
     const result: NavigationItem[] = [];
@@ -142,13 +201,26 @@ export const useRoleBasedNavigation = () => {
     return result;
   };
 
-  const navigationItems = useMemo(() => {
+  // A group with no remaining items after RBAC filtering is hidden entirely,
+  // header included (e.g. a Dozent without admin rights sees no empty
+  // "Administration" section).
+  const navigationGroups = useMemo(() => {
     if (!user) return [];
-    return filterNavigationItems(allNavigationItems);
+    return allNavigationGroups
+      .map((group) => ({ ...group, items: filterNavigationItems(group.items) }))
+      .filter((group) => group.items.length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, allNavigationItems]);
+  }, [user, allNavigationGroups]);
+
+  // Flat list derived from the filtered groups — kept for backward
+  // compatibility with consumers that don't care about grouping.
+  const navigationItems = useMemo(
+    () => navigationGroups.flatMap((group) => group.items),
+    [navigationGroups],
+  );
 
   return {
+    navigationGroups,
     navigationItems,
     hasAccess: (path: string) => {
       const findItem = (items: NavigationItem[]): boolean => {

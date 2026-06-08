@@ -388,7 +388,7 @@ async def list_documents_with_questions(
 ):
     """Return all documents of the institution.
     approved_question_count is 0 for documents with no approved questions yet."""
-    from sqlalchemy import case as sa_case
+    from sqlalchemy import case as sa_case, and_
 
     query = (
         db.query(
@@ -396,7 +396,11 @@ async def list_documents_with_questions(
             sa_func.count(
                 sa_case(
                     (
-                        QuestionReview.review_status == ReviewStatus.APPROVED.value,
+                        and_(
+                            QuestionReview.review_status == ReviewStatus.APPROVED.value,
+                            # TF-396: archivierte Fragen nicht mitzählen
+                            QuestionReview.archived_at.is_(None),
+                        ),
                         QuestionReview.id,
                     ),
                     else_=None,
@@ -447,7 +451,9 @@ async def list_approved_questions(
     """Browse approved questions for exam composition."""
     tenant_context = get_tenant_context(current_user)
     query = db.query(QuestionReview).filter(
-        QuestionReview.review_status == ReviewStatus.APPROVED.value
+        QuestionReview.review_status == ReviewStatus.APPROVED.value,
+        # TF-396: archivierte Fragen nicht zur Wiederverwendung anbieten
+        QuestionReview.archived_at.is_(None),
     )
     query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
 
@@ -1081,7 +1087,9 @@ def _build_candidate_query(
     """Build filtered query for approved question candidates."""
     tenant_context = get_tenant_context(current_user)
     query = db.query(QuestionReview).filter(
-        QuestionReview.review_status == ReviewStatus.APPROVED.value
+        QuestionReview.review_status == ReviewStatus.APPROVED.value,
+        # TF-396: archivierte Fragen nicht zur Wiederverwendung anbieten
+        QuestionReview.archived_at.is_(None),
     )
     query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
 

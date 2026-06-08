@@ -11,7 +11,12 @@ import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import DocumentTagEditor from '../DocumentTagEditor';
 import { DocumentService } from '../../../services/DocumentService';
-import { Document, DocumentStatus, DocumentTag } from '../../../types/document';
+import {
+  Document,
+  DocumentStatus,
+  DocumentTag,
+  DocumentVisibility,
+} from '../../../types/document';
 
 jest.mock('../../../services/DocumentService');
 const mockDocumentService = DocumentService as jest.Mocked<typeof DocumentService>;
@@ -30,6 +35,13 @@ const wrap = (ui: React.ReactElement) => (
 
 const tag1: DocumentTag = { id: 5, name: 'Mathe', scope: 'user', is_own: true };
 const tag2: DocumentTag = { id: 7, name: 'Physik', scope: 'user', is_own: true };
+// TF-382: an institution-scope tag — only attachable to INSTITUTION-visible docs.
+const instTag: DocumentTag = {
+  id: 9,
+  name: 'Lehrgang',
+  scope: 'institution',
+  is_own: false,
+};
 
 const makeDoc = (overrides: Partial<Document> = {}): Document => ({
   id: 42,
@@ -177,5 +189,95 @@ describe('DocumentTagEditor', () => {
     await waitFor(() => {
       expect(onChanged).toHaveBeenCalledWith(updatedDoc);
     });
+  });
+
+  // (d) TF-382: on a PRIVATE document, an institution-scope tag must not be a
+  //     dead end — its dropdown option is disabled so it can't be selected.
+  it('(d) institution tag option is disabled on a private document', async () => {
+    const doc = makeDoc({ tags: [], visibility: DocumentVisibility.PRIVATE });
+
+    render(
+      wrap(
+        <DocumentTagEditor
+          document={doc}
+          availableTags={[tag1, instTag]}
+          canEdit={true}
+          onChanged={jest.fn()}
+        />,
+      ),
+    );
+
+    const input = screen.getByRole('combobox');
+    fireEvent.mouseDown(input);
+    fireEvent.click(input);
+
+    // The institution tag renders as an option but is aria-disabled.
+    const option = await screen.findByRole('option', { name: /Lehrgang/ });
+    expect(option).toHaveAttribute('aria-disabled', 'true');
+    // The disabled reason is surfaced inline.
+    expect(
+      screen.getByText('Nur für institutionsweit geteilte Dokumente'),
+    ).toBeInTheDocument();
+  });
+
+  // (e) TF-382: on an INSTITUTION-visible document the same tag is selectable.
+  it('(e) institution tag option is enabled on an institution document', async () => {
+    const doc = makeDoc({ tags: [], visibility: DocumentVisibility.INSTITUTION });
+
+    render(
+      wrap(
+        <DocumentTagEditor
+          document={doc}
+          availableTags={[tag1, instTag]}
+          canEdit={true}
+          onChanged={jest.fn()}
+        />,
+      ),
+    );
+
+    const input = screen.getByRole('combobox');
+    fireEvent.mouseDown(input);
+    fireEvent.click(input);
+
+    const option = await screen.findByRole('option', { name: /Lehrgang/ });
+    expect(option).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  // (f) TF-382: the proactive "create a tag by typing" hint is shown when editable.
+  it('(f) shows the create-tag hint when canEdit', () => {
+    const doc = makeDoc({ tags: [] });
+
+    const { rerender } = render(
+      wrap(
+        <DocumentTagEditor
+          document={doc}
+          availableTags={[tag1]}
+          canEdit={true}
+          onChanged={jest.fn()}
+        />,
+      ),
+    );
+    expect(
+      screen.getByText(
+        'Neuen Tag erstellen: einfach tippen und mit Enter bestätigen.',
+      ),
+    ).toBeInTheDocument();
+
+    // Hidden when the user can't edit (no actionable path to surface).
+    rerender(
+      wrap(
+        <DocumentTagEditor
+          document={doc}
+          availableTags={[tag1]}
+          canEdit={false}
+          onChanged={jest.fn()}
+        />,
+      ),
+    );
+    expect(
+      screen.queryByText(
+        'Neuen Tag erstellen: einfach tippen und mit Enter bestätigen.',
+      ),
+    ).not.toBeInTheDocument();
   });
 });

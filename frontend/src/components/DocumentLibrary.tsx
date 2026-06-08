@@ -49,7 +49,8 @@ import {
   LockOutlined,
   Business,
   SearchOff,
-  FilterAltOff
+  FilterAltOff,
+  LocalOffer
 } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -359,6 +360,10 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     document: null
   });
   const [previewTab, setPreviewTab] = useState(0);
+  // TF-381: when the preview is opened via the «Tags bearbeiten» menu entry we
+  // land on the Metadata tab and scroll straight to the tag editor.
+  const [scrollToTagEditor, setScrollToTagEditor] = useState(false);
+  const tagEditorRef = React.useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [documentContent, setDocumentContent] = useState<string | null>(null);
   const [processingDocumentId, setProcessingDocumentId] = useState<number | null>(null);
@@ -606,6 +611,49 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       await loadDocumentChunksPaginated(document.id, 1);
     }
   };
+
+  // TF-381: direct, discoverable jump to the tag editor. Opens the preview on
+  // the Metadata tab (index 0, where DocumentTagEditor lives) instead of the
+  // ORIGINAL default, and flags the editor to be scrolled into view. Mirrors
+  // handlePreview's chunk pre-fetch so the CHUNKS tab still works from here.
+  const handleEditTags = async (document: Document) => {
+    setPreviewDialog({ open: true, document });
+    setPreviewTab(0);
+    setDocumentContent(null);
+    setDocumentChunks([]);
+    setChunksError(null);
+    setCurrentPage(1);
+    setScrollToTagEditor(true);
+    handleMenuClose();
+
+    if (isDocumentReady(document.status)) {
+      await loadDocumentChunksPaginated(document.id, 1);
+    }
+  };
+
+  // TF-381: once the Metadata tab is rendered, bring the tag editor into view.
+  // The Dialog mounts its portal content a frame after `open` flips, so the ref
+  // is briefly null — retry on the next frame(s) until it attaches. Guarded for
+  // environments (e.g. jsdom) where scrollIntoView is unavailable.
+  useEffect(() => {
+    if (!scrollToTagEditor || !previewDialog.open || previewTab !== 0) return;
+    let raf = 0;
+    let attempts = 0;
+    const scrollWhenReady = () => {
+      const el = tagEditorRef.current;
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setScrollToTagEditor(false);
+      } else if (attempts < 10) {
+        attempts += 1;
+        raf = window.requestAnimationFrame(scrollWhenReady);
+      } else {
+        setScrollToTagEditor(false);
+      }
+    };
+    raf = window.requestAnimationFrame(scrollWhenReady);
+    return () => window.cancelAnimationFrame(raf);
+  }, [scrollToTagEditor, previewDialog.open, previewTab]);
 
   const loadDocumentChunksPaginated = async (documentId: number, page: number) => {
     try {
@@ -1485,6 +1533,24 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           );
         })()}
 
+        {/* Edit tags — owner-only (TF-381). Opens the preview on the Metadata
+            tab and scrolls to the tag editor, the previously hard-to-find
+            entry point for assigning tags. */}
+        {(() => {
+          const doc = menuAnchor
+            ? documents.find(d => d.id === menuAnchor.documentId)
+            : undefined;
+          if (!doc || !isOwner(doc)) return null;
+          return (
+            <MenuItem onClick={() => handleEditTags(doc)}>
+              <ListItemIcon>
+                <LocalOffer fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>{t('components.documentLibrary.menuEditTags')}</ListItemText>
+            </MenuItem>
+          );
+        })()}
+
         {/* Process button - only show for UPLOADED documents */}
         {menuAnchor && documents.find(d => d.id === menuAnchor.documentId)?.status === DocumentStatus.UPLOADED && (
           <>
@@ -1627,7 +1693,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     </Grid>
 
                     {previewDialog.document && (
-                      <Box sx={{ mt: 2 }}>
+                      <Box ref={tagEditorRef} sx={{ mt: 2 }}>
                         <Typography variant="subtitle2" gutterBottom>
                           {t('components.documentLibrary.tagEditor.heading', 'Tags')}
                         </Typography>

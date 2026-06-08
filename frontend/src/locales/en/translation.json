@@ -5,6 +5,13 @@
     "logout": "Logout",
     "language": "Language",
     "documentation": "Documentation",
+    "groups": {
+      "overview": "Overview",
+      "content": "Content & Questions",
+      "evaluation": "Evaluation",
+      "tools": "Tools",
+      "administration": "Administration"
+    },
     "sidebar": {
       "dashboard": "Dashboard",
       "aktivitaeten": "Activity",
@@ -1187,6 +1194,7 @@
       "visibilityClickToChange": "Click to change",
       "visibilityEditAria": "Change visibility",
       "menuChangeVisibility": "Change visibility…",
+      "menuEditTags": "Edit tags…",
       "toolbar": {
         "searchPlaceholder": "Search…",
         "visibility": "Visibility",
@@ -1231,7 +1239,9 @@
       },
       "tagEditor": {
         "label": "Tags",
-        "heading": "Tags"
+        "heading": "Tags",
+        "createHint": "Create a new tag: just type and press Enter.",
+        "institutionTagDisabled": "Only for institution-shared documents"
       },
       "list": {
         "colVisibility": "Visibility",
@@ -1349,7 +1359,15 @@
       "reasonLabel": "Reason (optional)",
       "approve": "Approve",
       "reject": "Reject",
-      "errorStartReview": "Error starting review"
+      "errorStartReview": "Error starting review",
+      "showArchived": "Show archive",
+      "showActive": "Show active",
+      "deleteTitle": "Delete question permanently",
+      "deleteConfirm": "This question will be permanently deleted. Only archived questions not used in any exam can be deleted.",
+      "deleteConfirmBtn": "Delete",
+      "errorArchive": "Archiving failed",
+      "errorRestore": "Restore failed",
+      "errorDelete": "Deletion failed"
     },
     "questionCard": {
       "questionNumber": "Question #{{id}}",
@@ -1367,6 +1385,9 @@
       "showSources": "Show Sources ({{count}})",
       "hideSources": "Hide Sources ({{count}})",
       "sourceDocuments": "Source Documents:",
+      "templateProvenance": "Created with template",
+      "defaultTemplate": "Default template",
+      "templateNotRecorded": "Template not recorded",
       "showComments": "Show Comments",
       "hideComments": "Hide Comments",
       "noComments": "No comments yet. Click the comment icon to add one.",
@@ -1376,7 +1397,10 @@
       "rejectBtn": "Reject",
       "editQuestion": "Edit Question",
       "addComment": "Add Comment",
-      "showDetails": "Show Details"
+      "showDetails": "Show Details",
+      "archiveBtn": "Archive",
+      "restoreBtn": "Restore",
+      "deleteBtn": "Delete permanently"
     },
     "questionDetail": {
       "back": "Back",

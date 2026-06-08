@@ -80,20 +80,6 @@ class RAGExamRequestModel(BaseModel):
     )
 
 
-class RAGQuestionResponse(BaseModel):
-    """Response Model für RAG-Frage"""
-
-    question_text: str
-    question_type: str
-    options: Optional[List[str]] = None
-    correct_answer: Optional[str] = None
-    explanation: Optional[str] = None
-    difficulty: str
-    source_chunks: List[str]
-    source_documents: List[str]
-    confidence_score: float
-
-
 class RAGContextResponse(BaseModel):
     """Response Model für RAG-Kontext"""
 
@@ -102,19 +88,6 @@ class RAGContextResponse(BaseModel):
     total_similarity_score: float
     source_documents: List[Dict[str, Any]]
     context_length: int
-
-
-class RAGExamResponseModel(BaseModel):
-    """Response Model für RAG-Prüfung"""
-
-    exam_id: str
-    topic: str
-    questions: List[RAGQuestionResponse]
-    context_summary: RAGContextResponse
-    generation_time: float
-    quality_metrics: Dict[str, Any]
-    review_question_ids: List[int] = []
-    persistence_warning: Optional[str] = None
 
 
 class ContextRetrievalRequest(BaseModel):

@@ -57,6 +57,15 @@ plugins:
             Admin-Guide: Admin Guide
             FAQ: FAQ
             Changelog: Changelog
+            Auswertungen: Evaluations
+            Review & Bewertung: Review & Grading
+            Statistik: Statistics
+            Notenexport: Grade Export
+            Klassen: Classes
+            Moodle-Integration: Moodle Integration
+            Aktivitäten: Activities
+            Moodle-Anbindung: Moodle Connection
+            Notenschemata: Grading Schemes
         - locale: fr
           name: Français
           build: true
@@ -66,6 +75,15 @@ plugins:
             Admin-Guide: Guide administrateur
             FAQ: FAQ
             Changelog: Journal des modifications
+            Auswertungen: Évaluations
+            Review & Bewertung: Révision & notation
+            Statistik: Statistiques
+            Notenexport: Export des notes
+            Klassen: Classes
+            Moodle-Integration: Intégration Moodle
+            Aktivitäten: Activités
+            Moodle-Anbindung: Connexion Moodle
+            Notenschemata: Schémas de notation
         - locale: it
           name: Italiano
           build: true
@@ -75,6 +93,15 @@ plugins:
             Admin-Guide: Guida amministratore
             FAQ: FAQ
             Changelog: Registro delle modifiche
+            Auswertungen: Valutazioni
+            Review & Bewertung: Revisione & valutazione
+            Statistik: Statistiche
+            Notenexport: Esportazione voti
+            Klassen: Classi
+            Moodle-Integration: Integrazione Moodle
+            Aktivitäten: Attività
+            Moodle-Anbindung: Connessione Moodle
+            Notenschemata: Schemi di valutazione
 
 markdown_extensions:
   - admonition
@@ -105,6 +132,13 @@ nav:
       - user-guide/rag-exam.md
       - user-guide/review-queue.md
       - user-guide/exam-composer.md
+      - Auswertungen: user-guide/auswertungen.md
+      - Review & Bewertung: user-guide/review-grading.md
+      - Statistik: user-guide/statistik.md
+      - Notenexport: user-guide/notenexport.md
+      - Klassen: user-guide/klassen.md
+      - Moodle-Integration: user-guide/moodle-integration.md
+      - Aktivitäten: user-guide/aktivitaeten.md
       - user-guide/exam-export.md
       - user-guide/chatbot.md
       - user-guide/prompt-library.md
@@ -116,6 +150,8 @@ nav:
       - admin-guide/user-mgmt.md
       - admin-guide/institutions.md
       - admin-guide/roles.md
+      - Moodle-Anbindung: admin-guide/moodle.md
+      - Notenschemata: admin-guide/grading-schemes.md
       - admin-guide/monitoring.md
       - admin-guide/subscription.md
       - admin-guide/prompts.md

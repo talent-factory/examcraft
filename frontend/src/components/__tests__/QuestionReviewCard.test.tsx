@@ -320,4 +320,92 @@ describe('QuestionReviewCard', () => {
       expect(screen.getByText(/rejected/i)).toBeInTheDocument();
     });
   });
+
+  // TF-383: Template-/Prompt-Herkunft (Provenance-Snapshot)
+  describe('Template provenance', () => {
+    it('shows custom template name and version', () => {
+      const q: QuestionReview = {
+        ...mockQuestion,
+        generation_metadata: {
+          prompt_id: 'uuid-123',
+          prompt_name: 'universal_multiple_choice_generator',
+          prompt_version: 3,
+          is_default_template: false,
+          fallback_to_default: false,
+          variables: { topic: 'Heaps', difficulty: 'medium' },
+        },
+      };
+
+      render(
+        <TestWrapper>
+          <QuestionReviewCard question={q} />
+        </TestWrapper>
+      );
+
+      expect(
+        screen.getByText('universal_multiple_choice_generator v3')
+      ).toBeInTheDocument();
+    });
+
+    it('shows default-template badge for default snapshots', () => {
+      const q: QuestionReview = {
+        ...mockQuestion,
+        generation_metadata: {
+          prompt_id: null,
+          prompt_name: 'default_multiple_choice',
+          prompt_version: null,
+          is_default_template: true,
+          fallback_to_default: false,
+          variables: { topic: 'Heaps' },
+        },
+      };
+
+      render(
+        <TestWrapper>
+          <QuestionReviewCard question={q} />
+        </TestWrapper>
+      );
+
+      // de/translation.json → "Standard-Vorlage"
+      expect(screen.getByText('Standard-Vorlage')).toBeInTheDocument();
+    });
+
+    it('treats a failed-render fallback as default template', () => {
+      const q: QuestionReview = {
+        ...mockQuestion,
+        generation_metadata: {
+          prompt_id: 'uuid-broken',
+          prompt_name: 'default_open_ended',
+          prompt_version: null,
+          is_default_template: true,
+          fallback_to_default: true,
+          variables: {},
+        },
+      };
+
+      render(
+        <TestWrapper>
+          <QuestionReviewCard question={q} />
+        </TestWrapper>
+      );
+
+      expect(screen.getByText('Standard-Vorlage')).toBeInTheDocument();
+    });
+
+    it('shows "not recorded" for legacy questions without provenance', () => {
+      const q: QuestionReview = {
+        ...mockQuestion,
+        generation_metadata: null,
+      };
+
+      render(
+        <TestWrapper>
+          <QuestionReviewCard question={q} />
+        </TestWrapper>
+      );
+
+      // de/translation.json → "Vorlage nicht erfasst"
+      expect(screen.getByText('Vorlage nicht erfasst')).toBeInTheDocument();
+    });
+  });
 });

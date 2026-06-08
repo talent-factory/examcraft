@@ -11,7 +11,7 @@ Changes and news for ExamCraft AI.
 - **Dashboard**: New home page with statistics, quick-access tiles, and recent activities
 - **Review Queue**: Manual review and approval of AI-generated questions before exam composition
 - **Exam Composer**: Assemble approved questions into complete exams and export (PDF, Word, JSON)
-- **Prompt Library**: Now accessible to all DOZENT and ADMIN users (previously admin panel only)
+- **Prompt Library**: Now accessible to all INSTRUCTOR and ADMIN users (previously admin panel only)
 - **Profile page**: Manage personal data and password directly in user profile
 - **Subscription page**: Overview, upgrade, and billing management via Stripe portal
 

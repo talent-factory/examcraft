@@ -11,7 +11,11 @@ Exam Composer permet d'assembler des questions approuvées en un examen complet 
 
 Cliquez sur **Exam Composer** dans la navigation ou sélectionnez la tuile correspondante sur le [Dashboard](dashboard.md). Route: `/exams/compose`.
 
+![Exam Composer — Vue d'ensemble](../screenshots/exam-composer/exam-composer-overview.png)
+
 ### Étape 2: Démarrer un nouvel examen
+
+![Exam Composer — Nouveau formulaire](../screenshots/exam-composer/exam-composer-new.png)
 
 Cliquez sur **Créer un nouvel examen** et remplissez les champs suivants:
 
@@ -21,9 +25,25 @@ Cliquez sur **Créer un nouvel examen** et remplissez les champs suivants:
 | Description | Informations supplémentaires optionnelles sur l'examen |
 | Date | Date prévue de l'examen |
 
-Le titre est l'élément clé qui identifie uniquement votre examen. Choisissez une désignation explicite qui indique clairement la matière, le cours et la période. La description fournit un contexte supplémentaire pour vous et vos collègues — par exemple des informations sur le niveau de difficulté, le groupe cible ou les domaines d'emphasis spéciaux.
+Le titre est l'élément clé qui identifie uniquement votre examen. Choisissez une désignation explicite qui indique clairement la matière, le cours et la période. La description fournit un contexte supplémentaire pour vous et vos collègues — par exemple des informations sur le niveau de difficulté, le groupe cible ou les domaines thématiques spéciaux.
+
+### Choisir le schéma de notation
+
+Dans la barre `ExamMetadataBar` en haut de la page, vous trouverez le sélecteur **Schéma de notation**. Choisissez le schéma de notes souhaité pour cet examen:
+
+![Exam Composer — Sélecteur de schéma de notation](../screenshots/exam-composer/exam-composer-grading-scheme.png)
+
+| Option | Description |
+|--------|-------------|
+| Standard institution | Schéma prédéfini de votre institution (par défaut) |
+| Schémas système | 8 schémas préinstallés (Swiss, German, ECTS, etc.) |
+| Schémas personnalisés | Schémas définis par votre institution (Enterprise) |
+
+Le schéma de notation influence l'[export des notes](notenexport.md). Il peut être modifié à tout moment tant qu'aucun export n'a encore été créé.
 
 ### Étape 3: Sélectionner les questions
+
+![Exam Composer — Sélection des questions](../screenshots/exam-composer/exam-composer-question-selection.png)
 
 Sélectionnez des questions dans la liste des questions approuvées:
 
@@ -38,9 +58,13 @@ Les fonctions de filtrage vous aident à trouver efficacement les questions appr
 
 ### Étape 4: Définir l'ordre
 
+![Exam Composer — Définir l'ordre](../screenshots/exam-composer/exam-composer-reorder.png)
+
 Arrangez les questions sélectionnées par glisser-déposer dans l'ordre souhaité. Les questions sont numérotées automatiquement. Réfléchissez à la question de savoir si vous voulez commencer par des questions plus faciles pour introduire les examinés au sujet, ou si vous voulez volontairement placer en avant les questions plus difficiles. L'ordre peut aussi avoir du sens thématiquement — groupez les questions connexes pour permettre aux examinés de comprendre les connexions.
 
 ### Étape 5: Exporter l'examen
+
+![Exam Composer — Boîte de dialogue d'export](../screenshots/exam-composer/exam-composer-export.png)
 
 Cliquez sur **Exporter** et sélectionnez le format souhaité:
 
@@ -56,6 +80,8 @@ Cliquez sur **Exporter** et sélectionnez le format souhaité:
 Le format Markdown convient pour une édition ultérieure ou l'intégration dans des systèmes de documentation. Le format JSON est idéal pour l'intégration technique — par exemple, si vous voulez importer des données d'examen dans un système personnalisé ou effectuer des analyses automatisées. Le format Moodle XML permet l'import direct dans Moodle sans post-traitement manuel.
 
 ## Gérer les examens existants
+
+![Exam Composer — Vue d'ensemble des examens](../screenshots/exam-composer/exam-composer-builder.png)
 
 Tous les examens créés apparaissent dans une liste de présentation. Vous pouvez:
 

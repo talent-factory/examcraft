@@ -38,6 +38,24 @@ export interface ReviewerInfo {
 }
 
 /**
+ * Generation Metadata (TF-383)
+ * Snapshot der Vorlage/des Prompts, mit dem eine Frage generiert wurde.
+ * Spiegelt das Backend-Envelope (core `schemas/generation_metadata.py`): die
+ * Hüllen-Felder sind immer gesetzt (`null` wo nicht anwendbar), nur `variables`
+ * ist offen. Der GANZE Wert ist `null`/`undefined` bei Altbestand (nicht erfasst).
+ * Drei Zustände: default (is_default_template), custom, und fallback
+ * (`fallback_to_default` = fehlgeschlagener Custom-Render → Standard-Template).
+ */
+export interface GenerationMetadata {
+  prompt_id: string | null;
+  prompt_name: string | null;
+  prompt_version: number | null;
+  is_default_template: boolean;
+  fallback_to_default: boolean;
+  variables: Record<string, unknown>;
+}
+
+/**
  * Question Review Interface
  * Erweitert RAGQuestion mit Review-spezifischen Feldern
  */
@@ -57,11 +75,16 @@ export interface QuestionReview {
   bloom_level?: number;
   estimated_time_minutes?: number;
   quality_tier?: string;
+  generation_metadata?: GenerationMetadata | null;
   review_status: ReviewStatus;
   reviewed_by?: number;
   reviewer_info?: ReviewerInfo;
   reviewed_at?: string;
   exam_id?: string;
+  // TF-396: Archiv-Achse (orthogonal zu review_status).
+  archived_at?: string | null;
+  archived_by?: number | null;
+  archive_reason?: string | null;
   tags?: Tag[];
   created_at: string;
   updated_at: string;
@@ -128,6 +151,9 @@ export interface ReviewFilters {
   difficulty?: string;
   question_type?: string;
   exam_id?: string;
+  // TF-396: Archiv-Filter. Default (beide false) = nur aktive Fragen.
+  include_archived?: boolean;
+  archived_only?: boolean;
   limit?: number;
   offset?: number;
 }

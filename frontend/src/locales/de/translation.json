@@ -5,6 +5,13 @@
     "logout": "Abmelden",
     "language": "Sprache",
     "documentation": "Dokumentation",
+    "groups": {
+      "overview": "Überblick",
+      "content": "Inhalte & Fragen",
+      "evaluation": "Auswertung",
+      "tools": "Werkzeuge",
+      "administration": "Administration"
+    },
     "sidebar": {
       "dashboard": "Dashboard",
       "aktivitaeten": "Aktivitäten",
@@ -1187,6 +1194,7 @@
       "visibilityClickToChange": "Klicken zum Ändern",
       "visibilityEditAria": "Sichtbarkeit ändern",
       "menuChangeVisibility": "Sichtbarkeit ändern…",
+      "menuEditTags": "Tags bearbeiten…",
       "toolbar": {
         "searchPlaceholder": "Suchen…",
         "visibility": "Sichtbarkeit",
@@ -1231,7 +1239,9 @@
       },
       "tagEditor": {
         "label": "Tags",
-        "heading": "Tags"
+        "heading": "Tags",
+        "createHint": "Neuen Tag erstellen: einfach tippen und mit Enter bestätigen.",
+        "institutionTagDisabled": "Nur für institutionsweit geteilte Dokumente"
       },
       "list": {
         "colVisibility": "Sichtbarkeit",
@@ -1349,7 +1359,15 @@
       "reasonLabel": "Begründung (optional)",
       "approve": "Genehmigen",
       "reject": "Ablehnen",
-      "errorStartReview": "Fehler beim Starten des Reviews"
+      "errorStartReview": "Fehler beim Starten des Reviews",
+      "showArchived": "Archiv anzeigen",
+      "showActive": "Aktive anzeigen",
+      "deleteTitle": "Frage endgültig löschen",
+      "deleteConfirm": "Diese Frage wird unwiderruflich gelöscht. Nur archivierte, in keiner Prüfung verwendete Fragen können gelöscht werden.",
+      "deleteConfirmBtn": "Löschen",
+      "errorArchive": "Archivieren fehlgeschlagen",
+      "errorRestore": "Wiederherstellen fehlgeschlagen",
+      "errorDelete": "Löschen fehlgeschlagen"
     },
     "questionCard": {
       "questionNumber": "Frage #{{id}}",
@@ -1367,6 +1385,9 @@
       "showSources": "Quellen anzeigen ({{count}})",
       "hideSources": "Quellen ausblenden ({{count}})",
       "sourceDocuments": "Quelldokumente:",
+      "templateProvenance": "Erstellt mit Vorlage",
+      "defaultTemplate": "Standard-Vorlage",
+      "templateNotRecorded": "Vorlage nicht erfasst",
       "showComments": "Kommentare anzeigen",
       "hideComments": "Kommentare ausblenden",
       "noComments": "Noch keine Kommentare. Klicken Sie auf das Kommentar-Symbol, um einen hinzuzufügen.",
@@ -1376,7 +1397,10 @@
       "rejectBtn": "Ablehnen",
       "editQuestion": "Frage bearbeiten",
       "addComment": "Kommentar hinzufügen",
-      "showDetails": "Details anzeigen"
+      "showDetails": "Details anzeigen",
+      "archiveBtn": "Archivieren",
+      "restoreBtn": "Wiederherstellen",
+      "deleteBtn": "Endgültig löschen"
     },
     "questionDetail": {
       "back": "Zurück",

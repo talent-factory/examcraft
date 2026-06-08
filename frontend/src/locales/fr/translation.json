@@ -5,6 +5,13 @@
     "logout": "Déconnexion",
     "language": "Langue",
     "documentation": "Documentation",
+    "groups": {
+      "overview": "Aperçu",
+      "content": "Contenu et questions",
+      "evaluation": "Évaluation",
+      "tools": "Outils",
+      "administration": "Administration"
+    },
     "sidebar": {
       "dashboard": "Tableau de bord",
       "aktivitaeten": "Activité",
@@ -798,6 +805,7 @@
       "visibilityClickToChange": "Cliquer pour modifier",
       "visibilityEditAria": "Modifier la visibilité",
       "menuChangeVisibility": "Modifier la visibilité…",
+      "menuEditTags": "Modifier les tags…",
       "toolbar": {
         "searchPlaceholder": "Rechercher…",
         "visibility": "Visibilité",
@@ -842,7 +850,9 @@
       },
       "tagEditor": {
         "label": "Tags",
-        "heading": "Tags"
+        "heading": "Tags",
+        "createHint": "Créer une nouvelle étiquette : saisissez-la et appuyez sur Entrée.",
+        "institutionTagDisabled": "Uniquement pour les documents partagés avec l'institution"
       },
       "list": {
         "colVisibility": "Visibilité",
@@ -960,7 +970,15 @@
       "reasonLabel": "Motif (optionnel)",
       "approve": "Approuver",
       "reject": "Rejeter",
-      "errorStartReview": "Erreur lors du démarrage de la révision"
+      "errorStartReview": "Erreur lors du démarrage de la révision",
+      "showArchived": "Afficher les archives",
+      "showActive": "Afficher les actives",
+      "deleteTitle": "Supprimer définitivement la question",
+      "deleteConfirm": "Cette question sera définitivement supprimée. Seules les questions archivées et non utilisées dans un examen peuvent être supprimées.",
+      "deleteConfirmBtn": "Supprimer",
+      "errorArchive": "Échec de l'archivage",
+      "errorRestore": "Échec de la restauration",
+      "errorDelete": "Échec de la suppression"
     },
     "questionCard": {
       "questionNumber": "Question n°{{id}}",
@@ -978,6 +996,9 @@
       "showSources": "Afficher les sources ({{count}})",
       "hideSources": "Masquer les sources ({{count}})",
       "sourceDocuments": "Documents sources :",
+      "templateProvenance": "Créé avec le modèle",
+      "defaultTemplate": "Modèle par défaut",
+      "templateNotRecorded": "Modèle non enregistré",
       "showComments": "Afficher les commentaires",
       "hideComments": "Masquer les commentaires",
       "noComments": "Aucun commentaire pour l'instant. Cliquez sur l'icône commentaire pour en ajouter un.",
@@ -987,7 +1008,10 @@
       "rejectBtn": "Rejeter",
       "editQuestion": "Modifier la question",
       "addComment": "Ajouter un commentaire",
-      "showDetails": "Afficher les détails"
+      "showDetails": "Afficher les détails",
+      "archiveBtn": "Archiver",
+      "restoreBtn": "Restaurer",
+      "deleteBtn": "Supprimer définitivement"
     },
     "questionDetail": {
       "back": "Retour",

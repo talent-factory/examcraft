@@ -326,6 +326,11 @@ def _persist_questions(
                 estimated_time_minutes=TIME_ESTIMATES.get(
                     (question.question_type, question.difficulty), 3
                 ),
+                # TF-383: Provenance-Snapshot der verwendeten Vorlage. getattr,
+                # damit die Core-Persistenz nicht von einer Premium-Datenklasse
+                # abhängt (Tier-Grenze bleibt sauber); None für Frage-Quellen
+                # ohne Herkunft.
+                generation_metadata=getattr(question, "generation_metadata", None),
             )
             db.add(question_review)
             reviews.append(question_review)

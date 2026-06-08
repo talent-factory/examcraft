@@ -47,7 +47,14 @@ anknüpfen.
 - **Zuletzt generierte Fragen**: Klicken Sie auf eine Frage, um sie in der Review Queue zu öffnen
 - **Zuletzt hochgeladene Dokumente**: Klicken Sie auf ein Dokument, um es in der Dokumentenbibliothek zu öffnen
 
+!!! note "Datenschutz"
+    Das Dashboard-Widget zeigt ausschliesslich Ihre eigenen Aktivitäten. Klicken Sie auf **Alle Aktivitäten anzeigen →** um auf der [Aktivitäten-Seite](aktivitaeten.md) optional auch die institutionsweiten Ereignisse einzublenden.
+
 ![Dashboard Recent Activity](../screenshots/dashboard/dashboard-recent-activity.png)
+
+Klicken Sie auf **Alle Aktivitäten anzeigen →** unten im Widget um zur vollständigen [Aktivitäten-Seite](aktivitaeten.md) zu navigieren.
+
+![Dashboard — Widget-Link Aktivitäten](../screenshots/aktivitaeten/dashboard-widget-link.png)
 
 ## Abonnement-Badge
 
@@ -68,3 +75,4 @@ Ihren Plan einzusehen oder zu upgraden.
 - [:octicons-arrow-right-24: Dokument hochladen](documents.md)
 - [:octicons-arrow-right-24: Erste Prüfung erstellen](exam-create.md)
 - [:octicons-arrow-right-24: Abonnement verwalten](subscription.md)
+- [:octicons-arrow-right-24: Alle Aktivitäten anzeigen](aktivitaeten.md)

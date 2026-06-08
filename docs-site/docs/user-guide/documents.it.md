@@ -1,5 +1,7 @@
 # Caricamento e gestione documenti
 
+![Gestione documenti](../screenshots/documents/documents-overview.png)
+
 ## Formati file supportati
 
 | Formato | Estensione | Max. Dimensione | Particolarità |
@@ -85,6 +87,32 @@ Inserite parole chiave nel campo di ricerca. I risultati vengono filtrati in tem
 
 !!! warning "Attenzione"
     I documenti eliminati non possono essere ripristinati.
+
+## Anteprima del documento
+
+Fate clic sul nome di un documento nella libreria per aprire la finestra di dialogo di anteprima. È composta da tre schede:
+
+| Scheda | Contenuto |
+|--------|-----------|
+| **Metadati** | Nome file, data di caricamento, dimensione file, stato di elaborazione, tag |
+| **Originale** (predefinita) | Il documento originale in base al tipo: PDF direttamente nel browser, Markdown ed esportazioni chat come testo formattato, testo normale in monospace |
+| **Frammenti** | Chunk di elaborazione interni per la diagnosi tecnica |
+
+![Anteprima documento — Scheda Metadati](../screenshots/documents/documents-preview-dialog.png)
+
+![Anteprima documento — Scheda Originale (PDF)](../screenshots/documents/documents-preview-original-pdf.png)
+
+![Anteprima documento — Scheda Originale (Markdown)](../screenshots/documents/documents-preview-original-md.png)
+
+### Stati di errore
+
+| Errore | Causa | Soluzione |
+|--------|-------|-----------|
+| Errore di rete | Interruzione della connessione | Ricaricare la pagina |
+| 403 Forbidden | Nessun accesso a questo documento | Contattare l'amministratore |
+| 404 Not Found | Il documento è stato eliminato | Rimuovere dalla libreria |
+| 429 Too Many Requests | Limite di frequenza raggiunto | Attendere un momento e riprovare |
+| 500 Server Error | Errore interno | Contattare l'amministratore |
 
 ## Passaggi successivi
 

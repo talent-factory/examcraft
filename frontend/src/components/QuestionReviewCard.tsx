@@ -39,6 +39,10 @@ import {
   RateReview,
   Visibility,
   LocalOfferOutlined,
+  Description,
+  Archive,
+  Unarchive,
+  DeleteForever,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -54,6 +58,10 @@ interface QuestionReviewCardProps {
   onReject?: (questionId: number) => void;
   onEdit?: (questionId: number) => void;
   onComment?: (questionId: number) => void;
+  onArchive?: (questionId: number) => void;
+  onRestore?: (questionId: number) => void;
+  onDelete?: (questionId: number) => void;
+  canDelete?: boolean;
   loading?: boolean;
 }
 
@@ -64,6 +72,10 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
   onReject,
   onEdit,
   onComment,
+  onArchive,
+  onRestore,
+  onDelete,
+  canDelete = false,
   loading = false,
 }) => {
   const { t, i18n } = useTranslation();
@@ -131,6 +143,53 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
     return type.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
+  };
+
+  // TF-383: Provenance-Chip — zeigt, mit welcher Vorlage die Frage erstellt
+  // wurde. Snapshot zum Generierungszeitpunkt. Altbestand (null) → "nicht
+  // erfasst"; Default-/Fallback-Template → Standard-Badge; Custom-Prompt →
+  // Name + Version mit Variablen im Tooltip.
+  const renderTemplateChip = () => {
+    const gm = question.generation_metadata;
+    const provenance = t('components.questionCard.templateProvenance');
+
+    if (!gm) {
+      return (
+        <Tooltip title={provenance}>
+          <Chip
+            icon={<Description />}
+            label={t('components.questionCard.templateNotRecorded')}
+            size="small"
+            variant="outlined"
+          />
+        </Tooltip>
+      );
+    }
+
+    const isDefault = Boolean(gm.is_default_template || gm.fallback_to_default);
+    const version = gm.prompt_version != null ? ` v${gm.prompt_version}` : '';
+    const label = isDefault
+      ? t('components.questionCard.defaultTemplate')
+      : `${gm.prompt_name ?? '—'}${version}`;
+
+    const varEntries = gm.variables ? Object.entries(gm.variables) : [];
+    const fmtVar = (v: unknown) =>
+      typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v);
+    const tooltip = varEntries.length
+      ? `${provenance} — ${varEntries.map(([k, v]) => `${k}: ${fmtVar(v)}`).join(', ')}`
+      : provenance;
+
+    return (
+      <Tooltip title={tooltip}>
+        <Chip
+          icon={<Description />}
+          label={label}
+          size="small"
+          variant="outlined"
+          color={isDefault ? 'default' : 'info'}
+        />
+      </Tooltip>
+    );
   };
 
   return (
@@ -285,6 +344,9 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               variant="outlined"
             />
           </Tooltip>
+
+          {/* Template provenance (TF-383): mit welcher Vorlage wurde die Frage erstellt */}
+          {renderTemplateChip()}
         </Stack>
 
         {question.tags && question.tags.length > 0 && (
@@ -470,6 +532,43 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               <Visibility />
             </IconButton>
           </Tooltip>
+
+          {/* TF-396: Archiv-Aktionen */}
+          {!question.archived_at ? (
+            <Tooltip title={t('components.questionCard.archiveBtn')}>
+              <IconButton
+                onClick={() => onArchive?.(question.id)}
+                disabled={loading}
+                size="small"
+              >
+                <Archive />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <>
+              <Tooltip title={t('components.questionCard.restoreBtn')}>
+                <IconButton
+                  onClick={() => onRestore?.(question.id)}
+                  disabled={loading}
+                  size="small"
+                >
+                  <Unarchive />
+                </IconButton>
+              </Tooltip>
+              {canDelete && (
+                <Tooltip title={t('components.questionCard.deleteBtn')}>
+                  <IconButton
+                    onClick={() => onDelete?.(question.id)}
+                    disabled={loading}
+                    size="small"
+                    color="error"
+                  >
+                    <DeleteForever />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </>
+          )}
         </Box>
       </CardActions>
     </Card>

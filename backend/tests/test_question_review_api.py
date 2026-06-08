@@ -3,7 +3,7 @@ API Integration Tests für Question Review Endpoints
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 from fastapi.testclient import TestClient
 from datetime import datetime
 
@@ -88,10 +88,22 @@ class TestQuestionReviewAPI:
         mock.bloom_level = 3
         mock.estimated_time_minutes = 5
         mock.quality_tier = "A"
+        # TF-383: Provenance-Snapshot — muss gesetzt sein, sonst liefert der Mock
+        # ein Mock-Attribut, das Pydantic nicht als Optional[Dict] validieren kann.
+        mock.generation_metadata = {
+            "prompt_id": "uuid-1",
+            "prompt_name": "custom_mcq",
+            "prompt_version": 2,
+            "is_default_template": False,
+            "variables": {"topic": "Data Structures"},
+        }
         mock.review_status = ReviewStatus.PENDING.value
         mock.reviewed_by = None
         mock.reviewed_at = None
         mock.exam_id = "exam_123"
+        mock.archived_at = None  # TF-396: Archiv-Achse
+        mock.archived_by = None
+        mock.archive_reason = None
         mock.created_at = datetime.now()
         mock.updated_at = datetime.now()
         mock.tags = []  # TF-320: route iterates q.tags — must be a real iterable
@@ -151,6 +163,11 @@ class TestQuestionReviewAPI:
         response = client.get("/api/v1/questions/1/review")
 
         assert response.status_code == 200
+        # TF-383: Provenance-Snapshot wird durch die API-Serialisierung gereicht.
+        body = response.json()
+        assert body["generation_metadata"]["prompt_name"] == "custom_mcq"
+        assert body["generation_metadata"]["prompt_version"] == 2
+        assert body["generation_metadata"]["is_default_template"] is False
 
     def test_get_question_review_not_found(self, auth_client):
         """Test Question Review nicht gefunden"""
@@ -164,6 +181,79 @@ class TestQuestionReviewAPI:
         response = client.get("/api/v1/questions/999/review")
 
         assert response.status_code == 404
+
+    def test_get_question_review_denies_cross_tenant(self, auth_client, mock_user):
+        """TF-383 review: the by-id detail endpoint is institution-scoped — a
+        question outside the caller's tenant resolves to 404, so neither the
+        question nor its generation_metadata leaks across institutions."""
+        client, mock_db = auth_client
+
+        # Simulate the tenant-scoped query finding nothing in the caller's scope.
+        scoped_query = MagicMock()
+        scoped_query.filter.return_value = scoped_query
+        scoped_query.first.return_value = None
+
+        with patch(
+            "api.question_review.TenantFilter.filter_by_tenant",
+            return_value=scoped_query,
+        ) as tenant_spy:
+            response = client.get("/api/v1/questions/999/review")
+
+        assert response.status_code == 404
+        # Assert the CALLER's tenant is what scopes the query (not merely that
+        # *some* scoping ran) — catches a regression that passes the wrong
+        # institution_id. filter_by_tenant(query, model, tenant_context).
+        assert tenant_spy.called
+        tenant_context = tenant_spy.call_args.args[2]
+        assert tenant_context.institution_id == mock_user.institution_id
+
+    # By-id endpoints that must all route through _get_scoped_question. Format:
+    # (http_method, path, json_body_or_None, mutates_db).
+    _BY_ID_ENDPOINTS = [
+        ("get", "/api/v1/questions/777/review", None, False),
+        ("put", "/api/v1/questions/777/edit", {"bloom_level": 3}, True),
+        ("post", "/api/v1/questions/777/start-review", None, True),
+        ("post", "/api/v1/questions/777/approve", {"reason": "ok"}, True),
+        ("post", "/api/v1/questions/777/reject", {"reason": "no"}, True),
+        ("post", "/api/v1/questions/777/comments", {"comment_text": "hi"}, True),
+        ("get", "/api/v1/questions/777/comments", None, False),
+        ("get", "/api/v1/questions/777/history", None, False),
+        # TF-387: tag endpoints must also route through _get_scoped_question
+        # (previously used a raw institution_id == filter without superuser bypass).
+        ("post", "/api/v1/questions/777/tags", {"tag_ids": [1]}, True),
+        ("delete", "/api/v1/questions/777/tags/5", None, True),
+    ]
+
+    @pytest.mark.parametrize("method,path,body,mutates", _BY_ID_ENDPOINTS)
+    def test_by_id_endpoints_are_tenant_scoped(
+        self, auth_client, method, path, body, mutates
+    ):
+        """TF-383 review: EVERY by-id endpoint must fetch via the institution-scoped
+        path (TenantFilter.filter_by_tenant). When the scoped query finds nothing
+        (question not visible in the caller's tenant), the endpoint answers 404 and
+        performs no mutation. An endpoint reverted to an unscoped fetch would not
+        call filter_by_tenant → `tenant_spy.called` fails."""
+        client, mock_db = auth_client
+
+        # Real _get_scoped_question runs; we stub the tenant filter to yield a
+        # query that resolves to None (same seam as test_get_question_review_*).
+        scoped_query = MagicMock()
+        scoped_query.filter.return_value = scoped_query
+        scoped_query.first.return_value = None
+
+        with patch(
+            "api.question_review.TenantFilter.filter_by_tenant",
+            return_value=scoped_query,
+        ) as tenant_spy:
+            request = getattr(client, method)
+            response = request(path, json=body) if body is not None else request(path)
+
+        assert response.status_code == 404
+        assert tenant_spy.called, (
+            f"{method.upper()} {path} did not apply tenant scoping"
+        )
+        if mutates:
+            mock_db.commit.assert_not_called()
 
     # ==================== POST /api/v1/questions/{id}/approve ====================
 

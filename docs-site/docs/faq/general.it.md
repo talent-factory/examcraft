@@ -53,7 +53,7 @@ Dipende dal vostro piano di abbonamento:
 ## Dove trovo la Libreria Prompt?
 
 La Libreria Prompt è accessibile nella navigazione sotto **Prompt** (Rotta: `/prompts`).
-È disponibile per utenti con i ruoli ADMIN e DOZENT.
+È disponibile per utenti con i ruoli ADMIN e DOCENTE.
 
 → Ulteriori informazioni: [Libreria Prompt](../user-guide/prompt-library.md)
 

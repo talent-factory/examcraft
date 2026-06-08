@@ -73,7 +73,7 @@ Dans la section **Compte**, vous voyez un résumé des détails de votre compte:
 
 | Information | Description |
 |-------------|-------------|
-| Rôle | Votre rôle utilisateur (ADMIN ou PROFESSEUR) – détermine vos permissions |
+| Rôle | Votre rôle utilisateur (ADMIN ou ENSEIGNANT) – détermine vos permissions |
 | Institution | L'institution à laquelle vous êtes assigné |
 | Abonnement | Votre plan d'abonnement actuel et les limites |
 | Membre depuis | Date et heure de création du compte |
@@ -85,7 +85,7 @@ Ces informations sont en lecture seule et ne peuvent être modifiées que par un
 Le rôle détermine les fonctionnalités que vous pouvez utiliser:
 
 - **ADMIN** – Accès complet à toutes les fonctionnalités, gestion des utilisateurs, paramètres institutionnels
-- **PROFESSEUR** – Accès à la génération de questions, gestion des prompts, examens RAG
+- **ENSEIGNANT** – Accès à la génération de questions, gestion des prompts, examens RAG
 
 ### Institution
 

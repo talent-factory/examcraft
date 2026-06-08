@@ -11,7 +11,11 @@ The Exam Composer allows you to compile approved questions into a complete exam 
 
 Click on **Exam Composer** in the navigation or select the corresponding tile on the [Dashboard](dashboard.md). Route: `/exams/compose`.
 
+![Exam Composer — Overview](../screenshots/exam-composer/exam-composer-overview.png)
+
 ### Step 2: Start a New Exam
+
+![Exam Composer — New Form](../screenshots/exam-composer/exam-composer-new.png)
 
 Click on **Create New Exam** and fill in the following fields:
 
@@ -23,7 +27,26 @@ Click on **Create New Exam** and fill in the following fields:
 
 The title is the key element that uniquely identifies your exam. Choose a meaningful name that clearly indicates the subject, course, and time period. The description provides additional context for you and your colleagues — such as information about difficulty level, target audience, or special focus areas.
 
+### Choose Grade Scale
+
+In the `ExamMetadataBar` at the top of the page, you will find the **Grade Scale** selector. Choose the desired grading scheme for this exam:
+
+![Exam Composer — Grade Scale Selector](../screenshots/exam-composer/exam-composer-grading-scheme.png)
+
+| Option | Description |
+|--------|-------------|
+| Institution Default | Pre-configured scheme of your institution (default) |
+| System Schemas | 8 pre-installed schemas (Swiss, German, ECTS, etc.) |
+| Custom Schemas | Schemas defined by your institution (Enterprise) |
+
+The grade scale affects the [grade export](notenexport.md). It can be changed at any time as long as no export has been created yet.
+
+!!! note "Grade Scale"
+    The grade scale selection only affects export and reporting. Questions and exam composition are independent of the chosen grading scheme.
+
 ### Step 3: Select Questions
+
+![Exam Composer — Question Selection](../screenshots/exam-composer/exam-composer-question-selection.png)
 
 Select questions from the list of approved questions:
 
@@ -38,9 +61,13 @@ The filter functions help you find the right questions efficiently. Use the filt
 
 ### Step 4: Set Question Order
 
+![Exam Composer — Set Question Order](../screenshots/exam-composer/exam-composer-reorder.png)
+
 Arrange the selected questions in the desired order using drag and drop. The questions are automatically numbered. Consider whether you want to start with easier questions to introduce examinees to the topic, or deliberately place harder questions first. The order can also be thematically meaningful — group related questions to help examinees understand connections.
 
 ### Step 5: Export Exam
+
+![Exam Composer — Export Dialog](../screenshots/exam-composer/exam-composer-export.png)
 
 Click on **Export** and choose the desired format:
 
@@ -56,6 +83,8 @@ Click on **Export** and choose the desired format:
 The Markdown format is suitable for further editing or integration into documentation systems. The JSON format is ideal for technical integration — for example, when importing exam data into a custom system or performing automated evaluations. The Moodle XML format enables direct import into Moodle without manual post-processing.
 
 ## Manage Existing Exams
+
+![Exam Composer — Exam Overview](../screenshots/exam-composer/exam-composer-builder.png)
 
 All created exams appear in the overview list. There you can:
 

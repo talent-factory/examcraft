@@ -3,8 +3,9 @@ import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
+import Box from '@mui/material/Box';
 import { useTranslation } from 'react-i18next';
-import { Document, DocumentTag } from '../../types/document';
+import { Document, DocumentTag, DocumentVisibility } from '../../types/document';
 import { DocumentService } from '../../services/DocumentService';
 
 interface DocumentTagEditorProps {
@@ -30,6 +31,16 @@ const DocumentTagEditor: React.FC<DocumentTagEditorProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const currentTags: DocumentTag[] = document.tags ?? [];
+
+  // TF-382: An `institution`-scope tag may only be attached to an
+  // `INSTITUTION`-visible document (backend rule in utils/document_tags.py).
+  // On a private document such tags are a dead end — selecting one fails with
+  // a 400. Detect them so we can disable the option up front instead of letting
+  // the user pick something that can never attach.
+  const isInstitutionBlocked = (option: TagOrString): boolean =>
+    typeof option !== 'string' &&
+    option.scope === 'institution' &&
+    document.visibility !== DocumentVisibility.INSTITUTION;
 
   const handleChange = async (
     _event: React.SyntheticEvent,
@@ -110,9 +121,33 @@ const DocumentTagEditor: React.FC<DocumentTagEditorProps> = ({
           typeof option === 'string' ? option : option.name
         }
         isOptionEqualToValue={(a, b) => a.id === b.id}
+        getOptionDisabled={isInstitutionBlocked}
         filterOptions={(options, params) => {
           const filtered = filter(options, params);
           return filtered;
+        }}
+        renderOption={(props, option) => {
+          // MUI 5.18 injects `key` into `props`; spreading it warns, so pull it out.
+          const { key, ...optionProps } = props as typeof props & {
+            key?: React.Key;
+          };
+          return (
+            <li key={key} {...optionProps}>
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                <span>
+                  {typeof option === 'string' ? option : option.name}
+                </span>
+                {isInstitutionBlocked(option) && (
+                  <Typography variant="caption" color="text.secondary">
+                    {t(
+                      'components.documentLibrary.tagEditor.institutionTagDisabled',
+                      'Nur für institutionsweit geteilte Dokumente',
+                    )}
+                  </Typography>
+                )}
+              </Box>
+            </li>
+          );
         }}
         onChange={handleChange}
         renderInput={(params) => (
@@ -132,6 +167,18 @@ const DocumentTagEditor: React.FC<DocumentTagEditorProps> = ({
           />
         )}
       />
+      {canEdit && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ mt: 0.5, display: 'block' }}
+        >
+          {t(
+            'components.documentLibrary.tagEditor.createHint',
+            'Neuen Tag erstellen: einfach tippen und mit Enter bestätigen.',
+          )}
+        </Typography>
+      )}
       {error && (
         <Typography color="error" variant="caption" sx={{ mt: 0.5, display: 'block' }}>
           {error}

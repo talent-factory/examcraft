@@ -5,6 +5,13 @@
     "logout": "Esci",
     "language": "Lingua",
     "documentation": "Documentazione",
+    "groups": {
+      "overview": "Panoramica",
+      "content": "Contenuti e domande",
+      "evaluation": "Valutazione",
+      "tools": "Strumenti",
+      "administration": "Amministrazione"
+    },
     "sidebar": {
       "dashboard": "Dashboard",
       "aktivitaeten": "Attività",
@@ -798,6 +805,7 @@
       "visibilityClickToChange": "Clicca per modificare",
       "visibilityEditAria": "Modifica visibilità",
       "menuChangeVisibility": "Modifica visibilità…",
+      "menuEditTags": "Modifica tag…",
       "toolbar": {
         "searchPlaceholder": "Cerca…",
         "visibility": "Visibilità",
@@ -842,7 +850,9 @@
       },
       "tagEditor": {
         "label": "Tag",
-        "heading": "Tag"
+        "heading": "Tag",
+        "createHint": "Crea un nuovo tag: digita e premi Invio.",
+        "institutionTagDisabled": "Solo per documenti condivisi con l'istituzione"
       },
       "list": {
         "colVisibility": "Visibilità",
@@ -960,7 +970,15 @@
       "reasonLabel": "Motivo (opzionale)",
       "approve": "Approva",
       "reject": "Rifiuta",
-      "errorStartReview": "Errore nell'avvio della revisione"
+      "errorStartReview": "Errore nell'avvio della revisione",
+      "showArchived": "Mostra archivio",
+      "showActive": "Mostra attive",
+      "deleteTitle": "Elimina definitivamente la domanda",
+      "deleteConfirm": "Questa domanda verrà eliminata definitivamente. Solo le domande archiviate e non utilizzate in alcun esame possono essere eliminate.",
+      "deleteConfirmBtn": "Elimina",
+      "errorArchive": "Archiviazione non riuscita",
+      "errorRestore": "Ripristino non riuscito",
+      "errorDelete": "Eliminazione non riuscita"
     },
     "questionCard": {
       "questionNumber": "Domanda #{{id}}",
@@ -978,6 +996,9 @@
       "showSources": "Mostra fonti ({{count}})",
       "hideSources": "Nascondi fonti ({{count}})",
       "sourceDocuments": "Documenti fonte:",
+      "templateProvenance": "Creato con il modello",
+      "defaultTemplate": "Modello predefinito",
+      "templateNotRecorded": "Modello non registrato",
       "showComments": "Mostra commenti",
       "hideComments": "Nascondi commenti",
       "noComments": "Ancora nessun commento. Clicca sull'icona commento per aggiungerne uno.",
@@ -987,7 +1008,10 @@
       "rejectBtn": "Rifiuta",
       "editQuestion": "Modifica domanda",
       "addComment": "Aggiungi commento",
-      "showDetails": "Mostra dettagli"
+      "showDetails": "Mostra dettagli",
+      "archiveBtn": "Archivia",
+      "restoreBtn": "Ripristina",
+      "deleteBtn": "Elimina definitivamente"
     },
     "questionDetail": {
       "back": "Indietro",

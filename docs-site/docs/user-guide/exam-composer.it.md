@@ -11,7 +11,11 @@ Exam Composer consente di assemblare domande approvate in un esame completo e di
 
 Fate clic su **Exam Composer** nella navigazione o selezionate il riquadro corrispondente sul [Dashboard](dashboard.md). Rotta: `/exams/compose`.
 
+![Exam Composer — Vista iniziale](../screenshots/exam-composer/exam-composer-overview.png)
+
 ### Passaggio 2: Avvio nuovo esame
+
+![Exam Composer — Nuovo modulo](../screenshots/exam-composer/exam-composer-new.png)
 
 Fate clic su **Crea nuovo esame** e compilate i seguenti campi:
 
@@ -23,7 +27,26 @@ Fate clic su **Crea nuovo esame** e compilate i seguenti campi:
 
 Il titolo è l'elemento chiave che identifica univocamente l'esame. Scegliete una denominazione significativa che indichi chiaramente la materia, il corso e la classificazione temporale. La descrizione fornisce contesto aggiuntivo per voi e i vostri colleghi — ad esempio informazioni sul livello di difficoltà, il gruppo target o i focus specifici.
 
+### Scegliere il schema di valutazione
+
+Nell'`ExamMetadataBar` in cima alla pagina trovate il selettore **Schema di valutazione**. Scegliete lo schema di voto desiderato per questo esame:
+
+![Exam Composer — Selettore schema di valutazione](../screenshots/exam-composer/exam-composer-grading-scheme.png)
+
+| Opzione | Descrizione |
+|---------|-------------|
+| Standard istituzione | Schema predefinito della vostra istituzione (predefinito) |
+| Schemi di sistema | 8 schemi preinstallati (Svizzero, Tedesco, ECTS, ecc.) |
+| Schemi personalizzati | Schemi definiti dalla vostra istituzione (Enterprise) |
+
+Lo schema di valutazione influenza l'[esportazione voti](notenexport.md). Può essere modificato in qualsiasi momento, finché non è ancora stato creato alcun esportazione.
+
+!!! note "Nota"
+    Gli schemi personalizzati sono disponibili solo nel tier Enterprise. Per configurare schemi propri dell'istituzione, consultate la [guida admin sui schemi di valutazione](../admin-guide/grading-schemes.md).
+
 ### Passaggio 3: Selezione domande
+
+![Exam Composer — Selezione domande](../screenshots/exam-composer/exam-composer-question-selection.png)
 
 Selezionate domande dall'elenco delle domande approvate:
 
@@ -38,9 +61,13 @@ Le funzioni di filtraggio vi aiutano a trovare efficientemente le domande approp
 
 ### Passaggio 4: Ordinamento delle domande
 
+![Exam Composer — Ordinamento delle domande](../screenshots/exam-composer/exam-composer-reorder.png)
+
 Ordinate le domande selezionate tramite Drag & Drop nella sequenza desiderata. Le domande vengono numerate automaticamente. Considerate se iniziare con domande più semplici per introdurre gli esaminandi all'argomento, o se preferite iniziare deliberatamente con domande più difficili. L'ordinamento può anche essere significativo dal punto di vista tematico — raggruppate le domande correlate per consentire agli esaminandi di comprendere i collegamenti.
 
 ### Passaggio 5: Esportazione esame
+
+![Exam Composer — Finestra di dialogo Export](../screenshots/exam-composer/exam-composer-export.png)
 
 Fate clic su **Esporta** e scegliete il formato desiderato:
 
@@ -56,6 +83,8 @@ Fate clic su **Esporta** e scegliete il formato desiderato:
 Il formato Markdown è adatto per ulteriori modifiche o l'integrazione in sistemi di documentazione. Il formato JSON è ideale per l'integrazione tecnica — ad esempio se desiderate importare dati d'esame in un sistema personalizzato o eseguire valutazioni automatizzate. Il formato Moodle XML consente l'importazione diretta in Moodle senza elaborazione manuale successiva.
 
 ## Gestione esami esistenti
+
+![Exam Composer — Panoramica esami](../screenshots/exam-composer/exam-composer-builder.png)
 
 Tutti gli esami creati appaiono nell'elenco di panoramica. Lì potete:
 

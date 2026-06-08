@@ -11,7 +11,7 @@ Modifications et nouvelles pour ExamCraft AI.
 - **Dashboard**: Nouvelle page d'accueil avec statistiques, tuiles d'accès rapide et activités récentes
 - **Review Queue**: Vérification manuelle et libération des questions générées par l'IA avant assemblage des examens
 - **Exam Composer**: Assembler les questions approuvées en examens complets et exporter (PDF, Word, JSON)
-- **Bibliothèque de prompts**: Maintenant accessible pour tous les utilisateurs PROFESSEUR et ADMIN (auparavant panneau Admin uniquement)
+- **Bibliothèque de prompts**: Maintenant accessible pour tous les utilisateurs ENSEIGNANT et ADMIN (auparavant panneau Admin uniquement)
 - **Page de profil**: Gérer les données personnelles et le mot de passe directement dans le profil utilisateur
 - **Page d'abonnement**: Aperçu, mise à niveau et gestion de la facturation via portail Stripe
 

@@ -11,7 +11,7 @@ En tant qu'administrateur, vous gérez tous les utilisateurs de votre institutio
 |------|-------------|:-----------:|
 | Prénom et Nom | Nom complet de la personne | ✓ |
 | Adresse e-mail | Utilisé comme nom de connexion | ✓ |
-| Rôle | ADMIN ou PROFESSEUR (voir ci-dessous) | ✓ |
+| Rôle | ADMIN ou ENSEIGNANT (voir ci-dessous) | ✓ |
 | Institution | Affectation à l'institution | ✓ |
 | Mot de passe temporaire | Premier mot de passe (l'utilisateur peut le modifier) | ✓ |
 
@@ -28,8 +28,8 @@ ExamCraft AI a deux rôles:
 
 | Rôle | Permissions |
 |-------|---------------|
-| **PROFESSEUR** | Télécharger des documents, générer des questions, Review Queue, Exam Composer, Bibliothèque de prompts |
-| **ADMIN** | Toutes les permissions PROFESSEUR + gestion des utilisateurs, institutions, panneau Admin |
+| **ENSEIGNANT** | Télécharger des documents, générer des questions, Review Queue, Exam Composer, Bibliothèque de prompts |
+| **ADMIN** | Toutes les permissions ENSEIGNANT + gestion des utilisateurs, institutions, panneau Admin |
 
 N'accordez le rôle ADMIN que aux personnes qui doivent réellement gérer les utilisateurs.
 
