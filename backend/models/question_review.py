@@ -101,6 +101,16 @@ class QuestionReview(Base):
     # Exam Association
     exam_id = Column(String(100), nullable=True, index=True)  # RAG Exam ID
 
+    # TF-396: Archiv-Achse (orthogonal zu review_status).
+    # archived_at IS NULL  => aktiv; gesetzt => archiviert (aus Bank/Listen
+    # ausgeblendet, in Prüfungen aber erhalten). Wiederherstellen = archived_at
+    # zurück auf NULL, review_status bleibt unverändert.
+    archived_at = Column(DateTime, nullable=True, index=True)
+    archived_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    archive_reason = Column(Text, nullable=True)
+
     # Timestamps
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(

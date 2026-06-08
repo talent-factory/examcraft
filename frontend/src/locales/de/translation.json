@@ -1359,7 +1359,15 @@
       "reasonLabel": "Begründung (optional)",
       "approve": "Genehmigen",
       "reject": "Ablehnen",
-      "errorStartReview": "Fehler beim Starten des Reviews"
+      "errorStartReview": "Fehler beim Starten des Reviews",
+      "showArchived": "Archiv anzeigen",
+      "showActive": "Aktive anzeigen",
+      "deleteTitle": "Frage endgültig löschen",
+      "deleteConfirm": "Diese Frage wird unwiderruflich gelöscht. Nur archivierte, in keiner Prüfung verwendete Fragen können gelöscht werden.",
+      "deleteConfirmBtn": "Löschen",
+      "errorArchive": "Archivieren fehlgeschlagen",
+      "errorRestore": "Wiederherstellen fehlgeschlagen",
+      "errorDelete": "Löschen fehlgeschlagen"
     },
     "questionCard": {
       "questionNumber": "Frage #{{id}}",
@@ -1389,7 +1397,10 @@
       "rejectBtn": "Ablehnen",
       "editQuestion": "Frage bearbeiten",
       "addComment": "Kommentar hinzufügen",
-      "showDetails": "Details anzeigen"
+      "showDetails": "Details anzeigen",
+      "archiveBtn": "Archivieren",
+      "restoreBtn": "Wiederherstellen",
+      "deleteBtn": "Endgültig löschen"
     },
     "questionDetail": {
       "back": "Zurück",

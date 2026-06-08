@@ -82,6 +82,9 @@ def _question_to_dict(
         "reviewed_by": question.reviewed_by,
         "reviewed_at": question.reviewed_at,
         "exam_id": question.exam_id,
+        "archived_at": question.archived_at,
+        "archived_by": question.archived_by,
+        "archive_reason": question.archive_reason,
         "created_at": question.created_at,
         "updated_at": question.updated_at,
         "tags": [_serialize_tag(t, counts.get(t.id, 0)) for t in question.tags],
@@ -112,6 +115,9 @@ def _attach_reviewer_info(question: QuestionReview, db: Session) -> dict:
         "reviewed_by": question.reviewed_by,
         "reviewed_at": question.reviewed_at,
         "exam_id": question.exam_id,
+        "archived_at": question.archived_at,
+        "archived_by": question.archived_by,
+        "archive_reason": question.archive_reason,
         "created_at": question.created_at,
         "updated_at": question.updated_at,
         "tags": [_serialize_tag(t, counts.get(t.id, 0)) for t in question.tags],
@@ -238,6 +244,9 @@ class QuestionReviewResponse(BaseModel):
     reviewer_info: Optional[ReviewerInfo] = None
     reviewed_at: Optional[datetime]
     exam_id: Optional[str]
+    archived_at: Optional[datetime] = None
+    archived_by: Optional[int] = None
+    archive_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     tags: List[TagOut] = []
@@ -315,6 +324,8 @@ async def get_review_queue(
         None, pattern="^(multiple_choice|open_ended|true_false)$"
     ),
     exam_id: Optional[str] = None,
+    include_archived: bool = Query(False),
+    archived_only: bool = Query(False),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     request: Request = None,
@@ -350,11 +361,23 @@ async def get_review_queue(
             query = query.filter(QuestionReview.question_type == question_type)
         if exam_id:
             query = query.filter(QuestionReview.exam_id == exam_id)
+        # TF-396: Archiv-Achse. Default: nur aktive Fragen (archived_at IS NULL).
+        if archived_only:
+            query = query.filter(QuestionReview.archived_at.isnot(None))
+        elif not include_archived:
+            query = query.filter(QuestionReview.archived_at.is_(None))
 
         # Get Statistics — ebenfalls institution-scoped
         base_stats = TenantFilter.filter_by_tenant(
             db.query(QuestionReview), QuestionReview, tenant_context
         )
+        # TF-396: Stats folgen demselben Archiv-Filter wie die Liste, damit die
+        # Badge-Zähler zur angezeigten Menge passen (sonst über-zählen sie, sobald
+        # Fragen archiviert sind).
+        if archived_only:
+            base_stats = base_stats.filter(QuestionReview.archived_at.isnot(None))
+        elif not include_archived:
+            base_stats = base_stats.filter(QuestionReview.archived_at.is_(None))
         total = query.count()
         pending = base_stats.filter(
             QuestionReview.review_status == ReviewStatus.PENDING.value
@@ -931,6 +954,285 @@ async def reject_question(
             status_code=500,
             detail=t("review_reject_failed", locale=locale),
         )
+
+
+# ---------------------------------------------------------------------------
+# TF-396: Archivieren / Wiederherstellen / Hard-Delete
+# ---------------------------------------------------------------------------
+
+
+class ArchiveRequest(BaseModel):
+    """Request Model für Archivieren."""
+
+    reason: Optional[str] = Field(None, max_length=500)
+
+
+class BulkDeleteRequest(BaseModel):
+    """Request Model für Bulk-Hard-Delete."""
+
+    ids: list[int] = Field(..., min_length=1, max_length=200)
+
+
+class BlockedDeletion(BaseModel):
+    """Eine im Bulk-Delete abgewiesene Frage mit i18n-Begründung."""
+
+    id: int
+    reason: str
+
+
+class BulkDeleteResult(BaseModel):
+    """Ergebnis eines Bulk-Hard-Delete: gelöschte IDs + abgewiesene Einträge."""
+
+    deleted: list[int]
+    blocked: list[BlockedDeletion]
+
+
+def _question_delete_block_reason(
+    db: Session, question: QuestionReview, locale: str
+) -> str | None:
+    """i18n-Grund, falls die Frage NICHT hart löschbar ist, sonst ``None``.
+
+    Guard (TF-396): nur archivierte Fragen, die in keiner Prüfung verwendet
+    werden, dürfen hart gelöscht werden. "In keiner Prüfung" deckt transitiv
+    auch Schüler-Antworten ab (attempt_answers -> exam_questions).
+    """
+    from models.exam import ExamQuestion
+
+    if question.archived_at is None:
+        return t("delete_requires_archive", locale=locale)
+    in_exam = (
+        db.query(ExamQuestion).filter(ExamQuestion.question_id == question.id).first()
+    )
+    if in_exam is not None:
+        return t("delete_in_exam", locale=locale)
+    return None
+
+
+@router.post("/{question_id}/archive", response_model=QuestionReviewResponse)
+async def archive_question(
+    question_id: int,
+    request: ArchiveRequest,
+    http_request: Request,
+    current_user: User = Depends(require_permission("review_questions")),
+    db: Session = Depends(get_db),
+):
+    """Archiviere eine Frage (orthogonal zum review_status).
+
+    Blendet die Frage aus Bank/Listen aus; in Prüfungen bleibt sie erhalten.
+
+    **Required Permission:** `review_questions`
+    """
+    locale = get_request_locale(http_request, current_user)
+    try:
+        question = _get_scoped_question(db, question_id, current_user)
+        if not question:
+            raise HTTPException(
+                status_code=404, detail=t("review_question_not_found", locale=locale)
+            )
+        if question.archived_at is not None:
+            raise HTTPException(
+                status_code=409, detail=t("archive_already_archived", locale=locale)
+            )
+
+        question.archived_at = datetime.utcnow()
+        question.archived_by = current_user.id
+        question.archive_reason = request.reason
+        db.add(
+            ReviewHistory(
+                question_id=question.id,
+                action="archived",
+                old_status=question.review_status,
+                new_status=question.review_status,
+                changed_by=current_user.email,
+                change_reason=request.reason or "Question archived",
+            )
+        )
+        db.commit()
+        db.refresh(question)
+        logger.info(f"Archived question {question_id} by {current_user.email}")
+        return _attach_reviewer_info(question, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error archiving question {question_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=t("archive_failed", locale=locale))
+
+
+@router.post("/{question_id}/restore", response_model=QuestionReviewResponse)
+async def restore_question(
+    question_id: int,
+    http_request: Request,
+    current_user: User = Depends(require_permission("review_questions")),
+    db: Session = Depends(get_db),
+):
+    """Stelle eine archivierte Frage wieder her (Status bleibt unverändert).
+
+    **Required Permission:** `review_questions`
+    """
+    locale = get_request_locale(http_request, current_user)
+    try:
+        question = _get_scoped_question(db, question_id, current_user)
+        if not question:
+            raise HTTPException(
+                status_code=404, detail=t("review_question_not_found", locale=locale)
+            )
+        if question.archived_at is None:
+            raise HTTPException(
+                status_code=409, detail=t("archive_not_archived", locale=locale)
+            )
+
+        question.archived_at = None
+        question.archived_by = None
+        question.archive_reason = None
+        db.add(
+            ReviewHistory(
+                question_id=question.id,
+                action="restored",
+                old_status=question.review_status,
+                new_status=question.review_status,
+                changed_by=current_user.email,
+                change_reason="Question restored",
+            )
+        )
+        db.commit()
+        db.refresh(question)
+        logger.info(f"Restored question {question_id} by {current_user.email}")
+        return _attach_reviewer_info(question, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error restoring question {question_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=t("restore_failed", locale=locale))
+
+
+@router.delete("/{question_id}", status_code=200)
+async def delete_question(
+    question_id: int,
+    http_request: Request,
+    current_user: User = Depends(require_permission("delete_questions")),
+    db: Session = Depends(get_db),
+):
+    """Lösche eine Frage endgültig (Hard-Delete). 3-fach geguarded.
+
+    Voraussetzungen: Frage ist archiviert, in keiner Prüfung verwendet, und der
+    Aufrufer hat `delete_questions`. Schreibt einen Audit-Snapshot, bevor die
+    Zeile (per FK-Cascade) verschwindet.
+
+    **Required Permission:** `delete_questions`
+    """
+    locale = get_request_locale(http_request, current_user)
+    from services.audit_service import AuditService
+
+    try:
+        question = _get_scoped_question(db, question_id, current_user)
+        if not question:
+            raise HTTPException(
+                status_code=404, detail=t("review_question_not_found", locale=locale)
+            )
+
+        block = _question_delete_block_reason(db, question, locale)
+        if block:
+            raise HTTPException(status_code=409, detail=block)
+
+        # Snapshot fürs Audit-Log VOR dem Löschen erfassen (review_history stirbt
+        # per Cascade mit). Der Delete wird zuerst gestaged und dann zusammen mit
+        # dem Audit-Insert atomar committet: AuditService.log_action besitzt den
+        # commit; schlägt der Audit-Insert fehl, rollt er auch den Delete zurück
+        # und gibt None zurück -> wir brechen mit 500 ab. So gibt es weder einen
+        # Delete ohne Audit noch ein Orphan-Audit für eine noch existierende Frage.
+        snapshot = {
+            "question_text": question.question_text,
+            "review_status": question.review_status,
+            "topic": question.topic,
+            "created_by": question.created_by,
+        }
+        db.delete(question)
+        db.flush()
+        audit = AuditService.log_question_action(
+            db,
+            AuditService.ACTION_DELETE_QUESTION,
+            current_user.id,
+            question_id,
+            request=http_request,
+            additional_data=snapshot,
+        )
+        if audit is None:
+            raise HTTPException(
+                status_code=500, detail=t("delete_failed", locale=locale)
+            )
+        logger.info(f"Hard-deleted question {question_id} by {current_user.email}")
+        return {"deleted": True, "id": question_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting question {question_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=t("delete_failed", locale=locale))
+
+
+@router.post("/bulk-delete", response_model=BulkDeleteResult, status_code=200)
+async def bulk_delete_questions(
+    request: BulkDeleteRequest,
+    http_request: Request,
+    current_user: User = Depends(require_permission("delete_questions")),
+    db: Session = Depends(get_db),
+):
+    """Bulk-Hard-Delete. Jede ID einzeln geguarded und einzeln atomar gelöscht.
+
+    Pro Frage wird der Delete gestaged und über den (selbst-committenden)
+    Audit-Insert atomar committet; schlägt das Audit fehl, rollt es diesen
+    Delete zurück und die ID landet in ``blocked``. Bereits committete IDs
+    bleiben bei einem unerwarteten Fehler bestehen; die laufende, nicht
+    committete Frage wird zurückgerollt.
+
+    **Required Permission:** `delete_questions`
+    """
+    locale = get_request_locale(http_request, current_user)
+    from services.audit_service import AuditService
+
+    deleted: list[int] = []
+    blocked: list[dict] = []
+    try:
+        for qid in request.ids:
+            question = _get_scoped_question(db, qid, current_user)
+            if not question:
+                blocked.append(
+                    {"id": qid, "reason": t("review_question_not_found", locale=locale)}
+                )
+                continue
+            reason = _question_delete_block_reason(db, question, locale)
+            if reason:
+                blocked.append({"id": qid, "reason": reason})
+                continue
+            snapshot = {
+                "question_text": question.question_text,
+                "review_status": question.review_status,
+                "bulk": True,
+            }
+            db.delete(question)
+            db.flush()
+            audit = AuditService.log_question_action(
+                db,
+                AuditService.ACTION_DELETE_QUESTION,
+                current_user.id,
+                qid,
+                request=http_request,
+                additional_data=snapshot,
+            )
+            if audit is None:
+                # Audit fehlgeschlagen -> log_action hat diesen Delete bereits
+                # zurückgerollt; ID als blockiert melden statt still zu löschen.
+                blocked.append({"id": qid, "reason": t("delete_failed", locale=locale)})
+                continue
+            deleted.append(qid)
+        logger.info(f"Bulk-deleted {len(deleted)} questions by {current_user.email}")
+        return {"deleted": deleted, "blocked": blocked}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error in bulk delete: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=t("delete_failed", locale=locale))
 
 
 @router.get("/{question_id}/comments", response_model=List[CommentResponse])

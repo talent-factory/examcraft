@@ -970,7 +970,15 @@
       "reasonLabel": "Motif (optionnel)",
       "approve": "Approuver",
       "reject": "Rejeter",
-      "errorStartReview": "Erreur lors du démarrage de la révision"
+      "errorStartReview": "Erreur lors du démarrage de la révision",
+      "showArchived": "Afficher les archives",
+      "showActive": "Afficher les actives",
+      "deleteTitle": "Supprimer définitivement la question",
+      "deleteConfirm": "Cette question sera définitivement supprimée. Seules les questions archivées et non utilisées dans un examen peuvent être supprimées.",
+      "deleteConfirmBtn": "Supprimer",
+      "errorArchive": "Échec de l'archivage",
+      "errorRestore": "Échec de la restauration",
+      "errorDelete": "Échec de la suppression"
     },
     "questionCard": {
       "questionNumber": "Question n°{{id}}",
@@ -1000,7 +1008,10 @@
       "rejectBtn": "Rejeter",
       "editQuestion": "Modifier la question",
       "addComment": "Ajouter un commentaire",
-      "showDetails": "Afficher les détails"
+      "showDetails": "Afficher les détails",
+      "archiveBtn": "Archiver",
+      "restoreBtn": "Restaurer",
+      "deleteBtn": "Supprimer définitivement"
     },
     "questionDetail": {
       "back": "Retour",

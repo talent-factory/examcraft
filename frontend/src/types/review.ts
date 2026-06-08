@@ -81,6 +81,10 @@ export interface QuestionReview {
   reviewer_info?: ReviewerInfo;
   reviewed_at?: string;
   exam_id?: string;
+  // TF-396: Archiv-Achse (orthogonal zu review_status).
+  archived_at?: string | null;
+  archived_by?: number | null;
+  archive_reason?: string | null;
   tags?: Tag[];
   created_at: string;
   updated_at: string;
@@ -147,6 +151,9 @@ export interface ReviewFilters {
   difficulty?: string;
   question_type?: string;
   exam_id?: string;
+  // TF-396: Archiv-Filter. Default (beide false) = nur aktive Fragen.
+  include_archived?: boolean;
+  archived_only?: boolean;
   limit?: number;
   offset?: number;
 }

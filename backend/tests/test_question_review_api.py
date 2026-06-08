@@ -101,6 +101,9 @@ class TestQuestionReviewAPI:
         mock.reviewed_by = None
         mock.reviewed_at = None
         mock.exam_id = "exam_123"
+        mock.archived_at = None  # TF-396: Archiv-Achse
+        mock.archived_by = None
+        mock.archive_reason = None
         mock.created_at = datetime.now()
         mock.updated_at = datetime.now()
         mock.tags = []  # TF-320: route iterates q.tags — must be a real iterable

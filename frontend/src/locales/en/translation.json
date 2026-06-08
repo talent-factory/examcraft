@@ -1359,7 +1359,15 @@
       "reasonLabel": "Reason (optional)",
       "approve": "Approve",
       "reject": "Reject",
-      "errorStartReview": "Error starting review"
+      "errorStartReview": "Error starting review",
+      "showArchived": "Show archive",
+      "showActive": "Show active",
+      "deleteTitle": "Delete question permanently",
+      "deleteConfirm": "This question will be permanently deleted. Only archived questions not used in any exam can be deleted.",
+      "deleteConfirmBtn": "Delete",
+      "errorArchive": "Archiving failed",
+      "errorRestore": "Restore failed",
+      "errorDelete": "Deletion failed"
     },
     "questionCard": {
       "questionNumber": "Question #{{id}}",
@@ -1389,7 +1397,10 @@
       "rejectBtn": "Reject",
       "editQuestion": "Edit Question",
       "addComment": "Add Comment",
-      "showDetails": "Show Details"
+      "showDetails": "Show Details",
+      "archiveBtn": "Archive",
+      "restoreBtn": "Restore",
+      "deleteBtn": "Delete permanently"
     },
     "questionDetail": {
       "back": "Back",

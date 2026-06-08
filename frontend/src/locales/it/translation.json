@@ -970,7 +970,15 @@
       "reasonLabel": "Motivo (opzionale)",
       "approve": "Approva",
       "reject": "Rifiuta",
-      "errorStartReview": "Errore nell'avvio della revisione"
+      "errorStartReview": "Errore nell'avvio della revisione",
+      "showArchived": "Mostra archivio",
+      "showActive": "Mostra attive",
+      "deleteTitle": "Elimina definitivamente la domanda",
+      "deleteConfirm": "Questa domanda verrà eliminata definitivamente. Solo le domande archiviate e non utilizzate in alcun esame possono essere eliminate.",
+      "deleteConfirmBtn": "Elimina",
+      "errorArchive": "Archiviazione non riuscita",
+      "errorRestore": "Ripristino non riuscito",
+      "errorDelete": "Eliminazione non riuscita"
     },
     "questionCard": {
       "questionNumber": "Domanda #{{id}}",
@@ -1000,7 +1008,10 @@
       "rejectBtn": "Rifiuta",
       "editQuestion": "Modifica domanda",
       "addComment": "Aggiungi commento",
-      "showDetails": "Mostra dettagli"
+      "showDetails": "Mostra dettagli",
+      "archiveBtn": "Archivia",
+      "restoreBtn": "Ripristina",
+      "deleteBtn": "Elimina definitivamente"
     },
     "questionDetail": {
       "back": "Indietro",

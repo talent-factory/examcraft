@@ -42,6 +42,8 @@ export class ReviewService {
     if (filters?.difficulty) params.append('difficulty', filters.difficulty);
     if (filters?.question_type) params.append('question_type', filters.question_type);
     if (filters?.exam_id) params.append('exam_id', filters.exam_id);
+    if (filters?.include_archived) params.append('include_archived', 'true');
+    if (filters?.archived_only) params.append('archived_only', 'true');
     if (filters?.limit) params.append('limit', filters.limit.toString());
     if (filters?.offset) params.append('offset', filters.offset.toString());
 
@@ -166,6 +168,91 @@ export class ReviewService {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.detail || `Failed to reject question: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * TF-396: Archive Question (orthogonal to review_status).
+   */
+  static async archiveQuestion(
+    questionId: number,
+    reason?: string
+  ): Promise<QuestionReview> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/questions/${questionId}/archive`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ reason }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to archive question: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * TF-396: Restore an archived question.
+   */
+  static async restoreQuestion(questionId: number): Promise<QuestionReview> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/questions/${questionId}/restore`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to restore question: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * TF-396: Hard-delete a question (guarded backend-side).
+   */
+  static async deleteQuestion(questionId: number): Promise<void> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/questions/${questionId}`,
+      {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to delete question: ${response.statusText}`);
+    }
+  }
+
+  /**
+   * TF-396: Bulk hard-delete. Returns deleted ids and blocked entries.
+   */
+  static async bulkDeleteQuestions(
+    ids: number[]
+  ): Promise<{ deleted: number[]; blocked: { id: number; reason: string }[] }> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/questions/bulk-delete`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ ids }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to bulk-delete questions: ${response.statusText}`);
     }
 
     return response.json();

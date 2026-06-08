@@ -32,9 +32,12 @@ import {
 import {
   FilterList,
   Refresh,
+  Archive,
+  Inventory2,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { ReviewService } from '../services/ReviewService';
+import { useAuth } from '../contexts/AuthContext';
 import {
   QuestionReview,
   ReviewFilters,
@@ -89,6 +92,11 @@ const ReviewQueue: React.FC = () => {
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
   const [actionQuestionId, setActionQuestionId] = useState<number | null>(null);
   const [actionReason, setActionReason] = useState('');
+
+  // TF-396: Permission-Gating + Hard-Delete-Bestätigung
+  const { hasPermission } = useAuth();
+  const canDelete = hasPermission('delete_questions');
+  const [deleteQuestionId, setDeleteQuestionId] = useState<number | null>(null);
 
   // Load questions
   const loadQuestions = useCallback(async () => {
@@ -183,6 +191,49 @@ const ReviewQueue: React.FC = () => {
       await loadQuestions();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // TF-396: Archivieren / Wiederherstellen / Hard-Delete
+  const handleArchive = async (questionId: number) => {
+    setLoading(true);
+    try {
+      await ReviewService.archiveQuestion(questionId);
+      await loadQuestions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('components.reviewQueue.errorArchive'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestore = async (questionId: number) => {
+    setLoading(true);
+    try {
+      await ReviewService.restoreQuestion(questionId);
+      await loadQuestions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('components.reviewQueue.errorRestore'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = (questionId: number) => {
+    setDeleteQuestionId(questionId);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteQuestionId) return;
+    setLoading(true);
+    try {
+      await ReviewService.deleteQuestion(deleteQuestionId);
+      setDeleteQuestionId(null);
+      await loadQuestions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('components.reviewQueue.errorDelete'));
     } finally {
       setLoading(false);
     }
@@ -331,6 +382,20 @@ const ReviewQueue: React.FC = () => {
 
           <Box sx={{ flexGrow: 1 }} />
 
+          {/* TF-396: Archiv-Ansicht umschalten */}
+          <Button
+            variant={filters.archived_only ? 'contained' : 'outlined'}
+            startIcon={filters.archived_only ? <Inventory2 /> : <Archive />}
+            onClick={() =>
+              handleFilterChange('archived_only', filters.archived_only ? undefined : true)
+            }
+            size="small"
+          >
+            {filters.archived_only
+              ? t('components.reviewQueue.showActive')
+              : t('components.reviewQueue.showArchived')}
+          </Button>
+
           <Tooltip title={t('components.reviewQueue.refresh')}>
             <IconButton onClick={loadQuestions} disabled={loading}>
               <Refresh />
@@ -369,6 +434,10 @@ const ReviewQueue: React.FC = () => {
           onReject={handleReject}
           onEdit={handleEdit}
           onComment={handleComment}
+          onArchive={handleArchive}
+          onRestore={handleRestore}
+          onDelete={handleDelete}
+          canDelete={canDelete}
           loading={loading}
         />
       ))}
@@ -446,6 +515,27 @@ const ReviewQueue: React.FC = () => {
             disabled={loading}
           >
             {actionType === 'approve' ? t('components.reviewQueue.approve') : t('components.reviewQueue.reject')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* TF-396: Hard-Delete Bestätigung */}
+      <Dialog
+        open={deleteQuestionId !== null}
+        onClose={() => setDeleteQuestionId(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{t('components.reviewQueue.deleteTitle')}</DialogTitle>
+        <DialogContent>
+          <Typography>{t('components.reviewQueue.deleteConfirm')}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteQuestionId(null)}>
+            {t('components.reviewQueue.cancelBtn')}
+          </Button>
+          <Button onClick={executeDelete} variant="contained" color="error" disabled={loading}>
+            {t('components.reviewQueue.deleteConfirmBtn')}
           </Button>
         </DialogActions>
       </Dialog>

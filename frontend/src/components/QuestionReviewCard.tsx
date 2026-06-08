@@ -40,6 +40,9 @@ import {
   Visibility,
   LocalOfferOutlined,
   Description,
+  Archive,
+  Unarchive,
+  DeleteForever,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -55,6 +58,10 @@ interface QuestionReviewCardProps {
   onReject?: (questionId: number) => void;
   onEdit?: (questionId: number) => void;
   onComment?: (questionId: number) => void;
+  onArchive?: (questionId: number) => void;
+  onRestore?: (questionId: number) => void;
+  onDelete?: (questionId: number) => void;
+  canDelete?: boolean;
   loading?: boolean;
 }
 
@@ -65,6 +72,10 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
   onReject,
   onEdit,
   onComment,
+  onArchive,
+  onRestore,
+  onDelete,
+  canDelete = false,
   loading = false,
 }) => {
   const { t, i18n } = useTranslation();
@@ -521,6 +532,43 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
               <Visibility />
             </IconButton>
           </Tooltip>
+
+          {/* TF-396: Archiv-Aktionen */}
+          {!question.archived_at ? (
+            <Tooltip title={t('components.questionCard.archiveBtn')}>
+              <IconButton
+                onClick={() => onArchive?.(question.id)}
+                disabled={loading}
+                size="small"
+              >
+                <Archive />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <>
+              <Tooltip title={t('components.questionCard.restoreBtn')}>
+                <IconButton
+                  onClick={() => onRestore?.(question.id)}
+                  disabled={loading}
+                  size="small"
+                >
+                  <Unarchive />
+                </IconButton>
+              </Tooltip>
+              {canDelete && (
+                <Tooltip title={t('components.questionCard.deleteBtn')}>
+                  <IconButton
+                    onClick={() => onDelete?.(question.id)}
+                    disabled={loading}
+                    size="small"
+                    color="error"
+                  >
+                    <DeleteForever />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </>
+          )}
         </Box>
       </CardActions>
     </Card>
