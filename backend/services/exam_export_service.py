@@ -8,7 +8,23 @@ import logging
 from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom.minidom import parseString
 
+import markdown as _markdown
+
 logger = logging.getLogger(__name__)
+
+
+def _md_to_html(text: str | None) -> str:
+    """Convert Markdown source to HTML for Moodle's ``format="html"`` fields.
+
+    Question and feedback text is authored in Markdown, but Moodle renders
+    these fields as HTML (the elements carry ``format="html"``). Without
+    conversion, Markdown markers such as ``**`` or ``- `` show up literally
+    after import and paragraph/line structure is lost (TF-404). Converting
+    here lets bold text, lists and paragraphs render correctly in Moodle.
+    """
+    if not text:
+        return ""
+    return _markdown.markdown(text, extensions=["sane_lists", "nl2br"])
 
 
 class MarkdownExporter:
@@ -201,7 +217,7 @@ def _add_mc_question(quiz: Element, q: dict):
     name = SubElement(question, "name")
     SubElement(name, "text").text = f"Frage {q['position']}"
     qtext = SubElement(question, "questiontext", format="html")
-    SubElement(qtext, "text").text = q["question_text"]
+    SubElement(qtext, "text").text = _md_to_html(q["question_text"])
     SubElement(question, "defaultgrade").text = str(q["points"])
     SubElement(question, "single").text = "true"
     SubElement(question, "shuffleanswers").text = "0"
@@ -223,7 +239,7 @@ def _add_mc_question(quiz: Element, q: dict):
 
     if q.get("explanation"):
         gf = SubElement(question, "generalfeedback", format="html")
-        SubElement(gf, "text").text = q["explanation"]
+        SubElement(gf, "text").text = _md_to_html(q["explanation"])
 
 
 def _add_tf_question(quiz: Element, q: dict):
@@ -231,7 +247,7 @@ def _add_tf_question(quiz: Element, q: dict):
     name = SubElement(question, "name")
     SubElement(name, "text").text = f"Frage {q['position']}"
     qtext = SubElement(question, "questiontext", format="html")
-    SubElement(qtext, "text").text = q["question_text"]
+    SubElement(qtext, "text").text = _md_to_html(q["question_text"])
     SubElement(question, "defaultgrade").text = str(q["points"])
 
     correct_answer = (q.get("correct_answer") or "").lower()
@@ -247,9 +263,9 @@ def _add_essay_question(quiz: Element, q: dict):
     name = SubElement(question, "name")
     SubElement(name, "text").text = f"Frage {q['position']}"
     qtext = SubElement(question, "questiontext", format="html")
-    SubElement(qtext, "text").text = q["question_text"]
+    SubElement(qtext, "text").text = _md_to_html(q["question_text"])
     SubElement(question, "defaultgrade").text = str(q["points"])
 
     if q.get("explanation"):
         gf = SubElement(question, "generalfeedback", format="html")
-        SubElement(gf, "text").text = q["explanation"]
+        SubElement(gf, "text").text = _md_to_html(q["explanation"])

@@ -171,3 +171,56 @@ class TestMoodleXmlExporter:
         # C) Beide is the correct answer — should appear with fraction="100"
         assert 'fraction="100"' in xml
         assert 'fraction="0"' in xml
+
+    def test_markdown_question_text_rendered_as_html(self):
+        """Markdown in question text is converted to HTML (TF-404).
+
+        Question text is authored in Markdown but Moodle renders the
+        ``questiontext`` field as HTML (format="html"). Without
+        conversion, markers like ``**`` and ``- `` show up literally in
+        Moodle. The exporter must convert Markdown to HTML so bold text,
+        lists and paragraphs render after import.
+        """
+        exam_data = {
+            "title": "MD Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 6.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 6.0,
+                    "question_text": (
+                        "**Szenario:** Sie leiten ein Projekt.\n\n"
+                        "- Erster Punkt\n"
+                        "- Zweiter Punkt\n\n"
+                        "Zeile A\nZeile B"
+                    ),
+                    "question_type": "open_ended",
+                    "difficulty": "hard",
+                    "options": None,
+                    "correct_answer": "",
+                    "explanation": "Ein **wichtiger** Hinweis.",
+                }
+            ],
+        }
+        xml = MoodleXmlExporter.export(exam_data)
+
+        # Bold Markdown must become an HTML <strong> tag (escaped in XML),
+        # never a literal ``**``.
+        assert "&lt;strong&gt;Szenario:&lt;/strong&gt;" in xml
+        assert "**Szenario:**" not in xml
+        # A blank-line-separated list becomes a real HTML list.
+        assert "&lt;li&gt;Erster Punkt&lt;/li&gt;" in xml
+        assert "- Erster Punkt" not in xml
+        # Tight single newlines are preserved as <br> (not collapsed into
+        # one block like the unconverted output was).
+        assert "&lt;br" in xml
+        # generalfeedback (explanation) is converted too.
+        assert "&lt;strong&gt;wichtiger&lt;/strong&gt;" in xml
+        assert "**wichtiger**" not in xml
