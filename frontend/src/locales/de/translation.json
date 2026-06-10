@@ -1242,7 +1242,8 @@
         "label": "Tags",
         "heading": "Tags",
         "createHint": "Neuen Tag erstellen: einfach tippen und mit Enter bestätigen.",
-        "institutionTagDisabled": "Nur für institutionsweit geteilte Dokumente"
+        "institutionTagDisabled": "Nur für institutionsweit geteilte Dokumente",
+        "ownerOnlyTagDisabled": "Geteilte Tags kann nur der Eigentümer ändern"
       },
       "list": {
         "colVisibility": "Sichtbarkeit",

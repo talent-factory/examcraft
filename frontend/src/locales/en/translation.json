@@ -1242,7 +1242,8 @@
         "label": "Tags",
         "heading": "Tags",
         "createHint": "Create a new tag: just type and press Enter.",
-        "institutionTagDisabled": "Only for institution-shared documents"
+        "institutionTagDisabled": "Only for institution-shared documents",
+        "ownerOnlyTagDisabled": "Only the owner can change shared tags"
       },
       "list": {
         "colVisibility": "Visibility",

@@ -853,7 +853,8 @@
         "label": "Tag",
         "heading": "Tag",
         "createHint": "Crea un nuovo tag: digita e premi Invio.",
-        "institutionTagDisabled": "Solo per documenti condivisi con l'istituzione"
+        "institutionTagDisabled": "Solo per documenti condivisi con l'istituzione",
+        "ownerOnlyTagDisabled": "Solo il proprietario può modificare i tag condivisi"
       },
       "list": {
         "colVisibility": "Visibilità",

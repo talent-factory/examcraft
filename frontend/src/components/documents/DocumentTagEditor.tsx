@@ -4,6 +4,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 import { useTranslation } from 'react-i18next';
 import { Document, DocumentTag, DocumentVisibility } from '../../types/document';
 import { DocumentService } from '../../services/DocumentService';
@@ -12,6 +13,10 @@ interface DocumentTagEditorProps {
   document: Document;
   availableTags: DocumentTag[];
   canEdit: boolean;
+  // TF-399: whether the current user owns the document. Non-owners may still
+  // attach/detach their own `user`-scope (personal) tags to any visible
+  // document, but may not touch shared `institution`/`global` assignments.
+  isOwner: boolean;
   onChanged: (updated: Document) => void;
 }
 
@@ -24,6 +29,7 @@ const DocumentTagEditor: React.FC<DocumentTagEditorProps> = ({
   document,
   availableTags,
   canEdit,
+  isOwner,
   onChanged,
 }) => {
   const { t } = useTranslation();
@@ -41,6 +47,12 @@ const DocumentTagEditor: React.FC<DocumentTagEditorProps> = ({
     typeof option !== 'string' &&
     option.scope === 'institution' &&
     document.visibility !== DocumentVisibility.INSTITUTION;
+
+  // TF-399: a non-owner may only manage their own `user`-scope (personal) tags.
+  // Shared `institution`/`global` assignments stay owner-only (the backend
+  // returns 403), so disable those options up front for non-owners.
+  const isOwnerOnlyBlocked = (option: TagOrString): boolean =>
+    typeof option !== 'string' && !isOwner && option.scope !== 'user';
 
   const handleChange = async (
     _event: React.SyntheticEvent,
@@ -61,12 +73,17 @@ const DocumentTagEditor: React.FC<DocumentTagEditorProps> = ({
     try {
       // 1. Handle removals: existing tags not present in newValue. Detach
       //    returns no body, so apply the removal optimistically to `latest`.
-      const removedTags = currentTags.filter(
-        (existing) =>
-          !newValue.some(
-            (v) => typeof v !== 'string' && v.id === existing.id,
-          ),
-      );
+      const removedTags = currentTags
+        .filter(
+          (existing) =>
+            !newValue.some(
+              (v) => typeof v !== 'string' && v.id === existing.id,
+            ),
+        )
+        // TF-399: a non-owner may only detach their own personal assignments;
+        // shared tags stay owner-only (defence in depth — the chip's delete
+        // affordance is already hidden for them in renderTags).
+        .filter((existing) => isOwner || existing.is_personal === true);
       for (const tag of removedTags) {
         await DocumentService.detachDocumentTag(document.id, tag.id);
         latest = {
@@ -80,7 +97,9 @@ const DocumentTagEditor: React.FC<DocumentTagEditorProps> = ({
       const addedTags = newValue.filter(
         (v): v is DocumentTag =>
           typeof v !== 'string' &&
-          !currentTags.some((existing) => existing.id === v.id),
+          !currentTags.some((existing) => existing.id === v.id) &&
+          // TF-399: a non-owner may only attach their own `user`-scope tags.
+          (isOwner || v.scope === 'user'),
       );
       for (const tag of addedTags) {
         latest = await DocumentService.attachDocumentTags(document.id, [tag.id]);
@@ -121,11 +140,34 @@ const DocumentTagEditor: React.FC<DocumentTagEditorProps> = ({
           typeof option === 'string' ? option : option.name
         }
         isOptionEqualToValue={(a, b) => a.id === b.id}
-        getOptionDisabled={isInstitutionBlocked}
+        getOptionDisabled={(option) =>
+          isInstitutionBlocked(option) || isOwnerOnlyBlocked(option)
+        }
         filterOptions={(options, params) => {
           const filtered = filter(options, params);
           return filtered;
         }}
+        renderTags={(tagValue, getTagProps) =>
+          tagValue.map((option, index) => {
+            const { key, onDelete, ...tagProps } = getTagProps({ index });
+            const isPersonal =
+              typeof option !== 'string' && option.is_personal === true;
+            // Personal assignments render as outlined/primary chips; a non-owner
+            // can only remove those (shared chips lose their delete affordance).
+            const removable = isOwner || isPersonal;
+            return (
+              <Chip
+                key={key}
+                {...tagProps}
+                label={typeof option === 'string' ? option : option.name}
+                size="small"
+                variant={isPersonal ? 'outlined' : 'filled'}
+                color={isPersonal ? 'primary' : 'default'}
+                onDelete={canEdit && removable ? onDelete : undefined}
+              />
+            );
+          })
+        }
         renderOption={(props, option) => {
           // MUI 5.18 injects `key` into `props`; spreading it warns, so pull it out.
           const { key, ...optionProps } = props as typeof props & {
@@ -145,6 +187,15 @@ const DocumentTagEditor: React.FC<DocumentTagEditorProps> = ({
                     )}
                   </Typography>
                 )}
+                {isOwnerOnlyBlocked(option) &&
+                  !isInstitutionBlocked(option) && (
+                    <Typography variant="caption" color="text.secondary">
+                      {t(
+                        'components.documentLibrary.tagEditor.ownerOnlyTagDisabled',
+                        'Geteilte Tags kann nur der Eigentümer ändern',
+                      )}
+                    </Typography>
+                  )}
               </Box>
             </li>
           );

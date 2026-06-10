@@ -1700,7 +1700,11 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                         <DocumentTagEditor
                           document={previewDialog.document}
                           availableTags={availableTags}
-                          canEdit={isOwner(previewDialog.document)}
+                          // TF-399: any user who can see the document may manage
+                          // their own personal (`user`-scope) tags on it; the
+                          // editor restricts shared-tag actions to the owner.
+                          canEdit
+                          isOwner={isOwner(previewDialog.document)}
                           onChanged={(updated) => {
                             setPreviewDialog({ open: true, document: updated });
                             setDocuments((docs) => docs.map((d) => (d.id === updated.id ? updated : d)));

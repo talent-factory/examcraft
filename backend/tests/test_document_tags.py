@@ -313,15 +313,15 @@ def test_attach_nonowner_private_doc_raises_404(tag_scope_data, test_db):
 
 
 def test_attach_nonowner_institution_doc_raises_403(tag_scope_data, test_db):
-    """B10: non-owner + institution-visible doc (same institution) → exactly 403
-    (doc is visible → assert_document_visible_for passes → ownership check fires)."""
+    """B10: non-owner attaching a SHARED institution-scope tag to an
+    institution-visible doc → 403 (shared assignments stay owner-only, TF-399).
+
+    The doc is visible → assert_document_visible_for passes → the shared-tag
+    ownership check fires. The personal user-scope path, which a non-owner *is*
+    allowed to use, is covered in test_tf399_personal_tags.py."""
     d = tag_scope_data
-    # institution-scope tag on an institution-visible doc is allowed for the owner;
-    # use a user-scope tag that other already has visibility into via their own user tag.
-    # We attach d.my_user_tag (owned by me=800); other (801) can see the doc but
-    # is not the owner → 403 from _load_owned_document.
     doc = _doc(test_db, 9311, d.me.id, DocumentVisibility.INSTITUTION)
-    body = AttachTagsRequest(tag_ids=[d.my_user_tag.id])
+    body = AttachTagsRequest(tag_ids=[d.inst_tag.id])
     with pytest.raises(HTTPException) as exc:
         _run(
             attach_document_tags(
@@ -353,14 +353,15 @@ def test_detach_nonowner_private_doc_raises_404(tag_scope_data, test_db):
 
 
 def test_detach_nonowner_institution_doc_raises_403(tag_scope_data, test_db):
-    """B10 (detach): non-owner + institution-visible doc → exactly 403."""
+    """B10 (detach): non-owner detaching a SHARED institution-scope tag from an
+    institution-visible doc → 403 (shared assignments stay owner-only, TF-399)."""
     d = tag_scope_data
     doc = _doc(test_db, 9313, d.me.id, DocumentVisibility.INSTITUTION)
     with pytest.raises(HTTPException) as exc:
         _run(
             detach_document_tag(
                 document_id=doc.id,
-                tag_id=d.my_user_tag.id,
+                tag_id=d.inst_tag.id,
                 request=None,
                 current_user=d.other,
                 db=test_db,

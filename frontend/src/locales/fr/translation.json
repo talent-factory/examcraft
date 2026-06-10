@@ -853,7 +853,8 @@
         "label": "Tags",
         "heading": "Tags",
         "createHint": "Créer une nouvelle étiquette : saisissez-la et appuyez sur Entrée.",
-        "institutionTagDisabled": "Uniquement pour les documents partagés avec l'institution"
+        "institutionTagDisabled": "Uniquement pour les documents partagés avec l'institution",
+        "ownerOnlyTagDisabled": "Seul le propriétaire peut modifier les tags partagés"
       },
       "list": {
         "colVisibility": "Visibilité",

@@ -106,6 +106,10 @@ export interface DocumentTag {
   name: string;
   scope: 'user' | 'institution' | 'global';
   is_own: boolean;
+  // TF-399: true when this is a *personal* assignment of the current user
+  // (document_personal_tags) rather than a shared institution assignment.
+  // Only present on a document's `tags`; absent in the available-tags list.
+  is_personal?: boolean;
 }
 
 export interface DocumentStats {

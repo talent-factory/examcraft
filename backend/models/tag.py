@@ -140,3 +140,37 @@ class DocumentTag(Base):
         Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
     )
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class DocumentPersonalTag(Base):
+    """Per-user (personal) document↔tag assignment (TF-399).
+
+    Unlike ``DocumentTag`` — which is shared institution state visible to every
+    member who can see the document — a personal assignment is visible **only**
+    to the user who made it (``user_id`` is part of the primary key). This lets a
+    user group *any* document they can see, including foreign
+    ``institution``-visible documents, with their own ``user``-scope tags without
+    changing what anyone else sees. Shared (``institution``/``global``) tag
+    assignments stay in ``document_tags``.
+    """
+
+    __tablename__ = "document_personal_tags"
+
+    document_id = Column(
+        Integer,
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tag_id = Column(
+        Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    # Filter/read path always scopes by ``user_id`` ("my personal tags on these
+    # documents"); a dedicated index keeps that lookup cheap.
+    __table_args__ = (Index("ix_document_personal_tags_user_id", "user_id"),)
