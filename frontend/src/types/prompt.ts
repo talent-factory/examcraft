@@ -25,6 +25,15 @@ export enum QuestionType {
 }
 
 /**
+ * Managed prompt tag (TF-397).
+ * Prompt tags are now managed `Tag` rows (kind='prompt'), serialized as {id, name}.
+ */
+export interface PromptTag {
+  id: number;
+  name: string;
+}
+
+/**
  * Main Prompt Interface
  * Matches backend Prompt model
  */
@@ -34,7 +43,7 @@ export interface Prompt {
   content: string;
   description?: string;
   category: PromptCategory;
-  tags: string[];
+  tags: PromptTag[];
   use_case: string;
   version: number;
   is_active: boolean;
@@ -227,7 +236,7 @@ export function formatPromptMetadata(prompt: Prompt): PromptMetadata {
     version: prompt.version,
     category: prompt.category,
     use_case: prompt.use_case,
-    tags: prompt.tags,
+    tags: prompt.tags.map((t) => t.name),
     usage_count: prompt.usage_count,
     last_used: prompt.last_used_at,
     created_at: prompt.created_at,

@@ -18,6 +18,15 @@ jest.mock('axios', () => ({
 jest.mock('../../../services/ComposerService');
 const mockComposerService = ComposerService as jest.Mocked<typeof ComposerService>;
 
+// Mock useAuth (TF-398: ExamListView gates the hard-delete button on the
+// `delete_exams` permission). Default: full permission; overridden per test.
+jest.mock('../../../contexts/AuthContext', () => ({
+  useAuth: jest.fn(),
+}));
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { useAuth } = require('../../../contexts/AuthContext');
+const mockUseAuth = useAuth as jest.Mock;
+
 // Mock window.confirm
 const mockConfirm = jest.fn();
 window.confirm = mockConfirm;
@@ -63,6 +72,8 @@ describe('ExamListView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockConfirm.mockReturnValue(false);
+    // Default: caller has the delete_exams permission.
+    mockUseAuth.mockReturnValue({ hasPermission: () => true });
   });
 
   // -------------------------------------------------------------------------
@@ -195,12 +206,14 @@ describe('ExamListView', () => {
   // Delete button
   // -------------------------------------------------------------------------
 
-  describe('delete button', () => {
-    // The delete button is an icon-only button with aria-label="Löschen"
-    // (see ExamListView.tsx) — the visible glyph is an SVG trash icon. Use
-    // getByLabelText so the tests stay accessible-name-based and don't
-    // break if the icon changes.
-    it('shows Löschen button for draft exams', async () => {
+  // ---------------------------------------------------------------------------
+  // TF-398: Archive / Restore / guarded Delete row actions
+  // ---------------------------------------------------------------------------
+  describe('archive / restore / delete actions', () => {
+    const archived = (overrides: Partial<Exam> = {}): Exam =>
+      makeExam({ archived_at: '2025-02-01T00:00:00Z', ...overrides });
+
+    it('shows the Archivieren action (not Löschen) for an active exam', async () => {
       mockComposerService.listExams.mockResolvedValue({
         total: 1,
         exams: [makeExam({ status: ExamStatus.DRAFT })],
@@ -211,14 +224,16 @@ describe('ExamListView', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByLabelText('Löschen')).toBeInTheDocument();
+        expect(screen.getByLabelText('Archivieren')).toBeInTheDocument();
       });
+      // Hard-delete is only offered after archiving.
+      expect(screen.queryByLabelText('Löschen')).not.toBeInTheDocument();
     });
 
-    it('does NOT show Löschen button for finalized exams', async () => {
+    it('shows Wiederherstellen + enabled Löschen for an archived free exam', async () => {
       mockComposerService.listExams.mockResolvedValue({
         total: 1,
-        exams: [makeExam({ status: ExamStatus.FINALIZED })],
+        exams: [archived({ id: 7 })],
       });
 
       render(<ExamListView onSelectExam={mockOnSelectExam} />, {
@@ -226,18 +241,69 @@ describe('ExamListView', () => {
       });
 
       await waitFor(() => {
-        expect(screen.queryByLabelText('Löschen')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Wiederherstellen')).toBeInTheDocument();
+      });
+      expect(screen.queryByLabelText('Archivieren')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Löschen')).toBeEnabled();
+    });
+
+    it('archives an exam (with optional reason) on confirm', async () => {
+      mockComposerService.listExams.mockResolvedValue({
+        total: 1,
+        exams: [makeExam({ id: 5, status: ExamStatus.DRAFT })],
+      });
+      mockComposerService.archiveExam.mockResolvedValue(makeExam({ id: 5 }));
+
+      render(<ExamListView onSelectExam={mockOnSelectExam} />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Archivieren')).toBeInTheDocument();
+      });
+      // Open the archive confirmation dialog (row icon → dialog).
+      fireEvent.click(screen.getByLabelText('Archivieren'));
+
+      const dialog = await screen.findByRole('dialog');
+      const confirmButton = within(dialog).getByRole('button', {
+        name: 'Archivieren',
+      });
+      fireEvent.click(confirmButton);
+
+      await waitFor(() => {
+        expect(mockComposerService.archiveExam).toHaveBeenCalled();
+        expect(mockComposerService.archiveExam.mock.calls[0][0]).toBe(5);
       });
     });
 
-    it('calls deleteExam when delete is clicked and confirmed', async () => {
-      // ExamListView uses a MUI confirmation Dialog, not window.confirm.
-      // Flow: click trash icon (aria-label "Löschen") → dialog opens →
-      // click the dialog's "Löschen" button (text label, error variant)
-      // → deleteMutation fires.
+    it('restores an archived exam', async () => {
       mockComposerService.listExams.mockResolvedValue({
         total: 1,
-        exams: [makeExam({ id: 7 })],
+        exams: [archived({ id: 9 })],
+      });
+      mockComposerService.restoreExam.mockResolvedValue(makeExam({ id: 9 }));
+
+      render(<ExamListView onSelectExam={mockOnSelectExam} />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Wiederherstellen')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByLabelText('Wiederherstellen'));
+
+      await waitFor(() => {
+        expect(mockComposerService.restoreExam).toHaveBeenCalled();
+        // react-query passes (variables, context) to a bare mutationFn ref;
+        // restoreExam only consumes the first arg (the exam id).
+        expect(mockComposerService.restoreExam.mock.calls[0][0]).toBe(9);
+      });
+    });
+
+    it('calls deleteExam when an archived exam is deleted and confirmed', async () => {
+      mockComposerService.listExams.mockResolvedValue({
+        total: 1,
+        exams: [archived({ id: 7 })],
       });
       mockComposerService.deleteExam.mockResolvedValue(undefined);
 
@@ -248,12 +314,8 @@ describe('ExamListView', () => {
       await waitFor(() => {
         expect(screen.getByLabelText('Löschen')).toBeInTheDocument();
       });
-
-      // Open the confirmation dialog
       fireEvent.click(screen.getByLabelText('Löschen'));
 
-      // Find the dialog's confirm button (text "Löschen", inside the
-      // MUI dialog role="dialog")
       const dialog = await screen.findByRole('dialog');
       const confirmButton = within(dialog).getByRole('button', { name: 'Löschen' });
       fireEvent.click(confirmButton);
@@ -267,7 +329,7 @@ describe('ExamListView', () => {
     it('does NOT call deleteExam when delete is cancelled', async () => {
       mockComposerService.listExams.mockResolvedValue({
         total: 1,
-        exams: [makeExam({ id: 7 })],
+        exams: [archived({ id: 7 })],
       });
 
       render(<ExamListView onSelectExam={mockOnSelectExam} />, {
@@ -277,14 +339,81 @@ describe('ExamListView', () => {
       await waitFor(() => {
         expect(screen.getByLabelText('Löschen')).toBeInTheDocument();
       });
-
-      // Open the confirmation dialog and cancel
       fireEvent.click(screen.getByLabelText('Löschen'));
       const dialog = await screen.findByRole('dialog');
       const cancelButton = within(dialog).getByRole('button', { name: 'Abbrechen' });
       fireEvent.click(cancelButton);
 
       expect(mockComposerService.deleteExam).not.toHaveBeenCalled();
+    });
+
+    it('disables Löschen for an archived EXPORTED exam', async () => {
+      mockComposerService.listExams.mockResolvedValue({
+        total: 1,
+        exams: [archived({ id: 7, status: ExamStatus.EXPORTED })],
+      });
+
+      render(<ExamListView onSelectExam={mockOnSelectExam} />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Löschen')).toBeInTheDocument();
+      });
+      expect(screen.getByLabelText('Löschen')).toBeDisabled();
+    });
+
+    it('disables Löschen for an archived exam WITH submissions', async () => {
+      mockComposerService.listExams.mockResolvedValue({
+        total: 1,
+        exams: [archived({ id: 7, has_submissions: true })],
+      });
+
+      render(<ExamListView onSelectExam={mockOnSelectExam} />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Löschen')).toBeInTheDocument();
+      });
+      expect(screen.getByLabelText('Löschen')).toBeDisabled();
+    });
+
+    it('disables Löschen when the user lacks delete_exams', async () => {
+      mockUseAuth.mockReturnValue({ hasPermission: () => false });
+      mockComposerService.listExams.mockResolvedValue({
+        total: 1,
+        exams: [archived({ id: 7 })],
+      });
+
+      render(<ExamListView onSelectExam={mockOnSelectExam} />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Löschen')).toBeInTheDocument();
+      });
+      expect(screen.getByLabelText('Löschen')).toBeDisabled();
+    });
+
+    it('re-queries with include_archived when the toggle is enabled', async () => {
+      mockComposerService.listExams.mockResolvedValue({ total: 0, exams: [] });
+
+      render(<ExamListView onSelectExam={mockOnSelectExam} />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(mockComposerService.listExams).toHaveBeenCalled();
+      });
+
+      fireEvent.click(screen.getByLabelText('Archivierte anzeigen'));
+
+      await waitFor(() => {
+        const calls = mockComposerService.listExams.mock.calls;
+        const last = calls[calls.length - 1][0];
+        expect(last).toMatchObject({ include_archived: true });
+      });
     });
   });
 

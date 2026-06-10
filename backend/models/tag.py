@@ -1,5 +1,7 @@
 """Tag Models für ExamCraft AI."""
 
+from typing import Literal
+
 from sqlalchemy import (
     CheckConstraint,
     Column,
@@ -13,6 +15,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql import func
 from database import Base
+
+# TF-397: single source of truth for the tag-kind value set. The DB CHECK below
+# is built from ``TAG_KINDS`` and the API layer imports ``TagKind`` from here
+# instead of redeclaring the literal — so model, constraint and API can't drift.
+TagKind = Literal["content", "prompt"]
+TAG_KINDS: tuple[str, ...] = ("content", "prompt")
 
 
 class Tag(Base):
@@ -44,14 +52,22 @@ class Tag(Base):
     # berechnet. Spalte bleibt für Backwards-Compat des Schemas (keine Migration).
     usage_count = Column(Integer, default=0, nullable=False)
     is_archived = Column(Boolean, default=False, nullable=False)
+    # TF-397: namespace dimension. 'content' tags classify Fragen/Dokumente,
+    # 'prompt' tags classify Prompt-Templates. Kept separate so prompt
+    # classification tags (e.g. 'multiple_choice', 'default') never pollute the
+    # Fragen-/Dokument-Tag-Auswahl. Closed value set — enforced by DB CHECK.
+    kind = Column(String(20), default="content", nullable=False)
 
     __table_args__ = (
         # TF-355: case-insensitive uniqueness of user-scoped tag names per owner.
         # Partial unique index — only scope='user' rows. Declared here (not
         # migration-only) so Base.metadata.create_all() builds it for tests.
+        # TF-397: kind folded into the uniqueness key so a 'prompt'-kind tag may
+        # coexist with a 'content'-kind tag of the same name in the same scope.
         Index(
             "ux_tags_user_name",
             "created_by",
+            "kind",
             text("lower(name)"),
             unique=True,
             postgresql_where=text("scope = 'user'"),
@@ -64,12 +80,14 @@ class Tag(Base):
         Index(
             "ux_tags_institution_name",
             "institution_id",
+            "kind",
             text("lower(name)"),
             unique=True,
             postgresql_where=text("scope = 'institution'"),
         ),
         Index(
             "ux_tags_global_name",
+            "kind",
             text("lower(name)"),
             unique=True,
             postgresql_where=text("scope = 'global'"),
@@ -80,10 +98,19 @@ class Tag(Base):
             "scope IN ('user', 'institution', 'global')",
             name="ck_tags_scope_valid",
         ),
+        # TF-397: the kind value set is closed too — built from TAG_KINDS so the
+        # constraint and the TagKind literal stay in lockstep.
+        CheckConstraint(
+            f"kind IN ({', '.join(repr(k) for k in TAG_KINDS)})",
+            name="ck_tags_kind_valid",
+        ),
     )
 
     def __repr__(self) -> str:
-        return f"<Tag(id={self.id}, name={self.name!r}, scope={self.scope})>"
+        return (
+            f"<Tag(id={self.id}, name={self.name!r}, "
+            f"scope={self.scope}, kind={self.kind})>"
+        )
 
 
 class QuestionTag(Base):
@@ -113,3 +140,37 @@ class DocumentTag(Base):
         Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
     )
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class DocumentPersonalTag(Base):
+    """Per-user (personal) document↔tag assignment (TF-399).
+
+    Unlike ``DocumentTag`` — which is shared institution state visible to every
+    member who can see the document — a personal assignment is visible **only**
+    to the user who made it (``user_id`` is part of the primary key). This lets a
+    user group *any* document they can see, including foreign
+    ``institution``-visible documents, with their own ``user``-scope tags without
+    changing what anyone else sees. Shared (``institution``/``global``) tag
+    assignments stay in ``document_tags``.
+    """
+
+    __tablename__ = "document_personal_tags"
+
+    document_id = Column(
+        Integer,
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tag_id = Column(
+        Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    # Filter/read path always scopes by ``user_id`` ("my personal tags on these
+    # documents"); a dedicated index keeps that lookup cheap.
+    __table_args__ = (Index("ix_document_personal_tags_user_id", "user_id"),)

@@ -17,8 +17,13 @@ os.environ["RATE_LIMIT_ENABLED"] = "false"
 # at fixture setup time. Lifting the cap here is cheap, safe (CPython enforces
 # its own native-stack limit independently), and resolves the flake without
 # touching production schema build paths.
-if sys.getrecursionlimit() < 3000:
-    sys.setrecursionlimit(3000)
+# TF-400: the competency-frameworks router (FrameworkOut/CompetencyOut) plus the
+# framework_id/competencies fields added to RAGExamRequestModel grew the schema
+# graph past the previous 3000 cap, so the full-suite build now needs more
+# headroom. There is no reference cycle (FrameworkOut → List[CompetencyOut] is
+# one-directional); the depth is bounded, so a larger fixed cap is sufficient.
+if sys.getrecursionlimit() < 5000:
+    sys.setrecursionlimit(5000)
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -39,6 +44,7 @@ import models.feedback_cluster  # noqa: F401
 import models.question_generation_job  # noqa: F401
 import models.tag  # noqa: F401
 import models.tag_merge_log  # noqa: F401
+import models.competency  # noqa: F401
 
 # Skip test files that need major fixture updates for current DB schema
 collect_ignore_glob = [

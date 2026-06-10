@@ -408,4 +408,57 @@ describe('QuestionReviewCard', () => {
       expect(screen.getByText('Vorlage nicht erfasst')).toBeInTheDocument();
     });
   });
+
+  // TF-400: Handlungskompetenz (HK) + LN-Stufe an der Frage
+  describe('Competency display', () => {
+    const withCompetency: QuestionReview = {
+      ...mockQuestion,
+      competency_id: 42,
+      ln_level: 2,
+      competency: {
+        id: 42,
+        code: 'B3',
+        title: 'Wirkungsvoll kommunizieren',
+        framework_id: 7,
+        module_code: 'B',
+      },
+    };
+
+    it('shows the competency code with LN level when both are present', () => {
+      render(
+        <TestWrapper>
+          <QuestionReviewCard question={withCompetency} />
+        </TestWrapper>
+      );
+
+      // Chip-Label: `${code} · LN {level}`
+      expect(screen.getByText('B3 · LN 2')).toBeInTheDocument();
+    });
+
+    it('shows just the competency code when LN level is missing', () => {
+      const noLn: QuestionReview = {
+        ...withCompetency,
+        ln_level: null,
+      };
+
+      render(
+        <TestWrapper>
+          <QuestionReviewCard question={noLn} />
+        </TestWrapper>
+      );
+
+      expect(screen.getByText('B3')).toBeInTheDocument();
+      expect(screen.queryByText(/· LN/)).not.toBeInTheDocument();
+    });
+
+    it('renders no competency chip when no competency is assigned', () => {
+      render(
+        <TestWrapper>
+          <QuestionReviewCard question={mockQuestion} />
+        </TestWrapper>
+      );
+
+      expect(screen.queryByText(/^B3/)).not.toBeInTheDocument();
+    });
+  });
 });

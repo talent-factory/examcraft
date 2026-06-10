@@ -18,6 +18,7 @@ import services.rag_service as rag_service_module
 from services.rag_service import RAGExamRequest
 from services.document_service import document_service
 from models.auth import User
+from models.competency import CompetencyFramework
 from models.document import Document, DocumentStatus
 from models.question_generation_job import QuestionGenerationJob
 from tasks.question_tasks import generate_questions_task
@@ -78,6 +79,49 @@ class RAGExamRequestModel(BaseModel):
         default_factory=list,
         description="Tag-IDs, die allen generierten Fragen zugewiesen werden",
     )
+    framework_id: Optional[int] = Field(
+        None,
+        description="Handlungskompetenz-Framework-ID (optional)",
+    )
+    competencies_override: Optional[str] = Field(
+        None,
+        max_length=20000,
+        description="Freitext-Überschreibung der {{ competencies }}-Variable (gewinnt über Framework)",
+    )
+
+
+def resolve_competencies_text(db, framework_id, override, institution_id):
+    """Resolve the {{ competencies }} value: free-text override wins; else the
+    selected framework's rendered_text (institution-scoped, nicht archiviert);
+    else None.
+
+    Ein explizit gewähltes, aber nicht auflösbares ``framework_id`` (gelöscht,
+    archiviert oder fremde Institution) wird geloggt — sonst generiert die Prüfung
+    still ohne Kompetenz-Bezug, obwohl der Nutzer ein Framework gewählt hat.
+    """
+    if override and override.strip():
+        return override
+    if framework_id is None:
+        return None
+    fw = (
+        db.query(CompetencyFramework)
+        .filter(
+            CompetencyFramework.id == framework_id,
+            CompetencyFramework.institution_id == institution_id,
+            CompetencyFramework.is_archived.is_(False),
+        )
+        .first()
+    )
+    if fw is None:
+        logger.warning(
+            "resolve_competencies_text: framework_id=%s nicht auflösbar "
+            "(gelöscht/archiviert/fremde Institution=%s) — Kompetenz-Injektion "
+            "entfällt für diese Generierung",
+            framework_id,
+            institution_id,
+        )
+        return None
+    return fw.rendered_text
 
 
 class RAGContextResponse(BaseModel):
@@ -209,6 +253,13 @@ async def generate_rag_exam(
             request=http_request,
         )
 
+        competencies_text = resolve_competencies_text(
+            db,
+            framework_id=request.framework_id,
+            override=request.competencies_override,
+            institution_id=current_user.institution_id,
+        )
+
         rag_request = RAGExamRequest(
             topic=request.topic,
             document_ids=request.document_ids,
@@ -219,6 +270,8 @@ async def generate_rag_exam(
             context_chunks_per_question=request.context_chunks_per_question,
             prompt_config=prompt_config_dict,
             tag_ids=request.tag_ids,
+            framework_id=request.framework_id,
+            competencies=competencies_text,
         )
         request_data = rag_request.model_dump(mode="json")
 

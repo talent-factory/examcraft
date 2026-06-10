@@ -67,6 +67,18 @@ class QuestionReview(Base):
     estimated_time_minutes = Column(Integer, nullable=True)
     quality_tier = Column(String(1), nullable=True)  # A, B, C
 
+    # Kompetenz-Zuordnung (TF-400): geprüfte Handlungskompetenz + Ziel-LN-Stufe.
+    # ln_level (1-4) ist distinkt von bloom_level (1-6). NULL für Altbestand und
+    # für Fragen ohne Kompetenz-Bezug. Der Wert stammt aus Modell-Output; der
+    # Bereich wird per CHECK (check_ln_level_range, s. __table_args__) erzwungen.
+    competency_id = Column(
+        Integer,
+        ForeignKey("competencies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    ln_level = Column(Integer, nullable=True)
+
     # Generation provenance (TF-383): Snapshot der Vorlage/des Prompts, mit dem
     # diese Frage erzeugt wurde. Eingefroren zum Generierungszeitpunkt, damit
     # spätere Template-Änderungen die Herkunft alter Fragen nicht verfälschen.
@@ -134,12 +146,24 @@ class QuestionReview(Base):
         cascade="all, delete-orphan",
         back_populates="question",
     )
+    # TF-400: read-only Anzeige-Relationship auf die geprüfte Handlungskompetenz.
+    # viewonly + kein cascade — die FK ist SET NULL, die Frage darf die Kompetenz
+    # überleben. lazy="selectin" batcht den competency-Load über die Queue.
+    # ACHTUNG: _serialize_competency liest zusätzlich competency.framework
+    # (Competency.framework ist default-lazy) → ein Folge-Query pro HK-behafteter
+    # Frage; bei wachsender Queue dort ebenfalls selectin setzen.
+    competency = relationship("Competency", lazy="selectin", viewonly=True)
 
     # Table constraints
     __table_args__ = (
         CheckConstraint(
             "review_status IN ('pending', 'approved', 'rejected', 'edited', 'in_review')",
             name="check_review_status",
+        ),
+        # TF-400: ln_level ist 1–4 oder NULL (distinkt von bloom_level 1–6).
+        CheckConstraint(
+            "ln_level IS NULL OR (ln_level >= 1 AND ln_level <= 4)",
+            name="check_ln_level_range",
         ),
     )
 

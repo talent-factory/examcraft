@@ -16,7 +16,7 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
 from typing import Annotated, List, Literal, Optional
-from sqlalchemy import func, or_, and_
+from sqlalchemy import func, or_, and_, select, union_all
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -39,11 +39,11 @@ from services.quality_assessor import EscalationState
 from services.vector_service_factory import vector_service
 from models.document import Document, DocumentStatus, DocumentVisibility
 from models.auth import User
-from models.tag import Tag, DocumentTag
+from models.tag import Tag, DocumentTag, DocumentPersonalTag
 from utils.document_tags import (
     visible_tags_for_user,
-    attach_tags_to_document,
-    detach_tag_from_document,
+    attach_tags_for_user,
+    detach_tag_for_user,
     detach_institution_tags,
     STATUS_GROUPS,
     MIME_FAMILIES,
@@ -69,6 +69,10 @@ class DocumentTagOut(BaseModel):
     name: str
     scope: Literal["user", "institution", "global"]
     is_own: bool = False
+    # True when this entry is a *personal* assignment of the current user
+    # (document_personal_tags) rather than a shared institution assignment
+    # (document_tags). Lets the UI render personal tags distinctly (TF-399).
+    is_personal: bool = False
     model_config = {"from_attributes": True}
 
 
@@ -428,12 +432,26 @@ async def list_documents(
             query = query.filter(or_(*clauses))
         if tag_ids:
             unique_tag_ids = list(dict.fromkeys(tag_ids))
+            # Match across shared assignments (document_tags) AND the caller's
+            # own personal assignments (document_personal_tags), so the library
+            # can be filtered by personal tags too (TF-399). The two scopes are
+            # disjoint, so count(distinct tag_id) gives correct AND-semantics.
+            tag_pairs = union_all(
+                select(
+                    DocumentTag.document_id.label("document_id"),
+                    DocumentTag.tag_id.label("tag_id"),
+                ),
+                select(
+                    DocumentPersonalTag.document_id.label("document_id"),
+                    DocumentPersonalTag.tag_id.label("tag_id"),
+                ).where(DocumentPersonalTag.user_id == current_user.id),
+            ).subquery()
             query = (
-                query.join(DocumentTag, DocumentTag.document_id == Document.id)
-                .filter(DocumentTag.tag_id.in_(unique_tag_ids))
+                query.join(tag_pairs, tag_pairs.c.document_id == Document.id)
+                .filter(tag_pairs.c.tag_id.in_(unique_tag_ids))
                 .group_by(Document.id)
                 .having(
-                    func.count(func.distinct(DocumentTag.tag_id)) == len(unique_tag_ids)
+                    func.count(func.distinct(tag_pairs.c.tag_id)) == len(unique_tag_ids)
                 )
             )
 
@@ -643,7 +661,9 @@ async def update_document(
     **Required Permission:** ``create_documents``
     """
     locale = get_request_locale(request, current_user)
-    visibility_change = None
+    # Each effective metadata change appends one audit-row payload here; all of
+    # them commit together with the mutation in a single transaction below.
+    audit_entries: list[dict] = []
     try:
         document = document_service.get_document_by_id(document_id, db)
         if not document:
@@ -656,11 +676,32 @@ async def update_document(
 
         fields_set = payload.model_fields_set
 
-        # --- Rename (display_name): behaviour unchanged, visibility-scoped. ---
+        # --- Rename (display_name): owner-only + audited (TF-399). ---
+        # display_name is shared state on the Document row — a rename changes the
+        # name for every institution member — so it is now restricted to the
+        # owner (SuperUser bypass preserved), mirroring the visibility rule, and
+        # every effective change is written to the audit log.
         # The Pydantic validator already normalised empty/whitespace to None and
         # enforced the 255-char + no-control-chars invariant.
         if "display_name" in fields_set:
-            document.display_name = payload.display_name
+            is_owner = (
+                document.user_id is not None and document.user_id == current_user.id
+            )
+            if not is_owner and not current_user.is_superuser:
+                raise HTTPException(
+                    status_code=403,
+                    detail=t("documents_rename_owner_only", locale=locale),
+                )
+            old_display_name = document.display_name
+            if old_display_name != payload.display_name:
+                document.display_name = payload.display_name
+                audit_entries.append(
+                    {
+                        "field": "display_name",
+                        "old_display_name": old_display_name,
+                        "new_display_name": payload.display_name,
+                    }
+                )
 
         # --- Visibility: stricter — owner-only (SuperUser bypass preserved). ---
         if "visibility" in fields_set and payload.visibility is not None:
@@ -682,8 +723,17 @@ async def update_document(
                     detail=t("documents_visibility_no_institution", locale=locale),
                 )
             if document.visibility != new_visibility:
-                visibility_change = (document.visibility, new_visibility)
+                old_visibility = document.visibility
                 document.visibility = new_visibility
+                audit_entries.append(
+                    {
+                        "field": "visibility",
+                        "old_visibility": old_visibility.value
+                        if old_visibility
+                        else None,
+                        "new_visibility": new_visibility.value,
+                    }
+                )
                 # Leaving institution visibility: institution-scope tags may no
                 # longer be attached (attach block rule). Detach them in the
                 # same transaction so we never persist a private doc carrying
@@ -699,37 +749,36 @@ async def update_document(
         response_payload = document.to_dict()
         response_payload["tags"] = _document_tag_outs(document, current_user, db)
 
-        if visibility_change is not None:
-            # A visibility flip is a DSGVO-relevant privileged action: it must
-            # never persist without an audit row. log_document_action adds the
-            # audit row and commits it together with the pending visibility
-            # change in ONE transaction; on failure it rolls back BOTH and
-            # returns None. Treating None as a hard 500 (same fail-loud contract
-            # as log_admin_cross_owner / log_superuser_bypass) keeps the change
-            # and its audit atomic — we never report success on an un-audited
-            # flip, nor a 500 on a change that already landed.
+        if audit_entries:
+            # Both a rename and a visibility flip are privileged changes to
+            # shared/DSGVO-relevant state: neither may persist without an audit
+            # row. Each entry is staged with commit=False so all audit rows plus
+            # the document mutation (and any institution-tag detach) commit in
+            # ONE transaction below; log_document_action returns None on failure
+            # (rolling back the whole transaction). Treating None as a hard 500
+            # keeps every change and its audit atomic — we never report success
+            # on an un-audited change, nor a 500 on a change that already landed.
             from services.audit_service import AuditService
 
-            old_vis, new_vis = visibility_change
-            audit_log = AuditService.log_document_action(
-                db,
-                AuditService.ACTION_UPDATE_DOCUMENT,
-                current_user.id,
-                document_id,
-                request=request,
-                additional_data={
-                    "field": "visibility",
-                    "old_visibility": old_vis.value if old_vis else None,
-                    "new_visibility": new_vis.value,
-                },
-            )
-            if audit_log is None:
-                raise HTTPException(
-                    status_code=500,
-                    detail=t("documents_rename_failed", locale=locale),
+            for entry in audit_entries:
+                audit_log = AuditService.log_document_action(
+                    db,
+                    AuditService.ACTION_UPDATE_DOCUMENT,
+                    current_user.id,
+                    document_id,
+                    request=request,
+                    additional_data=entry,
+                    commit=False,
                 )
+                if audit_log is None:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=t("documents_rename_failed", locale=locale),
+                    )
+            db.commit()
         else:
-            # display_name-only change — rename was never audited; just persist.
+            # No effective change (e.g. rename to the current value): persist any
+            # no-op cleanly so the request still returns the current state.
             db.commit()
 
         return DocumentResponse(**response_payload)
@@ -779,6 +828,27 @@ def _load_owned_document(document_id: int, current_user: User, db: Session, loca
     return document
 
 
+def _load_visible_document(document_id: int, current_user: User, db: Session, locale):
+    """Load a doc the caller can see (404 otherwise) and report whether the caller
+    may mutate *shared* state (owner or SuperUser).
+
+    Unlike ``_load_owned_document`` this does **not** 403 a non-owner:
+    ``user``-scope (personal) tag operations are allowed for anyone who can see
+    the document (TF-399). The shared-vs-personal permission is decided per tag
+    downstream, where shared assignments still require ownership.
+    """
+    document = document_service.get_document_by_id(document_id, db)
+    if not document:
+        raise HTTPException(
+            status_code=404, detail=t("documents_not_found", locale=locale)
+        )
+    assert_document_visible_for(current_user, document, locale=locale)
+    is_owner = (
+        document.user_id is not None and document.user_id == current_user.id
+    ) or current_user.is_superuser
+    return document, is_owner
+
+
 def _document_response_with_tags(
     document, current_user: User, db: Session
 ) -> DocumentResponse:
@@ -790,23 +860,49 @@ def _document_response_with_tags(
 def _document_tag_outs(
     document, current_user: User, db: Session
 ) -> List[DocumentTagOut]:
-    """Load a single document's tags as DocumentTagOut, alphabetically by name."""
-    tag_rows = (
+    """Tags visible to ``current_user`` on this document, alphabetical by name.
+
+    Unions shared institution assignments (``document_tags``) with the user's own
+    personal assignments (``document_personal_tags``); personal entries are
+    flagged ``is_personal`` and are never visible to other users (TF-399). The
+    two scopes are disjoint, so no de-duplication is needed.
+    """
+    shared = (
         db.query(Tag)
         .join(DocumentTag, DocumentTag.tag_id == Tag.id)
         .filter(DocumentTag.document_id == document.id)
-        .order_by(func.lower(Tag.name))
         .all()
     )
-    return [
+    personal = (
+        db.query(Tag)
+        .join(DocumentPersonalTag, DocumentPersonalTag.tag_id == Tag.id)
+        .filter(
+            DocumentPersonalTag.document_id == document.id,
+            DocumentPersonalTag.user_id == current_user.id,
+        )
+        .all()
+    )
+    outs = [
         DocumentTagOut(
             id=t.id,
             name=t.name,
             scope=t.scope,
             is_own=(t.created_by == current_user.id),
+            is_personal=False,
         )
-        for t in tag_rows
+        for t in shared
+    ] + [
+        DocumentTagOut(
+            id=t.id,
+            name=t.name,
+            scope=t.scope,
+            is_own=(t.created_by == current_user.id),
+            is_personal=True,
+        )
+        for t in personal
     ]
+    outs.sort(key=lambda o: o.name.lower())
+    return outs
 
 
 def _document_tags_map(
@@ -820,24 +916,92 @@ def _document_tags_map(
     """
     if not document_ids:
         return {}
-    rows = (
+    shared_rows = (
         db.query(DocumentTag.document_id, Tag)
         .join(Tag, Tag.id == DocumentTag.tag_id)
         .filter(DocumentTag.document_id.in_(document_ids))
         .order_by(func.lower(Tag.name))
         .all()
     )
+    # Personal assignments are scoped to the current user (TF-399).
+    personal_rows = (
+        db.query(DocumentPersonalTag.document_id, Tag)
+        .join(Tag, Tag.id == DocumentPersonalTag.tag_id)
+        .filter(
+            DocumentPersonalTag.document_id.in_(document_ids),
+            DocumentPersonalTag.user_id == current_user.id,
+        )
+        .order_by(func.lower(Tag.name))
+        .all()
+    )
     result: "dict[int, List[DocumentTagOut]]" = {}
-    for document_id, tag in rows:
+    for document_id, tag in shared_rows:
         result.setdefault(document_id, []).append(
             DocumentTagOut(
                 id=tag.id,
                 name=tag.name,
                 scope=tag.scope,
                 is_own=(tag.created_by == current_user.id),
+                is_personal=False,
             )
         )
+    for document_id, tag in personal_rows:
+        result.setdefault(document_id, []).append(
+            DocumentTagOut(
+                id=tag.id,
+                name=tag.name,
+                scope=tag.scope,
+                is_own=(tag.created_by == current_user.id),
+                is_personal=True,
+            )
+        )
+    # Re-sort each group: shared+personal were appended separately above.
+    for outs in result.values():
+        outs.sort(key=lambda o: o.name.lower())
     return result
+
+
+def _audit_shared_tag_change(
+    db: Session,
+    document: Document,
+    current_user: User,
+    request: Optional[Request],
+    operation: str,
+    tag_ids: List[int],
+    locale: str,
+) -> None:
+    """Stage an audit row (``commit=False``) for an owner-only **shared**
+    (institution/global) tag attach/detach.
+
+    Shared tag links are institution-visible state — attaching/detaching one
+    changes what every institution member sees, exactly like a rename. So the
+    same contract applies: the change is recorded, a SuperUser acting on a
+    document they don't own is flagged as a bypass, and a failure to persist the
+    audit row aborts the whole operation (hard 500) rather than letting a shared
+    change land un-audited. Personal (``user``-scope) assignments are private and
+    are never routed here.
+    """
+    from services.audit_service import AuditService
+
+    real_owner = document.user_id is not None and document.user_id == current_user.id
+    audit_log = AuditService.log_document_action(
+        db,
+        AuditService.ACTION_UPDATE_DOCUMENT,
+        current_user.id,
+        document.id,
+        request=request,
+        additional_data={
+            "field": "shared_tags",
+            "operation": operation,  # "attach" | "detach"
+            "tag_ids": tag_ids,
+            "superuser_bypass": current_user.is_superuser and not real_owner,
+        },
+        commit=False,
+    )
+    if audit_log is None:
+        raise HTTPException(
+            status_code=500, detail=t("documents_tag_failed", locale=locale)
+        )
 
 
 @router.post("/{document_id}/tags", response_model=DocumentResponse)
@@ -848,15 +1012,47 @@ async def attach_document_tags(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Attach tags to a document. Owner-only. Enforces the institution-tag block rule."""
+    """Attach tags to a document, routing by tag scope (TF-399).
+
+    ``user``-scope tags become **personal** assignments and may be attached to
+    any document the caller can see; ``institution``/``global``-scope tags stay
+    **owner-only** shared assignments (and keep the institution-tag block rule).
+    An effective shared attach is audited atomically with the change.
+    """
     locale = get_request_locale(request, current_user)
-    document = _load_owned_document(document_id, current_user, db, locale)
+    document, is_owner = _load_visible_document(document_id, current_user, db, locale)
     try:
-        attach_tags_to_document(db, document, body.tag_ids, current_user)
+        attached_shared = attach_tags_for_user(
+            db, document, body.tag_ids, current_user, is_owner=is_owner
+        )
+        if attached_shared:
+            _audit_shared_tag_change(
+                db, document, current_user, request, "attach", attached_shared, locale
+            )
         db.commit()
     except HTTPException:
         db.rollback()
         raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(
+            f"DB error attaching tags to document {document_id} "
+            f"for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail=t("documents_tag_failed", locale=locale)
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Unexpected error attaching tags to document {document_id} "
+            f"for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail=t("documents_tag_failed", locale=locale)
+        )
     db.refresh(document)
     return _document_response_with_tags(document, current_user, db)
 
@@ -869,11 +1065,46 @@ async def detach_document_tag(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Detach a tag from a document. Owner-only."""
+    """Detach a tag from a document, routing by tag scope (TF-399).
+
+    A ``user``-scope tag removes only the caller's **personal** assignment (any
+    visible document); ``institution``/``global``-scope tags stay **owner-only**.
+    An effective shared detach is audited atomically with the change.
+    """
     locale = get_request_locale(request, current_user)
-    document = _load_owned_document(document_id, current_user, db, locale)
-    detach_tag_from_document(db, document, tag_id)
-    db.commit()
+    document, is_owner = _load_visible_document(document_id, current_user, db, locale)
+    try:
+        detached_shared = detach_tag_for_user(
+            db, document, tag_id, current_user, is_owner=is_owner
+        )
+        if detached_shared is not None:
+            _audit_shared_tag_change(
+                db, document, current_user, request, "detach", [detached_shared], locale
+            )
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(
+            f"DB error detaching tag {tag_id} from document {document_id} "
+            f"for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail=t("documents_tag_failed", locale=locale)
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Unexpected error detaching tag {tag_id} from document {document_id} "
+            f"for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail=t("documents_tag_failed", locale=locale)
+        )
     return Response(status_code=204)
 
 

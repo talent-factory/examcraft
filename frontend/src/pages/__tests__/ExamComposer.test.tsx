@@ -18,6 +18,12 @@ jest.mock('axios', () => ({
 jest.mock('../../services/ComposerService');
 const mockComposerService = ComposerService as jest.Mocked<typeof ComposerService>;
 
+// TF-398: the composer renders ExamListView, which reads the delete_exams
+// permission via useAuth. Stub it so the page test needs no AuthProvider.
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => true }),
+}));
+
 // Mock child components so tests stay fast and focused on ExamComposer routing logic
 jest.mock('../../components/composer/ExamBuilderView', () => ({
   __esModule: true,

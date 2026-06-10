@@ -29,17 +29,32 @@ def _persist_user(db, user_id, email, is_superuser, institution_id):
     return u
 
 
+# Hardcoded primary keys in a high range that the auto-increment sequence never
+# reaches within a test run. Other suites can leak committed user rows into the
+# shared test DB (e.g. integration tests whose TestClient uses the real get_db),
+# and Postgres sequences are not transactional, so a low fixed id like 100 can
+# collide with such a leaked auto-id user (TF-400 surfaced this by shifting the
+# sequence). Explicit high ids consume no nextval, so they neither shift the
+# sequence nor collide. See follow-up: the underlying leak should be removed by
+# giving the base `client` fixture a rolled-back get_db override.
+_BASE_ID = 9_000_000
+
+
 @pytest.fixture
 def super_user(test_db, test_institution):
-    return _persist_user(test_db, 99, "admin@test.ch", True, test_institution.id)
+    return _persist_user(
+        test_db, _BASE_ID + 99, "admin@test.ch", True, test_institution.id
+    )
 
 
 @pytest.fixture
 def normal_user(test_db, test_institution):
-    return _persist_user(test_db, 100, "user@test.ch", False, test_institution.id)
+    return _persist_user(
+        test_db, _BASE_ID + 100, "user@test.ch", False, test_institution.id
+    )
 
 
-def _create_users(test_db, institution, count, start_id=200):
+def _create_users(test_db, institution, count, start_id=_BASE_ID + 200):
     for i in range(count):
         test_db.add(
             User(

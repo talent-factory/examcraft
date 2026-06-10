@@ -19,8 +19,11 @@ from models.question_generation_job import QuestionGenerationJob
 
 @pytest.fixture
 def stage(test_db):
+    # Keine hartcodierten PK-IDs: die geteilte CI-Test-DB akkumuliert Zeilen
+    # aus nicht-isolierten Fixtures anderer Module; ein fixes ``id=320`` kollidiert
+    # dann mit einer geleakten Institution (UniqueViolation institutions_pkey).
+    # Autoincrement + Referenz über ``.id`` ist kollisionsfrei.
     inst = Institution(
-        id=320,
         name="RagOwner",
         slug="ragowner",
         subscription_tier="professional",
@@ -29,40 +32,37 @@ def stage(test_db):
         max_questions_per_month=1000,
     )
     test_db.add(inst)
+    test_db.flush()
     owner = User(
-        id=320,
         email="owner@r.ch",
         first_name="O",
         last_name="W",
         password_hash="x",
-        institution_id=320,
+        institution_id=inst.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=False,
     )
     other = User(
-        id=321,
         email="other@r.ch",
         first_name="X",
         last_name="Y",
         password_hash="x",
-        institution_id=320,
+        institution_id=inst.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=False,
     )
     admin = User(
-        id=322,
         email="admin@r.ch",
         first_name="A",
         last_name="D",
         password_hash="x",
-        institution_id=320,
+        institution_id=inst.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=True,
     )
     test_db.add_all([owner, other, admin])
     test_db.flush()
     job = QuestionGenerationJob(
-        id=550,
         task_id="rag-task-foreign",
         user_id=owner.id,
         topic="Test",

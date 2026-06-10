@@ -325,6 +325,17 @@ async def lifespan(app: FastAPI):
     grading_schemes_api = importlib.util.module_from_spec(spec_grading_schemes)
     spec_grading_schemes.loader.exec_module(grading_schemes_api)
 
+    # TF-400: Kompetenzrahmen-CRUD. Registered as "api.competency_frameworks"
+    # so that a later Premium import `from api.competency_frameworks import FrameworkOut`
+    # resolves — mirroring the api.tags pattern.
+    spec_competency = importlib.util.spec_from_file_location(
+        "api.competency_frameworks",
+        os.path.join(core_api_path, "competency_frameworks.py"),
+    )
+    competency_frameworks_api = importlib.util.module_from_spec(spec_competency)
+    sys.modules["api.competency_frameworks"] = competency_frameworks_api
+    spec_competency.loader.exec_module(competency_frameworks_api)
+
     spec_stats = importlib.util.spec_from_file_location(
         "core_api_stats", os.path.join(core_api_path, "stats.py")
     )
@@ -431,6 +442,7 @@ async def lifespan(app: FastAPI):
     app.include_router(grades_api.router_grades)
     app.include_router(grades_api.router_exams_review_queue)
     app.include_router(grading_schemes_api.router)
+    app.include_router(competency_frameworks_api.router)
     app.include_router(stats_api.router_exam_stats)
     app.include_router(stats_api.router_submission_stats)
     app.include_router(grade_export_api.router)

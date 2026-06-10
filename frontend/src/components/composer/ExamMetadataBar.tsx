@@ -138,6 +138,35 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
     },
   });
 
+  // TF-398: Archivieren / Wiederherstellen (orthogonal zum Lebenszyklus).
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [archiveReason, setArchiveReason] = useState('');
+
+  const archiveMutation = useMutation({
+    mutationFn: (reason: string) =>
+      ComposerService.archiveExam(exam.id, reason || undefined),
+    onSuccess: () => {
+      setFinalizeError(null);
+      setArchiveDialogOpen(false);
+      setArchiveReason('');
+      onInvalidate();
+    },
+    onError: (err) => {
+      setFinalizeError(getErrorMessage(err, t('composer.examMetadata.errorArchive')));
+    },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: () => ComposerService.restoreExam(exam.id),
+    onSuccess: () => {
+      setFinalizeError(null);
+      onInvalidate();
+    },
+    onError: (err) => {
+      setFinalizeError(getErrorMessage(err, t('composer.examMetadata.errorRestore')));
+    },
+  });
+
   const handleSave = () => {
     const payload: UpdateExamRequest = {
       updated_at: exam.updated_at,
@@ -171,6 +200,11 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
             >
               {STATUS_LABELS[exam.status] || exam.status}
             </span>
+            {exam.archived_at != null && (
+              <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-200 text-gray-700">
+                {t('composer.examMetadata.archivedBadge')}
+              </span>
+            )}
           </div>
           {exam.course && (
             <p className="text-sm text-gray-500 mt-1">{exam.course}</p>
@@ -232,6 +266,32 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
             >
               {t('composer.examMetadata.export')}
             </button>
+            {/* TF-398: Archivieren (in jedem Status) / Wiederherstellen */}
+            {exam.archived_at == null ? (
+              <button
+                onClick={() => {
+                  setFinalizeError(null);
+                  setArchiveReason('');
+                  setArchiveDialogOpen(true);
+                }}
+                className="px-3 py-1.5 text-sm border border-gray-400 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                {t('composer.examMetadata.archive')}
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setFinalizeError(null);
+                  restoreMutation.mutate();
+                }}
+                disabled={restoreMutation.isPending}
+                className="px-3 py-1.5 text-sm border border-gray-400 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                {restoreMutation.isPending
+                  ? t('composer.examMetadata.restoring')
+                  : t('composer.examMetadata.restore')}
+              </button>
+            )}
           </div>
 
           {finalizeError && (
@@ -239,6 +299,48 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
           )}
         </div>
       </div>
+
+      {/* TF-398: Archivieren — Bestätigung mit optionalem Grund */}
+      <Dialog
+        open={archiveDialogOpen}
+        onClose={() => {
+          if (!archiveMutation.isPending) setArchiveDialogOpen(false);
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>{t('composer.examMetadata.archiveDialogTitle')}</DialogTitle>
+        <DialogContent>
+          <p className="text-sm text-gray-600 mt-1 mb-3">
+            {t('composer.examMetadata.archiveDialogMessage')}
+          </p>
+          <TextField
+            label={t('composer.examMetadata.archiveReasonLabel')}
+            fullWidth
+            multiline
+            rows={2}
+            value={archiveReason}
+            onChange={(e) => setArchiveReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setArchiveDialogOpen(false)}
+            disabled={archiveMutation.isPending}
+          >
+            {t('composer.examMetadata.cancel')}
+          </Button>
+          <Button
+            onClick={() => archiveMutation.mutate(archiveReason)}
+            variant="contained"
+            disabled={archiveMutation.isPending}
+          >
+            {archiveMutation.isPending
+              ? t('composer.examMetadata.archiving')
+              : t('composer.examMetadata.archive')}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>

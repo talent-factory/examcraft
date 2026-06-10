@@ -28,7 +28,8 @@
       "tagSettings": "Tag-Verwaltung",
       "moodleConnection": "Moodle-Verbindung",
       "pricing": "Preise",
-      "profile": "Profil"
+      "profile": "Profil",
+      "competencyFrameworks": "Kompetenzrahmen"
     }
   },
   "language": {
@@ -1241,7 +1242,8 @@
         "label": "Tags",
         "heading": "Tags",
         "createHint": "Neuen Tag erstellen: einfach tippen und mit Enter bestätigen.",
-        "institutionTagDisabled": "Nur für institutionsweit geteilte Dokumente"
+        "institutionTagDisabled": "Nur für institutionsweit geteilte Dokumente",
+        "ownerOnlyTagDisabled": "Geteilte Tags kann nur der Eigentümer ändern"
       },
       "list": {
         "colVisibility": "Sichtbarkeit",
@@ -1370,6 +1372,8 @@
       "errorDelete": "Löschen fehlgeschlagen"
     },
     "questionCard": {
+      "competencyTooltip": "Handlungskompetenz: {{title}}",
+      "lnLevelShort": "LN {{level}}",
       "questionNumber": "Frage #{{id}}",
       "reviewer": "Reviewer: {{name}}",
       "options": "Optionen:",
@@ -1403,6 +1407,9 @@
       "deleteBtn": "Endgültig löschen"
     },
     "questionDetail": {
+      "competency": "Handlungskompetenz",
+      "competencyModule": "Modul {{module}}",
+      "lnLevel": "LN-Stufe {{level}}",
       "back": "Zurück",
       "backToQueue": "Zurück zur Queue",
       "questionNotFound": "Frage nicht gefunden",
@@ -1562,7 +1569,19 @@
       "errorCreate": "Prüfung konnte nicht erstellt werden. Bitte versuche es erneut.",
       "errorDelete": "Prüfung konnte nicht gelöscht werden. Bitte versuche es erneut.",
       "deleteDialogTitle": "Prüfung löschen",
-      "deleteDialogMessage": "Diese Prüfung wird unwiderruflich gelöscht."
+      "deleteDialogMessage": "Diese Prüfung wird unwiderruflich gelöscht.",
+      "showArchived": "Archivierte anzeigen",
+      "archivedBadge": "Archiviert",
+      "archive": "Archivieren",
+      "restore": "Wiederherstellen",
+      "deleteNoPermission": "Keine Berechtigung zum Löschen",
+      "deleteExported": "Exportierte Prüfungen können nicht gelöscht werden",
+      "deleteHasSubmissions": "Prüfung mit Abgaben kann nicht gelöscht werden",
+      "errorArchive": "Prüfung konnte nicht archiviert werden",
+      "errorRestore": "Prüfung konnte nicht wiederhergestellt werden",
+      "archiveDialogTitle": "Prüfung archivieren?",
+      "archiveDialogMessage": "Die Prüfung wird aus der aktiven Übersicht ausgeblendet. Sie kann jederzeit wiederhergestellt werden.",
+      "archiveReasonLabel": "Grund (optional)"
     },
     "examMetadata": {
       "statusDraft": "Entwurf",
@@ -1596,7 +1615,17 @@
       "save": "Speichern",
       "errorSave": "Fehler beim Speichern. Bitte lade die Seite neu und versuche es erneut.",
       "errorFinalize": "Finalisierung fehlgeschlagen. Bitte versuche es erneut.",
-      "errorUnfinalize": "Zurücksetzen fehlgeschlagen. Bitte versuche es erneut."
+      "errorUnfinalize": "Zurücksetzen fehlgeschlagen. Bitte versuche es erneut.",
+      "archivedBadge": "Archiviert",
+      "archive": "Archivieren",
+      "restore": "Wiederherstellen",
+      "restoring": "Wird wiederhergestellt …",
+      "archiving": "Wird archiviert …",
+      "errorArchive": "Prüfung konnte nicht archiviert werden",
+      "errorRestore": "Prüfung konnte nicht wiederhergestellt werden",
+      "archiveDialogTitle": "Prüfung archivieren?",
+      "archiveDialogMessage": "Die Prüfung wird aus der aktiven Übersicht ausgeblendet. Status, Export und Abgaben bleiben unverändert.",
+      "archiveReasonLabel": "Grund (optional)"
     },
     "examQuestions": {
       "panelTitle": "Prüfungsfragen",
@@ -1900,7 +1929,11 @@
       "goToReview": "Zum Review-Workflow",
       "createNewExam": "Neue Prüfung erstellen",
       "errorTagCreation": "Einige Tags konnten nicht erstellt werden: {{names}}",
-      "tagsLabel": "Tags (optional)"
+      "tagsLabel": "Tags (optional)",
+      "competencyFrameworkLabel": "Kompetenzrahmen / Modul (optional)",
+      "competencyFrameworkNone": "Kein Modul",
+      "competenciesOverrideLabel": "Kompetenzen (editierbar)",
+      "competenciesOverrideHelper": "Wird wörtlich als {{ competencies }} in die Generierung übernommen."
     },
     "ragExamDisplay": {
       "questions": "{{count}} Fragen",
@@ -2127,5 +2160,40 @@
       "helpful": "War das hilfreich?",
       "thanks": "Danke für dein Feedback!"
     }
+  },
+  "competencyFrameworks": {
+    "new": "Neuer Kompetenzrahmen",
+    "filter": {
+      "all": "Alle",
+      "active": "Aktiv",
+      "archived": "Archiviert"
+    },
+    "edit": "Bearbeiten",
+    "archive": "Archivieren",
+    "unarchive": "Reaktivieren",
+    "archivedBadge": "Archiviert",
+    "visibility": {
+      "private": "Privat",
+      "institution": "Institution"
+    },
+    "form": {
+      "name": "Name",
+      "moduleCode": "Modulcode",
+      "description": "Beschreibung",
+      "renderedText": "Kompetenzen-Volltext",
+      "renderedTextHelper": "Wird wörtlich als {{ competencies }} in die Generierung übernommen.",
+      "visibility": "Sichtbarkeit",
+      "language": "Sprache",
+      "save": "Speichern",
+      "cancel": "Abbrechen"
+    },
+    "title": "Kompetenzrahmen",
+    "subtitle": "Handlungskompetenzen pro Modul verwalten. Der Volltext fliesst wörtlich in die Fragengenerierung.",
+    "editTitle": "Kompetenzrahmen bearbeiten",
+    "empty": "Noch keine Kompetenzrahmen erfasst.",
+    "errorLoad": "Kompetenzrahmen konnten nicht geladen werden.",
+    "errorCreate": "Kompetenzrahmen konnte nicht erstellt werden.",
+    "errorUpdate": "Kompetenzrahmen konnte nicht gespeichert werden.",
+    "errorArchive": "Aktion fehlgeschlagen."
   }
 }

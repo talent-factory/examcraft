@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
 import { getDateLocale } from '../../utils/dateLocale';
+import { useAuth } from '../../contexts/AuthContext';
 import type { CreateExamRequest, DocumentWithQuestions } from '../../types/composer';
 
 interface ExamListViewProps {
@@ -34,6 +35,12 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  // TF-398: Archiv-Filter + Archivieren-Dialog (mit optionalem Grund).
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveTargetId, setArchiveTargetId] = useState<number | null>(null);
+  const [archiveReason, setArchiveReason] = useState('');
+  const { hasPermission } = useAuth();
+  const canHardDelete = hasPermission('delete_exams');
 
   const STATUS_LABELS: Record<string, string> = {
     draft: t('composer.examList.statusDraft'),
@@ -42,8 +49,12 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
   };
 
   const { data, isLoading, isError: isQueryError } = useQuery({
-    queryKey: ['exams', searchQuery],
-    queryFn: () => ComposerService.listExams({ search: searchQuery || undefined }),
+    queryKey: ['exams', searchQuery, showArchived],
+    queryFn: () =>
+      ComposerService.listExams({
+        search: searchQuery || undefined,
+        include_archived: showArchived,
+      }),
   });
 
   const { data: availableDocuments = [] } = useQuery({
@@ -71,6 +82,28 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exams'] }),
     onError: (err) => {
       setError(getErrorMessage(err, t('composer.examList.errorDelete')));
+    },
+  });
+
+  // TF-398: Archivieren / Wiederherstellen.
+  const archiveMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      ComposerService.archiveExam(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exams'] });
+      setArchiveTargetId(null);
+      setArchiveReason('');
+    },
+    onError: (err) => {
+      setError(getErrorMessage(err, t('composer.examList.errorArchive')));
+    },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: ComposerService.restoreExam,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exams'] }),
+    onError: (err) => {
+      setError(getErrorMessage(err, t('composer.examList.errorRestore')));
     },
   });
 
@@ -122,15 +155,24 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
         </div>
       )}
 
-      {/* Search */}
-      <div>
+      {/* Search + Archiv-Filter (TF-398) */}
+      <div className="flex flex-wrap items-center gap-4">
         <input
           type="text"
           placeholder={t('composer.examList.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          className="flex-1 min-w-[12rem] max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
         />
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+          {t('composer.examList.showArchived')}
+        </label>
       </div>
 
       {/* Exam Grid */}
@@ -161,6 +203,11 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
                 >
                   {STATUS_LABELS[exam.status] || exam.status}
                 </span>
+                {exam.archived_at != null && (
+                  <span className="text-xs px-2 py-1 rounded-full ml-1 flex-shrink-0 bg-gray-200 text-gray-700">
+                    {t('composer.examList.archivedBadge')}
+                  </span>
+                )}
               </div>
               {exam.course && <p className="text-sm text-gray-500 mt-1">{exam.course}</p>}
               <div className="flex items-center gap-3 mt-auto pt-3 text-sm text-gray-600">
@@ -174,20 +221,71 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
                     )}
                   </span>
                 )}
-                {exam.status === 'draft' && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteConfirmId(exam.id);
-                    }}
-                    className="ml-auto text-gray-300 hover:text-red-500 transition-colors p-0.5"
-                    aria-label={t('composer.examList.delete')}
-                  >
-                    <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                )}
+                {/* TF-398: Zeilen-Aktionen — Archivieren / Wiederherstellen / Löschen */}
+                <div
+                  className="ml-auto flex items-center gap-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {exam.archived_at == null ? (
+                    <button
+                      onClick={() => {
+                        setArchiveReason('');
+                        setArchiveTargetId(exam.id);
+                      }}
+                      className="text-gray-300 hover:text-amber-600 transition-colors p-0.5"
+                      title={t('composer.examList.archive')}
+                      aria-label={t('composer.examList.archive')}
+                    >
+                      <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8M10 12h4" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => restoreMutation.mutate(exam.id)}
+                        disabled={restoreMutation.isPending}
+                        className="text-gray-300 hover:text-green-600 transition-colors p-0.5 disabled:opacity-40"
+                        title={t('composer.examList.restore')}
+                        aria-label={t('composer.examList.restore')}
+                      >
+                        <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M4 9a9 9 0 119 9" />
+                        </svg>
+                      </button>
+                      {(() => {
+                        // canDelete = Permission ∧ nicht exportiert ∧ keine Abgaben.
+                        const deleteReason = !canHardDelete
+                          ? t('composer.examList.deleteNoPermission')
+                          : exam.status === 'exported'
+                            ? t('composer.examList.deleteExported')
+                            : exam.has_submissions
+                              ? t('composer.examList.deleteHasSubmissions')
+                              : '';
+                        const canDelete = deleteReason === '';
+                        return (
+                          <button
+                            onClick={() => {
+                              if (canDelete) setDeleteConfirmId(exam.id);
+                            }}
+                            disabled={!canDelete}
+                            className={`p-0.5 transition-colors ${
+                              canDelete
+                                ? 'text-gray-300 hover:text-red-500'
+                                : 'text-gray-200 cursor-not-allowed'
+                            }`}
+                            title={canDelete ? t('composer.examList.delete') : deleteReason}
+                            aria-label={t('composer.examList.delete')}
+                          >
+                            <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        );
+                      })()}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -216,6 +314,53 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
             disabled={deleteMutation.isPending}
           >
             {t('composer.examList.delete')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Archive Dialog (TF-398) — Bestätigung mit optionalem Grund */}
+      <Dialog
+        open={archiveTargetId !== null}
+        onClose={() => {
+          if (!archiveMutation.isPending) setArchiveTargetId(null);
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>{t('composer.examList.archiveDialogTitle')}</DialogTitle>
+        <DialogContent>
+          <p className="text-sm text-gray-600 mt-1 mb-3">
+            {t('composer.examList.archiveDialogMessage')}
+          </p>
+          <TextField
+            label={t('composer.examList.archiveReasonLabel')}
+            fullWidth
+            multiline
+            rows={2}
+            value={archiveReason}
+            onChange={(e) => setArchiveReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setArchiveTargetId(null)}
+            disabled={archiveMutation.isPending}
+          >
+            {t('composer.examList.cancel')}
+          </Button>
+          <Button
+            onClick={() => {
+              if (archiveTargetId !== null) {
+                archiveMutation.mutate({
+                  id: archiveTargetId,
+                  reason: archiveReason || undefined,
+                });
+              }
+            }}
+            variant="contained"
+            disabled={archiveMutation.isPending}
+          >
+            {t('composer.examList.archive')}
           </Button>
         </DialogActions>
       </Dialog>

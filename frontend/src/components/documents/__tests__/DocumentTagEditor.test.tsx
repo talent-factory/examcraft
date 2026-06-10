@@ -70,6 +70,7 @@ describe('DocumentTagEditor', () => {
           document={doc}
           availableTags={[tag1, tag2]}
           canEdit={false}
+          isOwner={true}
           onChanged={jest.fn()}
         />,
       ),
@@ -91,6 +92,7 @@ describe('DocumentTagEditor', () => {
           document={doc}
           availableTags={[tag1, tag2]}
           canEdit={true}
+          isOwner={true}
           onChanged={onChanged}
         />,
       ),
@@ -130,6 +132,7 @@ describe('DocumentTagEditor', () => {
           document={doc}
           availableTags={[tag1, tag2]}
           canEdit={true}
+          isOwner={true}
           onChanged={onChanged}
         />,
       ),
@@ -168,6 +171,7 @@ describe('DocumentTagEditor', () => {
           document={doc}
           availableTags={[tag1, tag2]}
           canEdit={true}
+          isOwner={true}
           onChanged={onChanged}
         />,
       ),
@@ -202,6 +206,7 @@ describe('DocumentTagEditor', () => {
           document={doc}
           availableTags={[tag1, instTag]}
           canEdit={true}
+          isOwner={true}
           onChanged={jest.fn()}
         />,
       ),
@@ -230,6 +235,7 @@ describe('DocumentTagEditor', () => {
           document={doc}
           availableTags={[tag1, instTag]}
           canEdit={true}
+          isOwner={true}
           onChanged={jest.fn()}
         />,
       ),
@@ -253,6 +259,7 @@ describe('DocumentTagEditor', () => {
           document={doc}
           availableTags={[tag1]}
           canEdit={true}
+          isOwner={true}
           onChanged={jest.fn()}
         />,
       ),
@@ -270,6 +277,7 @@ describe('DocumentTagEditor', () => {
           document={doc}
           availableTags={[tag1]}
           canEdit={false}
+          isOwner={true}
           onChanged={jest.fn()}
         />,
       ),
@@ -279,5 +287,99 @@ describe('DocumentTagEditor', () => {
         'Neuen Tag erstellen: einfach tippen und mit Enter bestätigen.',
       ),
     ).not.toBeInTheDocument();
+  });
+
+  // (g) TF-399: a non-owner may only remove their own personal tag chip; the
+  //     shared institution chip has no delete affordance.
+  it('(g) non-owner: only the personal tag chip is removable', async () => {
+    mockDocumentService.detachDocumentTag.mockResolvedValue(undefined);
+    const onChanged = jest.fn();
+    const sharedTag: DocumentTag = {
+      id: 9,
+      name: 'Lehrgang',
+      scope: 'institution',
+      is_own: false,
+      is_personal: false,
+    };
+    const personalTag: DocumentTag = {
+      id: 5,
+      name: 'Mathe',
+      scope: 'user',
+      is_own: true,
+      is_personal: true,
+    };
+    const doc = makeDoc({
+      tags: [sharedTag, personalTag],
+      visibility: DocumentVisibility.INSTITUTION,
+    });
+
+    render(
+      wrap(
+        <DocumentTagEditor
+          document={doc}
+          availableTags={[]}
+          canEdit
+          isOwner={false}
+          onChanged={onChanged}
+        />,
+      ),
+    );
+
+    // Exactly one chip delete button (CancelIcon) — the personal one.
+    const cancelIcons = screen.getAllByTestId('CancelIcon');
+    expect(cancelIcons).toHaveLength(1);
+    fireEvent.click(cancelIcons[0]);
+
+    await waitFor(() => {
+      expect(mockDocumentService.detachDocumentTag).toHaveBeenCalledWith(
+        42,
+        personalTag.id,
+      );
+    });
+    // The shared tag is never detached by a non-owner.
+    expect(mockDocumentService.detachDocumentTag).not.toHaveBeenCalledWith(
+      42,
+      sharedTag.id,
+    );
+  });
+
+  // (h) TF-399: a non-owner can attach a personal (user-scope) tag to a visible
+  //     foreign doc, but the institution-scope option stays disabled.
+  it('(h) non-owner can attach a user-scope tag; institution option disabled', async () => {
+    const updatedDoc = makeDoc({ tags: [{ ...tag2, is_personal: true }] });
+    mockDocumentService.attachDocumentTags.mockResolvedValue(updatedDoc);
+    const onChanged = jest.fn();
+    const doc = makeDoc({
+      tags: [],
+      visibility: DocumentVisibility.INSTITUTION,
+    });
+
+    render(
+      wrap(
+        <DocumentTagEditor
+          document={doc}
+          availableTags={[tag2, instTag]}
+          canEdit
+          isOwner={false}
+          onChanged={onChanged}
+        />,
+      ),
+    );
+
+    const input = screen.getByRole('combobox');
+    fireEvent.mouseDown(input);
+    fireEvent.click(input);
+
+    // The institution-scope option is offered but disabled for a non-owner.
+    const instOption = await screen.findByRole('option', { name: /Lehrgang/ });
+    expect(instOption).toHaveAttribute('aria-disabled', 'true');
+
+    // The user-scope (personal) option is enabled → clicking it attaches.
+    fireEvent.click(screen.getByText('Physik'));
+    await waitFor(() => {
+      expect(mockDocumentService.attachDocumentTags).toHaveBeenCalledWith(42, [
+        tag2.id,
+      ]);
+    });
   });
 });

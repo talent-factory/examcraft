@@ -1480,6 +1480,7 @@ def test_generate_questions_task_passes_tag_ids_from_request_data():
         user_id=1,
         institution_id=1,
         tag_ids=[5, 7],
+        framework_id=None,
     )
 
 

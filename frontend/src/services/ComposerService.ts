@@ -29,6 +29,8 @@ export class ComposerService {
   static async listExams(params?: {
     status?: string;
     search?: string;
+    include_archived?: boolean;
+    archived_only?: boolean;
     limit?: number;
     offset?: number;
   }): Promise<ExamListResponse> {
@@ -53,6 +55,19 @@ export class ComposerService {
 
   static async deleteExam(examId: number): Promise<void> {
     await apiClient.delete(`/api/v1/exams/${examId}`);
+  }
+
+  // TF-398: Archivieren (in jedem Status erlaubt) / Wiederherstellen.
+  static async archiveExam(examId: number, reason?: string): Promise<Exam> {
+    const response = await apiClient.post(`/api/v1/exams/${examId}/archive`, {
+      reason: reason ?? null,
+    });
+    return response.data;
+  }
+
+  static async restoreExam(examId: number): Promise<Exam> {
+    const response = await apiClient.post(`/api/v1/exams/${examId}/restore`);
+    return response.data;
   }
 
   static async addQuestions(examId: number, questionIds: number[]): Promise<ExamDetail> {

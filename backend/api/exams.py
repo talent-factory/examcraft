@@ -131,6 +131,13 @@ class ExamOut(BaseModel):
     question_count: int = 0
     default_document_ids: Optional[List[int]] = None
     grading_scheme_id: Optional[int] = None
+    # Archiv-Achse (TF-398) — orthogonal zu ``status``.
+    archived_at: Optional[datetime] = None
+    archived_by: Optional[int] = None
+    archive_reason: Optional[str] = None
+    # Ob die Prüfung Abgaben hat — vom Frontend für die ``canDelete``-Logik
+    # (disabled-Zustand des Lösch-Buttons) benötigt.
+    has_submissions: bool = False
 
     class Config:
         from_attributes = True
@@ -143,6 +150,12 @@ class ExamDetailOut(ExamOut):
 class ExamListOut(BaseModel):
     total: int
     exams: List[ExamOut]
+
+
+class ExamArchiveRequest(BaseModel):
+    """Optionaler Grund beim Archivieren (TF-398)."""
+
+    reason: Optional[str] = Field(None, max_length=500)
 
 
 # --- Helpers ---
@@ -172,7 +185,12 @@ def _require_draft(exam: Exam, locale: str = "de"):
         )
 
 
-def _exam_to_out(exam: Exam) -> dict:
+def _exam_to_out(exam: Exam, has_submissions: Optional[bool] = None) -> dict:
+    # ``has_submissions`` kann vom Aufrufer vorberechnet werden (Liste:
+    # Bulk-Query gegen N+1); fällt es weg, wird die Relationship lazy geladen
+    # (Einzel-Exam-Pfade — ein zusätzlicher Query, unkritisch).
+    if has_submissions is None:
+        has_submissions = bool(exam.submissions)
     return {
         "id": exam.id,
         "title": exam.title,
@@ -190,7 +208,37 @@ def _exam_to_out(exam: Exam) -> dict:
         "question_count": len(exam.questions) if exam.questions else 0,
         "default_document_ids": exam.default_document_ids,
         "grading_scheme_id": exam.grading_scheme_id,
+        "archived_at": exam.archived_at,
+        "archived_by": exam.archived_by,
+        "archive_reason": exam.archive_reason,
+        "has_submissions": has_submissions,
     }
+
+
+def _exam_has_submissions(db: Session, exam_id: int) -> bool:
+    """Ob die Prüfung mindestens eine Abgabe hat (Guard fürs Hard-Delete)."""
+    from models.submission import Submission
+
+    return (
+        db.query(Submission.id).filter(Submission.exam_id == exam_id).first()
+        is not None
+    )
+
+
+def _exam_delete_block_reason(db: Session, exam: Exam, locale: str) -> Optional[str]:
+    """i18n-Grund, warum die Prüfung NICHT hart gelöscht werden darf — oder
+    ``None``, wenn alle vier Guards erfüllt sind (TF-398).
+
+    Reihenfolge: zuerst archiviert, dann nicht exportiert, dann keine Abgaben.
+    Die Permission (``delete_exams``) wird vom Endpoint-Dependency geprüft.
+    """
+    if exam.archived_at is None:
+        return t("delete_exam_requires_archive", locale=locale)
+    if exam.status == ExamStatus.EXPORTED.value:
+        return t("delete_exam_exported", locale=locale)
+    if _exam_has_submissions(db, exam.id):
+        return t("delete_exam_has_submissions", locale=locale)
+    return None
 
 
 def _resolve_grading_scheme_id(
@@ -328,15 +376,31 @@ async def create_exam(
 async def list_exams(
     status: Optional[str] = Query(None, pattern="^(draft|finalized|exported)$"),
     search: Optional[str] = Query(None, max_length=200),
+    include_archived: bool = Query(
+        False, description="Auch archivierte Prüfungen einschliessen (TF-398)."
+    ),
+    archived_only: bool = Query(
+        False, description="Nur archivierte Prüfungen zeigen (TF-398)."
+    ),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
-    """List exams for the current user's institution."""
+    """List exams for the current user's institution.
+
+    Default blendet archivierte Prüfungen aus (``archived_at IS NULL``).
+    ``archived_only`` zeigt ausschliesslich archivierte; ``include_archived``
+    zeigt aktive + archivierte. ``archived_only`` hat Vorrang (TF-398).
+    """
     tenant_context = get_tenant_context(current_user)
     query = db.query(Exam)
     query = TenantFilter.filter_by_tenant(query, Exam, tenant_context)
+
+    if archived_only:
+        query = query.filter(Exam.archived_at.isnot(None))
+    elif not include_archived:
+        query = query.filter(Exam.archived_at.is_(None))
 
     if status:
         query = query.filter(Exam.status == status)
@@ -345,9 +409,25 @@ async def list_exams(
 
     total = query.count()
     exams = query.order_by(Exam.updated_at.desc()).limit(limit).offset(offset).all()
+
+    # has_submissions per Bulk-Query (vermeidet N+1 beim Lazy-Load der
+    # submissions-Relationship pro Prüfung).
+    exams_with_subs: set[int] = set()
+    exam_ids = [e.id for e in exams]
+    if exam_ids:
+        from models.submission import Submission
+
+        rows = (
+            db.query(Submission.exam_id)
+            .filter(Submission.exam_id.in_(exam_ids))
+            .distinct()
+            .all()
+        )
+        exams_with_subs = {row[0] for row in rows}
+
     return ExamListOut(
         total=total,
-        exams=[_exam_to_out(e) for e in exams],
+        exams=[_exam_to_out(e, has_submissions=e.id in exams_with_subs) for e in exams],
     )
 
 
@@ -684,17 +764,46 @@ async def update_exam_grading_scheme(
 async def delete_exam(
     exam_id: int,
     request: Request,
-    current_user: User = Depends(require_permission("create_exams")),
+    current_user: User = Depends(require_permission("delete_exams")),
     db: Session = Depends(get_db),
 ):
-    """Delete a draft exam."""
+    """Hard-delete an exam — abgesichert (TF-398).
+
+    Der frühere One-Click-Draft-Delete entfällt; jede Löschung läuft über
+    "erst archivieren, dann löschen". Nur erlaubt, wenn ALLE vier Guards
+    erfüllt sind: zuvor archiviert ∧ keine Abgaben ∧ nicht exportiert ∧
+    Aufrufer hat ``delete_exams`` (Admin oder Dozent — beide Rollen sind
+    dafür geseedet). Sonst HTTP 409. Vor dem Löschen
+    wird ein ``audit_logs``-Snapshot geschrieben; FK-Cascade räumt
+    ``exam_questions`` ab.
+    """
     locale = get_request_locale(request, current_user)
     exam = _get_exam_or_404(exam_id, db, current_user, locale)
-    _require_draft(exam, locale)
-    exam_title = exam.title
+
+    block = _exam_delete_block_reason(db, exam, locale)
+    if block is not None:
+        raise HTTPException(status_code=409, detail=block)
+
+    # Snapshot VOR der Löschung (forensische Wiederherstellbarkeit im Audit).
+    snapshot = {
+        "title": exam.title,
+        "course": exam.course,
+        "status": exam.status,
+        "language": exam.language,
+        "total_points": exam.total_points,
+        "question_count": len(exam.questions) if exam.questions else 0,
+        "created_by": exam.created_by,
+        "institution_id": exam.institution_id,
+        "archived_at": exam.archived_at.isoformat() if exam.archived_at else None,
+        "archived_by": exam.archived_by,
+        "archive_reason": exam.archive_reason,
+    }
+
+    from services.audit_service import AuditService
+
     db.delete(exam)
     try:
-        db.commit()
+        db.flush()
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in delete_exam for exam %s: %s", exam_id, exc)
@@ -703,11 +812,10 @@ async def delete_exam(
         db.rollback()
         logger.error("Database error in delete_exam for exam %s: %s", exam_id, exc)
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
-    logger.info(f"Deleted exam {exam_id} by user {current_user.id}")
 
-    from services.audit_service import AuditService
-
-    AuditService.log_action(
+    # log_action committet Delete + Audit atomar; bei Audit-Fehler rollt es
+    # auch den gestageten Delete zurück und liefert None (fail loud).
+    audit = AuditService.log_action(
         db,
         action="delete_exam",
         status=AuditService.STATUS_SUCCESS,
@@ -715,8 +823,104 @@ async def delete_exam(
         resource_type="exam",
         resource_id=str(exam_id),
         request=request,
-        additional_data={"title": exam_title},
+        additional_data=snapshot,
     )
+    if audit is None:
+        raise HTTPException(
+            status_code=500, detail=t("delete_exam_failed", locale=locale)
+        )
+    logger.info(f"Deleted exam {exam_id} by user {current_user.id}")
+
+
+@router.post("/{exam_id}/archive", response_model=ExamOut)
+async def archive_exam(
+    exam_id: int,
+    request: ExamArchiveRequest,
+    http_request: Request,
+    current_user: User = Depends(require_permission("create_exams")),
+    db: Session = Depends(get_db),
+):
+    """Prüfung archivieren — in jedem Status erlaubt (draft / finalized /
+    exported). Zweck ist Aufräumen: setzt nur ``archived_at/by/reason`` und
+    blendet die Prüfung aus der aktiven Übersicht aus. ``status``, Export und
+    Abgaben bleiben unangetastet. 409 falls bereits archiviert (idempotenz-
+    sicher). **Required Permission:** ``create_exams`` (Komponist). (TF-398)
+    """
+    locale = get_request_locale(http_request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    if exam.archived_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=t("exam_archive_already_archived", locale=locale),
+        )
+
+    exam.archived_at = datetime.utcnow()
+    exam.archived_by = current_user.id
+    exam.archive_reason = request.reason
+
+    from services.audit_service import AuditService
+
+    audit = AuditService.log_action(
+        db,
+        action="archive_exam",
+        status=AuditService.STATUS_SUCCESS,
+        user_id=current_user.id,
+        resource_type="exam",
+        resource_id=str(exam_id),
+        request=http_request,
+        additional_data={"reason": request.reason},
+    )
+    if audit is None:
+        raise HTTPException(
+            status_code=500, detail=t("exam_archive_failed", locale=locale)
+        )
+    db.refresh(exam)
+    logger.info(f"Archived exam {exam_id} by user {current_user.id}")
+    return _exam_to_out(exam)
+
+
+@router.post("/{exam_id}/restore", response_model=ExamOut)
+async def restore_exam(
+    exam_id: int,
+    http_request: Request,
+    current_user: User = Depends(require_permission("create_exams")),
+    db: Session = Depends(get_db),
+):
+    """Archivierte Prüfung wiederherstellen — setzt ``archived_at = NULL``
+    und lässt den ursprünglichen ``status`` unangetastet. 409 falls nicht
+    archiviert. **Required Permission:** ``create_exams``. (TF-398)
+    """
+    locale = get_request_locale(http_request, current_user)
+    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    if exam.archived_at is None:
+        raise HTTPException(
+            status_code=409,
+            detail=t("exam_archive_not_archived", locale=locale),
+        )
+
+    exam.archived_at = None
+    exam.archived_by = None
+    exam.archive_reason = None
+
+    from services.audit_service import AuditService
+
+    audit = AuditService.log_action(
+        db,
+        action="restore_exam",
+        status=AuditService.STATUS_SUCCESS,
+        user_id=current_user.id,
+        resource_type="exam",
+        resource_id=str(exam_id),
+        request=http_request,
+        additional_data={},
+    )
+    if audit is None:
+        raise HTTPException(
+            status_code=500, detail=t("exam_restore_failed", locale=locale)
+        )
+    db.refresh(exam)
+    logger.info(f"Restored exam {exam_id} by user {current_user.id}")
+    return _exam_to_out(exam)
 
 
 # --- Question Management Schemas ---

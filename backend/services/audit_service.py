@@ -83,6 +83,7 @@ class AuditService:
         additional_data: Optional[Dict[str, Any]] = None,
         error_message: Optional[str] = None,
         request: Optional[Request] = None,
+        commit: bool = True,
     ) -> AuditLog:
         """
         Log an audit action
@@ -150,8 +151,16 @@ class AuditService:
             )
 
             db.add(audit_log)
-            db.commit()
-            db.refresh(audit_log)
+            if commit:
+                db.commit()
+                db.refresh(audit_log)
+            else:
+                # Stage the row inside the caller's open transaction so that
+                # multiple audit rows and the mutation they describe commit
+                # atomically (the caller issues a single commit). flush() still
+                # assigns the PK and surfaces integrity errors here, preserving
+                # the fail-loud None contract in the except branch below.
+                db.flush()
 
             logger.info(
                 f"Audit log created: action={action}, status={status}, "
@@ -278,6 +287,7 @@ class AuditService:
         request: Optional[Request] = None,
         error_message: Optional[str] = None,
         additional_data: Optional[Dict[str, Any]] = None,
+        commit: bool = True,
     ) -> AuditLog:
         """Log document-related action"""
         return AuditService.log_action(
@@ -292,6 +302,7 @@ class AuditService:
             request=request,
             error_message=error_message,
             additional_data=additional_data,
+            commit=commit,
         )
 
     @staticmethod

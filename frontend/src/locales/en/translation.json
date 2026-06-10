@@ -28,7 +28,8 @@
       "tagSettings": "Tag Management",
       "moodleConnection": "Moodle connection",
       "pricing": "Pricing",
-      "profile": "Profile"
+      "profile": "Profile",
+      "competencyFrameworks": "Competency Frameworks"
     }
   },
   "language": {
@@ -1241,7 +1242,8 @@
         "label": "Tags",
         "heading": "Tags",
         "createHint": "Create a new tag: just type and press Enter.",
-        "institutionTagDisabled": "Only for institution-shared documents"
+        "institutionTagDisabled": "Only for institution-shared documents",
+        "ownerOnlyTagDisabled": "Only the owner can change shared tags"
       },
       "list": {
         "colVisibility": "Visibility",
@@ -1370,6 +1372,8 @@
       "errorDelete": "Deletion failed"
     },
     "questionCard": {
+      "competencyTooltip": "Competency: {{title}}",
+      "lnLevelShort": "LN {{level}}",
       "questionNumber": "Question #{{id}}",
       "reviewer": "Reviewer: {{name}}",
       "options": "Options:",
@@ -1403,6 +1407,9 @@
       "deleteBtn": "Delete permanently"
     },
     "questionDetail": {
+      "competency": "Competency",
+      "competencyModule": "Module {{module}}",
+      "lnLevel": "LN level {{level}}",
       "back": "Back",
       "backToQueue": "Back to Queue",
       "questionNotFound": "Question not found",
@@ -1562,7 +1569,19 @@
       "errorCreate": "Could not create exam. Please try again.",
       "errorDelete": "Could not delete exam. Please try again.",
       "deleteDialogTitle": "Delete Exam",
-      "deleteDialogMessage": "This exam will be permanently deleted."
+      "deleteDialogMessage": "This exam will be permanently deleted.",
+      "showArchived": "Show archived",
+      "archivedBadge": "Archived",
+      "archive": "Archive",
+      "restore": "Restore",
+      "deleteNoPermission": "You don't have permission to delete",
+      "deleteExported": "Exported exams cannot be deleted",
+      "deleteHasSubmissions": "An exam with submissions cannot be deleted",
+      "errorArchive": "Failed to archive the exam",
+      "errorRestore": "Failed to restore the exam",
+      "archiveDialogTitle": "Archive exam?",
+      "archiveDialogMessage": "The exam will be hidden from the active overview. You can restore it at any time.",
+      "archiveReasonLabel": "Reason (optional)"
     },
     "examMetadata": {
       "statusDraft": "Draft",
@@ -1596,7 +1615,17 @@
       "save": "Save",
       "errorSave": "Error saving. Please reload the page and try again.",
       "errorFinalize": "Finalization failed. Please try again.",
-      "errorUnfinalize": "Revert failed. Please try again."
+      "errorUnfinalize": "Revert failed. Please try again.",
+      "archivedBadge": "Archived",
+      "archive": "Archive",
+      "restore": "Restore",
+      "restoring": "Restoring …",
+      "archiving": "Archiving …",
+      "errorArchive": "Failed to archive the exam",
+      "errorRestore": "Failed to restore the exam",
+      "archiveDialogTitle": "Archive exam?",
+      "archiveDialogMessage": "The exam will be hidden from the active overview. Status, export and submissions remain unchanged.",
+      "archiveReasonLabel": "Reason (optional)"
     },
     "examQuestions": {
       "panelTitle": "Exam Questions",
@@ -1900,7 +1929,11 @@
       "goToReview": "Go to Review Workflow",
       "createNewExam": "Create New Exam",
       "errorTagCreation": "Some tags could not be created: {{names}}",
-      "tagsLabel": "Tags (optional)"
+      "tagsLabel": "Tags (optional)",
+      "competencyFrameworkLabel": "Competency framework / module (optional)",
+      "competencyFrameworkNone": "No module",
+      "competenciesOverrideLabel": "Competencies (editable)",
+      "competenciesOverrideHelper": "Injected verbatim as {{ competencies }} into generation."
     },
     "ragExamDisplay": {
       "questions": "{{count}} Questions",
@@ -2126,6 +2159,41 @@
     "feedback": {
       "helpful": "Was this helpful?",
       "thanks": "Thanks for your feedback!"
+    }
+  },
+  "competencyFrameworks": {
+    "title": "Competency Frameworks",
+    "subtitle": "Manage action competencies per module. The full text is injected verbatim into question generation.",
+    "new": "New Framework",
+    "editTitle": "Edit Framework",
+    "empty": "No competency frameworks yet.",
+    "edit": "Edit",
+    "archive": "Archive",
+    "unarchive": "Reactivate",
+    "archivedBadge": "Archived",
+    "errorLoad": "Could not load competency frameworks.",
+    "errorCreate": "Could not create framework.",
+    "errorUpdate": "Could not save framework.",
+    "errorArchive": "Action failed.",
+    "filter": {
+      "all": "All",
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "visibility": {
+      "private": "Private",
+      "institution": "Institution"
+    },
+    "form": {
+      "name": "Name",
+      "moduleCode": "Module code",
+      "description": "Description",
+      "renderedText": "Competencies full text",
+      "renderedTextHelper": "Injected verbatim as {{ competencies }} into generation.",
+      "visibility": "Visibility",
+      "language": "Language",
+      "save": "Save",
+      "cancel": "Cancel"
     }
   }
 }

@@ -161,6 +161,18 @@ export const useRoleBasedNavigation = (): RoleBasedNavigation => {
             requiredPermissions: ['create_questions'],
           },
           {
+            label: t('nav.sidebar.competencyFrameworks'),
+            path: '/settings/competency-frameworks',
+            icon: '🎯',
+            // Nur Dozent: ASSISTANT hat keine 'create_questions'-Permission und
+            // würde ohnehin herausgefiltert — der Eintrag bliebe sonst toter
+            // Config-Ballast. Admin/Superuser bedienen das Admin-Panel-Tab.
+            requiredRoles: [UserRole.DOZENT],
+            excludedRoles: [UserRole.ADMIN],
+            excludeSuperuser: true,
+            requiredPermissions: ['create_questions'],
+          },
+          {
             label: t('nav.sidebar.moodleConnection'),
             path: '/admin/integrations/moodle',
             icon: '🔗',

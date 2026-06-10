@@ -11,7 +11,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip,
   Grid,
   CircularProgress,
   Alert,
@@ -26,6 +25,32 @@ import axios from 'axios';
 import { promptsApi, Prompt } from '../../api/promptsApi';
 import { PromptCategory } from '../../types/prompt';
 import MarkdownRenderer from '../MarkdownRenderer';
+import TagAutocomplete from '../shared/TagAutocomplete';
+import { tagsApi, type Tag, type TagValue, isPendingTag } from '../../api/tagsApi';
+
+/** TF-397: a prompt's managed tags arrive as {id, name}; lift them into the
+ * TagValue shape the shared TagAutocomplete works with. */
+const toTagValue = (t: { id: number; name: string }): Tag => ({
+  id: t.id,
+  name: t.name,
+  scope: 'global',
+  kind: 'prompt',
+  institution_id: null,
+  usage_count: 0,
+  is_archived: false,
+  is_own: false,
+});
+
+/** TF-397: initialData tags can come from a loaded prompt as {id, name}, or from
+ * the Prompt-Wizard's "Edit in Editor" path as plain name strings (suggested
+ * tags that aren't managed Tag rows yet). Strings — and objects without a real
+ * id — become PendingTags so they are created on save instead of being silently
+ * dropped (toTagValue would otherwise yield {id: undefined, name: undefined}). */
+const toInitialTagValue = (t: string | { id?: number; name: string }): TagValue => {
+  if (typeof t === 'string') return { __pending: true as const, name: t };
+  if (typeof t.id === 'number') return toTagValue({ id: t.id, name: t.name });
+  return { __pending: true as const, name: t.name };
+};
 
 /** Extract a user-friendly error message from Axios/FastAPI errors. */
 function extractErrorMessage(
@@ -95,7 +120,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [tagInput, setTagInput] = useState('');
+  // TF-397: managed prompt-tags selected via the autocomplete (Tag | PendingTag).
+  const [selectedTags, setSelectedTags] = useState<TagValue[]>([]);
 
   const [formData, setFormData] = useState<Partial<Prompt>>({
     name: '',
@@ -115,6 +141,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       setError(null);
       const data = await promptsApi.getPrompt(promptId);
       setFormData(data);
+      setSelectedTags((data.tags ?? []).map(toTagValue));
     } catch (err: unknown) {
       setError(extractErrorMessage(err, t('admin.promptEditor.failedLoad'), errorLabels));
     } finally {
@@ -131,6 +158,11 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
   useEffect(() => {
     if (!promptId && initialData) {
       setFormData(prev => ({ ...prev, ...initialData }));
+      if (initialData.tags) {
+        // initialData may come from the wizard with tags as name strings.
+        const rawTags = initialData.tags as Array<string | { id?: number; name: string }>;
+        setSelectedTags(rawTags.map(toInitialTagValue));
+      }
     }
   }, [promptId, initialData]);
 
@@ -145,27 +177,42 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       setError(null);
       setSuccess(null);
 
+      // TF-397: resolve selected tags into managed tag_ids. Pending (inline-typed)
+      // tags are created as global kind='prompt' tags first, then linked by id.
+      const pending = selectedTags.filter(isPendingTag);
+      const existing = selectedTags.filter((tg): tg is Tag => !isPendingTag(tg));
+      const created = await Promise.all(
+        pending.map((p) => tagsApi.createTag(p.name, 'global', 'prompt'))
+      );
+      const tag_ids = Array.from(
+        new Set([...existing.map((tg) => tg.id), ...created.map((tg) => tg.id)])
+      );
+
       if (promptId) {
-        const result = await promptsApi.updatePrompt(promptId, formData);
+        const result = await promptsApi.updatePrompt(promptId, {
+          content: formData.content,
+          description: formData.description,
+          category: formData.category,
+          use_case: formData.use_case,
+          tag_ids,
+        });
         const versionBumped = result.version > (formData.version ?? 1);
         setFormData(result);
+        setSelectedTags((result.tags ?? []).map(toTagValue));
         setSuccess(versionBumped
           ? t('admin.promptEditor.successVersionCreated', { version: result.version })
           : t('admin.promptEditor.successUpdated')
         );
       } else {
-        // Type assertion after validation
-        const newPrompt = {
+        await promptsApi.createPrompt({
           name: formData.name,
           content: formData.content,
           category: formData.category,
           use_case: formData.use_case,
           description: formData.description,
-          tags: formData.tags || [],
-          is_active: formData.is_active ?? false
-        } as Omit<Prompt, 'id' | 'version' | 'created_at' | 'updated_at' | 'usage_count'>;
-
-        await promptsApi.createPrompt(newPrompt);
+          is_active: formData.is_active ?? false,
+          tag_ids,
+        });
         setSuccess(t('admin.promptEditor.successCreated'));
       }
 
@@ -176,30 +223,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       setError(extractErrorMessage(err, t('admin.promptEditor.failedSave'), errorLabels));
     } finally {
       setSaving(false);
-    }
-  };
-
-  const addTag = () => {
-    if (tagInput && !formData.tags?.includes(tagInput)) {
-      setFormData({
-        ...formData,
-        tags: [...(formData.tags || []), tagInput]
-      });
-      setTagInput('');
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    setFormData({
-      ...formData,
-      tags: formData.tags?.filter(t => t !== tag)
-    });
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addTag();
     }
   };
 
@@ -372,36 +395,16 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
               </Select>
             </FormControl>
 
-            {/* Tags */}
+            {/* Tags — TF-397: managed prompt-tags via autocomplete (select or inline-create) */}
             <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                {t('admin.promptEditor.tagsLabel')}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <TextField
-                  size="small"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder={t('admin.promptEditor.tagPlaceholder')}
-                  sx={{ flexGrow: 1 }}
-                />
-                <Button onClick={addTag} variant="outlined" size="small">
-                  +
-                </Button>
-              </Box>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {formData.tags?.map(tag => (
-                  <Chip
-                    key={tag}
-                    label={tag}
-                    onDelete={() => removeTag(tag)}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                  />
-                ))}
-              </Box>
+              <TagAutocomplete
+                value={selectedTags}
+                onChange={setSelectedTags}
+                disabled={saving}
+                label={t('admin.promptEditor.tagsLabel')}
+                kind="prompt"
+                deferCreation
+              />
             </Box>
 
             {/* Active Toggle */}

@@ -24,7 +24,8 @@
       "admin": "Admin",
       "tagSettings": "Gestione tag",
       "pricing": "Prezzi",
-      "profile": "Profilo"
+      "profile": "Profilo",
+      "competencyFrameworks": "Quadri di competenza"
     }
   },
   "language": {
@@ -852,7 +853,8 @@
         "label": "Tag",
         "heading": "Tag",
         "createHint": "Crea un nuovo tag: digita e premi Invio.",
-        "institutionTagDisabled": "Solo per documenti condivisi con l'istituzione"
+        "institutionTagDisabled": "Solo per documenti condivisi con l'istituzione",
+        "ownerOnlyTagDisabled": "Solo il proprietario può modificare i tag condivisi"
       },
       "list": {
         "colVisibility": "Visibilità",
@@ -981,6 +983,8 @@
       "errorDelete": "Eliminazione non riuscita"
     },
     "questionCard": {
+      "competencyTooltip": "Competency: {{title}}",
+      "lnLevelShort": "LN {{level}}",
       "questionNumber": "Domanda #{{id}}",
       "reviewer": "Revisore: {{name}}",
       "options": "Opzioni:",
@@ -1014,6 +1018,9 @@
       "deleteBtn": "Elimina definitivamente"
     },
     "questionDetail": {
+      "competency": "Competency",
+      "competencyModule": "Module {{module}}",
+      "lnLevel": "LN level {{level}}",
       "back": "Indietro",
       "backToQueue": "Torna alla coda",
       "questionNotFound": "Domanda non trovata",
@@ -1173,7 +1180,19 @@
       "errorCreate": "Impossibile creare l'esame. Riprova.",
       "errorDelete": "Impossibile eliminare l'esame. Riprova.",
       "deleteDialogTitle": "Elimina esame",
-      "deleteDialogMessage": "Questo esame verrà eliminato definitivamente."
+      "deleteDialogMessage": "Questo esame verrà eliminato definitivamente.",
+      "showArchived": "Mostra archiviati",
+      "archivedBadge": "Archiviato",
+      "archive": "Archivia",
+      "restore": "Ripristina",
+      "deleteNoPermission": "Non hai l'autorizzazione per eliminare",
+      "deleteExported": "Gli esami esportati non possono essere eliminati",
+      "deleteHasSubmissions": "Un esame con consegne non può essere eliminato",
+      "errorArchive": "Impossibile archiviare l'esame",
+      "errorRestore": "Impossibile ripristinare l'esame",
+      "archiveDialogTitle": "Archiviare l'esame?",
+      "archiveDialogMessage": "L'esame verrà nascosto dalla panoramica attiva. Puoi ripristinarlo in qualsiasi momento.",
+      "archiveReasonLabel": "Motivo (facoltativo)"
     },
     "examMetadata": {
       "statusDraft": "Bozza",
@@ -1202,7 +1221,17 @@
       "save": "Salva",
       "errorSave": "Errore durante il salvataggio. Ricarica la pagina e riprova.",
       "errorFinalize": "Finalizzazione fallita. Riprova.",
-      "errorUnfinalize": "Ripristino fallito. Riprova."
+      "errorUnfinalize": "Ripristino fallito. Riprova.",
+      "archivedBadge": "Archiviato",
+      "archive": "Archivia",
+      "restore": "Ripristina",
+      "restoring": "Ripristino …",
+      "archiving": "Archiviazione …",
+      "errorArchive": "Impossibile archiviare l'esame",
+      "errorRestore": "Impossibile ripristinare l'esame",
+      "archiveDialogTitle": "Archiviare l'esame?",
+      "archiveDialogMessage": "L'esame verrà nascosto dalla panoramica attiva. Stato, esportazione e consegne restano invariati.",
+      "archiveReasonLabel": "Motivo (facoltativo)"
     },
     "examQuestions": {
       "panelTitle": "Domande d'esame",
@@ -1506,7 +1535,11 @@
       "goToReview": "Vai al workflow di revisione",
       "createNewExam": "Crea nuovo esame",
       "errorTagCreation": "Alcuni tag non sono stati creati: {{names}}",
-      "tagsLabel": "Tag (opzionale)"
+      "tagsLabel": "Tag (opzionale)",
+      "competencyFrameworkLabel": "Competency framework / module (optional)",
+      "competencyFrameworkNone": "No module",
+      "competenciesOverrideLabel": "Competencies (editable)",
+      "competenciesOverrideHelper": "Injected verbatim as {{ competencies }} into generation."
     },
     "ragExamDisplay": {
       "questions": "{{count}} Domande",
@@ -1693,5 +1726,40 @@
   },
   "help": {
     "thinking": "Sto pensando…"
+  },
+  "competencyFrameworks": {
+    "title": "Competency Frameworks",
+    "subtitle": "Manage action competencies per module. The full text is injected verbatim into question generation.",
+    "new": "New Framework",
+    "editTitle": "Edit Framework",
+    "empty": "No competency frameworks yet.",
+    "edit": "Edit",
+    "archive": "Archive",
+    "unarchive": "Reactivate",
+    "archivedBadge": "Archived",
+    "errorLoad": "Could not load competency frameworks.",
+    "errorCreate": "Could not create framework.",
+    "errorUpdate": "Could not save framework.",
+    "errorArchive": "Action failed.",
+    "filter": {
+      "all": "All",
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "visibility": {
+      "private": "Private",
+      "institution": "Institution"
+    },
+    "form": {
+      "name": "Name",
+      "moduleCode": "Module code",
+      "description": "Description",
+      "renderedText": "Competencies full text",
+      "renderedTextHelper": "Injected verbatim as {{ competencies }} into generation.",
+      "visibility": "Visibility",
+      "language": "Language",
+      "save": "Save",
+      "cancel": "Cancel"
+    }
   }
 }

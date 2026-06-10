@@ -2,11 +2,16 @@ import axios from 'axios';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
+// TF-397: tag namespace. 'content' tags classify Fragen/Dokumente, 'prompt'
+// tags classify Prompt-Templates. The backend defaults to 'content'.
+export type TagKind = 'content' | 'prompt';
+
 export interface Tag {
   id: number;
   name: string;
   institution_id: number | null;
   scope: 'global' | 'institution';
+  kind: TagKind;
   usage_count: number;
   is_archived: boolean;
   is_own: boolean;
@@ -40,15 +45,23 @@ apiClient.interceptors.request.use((config) => {
 });
 
 export const tagsApi = {
-  listTags: async (includeArchived = false): Promise<Tag[]> => {
+  listTags: async (includeArchived = false, kind?: TagKind): Promise<Tag[]> => {
     const resp = await apiClient.get<Tag[]>('/api/v1/tags', {
-      params: { include_archived: includeArchived },
+      params: { include_archived: includeArchived, ...(kind ? { kind } : {}) },
     });
     return resp.data;
   },
 
-  createTag: async (name: string, scope: 'global' | 'institution' = 'institution'): Promise<Tag> => {
-    const resp = await apiClient.post<Tag>('/api/v1/tags', { name, scope });
+  createTag: async (
+    name: string,
+    scope: 'global' | 'institution' = 'institution',
+    kind?: TagKind
+  ): Promise<Tag> => {
+    const resp = await apiClient.post<Tag>('/api/v1/tags', {
+      name,
+      scope,
+      ...(kind ? { kind } : {}),
+    });
     return resp.data;
   },
 

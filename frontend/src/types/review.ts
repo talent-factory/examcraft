@@ -56,6 +56,19 @@ export interface GenerationMetadata {
 }
 
 /**
+ * Competency Brief (TF-400)
+ * Schlanke Sicht auf die geprüfte Handlungskompetenz (HK) für die Frage-Anzeige:
+ * Kürzel, Titel und Modul — ohne den vollen Deskriptor-Baum.
+ */
+export interface CompetencyBrief {
+  id: number;
+  code: string;
+  title: string;
+  framework_id: number;
+  module_code?: string | null;
+}
+
+/**
  * Question Review Interface
  * Erweitert RAGQuestion mit Review-spezifischen Feldern
  */
@@ -73,6 +86,11 @@ export interface QuestionReview {
   source_documents?: string[];
   confidence_score: number;
   bloom_level?: number;
+  // TF-400: geprüfte Handlungskompetenz (HK) + LN-Stufe (1-4). `competency`
+  // ist der schlanke Brief für die Anzeige; null/undefined ohne HK-Zuordnung.
+  competency_id?: number | null;
+  ln_level?: number | null;
+  competency?: CompetencyBrief | null;
   estimated_time_minutes?: number;
   quality_tier?: string;
   generation_metadata?: GenerationMetadata | null;
