@@ -1568,7 +1568,19 @@
       "errorCreate": "Prüfung konnte nicht erstellt werden. Bitte versuche es erneut.",
       "errorDelete": "Prüfung konnte nicht gelöscht werden. Bitte versuche es erneut.",
       "deleteDialogTitle": "Prüfung löschen",
-      "deleteDialogMessage": "Diese Prüfung wird unwiderruflich gelöscht."
+      "deleteDialogMessage": "Diese Prüfung wird unwiderruflich gelöscht.",
+      "showArchived": "Archivierte anzeigen",
+      "archivedBadge": "Archiviert",
+      "archive": "Archivieren",
+      "restore": "Wiederherstellen",
+      "deleteNoPermission": "Keine Berechtigung zum Löschen",
+      "deleteExported": "Exportierte Prüfungen können nicht gelöscht werden",
+      "deleteHasSubmissions": "Prüfung mit Abgaben kann nicht gelöscht werden",
+      "errorArchive": "Prüfung konnte nicht archiviert werden",
+      "errorRestore": "Prüfung konnte nicht wiederhergestellt werden",
+      "archiveDialogTitle": "Prüfung archivieren?",
+      "archiveDialogMessage": "Die Prüfung wird aus der aktiven Übersicht ausgeblendet. Sie kann jederzeit wiederhergestellt werden.",
+      "archiveReasonLabel": "Grund (optional)"
     },
     "examMetadata": {
       "statusDraft": "Entwurf",
@@ -1602,7 +1614,17 @@
       "save": "Speichern",
       "errorSave": "Fehler beim Speichern. Bitte lade die Seite neu und versuche es erneut.",
       "errorFinalize": "Finalisierung fehlgeschlagen. Bitte versuche es erneut.",
-      "errorUnfinalize": "Zurücksetzen fehlgeschlagen. Bitte versuche es erneut."
+      "errorUnfinalize": "Zurücksetzen fehlgeschlagen. Bitte versuche es erneut.",
+      "archivedBadge": "Archiviert",
+      "archive": "Archivieren",
+      "restore": "Wiederherstellen",
+      "restoring": "Wird wiederhergestellt …",
+      "archiving": "Wird archiviert …",
+      "errorArchive": "Prüfung konnte nicht archiviert werden",
+      "errorRestore": "Prüfung konnte nicht wiederhergestellt werden",
+      "archiveDialogTitle": "Prüfung archivieren?",
+      "archiveDialogMessage": "Die Prüfung wird aus der aktiven Übersicht ausgeblendet. Status, Export und Abgaben bleiben unverändert.",
+      "archiveReasonLabel": "Grund (optional)"
     },
     "examQuestions": {
       "panelTitle": "Prüfungsfragen",

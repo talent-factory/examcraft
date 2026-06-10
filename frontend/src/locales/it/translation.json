@@ -1179,7 +1179,19 @@
       "errorCreate": "Impossibile creare l'esame. Riprova.",
       "errorDelete": "Impossibile eliminare l'esame. Riprova.",
       "deleteDialogTitle": "Elimina esame",
-      "deleteDialogMessage": "Questo esame verrà eliminato definitivamente."
+      "deleteDialogMessage": "Questo esame verrà eliminato definitivamente.",
+      "showArchived": "Mostra archiviati",
+      "archivedBadge": "Archiviato",
+      "archive": "Archivia",
+      "restore": "Ripristina",
+      "deleteNoPermission": "Non hai l'autorizzazione per eliminare",
+      "deleteExported": "Gli esami esportati non possono essere eliminati",
+      "deleteHasSubmissions": "Un esame con consegne non può essere eliminato",
+      "errorArchive": "Impossibile archiviare l'esame",
+      "errorRestore": "Impossibile ripristinare l'esame",
+      "archiveDialogTitle": "Archiviare l'esame?",
+      "archiveDialogMessage": "L'esame verrà nascosto dalla panoramica attiva. Puoi ripristinarlo in qualsiasi momento.",
+      "archiveReasonLabel": "Motivo (facoltativo)"
     },
     "examMetadata": {
       "statusDraft": "Bozza",
@@ -1208,7 +1220,17 @@
       "save": "Salva",
       "errorSave": "Errore durante il salvataggio. Ricarica la pagina e riprova.",
       "errorFinalize": "Finalizzazione fallita. Riprova.",
-      "errorUnfinalize": "Ripristino fallito. Riprova."
+      "errorUnfinalize": "Ripristino fallito. Riprova.",
+      "archivedBadge": "Archiviato",
+      "archive": "Archivia",
+      "restore": "Ripristina",
+      "restoring": "Ripristino …",
+      "archiving": "Archiviazione …",
+      "errorArchive": "Impossibile archiviare l'esame",
+      "errorRestore": "Impossibile ripristinare l'esame",
+      "archiveDialogTitle": "Archiviare l'esame?",
+      "archiveDialogMessage": "L'esame verrà nascosto dalla panoramica attiva. Stato, esportazione e consegne restano invariati.",
+      "archiveReasonLabel": "Motivo (facoltativo)"
     },
     "examQuestions": {
       "panelTitle": "Domande d'esame",

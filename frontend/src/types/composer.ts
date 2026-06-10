@@ -42,6 +42,12 @@ export interface Exam {
   default_document_ids: number[] | null;
   // TF-335: NULL ⇒ Exam erbt Institution-Default (oder bleibt ohne).
   grading_scheme_id?: number | null;
+  // TF-398: Archiv-Achse — orthogonal zu status. archived_at !== null ⇒ archiviert.
+  archived_at?: string | null;
+  archived_by?: number | null;
+  archive_reason?: string | null;
+  // Ob die Prüfung Abgaben hat (Guard für den Lösch-Button).
+  has_submissions?: boolean;
 }
 
 export interface ExamDetail extends Exam {

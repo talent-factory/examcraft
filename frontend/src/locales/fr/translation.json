@@ -1179,7 +1179,19 @@
       "errorCreate": "Impossible de créer l'examen. Veuillez réessayer.",
       "errorDelete": "Impossible de supprimer l'examen. Veuillez réessayer.",
       "deleteDialogTitle": "Supprimer l'examen",
-      "deleteDialogMessage": "Cet examen sera définitivement supprimé."
+      "deleteDialogMessage": "Cet examen sera définitivement supprimé.",
+      "showArchived": "Afficher les archivés",
+      "archivedBadge": "Archivé",
+      "archive": "Archiver",
+      "restore": "Restaurer",
+      "deleteNoPermission": "Vous n'avez pas l'autorisation de supprimer",
+      "deleteExported": "Les examens exportés ne peuvent pas être supprimés",
+      "deleteHasSubmissions": "Un examen avec des soumissions ne peut pas être supprimé",
+      "errorArchive": "Échec de l'archivage de l'examen",
+      "errorRestore": "Échec de la restauration de l'examen",
+      "archiveDialogTitle": "Archiver l'examen ?",
+      "archiveDialogMessage": "L'examen sera masqué de la vue active. Vous pouvez le restaurer à tout moment.",
+      "archiveReasonLabel": "Motif (facultatif)"
     },
     "examMetadata": {
       "statusDraft": "Brouillon",
@@ -1208,7 +1220,17 @@
       "save": "Enregistrer",
       "errorSave": "Erreur lors de l'enregistrement. Veuillez recharger la page et réessayer.",
       "errorFinalize": "La finalisation a échoué. Veuillez réessayer.",
-      "errorUnfinalize": "L'annulation a échoué. Veuillez réessayer."
+      "errorUnfinalize": "L'annulation a échoué. Veuillez réessayer.",
+      "archivedBadge": "Archivé",
+      "archive": "Archiver",
+      "restore": "Restaurer",
+      "restoring": "Restauration …",
+      "archiving": "Archivage …",
+      "errorArchive": "Échec de l'archivage de l'examen",
+      "errorRestore": "Échec de la restauration de l'examen",
+      "archiveDialogTitle": "Archiver l'examen ?",
+      "archiveDialogMessage": "L'examen sera masqué de la vue active. Le statut, l'export et les soumissions restent inchangés.",
+      "archiveReasonLabel": "Motif (facultatif)"
     },
     "examQuestions": {
       "panelTitle": "Questions d'examen",

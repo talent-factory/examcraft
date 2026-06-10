@@ -78,6 +78,18 @@ class Exam(Base):
         nullable=False,
     )
 
+    # Archiv-Achse (TF-398): orthogonal zu ``status``. archived_at IS NULL =>
+    # aktiv; gesetzt => archiviert. Spiegelt das TF-396-Muster
+    # (question_reviews). Archivieren ist in jedem Status erlaubt und lässt
+    # ``status`` unangetastet.
+    archived_at = Column(DateTime(), nullable=True)
+    archived_by = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    archive_reason = Column(Text, nullable=True)
+
     institution = relationship(
         "Institution",
         foreign_keys=[institution_id],

@@ -173,6 +173,45 @@ describe('ComposerService', () => {
   });
 
   // -------------------------------------------------------------------------
+  // archiveExam / restoreExam (TF-398)
+  // -------------------------------------------------------------------------
+
+  describe('archiveExam', () => {
+    it('posts to /archive with a reason', async () => {
+      fakeClient.post.mockResolvedValueOnce({
+        data: makeExam({ id: 5, archived_at: '2025-02-01T00:00:00Z' }),
+      });
+
+      const result = await ComposerService.archiveExam(5, 'veraltet');
+
+      expect(fakeClient.post).toHaveBeenCalledWith('/api/v1/exams/5/archive', {
+        reason: 'veraltet',
+      });
+      expect(result.archived_at).not.toBeNull();
+    });
+
+    it('sends reason=null when omitted', async () => {
+      fakeClient.post.mockResolvedValueOnce({ data: makeExam({ id: 5 }) });
+
+      await ComposerService.archiveExam(5);
+
+      expect(fakeClient.post).toHaveBeenCalledWith('/api/v1/exams/5/archive', {
+        reason: null,
+      });
+    });
+  });
+
+  describe('restoreExam', () => {
+    it('posts to /restore', async () => {
+      fakeClient.post.mockResolvedValueOnce({ data: makeExam({ id: 5 }) });
+
+      await ComposerService.restoreExam(5);
+
+      expect(fakeClient.post).toHaveBeenCalledWith('/api/v1/exams/5/restore');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // addQuestions
   // -------------------------------------------------------------------------
 

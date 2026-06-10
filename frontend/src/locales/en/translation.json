@@ -1568,7 +1568,19 @@
       "errorCreate": "Could not create exam. Please try again.",
       "errorDelete": "Could not delete exam. Please try again.",
       "deleteDialogTitle": "Delete Exam",
-      "deleteDialogMessage": "This exam will be permanently deleted."
+      "deleteDialogMessage": "This exam will be permanently deleted.",
+      "showArchived": "Show archived",
+      "archivedBadge": "Archived",
+      "archive": "Archive",
+      "restore": "Restore",
+      "deleteNoPermission": "You don't have permission to delete",
+      "deleteExported": "Exported exams cannot be deleted",
+      "deleteHasSubmissions": "An exam with submissions cannot be deleted",
+      "errorArchive": "Failed to archive the exam",
+      "errorRestore": "Failed to restore the exam",
+      "archiveDialogTitle": "Archive exam?",
+      "archiveDialogMessage": "The exam will be hidden from the active overview. You can restore it at any time.",
+      "archiveReasonLabel": "Reason (optional)"
     },
     "examMetadata": {
       "statusDraft": "Draft",
@@ -1602,7 +1614,17 @@
       "save": "Save",
       "errorSave": "Error saving. Please reload the page and try again.",
       "errorFinalize": "Finalization failed. Please try again.",
-      "errorUnfinalize": "Revert failed. Please try again."
+      "errorUnfinalize": "Revert failed. Please try again.",
+      "archivedBadge": "Archived",
+      "archive": "Archive",
+      "restore": "Restore",
+      "restoring": "Restoring …",
+      "archiving": "Archiving …",
+      "errorArchive": "Failed to archive the exam",
+      "errorRestore": "Failed to restore the exam",
+      "archiveDialogTitle": "Archive exam?",
+      "archiveDialogMessage": "The exam will be hidden from the active overview. Status, export and submissions remain unchanged.",
+      "archiveReasonLabel": "Reason (optional)"
     },
     "examQuestions": {
       "panelTitle": "Exam Questions",

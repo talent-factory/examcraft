@@ -625,10 +625,20 @@ class TestExamCRUDApi:
         assert data["title"] == "New Title"
         assert data["time_limit_minutes"] == 90
 
-    def test_delete_draft_exam(self, exam_client):
-        """DELETE /api/v1/exams/{id} deletes a draft exam (status 204)."""
+    def test_delete_draft_exam_requires_archive_first(self, exam_client):
+        """DELETE erfordert vorheriges Archivieren (TF-398): der frühere
+        One-Click-Draft-Delete entfällt. Unarchiviert → 409; nach Archivieren
+        → 204 und die Prüfung ist weg."""
         create_resp = exam_client.post("/api/v1/exams/", json={"title": "To Delete"})
         exam_id = create_resp.json()["id"]
+
+        # Ohne vorheriges Archivieren blockiert (409).
+        blocked = exam_client.delete(f"/api/v1/exams/{exam_id}")
+        assert blocked.status_code == 409
+
+        # Archivieren, dann löschen.
+        archive_resp = exam_client.post(f"/api/v1/exams/{exam_id}/archive", json={})
+        assert archive_resp.status_code == 200
 
         response = exam_client.delete(f"/api/v1/exams/{exam_id}")
         assert response.status_code == 204
@@ -1282,10 +1292,14 @@ class TestExamCRUDApiExtra(
         response = exam_client.delete("/api/v1/exams/999999")
         assert response.status_code == 404
 
-    def test_delete_non_draft_exam_returns_400(
+    def test_delete_finalized_unarchived_exam_returns_409(
         self, exam_client, exam_db, exam_institution, exam_user
     ):
-        """DELETE /api/v1/exams/{id} returns 400 when exam is finalized."""
+        """DELETE einer finalisierten, NICHT archivierten Prüfung wird mit 409
+        blockiert (TF-398: erst archivieren, dann löschen). Eine finalisierte
+        Prüfung ist — anders als eine exportierte — nach dem Archivieren
+        grundsätzlich löschbar, sofern keine Abgaben existieren; ohne
+        Archivierung greift jedoch der Guard."""
         create_resp = exam_client.post(
             "/api/v1/exams/", json={"title": "Finalized Delete"}
         )
@@ -1299,7 +1313,7 @@ class TestExamCRUDApiExtra(
         exam_client.post(f"/api/v1/exams/{exam_id}/finalize")
 
         response = exam_client.delete(f"/api/v1/exams/{exam_id}")
-        assert response.status_code == 400
+        assert response.status_code == 409
 
     def test_list_exams_with_status_filter(
         self, exam_client, exam_db, exam_institution, exam_user
