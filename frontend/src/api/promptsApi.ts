@@ -52,6 +52,20 @@ export interface PromptSearchResult {
 // Re-export Prompt type from types/prompt.ts
 export type { Prompt };
 
+/**
+ * TF-397: write payload for creating/updating prompts.
+ * Tags are sent as managed `tag_ids` (kind='prompt'), not free-text strings.
+ */
+export interface PromptWritePayload {
+  name: string;
+  content: string;
+  description?: string;
+  category: string;
+  use_case: string;
+  is_active?: boolean;
+  tag_ids: number[];
+}
+
 class PromptsApiService {
 
   async getPrompts(): Promise<Prompt[]> {
@@ -78,7 +92,7 @@ class PromptsApiService {
     return response.data;
   }
 
-  async createPrompt(prompt: Omit<Prompt, 'id' | 'version' | 'created_at' | 'updated_at' | 'usage_count'>): Promise<Prompt> {
+  async createPrompt(prompt: PromptWritePayload): Promise<Prompt> {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }
@@ -86,7 +100,7 @@ class PromptsApiService {
     return response.data;
   }
 
-  async updatePrompt(id: string, prompt: Partial<Prompt>): Promise<Prompt> {
+  async updatePrompt(id: string, prompt: Partial<PromptWritePayload>): Promise<Prompt> {
     if (!isPremiumAvailable) {
       throw new Error('Prompts API is only available in the Premium package');
     }

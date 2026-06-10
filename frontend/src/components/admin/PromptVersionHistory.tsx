@@ -229,7 +229,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
               {previewVersion?.tags.map(tag => (
-                <Chip key={tag} label={tag} size="small" />
+                <Chip key={tag.id} label={tag.name} size="small" />
               ))}
             </Box>
           </Box>

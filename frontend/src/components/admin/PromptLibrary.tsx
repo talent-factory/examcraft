@@ -109,7 +109,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
   const filteredPrompts = prompts.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    p.tags.some(tag => tag.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const getCategoryColor = (category: string) => {
@@ -298,8 +298,8 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
                           {prompt.tags.slice(0, 3).map(tag => (
                             <Chip
-                              key={tag}
-                              label={`#${tag}`}
+                              key={tag.id}
+                              label={`#${tag.name}`}
                               size="small"
                               variant="outlined"
                               sx={{ fontSize: '0.7rem' }}

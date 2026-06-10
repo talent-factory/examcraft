@@ -16,7 +16,7 @@ import PublicIcon from '@mui/icons-material/Public';
 import CheckIcon from '@mui/icons-material/Check';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { tagsApi, type Tag, type TagValue, isPendingTag } from '../../api/tagsApi';
+import { tagsApi, type Tag, type TagValue, type TagKind, isPendingTag } from '../../api/tagsApi';
 
 interface TagAutocompleteProps {
   value: TagValue[];
@@ -24,6 +24,9 @@ interface TagAutocompleteProps {
   disabled?: boolean;
   label?: string;
   deferCreation?: boolean;
+  // TF-397: which tag namespace to list/create. Defaults to 'content' so the
+  // question/document tagging behaviour is unchanged. PromptEditor passes 'prompt'.
+  kind?: TagKind;
 }
 
 interface TagCreateOption {
@@ -42,7 +45,11 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
   disabled = false,
   label = 'Tags',
   deferCreation = false,
+  kind = 'content',
 }) => {
+  // Prompt tags are global-scoped; content tags default to institution scope.
+  const createScope: 'global' | 'institution' =
+    kind === 'prompt' ? 'global' : 'institution';
   const queryClient = useQueryClient();
   const [inputValue, setInputValue] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -56,8 +63,8 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
   const pendingCreateRef = useRef(false);
 
   const { data: allTagsWithArchived = [], isLoading } = useQuery({
-    queryKey: ['tags', 'with-archived'],
-    queryFn: () => tagsApi.listTags(true),
+    queryKey: ['tags', 'with-archived', kind],
+    queryFn: () => tagsApi.listTags(true, kind),
     staleTime: 60_000,
   });
   const allTags = useMemo(() =>
@@ -69,7 +76,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
   );
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => tagsApi.createTag(name),
+    mutationFn: (name: string) => tagsApi.createTag(name, createScope, kind),
     onSuccess: (newTag) => {
       pendingCreateRef.current = false;
       if (newTag.is_archived) {

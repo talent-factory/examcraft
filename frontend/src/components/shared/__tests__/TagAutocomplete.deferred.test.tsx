@@ -79,6 +79,9 @@ describe('deferCreation=false (Standard)', () => {
     await userEvent.type(input, 'EchterTag');
     await userEvent.keyboard('{Enter}');
 
-    await waitFor(() => expect(tagsApi.createTag).toHaveBeenCalledWith('EchterTag'));
+    // TF-397: createTag now receives scope + kind ('content' by default).
+    await waitFor(() =>
+      expect(tagsApi.createTag).toHaveBeenCalledWith('EchterTag', 'institution', 'content')
+    );
   });
 });
