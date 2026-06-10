@@ -26,6 +26,10 @@ jest.mock('../TagSettingsPage', () => ({
   __esModule: true,
   default: () => <div data-testid="tag-settings" />,
 }));
+jest.mock('../CompetencyFrameworkSettingsPage', () => ({
+  __esModule: true,
+  default: () => <div data-testid="competency-frameworks-settings" />,
+}));
 
 // Mock useAuth
 const mockHasRole = jest.fn();
@@ -57,6 +61,7 @@ describe('Admin Page', () => {
       expect(screen.getByText('Audit Logs')).toBeInTheDocument();
       expect(screen.getByText('Abonnement')).toBeInTheDocument();
       expect(screen.getByText('Tag-Verwaltung')).toBeInTheDocument();
+      expect(screen.getByText('Kompetenzrahmen')).toBeInTheDocument();
       expect(screen.queryByText('Institutionen')).not.toBeInTheDocument();
       expect(screen.queryByText('Rollen & Berechtigungen')).not.toBeInTheDocument();
     });
@@ -123,6 +128,17 @@ describe('Admin Page', () => {
       fireEvent.click(screen.getByText('Rollen & Berechtigungen'));
 
       expect(screen.getByTestId('admin-tab-content-roles')).toBeInTheDocument();
+    });
+
+    it('switches to Kompetenzrahmen tab for admin', () => {
+      mockHasRole.mockReturnValue(true);
+
+      render(<Admin />);
+
+      fireEvent.click(screen.getByText('Kompetenzrahmen'));
+
+      expect(screen.getByTestId('admin-tab-content-competency-frameworks')).toBeInTheDocument();
+      expect(screen.getByTestId('competency-frameworks-settings')).toBeInTheDocument();
     });
   });
 

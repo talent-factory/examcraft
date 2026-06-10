@@ -51,6 +51,8 @@ class RAGExamRequest(BaseModel):
     context_chunks_per_question: int = Field(default=3, ge=1, le=10)
     prompt_config: Optional[Dict[str, PromptConfig]] = None
     tag_ids: List[int] = Field(default_factory=list)
+    framework_id: Optional[int] = None
+    competencies: Optional[str] = None
 
 
 class RAGExamResponse(BaseModel):

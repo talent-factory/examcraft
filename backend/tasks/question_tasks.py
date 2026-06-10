@@ -8,12 +8,15 @@ import dataclasses
 import json
 import logging
 import time
-from typing import Any, Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
 
 import sentry_sdk
 from celery.exceptions import Ignore, Reject
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, ProgrammingError, SQLAlchemyError
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 from celery_app import celery_app
 from models.question_generation_job import QuestionGenerationJob
@@ -214,6 +217,20 @@ def _safe_update_job_status(task_id: str, status: str) -> bool:
         return False
 
 
+def _coerce_ln_level(value) -> Optional[int]:
+    """LN-Stufe defensiv auf 1–4 begrenzen, sonst None (TF-400).
+
+    Quelle ist Modell-Output (Premium klemmt bereits, aber die Core-Persistenz
+    darf sich nicht darauf verlassen — Tier-Grenze). Der DB-CHECK auf
+    question_reviews.ln_level ist der Backstop.
+    """
+    try:
+        level = int(value)
+    except (TypeError, ValueError):
+        return None
+    return level if 1 <= level <= 4 else None
+
+
 def _persist_questions(
     questions: list,
     exam_id: str,
@@ -222,15 +239,28 @@ def _persist_questions(
     user_id: int,
     institution_id: Optional[int],
     tag_ids: Optional[List[int]] = None,
+    framework_id: Optional[int] = None,
+    db: Optional["Session"] = None,
 ) -> List[int]:
     """
     Persistiert generierte Fragen in question_reviews mit Status 'pending'.
     Erstellt ReviewHistory-Einträge für den Audit-Trail.
 
+    Args:
+        framework_id: Kompetenzrahmen (TF-400). Dessen Kompetenzen werden EINMAL
+            als {code: id}-Map vorgeladen, um pro Frage competency_code →
+            competency_id aufzulösen (kein N+1). None → keine Auflösung.
+        db: Optionale injizierte Session (nur für Tests). Wenn None, öffnet die
+            Funktion ihre eigene Session via SessionLocal und schliesst sie im
+            finally. Eine injizierte Session wird NICHT geschlossen — ihr
+            Lifecycle gehört dem Aufrufer. Produktionsverhalten bleibt
+            unverändert (db wird nur in Tests gesetzt).
+
     Returns:
         Liste der generierten QuestionReview-IDs
     """
     from database import SessionLocal
+    from models.competency import Competency
     from models.document import Document
     from models.question_review import (
         QuestionReview,
@@ -240,8 +270,19 @@ def _persist_questions(
     )
     from utils.question_options import normalize_options
 
-    db = SessionLocal()
+    owns_session = db is None
+    if owns_session:
+        db = SessionLocal()
     try:
+        # Kompetenz-Code → ID EINMAL vorladen (kein N+1 in der Fragen-Schleife).
+        code_to_id: Dict[str, int] = {}
+        if framework_id:
+            code_to_id = {
+                c.code: c.id
+                for c in db.query(Competency).filter(
+                    Competency.framework_id == framework_id
+                )
+            }
         reviews = []
         for question in questions:
             # explanation can be str, list, or dict — Premium RAG open_ended rubrics
@@ -306,6 +347,28 @@ def _persist_questions(
             else:
                 correct_answer_text = None
 
+            # TF-400: Kompetenz-Zuordnung. competency_code gegen die vorgeladene
+            # Framework-Map auflösen (getattr hält die Tier-Grenze zur
+            # Premium-Datenklasse sauber). Ein nicht-leerer Code ohne Treffer
+            # (halluziniert oder abweichendes rendered_text-Heading-Format) wird
+            # geloggt — analog source_document_unmatched —, damit ein totaler
+            # Tagging-Ausfall nicht still bleibt. ln_level defensiv auf 1–4.
+            raw_competency_code = getattr(question, "competency_code", None)
+            competency_id = (
+                code_to_id.get(raw_competency_code) if raw_competency_code else None
+            )
+            if raw_competency_code and competency_id is None:
+                logger.warning(
+                    "persist_questions.competency_code_unmatched "
+                    "framework_id=%s code=%r — Modell lieferte einen "
+                    "competency_code ohne Treffer in der Framework-Map; "
+                    "competency_id bleibt NULL (rendered_text-Heading-Format vs. "
+                    "competency_parser prüfen oder halluzinierter Code)",
+                    framework_id,
+                    raw_competency_code,
+                )
+            ln_level = _coerce_ln_level(getattr(question, "ln_level", None))
+
             question_review = QuestionReview(
                 question_text=question.question_text,
                 question_type=question.question_type,
@@ -323,6 +386,12 @@ def _persist_questions(
                 created_by=user_id,
                 institution_id=institution_id,
                 bloom_level=getattr(question, "bloom_level", None),
+                # TF-400: Kompetenz-Zuordnung. competency_code wird gegen die
+                # vorgeladene Framework-Map aufgelöst; ein halluzinierter/
+                # competency_id/ln_level oben aufgelöst (Warning bei Code-Miss,
+                # ln_level auf 1–4 begrenzt).
+                competency_id=competency_id,
+                ln_level=ln_level,
                 estimated_time_minutes=TIME_ESTIMATES.get(
                     (question.question_type, question.difficulty), 3
                 ),
@@ -432,10 +501,17 @@ def _persist_questions(
         db.commit()
         return review_ids
     except Exception:
-        db.rollback()
+        # Nur eine selbst eröffnete Session zurückrollen — eine injizierte
+        # Session gehört dem Aufrufer; ein rollback() würde dessen Transaktion
+        # überraschend mitreissen. In Produktion gilt owns_session=True, also
+        # bleibt das Rollback-Verhalten bei Fehlern unverändert.
+        if owns_session:
+            db.rollback()
         raise
     finally:
-        db.close()
+        # Eine injizierte Test-Session gehört dem Aufrufer — nicht schliessen.
+        if owns_session:
+            db.close()
 
 
 @celery_app.task(
@@ -551,6 +627,7 @@ def generate_questions_task(
             user_id=int(user_id),
             institution_id=institution_id,
             tag_ids=rag_request.tag_ids or [],
+            framework_id=rag_request.framework_id,
         )
         logger.info(
             f"Fragen persistiert: {len(review_question_ids)} Reviews für Exam {result.exam_id}"

@@ -56,6 +56,25 @@ def _serialize_tag(tag: Tag, usage_count: int) -> dict:
     }
 
 
+def _serialize_competency(question: QuestionReview) -> dict | None:
+    """TF-400: Brief der geprüften Handlungskompetenz (HK) für die Anzeige.
+
+    None, wenn der Frage keine Kompetenz zugeordnet ist (Altbestand oder Code
+    ohne Treffer). ``module_code`` stammt aus dem zugehörigen Framework.
+    """
+    competency = question.competency
+    if competency is None:
+        return None
+    framework = competency.framework
+    return {
+        "id": competency.id,
+        "code": competency.code,
+        "title": competency.title,
+        "framework_id": competency.framework_id,
+        "module_code": framework.module_code if framework else None,
+    }
+
+
 def _question_to_dict(
     question: QuestionReview, counts: dict[int, int] | None = None
 ) -> dict:
@@ -88,40 +107,18 @@ def _question_to_dict(
         "created_at": question.created_at,
         "updated_at": question.updated_at,
         "tags": [_serialize_tag(t, counts.get(t.id, 0)) for t in question.tags],
+        # TF-400: geprüfte Handlungskompetenz + LN-Stufe (Anzeige in der
+        # Review-Queue/Detail). None für Fragen ohne HK-Zuordnung.
+        "competency_id": question.competency_id,
+        "ln_level": question.ln_level,
+        "competency": _serialize_competency(question),
     }
 
 
 def _attach_reviewer_info(question: QuestionReview, db: Session) -> dict:
     """Convert QuestionReview to dict with reviewer_info joined."""
     counts = _live_tag_counts(db, [t.id for t in question.tags])
-    data = {
-        "id": question.id,
-        "question_text": question.question_text,
-        "question_type": question.question_type,
-        "options": question.options,
-        "correct_answer": question.correct_answer,
-        "explanation": question.explanation,
-        "difficulty": question.difficulty,
-        "topic": question.topic,
-        "language": question.language,
-        "source_chunks": question.source_chunks,
-        "source_documents": question.source_documents,
-        "confidence_score": question.confidence_score,
-        "bloom_level": question.bloom_level,
-        "estimated_time_minutes": question.estimated_time_minutes,
-        "quality_tier": question.quality_tier,
-        "generation_metadata": question.generation_metadata,
-        "review_status": question.review_status,
-        "reviewed_by": question.reviewed_by,
-        "reviewed_at": question.reviewed_at,
-        "exam_id": question.exam_id,
-        "archived_at": question.archived_at,
-        "archived_by": question.archived_by,
-        "archive_reason": question.archive_reason,
-        "created_at": question.created_at,
-        "updated_at": question.updated_at,
-        "tags": [_serialize_tag(t, counts.get(t.id, 0)) for t in question.tags],
-    }
+    data = _question_to_dict(question, counts)
     if question.reviewed_by:
         reviewer = db.query(User).filter(User.id == question.reviewed_by).first()
         if reviewer:
@@ -220,6 +217,22 @@ class ReviewerInfo(BaseModel):
         from_attributes = True
 
 
+class CompetencyBrief(BaseModel):
+    """TF-400: schlanke Sicht auf die geprüfte Handlungskompetenz für die
+
+    Frage-Anzeige (Code + Titel + Modul), ohne den vollen Deskriptor-Baum.
+    """
+
+    id: int
+    code: str
+    title: str
+    framework_id: int
+    module_code: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class QuestionReviewResponse(BaseModel):
     """Response Model für Question Review"""
 
@@ -236,6 +249,11 @@ class QuestionReviewResponse(BaseModel):
     source_documents: Optional[List[str]]
     confidence_score: float
     bloom_level: Optional[int]
+    # TF-400: geprüfte Handlungskompetenz (HK) + LN-Stufe (1-4, distinkt von
+    # bloom_level). ``competency`` ist der schlanke Brief für die Anzeige.
+    competency_id: Optional[int] = None
+    ln_level: Optional[int] = Field(None, ge=1, le=4)
+    competency: Optional[CompetencyBrief] = None
     estimated_time_minutes: Optional[int]
     quality_tier: Optional[str]
     generation_metadata: Optional[GenerationMetadata] = None

@@ -28,7 +28,8 @@
       "tagSettings": "Tag Management",
       "moodleConnection": "Moodle connection",
       "pricing": "Pricing",
-      "profile": "Profile"
+      "profile": "Profile",
+      "competencyFrameworks": "Competency Frameworks"
     }
   },
   "language": {
@@ -1370,6 +1371,8 @@
       "errorDelete": "Deletion failed"
     },
     "questionCard": {
+      "competencyTooltip": "Competency: {{title}}",
+      "lnLevelShort": "LN {{level}}",
       "questionNumber": "Question #{{id}}",
       "reviewer": "Reviewer: {{name}}",
       "options": "Options:",
@@ -1403,6 +1406,9 @@
       "deleteBtn": "Delete permanently"
     },
     "questionDetail": {
+      "competency": "Competency",
+      "competencyModule": "Module {{module}}",
+      "lnLevel": "LN level {{level}}",
       "back": "Back",
       "backToQueue": "Back to Queue",
       "questionNotFound": "Question not found",
@@ -1900,7 +1906,11 @@
       "goToReview": "Go to Review Workflow",
       "createNewExam": "Create New Exam",
       "errorTagCreation": "Some tags could not be created: {{names}}",
-      "tagsLabel": "Tags (optional)"
+      "tagsLabel": "Tags (optional)",
+      "competencyFrameworkLabel": "Competency framework / module (optional)",
+      "competencyFrameworkNone": "No module",
+      "competenciesOverrideLabel": "Competencies (editable)",
+      "competenciesOverrideHelper": "Injected verbatim as {{ competencies }} into generation."
     },
     "ragExamDisplay": {
       "questions": "{{count}} Questions",
@@ -2126,6 +2136,41 @@
     "feedback": {
       "helpful": "Was this helpful?",
       "thanks": "Thanks for your feedback!"
+    }
+  },
+  "competencyFrameworks": {
+    "title": "Competency Frameworks",
+    "subtitle": "Manage action competencies per module. The full text is injected verbatim into question generation.",
+    "new": "New Framework",
+    "editTitle": "Edit Framework",
+    "empty": "No competency frameworks yet.",
+    "edit": "Edit",
+    "archive": "Archive",
+    "unarchive": "Reactivate",
+    "archivedBadge": "Archived",
+    "errorLoad": "Could not load competency frameworks.",
+    "errorCreate": "Could not create framework.",
+    "errorUpdate": "Could not save framework.",
+    "errorArchive": "Action failed.",
+    "filter": {
+      "all": "All",
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "visibility": {
+      "private": "Private",
+      "institution": "Institution"
+    },
+    "form": {
+      "name": "Name",
+      "moduleCode": "Module code",
+      "description": "Description",
+      "renderedText": "Competencies full text",
+      "renderedTextHelper": "Injected verbatim as {{ competencies }} into generation.",
+      "visibility": "Visibility",
+      "language": "Language",
+      "save": "Save",
+      "cancel": "Cancel"
     }
   }
 }

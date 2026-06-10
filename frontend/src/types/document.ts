@@ -183,6 +183,10 @@ export interface RAGExamRequest {
     true_false?: PromptConfig;
   };
   tag_ids?: number[];
+  /** TF-400: Kompetenzrahmen-ID; Backend lädt rendered_text, wenn kein Override gesetzt ist. */
+  framework_id?: number;
+  /** TF-400: Editierter Kompetenzen-Volltext; gewinnt über framework_id (verbatim {{ competencies }}). */
+  competencies_override?: string;
 }
 
 export interface RAGQuestion {

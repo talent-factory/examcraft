@@ -11,11 +11,12 @@ import RoleManagementPage from '../components/admin/RoleManagementPage';
 import SubscriptionTierOverview from '../components/admin/SubscriptionTierOverview';
 import HelpFeedbackQueue from '../components/admin/HelpFeedbackQueue';
 import TagSettingsPage from './TagSettingsPage';
+import CompetencyFrameworkSettingsPage from './CompetencyFrameworkSettingsPage';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/auth';
 import AdminGradingSchemes from './AdminGradingSchemes';
 
-type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'grading-schemes';
+type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'competency-frameworks' | 'grading-schemes';
 
 interface TabConfig {
   key: AdminTab;
@@ -37,6 +38,7 @@ export const Admin: React.FC = () => {
     { key: 'audit', label: t('pages.admin.tabAudit'), visible: isAdmin },
     { key: 'subscription', label: t('pages.admin.tabSubscription'), visible: isAdmin },
     { key: 'tags', label: t('nav.sidebar.tagSettings', 'Tag-Verwaltung'), visible: isAdmin },
+    { key: 'competency-frameworks', label: t('nav.sidebar.competencyFrameworks', 'Kompetenzrahmen'), visible: isAdmin },
     { key: 'grading-schemes', label: t('pages.admin.tabGradingSchemes'), visible: canManageGradingSchemes },
     { key: 'help-feedback', label: 'Help Feedback', visible: isSuperuser },
   ].filter((t): t is TabConfig => t.visible);
@@ -100,6 +102,11 @@ export const Admin: React.FC = () => {
         {effectiveTab === 'tags' && (
           <div data-testid="admin-tab-content-tags">
             <TagSettingsPage />
+          </div>
+        )}
+        {effectiveTab === 'competency-frameworks' && (
+          <div data-testid="admin-tab-content-competency-frameworks">
+            <CompetencyFrameworkSettingsPage />
           </div>
         )}
         {effectiveTab === 'grading-schemes' && (

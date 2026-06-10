@@ -18,6 +18,9 @@ export * from './review';
 // Prompt Types
 export * from './prompt';
 
+// Competency Framework Types (TF-400)
+export * from './competencyFramework';
+
 // RBAC Types - Selective export to avoid conflicts with auth.ts
 export type {
   Feature,

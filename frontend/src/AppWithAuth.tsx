@@ -40,6 +40,7 @@ import { AppErrorBoundary } from './components/ErrorBoundary';
 import QuestionReviewDetail from './components/QuestionReviewDetail';
 import GenerationTasksBar from './components/GenerationTasksBar';
 import TagSettingsPage from './pages/TagSettingsPage';
+import CompetencyFrameworkSettingsPage from './pages/CompetencyFrameworkSettingsPage';
 import HelpWidget from './components/help/HelpWidget';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
@@ -336,6 +337,18 @@ export const AppWithAuth: React.FC = () => {
                     <PermissionGuard requiredPermissions={['create_questions']}>
                       <AppLayout>
                         <TagSettingsPage />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings/competency-frameworks"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['create_questions']}>
+                      <AppLayout>
+                        <CompetencyFrameworkSettingsPage />
                       </AppLayout>
                     </PermissionGuard>
                   </ProtectedRoute>

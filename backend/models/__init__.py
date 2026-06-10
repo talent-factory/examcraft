@@ -47,6 +47,7 @@ from models.email_event import (
 from models.exam import Exam, ExamQuestion, ExamStatus
 from models.tag import Tag, QuestionTag
 from models.tag_merge_log import TagMergeLog
+from models.competency import CompetencyFramework, Competency
 from models.grading_scheme import GradingScheme
 from models.student import Student, StudentClass, StudentClassMembership
 from models.submission import (
@@ -99,6 +100,9 @@ __all__ = [
     "Tag",
     "QuestionTag",
     "TagMergeLog",
+    # Competency frameworks (TF-400)
+    "CompetencyFramework",
+    "Competency",
     # Grading schemes (system + per-institution)
     "GradingScheme",
     # Student master data

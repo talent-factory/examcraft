@@ -43,6 +43,7 @@ import {
   Archive,
   Unarchive,
   DeleteForever,
+  Verified,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -311,6 +312,30 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
                 label={getBloomLevelLabel(question.bloom_level)}
                 size="small"
                 variant="outlined"
+              />
+            </Tooltip>
+          )}
+
+          {/* TF-400: geprüfte Handlungskompetenz (HK) + LN-Stufe */}
+          {question.competency && (
+            <Tooltip
+              title={t('components.questionCard.competencyTooltip', {
+                title: question.competency.title,
+              })}
+            >
+              <Chip
+                icon={<Verified />}
+                label={
+                  question.ln_level
+                    ? `${question.competency.code} · ${t(
+                        'components.questionCard.lnLevelShort',
+                        { level: question.ln_level }
+                      )}`
+                    : question.competency.code
+                }
+                size="small"
+                variant="outlined"
+                color="info"
               />
             </Tooltip>
           )}

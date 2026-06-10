@@ -107,6 +107,11 @@ class TestQuestionReviewAPI:
         mock.created_at = datetime.now()
         mock.updated_at = datetime.now()
         mock.tags = []  # TF-320: route iterates q.tags — must be a real iterable
+        # TF-400: HK-Felder explizit None — sonst liefert der Mock Auto-Attribute,
+        # die Pydantic (Optional[int] / CompetencyBrief) nicht validieren kann.
+        mock.competency_id = None
+        mock.ln_level = None
+        mock.competency = None
         return mock
 
     # ==================== GET /api/v1/questions/review ====================
@@ -168,6 +173,83 @@ class TestQuestionReviewAPI:
         assert body["generation_metadata"]["prompt_name"] == "custom_mcq"
         assert body["generation_metadata"]["prompt_version"] == 2
         assert body["generation_metadata"]["is_default_template"] is False
+        # TF-400: Frage ohne HK-Zuordnung serialisiert competency/ln_level als
+        # None — Altbestand bricht nicht.
+        assert body["competency"] is None
+        assert body["competency_id"] is None
+        assert body["ln_level"] is None
+
+    def test_get_question_review_includes_competency(
+        self, auth_client, mock_question_review
+    ):
+        """TF-400: ist der Frage eine Handlungskompetenz zugeordnet, liefert die
+        Detail-Response den verschachtelten competency-Brief + LN-Stufe."""
+        client, mock_db = auth_client
+
+        mock_question_review.comments = []
+        mock_question_review.history = []
+
+        framework = Mock()
+        framework.module_code = "B"
+        competency = Mock()
+        competency.id = 42
+        competency.code = "B3"
+        competency.title = "Wirkungsvoll kommunizieren"
+        competency.framework_id = 7
+        competency.framework = framework
+        mock_question_review.competency = competency
+        mock_question_review.competency_id = 42
+        mock_question_review.ln_level = 2
+
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.first.return_value = mock_question_review
+        mock_db.query.return_value = mock_query
+
+        response = client.get("/api/v1/questions/1/review")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["competency_id"] == 42
+        assert body["ln_level"] == 2
+        assert body["competency"]["code"] == "B3"
+        assert body["competency"]["title"] == "Wirkungsvoll kommunizieren"
+        assert body["competency"]["framework_id"] == 7
+        assert body["competency"]["module_code"] == "B"
+
+    def test_review_queue_serializes_competency(
+        self, auth_client, mock_question_review
+    ):
+        """TF-400: auch die Queue-Liste reicht den competency-Brief durch."""
+        client, mock_db = auth_client
+
+        framework = Mock()
+        framework.module_code = "B"
+        competency = Mock()
+        competency.id = 42
+        competency.code = "B3"
+        competency.title = "Wirkungsvoll kommunizieren"
+        competency.framework_id = 7
+        competency.framework = framework
+        mock_question_review.competency = competency
+        mock_question_review.competency_id = 42
+        mock_question_review.ln_level = 4
+
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.offset.return_value = mock_query
+        mock_query.all.return_value = [mock_question_review]
+        mock_query.count.return_value = 1
+        mock_db.query.return_value = mock_query
+
+        response = client.get("/api/v1/questions/review")
+
+        assert response.status_code == 200
+        item = response.json()["questions"][0]
+        assert item["competency"]["code"] == "B3"
+        assert item["ln_level"] == 4
 
     def test_get_question_review_not_found(self, auth_client):
         """Test Question Review nicht gefunden"""

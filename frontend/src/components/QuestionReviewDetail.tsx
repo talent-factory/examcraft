@@ -347,6 +347,40 @@ const QuestionReviewDetail: React.FC = () => {
                 <MarkdownRenderer content={question.explanation} variant="compact" />
               </>
             )}
+            {/* TF-400: geprüfte Handlungskompetenz (HK) + LN-Stufe, read-only */}
+            {question.competency && (
+              <>
+                <Divider />
+                <Typography variant="subtitle2" color="text.secondary">
+                  {t('components.questionDetail.competency')}:
+                </Typography>
+                <Typography variant="body2">
+                  <strong>{question.competency.code}</strong>
+                  {question.competency.title ? ` — ${question.competency.title}` : ''}
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                  {question.competency.module_code && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={t('components.questionDetail.competencyModule', {
+                        module: question.competency.module_code,
+                      })}
+                    />
+                  )}
+                  {question.ln_level && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      color="info"
+                      label={t('components.questionDetail.lnLevel', {
+                        level: question.ln_level,
+                      })}
+                    />
+                  )}
+                </Box>
+              </>
+            )}
           </Box>
         )}
 
