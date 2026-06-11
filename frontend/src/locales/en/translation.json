@@ -1723,7 +1723,20 @@
       "tagFilterClear": "Clear all",
       "tagFilterSearch": "Search tag…",
       "tagFilterNoResults": "No tags found",
-      "tagsShowLess": "show less"
+      "tagsShowLess": "show less",
+      "preview": "Preview",
+      "previewAria": "Open question preview",
+      "previewHint": "Double-click to preview",
+      "previewTitle": "Question preview",
+      "previewError": "Could not load the question.",
+      "previewBloom": "Bloom {{level}}",
+      "previewLn": "LN {{level}}",
+      "previewModelAnswer": "Model answer",
+      "previewExplanation": "Explanation",
+      "previewCompetency": "Competency",
+      "previewSource": "Source document",
+      "previewClose": "Close",
+      "previewRemove": "Remove"
     }
   },
   "profile": {

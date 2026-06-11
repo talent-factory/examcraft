@@ -24,6 +24,8 @@ interface ExamQuestionsPanelProps {
   onRemove: (eqId: number) => void;
   onUpdatePoints: (eqId: number, points: number) => void;
   onReorder: (order: { id: number; position: number }[]) => void;
+  /** TF-405: open the read-only preview modal for a question. */
+  onPreview: (questionId: number) => void;
 }
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -38,6 +40,7 @@ const ExamQuestionsPanel: React.FC<ExamQuestionsPanelProps> = ({
   onRemove,
   onUpdatePoints,
   onReorder,
+  onPreview,
 }) => {
   const { t } = useTranslation();
   const sensors = useSensors(
@@ -96,6 +99,7 @@ const ExamQuestionsPanel: React.FC<ExamQuestionsPanelProps> = ({
                   disabled={disabled}
                   onRemove={onRemove}
                   onUpdatePoints={onUpdatePoints}
+                  onPreview={onPreview}
                 />
               ))}
             </div>
@@ -121,6 +125,7 @@ interface SortableExamQuestionItemProps {
   disabled: boolean;
   onRemove: (eqId: number) => void;
   onUpdatePoints: (eqId: number, points: number) => void;
+  onPreview: (questionId: number) => void;
 }
 
 const SortableExamQuestionItem: React.FC<SortableExamQuestionItemProps> = ({
@@ -129,6 +134,7 @@ const SortableExamQuestionItem: React.FC<SortableExamQuestionItemProps> = ({
   disabled,
   onRemove,
   onUpdatePoints,
+  onPreview,
 }) => {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -180,7 +186,11 @@ const SortableExamQuestionItem: React.FC<SortableExamQuestionItemProps> = ({
         </span>
 
         {/* Question content */}
-        <div className="flex-1 min-w-0">
+        <div
+          className="flex-1 min-w-0"
+          onDoubleClick={() => onPreview(question.question_id)}
+          title={t('composer.questionPool.previewHint')}
+        >
           {question.review_status !== 'approved' && (
             <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded mb-1">
               &#9888; {t('composer.examQuestions.notApproved')}
@@ -217,6 +227,20 @@ const SortableExamQuestionItem: React.FC<SortableExamQuestionItemProps> = ({
           title={t('composer.examQuestions.pointsLabel')}
         />
         <span className="text-xs text-gray-400 flex-shrink-0">{t('composer.examQuestions.pkt')}</span>
+
+        {/* Preview (read-only) — always available, also for finalised exams */}
+        <button
+          type="button"
+          onClick={() => onPreview(question.question_id)}
+          aria-label={t('composer.questionPool.previewAria')}
+          title={t('composer.questionPool.preview')}
+          className="text-gray-400 hover:text-indigo-600 transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-300 rounded"
+        >
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12s3.75-7.5 9.75-7.5 9.75 7.5 9.75 7.5-3.75 7.5-9.75 7.5S2.25 12 2.25 12z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
 
         {/* Remove button */}
         {!disabled && (

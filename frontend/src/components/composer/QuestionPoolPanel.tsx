@@ -11,7 +11,11 @@ import {
   Button,
 } from '@mui/material';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
-import type { ApprovedQuestion, AutoFillRequest, AutoComposePreview } from '../../types/composer';
+import type {
+  ApprovedQuestion,
+  AutoFillRequest,
+  AutoComposePreview,
+} from '../../types/composer';
 import { isAutoComposePreview } from '../../types/composer';
 
 interface QuestionPoolPanelProps {
@@ -21,6 +25,8 @@ interface QuestionPoolPanelProps {
   disabled: boolean;
   onInvalidate: () => void;
   defaultDocumentIds?: number[];
+  /** TF-405: open the read-only preview modal (owned by the parent). */
+  onPreview: (questionId: number) => void;
 }
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -53,6 +59,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   disabled,
   onInvalidate,
   defaultDocumentIds = [],
+  onPreview,
 }) => {
   const { t } = useTranslation();
 
@@ -682,6 +689,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
               isAdded={addedQuestionIds.has(q.id)}
               disabled={disabled}
               onAdd={() => onAddQuestions([q.id])}
+              onPreview={() => onPreview(q.id)}
             />
           ))
         )}
@@ -924,11 +932,12 @@ interface PoolQuestionCardProps {
   isAdded: boolean;
   disabled: boolean;
   onAdd: () => void;
+  onPreview: () => void;
 }
 
 const TAG_LIMIT = 4;
 
-const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({ question, isAdded, disabled, onAdd }) => {
+const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({ question, isAdded, disabled, onAdd, onPreview }) => {
   const { t } = useTranslation();
   const [tagsExpanded, setTagsExpanded] = useState(false);
 
@@ -960,13 +969,34 @@ const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({ question, isAdded, 
 
   return (
     <div
+      onDoubleClick={onPreview}
+      title={t('composer.questionPool.previewHint')}
       className={`p-3 rounded-lg border transition-colors ${
         isAdded
           ? 'bg-gray-50 border-gray-200 opacity-60'
           : 'bg-white border-gray-200 hover:border-gray-300'
       }`}
     >
-      <p className="text-[15px] font-medium text-gray-800 line-clamp-2 mb-3">{question.question_text}</p>
+      <div className="flex items-start gap-2 mb-3">
+        <p className="flex-1 min-w-0 text-[15px] font-medium text-gray-800 line-clamp-2">
+          {question.question_text}
+        </p>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreview();
+          }}
+          aria-label={t('composer.questionPool.previewAria')}
+          title={t('composer.questionPool.preview')}
+          className="shrink-0 p-1 -m-1 text-gray-400 hover:text-indigo-600 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        >
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12s3.75-7.5 9.75-7.5 9.75 7.5 9.75 7.5-3.75 7.5-9.75 7.5S2.25 12 2.25 12z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
 
       {/* Zwei-Spalten: links (Badges + Tags), rechts (Button) */}
       <div className="flex gap-2 items-start">

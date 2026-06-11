@@ -82,6 +82,7 @@
     "documents_tag_owner_only": "Seul le propriétaire peut modifier les étiquettes de ce document.",
     "documents_tag_failed": "Impossible d'enregistrer les étiquettes du document.",
     "exams_not_found": "Examen introuvable",
+    "approved_question_not_found": "Question introuvable",
     "exams_must_be_draft": "L'examen doit être en état de brouillon",
     "exams_conflict": "Conflit lors de l'enregistrement de l'examen",
     "exams_db_error": "Erreur de base de données lors du traitement de l'examen",

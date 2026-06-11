@@ -82,6 +82,7 @@
     "documents_tag_owner_only": "Nur der Besitzer darf die Tags dieses Dokuments ändern.",
     "documents_tag_failed": "Tags konnten nicht gespeichert werden.",
     "exams_not_found": "Prüfung nicht gefunden",
+    "approved_question_not_found": "Frage nicht gefunden",
     "exams_must_be_draft": "Prüfung muss im Entwurfsstatus sein",
     "exams_conflict": "Konflikt beim Speichern der Prüfung",
     "exams_db_error": "Datenbankfehler beim Verarbeiten der Prüfung",

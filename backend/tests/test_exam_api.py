@@ -2817,3 +2817,184 @@ class TestAutoFillDocumentFilter:
         added_ids = [eq["question_id"] for eq in response.json()["questions"]]
         assert q_linked.id in added_ids
         assert q_other.id not in added_ids
+
+
+# ---------------------------------------------------------------------------
+# TF-405: GET /approved-questions/{id} — read-only Detail für die Vorschau
+# ---------------------------------------------------------------------------
+
+
+class TestApprovedQuestionDetail(
+    _make_exam_test_class_fixtures("tf405-aqdetail-uni", "tf405-aqdetail@test.com")
+):
+    """Detail endpoint: marks the correct solution, exposes explanation/source/LN,
+    is tenant-scoped, and never leaks foreign institutions."""
+
+    def _make_question(self, db, institution_id, user_id, **overrides):
+        fields = dict(
+            question_text="Welcher Sortieralgorithmus ist O(n log n)?",
+            question_type="multiple_choice",
+            difficulty="medium",
+            topic="Sortieren",
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            options=["Bubblesort", "Heapsort", "Selectionsort", "Insertionsort"],
+            correct_answer="Heapsort",
+            explanation="Heapsort garantiert O(n log n) im Worst Case.",
+            bloom_level=2,
+            ln_level=3,
+            estimated_time_minutes=4,
+            institution_id=institution_id,
+            created_by=user_id,
+        )
+        fields.update(overrides)
+        q = QuestionReview(**fields)
+        db.add(q)
+        db.commit()
+        db.refresh(q)
+        return q
+
+    def test_detail_marks_correct_option_and_exposes_explanation(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """Happy path: full text, correct option flagged, explanation + LN/Bloom."""
+        q = self._make_question(exam_db, exam_institution.id, exam_user.id)
+
+        response = exam_client.get(f"/api/v1/exams/approved-questions/{q.id}")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["id"] == q.id
+        assert data["question_text"] == q.question_text
+        assert data["correct_answer"] == "Heapsort"
+        assert data["explanation"] == "Heapsort garantiert O(n log n) im Worst Case."
+        assert data["bloom_level"] == 2
+        assert data["ln_level"] == 3
+        assert data["estimated_time_minutes"] == 4
+
+        # Exactly the correct option is flagged.
+        correct = [o for o in data["options"] if o["is_correct"]]
+        assert len(correct) == 1
+        assert correct[0]["text"] == "Heapsort"
+        assert {o["text"] for o in data["options"]} == set(q.options)
+        assert all(
+            o["is_correct"] == (o["text"] == "Heapsort") for o in data["options"]
+        )
+
+    def test_detail_open_ended_returns_musterloesung_without_options(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """Open questions carry the model solution in correct_answer, no options."""
+        q = self._make_question(
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            question_type="open_ended",
+            options=None,
+            correct_answer="Eine Musterlösung in Prosa.",
+        )
+
+        response = exam_client.get(f"/api/v1/exams/approved-questions/{q.id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["options"] == []
+        assert data["correct_answer"] == "Eine Musterlösung in Prosa."
+
+    def test_detail_includes_source_documents(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """Linked source documents are surfaced via the join table."""
+        from models.document import Document
+        from models.question_review import QuestionSourceDocument
+
+        q = self._make_question(exam_db, exam_institution.id, exam_user.id)
+        doc = Document(
+            filename="algorithmen.pdf",
+            original_filename="algorithmen.pdf",
+            file_path="/tmp/algorithmen.pdf",
+            file_size=2048,
+            mime_type="application/pdf",
+            institution_id=exam_institution.id,
+            user_id=exam_user.id,
+        )
+        exam_db.add(doc)
+        exam_db.flush()
+        exam_db.add(QuestionSourceDocument(question_id=q.id, document_id=doc.id))
+        exam_db.commit()
+
+        response = exam_client.get(f"/api/v1/exams/approved-questions/{q.id}")
+        assert response.status_code == 200
+        docs = response.json()["source_documents"]
+        assert any(d["id"] == doc.id for d in docs)
+
+    def test_detail_404_for_missing(self, exam_client):
+        """Unknown id → 404."""
+        response = exam_client.get("/api/v1/exams/approved-questions/999999")
+        assert response.status_code == 404
+
+    def test_detail_previews_non_approved_question(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """A non-approved question in the tenant is previewable — eine Frage, die in
+        einer Prüfung liegt, kann nachträglich auf ``edited``/``pending`` wechseln und
+        muss trotzdem vorschaubar bleiben (Freigabe-Gating gilt nur für die Liste)."""
+        q = self._make_question(
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            review_status=ReviewStatus.PENDING.value,
+        )
+        response = exam_client.get(f"/api/v1/exams/approved-questions/{q.id}")
+        assert response.status_code == 200
+        assert response.json()["id"] == q.id
+
+    def test_detail_previews_archived_question(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """An archived question already in an exam stays previewable (read-only)."""
+        from datetime import datetime, timezone
+
+        q = self._make_question(
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            archived_at=datetime.now(timezone.utc),
+        )
+        response = exam_client.get(f"/api/v1/exams/approved-questions/{q.id}")
+        assert response.status_code == 200
+        assert response.json()["id"] == q.id
+
+    def test_detail_tenant_isolation_returns_404(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """A question of a foreign institution is indistinguishable from a missing
+        one (404, not 403) — no existence leak across tenants."""
+        from utils.auth_utils import get_current_user
+
+        q = self._make_question(exam_db, exam_institution.id, exam_user.id)
+
+        # Non-superuser in a different institution must not see the question.
+        foreign_user = _make_mock_user(
+            institution_id=exam_institution.id + 99999, user_id=exam_user.id + 99999
+        )
+        foreign_user.is_superuser = False
+        app.dependency_overrides[get_current_user] = lambda: foreign_user
+
+        response = exam_client.get(f"/api/v1/exams/approved-questions/{q.id}")
+        assert response.status_code == 404
+
+    def test_list_endpoint_stays_slim(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """TF-405 contract: the 50-row list must NOT carry the heavy detail fields."""
+        self._make_question(exam_db, exam_institution.id, exam_user.id)
+
+        response = exam_client.get("/api/v1/exams/approved-questions")
+        assert response.status_code == 200
+        questions = response.json()["questions"]
+        assert questions, "expected at least one approved question"
+        for q in questions:
+            assert "correct_answer" not in q
+            assert "explanation" not in q
+            assert "source_documents" not in q
+            assert "competency" not in q

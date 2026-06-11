@@ -82,6 +82,7 @@
     "documents_tag_owner_only": "Only the owner may change this document's tags.",
     "documents_tag_failed": "Could not save the document tags.",
     "exams_not_found": "Exam not found",
+    "approved_question_not_found": "Question not found",
     "exams_must_be_draft": "Exam must be in draft status",
     "exams_conflict": "Conflict while saving the exam",
     "exams_db_error": "Database error while processing the exam",

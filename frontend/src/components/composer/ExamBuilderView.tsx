@@ -7,6 +7,7 @@ import ExamMetadataBar from './ExamMetadataBar';
 import QuestionPoolPanel from './QuestionPoolPanel';
 import ExamQuestionsPanel from './ExamQuestionsPanel';
 import ExportDialog from './ExportDialog';
+import QuestionPreviewModal from './QuestionPreviewModal';
 
 interface ExamBuilderViewProps {
   examId: number;
@@ -18,6 +19,8 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
   const queryClient = useQueryClient();
   const [exportOpen, setExportOpen] = useState(false);
   const [builderError, setBuilderError] = useState<string | null>(null);
+  // TF-405: read-only preview modal, shared by both panels (left pool + right exam).
+  const [previewQuestionId, setPreviewQuestionId] = useState<number | null>(null);
 
   const { data: exam, isLoading, isError } = useQuery({
     queryKey: ['exam', examId],
@@ -126,6 +129,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
             disabled={!isDraft}
             onInvalidate={invalidateExam}
             defaultDocumentIds={exam.default_document_ids ?? []}
+            onPreview={setPreviewQuestionId}
           />
         </div>
 
@@ -139,6 +143,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
               updatePointsMutation.mutate({ eqId, points })
             }
             onReorder={(order) => reorderMutation.mutate(order)}
+            onPreview={setPreviewQuestionId}
           />
         </div>
       </div>
@@ -150,6 +155,32 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
         examId={examId}
         examTitle={exam.title}
         hasQuestions={exam.questions.length > 0}
+      />
+
+      {/* TF-405: read-only preview modal, shared by both panels */}
+      <QuestionPreviewModal
+        questionId={previewQuestionId}
+        isAdded={previewQuestionId !== null && addedQuestionIds.has(previewQuestionId)}
+        canEdit={isDraft}
+        onAdd={() => {
+          if (previewQuestionId !== null) {
+            addMutation.mutate([previewQuestionId]);
+          }
+        }}
+        onRemove={() => {
+          if (previewQuestionId === null) return;
+          const eq = exam.questions.find((q) => q.question_id === previewQuestionId);
+          if (eq) {
+            removeMutation.mutate(eq.id);
+          } else {
+            // Defensive: the "Entfernen"-Button erscheint nur, wenn isAdded true
+            // ist (gleiche exam.questions-Quelle) — dieser Zweig sollte also nie
+            // erreicht werden. Falls die beiden je auseinanderlaufen, lieber einen
+            // Fehler anzeigen als das Modal kommentarlos schliessen (kein Silent-Fail).
+            setBuilderError(t('composer.examBuilder.errorRemoveQuestion'));
+          }
+        }}
+        onClose={() => setPreviewQuestionId(null)}
       />
     </div>
   );

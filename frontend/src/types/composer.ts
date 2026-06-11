@@ -60,6 +60,28 @@ export interface UpdateExamRequest extends Partial<CreateExamRequest> { updated_
 export interface ApprovedQuestion { id: number; question_text: string; question_type: string; difficulty: string; topic: string; bloom_level: number | null; options: string[] | null; usage_count: number; tags?: Tag[]; }
 export interface ApprovedQuestionsResponse { total: number; questions: ApprovedQuestion[]; }
 
+// TF-405: Read-only Detail für das Vorschau-Modal im Prüfungskomponist.
+export interface ApprovedQuestionOption { text: string; is_correct: boolean; }
+export interface ApprovedQuestionSourceDocument { id: number; title: string; }
+export interface ApprovedQuestionCompetency { id: number; code: string; title: string; framework_id: number; module_code?: string | null; }
+export interface ApprovedQuestionDetail {
+  id: number;
+  question_text: string;
+  question_type: string;
+  difficulty: string;
+  topic: string;
+  language?: string | null;
+  bloom_level: number | null;
+  ln_level: number | null;
+  estimated_time_minutes: number | null;
+  options: ApprovedQuestionOption[];
+  correct_answer: string | null;
+  explanation: string | null;
+  usage_count: number;
+  competency: ApprovedQuestionCompetency | null;
+  source_documents: ApprovedQuestionSourceDocument[];
+}
+
 export interface DocumentWithQuestions {
   id: number;
   title: string;

@@ -1723,7 +1723,20 @@
       "tagFilterClear": "Alle entfernen",
       "tagFilterSearch": "Tag suchen…",
       "tagFilterNoResults": "Keine Tags gefunden",
-      "tagsShowLess": "weniger anzeigen"
+      "tagsShowLess": "weniger anzeigen",
+      "preview": "Vorschau",
+      "previewAria": "Frage-Vorschau öffnen",
+      "previewHint": "Doppelklick für Vorschau",
+      "previewTitle": "Frage-Vorschau",
+      "previewError": "Frage konnte nicht geladen werden.",
+      "previewBloom": "Bloom {{level}}",
+      "previewLn": "LN {{level}}",
+      "previewModelAnswer": "Musterlösung",
+      "previewExplanation": "Erklärung",
+      "previewCompetency": "Handlungskompetenz",
+      "previewSource": "Quelldokument",
+      "previewClose": "Schliessen",
+      "previewRemove": "Entfernen"
     }
   },
   "profile": {

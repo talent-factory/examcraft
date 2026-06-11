@@ -1329,7 +1329,20 @@
       "tagFilterClear": "Rimuovi tutti",
       "tagFilterSearch": "Cerca tag…",
       "tagFilterNoResults": "Nessun tag trovato",
-      "tagsShowLess": "mostra meno"
+      "tagsShowLess": "mostra meno",
+      "preview": "Anteprima",
+      "previewAria": "Apri anteprima della domanda",
+      "previewHint": "Doppio clic per l'anteprima",
+      "previewTitle": "Anteprima della domanda",
+      "previewError": "Impossibile caricare la domanda.",
+      "previewBloom": "Bloom {{level}}",
+      "previewLn": "LN {{level}}",
+      "previewModelAnswer": "Risposta modello",
+      "previewExplanation": "Spiegazione",
+      "previewCompetency": "Competenza",
+      "previewSource": "Documento di origine",
+      "previewClose": "Chiudi",
+      "previewRemove": "Rimuovi"
     }
   },
   "profile": {

@@ -1329,7 +1329,20 @@
       "tagFilterClear": "Tout effacer",
       "tagFilterSearch": "Rechercher un tag…",
       "tagFilterNoResults": "Aucun tag trouvé",
-      "tagsShowLess": "voir moins"
+      "tagsShowLess": "voir moins",
+      "preview": "Aperçu",
+      "previewAria": "Ouvrir l'aperçu de la question",
+      "previewHint": "Double-cliquez pour l'aperçu",
+      "previewTitle": "Aperçu de la question",
+      "previewError": "Impossible de charger la question.",
+      "previewBloom": "Bloom {{level}}",
+      "previewLn": "LN {{level}}",
+      "previewModelAnswer": "Réponse type",
+      "previewExplanation": "Explication",
+      "previewCompetency": "Compétence",
+      "previewSource": "Document source",
+      "previewClose": "Fermer",
+      "previewRemove": "Retirer"
     }
   },
   "profile": {

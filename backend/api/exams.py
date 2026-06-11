@@ -18,6 +18,8 @@ from models.document import Document
 from models.question_review import QuestionReview, ReviewStatus, QuestionSourceDocument
 from models.tag import QuestionTag
 from api.tags import TagOut
+from api.question_review import _serialize_competency
+from utils.question_options import normalize_options
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -455,6 +457,55 @@ class ApprovedQuestionsListOut(BaseModel):
     questions: List[ApprovedQuestionOut]
 
 
+class ApprovedQuestionOptionOut(BaseModel):
+    """TF-405: Eine Antwortoption mit Markierung der korrekten Lösung."""
+
+    text: str
+    is_correct: bool
+
+
+class ApprovedQuestionSourceDocumentOut(BaseModel):
+    id: int
+    title: str
+
+
+class ApprovedQuestionCompetencyOut(BaseModel):
+    id: int
+    code: str
+    title: str
+    framework_id: int
+    module_code: Optional[str] = None
+
+
+class ApprovedQuestionDetailOut(BaseModel):
+    """TF-405: Vollständiges, rein lesendes Detail für das Vorschau-Modal im
+    Prüfungskomponist.
+
+    Bewusst getrennt vom schlanken ``ApprovedQuestionOut`` der 50er-Liste: dieses
+    Detail wird beim Öffnen der Vorschau gezielt für *eine* Frage nachgeladen, damit
+    die Listen-API leichtgewichtig bleibt.
+    """
+
+    id: int
+    question_text: str
+    question_type: str
+    difficulty: str
+    topic: str
+    language: Optional[str] = None
+    bloom_level: Optional[int] = None
+    ln_level: Optional[int] = None
+    estimated_time_minutes: Optional[int] = None
+    # options[].is_correct markiert die richtige Wahl bei MC/TF (abgeleitet aus
+    # correct_answer). correct_answer bleibt zusätzlich gesetzt und ist die einzige
+    # Lösungsquelle bei offenen Fragen (Musterlösung, options ist dann leer).
+    options: List[ApprovedQuestionOptionOut] = []
+    correct_answer: Optional[str] = None
+    explanation: Optional[str] = None
+    usage_count: int = 0
+    competency: Optional[ApprovedQuestionCompetencyOut] = None
+    source_documents: List[ApprovedQuestionSourceDocumentOut] = []
+
+
 class DocumentWithQuestionsOut(BaseModel):
     id: int
     title: str
@@ -626,6 +677,107 @@ async def list_approved_questions(
         )
 
     return ApprovedQuestionsListOut(total=total, questions=result)
+
+
+@router.get(
+    "/approved-questions/{question_id}",
+    response_model=ApprovedQuestionDetailOut,
+)
+async def get_approved_question(
+    question_id: int,
+    request: Request,
+    current_user: User = Depends(require_permission("create_exams")),
+    db: Session = Depends(get_db),
+):
+    """TF-405: Rein lesendes Detail einer Frage für die Vorschau im Komponist.
+
+    Liefert vollen Fragetext, Optionen mit markierter korrekter Lösung, Erklärung,
+    Quelldokument(e) und Kompetenz/Bloom/LN.
+
+    Bewusst NUR tenant-skopiert (keine ``review_status``-/``archived_at``-Filter):
+    Die Vorschau wird sowohl aus dem Fragenpool (nur freigegebene Fragen) als auch
+    aus den bereits zusammengestellten Prüfungsfragen geöffnet. Eine Frage, die schon
+    in der Prüfung liegt, muss vorschaubar bleiben, auch wenn sie inzwischen
+    nachbearbeitet (``edited``) oder archiviert wurde — die Freigabe-Gating ist eine
+    Belang der Listen-API (was hinzugefügt werden darf), nicht der Detail-Ansicht.
+    Eine Frage einer fremden Institution ist nicht von einer nicht-existenten zu
+    unterscheiden (404, kein 403) — kein Existenz-Leak.
+    """
+    locale = get_request_locale(request, current_user)
+    tenant_context = get_tenant_context(current_user)
+
+    query = (
+        db.query(QuestionReview)
+        .options(joinedload(QuestionReview.source_document_links))
+        .filter(QuestionReview.id == question_id)
+    )
+    query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
+    question = query.first()
+    if question is None:
+        raise HTTPException(
+            status_code=404,
+            detail=t("approved_question_not_found", locale=locale),
+        )
+
+    # usage_count zählt — wie der Listen-Endpoint — institutionsübergreifend, wie
+    # oft die Frage in Prüfungen genutzt wird (globale Wiederverwendung, kein Leak,
+    # da keine fremden Prüfungsdaten exponiert werden).
+    usage_count = (
+        db.query(sa_func.count(ExamQuestion.id))
+        .filter(ExamQuestion.question_id == question.id)
+        .scalar()
+        or 0
+    )
+
+    correct = question.correct_answer
+    options = [
+        {"text": opt, "is_correct": opt == correct}
+        for opt in (normalize_options(question.options) or [])
+    ]
+
+    source_documents: list[dict] = []
+    doc_ids = [link.document_id for link in question.source_document_links]
+    if doc_ids:
+        # Defense-in-depth: Quelldokumente zusätzlich tenant-filtern, damit auch bei
+        # einem fehlerhaften Cross-Institution-Link kein fremder Titel durchsickert.
+        docs = (
+            db.query(Document)
+            .filter(
+                Document.id.in_(doc_ids),
+                Document.institution_id == tenant_context.institution_id,
+            )
+            .all()
+        )
+        if len(docs) < len(doc_ids):
+            # Ein gefiltertes Dokument deutet auf einen Cross-Institution-Link hin
+            # (Datenintegritätsproblem) — sichtbar machen statt stillschweigend droppen.
+            logger.warning(
+                "approved_question_detail: %d/%d Quelldokument(e) für Frage %s "
+                "tenant-gefiltert (institution_id=%s) — möglicher Cross-Institution-Link",
+                len(doc_ids) - len(docs),
+                len(doc_ids),
+                question.id,
+                tenant_context.institution_id,
+            )
+        source_documents = [{"id": doc.id, "title": doc.title} for doc in docs]
+
+    return ApprovedQuestionDetailOut(
+        id=question.id,
+        question_text=question.question_text,
+        question_type=question.question_type,
+        difficulty=question.difficulty,
+        topic=question.topic,
+        language=question.language,
+        bloom_level=question.bloom_level,
+        ln_level=question.ln_level,
+        estimated_time_minutes=question.estimated_time_minutes,
+        options=options,
+        correct_answer=question.correct_answer,
+        explanation=question.explanation,
+        usage_count=usage_count,
+        competency=_serialize_competency(question),
+        source_documents=source_documents,
+    )
 
 
 @router.get("/{exam_id}", response_model=ExamDetailOut)

@@ -5,6 +5,7 @@ import type {
   CreateExamRequest,
   UpdateExamRequest,
   ApprovedQuestionsResponse,
+  ApprovedQuestionDetail,
   AutoFillRequest,
   AutoComposePreview,
   DocumentWithQuestions,
@@ -136,6 +137,11 @@ export class ComposerService {
         ...(document_ids?.length ? { document_ids: document_ids.join(',') } : {}),
       },
     });
+    return response.data;
+  }
+
+  static async getApprovedQuestion(id: number): Promise<ApprovedQuestionDetail> {
+    const response = await apiClient.get(`/api/v1/exams/approved-questions/${id}`);
     return response.data;
   }
 

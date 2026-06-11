@@ -82,6 +82,7 @@
     "documents_tag_owner_only": "Solo il proprietario può modificare i tag di questo documento.",
     "documents_tag_failed": "Impossibile salvare i tag del documento.",
     "exams_not_found": "Esame non trovato",
+    "approved_question_not_found": "Domanda non trovata",
     "exams_must_be_draft": "L'esame deve essere in stato bozza",
     "exams_conflict": "Conflitto durante il salvataggio dell'esame",
     "exams_db_error": "Errore del database durante l'elaborazione dell'esame",
