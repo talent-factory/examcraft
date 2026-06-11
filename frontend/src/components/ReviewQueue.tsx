@@ -97,6 +97,8 @@ const ReviewQueue: React.FC = () => {
   const { hasPermission } = useAuth();
   const canDelete = hasPermission('delete_questions');
   const [deleteQuestionId, setDeleteQuestionId] = useState<number | null>(null);
+  // TF-408: Lösch-Fehler inline im Dialog anzeigen (statt Banner oben, ausserhalb des Viewports)
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Load questions
   const loadQuestions = useCallback(async () => {
@@ -222,18 +224,29 @@ const ReviewQueue: React.FC = () => {
   };
 
   const handleDelete = (questionId: number) => {
+    setDeleteError(null);
     setDeleteQuestionId(questionId);
+  };
+
+  // TF-408: Dialog schliessen und Lösch-Fehler zurücksetzen
+  const closeDeleteDialog = () => {
+    setDeleteQuestionId(null);
+    setDeleteError(null);
   };
 
   const executeDelete = async () => {
     if (!deleteQuestionId) return;
     setLoading(true);
+    setDeleteError(null);
     try {
       await ReviewService.deleteQuestion(deleteQuestionId);
-      setDeleteQuestionId(null);
+      closeDeleteDialog();
       await loadQuestions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('components.reviewQueue.errorDelete'));
+      // TF-408: Fehler inline im offenen Dialog zeigen — der Dialog bleibt
+      // offen (deleteQuestionId unverändert), damit die Meldung immer im
+      // Fokus des Benutzers liegt, statt als Banner oben ausserhalb des Viewports.
+      setDeleteError(err instanceof Error ? err.message : t('components.reviewQueue.errorDelete'));
     } finally {
       setLoading(false);
     }
@@ -522,18 +535,22 @@ const ReviewQueue: React.FC = () => {
       {/* TF-396: Hard-Delete Bestätigung */}
       <Dialog
         open={deleteQuestionId !== null}
-        onClose={() => setDeleteQuestionId(null)}
+        onClose={closeDeleteDialog}
         maxWidth="sm"
         fullWidth
       >
         <DialogTitle>{t('components.reviewQueue.deleteTitle')}</DialogTitle>
         <DialogContent>
           <Typography>{t('components.reviewQueue.deleteConfirm')}</Typography>
+          {/* TF-408: Lösch-Fehler inline im Dialog — immer im Viewport, dort wo der Benutzer interagiert */}
+          {deleteError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {deleteError}
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteQuestionId(null)}>
-            {t('components.reviewQueue.cancelBtn')}
-          </Button>
+          <Button onClick={closeDeleteDialog}>{t('components.reviewQueue.cancelBtn')}</Button>
           <Button onClick={executeDelete} variant="contained" color="error" disabled={loading}>
             {t('components.reviewQueue.deleteConfirmBtn')}
           </Button>
