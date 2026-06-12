@@ -36,7 +36,7 @@ const mockQuestions: QuestionReview[] = [
   {
     id: 1,
     question_text: 'What is a heap data structure?',
-    question_type: 'multiple_choice',
+    question_type: 'single_choice',
     options: ['A tree-based structure', 'A linear structure'],
     correct_answer: 'A tree-based structure',
     explanation: 'A heap is a tree-based structure.',
@@ -249,7 +249,7 @@ describe.skip('ReviewQueue', () => {
       await waitFor(() => {
         expect(mockReviewService.getReviewQueue).toHaveBeenCalledWith(
           expect.objectContaining({
-            question_type: 'multiple_choice'
+            question_type: 'single_choice'
           })
         );
       });

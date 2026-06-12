@@ -87,9 +87,9 @@ JobTerminalStatus = Literal["SUCCESS", "FAILURE", "REVOKED"]
 
 # Time estimation lookup table (minutes) based on question type and difficulty
 TIME_ESTIMATES = {
-    ("multiple_choice", "easy"): 1,
-    ("multiple_choice", "medium"): 2,
-    ("multiple_choice", "hard"): 3,
+    ("single_choice", "easy"): 1,
+    ("single_choice", "medium"): 2,
+    ("single_choice", "hard"): 3,
     ("true_false", "easy"): 1,
     ("true_false", "medium"): 1,
     ("true_false", "hard"): 2,
@@ -315,12 +315,12 @@ def _persist_questions(
             # it's corrupt or just rendered wrong.
             normalized_options = normalize_options(question.options)
             if (
-                question.question_type == "multiple_choice"
+                question.question_type == "single_choice"
                 and question.options is not None
                 and normalized_options is None
             ):
                 raise ValueError(
-                    f"Refusing to persist multiple_choice question with "
+                    f"Refusing to persist single_choice question with "
                     f"unrecoverable options shape "
                     f"(type={type(question.options).__name__}); "
                     f"see question_options.unsafe_dict_keys / "

@@ -55,7 +55,8 @@ const QuestionPreviewModal: React.FC<QuestionPreviewModalProps> = ({
   });
 
   const TYPE_LABELS: Record<string, string> = {
-    multiple_choice: t('composer.questionPool.typeMultipleChoice'),
+    single_choice: t('composer.questionPool.typeMultipleChoice'),
+    multiple_choice: t('composer.questionPool.typeMultipleResponse'),
     true_false: t('composer.questionPool.typeTrueFalse'),
     open_ended: t('composer.questionPool.typeOpenEnded'),
   };

@@ -54,7 +54,7 @@ class Tag(Base):
     is_archived = Column(Boolean, default=False, nullable=False)
     # TF-397: namespace dimension. 'content' tags classify Fragen/Dokumente,
     # 'prompt' tags classify Prompt-Templates. Kept separate so prompt
-    # classification tags (e.g. 'multiple_choice', 'default') never pollute the
+    # classification tags (e.g. 'single_choice', 'default') never pollute the
     # Fragen-/Dokument-Tag-Auswahl. Closed value set — enforced by DB CHECK.
     kind = Column(String(20), default="content", nullable=False)
 

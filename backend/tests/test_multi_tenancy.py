@@ -169,7 +169,7 @@ def test_question_tenant_isolation(db):
     # Create questions for each institution
     q1 = QuestionReview(
         question_text="Question from Institution 1?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         difficulty="medium",
         topic="Math",
         language="en",
@@ -179,7 +179,7 @@ def test_question_tenant_isolation(db):
     )
     q2 = QuestionReview(
         question_text="Question from Institution 2?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         difficulty="medium",
         topic="Science",
         language="en",
@@ -321,7 +321,7 @@ def test_question_limit_enforcement(db):
     for i in range(50):
         q = QuestionReview(
             question_text=f"Question {i}?",
-            question_type="multiple_choice",
+            question_type="single_choice",
             difficulty="medium",
             topic="Test",
             language="en",

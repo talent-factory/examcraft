@@ -10,7 +10,7 @@ export interface ExamRequest {
 
 export interface Question {
   id: number | string;
-  type: 'multiple_choice' | 'open_ended' | 'true_false' | 'short_answer';
+  type: 'single_choice' | 'multiple_choice' | 'open_ended' | 'true_false' | 'short_answer';
   question: string;
   options?: string[];
   correct_answer?: string;

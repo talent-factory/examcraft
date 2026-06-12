@@ -49,7 +49,7 @@ def _setup(test_db):
 def _q(**over):
     base = dict(
         question_text="F?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options={"A": "x"},
         correct_answer="A",
         explanation="e",

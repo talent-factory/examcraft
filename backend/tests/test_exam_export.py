@@ -30,7 +30,7 @@ def sample_exam_data():
                 "position": 1,
                 "points": 4.0,
                 "question_text": "Wie funktioniert Heapify?",
-                "question_type": "multiple_choice",
+                "question_type": "single_choice",
                 "difficulty": "medium",
                 "options": ["A) Top-down", "B) Bottom-up", "C) Beide", "D) Keines"],
                 "correct_answer": "C) Beide",
@@ -107,7 +107,7 @@ class TestJsonExporter:
         assert q["position"] == 1
         assert q["points"] == 4.0
         assert q["question_text"] == "Wie funktioniert Heapify?"
-        assert q["question_type"] == "multiple_choice"
+        assert q["question_type"] == "single_choice"
         assert q["correct_answer"] == "C) Beide"
 
     def test_export_is_valid_json(self, sample_exam_data):
@@ -171,6 +171,180 @@ class TestMoodleXmlExporter:
         # C) Beide is the correct answer — should appear with fraction="100"
         assert 'fraction="100"' in xml
         assert 'fraction="0"' in xml
+
+    def test_multichoice_multi_export_single_false_and_fractions(self):
+        """multiple_choice exports as multichoice with <single>false</single>.
+
+        Two-of-four correct → positive fraction 100/2 = 50 for each correct
+        option, negative fraction -100/(4-2) = -50 for each wrong option.
+        """
+        exam_data = {
+            "title": "Multi Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 4.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 4.0,
+                    "question_type": "multiple_choice",
+                    "question_text": "Welche zwei treffen zu?",
+                    "difficulty": "medium",
+                    "options": ["A", "B", "C", "D"],
+                    "correct_answer": '["A", "C"]',
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = MoodleXmlExporter.export(exam_data)
+        assert 'type="multichoice"' in xml
+        assert "<single>false</single>" in xml
+        assert 'fraction="50"' in xml  # two correct → 100/2
+        assert 'fraction="-50"' in xml  # two wrong → -100/(4-2)
+
+    def test_multichoice_multi_export_three_correct_fraction_5dp(self):
+        """Three-of-four correct uses Moodle-conformant 5-dp thirds."""
+        exam_data = {
+            "title": "Multi Test 3",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 6.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 6.0,
+                    "question_type": "multiple_choice",
+                    "question_text": "Welche drei treffen zu?",
+                    "difficulty": "medium",
+                    "options": ["A", "B", "C", "D"],
+                    "correct_answer": '["A", "B", "C"]',
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = MoodleXmlExporter.export(exam_data)
+        assert "<single>false</single>" in xml
+        assert 'fraction="33.33333"' in xml  # 100/3 to 5 dp
+        assert 'fraction="-100"' in xml  # single wrong → -100/(4-3)
+
+    def test_multichoice_multi_export_canonical_text_options(self):
+        """Production shape (TF-403): options are plain text and
+        correct_answer holds the exact option strings. The exporter marks
+        them correct via the same grader normalization, emits the original
+        option text, single=false, and 50/-50 fractions."""
+        exam_data = {
+            "title": "Multi Canonical",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 4.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 4.0,
+                    "question_type": "multiple_choice",
+                    "question_text": "Welche zwei sind Schweizer Städte?",
+                    "difficulty": "medium",
+                    "options": ["Bern", "Paris", "Zürich", "London"],
+                    "correct_answer": '["Bern", "Zürich"]',
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = MoodleXmlExporter.export(exam_data)
+        assert "<single>false</single>" in xml
+        assert 'fraction="50"' in xml  # 100/2
+        assert 'fraction="-50"' in xml  # -100/(4-2)
+        assert "Bern" in xml and "Zürich" in xml  # original text emitted
+
+    def test_multichoice_multi_export_negative_thirds(self):
+        """2-of-5 produces -100/3 = -33.33333 for the three wrong options."""
+        exam_data = {
+            "title": "Multi 2of5",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 5.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 5.0,
+                    "question_type": "multiple_choice",
+                    "question_text": "Welche zwei von fünf?",
+                    "difficulty": "medium",
+                    "options": ["A", "B", "C", "D", "E"],
+                    "correct_answer": '["A", "C"]',
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = MoodleXmlExporter.export(exam_data)
+        assert 'fraction="50"' in xml  # 100/2
+        assert 'fraction="-33.33333"' in xml  # -100/3 to 5 dp
+
+    def test_multichoice_multi_export_skips_unscoreable_question(self, monkeypatch):
+        """When no option matches correct_answer (malformed/letter-mismatch),
+        the exporter skips the question with a warning rather than emitting an
+        unscoreable all-negative Moodle question (TF-403)."""
+        import services.exam_export_service as ees
+
+        captured: list = []
+        monkeypatch.setattr(
+            ees.logger,
+            "warning",
+            lambda fmt, *args, **kwargs: captured.append((fmt, args)),
+        )
+        exam_data = {
+            "title": "Multi Broken",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 4.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 4.0,
+                    "question_type": "multiple_choice",
+                    "question_text": "Unbewertbare Frage",
+                    "difficulty": "medium",
+                    "options": ["A) 2", "B) 4", "C) 3", "D) 6"],
+                    "correct_answer": '["X", "Y"]',  # matches no option
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = MoodleXmlExporter.export(exam_data)
+        assert 'type="multichoice"' not in xml  # question skipped
+        assert "Unbewertbare Frage" not in xml
+        assert captured  # warning emitted
+
+    def test_single_choice_export_still_single_true(self, sample_exam_data):
+        """single_choice still routes to single-answer multichoice."""
+        xml = MoodleXmlExporter.export(sample_exam_data)
+        assert "<single>true</single>" in xml
+        assert "<single>false</single>" not in xml
 
     def test_markdown_question_text_rendered_as_html(self):
         """Markdown in question text is converted to HTML (TF-404).

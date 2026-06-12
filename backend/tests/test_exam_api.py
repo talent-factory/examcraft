@@ -779,7 +779,7 @@ class TestExamQuestionApi:
         institution_id,
         user_id,
         text="Test Q",
-        question_type="multiple_choice",
+        question_type="single_choice",
         difficulty="medium",
     ):
         from models.question_review import QuestionReview
@@ -809,12 +809,12 @@ class TestExamQuestionApi:
         assert create_resp.status_code == 201
         exam_id = create_resp.json()["id"]
 
-        # Create approved question (multiple_choice + medium => 4 pts)
+        # Create approved question (single_choice + medium => 4 pts)
         q = self._create_approved_question(
             exam_db,
             exam_institution.id,
             exam_user.id,
-            question_type="multiple_choice",
+            question_type="single_choice",
             difficulty="medium",
         )
 
@@ -1017,7 +1017,7 @@ class TestExamWorkflowApi:
         institution_id,
         user_id,
         text="Test Q",
-        question_type="multiple_choice",
+        question_type="single_choice",
         difficulty="medium",
         topic="Test",
     ):
@@ -1029,11 +1029,9 @@ class TestExamWorkflowApi:
             difficulty=difficulty,
             topic=topic,
             review_status="approved",
-            options=["A", "B", "C", "D"]
-            if question_type == "multiple_choice"
-            else None,
-            correct_answer="A" if question_type == "multiple_choice" else None,
-            explanation="A is correct." if question_type == "multiple_choice" else None,
+            options=["A", "B", "C", "D"] if question_type == "single_choice" else None,
+            correct_answer="A" if question_type == "single_choice" else None,
+            explanation="A is correct." if question_type == "single_choice" else None,
             institution_id=institution_id,
             created_by=user_id,
         )
@@ -1201,7 +1199,7 @@ def _make_exam_test_class_fixtures(slug: str, email: str):
             institution_id,
             user_id,
             text="Extra Q",
-            question_type="multiple_choice",
+            question_type="single_choice",
             difficulty="medium",
             topic="General",
             bloom_level=None,
@@ -1217,9 +1215,9 @@ def _make_exam_test_class_fixtures(slug: str, email: str):
                 bloom_level=bloom_level,
                 review_status=review_status,
                 options=["A", "B", "C", "D"]
-                if question_type == "multiple_choice"
+                if question_type == "single_choice"
                 else None,
-                correct_answer="A" if question_type == "multiple_choice" else None,
+                correct_answer="A" if question_type == "single_choice" else None,
                 institution_id=institution_id,
                 created_by=user_id,
             )
@@ -1558,7 +1556,7 @@ class TestApprovedQuestionsFilters(
             exam_institution.id,
             exam_user.id,
             text="MC Q AQ",
-            question_type="multiple_choice",
+            question_type="single_choice",
             topic="TypeFilter",
         )
 
@@ -1569,6 +1567,41 @@ class TestApprovedQuestionsFilters(
         data = response.json()
         types = [q["question_type"] for q in data["questions"]]
         assert all(t == "open_ended" for t in types)
+        assert data["total"] >= 1
+
+    def test_filter_by_question_type_multiple_choice(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """TF-403: question_type=multiple_choice is accepted (not 422).
+
+        The composer "Mehrfachauswahl" filter sends this value; the
+        approved-questions query-param validator must allow the new
+        multi-answer type alongside single_choice/open_ended/true_false.
+        """
+        self._create_approved_question(
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            text="MR Q AQ",
+            question_type="multiple_choice",
+            topic="TypeFilterMC",
+        )
+        self._create_approved_question(
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            text="SC Q AQ",
+            question_type="single_choice",
+            topic="TypeFilterMC",
+        )
+
+        response = exam_client.get(
+            "/api/v1/exams/approved-questions?question_type=multiple_choice"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        types = [q["question_type"] for q in data["questions"]]
+        assert all(t == "multiple_choice" for t in types)
         assert data["total"] >= 1
 
     def test_filter_by_bloom_level(
@@ -2116,9 +2149,9 @@ class TestAutoComposeQuestions(
         """Create a diverse set of questions with metadata."""
         questions = []
         configs = [
-            ("multiple_choice", "easy", 1, 1),
-            ("multiple_choice", "medium", 2, 2),
-            ("multiple_choice", "hard", 3, 3),
+            ("single_choice", "easy", 1, 1),
+            ("single_choice", "medium", 2, 2),
+            ("single_choice", "hard", 3, 3),
             ("open_ended", "easy", 1, 3),
             ("open_ended", "medium", 2, 5),
             ("open_ended", "hard", 3, 8),
@@ -3220,7 +3253,7 @@ class TestApprovedQuestionDetail(
     def _make_question(self, db, institution_id, user_id, **overrides):
         fields = dict(
             question_text="Welcher Sortieralgorithmus ist O(n log n)?",
-            question_type="multiple_choice",
+            question_type="single_choice",
             difficulty="medium",
             topic="Sortieren",
             language="de",

@@ -72,6 +72,9 @@ class _QuestionMeta:
     explanation: str | None
     difficulty: str | None
     bloom_level: str | None
+    # TF-403: Antwortoptionen (JSON-Liste) für multiple_choice-Teilpunkte;
+    # None/leer für andere Typen.
+    options: list[str] | None = None
 
 
 class UnknownQuestionTypeError(Exception):
@@ -252,12 +255,13 @@ class GradingService:
         qmeta: _QuestionMeta,
         answer: AttemptAnswer,
     ) -> GradeOutcome | LlmGradeOutcome:
-        if qmeta.question_type in ("multiple_choice", "true_false"):
+        if qmeta.question_type in ("single_choice", "multiple_choice", "true_false"):
             return self.grader.grade(
                 question_type=qmeta.question_type,
                 given_answer=answer.given_answer,
                 correct_answer=qmeta.correct_answer,
                 points_max=qmeta.points,
+                num_options=len(qmeta.options or []),
             )
         if qmeta.question_type == "open_ended":
             # LlmGrader fängt API/Schema-Fehler intern ab und liefert
@@ -714,6 +718,7 @@ class GradingService:
                 QuestionReview.explanation,
                 QuestionReview.difficulty,
                 QuestionReview.bloom_level,
+                QuestionReview.options,
             )
             .join(QuestionReview, ExamQuestion.question_id == QuestionReview.id)
             .filter(ExamQuestion.id.in_(ids))
@@ -730,6 +735,7 @@ class GradingService:
                 bloom_level=str(row.bloom_level)
                 if row.bloom_level is not None
                 else None,
+                options=row.options,
             )
             for row in rows
         }

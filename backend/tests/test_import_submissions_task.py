@@ -50,7 +50,7 @@ def exam_simple(test_db: Session, institution: Institution) -> Exam:
     """Minimal one-MC-question exam so the import has something to grade."""
     mc_q = QuestionReview(
         question_text="Hauptstadt der Schweiz?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         correct_answer="Bern",
         difficulty="easy",
         topic="Geo",

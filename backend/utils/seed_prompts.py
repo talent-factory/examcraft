@@ -89,14 +89,14 @@ When answering:
             "is_active": True,
         },
         {
-            "name": "default_prompt_multiple_choice",
+            "name": "default_prompt_single_choice",
             "content": """Du bist ein Experte für die Erstellung von OpenBook-Prüfungsfragen für akademische Kurse.
 
 KONTEXT AUS DOKUMENTEN:
 {context}
 
 AUFGABE:
-Erstelle eine anspruchsvolle Multiple-Choice-Frage zum Thema "{topic}" basierend AUSSCHLIESSLICH auf dem obigen Kontext.
+Erstelle eine anspruchsvolle Einfachauswahl-Frage zum Thema "{topic}" basierend AUSSCHLIESSLICH auf dem obigen Kontext.
 
 ANFORDERUNGEN:
 - Schwierigkeitsgrad: {difficulty}
@@ -119,7 +119,42 @@ Antworte als JSON:
 - explanation: Detaillierte Erklärung mit Verweis auf den Kontext
 - difficulty: Schwierigkeitsgrad (easy/medium/hard)
 - source_reference: Verweis auf den genutzten Kontext-Abschnitt""",
-            "description": "Default system prompt for multiple-choice question generation",
+            "description": "Default system prompt for single-choice question generation",
+            "category": "template",
+            "use_case": "question_generation_single_choice",
+            "tags": ["single_choice", "openbook", "default"],
+            "version": 1,
+            "is_active": True,
+        },
+        {
+            "name": "default_prompt_multiple_choice",
+            "content": """Du bist ein Experte für die Erstellung von OpenBook-Prüfungsfragen für akademische Kurse.
+
+KONTEXT AUS DOKUMENTEN:
+{context}
+
+AUFGABE:
+Erstelle eine anspruchsvolle Mehrfachauswahl-Frage zum Thema "{topic}" basierend AUSSCHLIESSLICH auf dem obigen Kontext.
+
+ANFORDERUNGEN:
+- Schwierigkeitsgrad: {difficulty}
+- Sprache: {language}
+- Die Frage muss SPEZIFISCHE Details, Konzepte oder Zusammenhänge aus dem Kontext abfragen
+
+ANTWORTOPTIONEN:
+- Erstelle GENAU 4 Optionen mit konkreten, fachlichen Inhalten
+- Es sind 2 ODER 3 Optionen korrekt (mindestens 2, höchstens 3)
+- Distraktoren müssen plausibel sein und häufige Missverständnisse widerspiegeln
+- Keine Meta-Optionen wie "Alle oben genannten" oder "Keine der genannten"
+
+Antworte als JSON:
+- question_text: Die Fragestellung (spezifisch, detailliert)
+- options: Array mit GENAU 4 Antwortoptionen (Strings)
+- correct_answers: Array der korrekten Optionen als WORTWÖRTLICHE Kopien der betreffenden Einträge aus `options` (2-3 Stück, exakt identische Strings)
+- explanation: Detaillierte Erklärung mit Verweis auf den Kontext
+- difficulty: Schwierigkeitsgrad (easy/medium/hard)
+- source_reference: Verweis auf den genutzten Kontext-Abschnitt""",
+            "description": "Default system prompt for multiple-response (multi-answer) question generation",
             "category": "template",
             "use_case": "question_generation_multiple_choice",
             "tags": ["multiple_choice", "openbook", "default"],

@@ -162,7 +162,7 @@ class TestRetryValidation:
             "question_count": 10,
             "difficulty": "hard",
             "language": "de",
-            "question_types": ["multiple_choice", "open_ended"],
+            "question_types": ["single_choice", "open_ended"],
             "document_ids": [42, 43],
             "context_chunks_per_question": 5,
         }

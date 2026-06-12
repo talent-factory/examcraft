@@ -139,9 +139,9 @@ def tags_client(tags_db: Session):
 
 class TestNormalizePromptTagName:
     def test_collapses_separator_variants(self) -> None:
-        assert normalize_prompt_tag_name("Multiple Choice") == "multiple_choice"
-        assert normalize_prompt_tag_name("multiple-choice") == "multiple_choice"
-        assert normalize_prompt_tag_name("multiple_choice") == "multiple_choice"
+        assert normalize_prompt_tag_name("Single Choice") == "single_choice"
+        assert normalize_prompt_tag_name("single-choice") == "single_choice"
+        assert normalize_prompt_tag_name("single_choice") == "single_choice"
         assert normalize_prompt_tag_name("  Open   Ended ") == "open_ended"
 
     def test_empty_and_whitespace_only_yield_empty(self) -> None:
@@ -258,7 +258,7 @@ class TestPromptTagRBAC:
 
         resp = tags_client.post(
             "/api/v1/tags",
-            json={"name": "multiple_choice", "scope": "global", "kind": "prompt"},
+            json={"name": "single_choice", "scope": "global", "kind": "prompt"},
         )
         assert resp.status_code == 200, resp.text
         data = resp.json()

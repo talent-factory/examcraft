@@ -40,7 +40,7 @@ const createWrapper = () => {
 const detail: ApprovedQuestionDetail = {
   id: 42,
   question_text: 'Welcher Sortieralgorithmus ist O(n log n)?',
-  question_type: 'multiple_choice',
+  question_type: 'single_choice',
   difficulty: 'medium',
   topic: 'Sortieren',
   language: 'de',

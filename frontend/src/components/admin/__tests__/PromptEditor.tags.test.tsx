@@ -37,7 +37,7 @@ jest.mock('../../../api/tagsApi', () => {
       listTags: jest.fn().mockResolvedValue([]),
       createTag: jest.fn().mockResolvedValue({
         id: 7,
-        name: 'multiple_choice',
+        name: 'single_choice',
         scope: 'global',
         kind: 'prompt',
         institution_id: null,
@@ -58,7 +58,7 @@ const renderEditor = () => {
           name: 'My Prompt',
           content: 'Some prompt content here',
           category: PromptCategory.SYSTEM_PROMPT,
-          use_case: 'question_generation_multiple_choice',
+          use_case: 'question_generation_single_choice',
         }}
       />
     </QueryClientProvider>
@@ -77,7 +77,7 @@ describe('PromptEditor managed tags (TF-397)', () => {
     const input = screen.getByRole('combobox', {
       name: 'admin.promptEditor.tagsLabel',
     });
-    await userEvent.type(input, 'multiple_choice');
+    await userEvent.type(input, 'single_choice');
     await userEvent.keyboard('{Enter}');
 
     // Save.
@@ -87,7 +87,7 @@ describe('PromptEditor managed tags (TF-397)', () => {
 
     await waitFor(() =>
       expect(tagsApi.createTag).toHaveBeenCalledWith(
-        'multiple_choice',
+        'single_choice',
         'global',
         'prompt'
       )

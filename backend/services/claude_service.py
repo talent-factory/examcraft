@@ -198,7 +198,7 @@ class ClaudeService:
             topic: The subject/topic for the questions
             difficulty: easy, medium, or hard
             question_count: Number of questions to generate
-            question_types: Types of questions (multiple_choice, open_ended, etc.)
+            question_types: Types of questions (single_choice, open_ended, etc.)
             language: Language for questions (de, en)
 
         Returns:
@@ -246,7 +246,7 @@ class ClaudeService:
             topic = exam_request.get("topic", "")
             difficulty = exam_request.get("difficulty", "medium")
             question_count = exam_request.get("question_count", 1)
-            question_types = exam_request.get("question_types", ["multiple_choice"])
+            question_types = exam_request.get("question_types", ["single_choice"])
             context = exam_request.get("context", "")
             language = exam_request.get("language", "de")
             custom_prompt = exam_request.get("custom_prompt")
@@ -362,7 +362,7 @@ Format als JSON:
   "questions": [
     {{
       "id": "q1",
-      "type": "multiple_choice",
+      "type": "single_choice",
       "question": "Fragetext hier (Code in `backticks`)",
       "options": ["Option A (Code in `backticks`)", "Option B", "Option C", "Option D"],
       "correct_answer": "Option A (Code in `backticks`)",

@@ -182,7 +182,7 @@ export interface RAGExamRequest {
   language: string;
   context_chunks_per_question?: number;
   prompt_config?: {
-    multiple_choice?: PromptConfig;
+    single_choice?: PromptConfig;
     open_ended?: PromptConfig;
     true_false?: PromptConfig;
   };

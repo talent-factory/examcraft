@@ -482,7 +482,7 @@ class TestQuestionLimitEnforcement:
             db_with_quotas.add(
                 QuestionReview(
                     question_text=f"Question {i}?",
-                    question_type="multiple_choice",
+                    question_type="single_choice",
                     difficulty="medium",
                     topic="Test Topic",
                     institution_id=institution.id,

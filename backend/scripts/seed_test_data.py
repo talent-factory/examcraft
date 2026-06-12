@@ -256,7 +256,7 @@ def seed_questions(db, institution, admin_user):
             continue
         q = QuestionReview(
             question_text=text,
-            question_type="multiple_choice",
+            question_type="single_choice",
             options=options,
             correct_answer=correct,
             explanation=f"Korrekte Antwort: {correct}",
@@ -341,7 +341,7 @@ def seed_exam(db, institution, admin_user, questions):
     mc_pts = 1.0
     open_pts = 3.0
     for pos, q in enumerate(questions, 1):
-        pts = mc_pts if q.question_type == "multiple_choice" else open_pts
+        pts = mc_pts if q.question_type == "single_choice" else open_pts
         eq = ExamQuestion(
             exam_id=exam.id,
             question_id=q.id,
@@ -351,7 +351,7 @@ def seed_exam(db, institution, admin_user, questions):
         db.add(eq)
 
     exam.total_points = sum(
-        mc_pts if q.question_type == "multiple_choice" else open_pts for q in questions
+        mc_pts if q.question_type == "single_choice" else open_pts for q in questions
     )
     db.flush()
     logger.info(f"   ✅ Exam '{exam.title}' (ID {exam.id}, {exam.total_points} Punkte)")
@@ -423,7 +423,7 @@ def seed_submissions(db, institution, exam, students):
     # Nach Fragetyp filtern statt per Index slicen — robust gegen abweichende
     # Reihenfolge/Anzahl. mc_correct hat 5, open_pts hat 3 Einträge pro Student.
     mc_questions = [
-        eq for eq in exam_questions if eq.question.question_type == "multiple_choice"
+        eq for eq in exam_questions if eq.question.question_type == "single_choice"
     ]
     open_questions = [
         eq for eq in exam_questions if eq.question.question_type == "open_ended"

@@ -36,11 +36,19 @@ def test_normalize_returns_valid_values_unchanged(value: str) -> None:
 @pytest.mark.parametrize(
     "raw, expected",
     [
+        ("single_choice", "question_generation_single_choice"),
+        ("Single Choice", "question_generation_single_choice"),
+        ("einfachauswahl", "question_generation_single_choice"),
+        (
+            "question_generation_single_choice_advanced",
+            "question_generation_single_choice",
+        ),
         ("multiple_choice", "question_generation_multiple_choice"),
         ("Multiple Choice", "question_generation_multiple_choice"),
-        ("single_choice", "question_generation_multiple_choice"),
+        ("Mehrfachauswahl", "question_generation_multiple_choice"),
+        ("multi_select", "question_generation_multiple_choice"),
         (
-            "question_generation_multiple_choice_advanced",
+            "question_generation_multiple_choice",
             "question_generation_multiple_choice",
         ),
         ("true_false", "question_generation_true_false"),

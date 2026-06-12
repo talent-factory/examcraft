@@ -99,7 +99,7 @@ def _make_mock_rag_response():
 
     q1 = Mock()
     q1.question_text = "Was ist ExamCraft AI?"
-    q1.question_type = "multiple_choice"
+    q1.question_type = "single_choice"
     q1.options = ["A) CMS", "B) Prüfungssystem", "C) Browser", "D) Editor"]
     q1.correct_answer = "B"
     q1.explanation = "ExamCraft AI ist ein intelligentes Prüfungssystem"
@@ -129,7 +129,7 @@ def _make_mock_rag_response():
         "total_questions": 2,
         "average_confidence": 0.815,
         "source_coverage": 1.0,
-        "question_type_distribution": {"multiple_choice": 1, "open_ended": 1},
+        "question_type_distribution": {"single_choice": 1, "open_ended": 1},
     }
 
     return response
@@ -177,7 +177,7 @@ class TestRAGAPI:
             "topic": "ExamCraft AI",
             "document_ids": [1],
             "question_count": 2,
-            "question_types": ["multiple_choice", "open_ended"],
+            "question_types": ["single_choice", "open_ended"],
             "difficulty": "medium",
             "language": "de",
             "context_chunks_per_question": 3,
@@ -294,7 +294,7 @@ class TestRAGAPI:
             "topic": "Heap Sort",
             "document_ids": [1],
             "question_count": 5,
-            "question_types": ["multiple_choice"],
+            "question_types": ["single_choice"],
             "difficulty": "medium",
             "language": "de",
         }
@@ -462,7 +462,7 @@ class TestRAGAPI:
         assert "supported_languages" in data
 
         question_types = {qt["type"] for qt in data["supported_types"]}
-        assert "multiple_choice" in question_types
+        assert "single_choice" in question_types
         assert "open_ended" in question_types
         assert "true_false" in question_types
 
@@ -568,7 +568,7 @@ class TestRAGAPI:
                 json={
                     "topic": "Test",
                     "question_count": 2,
-                    "question_types": ["multiple_choice"],
+                    "question_types": ["single_choice"],
                     "difficulty": "medium",
                     "language": "de",
                     "tag_ids": [1],
@@ -589,7 +589,7 @@ class TestRAGAPI:
             json={
                 "topic": "Test",
                 "question_count": 2,
-                "question_types": ["multiple_choice"],
+                "question_types": ["single_choice"],
                 "difficulty": "medium",
                 "language": "de",
                 "tag_ids": [999],
@@ -612,7 +612,7 @@ class TestRAGAPI:
             json={
                 "topic": "Test",
                 "question_count": 2,
-                "question_types": ["multiple_choice"],
+                "question_types": ["single_choice"],
                 "difficulty": "medium",
                 "language": "de",
                 "tag_ids": [2],
@@ -638,7 +638,7 @@ class TestRAGAPI:
             json={
                 "topic": "Test",
                 "question_count": 2,
-                "question_types": ["multiple_choice"],
+                "question_types": ["single_choice"],
                 "difficulty": "medium",
                 "language": "de",
                 "tag_ids": [3],
@@ -795,7 +795,7 @@ class TestRAGQuestionPersistence:
 
         q1 = Mock()
         q1.question_text = "Was ist Unit Testing?"
-        q1.question_type = "multiple_choice"
+        q1.question_type = "single_choice"
         q1.options = ["A) Spass", "B) Qualitaet", "C) Zeitverschwendung", "D) Kunst"]
         q1.correct_answer = "B"
         q1.explanation = "Unit Testing sichert Qualitaet"

@@ -78,7 +78,8 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   }), [t]);
 
   const TYPE_ABBREV = useMemo<Record<string, string>>(() => ({
-    multiple_choice: t('composer.questionPool.typeMultipleChoice'),
+    single_choice: t('composer.questionPool.typeMultipleChoice'),
+    multiple_choice: t('composer.questionPool.typeMultipleResponse'),
     true_false: t('composer.questionPool.typeTrueFalse'),
     open_ended: t('composer.questionPool.typeOpenEnded'),
   }), [t]);
@@ -580,7 +581,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
 
       {/* Type + difficulty filter chips */}
       <div className="flex gap-2 flex-wrap mb-3">
-        {(['multiple_choice', 'true_false', 'open_ended'] as const).map((type) => (
+        {(['single_choice', 'multiple_choice', 'true_false', 'open_ended'] as const).map((type) => (
           <button
             key={type}
             onClick={() => setFilterType(filterType === type ? '' : type)}
@@ -997,7 +998,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
               <div>
                 <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.autoFillTypes')}</p>
                 <div className="flex gap-2 flex-wrap">
-                  {(['multiple_choice', 'true_false', 'open_ended'] as const).map((qt) => (
+                  {(['single_choice', 'multiple_choice', 'true_false', 'open_ended'] as const).map((qt) => (
                     <button key={qt} type="button" onClick={() => toggleAutoFillType(qt)}
                       className={`text-xs px-2 py-1 rounded-full border transition-colors ${
                         autoFillForm.question_types.includes(qt) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300'
@@ -1131,7 +1132,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
               <div>
                 <p className="text-sm text-gray-600 mb-1">{t('composer.questionPool.autoFillTypes')}</p>
                 <div className="flex gap-2 flex-wrap">
-                  {(['multiple_choice', 'true_false', 'open_ended'] as const).map((qt) => (
+                  {(['single_choice', 'multiple_choice', 'true_false', 'open_ended'] as const).map((qt) => (
                     <button key={qt} type="button"
                       onClick={() => setCompositionForm((f) => ({
                         ...f, question_types: f.question_types.includes(qt)
@@ -1199,7 +1200,8 @@ const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({ question, isAdded, 
   }), [t]);
 
   const TYPE_ABBREV = useMemo<Record<string, string>>(() => ({
-    multiple_choice: t('composer.questionPool.typeMultipleChoice'),
+    single_choice: t('composer.questionPool.typeMultipleChoice'),
+    multiple_choice: t('composer.questionPool.typeMultipleResponse'),
     true_false: t('composer.questionPool.typeTrueFalse'),
     open_ended: t('composer.questionPool.typeOpenEnded'),
   }), [t]);

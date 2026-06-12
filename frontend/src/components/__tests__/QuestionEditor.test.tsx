@@ -46,7 +46,7 @@ const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const mockQuestion: QuestionReview = {
   id: 1,
   question_text: 'What is a heap data structure?',
-  question_type: 'multiple_choice',
+  question_type: 'single_choice',
   options: ['A tree-based structure', 'A linear structure', 'A graph structure'],
   correct_answer: 'A tree-based structure',
   explanation: 'A heap is a specialized tree-based data structure.',
@@ -448,6 +448,101 @@ describe.skip('QuestionEditor', () => {
       expect(screen.getByLabelText(/Question Text/i)).toBeDisabled();
       expect(screen.getByLabelText(/Explanation/i)).toBeDisabled();
       expect(screen.getByRole('button', { name: /Save Changes/i })).toBeDisabled();
+    });
+  });
+});
+
+/**
+ * TF-403: multi-answer `multiple_choice` correct-answer editing + validation.
+ *
+ * Separate, NON-skipped block (the legacy suite above is `describe.skip`ed for
+ * unrelated reasons). i18n is mocked in setupTests to return the real German
+ * strings, so assertions use the German labels/messages.
+ */
+describe('QuestionEditor — TF-403 multiple_choice', () => {
+  const onClose = jest.fn();
+  const onSave = jest.fn().mockResolvedValue(undefined);
+
+  // German values from core/frontend/src/locales/de/translation.json
+  const SAVE = 'Änderungen speichern';
+  const ERR_SELECT = 'Bitte wählen Sie eine korrekte Antwort';
+  const ERR_IN_OPTIONS = 'Die korrekte Antwort muss eine der Optionen sein';
+
+  const multiQuestion: QuestionReview = {
+    ...mockQuestion,
+    question_type: 'multiple_choice',
+    options: ['Bern', 'Genf', 'Zürich'],
+    correct_answer: '', // nothing selected yet
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const renderEditor = (question: QuestionReview) =>
+    render(
+      <TestWrapper>
+        <QuestionEditor question={question} open={true} onClose={onClose} onSave={onSave} />
+      </TestWrapper>
+    );
+
+  it('blocks save with an error when no correct answer is selected', async () => {
+    renderEditor(multiQuestion);
+
+    // Make a change so the Save button enables, without selecting an answer.
+    fireEvent.change(screen.getByLabelText(/Fragetext/i), {
+      target: { value: 'Welche zwei Städte liegen in der Schweiz?' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() => {
+      expect(screen.getByText(ERR_SELECT)).toBeInTheDocument();
+    });
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('blocks save when a selected answer is not among the options', async () => {
+    renderEditor({ ...multiQuestion, correct_answer: '["Paris"]' });
+
+    // Trigger a change to enable Save; the stale "Paris" selection stays invalid.
+    fireEvent.change(screen.getByLabelText(/Fragetext/i), {
+      target: { value: 'Welche Stadt liegt in der Schweiz?' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() => {
+      expect(screen.getByText(ERR_IN_OPTIONS)).toBeInTheDocument();
+    });
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('toggling a checkbox serializes the selection to a JSON array and saves', async () => {
+    renderEditor(multiQuestion);
+
+    // The "Korrekte Antworten" section renders one checkbox per option.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Bern' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Zürich' }));
+    fireEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(
+        multiQuestion.id,
+        expect.objectContaining({ correct_answer: '["Bern","Zürich"]' })
+      );
+    });
+  });
+
+  it('un-checking a selected option removes it from the JSON array', async () => {
+    renderEditor({ ...multiQuestion, correct_answer: '["Bern","Zürich"]' });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Bern' })); // uncheck Bern
+    fireEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(
+        multiQuestion.id,
+        expect.objectContaining({ correct_answer: '["Zürich"]' })
+      );
     });
   });
 });

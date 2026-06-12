@@ -266,7 +266,7 @@ def _make_exam_with_one_mc_question(
 ) -> tuple[Exam, ExamQuestion]:
     qr = QuestionReview(
         question_text="Hauptstadt der Schweiz?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["Bern", "Zürich", "Genf"],
         correct_answer="Bern",
         difficulty="easy",

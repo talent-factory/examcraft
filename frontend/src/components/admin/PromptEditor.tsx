@@ -101,7 +101,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
 
   const USE_CASE_LABELS: Record<string, string> = {
     'question_generation': t('admin.promptEditor.useCaseGeneral'),
-    'question_generation_multiple_choice': t('admin.promptEditor.useCaseMultipleChoice'),
+    'question_generation_single_choice': t('admin.promptEditor.useCaseMultipleChoice'),
     'question_generation_open_ended': t('admin.promptEditor.useCaseOpenEnded'),
     'question_generation_true_false': t('admin.promptEditor.useCaseTrueFalse'),
     'chatbot': t('admin.promptEditor.useCaseChatbot'),

@@ -10,7 +10,22 @@ from xml.dom.minidom import parseString
 
 import markdown as _markdown
 
+from services.grading.deterministic_grader import DeterministicGrader
+
 logger = logging.getLogger(__name__)
+
+
+def _normalized_option_token(text: str) -> str:
+    """Normalize an option string exactly like the grader's
+    ``_parse_answer_set`` (trim + lowercase + Moodle letter-prefix
+    stripping), so the Moodle export marks the same options correct that
+    ``DeterministicGrader`` scores as correct (TF-403). Without this the
+    export compares raw option text while the grader compares normalized
+    tokens, and letter-keyed ``correct_answer`` data grades and exports
+    inconsistently."""
+    norm = DeterministicGrader._normalise(text)
+    stripped = DeterministicGrader._strip_letter_prefix(norm)
+    return stripped if stripped else norm
 
 
 def _md_to_html(text: str | None) -> str:
@@ -72,7 +87,9 @@ class MarkdownExporter:
             )
             lines.append(f"{q['question_text']}\n")
 
-            if q["question_type"] == "multiple_choice" and q.get("options"):
+            if q["question_type"] in ("single_choice", "multiple_choice") and q.get(
+                "options"
+            ):
                 lines.append("")
                 for opt in q["options"]:
                     lines.append(f"- [ ] {opt}")
@@ -176,8 +193,10 @@ class MoodleXmlExporter:
 
         for slot, q in enumerate(exam_data["questions"], start=1):
             qtype = q["question_type"]
-            if qtype == "multiple_choice":
+            if qtype == "single_choice":
                 _add_mc_question(quiz, q)
+            elif qtype == "multiple_choice":
+                _add_multichoice_multi_question(quiz, q)
             elif qtype == "true_false":
                 _add_tf_question(quiz, q)
             else:
@@ -206,7 +225,8 @@ class MoodleXmlExporter:
 
 def _type_label(question_type: str) -> str:
     return {
-        "multiple_choice": "Multiple Choice",
+        "single_choice": "Einfachauswahl",
+        "multiple_choice": "Mehrfachauswahl",
         "true_false": "Wahr/Falsch",
         "open_ended": "Offene Frage",
     }.get(question_type, question_type)
@@ -233,6 +253,74 @@ def _add_mc_question(quiz: Element, q: dict):
         answer = SubElement(
             question, "answer", fraction="100" if opt == correct else "0"
         )
+        SubElement(answer, "text").text = opt
+        feedback = SubElement(answer, "feedback")
+        SubElement(feedback, "text").text = ""
+
+    if q.get("explanation"):
+        gf = SubElement(question, "generalfeedback", format="html")
+        SubElement(gf, "text").text = _md_to_html(q["explanation"])
+
+
+def _format_fraction(value: float) -> str:
+    """Format a Moodle fraction: whole numbers without trailing ``.0``
+    (``"50"``, ``"-50"``, ``"-100"``), thirds with 5 decimal places
+    (``"33.33333"``) as required by Moodle's fixed fraction set."""
+    rounded = round(value, 5)
+    if rounded == int(rounded):
+        return str(int(rounded))
+    return f"{rounded:.5f}"
+
+
+def _add_multichoice_multi_question(quiz: Element, q: dict):
+    """Export a multi-answer ``multiple_choice`` question as a Moodle
+    multichoice with ``<single>false</single>`` and partial fractions.
+
+    For k correct of N options, each correct option gets ``100/k`` and
+    each wrong option ``-100/(N-k)`` so a fully-correct selection scores
+    100 and over-selecting is penalised. Fractions are formatted to
+    Moodle's fixed set (whole numbers plain, thirds to 5 dp).
+
+    Membership is decided on grader-normalized tokens (see
+    ``_normalized_option_token``) so the export marks exactly the options
+    ``DeterministicGrader`` scores as correct. If no option matches the
+    correct set (``k == 0`` — malformed/letter-mismatched data) the
+    question would export with every option negative and be unscoreable,
+    so it is skipped with a loud warning rather than shipped broken."""
+    options = q.get("options") or []
+    raw_correct = q.get("correct_answer", "") or ""
+    # Same parser the grader uses: JSON-array canonical form, comma/
+    # semicolon legacy fallback, trim + lowercase + letter-prefix strip.
+    # Logs on its own when a JSON-looking value fails to parse.
+    correct_set = DeterministicGrader._parse_answer_set(raw_correct)
+    option_tokens = [(_normalized_option_token(opt), opt) for opt in options]
+    k = sum(1 for tok, _ in option_tokens if tok in correct_set)
+
+    if k == 0:
+        logger.warning(
+            "Multi-choice question at position %s: keine Option passt zur "
+            "correct_answer %r — Frage wird NICHT exportiert (unbewertbar).",
+            q.get("position"),
+            raw_correct,
+        )
+        return
+
+    question = SubElement(quiz, "question", type="multichoice")
+    name = SubElement(question, "name")
+    SubElement(name, "text").text = f"Frage {q['position']}"
+    qtext = SubElement(question, "questiontext", format="html")
+    SubElement(qtext, "text").text = _md_to_html(q["question_text"])
+    SubElement(question, "defaultgrade").text = str(q["points"])
+    SubElement(question, "single").text = "false"
+    SubElement(question, "shuffleanswers").text = "0"
+
+    n_wrong = len(options) - k
+    pos_fraction = _format_fraction(100 / k)
+    neg_fraction = _format_fraction(-100 / n_wrong) if n_wrong else "0"
+
+    for tok, opt in option_tokens:
+        fraction = pos_fraction if tok in correct_set else neg_fraction
+        answer = SubElement(question, "answer", fraction=fraction)
         SubElement(answer, "text").text = opt
         feedback = SubElement(answer, "feedback")
         SubElement(feedback, "text").text = ""

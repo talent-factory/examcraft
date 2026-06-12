@@ -47,6 +47,13 @@ class TestSuggestPoints:
         """Lookup is case-sensitive -- capitalized keys get default."""
         assert suggest_points("Open_Ended", "Medium") == DEFAULT_POINTS
 
+    def test_multiple_choice_suggestions(self):
+        """TF-403: multiple_choice (Mehrfachauswahl) gets its own 3/5/8 scale,
+        distinct from single_choice's 2/4/6."""
+        assert suggest_points("multiple_choice", "easy") == 3.0
+        assert suggest_points("multiple_choice", "medium") == 5.0
+        assert suggest_points("multiple_choice", "hard") == 8.0
+
 
 class TestComposeQuestions:
     def test_basic_point_budget(self):
@@ -55,7 +62,7 @@ class TestComposeQuestions:
             _candidate(1, "open_ended", "medium"),  # 6 pts
             _candidate(2, "open_ended", "easy"),  # 3 pts
             _candidate(3, "open_ended", "hard"),  # 10 pts
-            _candidate(4, "multiple_choice", "easy"),  # 2 pts
+            _candidate(4, "single_choice", "easy"),  # 2 pts
         ]
         constraints = CompositionConstraints(target_points=12.0)
         result = compose_questions(candidates, constraints)
@@ -163,7 +170,7 @@ class TestComposeQuestions:
         """Does not select questions that would exceed budget."""
         candidates = [
             _candidate(1, "open_ended", "hard"),  # 10 pts
-            _candidate(2, "multiple_choice", "easy"),  # 2 pts
+            _candidate(2, "single_choice", "easy"),  # 2 pts
         ]
         constraints = CompositionConstraints(target_points=5.0)
         result = compose_questions(candidates, constraints)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from services.grading.deterministic_grader import DeterministicGrader, GradeOutcome
@@ -28,11 +30,11 @@ def grader() -> DeterministicGrader:
         ("Wien", "Berlin", False),
     ],
 )
-def test_multiple_choice_basic(
+def test_single_choice_basic(
     grader: DeterministicGrader, given: str, correct: str, is_correct: bool
 ) -> None:
     outcome = grader.grade(
-        question_type="multiple_choice",
+        question_type="single_choice",
         given_answer=given,
         correct_answer=correct,
         points_max=4.0,
@@ -43,11 +45,11 @@ def test_multiple_choice_basic(
     assert outcome.status == "proposed"
 
 
-def test_multiple_choice_empty_given_answer_is_wrong(
+def test_single_choice_empty_given_answer_is_wrong(
     grader: DeterministicGrader,
 ) -> None:
     outcome = grader.grade(
-        question_type="multiple_choice",
+        question_type="single_choice",
         given_answer=None,
         correct_answer="A",
         points_max=2.0,
@@ -56,11 +58,11 @@ def test_multiple_choice_empty_given_answer_is_wrong(
     assert outcome.points_awarded == 0.0
 
 
-def test_multiple_choice_missing_correct_answer_is_wrong(
+def test_single_choice_missing_correct_answer_is_wrong(
     grader: DeterministicGrader,
 ) -> None:
     outcome = grader.grade(
-        question_type="multiple_choice",
+        question_type="single_choice",
         given_answer="A",
         correct_answer=None,
         points_max=2.0,
@@ -84,11 +86,11 @@ def test_multiple_choice_missing_correct_answer_is_wrong(
         ("B) Bern", "b) Bern"),
     ],
 )
-def test_multiple_choice_letter_prefix_tolerance(
+def test_single_choice_letter_prefix_tolerance(
     grader: DeterministicGrader, given: str, correct: str
 ) -> None:
     outcome = grader.grade(
-        question_type="multiple_choice",
+        question_type="single_choice",
         given_answer=given,
         correct_answer=correct,
         points_max=4.0,
@@ -97,19 +99,233 @@ def test_multiple_choice_letter_prefix_tolerance(
     assert outcome.points_awarded == 4.0
 
 
-def test_multiple_choice_letter_prefix_does_not_match_unrelated(
+def test_single_choice_letter_prefix_does_not_match_unrelated(
     grader: DeterministicGrader,
 ) -> None:
     """``B) Bern`` must not match ``A) Bern`` once stripped — different
     options that happen to have the same canonical text are still the
     same answer; but ``B) Bern`` must NOT match ``A) Zürich``."""
     outcome = grader.grade(
-        question_type="multiple_choice",
+        question_type="single_choice",
         given_answer="B) Bern",
         correct_answer="A) Zürich",
         points_max=4.0,
     )
     assert outcome.is_correct is False
+
+
+# ---------------------------------------------------------------------------
+# Multiple Choice (Mehrfachauswahl) — Moodle-fractional Teilpunkte
+# ---------------------------------------------------------------------------
+
+
+def test_multiple_choice_exact_set_full_marks(grader: DeterministicGrader) -> None:
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps(["A", "C"]),
+        correct_answer=json.dumps(["A", "C"]),
+        points_max=4.0,
+        num_options=4,
+    )
+    assert out.points_awarded == 4.0 and out.is_correct is True
+
+
+def test_multiple_choice_partial_one_of_two_no_wrong(
+    grader: DeterministicGrader,
+) -> None:
+    # pos=1/2, neg=0 -> 0.5*4 = 2.0
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps(["A"]),
+        correct_answer=json.dumps(["A", "C"]),
+        points_max=4.0,
+        num_options=4,
+    )
+    assert out.points_awarded == 2.0 and out.is_correct is False
+
+
+def test_multiple_choice_penalty_for_wrong(grader: DeterministicGrader) -> None:
+    # A correct + B wrong: pos=1/2, neg=1/2 (wrong_total=2) -> 0.0
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps(["A", "B"]),
+        correct_answer=json.dumps(["A", "C"]),
+        points_max=4.0,
+        num_options=4,
+    )
+    assert out.points_awarded == 0.0 and out.is_correct is False
+
+
+def test_multiple_choice_select_all_is_zero(grader: DeterministicGrader) -> None:
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps(["A", "B", "C", "D"]),
+        correct_answer=json.dumps(["A", "C"]),
+        points_max=4.0,
+        num_options=4,
+    )
+    assert out.points_awarded == 0.0
+
+
+def test_multiple_choice_empty_is_zero(grader: DeterministicGrader) -> None:
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps([]),
+        correct_answer=json.dumps(["A", "C"]),
+        points_max=4.0,
+        num_options=4,
+    )
+    assert out.points_awarded == 0.0
+
+
+def test_multiple_choice_all_options_correct_no_penalty_term(
+    grader: DeterministicGrader,
+) -> None:
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps(["A", "B"]),
+        correct_answer=json.dumps(["A", "B"]),
+        points_max=4.0,
+        num_options=2,
+    )
+    assert out.points_awarded == 4.0
+
+
+def test_multiple_choice_missing_num_options_routes_to_needs_review(
+    grader: DeterministicGrader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """num_options missing/invalid → 0 points, ``is_correct=None`` (the
+    open-ended needs-review sentinel, so _compute_grade_status routes the
+    submission to pending_review instead of silently zeroing behind
+    fully_reviewed), and a loud warning (patched logger, not caplog: this
+    suite disables propagation)."""
+    from services.grading import deterministic_grader as dg_module
+
+    captured: list[tuple[str, tuple]] = []
+    monkeypatch.setattr(
+        dg_module.logger,
+        "warning",
+        lambda fmt, *args, **kwargs: captured.append((fmt, args)),
+    )
+
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps(["A"]),
+        correct_answer=json.dumps(["A", "C"]),
+        points_max=4.0,
+        num_options=None,
+    )
+    assert out.points_awarded == 0.0 and out.is_correct is None
+    assert captured  # at least one warning emitted
+
+
+def test_multiple_choice_empty_correct_answer_routes_to_needs_review(
+    grader: DeterministicGrader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """k==0 (no usable correct set) must flag needs-review (is_correct=None),
+    not score a confident 0, so a misconfigured question reaches a human."""
+    from services.grading import deterministic_grader as dg_module
+
+    captured: list[tuple[str, tuple]] = []
+    monkeypatch.setattr(
+        dg_module.logger,
+        "warning",
+        lambda fmt, *args, **kwargs: captured.append((fmt, args)),
+    )
+
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps(["A"]),
+        correct_answer="",
+        points_max=4.0,
+        num_options=4,
+    )
+    assert out.points_awarded == 0.0 and out.is_correct is None
+    assert captured
+
+
+def test_multiple_choice_k_exceeds_num_options_routes_to_needs_review(
+    grader: DeterministicGrader,
+) -> None:
+    """More correct tokens than options is a misconfiguration (negative
+    wrong_total) — flag needs-review rather than compute garbage."""
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps(["A", "B"]),
+        correct_answer=json.dumps(["A", "B", "C"]),
+        points_max=4.0,
+        num_options=2,  # k=3 > N=2
+    )
+    assert out.points_awarded == 0.0 and out.is_correct is None
+
+
+def test_multiple_choice_partial_with_wrong_nets_nonzero_fraction(
+    grader: DeterministicGrader,
+) -> None:
+    """All correct picked plus one wrong: pos=2/2=1.0, neg=1/3 over 3
+    wrong options -> fraction 0.6667 * 4 = 2.6667 (a non-trivial
+    fractional result a sign/divisor error would not produce)."""
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps(["A", "C", "B"]),
+        correct_answer=json.dumps(["A", "C"]),
+        points_max=4.0,
+        num_options=5,
+    )
+    assert out.points_awarded == 2.6667
+    assert out.is_correct is False
+
+
+def test_multiple_choice_semicolon_legacy_split(grader: DeterministicGrader) -> None:
+    """Legacy non-JSON semicolon-separated answers parse symmetrically."""
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer="A; C",
+        correct_answer="A; C",
+        points_max=4.0,
+        num_options=4,
+    )
+    assert out.points_awarded == 4.0 and out.is_correct is True
+
+
+def test_multiple_choice_letter_prefix_normalisation_in_set(
+    grader: DeterministicGrader,
+) -> None:
+    """Moodle letter-prefixed given ("A) Bern") matches the canonical
+    option text ("Bern") on both sides of a multi-answer set."""
+    out = grader.grade(
+        question_type="multiple_choice",
+        given_answer=json.dumps(["A) Bern", "C) Genf"]),
+        correct_answer=json.dumps(["Bern", "Genf"]),
+        points_max=4.0,
+        num_options=4,
+    )
+    assert out.points_awarded == 4.0 and out.is_correct is True
+
+
+def test_multiple_choice_malformed_json_array_warns(
+    grader: DeterministicGrader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A value that looks like a JSON array but fails to parse must warn
+    (mirrors the true_false question-bank-bug warning) instead of silently
+    mis-parsing via the delimiter fallback."""
+    from services.grading import deterministic_grader as dg_module
+
+    captured: list[tuple[str, tuple]] = []
+    monkeypatch.setattr(
+        dg_module.logger,
+        "warning",
+        lambda fmt, *args, **kwargs: captured.append((fmt, args)),
+    )
+
+    grader.grade(
+        question_type="multiple_choice",
+        given_answer='["A"',  # malformed — missing closing bracket
+        correct_answer=json.dumps(["A", "C"]),
+        points_max=4.0,
+        num_options=4,
+    )
+    assert any('["A"' in repr(args) for _fmt, args in captured)
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +460,7 @@ def test_multi_select_mc_uses_strict_canonical_equality(
     not an accidental side-effect.
     """
     outcome = grader.grade(
-        question_type="multiple_choice",
+        question_type="single_choice",
         given_answer=given,
         correct_answer=correct,
         points_max=2.0,
@@ -445,4 +661,182 @@ def test_grade_submission_handles_unknown_question_type_as_stub(
     assert answer.grade.points_awarded == 0.0
     assert answer.grade.is_correct is None
     # Submission stays pending_review because is_correct=None gates it
+    assert submission.grade_status == "pending_review"
+
+
+def test_grade_submission_multiple_choice_awards_partial_credit(test_db) -> None:
+    """TF-403 wiring: GradingService passes num_options=len(options) so a
+    multiple_choice answer gets Moodle-fractional partial credit end-to-end.
+
+    Question has 4 options, correct={A,C}; student picks only A:
+    pos=1/2, neg=0 -> 0.5 * 4 = 2.0 points, is_correct False.
+    """
+    from datetime import date
+
+    from models.auth import Institution
+    from models.exam import Exam, ExamQuestion
+    from models.question_review import QuestionReview
+    from models.student import Student
+    from models.submission import Attempt, AttemptAnswer, Submission
+    from services.grading_service import GradingService
+
+    inst = Institution(
+        name="MC-Partial Inst",
+        slug="mc-partial-test",
+        subscription_tier="professional",
+        max_users=10,
+        max_documents=100,
+        max_questions_per_month=1000,
+    )
+    test_db.add(inst)
+    test_db.flush()
+
+    mc_q = QuestionReview(
+        question_text="Welche sind Primzahlen?",
+        question_type="multiple_choice",
+        options=["A) 2", "B) 4", "C) 3", "D) 6"],
+        correct_answer=json.dumps(["A", "C"]),
+        difficulty="medium",
+        topic="Mathe",
+        institution_id=inst.id,
+    )
+    test_db.add(mc_q)
+    test_db.flush()
+
+    exam = Exam(
+        title="MC",
+        course="Y",
+        exam_date=date(2026, 5, 15),
+        passing_percentage=50.0,
+        total_points=4.0,
+        status="finalized",
+        language="de",
+        institution_id=inst.id,
+    )
+    student = Student(institution_id=inst.id, external_id="mc@example.org")
+    test_db.add_all([exam, student])
+    test_db.flush()
+    eq = ExamQuestion(exam_id=exam.id, question_id=mc_q.id, position=1, points=4.0)
+    test_db.add(eq)
+    test_db.flush()
+
+    submission = Submission(
+        exam_id=exam.id, student_id=student.id, scoring_strategy="latest"
+    )
+    test_db.add(submission)
+    test_db.flush()
+
+    attempt = Attempt(
+        submission_id=submission.id,
+        institution_id=inst.id,
+        attempt_number=1,
+        source="moodle_csv",
+        source_attempt_id="mc|2026-05-15|1",
+    )
+    test_db.add(attempt)
+    test_db.flush()
+
+    answer = AttemptAnswer(
+        attempt_id=attempt.id,
+        exam_question_id=eq.id,
+        given_answer=json.dumps(["A"]),
+    )
+    test_db.add(answer)
+    test_db.commit()
+
+    result = GradingService(test_db).grade_submission(submission.id)
+    assert result is submission
+    test_db.refresh(answer)
+    assert answer.grade is not None
+    assert answer.grade.points_awarded == 2.0
+    assert answer.grade.is_correct is False
+
+
+def test_grade_submission_misconfigured_multiple_choice_pending_review(
+    test_db,
+) -> None:
+    """TF-403 regression: a multiple_choice question with no options
+    (num_options=0) must NOT silently zero the student behind a
+    fully_reviewed status. The grader returns is_correct=None, which gates
+    the submission to pending_review so a human looks at it.
+    """
+    from datetime import date
+
+    from models.auth import Institution
+    from models.exam import Exam, ExamQuestion
+    from models.question_review import QuestionReview
+    from models.student import Student
+    from models.submission import Attempt, AttemptAnswer, Submission
+    from services.grading_service import GradingService
+
+    inst = Institution(
+        name="MC-Misconfig Inst",
+        slug="mc-misconfig-test",
+        subscription_tier="professional",
+        max_users=10,
+        max_documents=100,
+        max_questions_per_month=1000,
+    )
+    test_db.add(inst)
+    test_db.flush()
+
+    mc_q = QuestionReview(
+        question_text="Welche sind Primzahlen?",
+        question_type="multiple_choice",
+        options=None,  # misconfigured: no options -> num_options=0
+        correct_answer=json.dumps(["A", "C"]),
+        difficulty="medium",
+        topic="Mathe",
+        institution_id=inst.id,
+    )
+    test_db.add(mc_q)
+    test_db.flush()
+
+    exam = Exam(
+        title="MC",
+        course="Y",
+        exam_date=date(2026, 5, 15),
+        passing_percentage=50.0,
+        total_points=4.0,
+        status="finalized",
+        language="de",
+        institution_id=inst.id,
+    )
+    student = Student(institution_id=inst.id, external_id="mcbad@example.org")
+    test_db.add_all([exam, student])
+    test_db.flush()
+    eq = ExamQuestion(exam_id=exam.id, question_id=mc_q.id, position=1, points=4.0)
+    test_db.add(eq)
+    test_db.flush()
+
+    submission = Submission(
+        exam_id=exam.id, student_id=student.id, scoring_strategy="latest"
+    )
+    test_db.add(submission)
+    test_db.flush()
+
+    attempt = Attempt(
+        submission_id=submission.id,
+        institution_id=inst.id,
+        attempt_number=1,
+        source="moodle_csv",
+        source_attempt_id="mcbad|2026-05-15|1",
+    )
+    test_db.add(attempt)
+    test_db.flush()
+
+    answer = AttemptAnswer(
+        attempt_id=attempt.id,
+        exam_question_id=eq.id,
+        given_answer=json.dumps(["A", "C"]),  # would be fully correct if configured
+    )
+    test_db.add(answer)
+    test_db.commit()
+
+    result = GradingService(test_db).grade_submission(submission.id)
+    assert result is submission
+    test_db.refresh(answer)
+    assert answer.grade is not None
+    assert answer.grade.points_awarded == 0.0
+    assert answer.grade.is_correct is None
     assert submission.grade_status == "pending_review"

@@ -29,7 +29,7 @@ class TestReviewService:
         mock = Mock(spec=QuestionReview)
         mock.id = 1
         mock.question_text = "What is a heap?"
-        mock.question_type = "multiple_choice"
+        mock.question_type = "single_choice"
         mock.options = ["Tree", "Array", "Graph"]
         mock.correct_answer = "Tree"
         mock.explanation = "A heap is a tree-based structure"
@@ -89,7 +89,7 @@ class TestReviewService:
 
         questions = service.get_pending_reviews(
             difficulty="medium",
-            question_type="multiple_choice",
+            question_type="single_choice",
             limit=10,
             offset=0,
         )

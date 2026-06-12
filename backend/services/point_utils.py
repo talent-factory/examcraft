@@ -5,9 +5,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 POINT_SUGGESTIONS = {
-    ("multiple_choice", "easy"): 2,
-    ("multiple_choice", "medium"): 4,
-    ("multiple_choice", "hard"): 6,
+    ("single_choice", "easy"): 2,
+    ("single_choice", "medium"): 4,
+    ("single_choice", "hard"): 6,
+    ("multiple_choice", "easy"): 3,
+    ("multiple_choice", "medium"): 5,
+    ("multiple_choice", "hard"): 8,
     ("true_false", "easy"): 1,
     ("true_false", "medium"): 2,
     ("true_false", "hard"): 3,

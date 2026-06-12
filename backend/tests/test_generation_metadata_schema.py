@@ -13,7 +13,7 @@ from schemas.generation_metadata import GenerationMetadata
 
 def test_default_state_flag_present_and_false():
     gm = GenerationMetadata(
-        prompt_name="default_multiple_choice",
+        prompt_name="default_single_choice",
         is_default_template=True,
         variables={"topic": "X"},
     )

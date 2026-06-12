@@ -22,7 +22,7 @@ const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const mockQuestion: QuestionReview = {
   id: 1,
   question_text: 'What is a heap data structure?',
-  question_type: 'multiple_choice',
+  question_type: 'single_choice',
   options: ['A tree-based structure', 'A linear structure', 'A graph structure', 'A hash table'],
   correct_answer: 'A tree-based structure',
   explanation: 'A heap is a specialized tree-based data structure that satisfies the heap property.',
@@ -328,7 +328,7 @@ describe('QuestionReviewCard', () => {
         ...mockQuestion,
         generation_metadata: {
           prompt_id: 'uuid-123',
-          prompt_name: 'universal_multiple_choice_generator',
+          prompt_name: 'universal_single_choice_generator',
           prompt_version: 3,
           is_default_template: false,
           fallback_to_default: false,
@@ -343,7 +343,7 @@ describe('QuestionReviewCard', () => {
       );
 
       expect(
-        screen.getByText('universal_multiple_choice_generator v3')
+        screen.getByText('universal_single_choice_generator v3')
       ).toBeInTheDocument();
     });
 
@@ -352,7 +352,7 @@ describe('QuestionReviewCard', () => {
         ...mockQuestion,
         generation_metadata: {
           prompt_id: null,
-          prompt_name: 'default_multiple_choice',
+          prompt_name: 'default_single_choice',
           prompt_version: null,
           is_default_template: true,
           fallback_to_default: false,

@@ -83,7 +83,7 @@ const startTaskAndGetWs = async (): Promise<MockWebSocket> => {
     await captured!.startGeneration({
       topic: 'T',
       question_count: 1,
-      question_types: ['multiple_choice'],
+      question_types: ['single_choice'],
       difficulty: 'medium',
       language: 'de',
       document_ids: null,

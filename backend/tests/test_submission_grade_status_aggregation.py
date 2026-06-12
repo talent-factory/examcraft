@@ -181,7 +181,7 @@ def test_only_mc_answers_are_fully_reviewed_immediately(test_db: Session) -> Non
     test_db.flush()
     qr = QuestionReview(
         question_text="MC",
-        question_type="multiple_choice",
+        question_type="single_choice",
         correct_answer="A",
         difficulty="easy",
         topic="T",

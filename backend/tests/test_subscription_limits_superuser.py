@@ -188,7 +188,7 @@ def _create_questions(test_db, institution, count, start_id=600):
             QuestionReview(
                 id=start_id + i,
                 question_text=f"Q{i}",
-                question_type="multiple_choice",
+                question_type="single_choice",
                 options=["a", "b"],
                 correct_answer="a",
                 explanation="x",

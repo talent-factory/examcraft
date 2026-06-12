@@ -95,7 +95,7 @@ def test_generate_questions_task_emits_step_zero():
         request_data = {
             "topic": "Heapsort",
             "question_count": 1,
-            "question_types": ["multiple_choice"],
+            "question_types": ["single_choice"],
             "difficulty": "medium",
             "language": "de",
             "document_ids": None,
@@ -133,7 +133,7 @@ def test_generate_questions_task_returns_correct_format():
     mock_result.exam_id = "exam_001"
     mock_result.topic = "Heapsort"
     mock_result.questions = [
-        FakeQuestion(question_text="Was ist ein Heap?", question_type="multiple_choice")
+        FakeQuestion(question_text="Was ist ein Heap?", question_type="single_choice")
     ]
     mock_result.context_summary = FakeContextSummary(query="Heapsort", total_chunks=3)
     mock_result.generation_time = 5.0
@@ -160,7 +160,7 @@ def test_generate_questions_task_returns_correct_format():
         request_data = {
             "topic": "Heapsort",
             "question_count": 1,
-            "question_types": ["multiple_choice"],
+            "question_types": ["single_choice"],
             "difficulty": "medium",
             "language": "de",
             "document_ids": None,
@@ -193,7 +193,7 @@ def test_generate_questions_task_rejects_when_rag_service_unavailable():
         request_data = {
             "topic": "Heapsort",
             "question_count": 1,
-            "question_types": ["multiple_choice"],
+            "question_types": ["single_choice"],
             "difficulty": "medium",
             "language": "de",
             "document_ids": None,
@@ -474,7 +474,7 @@ def test_generate_questions_task_uses_safe_update_on_success():
 
     fake_q = FakeQuestion(
         question_text="q?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["a", "b", "c", "d"],
         correct_answer="a",
         explanation="e",
@@ -494,7 +494,7 @@ def test_generate_questions_task_uses_safe_update_on_success():
     request_data = {
         "topic": "T",
         "question_count": 1,
-        "question_types": ["multiple_choice"],
+        "question_types": ["single_choice"],
         "difficulty": "medium",
         "language": "de",
         "document_ids": None,
@@ -525,7 +525,7 @@ def test_generate_questions_task_uses_safe_update_on_reject():
     request_data = {
         "topic": "T",
         "question_count": 1,
-        "question_types": ["multiple_choice"],
+        "question_types": ["single_choice"],
         "difficulty": "medium",
         "language": "de",
         "document_ids": None,
@@ -563,7 +563,7 @@ def test_generate_questions_task_uses_safe_update_on_final_retry_failure():
     request_data = {
         "topic": "T",
         "question_count": 1,
-        "question_types": ["multiple_choice"],
+        "question_types": ["single_choice"],
         "difficulty": "medium",
         "language": "de",
         "document_ids": None,
@@ -652,7 +652,7 @@ def _make_fake_question(options):
 
     return SimpleNamespace(
         question_text="Welche Empfehlung gilt für E-Mails?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=options,
         correct_answer="A",
         explanation="Aktive Sprache ist klarer.",
@@ -1103,7 +1103,7 @@ def test_programming_error_marks_job_failure_and_propagates():
     mock_result.exam_id = "exam_e2e"
     mock_result.topic = "Heapsort"
     mock_result.questions = [
-        FakeQuestion(question_text="Was ist ein Heap?", question_type="multiple_choice")
+        FakeQuestion(question_text="Was ist ein Heap?", question_type="single_choice")
     ]
     mock_result.context_summary = FakeContextSummary(query="Heapsort")
     mock_result.generation_time = 1.0
@@ -1122,7 +1122,7 @@ def test_programming_error_marks_job_failure_and_propagates():
         request_data = {
             "topic": "Heapsort",
             "question_count": 1,
-            "question_types": ["multiple_choice"],
+            "question_types": ["single_choice"],
             "difficulty": "medium",
             "language": "de",
             "document_ids": None,
@@ -1245,7 +1245,7 @@ def _run_persist_with_tags(tag_ids: list):
 
     fake_question = SimpleNamespace(
         question_text="Welche Tags werden zugewiesen?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["A", "B", "C", "D"],
         correct_answer="A",
         explanation="Erklärung.",
@@ -1359,7 +1359,7 @@ def test_persist_questions_rejects_invisible_tag_ids():
 
     fake_question = SimpleNamespace(
         question_text="Q?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["A", "B"],
         correct_answer="A",
         explanation="x",
@@ -1443,7 +1443,7 @@ def test_generate_questions_task_passes_tag_ids_from_request_data():
     mock_result = MagicMock()
     mock_result.exam_id = "exam_tf320_task"
     mock_result.topic = "Tags Task Test"
-    mock_result.questions = [FakeQuestion("Q?", "multiple_choice")]
+    mock_result.questions = [FakeQuestion("Q?", "single_choice")]
     mock_result.context_summary = FakeContext("Tags Task Test", 1)
     mock_result.generation_time = 1.0
     mock_result.quality_metrics = {}
@@ -1461,7 +1461,7 @@ def test_generate_questions_task_passes_tag_ids_from_request_data():
         request_data = {
             "topic": "Tags Task Test",
             "question_count": 1,
-            "question_types": ["multiple_choice"],
+            "question_types": ["single_choice"],
             "difficulty": "medium",
             "language": "de",
             "document_ids": None,
@@ -1546,14 +1546,14 @@ def test_persist_questions_stores_generation_metadata():
 
     snapshot = {
         "prompt_id": "uuid-1",
-        "prompt_name": "universal_multiple_choice_generator",
+        "prompt_name": "universal_single_choice_generator",
         "prompt_version": 3,
         "is_default_template": False,
         "variables": {"topic": "Heaps", "difficulty": "medium"},
     }
     fake_question = SimpleNamespace(
         question_text="Was ist ein Heap?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["A", "B", "C", "D"],
         correct_answer="A",
         explanation="…",

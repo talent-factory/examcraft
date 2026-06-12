@@ -66,7 +66,7 @@ def _insert_review(test_db, *, review_id: int, options, user_id: int = 9999) -> 
         {
             "id": review_id,
             "question_text": f"Test question {review_id}",
-            "question_type": "multiple_choice",
+            "question_type": "single_choice",
             "options": options_param,
             "correct_answer": "A",
             "difficulty": "medium",

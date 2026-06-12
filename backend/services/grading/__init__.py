@@ -1,6 +1,6 @@
 """Grading strategies.
 
-* ``DeterministicGrader`` — ``multiple_choice`` + ``true_false``
+* ``DeterministicGrader`` — ``single_choice`` + ``true_false``
   (pure functions, kein LLM).
 * ``LlmGrader`` — ``open_ended``, Anthropic Claude mit Prompt-Caching.
 

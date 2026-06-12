@@ -19,6 +19,7 @@ export enum PromptCategory {
  * Question Types for Prompt Selection
  */
 export enum QuestionType {
+  SINGLE_CHOICE = 'single_choice',
   MULTIPLE_CHOICE = 'multiple_choice',
   OPEN_ENDED = 'open_ended',
   TRUE_FALSE = 'true_false'
@@ -93,7 +94,7 @@ export interface TemplateVariable {
  * Tracks selected prompts for each question type
  */
 export interface PromptSelection {
-  multiple_choice: string | null;  // Prompt ID
+  single_choice: string | null;  // Prompt ID
   open_ended: string | null;
   true_false: string | null;
 }
@@ -112,7 +113,7 @@ export interface PromptConfig {
  * Used in RAG Exam Request
  */
 export interface PromptConfigMap {
-  multiple_choice?: PromptConfig;
+  single_choice?: PromptConfig;
   open_ended?: PromptConfig;
   true_false?: PromptConfig;
 }

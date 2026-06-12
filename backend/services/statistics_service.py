@@ -337,7 +337,7 @@ class StatisticsService:
             success, difficulty = _success_and_difficulty(ans, eq.points)
             discrimination = _discrimination(ans)
             top_wrong = (
-                _top_wrong_answers(ans) if qr.question_type == "multiple_choice" else []
+                _top_wrong_answers(ans) if qr.question_type == "single_choice" else []
             )
             learning = _learning_effect(learning_by_question.get(eq.id, {}))
 

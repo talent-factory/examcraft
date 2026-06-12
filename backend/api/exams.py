@@ -567,7 +567,7 @@ async def list_approved_questions(
     difficulty: Optional[str] = Query(None, pattern="^(easy|medium|hard)$"),
     bloom_level: Optional[int] = Query(None, ge=1, le=6),
     question_type: Optional[str] = Query(
-        None, pattern="^(multiple_choice|open_ended|true_false)$"
+        None, pattern="^(single_choice|multiple_choice|open_ended|true_false)$"
     ),
     # TF-406: Fachfilter-Facetten (Anforderungsniveau, Handlungskompetenz,
     # Qualitätsstufe) und "noch nie verwendet". Felder liegen am Modell

@@ -165,7 +165,7 @@ def test_preview_returns_correct_counts(test_db, test_institution):
         test_db.add(
             QuestionReview(
                 question_text=f"q{i}",
-                question_type="multiple_choice",
+                question_type="single_choice",
                 difficulty="medium",
                 topic=f"topic{i}",
                 created_by=user.id,
@@ -400,7 +400,7 @@ def test_transfer_user_moves_all_artifact_types(test_db, test_institution):
     review = QuestionReview(
         question_text="q",
         created_by=target_user.id,
-        question_type="multiple_choice",
+        question_type="single_choice",
         difficulty="easy",
         topic="t",
         institution_id=test_institution.id,
@@ -1152,7 +1152,7 @@ def test_transfer_dedups_duplicate_institution_tag(test_db, test_institution):
     # Link the source tag to a question and a document.
     review = QuestionReview(
         question_text="q",
-        question_type="multiple_choice",
+        question_type="single_choice",
         difficulty="easy",
         topic="t",
         created_by=user.id,
@@ -1257,7 +1257,7 @@ def test_transfer_dedup_avoids_duplicate_link(test_db, test_institution):
 
     review = QuestionReview(
         question_text="q",
-        question_type="multiple_choice",
+        question_type="single_choice",
         difficulty="easy",
         topic="t",
         created_by=user.id,

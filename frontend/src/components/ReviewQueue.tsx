@@ -387,7 +387,8 @@ const ReviewQueue: React.FC = () => {
               label={t('components.reviewQueue.filterQuestionType')}
             >
               <MenuItem value="">{t('components.reviewQueue.filterAll')}</MenuItem>
-              <MenuItem value="multiple_choice">{t('components.reviewQueue.filterMultipleChoice')}</MenuItem>
+              <MenuItem value="single_choice">{t('components.reviewQueue.filterSingleChoice')}</MenuItem>
+              <MenuItem value="multiple_choice">{t('components.reviewQueue.filterMultipleResponse')}</MenuItem>
               <MenuItem value="open_ended">{t('components.reviewQueue.filterOpenEnded')}</MenuItem>
               <MenuItem value="true_false">{t('components.reviewQueue.filterTrueFalse')}</MenuItem>
             </Select>

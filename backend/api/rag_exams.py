@@ -61,7 +61,7 @@ class RAGExamRequestModel(BaseModel):
     )
     question_count: int = Field(5, description="Anzahl Fragen", ge=1, le=20)
     question_types: Optional[List[str]] = Field(
-        ["multiple_choice", "open_ended"], description="Fragetypen"
+        ["single_choice", "open_ended"], description="Fragetypen"
     )
     difficulty: Literal["easy", "medium", "hard"] = Field(
         "medium", description="Schwierigkeitsgrad"
@@ -73,7 +73,7 @@ class RAGExamRequestModel(BaseModel):
 
     prompt_config: Optional[Dict[str, PromptConfig]] = Field(
         None,
-        description="Prompt-Konfiguration pro Fragetyp (z.B. {'multiple_choice': {...}, 'open_ended': {...}})",
+        description="Prompt-Konfiguration pro Fragetyp (z.B. {'single_choice': {...}, 'open_ended': {...}})",
     )
     tag_ids: List[int] = Field(
         default_factory=list,
@@ -167,7 +167,7 @@ async def generate_rag_exam(
     - **topic**: Thema der Prüfung (3-200 Zeichen)
     - **document_ids**: Optional spezifische Dokumente
     - **question_count**: Anzahl Fragen (1-20, default: 5)
-    - **question_types**: Fragetypen (multiple_choice, open_ended, true_false)
+    - **question_types**: Fragetypen (single_choice, open_ended, true_false)
     - **difficulty**: Schwierigkeitsgrad (easy, medium, hard)
     - **language**: Sprache (de, en)
     - **context_chunks_per_question**: Context Chunks pro Frage (1-10)
@@ -194,7 +194,7 @@ async def generate_rag_exam(
                     )
 
         # Validiere Question Types
-        valid_types = ["multiple_choice", "open_ended", "true_false"]
+        valid_types = ["single_choice", "multiple_choice", "open_ended", "true_false"]
         if request.question_types:
             for qtype in request.question_types:
                 if qtype not in valid_types:
@@ -671,9 +671,9 @@ async def get_supported_question_types():
     return {
         "supported_types": [
             {
-                "type": "multiple_choice",
-                "name": "Multiple Choice",
-                "description": "Frage mit 4 Antwortoptionen (A, B, C, D)",
+                "type": "single_choice",
+                "name": "Einfachauswahl",
+                "description": "Frage mit 4 Antwortoptionen (A, B, C, D), genau eine richtig",
                 "example": "Welche Aussage ist korrekt?",
             },
             {

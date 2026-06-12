@@ -245,7 +245,7 @@ class TestSubscriptionLimits:
         for i in range(1000):
             question = QuestionReview(
                 question_text=f"Question {i}?",
-                question_type="multiple_choice",
+                question_type="single_choice",
                 difficulty="medium",
                 topic="Test Topic",
                 bloom_level=2,
@@ -275,7 +275,7 @@ class TestSubscriptionLimits:
         for i in range(20):
             question = QuestionReview(
                 question_text=f"Question {i}?",
-                question_type="multiple_choice",
+                question_type="single_choice",
                 difficulty="medium",
                 topic="Test Topic",
                 bloom_level=2,
@@ -308,7 +308,7 @@ class TestSubscriptionLimits:
         for i in range(30):
             question = QuestionReview(
                 question_text=f"Question {i}?",
-                question_type="multiple_choice",
+                question_type="single_choice",
                 difficulty="medium",
                 topic="Test Topic",
                 bloom_level=2,

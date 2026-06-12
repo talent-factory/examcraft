@@ -52,7 +52,7 @@ def exam_with_questions(test_db: Session, institution: Institution) -> Exam:
     """Prüfung mit 1 MC, 1 W/F, 1 offene Frage. Punkte: 4 + 1 + 5 = 10."""
     mc_q = QuestionReview(
         question_text="Hauptstadt der Schweiz?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["A) Zürich", "B) Bern", "C) Genf", "D) Basel"],
         correct_answer="Bern",
         difficulty="easy",
@@ -889,7 +889,7 @@ def test_two_institutions_can_have_overlapping_source_attempt_ids(
 
     mc_q_b = QuestionReview(
         question_text="Hauptstadt der Schweiz?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         correct_answer="Bern",
         difficulty="easy",
         topic="Geo",
@@ -918,7 +918,7 @@ def test_two_institutions_can_have_overlapping_source_attempt_ids(
     # collision case is reachable from CSV.
     mc_q_a = QuestionReview(
         question_text="Hauptstadt der Schweiz?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         correct_answer="Bern",
         difficulty="easy",
         topic="Geo",

@@ -116,7 +116,7 @@ def test_deleting_competency_sets_question_review_competency_id_null(test_db):
     test_db.flush()
     q = QuestionReview(
         question_text="Frage?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         difficulty="medium",
         topic="Kommunikation",
         competency_id=comp.id,
@@ -171,7 +171,7 @@ def test_question_review_links_competency(test_db):
 
     q = QuestionReview(
         question_text="Frage?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         difficulty="medium",
         topic="Kommunikation",
         competency_id=comp.id,

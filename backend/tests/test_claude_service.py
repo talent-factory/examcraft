@@ -206,7 +206,7 @@ class TestClaudeService:
             topic="Python",
             difficulty="medium",
             question_count=3,
-            question_types=["multiple_choice"],
+            question_types=["single_choice"],
             language="de",
         )
 
@@ -221,7 +221,7 @@ class TestClaudeService:
             topic="Python",
             difficulty="medium",
             question_count=3,
-            question_types=["multiple_choice"],
+            question_types=["single_choice"],
             language="en",
         )
 

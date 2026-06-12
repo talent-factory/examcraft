@@ -732,7 +732,7 @@ class ExamRequest(BaseModel):
     topic: str
     difficulty: str = "medium"  # easy, medium, hard
     question_count: int = 5
-    question_types: List[str] = ["multiple_choice", "open_ended"]
+    question_types: List[str] = ["single_choice", "open_ended"]
     language: str = "de"
     tag_ids: Optional[List[int]] = None  # TF-320 Iter2: Tags für generierte Fragen
 
@@ -942,7 +942,7 @@ async def generate_exam(request: ExamRequest):
         for i, q_data in enumerate(question_data):
             question = Question(
                 id=q_data.get("id", f"q{i + 1}"),
-                type=q_data.get("type", "multiple_choice"),
+                type=q_data.get("type", "single_choice"),
                 question=q_data.get("question", ""),
                 options=q_data.get("options"),
                 correct_answer=q_data.get("correct_answer"),
@@ -997,7 +997,7 @@ async def generate_questions_endpoint(
             topic=request.topic,
             difficulty=request.difficulty,
             question_count=request.num_questions,
-            question_types=["multiple_choice", "open_ended"],
+            question_types=["single_choice", "open_ended"],
             language="de",
         )
     except Exception as e:

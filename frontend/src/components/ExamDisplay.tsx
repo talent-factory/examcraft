@@ -8,6 +8,8 @@ import {
   CardContent,
   Radio,
   RadioGroup,
+  Checkbox,
+  FormGroup,
   FormControlLabel,
   FormControl,
   TextField,
@@ -61,8 +63,44 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
     return userAnswers.find(ua => ua.questionId === questionId)?.answer || '';
   };
 
+  // Parse a JSON-array answer string (e.g. '["A","C"]') into a string[]. Falls
+  // back to an empty array for non-array / malformed input so callers can rely
+  // on a stable shape for multiple_choice handling.
+  const parseAnswerArray = (value?: string): string[] => {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Toggle a single option in a multiple_choice answer and persist the new
+  // selection back as a JSON-array string (matching the correct_answer format).
+  const handleMultiAnswerToggle = (questionId: string, option: string) => {
+    const current = parseAnswerArray(getUserAnswer(questionId));
+    const next = current.includes(option)
+      ? current.filter(o => o !== option)
+      : [...current, option];
+    handleAnswerChange(questionId, JSON.stringify(next));
+  };
+
+  // NOTE: this is the in-browser generate-and-preview self-check only — it is
+  // intentionally all-or-nothing. The authoritative, partial-credit grading for
+  // real submissions lives in the backend DeterministicGrader (Moodle-style
+  // fractions). A partially-correct multiple_choice selection shown here as
+  // "wrong" still earns Teilpunkte when actually graded.
   const isCorrectAnswer = (question: Question, userAnswer: string): boolean => {
     if (!question.correct_answer || !userAnswer) return false;
+    if (question.type === 'multiple_choice') {
+      // Set equality of selected vs. correct option strings (order-independent).
+      const correct = parseAnswerArray(question.correct_answer).map(s => s.trim());
+      const given = parseAnswerArray(userAnswer).map(s => s.trim());
+      if (correct.length === 0 || correct.length !== given.length) return false;
+      const correctSet = new Set(correct);
+      return given.every(o => correctSet.has(o));
+    }
     return question.correct_answer.toLowerCase().trim() === userAnswer.toLowerCase().trim();
   };
 
@@ -75,6 +113,17 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
     const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
 
     return { correct, total, percentage };
+  };
+
+  const getTypeLabel = (type: Question['type']): string => {
+    switch (type) {
+      case 'single_choice':
+        return t('components.examDisplay.singleChoice');
+      case 'multiple_choice':
+        return t('components.examDisplay.multipleResponse');
+      default:
+        return t('components.examDisplay.openQuestion');
+    }
   };
 
   const renderQuestion = (question: Question, index: number) => {
@@ -96,7 +145,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
                 <MarkdownRenderer content={question.question} variant="compact" />
               </Box>
               <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <Chip label={question.type === 'multiple_choice' ? t('components.examDisplay.multipleChoice') : t('components.examDisplay.openQuestion')} size="small" />
+                <Chip label={getTypeLabel(question.type)} size="small" />
                 <Chip label={question.difficulty} size="small" color="secondary" />
               </Box>
             </Box>
@@ -111,7 +160,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
             )}
           </Box>
 
-          {question.type === 'multiple_choice' && question.options ? (
+          {question.type === 'single_choice' && question.options ? (
             <FormControl component="fieldset" fullWidth>
               <RadioGroup
                 value={userAnswer}
@@ -146,6 +195,47 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
                   />
                 ))}
               </RadioGroup>
+            </FormControl>
+          ) : question.type === 'multiple_choice' && question.options ? (
+            <FormControl component="fieldset" fullWidth>
+              <FormGroup>
+                {(() => {
+                  const selected = parseAnswerArray(userAnswer);
+                  const correctOptions = parseAnswerArray(question.correct_answer);
+                  return question.options.map((option, optionIndex) => (
+                    <FormControlLabel
+                      key={optionIndex}
+                      control={
+                        <Checkbox
+                          checked={selected.includes(option)}
+                          onChange={() => handleMultiAnswerToggle(String(question.id), option)}
+                        />
+                      }
+                      label={
+                        <Box sx={{
+                          flex: 1,
+                          '& p': { m: 0 },
+                          '& code': {
+                            fontSize: '0.875rem',
+                            fontFamily: 'monospace'
+                          }
+                        }}>
+                          <MarkdownRenderer content={option} variant="compact" />
+                        </Box>
+                      }
+                      disabled={showResults}
+                      sx={{
+                        backgroundColor: showResults && correctOptions.includes(option) ? 'success.light' : 'transparent',
+                        borderRadius: 1,
+                        px: 1,
+                        py: 0.5,
+                        mb: 0.5,
+                        alignItems: 'flex-start'
+                      }}
+                    />
+                  ));
+                })()}
+              </FormGroup>
             </FormControl>
           ) : (
             <TextField

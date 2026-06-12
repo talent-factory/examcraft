@@ -161,7 +161,9 @@ class QuestionReviewCreate(BaseModel):
     """Request Model für neue Question Review"""
 
     question_text: str = Field(..., min_length=10, max_length=5000)
-    question_type: str = Field(..., pattern="^(multiple_choice|open_ended|true_false)$")
+    question_type: str = Field(
+        ..., pattern="^(single_choice|multiple_choice|open_ended|true_false)$"
+    )
     options: Optional[List[str]] = None
     correct_answer: Optional[str] = None
     explanation: Optional[str] = None
@@ -339,7 +341,7 @@ async def get_review_queue(
     ),
     difficulty: Optional[str] = Query(None, pattern="^(easy|medium|hard)$"),
     question_type: Optional[str] = Query(
-        None, pattern="^(multiple_choice|open_ended|true_false)$"
+        None, pattern="^(single_choice|multiple_choice|open_ended|true_false)$"
     ),
     exam_id: Optional[str] = None,
     include_archived: bool = Query(False),

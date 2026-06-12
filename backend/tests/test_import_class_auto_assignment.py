@@ -72,7 +72,7 @@ def _make_user(db: Session, institution_id: int) -> User:
 def _make_exam(db: Session, institution_id: int) -> Exam:
     mc_q = QuestionReview(
         question_text="Hauptstadt der Schweiz?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["A) Zürich", "B) Bern"],
         correct_answer="Bern",
         difficulty="easy",

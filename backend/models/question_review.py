@@ -45,7 +45,7 @@ class QuestionReview(Base):
     question_text = Column(Text, nullable=False)
     question_type = Column(
         String(50), nullable=False
-    )  # multiple_choice, open_ended, true_false
+    )  # single_choice, open_ended, true_false
     options = Column(
         JSON, nullable=True
     )  # Für Multiple Choice: ["A) ...", "B) ...", ...]

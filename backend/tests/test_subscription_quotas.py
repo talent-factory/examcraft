@@ -72,7 +72,7 @@ def _make_user(db: Session, institution_id: int) -> User:
 def _make_exam(db: Session, institution_id: int) -> Exam:
     q1 = QuestionReview(
         question_text="Q?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["A", "B"],
         correct_answer="A",
         difficulty="easy",

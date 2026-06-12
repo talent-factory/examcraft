@@ -69,7 +69,7 @@ def _make_question(
 ) -> QuestionReview:
     q = QuestionReview(
         question_text=f"Q[{topic}]",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["A", "B"],
         correct_answer="A",
         difficulty="medium",

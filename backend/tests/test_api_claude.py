@@ -119,7 +119,7 @@ class TestClaudeAPIEndpoints:
         mock_claude_service.generate_questions.return_value = [
             {
                 "id": "1",
-                "type": "multiple_choice",
+                "type": "single_choice",
                 "question": "Was ist Python?",
                 "options": ["Sprache", "Schlange", "Framework", "Datenbank"],
                 "correct_answer": "Sprache",
@@ -136,7 +136,7 @@ class TestClaudeAPIEndpoints:
                     "topic": "Python Grundlagen",
                     "difficulty": "medium",
                     "question_count": 1,
-                    "question_types": ["multiple_choice"],
+                    "question_types": ["single_choice"],
                     "language": "de",
                 },
             )
@@ -215,7 +215,7 @@ class TestClaudeServiceEndToEnd:
                 "topic": "Software Testing",
                 "difficulty": "medium",
                 "question_count": 2,
-                "question_types": ["multiple_choice", "open_ended"],
+                "question_types": ["single_choice", "open_ended"],
                 "language": "de",
             },
         )

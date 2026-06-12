@@ -70,7 +70,7 @@ def _setup_exam_with_two_questions(
 ) -> tuple[Exam, ExamQuestion, ExamQuestion]:
     q1 = QuestionReview(
         question_text="Hauptstadt der Schweiz?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["A", "B"],
         correct_answer="Bern",
         difficulty="easy",

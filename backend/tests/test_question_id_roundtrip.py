@@ -74,7 +74,7 @@ def _make_user(db: Session, institution_id: int) -> User:
 def _setup_exam(db: Session, institution_id: int) -> Exam:
     q1 = QuestionReview(
         question_text="Hauptstadt der Schweiz?",
-        question_type="multiple_choice",
+        question_type="single_choice",
         options=["A", "B"],
         correct_answer="Bern",
         difficulty="easy",
@@ -141,7 +141,7 @@ def test_exporter_returns_slot_mapping() -> None:
                 "position": 1,
                 "points": 4.0,
                 "question_text": "Q1",
-                "question_type": "multiple_choice",
+                "question_type": "single_choice",
                 "options": ["A", "B"],
                 "correct_answer": "A",
             },

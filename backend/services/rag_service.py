@@ -43,9 +43,7 @@ class RAGExamRequest(BaseModel):
     topic: str
     document_ids: Optional[List[int]] = None
     question_count: int = Field(default=5, ge=1, le=20)
-    question_types: Optional[List[str]] = Field(
-        default=["multiple_choice", "open_ended"]
-    )
+    question_types: Optional[List[str]] = Field(default=["single_choice", "open_ended"])
     difficulty: str = "medium"
     language: str = "de"
     context_chunks_per_question: int = Field(default=3, ge=1, le=10)

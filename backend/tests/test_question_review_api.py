@@ -70,7 +70,7 @@ class TestQuestionReviewAPI:
         mock = Mock()
         mock.id = 1
         mock.question_text = "What is a heap data structure?"
-        mock.question_type = "multiple_choice"
+        mock.question_type = "single_choice"
         mock.options = [
             "A tree-based structure",
             "A linear structure",
@@ -407,7 +407,7 @@ class TestReviewQueueOptionsShape:
         return {
             "id": 1,
             "question_text": "Welche Empfehlung gilt für E-Mails?",
-            "question_type": "multiple_choice",
+            "question_type": "single_choice",
             "options": options,
             "correct_answer": "A",
             "explanation": "Aktive Sprache ist klarer.",

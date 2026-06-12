@@ -84,7 +84,7 @@ const mockDocuments = [
 const mockQuestionTypes = {
   supported_types: [
     {
-      type: 'multiple_choice',
+      type: 'single_choice',
       name: 'Multiple Choice',
       description: 'Frage mit 4 Antwortoptionen',
       example: 'Welche Aussage ist korrekt?'
@@ -108,7 +108,7 @@ const mockRAGExam = {
   questions: [
     {
       question_text: 'Was ist ein Integration Test?',
-      question_type: 'multiple_choice',
+      question_type: 'single_choice',
       options: ['A) Ein Test', 'B) Ein Verfahren', 'C) Ein System', 'D) Ein Prozess'],
       correct_answer: 'A',
       explanation: 'Ein Integration Test prüft das Zusammenspiel',
@@ -130,7 +130,7 @@ const mockRAGExam = {
     total_questions: 1,
     average_confidence: 0.85,
     source_coverage: 1.0,
-    question_type_distribution: { multiple_choice: 1 },
+    question_type_distribution: { single_choice: 1 },
     context_chunks_used: 1,
     total_context_length: 100,
     average_similarity_score: 0.85
@@ -298,7 +298,7 @@ describe('Frontend Integration Tests', () => {
           {
             id: 1,
             question: 'Was ist ein regulärer Test?',
-            type: 'multiple_choice',
+            type: 'single_choice',
             options: ['A) Ein Test', 'B) Ein Verfahren'],
             correct_answer: 'A',
             explanation: 'Ein regulärer Test...',

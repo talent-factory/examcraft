@@ -12,6 +12,9 @@ import {
   TextField,
   Button,
   FormControl,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
   InputLabel,
   Select,
   MenuItem,
@@ -45,6 +48,24 @@ interface QuestionEditorProps {
   loading?: boolean;
 }
 
+/**
+ * Defensive parse of a multiple_choice correct_answer. For multi-answer
+ * questions correct_answer is a JSON-array string of the selected option
+ * strings (e.g. '["A","C"]'). single_choice stores a plain string. Returns the
+ * parsed list for a JSON array, otherwise an empty list — callers never get a
+ * single plain string back, so a value that is a JSON array drives multi-select
+ * state while a plain string is treated as "nothing selected yet" for multi.
+ */
+const parseCorrectAnswerArray = (value?: string | null): string[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+
 const QuestionEditor: React.FC<QuestionEditorProps> = ({
   question,
   open,
@@ -60,6 +81,15 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<TagValue[]>(question.tags ?? []);
+
+  const isSingleChoice = question.question_type === 'single_choice';
+  const isMultipleChoice = question.question_type === 'multiple_choice';
+  const isChoice = isSingleChoice || isMultipleChoice;
+
+  // Selected correct options for multiple_choice (read from the JSON array).
+  const multiCorrect = isMultipleChoice
+    ? parseCorrectAnswerArray(formData.correct_answer)
+    : [];
 
   // Initialize form data when question changes
   useEffect(() => {
@@ -112,6 +142,16 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
     handleFieldChange('correct_answer', value);
   };
 
+  // Toggle a correct option for multiple_choice and serialize the selection back
+  // to a JSON-array string of the exact option strings.
+  const handleToggleMultiCorrect = (option: string) => {
+    const current = parseCorrectAnswerArray(formData.correct_answer);
+    const next = current.includes(option)
+      ? current.filter((o) => o !== option)
+      : [...current, option];
+    handleFieldChange('correct_answer', JSON.stringify(next));
+  };
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -119,14 +159,26 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
       newErrors.question_text = t('components.questionEditor.validationQuestionLength');
     }
 
-    if (question.question_type === 'multiple_choice') {
+    if (isChoice) {
       if (!options || options.length < 2) {
         newErrors.options = t('components.questionEditor.validationMinOptions');
       }
+    }
+
+    if (isSingleChoice) {
       if (!formData.correct_answer) {
         newErrors.correct_answer = t('components.questionEditor.validationSelectAnswer');
       }
       if (formData.correct_answer && !options.includes(formData.correct_answer)) {
+        newErrors.correct_answer = t('components.questionEditor.validationAnswerInOptions');
+      }
+    }
+
+    if (isMultipleChoice) {
+      const selected = parseCorrectAnswerArray(formData.correct_answer);
+      if (selected.length === 0) {
+        newErrors.correct_answer = t('components.questionEditor.validationSelectAnswer');
+      } else if (selected.some((o) => !options.includes(o))) {
         newErrors.correct_answer = t('components.questionEditor.validationAnswerInOptions');
       }
     }
@@ -257,18 +309,22 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
             required
           />
 
-          {/* Options (for multiple choice) */}
-          {question.question_type === 'multiple_choice' && (
+          {/* Options (for single_choice and multiple_choice) */}
+          {isChoice && (
             <Box>
               <Typography variant="subtitle2" gutterBottom>
                 {t('components.questionEditor.answerOptions')}
               </Typography>
               <List dense>
-                {options.map((option, index) => (
+                {options.map((option, index) => {
+                  const isCorrectOption = isMultipleChoice
+                    ? multiCorrect.includes(option)
+                    : option === formData.correct_answer;
+                  return (
                   <ListItem
                     key={index}
                     sx={{
-                      bgcolor: option === formData.correct_answer ? 'success.light' : 'background.paper',
+                      bgcolor: isCorrectOption ? 'success.light' : 'background.paper',
                       borderRadius: 1,
                       mb: 1,
                     }}
@@ -285,7 +341,8 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
                       </IconButton>
                     </ListItemSecondaryAction>
                   </ListItem>
-                ))}
+                  );
+                })}
               </List>
 
               <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
@@ -319,7 +376,7 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
           )}
 
           {/* Correct Answer */}
-          {question.question_type === 'multiple_choice' ? (
+          {isSingleChoice ? (
             <FormControl fullWidth error={!!errors.correct_answer}>
               <InputLabel>{t('components.questionEditor.correctAnswer')}</InputLabel>
               <Select
@@ -334,6 +391,32 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
                   </MenuItem>
                 ))}
               </Select>
+              {errors.correct_answer && (
+                <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                  {errors.correct_answer}
+                </Typography>
+              )}
+            </FormControl>
+          ) : isMultipleChoice ? (
+            <FormControl component="fieldset" fullWidth error={!!errors.correct_answer}>
+              <Typography variant="subtitle2" gutterBottom>
+                {t('components.questionEditor.correctAnswers')}
+              </Typography>
+              <FormGroup>
+                {options.map((option, index) => (
+                  <FormControlLabel
+                    key={index}
+                    control={
+                      <Checkbox
+                        checked={multiCorrect.includes(option)}
+                        onChange={() => handleToggleMultiCorrect(option)}
+                        disabled={loading}
+                      />
+                    }
+                    label={option}
+                  />
+                ))}
+              </FormGroup>
               {errors.correct_answer && (
                 <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
                   {errors.correct_answer}
