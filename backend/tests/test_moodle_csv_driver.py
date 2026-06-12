@@ -17,7 +17,11 @@ from services.import_drivers import (
     MissingColumnError,
     MoodleCsvDriver,
 )
-from services.import_drivers.moodle_csv_driver import _parse_datetime
+from services.import_drivers.moodle_csv_driver import (
+    _OVERFLOW_KEY,
+    _parse_datetime,
+    _parse_german_long_date,
+)
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "moodle_csv"
@@ -234,6 +238,85 @@ def test_row_with_empty_email_is_skipped() -> None:
     assert "external_id" in payload.errors[0].reason.lower()
 
 
+def test_row_with_surplus_columns_is_imported_not_dropped() -> None:
+    """A row with more fields than the header (an extra exported column,
+    a stray delimiter, or broken quoting) makes ``csv.DictReader`` collect
+    the surplus values under the ``restkey`` — whose default is ``None``.
+    ``raw_payload: dict[str, Any]`` then rejects the ``None`` key
+    (Pydantic: keys must be ``str``) and the row was rejected as a
+    row-level error instead of being imported (TF-411). The row must
+    instead be imported, the overflow surfaced as a warning, and
+    ``raw_payload`` carry only string keys.
+    """
+    # Quoted fields so csv.Sniffer locks onto ';' via its quote
+    # heuristic (the frequency heuristic bails on ragged rows). Bruno's
+    # row carries one surplus field ("Spanien") beyond the 9-column
+    # header → DictReader files it under the None restkey.
+    csv_text = (
+        '"Vorname";"Nachname";"E-Mail-Adresse";"Status";"Begonnen am";'
+        '"Beendet";"Antwort 1";"Antwort 2";"Antwort 3"\n'
+        '"Anna";"Beispiel";"anna@example.org";"Beendet";'
+        '"2026-04-30 09:00:00";"2026-04-30 09:30:00";"A";"Wahr";"Berlin"\n'
+        '"Bruno";"Muster";"bruno@example.org";"Beendet";'
+        '"2026-04-30 09:00:00";"2026-04-30 09:25:00";"C";"Falsch";'
+        '"Madrid";"Spanien"\n'
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=make_exam(num_questions=3))
+
+    # Both rows survive — no Pydantic crash, both attempts persisted.
+    assert payload.errors == []
+    assert len(payload.students) == 2
+    assert len(payload.attempts) == 2
+    # raw_payload must never carry a non-string (None) key.
+    for attempt in payload.attempts:
+        assert all(isinstance(k, str) for k in attempt.raw_payload)
+    # Exactly one overflow warning for Bruno (row 3), naming the surplus
+    # count and flagging possible column shift (not a benign "junk
+    # ignored" message) so the operator verifies the row.
+    overflow_warnings = [w for w in payload.warnings if "überzählige Spalte" in w]
+    assert len(overflow_warnings) == 1
+    assert "Zeile 3" in overflow_warnings[0]
+    assert "1 überzählige" in overflow_warnings[0]
+    assert "Spaltenverschiebung" in overflow_warnings[0]
+    # In-header answers stay correctly aligned despite the overflow.
+    bruno = next(
+        a for a in payload.attempts if a.student_external_id == "bruno@example.org"
+    )
+    given = {ans.exam_question_id: ans.given_answer for ans in bruno.answers}
+    assert given[102] == "Madrid"
+    # The surplus value is preserved in raw_payload (recoverable) rather
+    # than silently lost.
+    assert bruno.raw_payload[_OVERFLOW_KEY] == ["Spanien"]
+
+
+def test_row_with_fewer_columns_is_imported_without_overflow_warning() -> None:
+    """The mirror of the surplus case: a row with *fewer* fields than the
+    header. ``csv.DictReader`` fills the missing trailing fields with its
+    ``restval`` (default ``None``), so ``raw_payload`` carries ``None``
+    *values* — which ``dict[str, Any]`` accepts (only ``None`` *keys*
+    crash). The row imports cleanly, missing answers become ``None``, and
+    crucially NO overflow warning fires (short != surplus)."""
+    csv_text = (
+        '"E-Mail-Adresse";"Antwort 1";"Antwort 2";"Antwort 3"\n'
+        '"anna@example.org";"A";"Wahr";"Berlin"\n'
+        '"bruno@example.org";"C"\n'  # Antwort 2 + 3 absent
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=make_exam(num_questions=3))
+
+    assert payload.errors == []
+    assert len(payload.attempts) == 2
+    bruno = next(
+        a for a in payload.attempts if a.student_external_id == "bruno@example.org"
+    )
+    given = {ans.exam_question_id: ans.given_answer for ans in bruno.answers}
+    assert given == {100: "C", 101: None, 102: None}
+    # Missing headers carry None *values* in raw_payload (not a crash).
+    assert bruno.raw_payload["Antwort 3"] is None
+    # A short row is not an overflow — no surplus key, no overflow warning.
+    assert _OVERFLOW_KEY not in bruno.raw_payload
+    assert not any("überzählige Spalte" in w for w in payload.warnings)
+
+
 # ---------------------------------------------------------------------------
 # Mehrfachversuche + Idempotenz
 # ---------------------------------------------------------------------------
@@ -306,6 +389,92 @@ def test_date_parsing_accepts_multiple_formats(raw: str, expected: datetime) -> 
     # produces non-deterministic source_attempt_ids.
     assert payload.attempts[0].started_at.tzinfo is not None
     assert payload.attempts[0].started_at.utcoffset().total_seconds() == 0
+
+
+# TF-411: Moodle DE exports render long-form dates with German month
+# names ("12. Juni 2026 11:55"). These never parsed because (a) no
+# format matched the "day-dot, no comma" shape and (b) ``%B`` is
+# locale-bound and only matches English month names under the C locale.
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        # The exact value from the prod report (no comma before time).
+        ("12. Juni 2026 11:55", datetime(2026, 6, 12, 11, 55, tzinfo=timezone.utc)),
+        # Comma variant (older Moodle long format).
+        ("12. Juni 2026, 11:55", datetime(2026, 6, 12, 11, 55, tzinfo=timezone.utc)),
+        # Single-digit day + umlaut month.
+        ("1. März 2026 08:00", datetime(2026, 3, 1, 8, 0, tzinfo=timezone.utc)),
+        # With seconds.
+        ("5. Mai 2026 09:00:30", datetime(2026, 5, 5, 9, 0, 30, tzinfo=timezone.utc)),
+        # All twelve month names must map.
+        ("3. Januar 2026 00:00", datetime(2026, 1, 3, 0, 0, tzinfo=timezone.utc)),
+        ("3. Februar 2026 00:00", datetime(2026, 2, 3, 0, 0, tzinfo=timezone.utc)),
+        ("3. April 2026 00:00", datetime(2026, 4, 3, 0, 0, tzinfo=timezone.utc)),
+        ("3. Juli 2026 00:00", datetime(2026, 7, 3, 0, 0, tzinfo=timezone.utc)),
+        ("3. August 2026 00:00", datetime(2026, 8, 3, 0, 0, tzinfo=timezone.utc)),
+        ("3. September 2026 00:00", datetime(2026, 9, 3, 0, 0, tzinfo=timezone.utc)),
+        ("3. Oktober 2026 14:30", datetime(2026, 10, 3, 14, 30, tzinfo=timezone.utc)),
+        ("3. November 2026 00:00", datetime(2026, 11, 3, 0, 0, tzinfo=timezone.utc)),
+        (
+            "24. Dezember 2026 23:59",
+            datetime(2026, 12, 24, 23, 59, tzinfo=timezone.utc),
+        ),
+    ],
+)
+def test_parse_datetime_accepts_german_month_names(
+    raw: str, expected: datetime
+) -> None:
+    parsed = _parse_datetime(raw)
+    assert parsed == expected
+    assert parsed.tzinfo is not None
+    assert parsed.utcoffset().total_seconds() == 0
+
+
+def test_german_long_date_parses_through_driver_without_warning() -> None:
+    """End-to-end: a German 'Beendet' value lands in ``submitted_at``
+    and no 'nicht parsbar' warning is emitted (TF-411 Problem 2)."""
+    csv_text = (
+        "E-Mail-Adresse;Begonnen am;Beendet;Antwort 1\n"
+        "anna@example.org;12. Juni 2026 11:50;12. Juni 2026 11:55;A\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=make_exam(num_questions=1))
+    assert payload.attempts[0].started_at == datetime(
+        2026, 6, 12, 11, 50, tzinfo=timezone.utc
+    )
+    assert payload.attempts[0].submitted_at == datetime(
+        2026, 6, 12, 11, 55, tzinfo=timezone.utc
+    )
+    assert not any("nicht parsbar" in w for w in payload.warnings)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "31. Februar 2026 10:00",  # regex matches, calendar-invalid → ValueError
+        "12. Foo 2026 11:55",  # regex matches, unknown month name
+        "12. Juni 2026 25:00",  # regex matches, out-of-range hour
+    ],
+)
+def test_parse_german_long_date_rejects_invalid_values(raw: str) -> None:
+    """Shape matches the regex but the value is not a real date — the two
+    guard branches (unknown month, ValueError from ``datetime(...)``)
+    must return None rather than a wrong/rolled-over timestamp."""
+    assert _parse_german_long_date(raw) is None
+    assert _parse_datetime(raw) is None
+
+
+def test_invalid_german_date_warns_as_unparsable_through_driver() -> None:
+    """A calendar-invalid German date reaches the same 'nicht parsbar →
+    NULL' path as any other unparseable value (no silent divergence)."""
+    csv_text = (
+        '"E-Mail-Adresse";"Beendet";"Antwort 1"\n'
+        '"anna@example.org";"31. Februar 2026 10:00";"A"\n'
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=make_exam(num_questions=1))
+    assert payload.attempts[0].submitted_at is None
+    assert any(
+        "Zeile 2" in w and "'Beendet' nicht parsbar" in w for w in payload.warnings
+    )
 
 
 @pytest.mark.parametrize(

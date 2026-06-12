@@ -53,6 +53,19 @@ from services.import_drivers.payloads import (
 logger = logging.getLogger(__name__)
 
 
+# Surplus fields — a row with more fields than the header (e.g. an extra
+# exported column, a stray delimiter, or broken quoting) — are collected
+# by ``csv.DictReader`` under its ``restkey``. The default is ``None``,
+# which then fails ``AttemptRecord.raw_payload`` (``dict[str, Any]``
+# rejects a non-string key); the row surfaced as a row-level error and
+# was not imported. We give the restkey an explicit string name so the
+# key is always valid and the overflow can be surfaced as a per-row
+# warning while the row is still imported. The full original row —
+# including the overflow values — is preserved in ``raw_payload`` under
+# this key, so a misaligned row stays recoverable. (TF-411)
+_OVERFLOW_KEY = "_unmapped_columns"
+
+
 # Date formats encountered in Moodle exports. Try-order matters: the
 # first match wins, so list the most specific/common variants first.
 _DATE_FORMATS: tuple[str, ...] = (
@@ -66,6 +79,67 @@ _DATE_FORMATS: tuple[str, ...] = (
     "%d %B %Y, %H:%M",
     "%d %B %Y, %I:%M %p",
 )
+
+
+# German long-form dates ("12. Juni 2026 11:55") never parsed via
+# ``strptime``/``%B``: that directive is locale-bound and only matches
+# English month names under the container's C locale. We map the names
+# ourselves so parsing is locale-independent and thread-safe (no
+# ``setlocale``, which mutates global process state). (TF-411)
+_GERMAN_MONTHS: dict[str, int] = {
+    "januar": 1,
+    "februar": 2,
+    "märz": 3,
+    "april": 4,
+    "mai": 5,
+    "juni": 6,
+    "juli": 7,
+    "august": 8,
+    "september": 9,
+    "oktober": 10,
+    "november": 11,
+    "dezember": 12,
+}
+
+# "<weekday>, 12. Juni 2026, 11:55" / "12. Juni 2026 11:55:30" — weekday
+# prefix, comma before the time, and seconds are all optional.
+_GERMAN_LONG_DATE_RE = re.compile(
+    r"^(?:\w+,\s*)?"
+    r"(\d{1,2})\.\s+"
+    r"([A-Za-zäöüÄÖÜ]+)\s+"
+    r"(\d{4})"
+    r",?\s+"
+    r"(\d{1,2}):(\d{2})"
+    r"(?::(\d{2}))?$"
+)
+
+
+def _parse_german_long_date(value: str) -> datetime | None:
+    """Parse a German long-form date locale-independently.
+
+    Returns a naïve datetime (caller normalises to UTC, consistent with
+    the other naïve formats) or ``None`` if the shape or month name does
+    not match.
+    """
+    match = _GERMAN_LONG_DATE_RE.match(value)
+    if not match:
+        return None
+    day, month_name, year, hour, minute, second = match.groups()
+    month = _GERMAN_MONTHS.get(month_name.lower())
+    if month is None:
+        return None
+    try:
+        return datetime(
+            int(year),
+            month,
+            int(day),
+            int(hour),
+            int(minute),
+            int(second) if second else 0,
+        )
+    except ValueError:
+        # Out-of-range day/time (e.g. "31. Februar") — treat as unparseable.
+        return None
 
 
 def _parse_datetime(raw: str | None) -> datetime | None:
@@ -97,6 +171,9 @@ def _parse_datetime(raw: str | None) -> datetime | None:
             break
         except ValueError:
             continue
+    if parsed is None:
+        # German long-form ("12. Juni 2026 11:55") — locale-independent.
+        parsed = _parse_german_long_date(value)
     if parsed is None:
         # ISO-8601 fallback (with/without timezone, ``Z`` suffix etc.)
         try:
@@ -171,7 +248,9 @@ class MoodleCsvDriver(BaseImportDriver):
             raise EmptyCsvError("CSV ist leer")
 
         dialect, sniffer_fallback = self._sniff_dialect(text)
-        reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+        reader = csv.DictReader(
+            io.StringIO(text), dialect=dialect, restkey=_OVERFLOW_KEY
+        )
 
         raw_headers = reader.fieldnames or []
         if not raw_headers:
@@ -414,6 +493,13 @@ class MoodleCsvDriver(BaseImportDriver):
         ``(institution_id, source, source_attempt_id)``. Changing the
         format silently breaks idempotency for existing rows — treat
         any change as a data-migration boundary.
+
+        Note (TF-411): rows imported *before* German long-date parsing
+        worked had ``started_at=None`` (→ ``no-start`` key). Re-importing
+        the same CSV now resolves a real ``started_at`` and therefore a
+        *different* key, so such rows insert as new attempts rather than
+        deduplicating. Expected for fresh imports; re-running a pre-fix
+        partial import may create duplicates for the affected rows.
         """
         ts = started_at.isoformat() if started_at else "no-start"
         return f"{external_id}|{ts}|{attempt_number}"
@@ -481,6 +567,22 @@ class MoodleCsvDriver(BaseImportDriver):
             payload.warnings.append(
                 f"Zeile {row_idx}: 'Beendet' nicht parsbar "
                 f"({submitted_raw!r}) — wird als NULL persistiert"
+            )
+
+        # Surplus fields beyond the header (see _OVERFLOW_KEY). The row is
+        # still imported, but a stray delimiter *early* in the row shifts
+        # every named column right, so the answers (and even external_id)
+        # of this row may be misaligned — not merely a harmless trailing
+        # value. Warn loudly enough that the operator verifies the row
+        # rather than dismissing it; the full original row is kept in
+        # raw_payload[_OVERFLOW_KEY] so it stays recoverable.
+        overflow = row.get(_OVERFLOW_KEY)
+        if overflow:
+            payload.warnings.append(
+                f"Zeile {row_idx}: {len(overflow)} überzählige Spalte(n) "
+                f"ohne Header — mögliche Spaltenverschiebung; "
+                f"Antwort-Zuordnung dieser Zeile prüfen "
+                f"(Quoting/Trenner der Quelle prüfen)"
             )
 
         answers: list[AnswerRecord] = []
