@@ -3,8 +3,11 @@ Seed script for initial prompts in the Knowledge Base.
 Simplified version that works in Docker container.
 """
 
+import logging
 import sys
 import os
+
+logger = logging.getLogger(__name__)
 
 # Add app path for imports (Docker: /app)
 app_path = "/app"
@@ -193,19 +196,46 @@ Antworte als JSON:
         },
     ]
 
+    # TF-346: prompts are owned by an institution. Default seed prompts are
+    # assigned to the system institution (the lowest-id institution). If no
+    # institution exists yet, prompt seeding is skipped rather than crashing the
+    # NOT NULL constraint at startup.
+    from models.auth import Institution
+
+    system_institution_id = (
+        db.query(Institution.id).order_by(Institution.id).limit(1).scalar()
+    )
+    if system_institution_id is None:
+        # Surface to structured logs / Sentry too, not only stdout — a missing
+        # institution at this point is a bootstrap ordering misconfiguration.
+        logger.warning(
+            "No institution found — skipping prompt seeding (TF-346). "
+            "Ensure institutions are seeded before prompts."
+        )
+        print("⏭️  No institution found — skipping prompt seeding (TF-346).")
+        db.close()
+        return
+
     created_count = 0
     skipped_count = 0
 
     for prompt_data in prompts_to_seed:
-        # Check if already exists
-        existing = db.query(Prompt).filter(Prompt.name == prompt_data["name"]).first()
+        # Check if already exists within the system institution
+        existing = (
+            db.query(Prompt)
+            .filter(
+                Prompt.name == prompt_data["name"],
+                Prompt.institution_id == system_institution_id,
+            )
+            .first()
+        )
         if existing:
             print(f"⏭️  Prompt '{prompt_data['name']}' already exists, skipping...")
             skipped_count += 1
             continue
 
         # Create prompt (without Qdrant indexing for now)
-        prompt = Prompt(**prompt_data)
+        prompt = Prompt(**prompt_data, institution_id=system_institution_id)
         db.add(prompt)
         db.flush()
 
