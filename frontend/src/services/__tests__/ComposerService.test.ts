@@ -348,6 +348,50 @@ describe('ComposerService', () => {
         params: { topic: 'Math', limit: 20 },
       });
     });
+
+    // TF-406: Fachfilter-Facetten + Sortierung
+    it('passes the new facet params (ln_level, competency_id, quality_tier, bloom_level)', async () => {
+      fakeClient.get.mockResolvedValueOnce({ data: { total: 0, questions: [] } });
+
+      await ComposerService.listApprovedQuestions({
+        ln_level: 3,
+        competency_id: 7,
+        quality_tier: 'A',
+        bloom_level: 4,
+      });
+
+      expect(fakeClient.get).toHaveBeenCalledWith('/api/v1/exams/approved-questions', {
+        params: { ln_level: 3, competency_id: 7, quality_tier: 'A', bloom_level: 4 },
+      });
+    });
+
+    it('includes sort only when it differs from "newest"', async () => {
+      fakeClient.get.mockResolvedValueOnce({ data: { total: 0, questions: [] } });
+      await ComposerService.listApprovedQuestions({ sort: 'most_used' });
+      expect(fakeClient.get).toHaveBeenCalledWith('/api/v1/exams/approved-questions', {
+        params: { sort: 'most_used' },
+      });
+
+      fakeClient.get.mockResolvedValueOnce({ data: { total: 0, questions: [] } });
+      await ComposerService.listApprovedQuestions({ sort: 'newest' });
+      expect(fakeClient.get).toHaveBeenLastCalledWith('/api/v1/exams/approved-questions', {
+        params: {},
+      });
+    });
+
+    it('includes unused only when true', async () => {
+      fakeClient.get.mockResolvedValueOnce({ data: { total: 0, questions: [] } });
+      await ComposerService.listApprovedQuestions({ unused: true });
+      expect(fakeClient.get).toHaveBeenCalledWith('/api/v1/exams/approved-questions', {
+        params: { unused: true },
+      });
+
+      fakeClient.get.mockResolvedValueOnce({ data: { total: 0, questions: [] } });
+      await ComposerService.listApprovedQuestions({ unused: false });
+      expect(fakeClient.get).toHaveBeenLastCalledWith('/api/v1/exams/approved-questions', {
+        params: {},
+      });
+    });
   });
 
   // -------------------------------------------------------------------------

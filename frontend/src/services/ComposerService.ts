@@ -9,6 +9,7 @@ import type {
   AutoFillRequest,
   AutoComposePreview,
   DocumentWithQuestions,
+  QuestionSort,
 } from '../types/composer';
 import { apiClient } from '../api/apiClient';
 
@@ -123,18 +124,26 @@ export class ComposerService {
     difficulty?: string;
     bloom_level?: number;
     question_type?: string;
+    // TF-406: Fachfilter-Facetten + Sortierung
+    ln_level?: number;
+    competency_id?: number;
+    quality_tier?: string;
+    unused?: boolean;
+    sort?: QuestionSort;
     search?: string;
     tag_ids?: number[];
     document_ids?: number[];
     limit?: number;
     offset?: number;
   }): Promise<ApprovedQuestionsResponse> {
-    const { tag_ids, document_ids, ...rest } = params ?? {};
+    const { tag_ids, document_ids, unused, sort, ...rest } = params ?? {};
     const response = await apiClient.get('/api/v1/exams/approved-questions', {
       params: {
         ...rest,
         ...(tag_ids?.length ? { tag_ids: tag_ids.join(',') } : {}),
         ...(document_ids?.length ? { document_ids: document_ids.join(',') } : {}),
+        ...(unused ? { unused: true } : {}),
+        ...(sort && sort !== 'newest' ? { sort } : {}),
       },
     });
     return response.data;

@@ -1,6 +1,9 @@
 import type { Tag } from '../api/tagsApi';
 export type { Tag };
 
+// TF-406: Sortierung des Fragenpools im Prüfungskomponist.
+export type QuestionSort = 'newest' | 'most_used' | 'difficulty';
+
 export enum ExamStatus {
   DRAFT = 'draft',
   FINALIZED = 'finalized',

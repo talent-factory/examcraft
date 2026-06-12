@@ -1736,7 +1736,25 @@
       "previewCompetency": "Handlungskompetenz",
       "previewSource": "Quelldokument",
       "previewClose": "Schliessen",
-      "previewRemove": "Entfernen"
+      "previewRemove": "Entfernen",
+      "autoComposeButton": "Auto-Komposition",
+      "lnLevelAll": "Niveau: alle",
+      "lnLevelOption": "LN {{level}}",
+      "lnLevelSelectLabel": "Nach Anforderungsniveau filtern",
+      "qualityAll": "Qualität: alle",
+      "qualityOption": "Stufe {{tier}}",
+      "qualitySelectLabel": "Nach Qualitätsstufe filtern",
+      "bloomAll": "Bloom: alle",
+      "bloomSelectLabel": "Nach Bloom-Stufe filtern",
+      "competencyAll": "Kompetenz: alle",
+      "competencySelectLabel": "Nach Handlungskompetenz filtern",
+      "unusedLabel": "Nur nie verwendete",
+      "sortLabel": "Sortierung",
+      "sortNewest": "Neueste zuerst",
+      "sortMostUsed": "Meistverwendet",
+      "sortDifficulty": "Nach Schwierigkeit",
+      "resetFilters": "Filter zurücksetzen",
+      "filterChipRemove": "Filter entfernen"
     }
   },
   "profile": {

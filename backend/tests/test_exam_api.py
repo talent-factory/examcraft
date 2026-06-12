@@ -2688,6 +2688,393 @@ class TestApprovedQuestionsDocumentFilter:
 
 
 # ---------------------------------------------------------------------------
+# TF-406: Fachfilter-Facetten + Sortierung auf GET /approved-questions
+# ---------------------------------------------------------------------------
+
+
+class TestApprovedQuestionsFacetsAndSort:
+    """TF-406: ln_level / competency_id / quality_tier / unused facets and the
+    most_used / newest / difficulty sort on GET /approved-questions.
+
+    Rows are scoped by a per-run unique ``topic`` marker so assertions stay
+    deterministic against the shared, non-teardown test DB (see the
+    ``aqdf`` fixtures above for the same pattern).
+    """
+
+    @pytest.fixture
+    def aqfs_db(self, test_engine):
+        from sqlalchemy.orm import sessionmaker
+
+        TestSession = sessionmaker(bind=test_engine)
+        session = TestSession()
+        yield session
+        session.close()
+
+    @pytest.fixture
+    def aqfs_institution(self, aqfs_db):
+        existing = aqfs_db.query(Institution).filter_by(slug="aqfs-test-inst").first()
+        if existing:
+            return existing
+        inst = Institution(
+            name="AQFS Test University",
+            slug="aqfs-test-inst",
+            subscription_tier="professional",
+            max_users=-1,
+            max_documents=-1,
+            max_questions_per_month=-1,
+        )
+        aqfs_db.add(inst)
+        aqfs_db.commit()
+        aqfs_db.refresh(inst)
+        return inst
+
+    @pytest.fixture
+    def aqfs_user(self, aqfs_db, aqfs_institution):
+        existing = aqfs_db.query(User).filter_by(email="aqfs@test.com").first()
+        if existing:
+            return existing
+        user = User(
+            email="aqfs@test.com",
+            first_name="AQFS",
+            last_name="User",
+            password_hash="dummy_hash",  # pragma: allowlist secret
+            institution_id=aqfs_institution.id,
+            status=UserStatus.ACTIVE.value,
+        )
+        aqfs_db.add(user)
+        aqfs_db.commit()
+        aqfs_db.refresh(user)
+        return user
+
+    @pytest.fixture
+    def aqfs_client(self, aqfs_db, aqfs_institution, aqfs_user):
+        from utils.auth_utils import get_current_user
+        from database import get_db
+        import api.exams as exams_module
+
+        app.include_router(exams_module.router)
+        mock_user = _make_mock_user(
+            institution_id=aqfs_institution.id, user_id=aqfs_user.id
+        )
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = lambda: aqfs_db
+        client = TestClient(app, raise_server_exceptions=True)
+        yield client
+        app.dependency_overrides.clear()
+
+    def _make_question(self, db, institution, user, topic, **overrides):
+        q = QuestionReview(
+            question_text=overrides.pop("question_text", "Frage?"),
+            question_type=overrides.pop("question_type", "open_ended"),
+            difficulty=overrides.pop("difficulty", "medium"),
+            topic=topic,
+            language="de",
+            review_status=ReviewStatus.APPROVED.value,
+            institution_id=institution.id,
+            created_by=user.id,
+            **overrides,
+        )
+        db.add(q)
+        db.flush()
+        return q
+
+    def _use_question(self, db, institution, user, question):
+        """Attach the question to an exam once (bumps usage_count)."""
+        exam = Exam(
+            title=f"Exam for {question.id}",
+            institution_id=institution.id,
+            created_by=user.id,
+        )
+        db.add(exam)
+        db.flush()
+        db.add(
+            ExamQuestion(
+                exam_id=exam.id, question_id=question.id, position=1, points=1.0
+            )
+        )
+        db.flush()
+
+    def test_filter_by_ln_level(
+        self, aqfs_client, aqfs_db, aqfs_institution, aqfs_user
+    ):
+        import uuid
+
+        topic = f"ln-{uuid.uuid4().hex}"
+        q2 = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, ln_level=2
+        )
+        q4 = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, ln_level=4
+        )
+        aqfs_db.commit()
+
+        resp = aqfs_client.get(
+            f"/api/v1/exams/approved-questions?topic={topic}&ln_level=2"
+        )
+        assert resp.status_code == 200
+        ids = {q["id"] for q in resp.json()["questions"]}
+        assert ids == {q2.id}
+        assert q4.id not in ids
+
+    def test_filter_by_quality_tier(
+        self, aqfs_client, aqfs_db, aqfs_institution, aqfs_user
+    ):
+        import uuid
+
+        topic = f"qt-{uuid.uuid4().hex}"
+        q_a = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, quality_tier="A"
+        )
+        q_b = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, quality_tier="B"
+        )
+        aqfs_db.commit()
+
+        resp = aqfs_client.get(
+            f"/api/v1/exams/approved-questions?topic={topic}&quality_tier=A"
+        )
+        assert resp.status_code == 200
+        ids = {q["id"] for q in resp.json()["questions"]}
+        assert ids == {q_a.id}
+        assert q_b.id not in ids
+
+    def test_filter_by_competency_id(
+        self, aqfs_client, aqfs_db, aqfs_institution, aqfs_user
+    ):
+        import uuid
+
+        from models.competency import CompetencyFramework, Competency
+
+        topic = f"comp-{uuid.uuid4().hex}"
+        fw = CompetencyFramework(
+            name=f"Modul {topic}",
+            rendered_text="HKB Text",
+            institution_id=aqfs_institution.id,
+            created_by=aqfs_user.id,
+        )
+        aqfs_db.add(fw)
+        aqfs_db.flush()
+        comp = Competency(framework_id=fw.id, code="B3", title="Handlungskompetenz B3")
+        aqfs_db.add(comp)
+        aqfs_db.flush()
+
+        q_with = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, competency_id=comp.id
+        )
+        q_without = self._make_question(aqfs_db, aqfs_institution, aqfs_user, topic)
+        aqfs_db.commit()
+
+        resp = aqfs_client.get(
+            f"/api/v1/exams/approved-questions?topic={topic}&competency_id={comp.id}"
+        )
+        assert resp.status_code == 200
+        ids = {q["id"] for q in resp.json()["questions"]}
+        assert ids == {q_with.id}
+        assert q_without.id not in ids
+
+    def test_filter_unused_returns_only_zero_usage(
+        self, aqfs_client, aqfs_db, aqfs_institution, aqfs_user
+    ):
+        import uuid
+
+        topic = f"unused-{uuid.uuid4().hex}"
+        q_used = self._make_question(aqfs_db, aqfs_institution, aqfs_user, topic)
+        q_unused = self._make_question(aqfs_db, aqfs_institution, aqfs_user, topic)
+        self._use_question(aqfs_db, aqfs_institution, aqfs_user, q_used)
+        aqfs_db.commit()
+
+        resp = aqfs_client.get(
+            f"/api/v1/exams/approved-questions?topic={topic}&unused=true"
+        )
+        assert resp.status_code == 200
+        questions = resp.json()["questions"]
+        ids = {q["id"] for q in questions}
+        assert ids == {q_unused.id}
+        assert q_used.id not in ids
+        # Every returned question is genuinely unused.
+        assert all(q["usage_count"] == 0 for q in questions)
+
+    def test_combined_facets_are_anded(
+        self, aqfs_client, aqfs_db, aqfs_institution, aqfs_user
+    ):
+        import uuid
+
+        topic = f"and-{uuid.uuid4().hex}"
+        q_both = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, ln_level=3, quality_tier="B"
+        )
+        q_ln_only = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, ln_level=3, quality_tier="A"
+        )
+        q_tier_only = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, ln_level=1, quality_tier="B"
+        )
+        aqfs_db.commit()
+
+        resp = aqfs_client.get(
+            f"/api/v1/exams/approved-questions?topic={topic}&ln_level=3&quality_tier=B"
+        )
+        assert resp.status_code == 200
+        ids = {q["id"] for q in resp.json()["questions"]}
+        assert ids == {q_both.id}
+        assert q_ln_only.id not in ids
+        assert q_tier_only.id not in ids
+
+    def test_sort_most_used_orders_by_usage_desc(
+        self, aqfs_client, aqfs_db, aqfs_institution, aqfs_user
+    ):
+        import uuid
+
+        topic = f"mostused-{uuid.uuid4().hex}"
+        q_high = self._make_question(aqfs_db, aqfs_institution, aqfs_user, topic)
+        q_low = self._make_question(aqfs_db, aqfs_institution, aqfs_user, topic)
+        q_zero = self._make_question(aqfs_db, aqfs_institution, aqfs_user, topic)
+        self._use_question(aqfs_db, aqfs_institution, aqfs_user, q_high)
+        self._use_question(aqfs_db, aqfs_institution, aqfs_user, q_high)
+        self._use_question(aqfs_db, aqfs_institution, aqfs_user, q_low)
+        aqfs_db.commit()
+
+        resp = aqfs_client.get(
+            f"/api/v1/exams/approved-questions?topic={topic}&sort=most_used"
+        )
+        assert resp.status_code == 200
+        ordered_ids = [q["id"] for q in resp.json()["questions"]]
+        assert ordered_ids == [q_high.id, q_low.id, q_zero.id]
+
+    def test_sort_most_used_tiebreak_is_newest_first(
+        self, aqfs_client, aqfs_db, aqfs_institution, aqfs_user
+    ):
+        """Equal usage falls back to created_at DESC (newest first).
+
+        created_at must be set explicitly: PostgreSQL ``now()`` returns the
+        transaction-start timestamp, so rows committed together would share an
+        identical created_at and leave the tie-break order undefined.
+        """
+        import uuid
+        from datetime import datetime
+
+        topic = f"mostused-tie-{uuid.uuid4().hex}"
+        q_older = self._make_question(
+            aqfs_db,
+            aqfs_institution,
+            aqfs_user,
+            topic,
+            created_at=datetime(2024, 1, 1, 12, 0, 0),
+        )
+        q_newer = self._make_question(
+            aqfs_db,
+            aqfs_institution,
+            aqfs_user,
+            topic,
+            created_at=datetime(2024, 6, 1, 12, 0, 0),
+        )
+        # Identical usage count (1 each) so only the created_at tie-break decides.
+        self._use_question(aqfs_db, aqfs_institution, aqfs_user, q_older)
+        self._use_question(aqfs_db, aqfs_institution, aqfs_user, q_newer)
+        aqfs_db.commit()
+
+        resp = aqfs_client.get(
+            f"/api/v1/exams/approved-questions?topic={topic}&sort=most_used"
+        )
+        assert resp.status_code == 200
+        ordered_ids = [q["id"] for q in resp.json()["questions"]]
+        assert ordered_ids == [q_newer.id, q_older.id]
+
+    def test_unused_combined_with_most_used_sort(
+        self, aqfs_client, aqfs_db, aqfs_institution, aqfs_user
+    ):
+        """unused=true + sort=most_used: only zero-usage rows, newest first.
+
+        Both facets touch ExamQuestion (NOT EXISTS filter vs. grouped usage
+        outerjoin); this pins that they compose without dropping or duplicating
+        rows. created_at is explicit for a deterministic tie-break (all usages
+        are 0, so coalesce(uses, 0) ties and created_at DESC decides).
+        """
+        import uuid
+        from datetime import datetime
+
+        topic = f"unused-mostused-{uuid.uuid4().hex}"
+        q_used = self._make_question(aqfs_db, aqfs_institution, aqfs_user, topic)
+        q_unused_old = self._make_question(
+            aqfs_db,
+            aqfs_institution,
+            aqfs_user,
+            topic,
+            created_at=datetime(2024, 1, 1, 12, 0, 0),
+        )
+        q_unused_new = self._make_question(
+            aqfs_db,
+            aqfs_institution,
+            aqfs_user,
+            topic,
+            created_at=datetime(2024, 6, 1, 12, 0, 0),
+        )
+        self._use_question(aqfs_db, aqfs_institution, aqfs_user, q_used)
+        aqfs_db.commit()
+
+        resp = aqfs_client.get(
+            f"/api/v1/exams/approved-questions?topic={topic}&unused=true&sort=most_used"
+        )
+        assert resp.status_code == 200
+        questions = resp.json()["questions"]
+        ordered_ids = [q["id"] for q in questions]
+        assert ordered_ids == [q_unused_new.id, q_unused_old.id]
+        assert q_used.id not in ordered_ids
+        assert all(q["usage_count"] == 0 for q in questions)
+
+    def test_sort_difficulty_orders_easy_to_hard(
+        self, aqfs_client, aqfs_db, aqfs_institution, aqfs_user
+    ):
+        import uuid
+
+        topic = f"diff-{uuid.uuid4().hex}"
+        q_hard = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, difficulty="hard"
+        )
+        q_easy = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, difficulty="easy"
+        )
+        q_medium = self._make_question(
+            aqfs_db, aqfs_institution, aqfs_user, topic, difficulty="medium"
+        )
+        aqfs_db.commit()
+
+        resp = aqfs_client.get(
+            f"/api/v1/exams/approved-questions?topic={topic}&sort=difficulty"
+        )
+        assert resp.status_code == 200
+        ordered = [q["difficulty"] for q in resp.json()["questions"]]
+        assert ordered == ["easy", "medium", "hard"]
+        ids = [q["id"] for q in resp.json()["questions"]]
+        assert ids == [q_easy.id, q_medium.id, q_hard.id]
+
+    def test_default_sort_accepts_no_sort_param(
+        self, aqfs_client, aqfs_db, aqfs_institution, aqfs_user
+    ):
+        import uuid
+
+        topic = f"default-{uuid.uuid4().hex}"
+        self._make_question(aqfs_db, aqfs_institution, aqfs_user, topic)
+        aqfs_db.commit()
+
+        resp = aqfs_client.get(f"/api/v1/exams/approved-questions?topic={topic}")
+        assert resp.status_code == 200
+        assert len(resp.json()["questions"]) == 1
+
+    def test_invalid_sort_returns_422(self, aqfs_client):
+        resp = aqfs_client.get("/api/v1/exams/approved-questions?sort=bogus")
+        assert resp.status_code == 422
+
+    def test_invalid_quality_tier_returns_422(self, aqfs_client):
+        resp = aqfs_client.get("/api/v1/exams/approved-questions?quality_tier=Z")
+        assert resp.status_code == 422
+
+    def test_invalid_ln_level_returns_422(self, aqfs_client):
+        resp = aqfs_client.get("/api/v1/exams/approved-questions?ln_level=5")
+        assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
 # Task 8: document_ids filter on POST /{exam_id}/auto-fill
 # ---------------------------------------------------------------------------
 

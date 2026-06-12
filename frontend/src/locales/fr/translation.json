@@ -1342,7 +1342,25 @@
       "previewCompetency": "Compétence",
       "previewSource": "Document source",
       "previewClose": "Fermer",
-      "previewRemove": "Retirer"
+      "previewRemove": "Retirer",
+      "autoComposeButton": "Auto-composition",
+      "lnLevelAll": "Niveau : tous",
+      "lnLevelOption": "NE {{level}}",
+      "lnLevelSelectLabel": "Filtrer par niveau d'exigence",
+      "qualityAll": "Qualité : toutes",
+      "qualityOption": "Niveau {{tier}}",
+      "qualitySelectLabel": "Filtrer par niveau de qualité",
+      "bloomAll": "Bloom : tous",
+      "bloomSelectLabel": "Filtrer par niveau de Bloom",
+      "competencyAll": "Compétence : toutes",
+      "competencySelectLabel": "Filtrer par compétence",
+      "unusedLabel": "Jamais utilisées",
+      "sortLabel": "Tri",
+      "sortNewest": "Plus récentes",
+      "sortMostUsed": "Plus utilisées",
+      "sortDifficulty": "Par difficulté",
+      "resetFilters": "Réinitialiser les filtres",
+      "filterChipRemove": "Retirer le filtre"
     }
   },
   "profile": {

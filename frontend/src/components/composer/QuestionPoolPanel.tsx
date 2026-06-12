@@ -11,10 +11,12 @@ import {
   Button,
 } from '@mui/material';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
+import { competencyFrameworksApi } from '../../api/competencyFrameworksApi';
 import type {
   ApprovedQuestion,
   AutoFillRequest,
   AutoComposePreview,
+  QuestionSort,
 } from '../../types/composer';
 import { isAutoComposePreview } from '../../types/composer';
 
@@ -34,6 +36,12 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   medium: 'bg-yellow-100 text-yellow-700',
   hard: 'bg-red-100 text-red-700',
 };
+
+// TF-406: gemeinsame Optik der Facetten-/Sortier-Dropdowns.
+const FACET_SELECT_CLS =
+  'text-xs px-2 py-1.5 border border-gray-300 rounded-lg bg-white text-gray-700 ' +
+  'focus:ring-2 focus:ring-primary-500 focus:border-transparent ' +
+  'disabled:opacity-50 disabled:cursor-not-allowed';
 
 interface AutoFillForm {
   count: string;
@@ -112,6 +120,13 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<number[]>([]);
   const [docFilterOpen, setDocFilterOpen] = useState(false);
   const docFilterRef = useRef<HTMLDivElement>(null);
+  // TF-406: Fachfilter-Facetten + Sortierung. Leerstring = Facette inaktiv.
+  const [filterBloom, setFilterBloom] = useState<number | ''>('');
+  const [filterLnLevel, setFilterLnLevel] = useState<number | ''>('');
+  const [filterCompetencyId, setFilterCompetencyId] = useState<number | ''>('');
+  const [filterQualityTier, setFilterQualityTier] = useState('');
+  const [filterUnused, setFilterUnused] = useState(false);
+  const [sortBy, setSortBy] = useState<QuestionSort>('newest');
 
   useEffect(() => {
     if (!docFilterOpen) return;
@@ -152,6 +167,21 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   const activeTags = allTagsRaw.filter((t) => !t.is_archived);
   const archivedTagsWithQuestions = allTagsRaw.filter((t) => t.is_archived && t.usage_count > 0);
 
+  // TF-406: Handlungskompetenzen für die Kompetenz-Facette (über alle aktiven
+  // Frameworks der Institution geflacht).
+  const { data: frameworks = [] } = useQuery({
+    queryKey: ['competency-frameworks', 'active'],
+    queryFn: () => competencyFrameworksApi.listFrameworks(false),
+    staleTime: 60_000,
+  });
+  const competencies = useMemo(
+    () =>
+      frameworks
+        .flatMap((fw) => fw.competencies)
+        .sort((a, b) => a.code.localeCompare(b.code)),
+    [frameworks],
+  );
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (tagFilterRef.current && !tagFilterRef.current.contains(event.target as Node)) {
@@ -186,12 +216,32 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
     isError: isQuestionsError,
     error: questionsError,
   } = useQuery({
-    queryKey: ['approved-questions', search, filterType, filterDifficulty, selectedTagIds, selectedDocumentIds, defaultDocumentIds],
+    queryKey: [
+      'approved-questions',
+      search,
+      filterType,
+      filterDifficulty,
+      filterBloom,
+      filterLnLevel,
+      filterCompetencyId,
+      filterQualityTier,
+      filterUnused,
+      sortBy,
+      selectedTagIds,
+      selectedDocumentIds,
+      defaultDocumentIds,
+    ],
     queryFn: () =>
       ComposerService.listApprovedQuestions({
         search: search || undefined,
         question_type: filterType || undefined,
         difficulty: filterDifficulty || undefined,
+        bloom_level: filterBloom === '' ? undefined : filterBloom,
+        ln_level: filterLnLevel === '' ? undefined : filterLnLevel,
+        competency_id: filterCompetencyId === '' ? undefined : filterCompetencyId,
+        quality_tier: filterQualityTier || undefined,
+        unused: filterUnused || undefined,
+        sort: sortBy,
         tag_ids: selectedTagIds.length > 0 ? selectedTagIds : undefined,
         document_ids: selectedDocumentIds.length > 0
           ? selectedDocumentIds
@@ -340,17 +390,101 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
     return doc ? `${doc.title} (${doc.approved_question_count})` : `Doc ${id}`;
   };
 
+  // TF-406: Auto-Komposition (constraint-basiert) als 1-Klick-Einstieg sichtbar
+  // machen — öffnet den Dialog direkt im Kompositions-Modus.
+  const openAutoFill = (composition: boolean) => {
+    setCompositionMode(composition);
+    setPreview(null);
+    setAutoFillError(null);
+    setAutoFillOpen(true);
+  };
+
+  const resetAllFilters = () => {
+    setSearch('');
+    setFilterType('');
+    setFilterDifficulty('');
+    setSelectedTagIds([]);
+    setSelectedDocumentIds([]);
+    setFilterBloom('');
+    setFilterLnLevel('');
+    setFilterCompetencyId('');
+    setFilterQualityTier('');
+    setFilterUnused(false);
+    setSortBy('newest');
+  };
+
+  const competencyChipLabel = (id: number) => {
+    const c = competencies.find((x) => x.id === id);
+    return c ? c.code : `#${id}`;
+  };
+
+  // TF-406: aktive Fachfilter-Facetten als Chips. Bestehende Filter (Suche,
+  // Typ, Difficulty, Tags, Dokument) behalten ihre eigene Inline-Darstellung.
+  const facetChips: { key: string; label: string; onClear: () => void }[] = [];
+  if (filterLnLevel !== '') {
+    facetChips.push({
+      key: 'ln',
+      label: t('composer.questionPool.lnLevelOption', { level: filterLnLevel }),
+      onClear: () => setFilterLnLevel(''),
+    });
+  }
+  if (filterQualityTier) {
+    facetChips.push({
+      key: 'quality',
+      label: t('composer.questionPool.qualityOption', { tier: filterQualityTier }),
+      onClear: () => setFilterQualityTier(''),
+    });
+  }
+  if (filterBloom !== '') {
+    facetChips.push({
+      key: 'bloom',
+      label: BLOOM_LABELS[filterBloom],
+      onClear: () => setFilterBloom(''),
+    });
+  }
+  if (filterCompetencyId !== '') {
+    facetChips.push({
+      key: 'competency',
+      label: competencyChipLabel(filterCompetencyId),
+      onClear: () => setFilterCompetencyId(''),
+    });
+  }
+  if (filterUnused) {
+    facetChips.push({
+      key: 'unused',
+      label: t('composer.questionPool.unusedLabel'),
+      onClear: () => setFilterUnused(false),
+    });
+  }
+
+  const hasAnyFilter =
+    Boolean(search) ||
+    Boolean(filterType) ||
+    Boolean(filterDifficulty) ||
+    selectedTagIds.length > 0 ||
+    selectedDocumentIds.length > 0 ||
+    facetChips.length > 0 ||
+    sortBy !== 'newest';
+
   return (
     <div className="card p-4 bg-white rounded-lg border border-gray-200 h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-gray-900">{t('composer.questionPool.title')}</h3>
         {!disabled && (
-          <button
-            onClick={() => setAutoFillOpen(true)}
-            className="text-sm px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            Auto-Fill
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => openAutoFill(false)}
+              className="text-sm px-3 py-1 border border-indigo-600 text-indigo-700 rounded-lg hover:bg-indigo-50 transition-colors"
+            >
+              {t('composer.questionPool.autoFill')}
+            </button>
+            <button
+              onClick={() => openAutoFill(true)}
+              className="text-sm px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              {t('composer.questionPool.autoComposeButton')}
+            </button>
+          </div>
         )}
       </div>
 
@@ -665,6 +799,123 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
           );
         })}
       </div>
+
+      {/* TF-406: Fachfilter-Facetten, Sortierung & aktive-Filter-Chips */}
+      {!disabled && (
+        <div className="mb-3 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={filterLnLevel}
+              onChange={(e) =>
+                setFilterLnLevel(e.target.value === '' ? '' : Number(e.target.value))
+              }
+              aria-label={t('composer.questionPool.lnLevelSelectLabel')}
+              className={FACET_SELECT_CLS}
+            >
+              <option value="">{t('composer.questionPool.lnLevelAll')}</option>
+              {[1, 2, 3, 4].map((n) => (
+                <option key={n} value={n}>
+                  {t('composer.questionPool.lnLevelOption', { level: n })}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterQualityTier}
+              onChange={(e) => setFilterQualityTier(e.target.value)}
+              aria-label={t('composer.questionPool.qualitySelectLabel')}
+              className={FACET_SELECT_CLS}
+            >
+              <option value="">{t('composer.questionPool.qualityAll')}</option>
+              {['A', 'B', 'C'].map((tier) => (
+                <option key={tier} value={tier}>
+                  {t('composer.questionPool.qualityOption', { tier })}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterBloom}
+              onChange={(e) =>
+                setFilterBloom(e.target.value === '' ? '' : Number(e.target.value))
+              }
+              aria-label={t('composer.questionPool.bloomSelectLabel')}
+              className={FACET_SELECT_CLS}
+            >
+              <option value="">{t('composer.questionPool.bloomAll')}</option>
+              {[1, 2, 3, 4, 5, 6].map((b) => (
+                <option key={b} value={b}>
+                  {BLOOM_LABELS[b]}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterCompetencyId}
+              onChange={(e) =>
+                setFilterCompetencyId(e.target.value === '' ? '' : Number(e.target.value))
+              }
+              aria-label={t('composer.questionPool.competencySelectLabel')}
+              disabled={competencies.length === 0}
+              className={FACET_SELECT_CLS}
+            >
+              <option value="">{t('composer.questionPool.competencyAll')}</option>
+              {competencies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} — {c.title}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={filterUnused}
+                onChange={(e) => setFilterUnused(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              {t('composer.questionPool.unusedLabel')}
+            </label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as QuestionSort)}
+              aria-label={t('composer.questionPool.sortLabel')}
+              className={FACET_SELECT_CLS}
+            >
+              <option value="newest">{t('composer.questionPool.sortNewest')}</option>
+              <option value="most_used">{t('composer.questionPool.sortMostUsed')}</option>
+              <option value="difficulty">{t('composer.questionPool.sortDifficulty')}</option>
+            </select>
+          </div>
+          {(facetChips.length > 0 || hasAnyFilter) && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {facetChips.map((chip) => (
+                <span
+                  key={chip.key}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-indigo-50 text-indigo-700 border-indigo-200"
+                >
+                  {chip.label}
+                  <button
+                    type="button"
+                    onClick={chip.onClear}
+                    aria-label={t('composer.questionPool.filterChipRemove')}
+                    className="font-bold leading-none hover:text-indigo-900"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {hasAnyFilter && (
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-auto"
+                >
+                  {t('composer.questionPool.resetFilters')}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Question list */}
       <div className="flex-1 overflow-y-auto space-y-2 min-h-0">

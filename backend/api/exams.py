@@ -7,7 +7,7 @@ from typing import List, Optional, Union
 from datetime import date, datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Query, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func as sa_func
+from sqlalchemy import case, func as sa_func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
@@ -569,10 +569,28 @@ async def list_approved_questions(
     question_type: Optional[str] = Query(
         None, pattern="^(multiple_choice|open_ended|true_false)$"
     ),
+    # TF-406: Fachfilter-Facetten (Anforderungsniveau, Handlungskompetenz,
+    # Qualitätsstufe) und "noch nie verwendet". Felder liegen am Modell
+    # QuestionReview; UND-Verknüpfung zwischen den Facetten.
+    ln_level: Optional[int] = Query(
+        None, ge=1, le=4, description="TF-400 Anforderungsniveau (1–4)"
+    ),
+    competency_id: Optional[int] = Query(
+        None, ge=1, description="Handlungskompetenz-ID"
+    ),
+    quality_tier: Optional[str] = Query(None, pattern="^(A|B|C)$"),
+    unused: bool = Query(
+        False, description="Nur Fragen ohne Prüfungs-Verwendung (usage_count=0)"
+    ),
     search: Optional[str] = Query(None, max_length=500),
     tag_ids: Optional[str] = Query(None, description="Comma-separated tag IDs"),
     document_ids: Optional[str] = Query(
         None, description="Comma-separated document IDs"
+    ),
+    sort: str = Query(
+        "newest",
+        pattern="^(most_used|newest|difficulty)$",
+        description="Sortierung der Resultate",
     ),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -596,6 +614,12 @@ async def list_approved_questions(
         query = query.filter(QuestionReview.bloom_level == bloom_level)
     if question_type:
         query = query.filter(QuestionReview.question_type == question_type)
+    if ln_level:
+        query = query.filter(QuestionReview.ln_level == ln_level)
+    if competency_id:
+        query = query.filter(QuestionReview.competency_id == competency_id)
+    if quality_tier:
+        query = query.filter(QuestionReview.quality_tier == quality_tier)
     if search:
         query = query.filter(QuestionReview.question_text.ilike(f"%{search}%"))
     if tag_ids:
@@ -622,13 +646,45 @@ async def list_approved_questions(
             )
             query = query.filter(QuestionReview.id.in_(linked_ids_select))
 
+    if unused:
+        # "noch nie verwendet" — kein einziger ExamQuestion-Eintrag verweist
+        # auf die Frage (usage_count=0). Korrelierte NOT EXISTS-Subquery.
+        query = query.filter(
+            ~db.query(ExamQuestion.id)
+            .filter(ExamQuestion.question_id == QuestionReview.id)
+            .exists()
+        )
+
     total = query.count()
-    questions = (
-        query.order_by(QuestionReview.created_at.desc())
-        .limit(limit)
-        .offset(offset)
-        .all()
-    )
+
+    # TF-406: Sortierung. "newest" (Default) = bisheriges Verhalten.
+    if sort == "most_used":
+        usage_sort_sq = (
+            db.query(
+                ExamQuestion.question_id.label("qid"),
+                sa_func.count(ExamQuestion.id).label("uses"),
+            )
+            .group_by(ExamQuestion.question_id)
+            .subquery()
+        )
+        query = query.outerjoin(
+            usage_sort_sq, usage_sort_sq.c.qid == QuestionReview.id
+        ).order_by(
+            sa_func.coalesce(usage_sort_sq.c.uses, 0).desc(),
+            QuestionReview.created_at.desc(),
+        )
+    elif sort == "difficulty":
+        difficulty_rank = case(
+            (QuestionReview.difficulty == "easy", 1),
+            (QuestionReview.difficulty == "medium", 2),
+            (QuestionReview.difficulty == "hard", 3),
+            else_=4,
+        )
+        query = query.order_by(difficulty_rank.asc(), QuestionReview.created_at.desc())
+    else:  # "newest"
+        query = query.order_by(QuestionReview.created_at.desc())
+
+    questions = query.limit(limit).offset(offset).all()
 
     question_ids = [q.id for q in questions]
     usage_counts = {}
