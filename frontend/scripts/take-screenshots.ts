@@ -402,7 +402,7 @@ const SCREENSHOTS: ScreenshotDef[] = [
         console.log('  ✓ questions-step3-context-preview.png');
       }
 
-      // Schritt 4: "Prüfung generieren" → Hintergrundtask → TaskBar-Click → Schritt 4
+      // Schritt 4: "Fragen generieren" → Hintergrundtask → TaskBar-Click → Schritt 4
       const generateBtn = page.locator('button:has-text("Generieren")').first();
       if (await generateBtn.isVisible().catch(() => false) && await generateBtn.isEnabled().catch(() => false)) {
         await generateBtn.click();
@@ -411,7 +411,7 @@ const SCREENSHOTS: ScreenshotDef[] = [
         const found = await successTask.waitFor({ state: 'visible', timeout: WIZARD_GENERATE_TIMEOUT_MS }).catch(() => false);
         if (found !== false) {
           await successTask.click();
-          await page.waitForSelector('text=Prüfung erfolgreich generiert', { timeout: SELECTOR_TIMEOUT_MS }).catch(() => null);
+          await page.waitForSelector('text=Prüfungsfragen erfolgreich generiert', { timeout: SELECTOR_TIMEOUT_MS }).catch(() => null);
           await page.waitForTimeout(ACTION_PAUSE_MS);
         } else {
           console.warn('  ⚠ SKIP questions-step4 — Task nicht innerhalb 60s abgeschlossen');

@@ -507,7 +507,7 @@
       "subtitle": "Review and validate generated exam questions"
     },
     "exams": {
-      "title": "Exam Generation",
+      "title": "Question Generation",
       "subtitle": "Create intelligent exam questions with AI support"
     },
     "admin": {
@@ -1914,13 +1914,13 @@
   },
   "premium": {
     "ragExamCreator": {
-      "title": "Create RAG-based Exam",
+      "title": "Create RAG-based Exam Questions",
       "back": "Back",
       "next": "Next",
       "errorLoadingData": "Error loading data",
       "errorTopicAndDocument": "Please enter a topic and select at least one document.",
       "errorContextPreview": "Error loading context preview",
-      "errorExamGeneration": "Error generating exam",
+      "errorExamGeneration": "Error generating questions",
       "runningGenerations": "Running Generations",
       "generation": "Generation",
       "questionCountChip": "{{count}} Questions",
@@ -1952,11 +1952,11 @@
       "recommendedQuestionCount": "Recommended number of questions:",
       "recommendedDifficulty": "Recommended difficulty level:",
       "recommendedQuestionTypes": "Recommended question types:",
-      "generateAnother": "Generate another exam",
-      "generateExam": "Generate Exam",
-      "step4Label": "Exam Generated",
+      "generateAnother": "Generate more questions",
+      "generateExam": "Generate Questions",
+      "step4Label": "Questions Generated",
       "generatedNotSaved": "Questions generated but not saved",
-      "examGeneratedSuccess": "Exam successfully generated!",
+      "examGeneratedSuccess": "Questions successfully generated!",
       "questionsGeneratedAndSaved": "{{count}} questions were generated and saved for review.",
       "generatedQuestions": "Generated Questions",
       "generationDuration": "Generation Duration",
@@ -1965,7 +1965,7 @@
       "pendingReview": "Pending Review",
       "pendingReviewInfo": "The questions are in Pending status and need to be reviewed and approved in the review workflow.",
       "goToReview": "Go to Review Workflow",
-      "createNewExam": "Create New Exam",
+      "createNewExam": "Create New Questions",
       "errorTagCreation": "Some tags could not be created: {{names}}",
       "tagsLabel": "Tags (optional)",
       "competencyFrameworkLabel": "Competency framework / module (optional)",

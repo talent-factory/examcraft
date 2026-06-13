@@ -200,7 +200,7 @@ describe('Frontend Integration Tests', () => {
       // Switch to RAG exam creator tab
       fireEvent.click(screen.getByText('RAG-Prüfung erstellen'));
       await waitFor(() => {
-        expect(screen.getByText('RAG-basierte Prüfung erstellen')).toBeInTheDocument();
+        expect(screen.getByText('RAG-basierte Prüfungsfragen erstellen')).toBeInTheDocument();
       });
     });
   });
@@ -329,7 +329,7 @@ describe('Frontend Integration Tests', () => {
       const topicInput = screen.getByLabelText('Prüfungsthema');
       fireEvent.change(topicInput, { target: { value: 'Regular Test' } });
 
-      const generateButton = screen.getByText('Prüfung generieren');
+      const generateButton = screen.getByText('Fragen generieren');
       fireEvent.click(generateButton);
 
       await waitFor(() => {
@@ -413,7 +413,7 @@ describe('Frontend Integration Tests', () => {
       const topicInput = screen.getByLabelText('Prüfungsthema');
       fireEvent.change(topicInput, { target: { value: 'Test Topic' } });
 
-      const generateButton = screen.getByText('Prüfung generieren');
+      const generateButton = screen.getByText('Fragen generieren');
       fireEvent.click(generateButton);
 
       await waitFor(() => {
@@ -512,7 +512,7 @@ describe('Frontend Integration Tests', () => {
 
       // Check for form elements
       expect(screen.getByRole('textbox', { name: /Prüfungsthema/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Prüfung generieren/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Fragen generieren/i })).toBeInTheDocument();
     });
 
     it('supports keyboard navigation', async () => {

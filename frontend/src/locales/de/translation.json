@@ -507,8 +507,8 @@
       "subtitle": "Überprüfe und validiere generierte Prüfungsfragen"
     },
     "exams": {
-      "title": "Prüfungsgenerierung",
-      "subtitle": "Erstelle intelligente Prüfungsaufgaben mit KI-Unterstützung"
+      "title": "Fragengenerierung",
+      "subtitle": "Erstelle intelligente Prüfungsfragen mit KI-Unterstützung"
     },
     "admin": {
       "title": "Admin-Panel",
@@ -1914,13 +1914,13 @@
   },
   "premium": {
     "ragExamCreator": {
-      "title": "RAG-basierte Prüfung erstellen",
+      "title": "RAG-basierte Prüfungsfragen erstellen",
       "back": "Zurück",
       "next": "Weiter",
       "errorLoadingData": "Fehler beim Laden der Daten",
       "errorTopicAndDocument": "Bitte geben Sie ein Thema ein und wählen Sie mindestens ein Dokument aus.",
       "errorContextPreview": "Fehler bei der Kontext-Vorschau",
-      "errorExamGeneration": "Fehler bei der Prüfungserstellung",
+      "errorExamGeneration": "Fehler bei der Generierung der Prüfungsfragen",
       "runningGenerations": "Laufende Generierungen",
       "generation": "Generierung",
       "questionCountChip": "{{count}} Fragen",
@@ -1952,11 +1952,11 @@
       "recommendedQuestionCount": "Empfohlene Anzahl Fragen:",
       "recommendedDifficulty": "Empfohlener Schwierigkeitsgrad:",
       "recommendedQuestionTypes": "Empfohlene Fragetypen:",
-      "generateAnother": "Weitere Prüfung generieren",
-      "generateExam": "Prüfung generieren",
-      "step4Label": "Prüfung generiert",
+      "generateAnother": "Weitere Fragen generieren",
+      "generateExam": "Fragen generieren",
+      "step4Label": "Prüfungsfragen generiert",
       "generatedNotSaved": "Fragen generiert, aber nicht gespeichert",
-      "examGeneratedSuccess": "Prüfung erfolgreich generiert!",
+      "examGeneratedSuccess": "Prüfungsfragen erfolgreich generiert!",
       "questionsGeneratedAndSaved": "{{count}} Fragen wurden generiert und zur Überprüfung gespeichert.",
       "generatedQuestions": "Generierte Fragen",
       "generationDuration": "Generierungsdauer",
@@ -1965,7 +1965,7 @@
       "pendingReview": "Pending Review",
       "pendingReviewInfo": "Die Fragen befinden sich im Status Pending und müssen im Review-Workflow überprüft und genehmigt werden.",
       "goToReview": "Zum Review-Workflow",
-      "createNewExam": "Neue Prüfung erstellen",
+      "createNewExam": "Neue Prüfungsfragen erstellen",
       "errorTagCreation": "Einige Tags konnten nicht erstellt werden: {{names}}",
       "tagsLabel": "Tags (optional)",
       "competencyFrameworkLabel": "Kompetenzrahmen / Modul (optional)",
