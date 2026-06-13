@@ -19,6 +19,14 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// TF-410: PromptEditor now reads the auth context (useAuth) to gate the
+// visibility-tier controls. Mock it so this tag-focused test neither needs an
+// AuthProvider nor pulls in the real AuthContext → i18n.ts side-effect import
+// (which would otherwise hit `.use(initReactI18next)` with the mocked module).
+jest.mock('../../../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { is_superuser: false }, hasRole: () => false }),
+}));
+
 jest.mock('../../MarkdownRenderer', () => () => null);
 
 jest.mock('../../../api/promptsApi', () => ({

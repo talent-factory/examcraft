@@ -277,9 +277,39 @@ async def register(
     db.add(user)
     db.flush()  # Get user.id
 
-    # Assign default 'dozent' role — self-registered users need core features
-    # (question generation, document management) that viewer role lacks
-    default_role = db.query(Role).filter(Role.name == UserRole.DOZENT.value).first()
+    # TF-410: the first user of a non-personal institution becomes its admin so
+    # every institution always has >=1 admin (required to manage institution-
+    # default prompts and other admin-only resources). Personal institutions and
+    # any subsequent user keep the default 'dozent' role.
+    is_personal_institution = (institution.slug or "").endswith("-personal")
+    is_first_user = (
+        db.query(User).filter(User.institution_id == institution.id).count() == 1
+    )
+    primary_role_name = (
+        UserRole.ADMIN.value
+        if (not is_personal_institution and is_first_user)
+        else UserRole.DOZENT.value
+    )
+
+    # Assign the primary role — self-registered users need core features
+    # (question generation, document management) that viewer role lacks. Fall back
+    # gracefully (admin -> dozent -> viewer) if a role is not seeded yet.
+    default_role = db.query(Role).filter(Role.name == primary_role_name).first()
+    if not default_role and primary_role_name == UserRole.ADMIN.value:
+        # TF-410: the admin invariant ("every non-personal institution has >=1
+        # admin") silently breaks if the admin role isn't seeded at this point.
+        # Log it loudly so an unsatisfied invariant is investigable rather than
+        # invisible, then downgrade to the regular role.
+        logger.error(
+            "admin role not seeded — first user %s of institution %s (%s) "
+            "downgraded to dozent; TF-410 admin invariant unsatisfied, run role "
+            "seeding and grant an admin manually.",
+            request.email,
+            institution.id,
+            institution.slug,
+        )
+    if not default_role and primary_role_name != UserRole.DOZENT.value:
+        default_role = db.query(Role).filter(Role.name == UserRole.DOZENT.value).first()
     if not default_role:
         default_role = db.query(Role).filter(Role.name == UserRole.VIEWER.value).first()
     if not default_role:

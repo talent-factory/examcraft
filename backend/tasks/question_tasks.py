@@ -569,6 +569,10 @@ def generate_questions_task(
     from services.rag_service import RAGExamRequest
 
     rag_request = RAGExamRequest(**request_data)
+    # TF-410: thread tenant context so institution-specific default templates win
+    # over the system default (own institution → system precedence).
+    if institution_id is not None:
+        rag_request.institution_id = institution_id
     question_count = rag_request.question_count
 
     # Re-raised "No context available" ValueError from TF-358 is raised later in

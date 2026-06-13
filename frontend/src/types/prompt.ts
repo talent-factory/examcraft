@@ -35,6 +35,16 @@ export interface PromptTag {
 }
 
 /**
+ * Prompt visibility tier (TF-410). Mirrors the backend ``PromptVisibility``.
+ * Reading widens downward; editing stays narrow (see ``can_edit`` on Prompt).
+ */
+export enum PromptVisibility {
+  PRIVATE = 'private',
+  INSTITUTION = 'institution',
+  SYSTEM = 'system'
+}
+
+/**
  * Main Prompt Interface
  * Matches backend Prompt model
  */
@@ -56,6 +66,12 @@ export interface Prompt {
   usage_count: number;
   tokens_estimated?: number;
   qdrant_point_id?: string;
+  // TF-410 visibility tiers
+  visibility?: PromptVisibility;
+  is_institution_default?: boolean;
+  owner_id?: number | null;
+  /** Computed for the requesting user: may they edit this prompt? */
+  can_edit?: boolean;
 }
 
 /**

@@ -7,12 +7,16 @@ from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
 from typing import Dict, Any
 import httpx
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models.auth import User, OAuthAccount, Institution, Role
+from models.auth import User, OAuthAccount, Institution, Role, UserRole
+
+
+logger = logging.getLogger(__name__)
 
 
 # OAuth Configuration
@@ -346,10 +350,43 @@ class OAuthService:
         self.db.add(new_user)
         self.db.flush()  # Get user.id
 
-        # Assign default Viewer role
-        viewer_role = self.db.query(Role).filter(Role.name == "Viewer").first()
-        if viewer_role:
-            new_user.roles.append(viewer_role)
+        # TF-410: the first user of a non-personal institution becomes its admin
+        # so every institution always has >=1 admin. Otherwise assign the default
+        # Viewer role.
+        #
+        # The shared "default-institution" bucket is excluded: unmatched OAuth
+        # sign-ups all land there, so granting the first arrival admin over it
+        # would hand an unrelated user admin of everyone else's fallback tenant.
+        slug = institution.slug or ""
+        is_auto_admin_exempt = (
+            slug.endswith("-personal") or slug == "default-institution"
+        )
+        is_first_user = (
+            self.db.query(User).filter(User.institution_id == institution.id).count()
+            == 1
+        )
+        assigned_role = None
+        if not is_auto_admin_exempt and is_first_user:
+            assigned_role = (
+                self.db.query(Role).filter(Role.name == UserRole.ADMIN.value).first()
+            )
+        if assigned_role is None:
+            # Default viewer role (also the fallback if the admin role is unseeded).
+            # TF-410: match the seeded role *name* (lowercase ``UserRole.VIEWER.value``,
+            # not the display name "Viewer") — the old "Viewer" lookup never matched
+            # and silently left OAuth users role-less.
+            assigned_role = (
+                self.db.query(Role).filter(Role.name == UserRole.VIEWER.value).first()
+            )
+        if assigned_role:
+            new_user.roles.append(assigned_role)
+        else:
+            # Never commit a role-less account silently — surface the misconfiguration.
+            logger.error(
+                "No assignable role found for OAuth user %s (admin/viewer both "
+                "unseeded) — created without a role; run role seeding.",
+                new_user.email,
+            )
 
         # Create OAuth account
         new_oauth_account = OAuthAccount(

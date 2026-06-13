@@ -64,6 +64,9 @@ export interface PromptWritePayload {
   use_case: string;
   is_active?: boolean;
   tag_ids: number[];
+  // TF-410 visibility tiers (permission-checked server-side).
+  visibility?: string;
+  is_institution_default?: boolean;
 }
 
 class PromptsApiService {

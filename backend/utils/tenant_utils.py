@@ -476,3 +476,19 @@ def get_tenant_context(user: User) -> TenantContext:
         TenantContext object
     """
     return TenantContext(user)
+
+
+def get_system_institution_id(db: Session) -> Optional[int]:
+    """TF-410: id of the single platform-wide system institution (``is_system``).
+
+    System-visible prompts and other global seed data live on this institution.
+    Returns ``None`` when no system institution exists yet (e.g. a brand-new DB
+    before seeding).
+    """
+    return (
+        db.query(Institution.id)
+        .filter(Institution.is_system.is_(True))
+        .order_by(Institution.id)
+        .limit(1)
+        .scalar()
+    )

@@ -893,7 +893,12 @@
       "confirmActivate": "Are you sure you want to activate this prompt?",
       "failedLoad": "Error loading prompts",
       "failedDelete": "Error deleting",
-      "failedToggle": "Error changing status"
+      "failedToggle": "Error changing status",
+      "visibilitySystem": "System-wide",
+      "visibilityInstitution": "Institution",
+      "visibilityInstitutionDefault": "Institution default",
+      "visibilityPrivate": "Private",
+      "readOnly": "Read-only"
     },
     "promptManagement": {
       "tabLibrary": "Prompt Library",
@@ -932,6 +937,11 @@
       "useCaseTrueFalse": "True/False",
       "useCaseChatbot": "Chatbot",
       "useCaseEvaluation": "Evaluation",
+      "visibilityLabel": "Visibility",
+      "visibilityPrivate": "Private (only me)",
+      "visibilityInstitution": "Institution (all members)",
+      "visibilitySystem": "System-wide (all institutions)",
+      "institutionDefaultLabel": "Set as institution default (read-only for members)",
       "tagsLabel": "Tags",
       "tagPlaceholder": "New tag",
       "activeLabel": "Active",

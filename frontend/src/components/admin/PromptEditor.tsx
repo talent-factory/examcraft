@@ -23,7 +23,9 @@ import {
 import { Save, Cancel, Preview, Code, History } from '@mui/icons-material';
 import axios from 'axios';
 import { promptsApi, Prompt } from '../../api/promptsApi';
-import { PromptCategory } from '../../types/prompt';
+import { PromptCategory, PromptVisibility } from '../../types/prompt';
+import { useAuth } from '../../contexts/AuthContext';
+import { UserRole } from '../../types/auth';
 import MarkdownRenderer from '../MarkdownRenderer';
 import TagAutocomplete from '../shared/TagAutocomplete';
 import { tagsApi, type Tag, type TagValue, isPendingTag } from '../../api/tagsApi';
@@ -98,6 +100,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
   onCancel
 }) => {
   const { t } = useTranslation();
+  const { user, hasRole } = useAuth();
+  // TF-410: who may pick which visibility tier (mirrors the backend guard).
+  const isSuperuser = !!user?.is_superuser;
+  const isAdmin = isSuperuser || hasRole(UserRole.ADMIN);
 
   const USE_CASE_LABELS: Record<string, string> = {
     'question_generation': t('admin.promptEditor.useCaseGeneral'),
@@ -130,7 +136,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     category: PromptCategory.SYSTEM_PROMPT,
     use_case: '',
     tags: [],
-    is_active: false
+    is_active: false,
+    // TF-410: new prompts default to the most private tier.
+    visibility: PromptVisibility.PRIVATE,
+    is_institution_default: false
   });
 
   const loadPrompt = useCallback(async () => {
@@ -195,6 +204,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
           category: formData.category,
           use_case: formData.use_case,
           tag_ids,
+          // TF-410: tier changes (permission-checked server-side).
+          visibility: formData.visibility,
+          is_institution_default: formData.is_institution_default,
         });
         const versionBumped = result.version > (formData.version ?? 1);
         setFormData(result);
@@ -212,6 +224,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
           description: formData.description,
           is_active: formData.is_active ?? false,
           tag_ids,
+          // TF-410: chosen visibility tier (permission-checked server-side).
+          visibility: formData.visibility,
+          is_institution_default: formData.is_institution_default,
         });
         setSuccess(t('admin.promptEditor.successCreated'));
       }
@@ -394,6 +409,62 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                 ))}
               </Select>
             </FormControl>
+
+            {/* Visibility tier (TF-410) */}
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel id="visibility-label">
+                {t('admin.promptEditor.visibilityLabel')}
+              </InputLabel>
+              <Select
+                labelId="visibility-label"
+                value={formData.visibility ?? PromptVisibility.PRIVATE}
+                label={t('admin.promptEditor.visibilityLabel')}
+                disabled={saving}
+                onChange={(e: SelectChangeEvent) =>
+                  setFormData({
+                    ...formData,
+                    visibility: e.target.value as PromptVisibility,
+                    // institution_default is only valid for the institution tier
+                    is_institution_default:
+                      e.target.value === PromptVisibility.INSTITUTION
+                        ? formData.is_institution_default
+                        : false,
+                  })
+                }
+              >
+                <MenuItem value={PromptVisibility.PRIVATE}>
+                  {t('admin.promptEditor.visibilityPrivate')}
+                </MenuItem>
+                <MenuItem value={PromptVisibility.INSTITUTION}>
+                  {t('admin.promptEditor.visibilityInstitution')}
+                </MenuItem>
+                {isSuperuser && (
+                  <MenuItem value={PromptVisibility.SYSTEM}>
+                    {t('admin.promptEditor.visibilitySystem')}
+                  </MenuItem>
+                )}
+              </Select>
+            </FormControl>
+
+            {/* Institution default — admin-only, institution tier only (TF-410) */}
+            {isAdmin && formData.visibility === PromptVisibility.INSTITUTION && (
+              <FormControlLabel
+                sx={{ mb: 2, display: 'block' }}
+                control={
+                  <Switch
+                    checked={!!formData.is_institution_default}
+                    disabled={saving}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        is_institution_default: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label={t('admin.promptEditor.institutionDefaultLabel')}
+              />
+            )}
 
             {/* Tags — TF-397: managed prompt-tags via autocomplete (select or inline-create) */}
             <Box sx={{ mb: 3 }}>

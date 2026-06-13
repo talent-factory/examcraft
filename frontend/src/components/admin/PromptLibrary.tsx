@@ -22,6 +22,47 @@ import {
 } from '@mui/material';
 import { Add, Search, Edit, Delete, History } from '@mui/icons-material';
 import { promptsApi, Prompt } from '../../api/promptsApi';
+import { PromptVisibility } from '../../types/prompt';
+import type { TFunction } from 'i18next';
+
+/** TF-410: small chip describing a prompt's visibility tier. */
+const renderVisibilityChip = (prompt: Prompt, t: TFunction) => {
+  if (prompt.visibility === PromptVisibility.SYSTEM) {
+    return (
+      <Chip
+        label={t('admin.promptLibrary.visibilitySystem')}
+        size="small"
+        color="secondary"
+        variant="outlined"
+      />
+    );
+  }
+  if (prompt.visibility === PromptVisibility.INSTITUTION) {
+    return (
+      <Chip
+        label={
+          prompt.is_institution_default
+            ? t('admin.promptLibrary.visibilityInstitutionDefault')
+            : t('admin.promptLibrary.visibilityInstitution')
+        }
+        size="small"
+        color="info"
+        variant="outlined"
+      />
+    );
+  }
+  if (prompt.visibility === PromptVisibility.PRIVATE) {
+    return (
+      <Chip
+        label={t('admin.promptLibrary.visibilityPrivate')}
+        size="small"
+        color="default"
+        variant="outlined"
+      />
+    );
+  }
+  return null;
+};
 
 interface PromptLibraryProps {
   onEditPrompt?: (promptId: string) => void;
@@ -291,6 +332,17 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                             sx={{ fontWeight: 600 }}
                           />
                         )}
+                        {/* TF-410: visibility tier badge */}
+                        {renderVisibilityChip(prompt, t)}
+                        {/* TF-410: fail-safe — treat unknown can_edit as read-only */}
+                        {prompt.can_edit !== true && (
+                          <Chip
+                            label={t('admin.promptLibrary.readOnly')}
+                            size="small"
+                            variant="outlined"
+                            color="default"
+                          />
+                        )}
                       </Box>
 
                       {/* Tags */}
@@ -327,6 +379,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                         <Button
                           size="small"
                           startIcon={<Edit />}
+                          disabled={prompt.can_edit !== true}
                           onClick={() => onEditPrompt?.(prompt.id)}
                         >
                           {t('admin.promptLibrary.btnEdit')}
@@ -334,6 +387,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                         <Button
                           size="small"
                           color={prompt.is_active ? 'warning' : 'success'}
+                          disabled={prompt.can_edit !== true}
                           onClick={() => handleToggleActive(prompt.id, prompt.is_active)}
                         >
                           {prompt.is_active ? t('admin.promptLibrary.btnDeactivate') : t('admin.promptLibrary.btnActivate')}
@@ -351,6 +405,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
                           size="small"
                           color="error"
                           startIcon={<Delete />}
+                          disabled={prompt.can_edit !== true}
                           onClick={() => handleDelete(prompt.id)}
                         >
                           {t('admin.promptLibrary.btnDelete')}

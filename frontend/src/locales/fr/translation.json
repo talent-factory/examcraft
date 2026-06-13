@@ -507,7 +507,12 @@
       "confirmActivate": "Voulez-vous vraiment activer ce prompt ?",
       "failedLoad": "Erreur lors du chargement des prompts",
       "failedDelete": "Erreur lors de la suppression",
-      "failedToggle": "Erreur lors du changement de statut"
+      "failedToggle": "Erreur lors du changement de statut",
+      "visibilitySystem": "Système",
+      "visibilityInstitution": "Institution",
+      "visibilityInstitutionDefault": "Défaut de l'institution",
+      "visibilityPrivate": "Personnel",
+      "readOnly": "Lecture seule"
     },
     "promptManagement": {
       "tabLibrary": "Bibliothèque de prompts",
@@ -546,6 +551,11 @@
       "useCaseTrueFalse": "Vrai/Faux",
       "useCaseChatbot": "Chatbot",
       "useCaseEvaluation": "Évaluation",
+      "visibilityLabel": "Visibilité",
+      "visibilityPrivate": "Personnel (moi uniquement)",
+      "visibilityInstitution": "Institution (tous les membres)",
+      "visibilitySystem": "Système (toutes les institutions)",
+      "institutionDefaultLabel": "Définir comme valeur par défaut de l'institution (lecture seule pour les membres)",
       "tagsLabel": "Tags",
       "tagPlaceholder": "Nouveau tag",
       "activeLabel": "Actif",

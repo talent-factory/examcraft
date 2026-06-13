@@ -99,6 +99,12 @@ class Institution(Base):
     # Status
     is_active = Column(Boolean, default=True, nullable=False, index=True)
 
+    # TF-410: marks the single platform-wide "system" institution that owns
+    # system-visible prompts (and other global seed data). Exactly one row may
+    # have ``is_system = true`` — enforced by a partial unique index in the
+    # migration. Replaces the old "lowest id" seed convention.
+    is_system = Column(Boolean, default=False, nullable=False, index=True)
+
     # Subscription Info (TF-116 Monetarisierungsstrategie)
     subscription_tier = Column(
         String(50), default="free", nullable=False

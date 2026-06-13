@@ -51,6 +51,8 @@ class RAGExamRequest(BaseModel):
     tag_ids: List[int] = Field(default_factory=list)
     framework_id: Optional[int] = None
     competencies: Optional[str] = None
+    # TF-410: requesting institution for tenant-aware default-template resolution.
+    institution_id: Optional[int] = None
 
 
 class RAGExamResponse(BaseModel):

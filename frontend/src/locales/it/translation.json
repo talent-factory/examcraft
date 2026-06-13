@@ -507,7 +507,12 @@
       "confirmActivate": "Sei sicuro di voler attivare questo prompt?",
       "failedLoad": "Errore nel caricamento dei prompt",
       "failedDelete": "Errore nell'eliminazione",
-      "failedToggle": "Errore nel cambio di stato"
+      "failedToggle": "Errore nel cambio di stato",
+      "visibilitySystem": "Sistema",
+      "visibilityInstitution": "Istituzione",
+      "visibilityInstitutionDefault": "Predefinito istituzione",
+      "visibilityPrivate": "Personale",
+      "readOnly": "Sola lettura"
     },
     "promptManagement": {
       "tabLibrary": "Libreria prompt",
@@ -546,6 +551,11 @@
       "useCaseTrueFalse": "Vero/Falso",
       "useCaseChatbot": "Chatbot",
       "useCaseEvaluation": "Valutazione",
+      "visibilityLabel": "Visibilità",
+      "visibilityPrivate": "Personale (solo io)",
+      "visibilityInstitution": "Istituzione (tutti i membri)",
+      "visibilitySystem": "Sistema (tutte le istituzioni)",
+      "institutionDefaultLabel": "Imposta come predefinito dell'istituzione (sola lettura per i membri)",
       "tagsLabel": "Tag",
       "tagPlaceholder": "Nuovo tag",
       "activeLabel": "Attivo",

@@ -137,3 +137,81 @@ def test_oauth_refreshes_profile_data_on_subsequent_login(
     )
     assert refreshed_oauth.access_token == "new_token"
     assert refreshed_oauth.picture == "https://new-avatar.jpg"
+
+
+# --------------------------------------------------------------------------- #
+# TF-410: first-user-becomes-admin on the OAuth provisioning path
+# --------------------------------------------------------------------------- #
+def _seed_role(test_db: Session, name: str):
+    from models.auth import Role
+
+    role = test_db.query(Role).filter(Role.name == name).first()
+    if role is None:
+        role = Role(
+            name=name,
+            display_name=name.capitalize(),
+            description=f"{name} role",
+            permissions="[]",
+            is_system_role=True,
+        )
+        test_db.add(role)
+        test_db.flush()
+    return role
+
+
+def test_first_oauth_user_of_domain_matched_institution_becomes_admin(
+    test_db: Session, oauth_service: OAuthService
+):
+    """TF-410: the first OAuth user provisioned into a domain-matched, non-personal
+    institution is made its admin (mirrors the password-register path), so every
+    institution always has >=1 admin."""
+    _seed_role(test_db, "admin")
+    _seed_role(test_db, "viewer")
+    institution = Institution(
+        name="Acme University",
+        slug="acme-university",
+        domain="acme-oauth.edu",
+        subscription_tier="free",
+    )
+    test_db.add(institution)
+    test_db.commit()
+
+    user = oauth_service.find_or_create_user_from_oauth(
+        provider="google",
+        user_info={
+            "email": "founder@acme-oauth.edu",
+            "first_name": "Founder",
+            "last_name": "Admin",
+            "name": "Founder Admin",
+            "provider_user_id": "google-acme-1",
+        },
+        token={"access_token": "t", "refresh_token": "r"},
+    )
+
+    assert [r.name for r in user.roles] == ["admin"]
+
+
+def test_oauth_user_routed_to_default_institution_is_not_admin(
+    test_db: Session, oauth_service: OAuthService
+):
+    """TF-410: the shared ``default-institution`` fallback bucket is exempt from
+    auto-admin — an unmatched OAuth sign-up there must not be handed admin over
+    everyone else's fallback tenant. It gets the default viewer role instead."""
+    _seed_role(test_db, "admin")
+    _seed_role(test_db, "viewer")
+
+    user = oauth_service.find_or_create_user_from_oauth(
+        provider="google",
+        user_info={
+            "email": "stranger@unmatched-oauth-domain.example",
+            "first_name": "Stranger",
+            "last_name": "User",
+            "name": "Stranger User",
+            "provider_user_id": "google-stranger-1",
+        },
+        token={"access_token": "t", "refresh_token": "r"},
+    )
+
+    role_names = [r.name for r in user.roles]
+    assert "admin" not in role_names
+    assert "viewer" in role_names

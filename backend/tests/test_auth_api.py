@@ -156,6 +156,47 @@ def test_register_new_user(test_client, db):
     assert user.roles[0].name in (UserRole.DOZENT.value, UserRole.VIEWER.value)
 
 
+def test_register_first_user_of_non_personal_institution_becomes_admin(test_client, db):
+    """TF-410: the first user of a non-personal institution is made its admin.
+
+    ``founder@test.edu`` domain-matches the seeded non-personal "Test University"
+    (slug ``test-university``), which has no users yet — so the registrant must
+    receive the ADMIN role, guaranteeing every institution has >=1 admin.
+    """
+    response = test_client.post(
+        "/api/auth/register",
+        json={
+            "email": "founder@test.edu",
+            "password": "SecurePass123!",
+            "first_name": "Founder",
+            "last_name": "Admin",
+        },
+    )
+
+    assert response.status_code == 201
+    user = db.query(User).filter(User.email == "founder@test.edu").first()
+    assert user is not None
+    assert [r.name for r in user.roles] == [UserRole.ADMIN.value]
+
+
+def test_register_personal_institution_user_is_not_admin(test_client, db):
+    """TF-410: a personal institution's user keeps the default (non-admin) role."""
+    response = test_client.post(
+        "/api/auth/register",
+        json={
+            "email": "solo@no-such-domain.example",
+            "password": "SecurePass123!",
+            "first_name": "Solo",
+            "last_name": "User",
+        },
+    )
+
+    assert response.status_code == 201
+    user = db.query(User).filter(User.email == "solo@no-such-domain.example").first()
+    assert user is not None
+    assert UserRole.ADMIN.value not in [r.name for r in user.roles]
+
+
 def test_register_duplicate_email(test_client, test_user):
     """Test registration with existing email fails"""
     response = test_client.post(

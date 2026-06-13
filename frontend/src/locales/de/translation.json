@@ -893,7 +893,12 @@
       "confirmActivate": "Möchten Sie diesen Prompt wirklich aktivieren?",
       "failedLoad": "Fehler beim Laden der Prompts",
       "failedDelete": "Fehler beim Löschen",
-      "failedToggle": "Fehler beim Ändern des Status"
+      "failedToggle": "Fehler beim Ändern des Status",
+      "visibilitySystem": "Systemweit",
+      "visibilityInstitution": "Institution",
+      "visibilityInstitutionDefault": "Institutions-Default",
+      "visibilityPrivate": "Persönlich",
+      "readOnly": "Schreibgeschützt"
     },
     "promptManagement": {
       "tabLibrary": "Prompt Library",
@@ -932,6 +937,11 @@
       "useCaseTrueFalse": "Wahr/Falsch",
       "useCaseChatbot": "Chatbot",
       "useCaseEvaluation": "Bewertung",
+      "visibilityLabel": "Sichtbarkeit",
+      "visibilityPrivate": "Persönlich (nur ich)",
+      "visibilityInstitution": "Institution (alle Mitglieder)",
+      "visibilitySystem": "Systemweit (alle Institutionen)",
+      "institutionDefaultLabel": "Als Institutions-Default (schreibgeschützt für Mitglieder)",
       "tagsLabel": "Tags",
       "tagPlaceholder": "Neuer Tag",
       "activeLabel": "Aktiv",
