@@ -14,19 +14,15 @@ Verifies that:
 from __future__ import annotations
 
 from datetime import date
-from io import BytesIO
 
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from database import get_db
-from main import app
 from models.auth import Institution, User, UserStatus
 from models.exam import Exam, ExamQuestion
 from models.question_review import QuestionReview
 from models.student import Student, StudentClass, StudentClassMembership
 from services.import_drivers.moodle_csv_driver import MoodleCsvDriver
-from utils.auth_utils import get_current_user, get_current_active_user
+from services.import_service import ImportService
 
 
 _CSV_WITH_CLASS = (
@@ -112,17 +108,19 @@ def _make_exam(db: Session, institution_id: int) -> Exam:
     return exam
 
 
-def _client(test_db: Session, user: User) -> TestClient:
-    import api.submissions as submissions_module
+def _seed_import(test_db: Session, exam: Exam, user: User):
+    """Run the import pipeline directly (worker path).
 
-    if submissions_module.router not in app.router.routes:
-        app.include_router(submissions_module.router)
-        app.include_router(submissions_module.exams_alias_router)
-
-    app.dependency_overrides[get_db] = lambda: test_db
-    app.dependency_overrides[get_current_user] = lambda: user
-    app.dependency_overrides[get_current_active_user] = lambda: user
-    return TestClient(app, raise_server_exceptions=True)
+    The commit endpoint only enqueues now (TF-412); these tests exercise the
+    auto-class-assignment that happens inside ``ImportService.commit``, so they
+    invoke it directly against ``test_db`` exactly as the Celery worker would.
+    """
+    return ImportService(test_db).commit(
+        exam=exam,
+        driver_name="moodle_csv",
+        source=_CSV_WITH_CLASS.encode("utf-8"),
+        triggered_by=user.id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -181,21 +179,9 @@ def test_commit_creates_classes_and_memberships(test_db: Session) -> None:
     user = _make_user(test_db, inst.id)
     exam = _make_exam(test_db, inst.id)
     test_db.commit()
-    client = _client(test_db, user)
 
-    resp = client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": (
-                "klasse.csv",
-                BytesIO(_CSV_WITH_CLASS.encode("utf-8")),
-                "text/csv",
-            )
-        },
-        data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
-    )
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["status"] == "succeeded"
+    job = _seed_import(test_db, exam, user)
+    assert job.status == "succeeded"
 
     classes = (
         test_db.query(StudentClass)
@@ -226,21 +212,10 @@ def test_commit_idempotent_on_re_import(test_db: Session) -> None:
     user = _make_user(test_db, inst.id)
     exam = _make_exam(test_db, inst.id)
     test_db.commit()
-    client = _client(test_db, user)
 
     for _ in range(2):
-        resp = client.post(
-            "/api/v1/submissions/import/commit",
-            files={
-                "file": (
-                    "klasse.csv",
-                    BytesIO(_CSV_WITH_CLASS.encode("utf-8")),
-                    "text/csv",
-                )
-            },
-            data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
-        )
-        assert resp.status_code == 200, resp.text
+        job = _seed_import(test_db, exam, user)
+        assert job.status == "succeeded"
 
     classes = (
         test_db.query(StudentClass).filter(StudentClass.institution_id == inst.id).all()
@@ -265,20 +240,9 @@ def test_commit_reuses_pre_existing_class(test_db: Session) -> None:
     test_db.add(pre_existing)
     test_db.commit()
     pre_existing_id = pre_existing.id
-    client = _client(test_db, user)
 
-    resp = client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": (
-                "klasse.csv",
-                BytesIO(_CSV_WITH_CLASS.encode("utf-8")),
-                "text/csv",
-            )
-        },
-        data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
-    )
-    assert resp.status_code == 200
+    job = _seed_import(test_db, exam, user)
+    assert job.status == "succeeded"
 
     classes = (
         test_db.query(StudentClass)

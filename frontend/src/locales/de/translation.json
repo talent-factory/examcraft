@@ -151,6 +151,7 @@
       "title": "Resultate importieren — {{examTitle}}",
       "errorPreview": "Vorschau fehlgeschlagen.",
       "errorCommit": "Import fehlgeschlagen.",
+      "importTimeout": "Import dauert ungewöhnlich lange — der Status kann später im Job-Detail geprüft werden.",
       "steps": {
         "source": "Quelle",
         "upload": "Datei",

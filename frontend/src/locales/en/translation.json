@@ -151,6 +151,7 @@
       "title": "Import results — {{examTitle}}",
       "errorPreview": "Preview failed.",
       "errorCommit": "Import failed.",
+      "importTimeout": "The import is taking unusually long — you can check its status later in the job detail.",
       "steps": {
         "source": "Source",
         "upload": "File",

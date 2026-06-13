@@ -50,6 +50,7 @@ celery_app = Celery(
         "tasks.feedback_tasks",
         "tasks.maintenance_tasks",
         "tasks.diagnostics_tasks",  # TF-359 Sentry worker-pipeline verification
+        "tasks.import_submissions_task",  # TF-412 async result import
     ],
 )
 
@@ -78,6 +79,12 @@ celery_app.conf.update(
 celery_app.conf.beat_schedule = {
     "reconcile-stuck-jobs-every-5-minutes": {
         "task": "tasks.maintenance_tasks.reconcile_stuck_jobs",
+        "schedule": 300.0,  # 5 Minuten
+    },
+    # TF-412: age-fail ImportJob rows stuck in queued/running so the
+    # polling client always converges on a terminal status.
+    "reap-stuck-import-jobs-every-5-minutes": {
+        "task": "tasks.maintenance_tasks.reap_stuck_import_jobs",
         "schedule": 300.0,  # 5 Minuten
     },
 }
@@ -117,6 +124,18 @@ celery_app.conf.task_queues = (
         routing_key="feedback.process",
         durable=True,
     ),
+    Queue(
+        # TF-412 async result import. x-max-priority so the task's
+        # priority=5 is honoured. A task with no route lands on the
+        # default ``celery`` queue, which the queue-pinned workers
+        # (docker-compose --queues, and the Fly worker via task_queues)
+        # never consume — the job would sit ``queued`` forever.
+        "import_processing",
+        default_exchange,
+        routing_key="import.process",
+        durable=True,
+        queue_arguments={"x-max-priority": 10},
+    ),
 )
 
 # Task Routes
@@ -144,6 +163,10 @@ celery_app.conf.task_routes = {
     "tasks.feedback_tasks.process_feedback": {
         "queue": "feedback_processing",
         "routing_key": "feedback.process",
+    },
+    "tasks.import_submissions_task.import_submissions": {
+        "queue": "import_processing",
+        "routing_key": "import.process",
     },
 }
 

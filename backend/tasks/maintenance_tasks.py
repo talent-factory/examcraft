@@ -14,7 +14,9 @@ from celery.result import AsyncResult
 
 from celery_app import celery_app
 from database import SessionLocal
+from enums import ImportJobStatus
 from models.question_generation_job import QuestionGenerationJob
+from models.submission import ImportJob
 from tasks.question_tasks import _safe_update_job_status
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,21 @@ logger = logging.getLogger(__name__)
 # nicht prematur eine FAILURE setzt, die ein nachfolgender Retry mit SUCCESS
 # überschreibt (Status-Flicker im UI).
 _STUCK_THRESHOLD = timedelta(minutes=25)
+
+# TF-412: ImportJob rows are pre-created in ``queued`` and flipped to
+# ``running`` by the Celery worker. If the message is lost (broker blip,
+# misrouted queue, worker OOM before any DB write) the row never reaches a
+# terminal status and the polling client hangs until its own 5-min timeout.
+# Unlike question jobs there is no Celery result_backend lookup here — an
+# ImportJob carries no ``task_id`` — so this reaper is purely age-based on
+# ``created_at`` (``queued`` rows have ``started_at = NULL``, so filtering on
+# ``started_at`` would miss them). 30 min comfortably clears the slowest
+# legitimate LLM-graded large-class import while still bounding the stuck row.
+_IMPORT_STUCK_THRESHOLD = timedelta(minutes=30)
+_IMPORT_NON_TERMINAL_STATUSES = (
+    ImportJobStatus.QUEUED.value,
+    ImportJobStatus.RUNNING.value,
+)
 
 # In-Progress-States, die der Watchdog NICHT anfasst — die Tasks laufen tatsächlich.
 _IN_PROGRESS_STATES = frozenset({"PROGRESS", "STARTED", "RETRY"})
@@ -184,3 +201,68 @@ def reconcile_stuck_jobs() -> dict:
         session.close()
 
     return counters
+
+
+@celery_app.task(name="tasks.maintenance_tasks.reap_stuck_import_jobs")
+def reap_stuck_import_jobs() -> dict[str, int]:
+    """Mark ImportJob rows stuck in a non-terminal state as ``failed`` (TF-412).
+
+    The async import endpoint pre-creates a ``queued`` row, enqueues the
+    grading task, and returns 202; the polling client waits for a terminal
+    status. If the task message is lost (broker blip, misrouted queue, worker
+    killed before any DB write), the row would sit ``queued``/``running``
+    forever and the client would only ever see its own 5-min poll timeout —
+    the DB row itself would never reach a terminal status. This watchdog
+    closes that gap by age-failing such rows so the job detail eventually
+    shows ``failed`` instead of a perpetual spinner on re-open.
+
+    Age-based on ``created_at`` (not ``started_at``, which is NULL for
+    ``queued`` rows). Idempotent: only non-terminal rows past the threshold
+    are touched.
+    """
+    cutoff = datetime.now(timezone.utc) - _IMPORT_STUCK_THRESHOLD
+    reaped = 0
+
+    session = SessionLocal()
+    try:
+        stuck = (
+            session.query(ImportJob)
+            .filter(
+                ImportJob.status.in_(_IMPORT_NON_TERMINAL_STATUSES),
+                ImportJob.created_at < cutoff,
+            )
+            .all()
+        )
+
+        for job in stuck:
+            prior_status = job.status
+            job.status = ImportJobStatus.FAILED.value
+            job.finished_at = datetime.now(timezone.utc)
+            existing = list(job.error_log or [])
+            existing.append(
+                {
+                    "row_index": 0,
+                    "reason": (
+                        "Import-Job in nicht-terminalem Status "
+                        f"({prior_status!r}) seit über "
+                        f"{int(_IMPORT_STUCK_THRESHOLD.total_seconds() // 60)} "
+                        "Minuten — vom Watchdog als fehlgeschlagen markiert. "
+                        "Mögliche Ursache: verlorene Broker-Nachricht oder "
+                        "abgestürzter Worker."
+                    ),
+                    "step": "reaper",
+                }
+            )
+            job.error_log = existing
+            reaped += 1
+
+        if reaped:
+            session.commit()
+            logger.warning("Reaped %s stuck import_jobs (age-failed)", reaped)
+    except Exception:
+        logger.exception("reap_stuck_import_jobs failed")
+        session.rollback()
+    finally:
+        session.close()
+
+    return {"reaped": reaped}

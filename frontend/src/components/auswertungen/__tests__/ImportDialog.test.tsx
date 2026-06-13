@@ -152,6 +152,76 @@ describe('ImportDialog', () => {
     expect(screen.getByTestId('import-result')).toBeInTheDocument();
   });
 
+  test('polls the queued job until it succeeds, then fires onImported (TF-412)', async () => {
+    // Backend now returns a *queued* job and grades asynchronously; the
+    // dialog must poll the job until a terminal status before reporting.
+    mockSubmissionsService.preview.mockResolvedValueOnce(samplePreview);
+    mockSubmissionsService.commit.mockResolvedValueOnce({
+      ...sampleJob,
+      status: 'queued',
+      rows_processed: 0,
+    });
+    mockSubmissionsService.getImportJob
+      .mockResolvedValueOnce({ ...sampleJob, status: 'running', rows_processed: 0 })
+      .mockResolvedValueOnce(sampleJob); // succeeded
+    const { onImported } = renderDialog({ pollIntervalMs: 5 });
+
+    fireEvent.click(screen.getByTestId('import-next-source'));
+    const input = screen
+      .getByTestId('import-file-upload')
+      .querySelector('input[type=file]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.click(screen.getByTestId('import-run-preview'));
+    await screen.findByTestId('preview-student-count');
+
+    fireEvent.click(screen.getByTestId('import-confirm'));
+
+    await waitFor(() => {
+      expect(mockSubmissionsService.getImportJob).toHaveBeenCalledWith(7);
+    });
+    await waitFor(() => {
+      expect(onImported).toHaveBeenCalledWith(sampleJob);
+    });
+    expect(screen.getByTestId('import-result')).toBeInTheDocument();
+  });
+
+  test('polls until failed without firing onImported (TF-412)', async () => {
+    mockSubmissionsService.preview.mockResolvedValueOnce(samplePreview);
+    mockSubmissionsService.commit.mockResolvedValueOnce({
+      ...sampleJob,
+      status: 'queued',
+      rows_processed: 0,
+    });
+    mockSubmissionsService.getImportJob.mockResolvedValueOnce({
+      ...sampleJob,
+      status: 'failed',
+      rows_processed: 0,
+      rows_failed: 0,
+      error_log: [
+        { row_index: -1, reason: 'Grading abgebrochen', step: 'grade', details: null },
+      ],
+    });
+    const { onImported } = renderDialog({ pollIntervalMs: 5 });
+
+    fireEvent.click(screen.getByTestId('import-next-source'));
+    const input = screen
+      .getByTestId('import-file-upload')
+      .querySelector('input[type=file]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.click(screen.getByTestId('import-run-preview'));
+    await screen.findByTestId('preview-student-count');
+
+    fireEvent.click(screen.getByTestId('import-confirm'));
+
+    await waitFor(() => {
+      expect(mockSubmissionsService.getImportJob).toHaveBeenCalledWith(7);
+    });
+    // import-result only renders once a *terminal* status is reached (queued/
+    // running show the spinner), so finding it confirms polling completed.
+    await screen.findByTestId('import-result');
+    expect(onImported).not.toHaveBeenCalled();
+  });
+
   test('shows error message when preview fails', async () => {
     mockSubmissionsService.preview.mockRejectedValueOnce(
       new Error('CSV ist leer'),
@@ -203,6 +273,88 @@ describe('ImportDialog', () => {
     expect(onClose).toHaveBeenCalled();
     expect(mockSubmissionsService.preview).not.toHaveBeenCalled();
     expect(mockSubmissionsService.commit).not.toHaveBeenCalled();
+  });
+
+  test('surfaces a timeout error when the job never reaches a terminal status (TF-412)', async () => {
+    // A hung worker (or a genuinely stuck job) must not spin forever: once
+    // pollTimeoutMs elapses the dialog surfaces an error and returns to the
+    // preview step so the teacher can retry — onImported never fires.
+    mockSubmissionsService.preview.mockResolvedValueOnce(samplePreview);
+    mockSubmissionsService.commit.mockResolvedValueOnce({
+      ...sampleJob,
+      status: 'queued',
+      rows_processed: 0,
+    });
+    // Always non-terminal → the poll loop only ends via the deadline.
+    mockSubmissionsService.getImportJob.mockResolvedValue({
+      ...sampleJob,
+      status: 'running',
+      rows_processed: 0,
+    });
+    const { onImported } = renderDialog({ pollIntervalMs: 5, pollTimeoutMs: 10 });
+
+    fireEvent.click(screen.getByTestId('import-next-source'));
+    const input = screen
+      .getByTestId('import-file-upload')
+      .querySelector('input[type=file]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.click(screen.getByTestId('import-run-preview'));
+    await screen.findByTestId('preview-student-count');
+
+    fireEvent.click(screen.getByTestId('import-confirm'));
+
+    // The timeout rejects the poll loop → error surfaces, no success callback.
+    await screen.findByTestId('import-error');
+    expect(onImported).not.toHaveBeenCalled();
+  });
+
+  test('aborts the poll loop on unmount without firing onImported (TF-412)', async () => {
+    // Closing the dialog mid-poll must stop the loop; a late terminal status
+    // must never call onImported on an unmounted component.
+    mockSubmissionsService.preview.mockResolvedValueOnce(samplePreview);
+    mockSubmissionsService.commit.mockResolvedValueOnce({
+      ...sampleJob,
+      status: 'queued',
+      rows_processed: 0,
+    });
+    // Never terminal → the loop only stops when aborted on unmount.
+    mockSubmissionsService.getImportJob.mockResolvedValue({
+      ...sampleJob,
+      status: 'running',
+      rows_processed: 0,
+    });
+    const onImported = jest.fn();
+    const { unmount } = render(
+      <Wrapper>
+        <ImportDialog
+          open
+          examId={42}
+          examTitle="Allgemeinbildung"
+          onClose={jest.fn()}
+          onImported={onImported}
+          pollIntervalMs={5}
+        />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('import-next-source'));
+    const input = screen
+      .getByTestId('import-file-upload')
+      .querySelector('input[type=file]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.click(screen.getByTestId('import-run-preview'));
+    await screen.findByTestId('preview-student-count');
+
+    fireEvent.click(screen.getByTestId('import-confirm'));
+    await waitFor(() => {
+      expect(mockSubmissionsService.getImportJob).toHaveBeenCalled();
+    });
+
+    unmount(); // triggers the abort in the cleanup effect
+
+    // Give any in-flight poll promise a chance to (incorrectly) resolve.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(onImported).not.toHaveBeenCalled();
   });
 
   test('does not fire onImported for partial commit so the user can read the alert', async () => {

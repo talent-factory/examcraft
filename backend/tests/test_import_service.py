@@ -23,6 +23,7 @@ from models.submission import (
     Submission,
 )
 from models.student import Student
+from enums import ImportJobStatus
 from services.import_service import ImportService, ImportValidationError
 
 
@@ -1100,3 +1101,62 @@ def test_silent_skip_on_missing_student_now_records_row_error(
     assert all(
         "konnte nicht angelegt/gefunden werden" in e["reason"] for e in job.error_log
     )
+
+
+# ---------------------------------------------------------------------------
+# create_queued_job: pre-creates the row a Celery worker reuses (TF-412)
+# ---------------------------------------------------------------------------
+
+
+def test_create_queued_job_persists_queued_row(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """``create_queued_job`` inserts a *committed* ImportJob in ``queued``
+    state that an async worker later picks up via ``import_job_id``. No
+    parsing or grading happens here — only the row is created."""
+    service = ImportService(test_db)
+
+    job = service.create_queued_job(
+        exam=exam_with_questions,
+        driver_name="moodle_csv",
+        triggered_by=None,
+    )
+
+    assert job.id is not None
+    assert job.status == ImportJobStatus.QUEUED.value
+    assert job.exam_id == exam_with_questions.id
+    assert job.institution_id == exam_with_questions.institution_id
+    assert job.driver_name == "moodle_csv"
+    assert job.rows_processed == 0
+    assert job.rows_failed == 0
+    assert job.started_at is None  # not started until the worker runs commit()
+
+    # Committed, so a fresh query in the same session sees it.
+    fetched = test_db.query(ImportJob).filter(ImportJob.id == job.id).one()
+    assert fetched.status == ImportJobStatus.QUEUED.value
+
+
+def test_queued_job_is_reused_by_commit_without_duplicate(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """A queued job handed to ``commit`` via ``import_job_id`` is reused
+    in place (transitioned to a terminal state) — no second ImportJob row."""
+    service = ImportService(test_db)
+    queued = service.create_queued_job(
+        exam=exam_with_questions, driver_name="moodle_csv", triggered_by=None
+    )
+
+    job = service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_csv",
+        source=_csv_two_students(),
+        triggered_by=None,
+        import_job_id=queued.id,
+    )
+
+    assert job.id == queued.id
+    assert job.status in {
+        ImportJobStatus.SUCCEEDED.value,
+        ImportJobStatus.PARTIAL.value,
+    }
+    assert test_db.query(ImportJob).count() == 1

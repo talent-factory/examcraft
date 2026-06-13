@@ -1,11 +1,12 @@
-"""Celery wrapper for ``ImportService.commit``.
+"""Celery task that runs ``ImportService.commit`` off the request thread.
 
-The synchronous API path runs ``ImportService.commit()`` directly. This
-task exposes the same operation for asynchronous callers — backfills,
-LLM-graded modes, or large classes that need to run in the background
-without holding an HTTP connection open. Migrating an endpoint from
-sync to async needs no schema change because the persisted output
-(``import_jobs``) is identical either way.
+Since TF-412 this is the *only* execution path for result imports: the
+HTTP endpoints (``/import/commit``, ``/import/api-commit``) validate the
+upload synchronously, create a ``queued`` ImportJob, then dispatch this
+task to persist attempts and — for open-ended questions — run serial LLM
+grading in the background, so the request never blocks on grading. The
+persisted output (``import_jobs``) is identical to the former inline
+path, so the sync→async move needed no schema change.
 
 Retry contract: the caller pre-creates the ``ImportJob`` row in
 ``queued`` status and passes its id. The task reuses that row across
@@ -16,10 +17,12 @@ client sees a terminal state instead of a permanently-``running`` row.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 import traceback
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, NewType
 
 from sqlalchemy.exc import DatabaseError, OperationalError
 
@@ -32,6 +35,13 @@ from services.import_service import ImportService
 
 
 logger = logging.getLogger(__name__)
+
+# Documents that this str is base64-encoded raw upload bytes, not arbitrary
+# text — distinguishing the two at the type level the way ``secret_encryption``
+# separates ciphertext from plaintext. NewType is erased at runtime; the real
+# guard against a mis-encoded payload is ``b64decode(..., validate=True)`` below
+# (Celery's JSON kwargs are untyped, so this can't be enforced across the wire).
+Base64Str = NewType("Base64Str", str)
 
 
 # Retry only on truly transient errors — DB connection drops, deadlock
@@ -47,6 +57,12 @@ _TRANSIENT_ERRORS = (OperationalError, DatabaseError, ConnectionError)
     name="tasks.import_submissions_task.import_submissions",
     priority=5,
     autoretry_for=_TRANSIENT_ERRORS,
+    # max_retries is set at task level *and* in retry_kwargs so the two agree:
+    # autoretry reads retry_kwargs, but the manual exhaustion check below reads
+    # ``self.max_retries`` (the task attribute, which otherwise defaults to 3).
+    # If they diverge, ``retries >= self.max_retries`` never trips before
+    # Celery aborts and the terminal-failure branch becomes dead code.
+    max_retries=2,
     retry_kwargs={"max_retries": 2, "countdown": 30},
     acks_late=True,
 )
@@ -55,7 +71,7 @@ def import_submissions(  # type: ignore[no-untyped-def]
     *,
     exam_id: int,
     driver_name: str,
-    source_text: str,
+    source_b64: Base64Str,
     import_job_id: int,
     triggered_by: int | None = None,
     source_metadata: dict[str, Any] | None = None,
@@ -66,8 +82,16 @@ def import_submissions(  # type: ignore[no-untyped-def]
         exam_id: institution-scoped — caller must have already checked
             multi-tenancy.
         driver_name: registered driver (e.g. ``moodle_csv``).
-        source_text: CSV as UTF-8 string. Bytes are not accepted because
-            Celery serialises args as JSON.
+        source_b64: base64 of the *raw* upload bytes. Celery serialises args
+            as JSON, so raw bytes cannot be passed directly; base64 round-trips
+            them losslessly. The task decodes back to ``bytes`` and hands the
+            driver the exact original bytes — keeping grading identical to the
+            synchronous path and letting the CSV driver's own encoding
+            detection run on the original bytes (its utf-8-sig → utf-8 →
+            cp1252 → latin-1 cascade). Pre-decoding to ``str`` here would
+            force one encoding before the driver sees the file and skip that
+            detection. (``moodle_api`` accepts either bytes or str, so this
+            matters for the ``moodle_csv`` path.)
         import_job_id: id of a pre-created ``import_jobs`` row in
             ``queued``/``running`` status. Reused across retries.
         triggered_by: user id for ``import_jobs.triggered_by``.
@@ -76,6 +100,18 @@ def import_submissions(  # type: ignore[no-untyped-def]
     Returns:
         Job summary with id/status/rows_processed/rows_failed.
     """
+    try:
+        source = base64.b64decode(source_b64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        # Malformed payload — permanent, do not retry. Mark the job failed so
+        # the polling client sees a terminal state.
+        db = SessionLocal()
+        try:
+            _mark_terminal_failure(db, import_job_id, exc, step="decode")
+        finally:
+            db.close()
+        raise
+
     db = SessionLocal()
     try:
         exam = db.query(Exam).filter(Exam.id == exam_id).one_or_none()
@@ -91,7 +127,7 @@ def import_submissions(  # type: ignore[no-untyped-def]
         job = ImportService(db).commit(
             exam=exam,
             driver_name=driver_name,
-            source=source_text,
+            source=source,
             triggered_by=triggered_by,
             source_metadata=source_metadata or {},
             import_job_id=import_job_id,
@@ -104,9 +140,12 @@ def import_submissions(  # type: ignore[no-untyped-def]
             "rows_failed": job.rows_failed,
         }
     except _TRANSIENT_ERRORS as exc:
-        # Transient — Celery will retry. Only mark terminal-failed when
-        # we're out of retries; otherwise leave the row at ``running`` so
-        # the next attempt resets it cleanly.
+        # Transient — Celery will retry. ``ImportService.commit`` has already
+        # marked the row ``failed`` (its own except handler committed before
+        # re-raising), and the next retry resets it to ``running`` in place
+        # via ``import_job_id`` — so we only need to record a *terminal*
+        # failure once retries are exhausted, to stop a transient blip from
+        # masquerading as a permanent failure on every attempt.
         if self.request.retries >= self.max_retries:
             logger.exception(
                 "import_submissions_task exhausted retries for exam_id=%s job_id=%s",
@@ -133,8 +172,10 @@ def _mark_terminal_failure(
 ) -> None:
     """Persist a terminal FAILED state on the job row.
 
-    Best-effort: if the DB itself is the problem we cannot record it;
-    the stuck-job reaper will clean up later.
+    Best-effort: if the DB itself is the problem we cannot record it here.
+    The periodic ``reap_stuck_import_jobs`` watchdog (Celery Beat, every
+    5 min) age-fails any row left in ``queued``/``running``, so the job
+    still converges on a terminal status even if this write is lost.
     """
     try:
         job = db.query(ImportJob).filter(ImportJob.id == import_job_id).one_or_none()

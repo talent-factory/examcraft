@@ -48,6 +48,7 @@ import { MoodleConnectionsService } from '../../services/moodleConnectionsServic
 import {
   DriverName,
   ImportJob,
+  ImportJobStatus,
   ImportPreview,
   ImportRowError,
 } from '../../types/submission';
@@ -63,6 +64,13 @@ interface ImportDialogProps {
    * the dialog open with an error so the user can read it before leaving.
    */
   onImported?: (job: ImportJob) => void;
+  /**
+   * Cadence for polling the async import job (TF-412). Defaults to 1.5 s;
+   * exposed so tests can poll fast without fake timers.
+   */
+  pollIntervalMs?: number;
+  /** Give up polling after this long and surface a timeout error. */
+  pollTimeoutMs?: number;
 }
 
 type WizardStep = 'source' | 'upload' | 'preview' | 'submitting';
@@ -72,6 +80,38 @@ type WizardStep = 'source' | 'upload' | 'preview' | 'submitting';
 // browser without uploading.
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_VISIBLE_ERRORS = 5;
+const DEFAULT_POLL_INTERVAL_MS = 1500;
+const DEFAULT_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+
+// The import commit is async (TF-412): the endpoint returns a ``queued``
+// job and a Celery worker grades it. ``queued``/``running`` are transient;
+// the dialog polls until the job reaches a terminal status (the set below).
+const TERMINAL_STATUSES: readonly ImportJobStatus[] = [
+  'succeeded',
+  'partial',
+  'failed',
+];
+const isTerminalStatus = (status: ImportJobStatus): boolean =>
+  TERMINAL_STATUSES.includes(status);
+
+// Promise that resolves after ``ms`` but rejects immediately on abort, so
+// closing the dialog stops the poll loop without waiting out the interval.
+const abortableDelay = (ms: number, signal: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const id = setTimeout(resolve, ms);
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(id);
+        reject(new DOMException('Aborted', 'AbortError'));
+      },
+      { once: true },
+    );
+  });
 
 const ImportDialog: React.FC<ImportDialogProps> = ({
   open,
@@ -79,6 +119,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   examId,
   examTitle,
   onImported,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  pollTimeoutMs = DEFAULT_POLL_TIMEOUT_MS,
 }) => {
   const { t } = useTranslation();
 
@@ -230,12 +272,36 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     }
   };
 
+  // Poll the async import job until it reaches a terminal status, updating
+  // the visible job state on each tick so the user sees live progress.
+  const pollUntilTerminal = async (
+    jobId: number,
+    signal: AbortSignal,
+  ): Promise<ImportJob> => {
+    const deadline = Date.now() + pollTimeoutMs;
+    for (;;) {
+      await abortableDelay(pollIntervalMs, signal);
+      const polled = await SubmissionsService.getImportJob(jobId);
+      if (signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      setJob(polled);
+      if (isTerminalStatus(polled.status)) {
+        return polled;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(t('auswertungen.importDialog.importTimeout'));
+      }
+    }
+  };
+
   const runCommit = async () => {
     setBusy(true);
     setStep('submitting');
     setError(null);
     setErrorIssues([]);
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       let result: ImportJob;
       if (driverName === 'moodle_api') {
@@ -243,7 +309,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         result = await SubmissionsService.apiCommit({
           examId,
           quizId,
-          signal: abortRef.current.signal,
+          signal: controller.signal,
         });
       } else {
         if (!file) return;
@@ -251,17 +317,38 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           examId,
           file,
           driverName,
-          signal: abortRef.current.signal,
+          signal: controller.signal,
         });
       }
       setJob(result);
+
+      // Commit only *enqueues* now (TF-412): the response is a queued job and
+      // a Celery worker grades it. Poll until grading finishes (or fails). A
+      // response that is already terminal — e.g. a fast worker, or a test mock
+      // — skips the loop entirely.
+      let finalJob = result;
+      if (!isTerminalStatus(result.status)) {
+        finalJob = await pollUntilTerminal(result.id, controller.signal);
+      }
+
       // Only signal completion when nothing failed — partial / failed
       // imports must keep the dialog open so the user reads the alert
       // before the parent page navigates / reloads.
-      if (result.status === 'succeeded') {
-        onImported?.(result);
+      if (finalJob.status === 'succeeded') {
+        onImported?.(finalJob);
       }
     } catch (err) {
+      // Dialog closed mid-import: handleClose already aborted and ran
+      // resetState, so any in-flight rejection must not re-pollute state for
+      // the next open. The expected case is the AbortError; a real error that
+      // merely lost the race to the abort is logged (not surfaced — the dialog
+      // is gone) so it isn't completely invisible.
+      if (controller.signal.aborted) {
+        if (!(err instanceof DOMException && err.name === 'AbortError')) {
+          console.warn('[ImportDialog] import error after dialog close:', err);
+        }
+        return;
+      }
       handleApiError(err, 'auswertungen.importDialog.errorCommit');
       setStep('preview'); // allow retry without re-uploading
     } finally {
@@ -573,7 +660,9 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
         {step === 'submitting' && (
           <Box sx={{ textAlign: 'center', py: 4 }}>
-            {!job ? (
+            {!job || !isTerminalStatus(job.status) ? (
+              // queued / running: grading happens in the worker (TF-412) —
+              // show progress, not the (error-styled) result alert.
               <>
                 <CircularProgress />
                 <Typography sx={{ mt: 2 }}>

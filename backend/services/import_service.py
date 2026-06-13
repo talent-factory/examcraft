@@ -114,6 +114,38 @@ class ImportService:
         self._validate_payload(payload, exam)
         return payload
 
+    def create_queued_job(
+        self,
+        *,
+        exam: Exam,
+        driver_name: str,
+        triggered_by: int | None,
+        source_metadata: dict[str, Any] | None = None,
+    ) -> ImportJob:
+        """Pre-create a committed ``ImportJob`` in ``queued`` state.
+
+        Async callers (the Celery import task) reuse this exact row by passing
+        its id to :meth:`commit` as ``import_job_id`` — ``commit`` flips it to
+        ``running`` in place, so no duplicate job is produced and the polling
+        client has a stable job id the instant the request returns. No parsing
+        or grading happens here.
+        """
+        job = ImportJob(
+            institution_id=exam.institution_id,
+            exam_id=exam.id,
+            driver_name=driver_name,
+            status=ImportJobStatus.QUEUED.value,
+            rows_processed=0,
+            rows_failed=0,
+            error_log=[],
+            source_metadata=source_metadata or {},
+            triggered_by=triggered_by,
+        )
+        self.db.add(job)
+        self.db.commit()
+        self.db.refresh(job)
+        return job
+
     def commit(
         self,
         *,

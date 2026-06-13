@@ -6,10 +6,15 @@ multi-tenancy.
 
 from __future__ import annotations
 
+import base64
 from datetime import date
 from io import BytesIO
+from unittest.mock import MagicMock, patch
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -17,6 +22,7 @@ from main import app
 from models.auth import Institution, User, UserStatus
 from models.exam import Exam, ExamQuestion
 from models.question_review import QuestionReview
+from models.submission import ImportJob
 from utils.auth_utils import get_current_user, get_current_active_user
 
 
@@ -137,6 +143,32 @@ _CSV_FIXTURE = (
 )
 
 
+def _seed_import(
+    test_db: Session,
+    exam: Exam,
+    *,
+    source: str = _CSV_FIXTURE,
+    triggered_by: int | None = None,
+):
+    """Run the import pipeline directly against the test session.
+
+    The commit endpoint now only *enqueues* (TF-412), so the actual
+    persist + grade happens in a Celery worker. Tests that assert on the
+    imported submissions/grades seed them this way — the worker's own
+    ``SessionLocal`` would not see the savepoint-isolated test data, so we
+    invoke ``ImportService.commit`` against ``test_db`` exactly as the worker
+    would against its own session.
+    """
+    from services.import_service import ImportService
+
+    return ImportService(test_db).commit(
+        exam=exam,
+        driver_name="moodle_csv",
+        source=source.encode("utf-8"),
+        triggered_by=triggered_by,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Preview
 # ---------------------------------------------------------------------------
@@ -206,33 +238,95 @@ def test_preview_rejects_missing_email_column(test_db: Session) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_commit_creates_submissions_and_grades(test_db: Session) -> None:
+def test_commit_enqueues_task_and_returns_queued(test_db: Session) -> None:
+    """Commit no longer grades inline (TF-412): it validates synchronously,
+    pre-creates a ``queued`` ImportJob, hands the *raw* upload bytes (base64)
+    to the Celery worker and returns 202 immediately — so the HTTP request can
+    never hang on serial LLM grading."""
     inst = _make_institution(test_db)
     user = _make_user(test_db, inst.id)
     exam = _make_exam(test_db, inst.id)
     test_db.commit()
     client = _client(test_db, user)
 
-    response = client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": (
-                "klasse.csv",
-                BytesIO(_CSV_FIXTURE.encode("utf-8")),
-                "text/csv",
-            )
-        },
-        data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
-    )
-    assert response.status_code == 200, response.text
+    with patch("api.submissions.import_submissions.apply_async") as apply_async:
+        response = client.post(
+            "/api/v1/submissions/import/commit",
+            files={
+                "file": (
+                    "klasse.csv",
+                    BytesIO(_CSV_FIXTURE.encode("utf-8")),
+                    "text/csv",
+                )
+            },
+            data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
+        )
+
+    assert response.status_code == 202, response.text
     job = response.json()
-    assert job["status"] == "succeeded"
-    assert job["rows_processed"] == 2
+    assert job["status"] == "queued"
+    assert job["rows_processed"] == 0
     assert job["rows_failed"] == 0
-    # Polling-Endpoint liefert dasselbe:
+
+    apply_async.assert_called_once()
+    enqueued = apply_async.call_args.kwargs["kwargs"]
+    assert enqueued["exam_id"] == exam.id
+    assert enqueued["driver_name"] == "moodle_csv"
+    assert enqueued["import_job_id"] == job["id"]
+    assert enqueued["triggered_by"] == user.id
+    # The worker gets the exact original bytes, not a pre-decoded string.
+    assert base64.b64decode(enqueued["source_b64"]) == _CSV_FIXTURE.encode("utf-8")
+
+    # The queued job is immediately pollable while the worker runs.
     poll = client.get(f"/api/v1/submissions/import-jobs/{job['id']}")
     assert poll.status_code == 200
-    assert poll.json()["status"] == "succeeded"
+    assert poll.json()["status"] == "queued"
+
+
+def test_commit_rejects_malformed_csv_before_enqueue(test_db: Session) -> None:
+    """The 202-async design rests on validation staying *in front of* the
+    enqueue: a malformed upload must be rejected (4xx) and NOTHING enqueued,
+    so the worker never sees input it would only fail on. The ``assert_not_called``
+    + zero-row assertions are the load-bearing guards against a refactor that
+    moves the enqueue ahead of validation."""
+    inst = _make_institution(test_db)
+    user = _make_user(test_db, inst.id)
+    exam = _make_exam(test_db, inst.id)
+    test_db.commit()
+    client = _client(test_db, user)
+
+    with patch("api.submissions.import_submissions.apply_async") as apply_async:
+        response = client.post(
+            "/api/v1/submissions/import/commit",
+            files={"file": ("empty.csv", BytesIO(b""), "text/csv")},
+            data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
+        )
+
+    assert response.status_code == 400, response.text
+    apply_async.assert_not_called()
+    assert test_db.query(ImportJob).filter(ImportJob.exam_id == exam.id).count() == 0
+
+
+def test_commit_rejects_missing_email_column_before_enqueue(test_db: Session) -> None:
+    """Second malformed-input branch (missing external-id column): same
+    contract — 400, no task enqueued, no job row created."""
+    inst = _make_institution(test_db)
+    user = _make_user(test_db, inst.id)
+    exam = _make_exam(test_db, inst.id)
+    test_db.commit()
+    client = _client(test_db, user)
+
+    bad_csv = b"Vorname;Nachname;Antwort 1\nAnna;Beispiel;A\n"
+    with patch("api.submissions.import_submissions.apply_async") as apply_async:
+        response = client.post(
+            "/api/v1/submissions/import/commit",
+            files={"file": ("bad.csv", BytesIO(bad_csv), "text/csv")},
+            data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
+        )
+
+    assert response.status_code == 400, response.text
+    apply_async.assert_not_called()
+    assert test_db.query(ImportJob).filter(ImportJob.exam_id == exam.id).count() == 0
 
 
 # ---------------------------------------------------------------------------
@@ -247,13 +341,7 @@ def test_list_submissions_returns_imported(test_db: Session) -> None:
     test_db.commit()
     client = _client(test_db, user)
 
-    client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
-        },
-        data={"exam_id": str(exam.id)},
-    )
+    _seed_import(test_db, exam)
 
     response = client.get("/api/v1/submissions", params={"exam_id": exam.id})
     assert response.status_code == 200
@@ -273,13 +361,7 @@ def test_list_submissions_via_exam_alias(test_db: Session) -> None:
     test_db.commit()
     client = _client(test_db, user)
 
-    client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
-        },
-        data={"exam_id": str(exam.id)},
-    )
+    _seed_import(test_db, exam)
 
     alias = client.get(f"/api/v1/exams/{exam.id}/submissions")
     assert alias.status_code == 200
@@ -295,13 +377,7 @@ def test_submission_detail_includes_attempts_and_grades(
     test_db.commit()
     client = _client(test_db, user)
 
-    client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
-        },
-        data={"exam_id": str(exam.id)},
-    )
+    _seed_import(test_db, exam)
 
     list_resp = client.get("/api/v1/submissions", params={"exam_id": exam.id})
     anna_id = next(
@@ -354,19 +430,12 @@ def test_cannot_read_submission_from_other_institution(test_db: Session) -> None
     exam_b = _make_exam(test_db, inst_b.id)
     test_db.commit()
 
-    # Import als User B
+    # Import als User B (worker-Pfad direkt gegen test_db geseedet)
     client_b = _client(test_db, user_b)
-    commit = client_b.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
-        },
-        data={"exam_id": str(exam_b.id)},
-    )
-    assert commit.status_code == 200
+    job = _seed_import(test_db, exam_b, triggered_by=user_b.id)
     list_b = client_b.get("/api/v1/submissions", params={"exam_id": exam_b.id})
     submission_id = list_b.json()["items"][0]["id"]
-    job_id = commit.json()["id"]
+    job_id = job.id
 
     # User A darf weder Liste, Detail, noch Job sehen
     client_a = _client(test_db, user_a)
@@ -477,15 +546,21 @@ def test_dozent_with_import_permission_can_commit(test_db: Session) -> None:
     test_db.commit()
 
     client = _client(test_db, user)
-    response = client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
-        },
-        data={"exam_id": str(exam.id)},
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["status"] == "succeeded"
+    with patch("api.submissions.import_submissions.apply_async") as apply_async:
+        response = client.post(
+            "/api/v1/submissions/import/commit",
+            files={
+                "file": (
+                    "klasse.csv",
+                    BytesIO(_CSV_FIXTURE.encode("utf-8")),
+                    "text/csv",
+                )
+            },
+            data={"exam_id": str(exam.id)},
+        )
+    assert response.status_code == 202, response.text
+    assert response.json()["status"] == "queued"
+    apply_async.assert_called_once()
 
 
 def test_upload_too_large_returns_413(test_db: Session) -> None:
@@ -596,13 +671,7 @@ def test_list_submissions_returns_pagination_metadata(test_db: Session) -> None:
     test_db.commit()
 
     client = _client(test_db, user)
-    client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
-        },
-        data={"exam_id": str(exam.id)},
-    )
+    _seed_import(test_db, exam)
 
     resp = client.get("/api/v1/submissions", params={"exam_id": exam.id})
     assert resp.status_code == 200
@@ -619,13 +688,7 @@ def test_list_submissions_respects_limit_and_offset(test_db: Session) -> None:
     test_db.commit()
 
     client = _client(test_db, user)
-    client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
-        },
-        data={"exam_id": str(exam.id)},
-    )
+    _seed_import(test_db, exam)
 
     resp = client.get(
         "/api/v1/submissions",
@@ -656,61 +719,83 @@ def test_list_submissions_rejects_limit_above_cap(test_db: Session) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_500_response_includes_import_job_id_when_pipeline_crashes(
-    test_db: Session, monkeypatch
-) -> None:
-    """When ImportService.commit raises, the 500 detail must include
-    ``import_job_id`` so the client can poll /import-jobs/{id} for the
-    structured error_log instead of needing server-log access."""
-    from services.import_service import ImportService
-
-    inst = _make_institution(test_db, slug="500-job-id")
-    user = _make_user(test_db, inst.id, email="500@test.ch")
+def test_broker_failure_marks_job_failed_and_returns_503(test_db: Session) -> None:
+    """If the import can't be enqueued (broker unreachable), the endpoint must
+    mark the just-created job ``failed`` in place and return 503 with its id —
+    so the client lands on a terminal, pollable state instead of a job stuck
+    in ``queued`` forever (TF-412)."""
+    inst = _make_institution(test_db, slug="broker-down")
+    user = _make_user(test_db, inst.id, email="broker@test.ch")
     exam = _make_exam(test_db, inst.id)
     test_db.commit()
 
-    # Force an unhandled exception inside commit, AFTER the ImportJob
-    # row has been persisted (so _latest_failed_job_id finds it).
-    real_commit = ImportService.commit
-
-    def boom(self, **kwargs):
-        # call real_commit so the failed ImportJob is created, then re-
-        # raise the original exception
-        try:
-            return real_commit(self, **kwargs)
-        except Exception:
-            raise
-
-    # Replace _persist_attempts with a crash so commit fails after job
-    # is committed.
-    monkeypatch.setattr(
-        ImportService,
-        "_persist_attempts",
-        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("synthetic crash")),
-    )
-
     client = _client(test_db, user)
-    response = client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
-        },
-        data={"exam_id": str(exam.id)},
-    )
-    assert response.status_code == 500
+    with patch(
+        "api.submissions.import_submissions.apply_async",
+        side_effect=RuntimeError("broker unreachable"),
+    ):
+        response = client.post(
+            "/api/v1/submissions/import/commit",
+            files={
+                "file": (
+                    "klasse.csv",
+                    BytesIO(_CSV_FIXTURE.encode("utf-8")),
+                    "text/csv",
+                )
+            },
+            data={"exam_id": str(exam.id)},
+        )
+
+    assert response.status_code == 503
     detail = response.json()["detail"]
     assert isinstance(detail, dict)
-    assert "import_job_id" in detail
     assert detail["import_job_id"] is not None
-    assert detail["exception"] == "RuntimeError"
 
-    # Polling the failed job must work and surface the traceback.
+    # Polling the job must work and show a terminal, failed state.
     poll = client.get(f"/api/v1/submissions/import-jobs/{detail['import_job_id']}")
     assert poll.status_code == 200
     job_body = poll.json()
     assert job_body["status"] == "failed"
     assert job_body["error_log"]
-    assert "RuntimeError" in job_body["error_log"][0]["reason"]
+
+
+def test_enqueue_still_returns_503_when_failure_persist_also_fails() -> None:
+    """H2: on a correlated broker+DB outage the failure-state commit itself
+    raises. ``_enqueue_import`` must swallow that, attempt a rollback, and
+    still raise the 503 with the pollable job id — never let the commit
+    error escape as an unhandled 500 that buries the broker cause."""
+    from api.submissions import _enqueue_import
+
+    db = MagicMock()
+    fake_job = MagicMock()
+    fake_job.id = 4242
+
+    with (
+        patch("api.submissions.ImportService") as service_cls,
+        patch(
+            "api.submissions.import_submissions.apply_async",
+            side_effect=RuntimeError("broker unreachable"),
+        ),
+    ):
+        service_cls.return_value.create_queued_job.return_value = fake_job
+        # The terminal-state persist (the only db.commit in _enqueue_import)
+        # blows up too, simulating Postgres also being down.
+        db.commit.side_effect = OperationalError("stmt", {}, Exception("db gone"))
+
+        with pytest.raises(HTTPException) as excinfo:
+            _enqueue_import(
+                db=db,
+                exam=MagicMock(),
+                driver_name="moodle_csv",
+                source_bytes=b"x;y\n1;2\n",
+                triggered_by=1,
+                source_metadata={},
+            )
+
+    exc = excinfo.value
+    assert exc.status_code == 503
+    assert exc.detail["import_job_id"] == 4242
+    db.rollback.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -736,17 +821,12 @@ def test_error_log_serialises_as_structured_list(test_db: Session) -> None:
     test_db.commit()
 
     client = _client(test_db, user)
-    resp = client.post(
-        "/api/v1/submissions/import/commit",
-        files={
-            "file": (
-                "klasse.csv",
-                BytesIO(csv_with_bad_row.encode("utf-8")),
-                "text/csv",
-            )
-        },
-        data={"exam_id": str(exam.id)},
-    )
+    # The worker produces the partial import + structured error_log; we assert
+    # the *wire* shape via the polling endpoint (_import_job_to_out).
+    job = _seed_import(test_db, exam, source=csv_with_bad_row)
+    assert job.status == "partial"
+
+    resp = client.get(f"/api/v1/submissions/import-jobs/{job.id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "partial"

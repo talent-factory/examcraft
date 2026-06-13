@@ -20,8 +20,9 @@ modules (``services/import_service.py`` etc.) keep ``__future__`` because
 they hold no FastAPI route defs.
 """
 
+import base64
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -49,6 +50,7 @@ from services.auswertung_quotas import (
 )
 from services.import_drivers import ImportDriverError
 from services.import_service import ImportService, ImportValidationError
+from tasks.import_submissions_task import Base64Str, import_submissions
 from utils.auth_utils import require_permission
 
 
@@ -295,23 +297,90 @@ def _import_payload_to_preview(payload, *, max_rows: int = 50) -> ImportPreviewO
     )
 
 
-def _latest_failed_job_id(
-    *, db: Session, exam_id: int, institution_id: int
-) -> int | None:
-    """Best-effort lookup of the most recent failed ImportJob for this
-    exam — used to enrich a 500 response so the client can poll the
-    job detail rather than rely on server logs."""
-    row = (
-        db.query(ImportJob.id)
-        .filter(
-            ImportJob.exam_id == exam_id,
-            ImportJob.institution_id == institution_id,
-            ImportJob.status == ImportJobStatus.FAILED.value,
-        )
-        .order_by(ImportJob.id.desc())
-        .first()
+def _enqueue_import(
+    *,
+    db: Session,
+    exam: Exam,
+    driver_name: str,
+    source_bytes: bytes,
+    triggered_by: int,
+    source_metadata: dict[str, Any],
+) -> ImportJob:
+    """Create a ``queued`` ImportJob and hand it to the Celery worker (TF-412).
+
+    The slow part of the import — persisting attempts and, for open-ended
+    questions, serial LLM grading — runs in the worker instead of the HTTP
+    request, so the request can return immediately. The worker reuses this
+    exact job row via ``import_job_id``, and the raw upload bytes are passed
+    base64-encoded so the driver's own encoding detection still runs.
+
+    On broker failure the job is marked ``failed`` in place and a 503 is
+    raised, so the client gets a terminal, pollable state instead of a job
+    stuck forever in ``queued``.
+    """
+    job = ImportService(db).create_queued_job(
+        exam=exam,
+        driver_name=driver_name,
+        triggered_by=triggered_by,
+        source_metadata=source_metadata,
     )
-    return row[0] if row else None
+    # Captured up front: after a rollback in the failure path below the ORM
+    # object is expired, so reading ``job.id`` there could trigger a reload
+    # against an already-down DB. The PK is known the moment the row commits.
+    job_id = job.id
+    try:
+        import_submissions.apply_async(
+            kwargs={
+                "exam_id": exam.id,
+                "driver_name": driver_name,
+                "source_b64": Base64Str(base64.b64encode(source_bytes).decode("ascii")),
+                "import_job_id": job.id,
+                "triggered_by": triggered_by,
+            },
+        )
+    except Exception as exc:
+        logger.exception(
+            "Import-Job konnte nicht eingereiht werden (job_id=%s, exam_id=%s)",
+            job.id,
+            exam.id,
+        )
+        job.status = ImportJobStatus.FAILED.value
+        job.finished_at = datetime.now(timezone.utc)
+        job.error_log = [
+            {
+                "row_index": -1,
+                "reason": (
+                    "Import konnte nicht gestartet werden — der Hintergrund-"
+                    "Dienst war nicht erreichbar. Bitte erneut versuchen."
+                ),
+            }
+        ]
+        # Persisting the terminal state is best-effort: if the DB is *also*
+        # unreachable (a correlated broker+DB outage) the commit raises too.
+        # Swallow that here so the original broker failure still surfaces as a
+        # 503 with a pollable job id, instead of an unhandled 500 that buries
+        # the broker cause. The periodic reaper age-fails the row either way.
+        try:
+            db.commit()
+            db.refresh(job)
+        except Exception:  # noqa: BLE001 — already in the error path
+            logger.exception(
+                "Konnte fehlgeschlagenen Import-Job %s nicht persistieren", job_id
+            )
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "Rollback ebenfalls fehlgeschlagen für Import-Job %s", job_id
+                )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": "Import konnte nicht gestartet werden — bitte erneut versuchen.",
+                "import_job_id": job_id,
+            },
+        ) from exc
+    return job
 
 
 def _import_job_to_out(job: ImportJob) -> ImportJobOut:
@@ -393,7 +462,7 @@ async def import_preview(
     return _import_payload_to_preview(payload)
 
 
-@router.post("/import/commit", response_model=ImportJobOut)
+@router.post("/import/commit", response_model=ImportJobOut, status_code=202)
 async def import_commit(
     exam_id: int = Form(...),
     driver_name: str = Form(DriverName.MOODLE_CSV.value),
@@ -401,11 +470,14 @@ async def import_commit(
     current_user: User = Depends(require_permission("submissions:import")),
     db: Session = Depends(get_db),
 ) -> ImportJobOut:
-    """Stage 2: full pipeline — persist + grade + aggregate.
+    """Stage 2: validate synchronously, then grade asynchronously (TF-412).
 
-    The pipeline does sync DB + grading work; we run it in a threadpool
-    so the FastAPI event loop stays responsive while a large CSV is
-    being imported.
+    Parsing/validation is fast and runs inline, so malformed CSVs still fail
+    fast with a 4xx. The slow part — persisting attempts and the serial LLM
+    grading of open-ended answers — is handed to a Celery worker. We return
+    202 with a ``queued`` job that the client polls via
+    ``GET /import-jobs/{id}``, so the HTTP request can never hang for minutes
+    on grading.
     """
     exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
     assert_driver_allowed(user=current_user, driver_name=driver_name)
@@ -414,40 +486,17 @@ async def import_commit(
     assert_exam_quota_for_import(db=db, user=current_user, exam_id=exam.id)
     contents = await _read_upload(file)
 
-    # Submission-Quota: vor dem Persist eine Pre-Flight-Parse, damit
-    # ein Free-/Starter-CSV mit zu vielen Zeilen *vor* der Persistenz
-    # 402 wirft, statt halb importiert auf einer Constraint zu landen.
+    # Synchronous validation (parse only — no persist, no grading, so it stays
+    # fast). Malformed CSVs surface as 4xx here, *before* anything is enqueued.
+    # The parsed payload also yields the student count for the submission-quota
+    # pre-flight (so a Free/Starter class that is too large is rejected with
+    # 402 up front instead of half-importing).
     try:
         preview_payload = await run_in_threadpool(
             ImportService(db).preview,
             exam=exam,
             driver_name=driver_name,
             source=contents,
-        )
-    except (ImportDriverError, ImportValidationError):
-        # Defer the proper 4xx to the commit branch below — same
-        # exception will be raised again with full context.
-        pass
-    else:
-        assert_submission_quota_for_exam(
-            db=db,
-            user=current_user,
-            exam_id=exam.id,
-            additional=len(preview_payload.students),
-        )
-
-    try:
-        job = await run_in_threadpool(
-            ImportService(db).commit,
-            exam=exam,
-            driver_name=driver_name,
-            source=contents,
-            triggered_by=current_user.id,
-            source_metadata={
-                "filename": file.filename or "",
-                "content_type": file.content_type or "",
-                "size_bytes": len(contents),
-            },
         )
     except ImportDriverError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -456,25 +505,26 @@ async def import_commit(
             status_code=422,
             detail={"message": str(exc), "issues": exc.issues},
         ) from exc
-    except Exception as exc:
-        logger.exception(
-            "import_commit unerwartet fehlgeschlagen (exam_id=%s)", exam_id
-        )
-        # ImportService persists a failed ImportJob with diagnostic
-        # error_log before raising — surface its id so the client can
-        # poll /import-jobs/{id} instead of needing log access.
-        job_id = _latest_failed_job_id(
-            db=db, exam_id=exam.id, institution_id=current_user.institution_id
-        )
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "message": "Import fehlgeschlagen — siehe Job-Detail.",
-                "import_job_id": job_id,
-                "exception": type(exc).__name__,
-            },
-        ) from exc
 
+    assert_submission_quota_for_exam(
+        db=db,
+        user=current_user,
+        exam_id=exam.id,
+        additional=len(preview_payload.students),
+    )
+
+    job = _enqueue_import(
+        db=db,
+        exam=exam,
+        driver_name=driver_name,
+        source_bytes=contents,
+        triggered_by=current_user.id,
+        source_metadata={
+            "filename": file.filename or "",
+            "content_type": file.content_type or "",
+            "size_bytes": len(contents),
+        },
+    )
     return _import_job_to_out(job)
 
 
@@ -702,17 +752,19 @@ async def import_api_preview(
     return _import_payload_to_preview(payload)
 
 
-@router.post("/import/api-commit", response_model=ImportJobOut)
+@router.post("/import/api-commit", response_model=ImportJobOut, status_code=202)
 async def import_api_commit(
     body: ApiImportIn,
     current_user: User = Depends(require_permission("submissions:import")),
     db: Session = Depends(get_db),
 ) -> ImportJobOut:
-    """Volle Pipeline gegen den Moodle-API-Driver.
+    """Moodle-API-Import — validiert synchron, gradet asynchron (TF-412).
 
-    Nutzt dieselbe Idempotenz wie der CSV-Import (über
-    ``source_attempt_id`` = Moodle-Attempt-ID), so dass ein erneuter
-    Aufruf nach Korrektur einer Frage ohne Duplikate durchläuft.
+    Wie der CSV-Pfad: Web-Service-Calls + Validierung laufen inline (frühes
+    400/422 bei falscher Quiz-ID / Auth), die langsame persist+grade-Pipeline
+    übernimmt ein Celery-Worker. Antwort ist 202 mit einem ``queued``-Job, den
+    der Client über ``GET /import-jobs/{id}`` pollt. Idempotent über
+    ``source_attempt_id`` (= Moodle-Attempt-ID).
     """
     import json as _json
 
@@ -720,14 +772,15 @@ async def import_api_commit(
     assert_driver_allowed(user=current_user, driver_name=DriverName.MOODLE_API.value)
     assert_exam_quota_for_import(db=db, user=current_user, exam_id=exam.id)
     source_bytes = _json.dumps({"quiz_id": body.quiz_id}).encode("utf-8")
+
+    # Synchronous validation (Moodle web-service fetch, no grading) → early
+    # 400/422 for a bad quiz-id or auth failure, before anything is enqueued.
     try:
-        job = await run_in_threadpool(
-            ImportService(db).commit,
+        await run_in_threadpool(
+            ImportService(db).preview,
             exam=exam,
             driver_name=DriverName.MOODLE_API.value,
             source=source_bytes,
-            triggered_by=current_user.id,
-            source_metadata={"quiz_id": body.quiz_id},
         )
     except ImportDriverError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -736,24 +789,15 @@ async def import_api_commit(
             status_code=422,
             detail={"message": str(exc), "issues": exc.issues},
         ) from exc
-    except Exception as exc:
-        logger.exception(
-            "import_api_commit unerwartet fehlgeschlagen (exam_id=%s, quiz_id=%s)",
-            body.exam_id,
-            body.quiz_id,
-        )
-        job_id = _latest_failed_job_id(
-            db=db, exam_id=exam.id, institution_id=current_user.institution_id
-        )
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "message": "Moodle-API-Import fehlgeschlagen — siehe Job-Detail.",
-                "import_job_id": job_id,
-                "exception": type(exc).__name__,
-            },
-        ) from exc
 
+    job = _enqueue_import(
+        db=db,
+        exam=exam,
+        driver_name=DriverName.MOODLE_API.value,
+        source_bytes=source_bytes,
+        triggered_by=current_user.id,
+        source_metadata={"quiz_id": body.quiz_id},
+    )
     return _import_job_to_out(job)
 
 
