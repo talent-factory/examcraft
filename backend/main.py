@@ -262,10 +262,15 @@ async def lifespan(app: FastAPI):
     sys.modules["api.tags"] = tags_api
     spec_tags.loader.exec_module(tags_api)
 
+    # TF-417 hotfix: register as "api.question_review" (same pattern as
+    # api.tags above) so ``from api.question_review import _serialize_competency``
+    # in exams.py resolves through sys.modules. Loaded via core_api_* the
+    # absolute import breaks in the prod image (Dockerfile.fly) → boot crash.
     spec_qr = importlib.util.spec_from_file_location(
-        "core_api_question_review", os.path.join(core_api_path, "question_review.py")
+        "api.question_review", os.path.join(core_api_path, "question_review.py")
     )
     question_review = importlib.util.module_from_spec(spec_qr)
+    sys.modules["api.question_review"] = question_review
     spec_qr.loader.exec_module(question_review)
 
     spec_exams = importlib.util.spec_from_file_location(
