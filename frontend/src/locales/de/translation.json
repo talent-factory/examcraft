@@ -519,7 +519,28 @@
       "tabAudit": "Audit Logs",
       "tabSubscription": "Abonnement",
       "tabGradingSchemes": "Bewertungsschemata",
-      "auditPlaceholder": "Audit Logs — Demnächst verfügbar"
+      "auditPlaceholder": "Audit Logs — Demnächst verfügbar",
+      "audit": {
+        "filterAll": "Alle",
+        "filterCategory": "Kategorie",
+        "filterStatus": "Status",
+        "filterInstitution": "Institution-ID",
+        "loadError": "Audit-Logs konnten nicht geladen werden",
+        "colTime": "Zeitpunkt",
+        "colActor": "Akteur",
+        "colCategory": "Kategorie",
+        "colAction": "Aktion",
+        "colResource": "Ressource",
+        "colStatus": "Status",
+        "colIp": "IP-Adresse",
+        "colUserAgent": "User-Agent",
+        "category": {
+          "business": "Geschäftlich",
+          "admin": "Administration",
+          "auth": "Authentifizierung",
+          "security": "Sicherheit"
+        }
+      }
     },
     "promptLibrary": {
       "title": "Prompt Library",

@@ -56,6 +56,7 @@ class AuditService:
     ACTION_RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
     ACTION_SUPERUSER_BYPASS = "superuser_bypass"
     ACTION_ADMIN_CROSS_OWNER = "admin_cross_owner"
+    ACTION_VIEW_AUDIT_LOG = "view_audit_log"
 
     # Status Types
     STATUS_SUCCESS = "success"
@@ -480,3 +481,93 @@ class AuditService:
             request=request,
             additional_data={"limit_type": limit_type},
         )
+
+
+# ---------------------------------------------------------------------------
+# Audit category taxonomy (TF-415)
+#
+# Single source of truth for the read-side RBAC scoping. Defined here, next to
+# the write-side ACTION_* constants, so the two never drift. Consumed by
+# services.audit_query_service and api.audit.
+#
+# Visibility tiers (see docs/superpowers/specs/2026-06-13-audit-visibility-rbac-design.md):
+#   - Institution-Admin: business + admin
+#   - SuperAdmin:         all four categories + any uncategorized action
+#
+# Fail-closed: an action absent from every category is treated as "security"
+# (SuperAdmin-only) so a forgotten mapping never widens visibility.
+# ---------------------------------------------------------------------------
+
+AUDIT_CATEGORIES: tuple[str, ...] = ("business", "admin", "auth", "security")
+
+ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
+    "business": frozenset(
+        {
+            AuditService.ACTION_CREATE_DOCUMENT,
+            AuditService.ACTION_UPDATE_DOCUMENT,
+            AuditService.ACTION_DELETE_DOCUMENT,
+            AuditService.ACTION_PROCESS_DOCUMENT,
+            AuditService.ACTION_CREATE_QUESTION,
+            AuditService.ACTION_APPROVE_QUESTION,
+            AuditService.ACTION_REJECT_QUESTION,
+            AuditService.ACTION_EDIT_QUESTION,
+            AuditService.ACTION_DELETE_QUESTION,
+            # Exam lifecycle (api/exams.py)
+            "create_exam",
+            "update_exam_grading_scheme",
+            "delete_exam",
+            "archive_exam",
+            "restore_exam",
+            # GDPR data actions (api/gdpr.py)
+            "data_export",
+            "deletion_requested",
+            "deletion_cancelled",
+            "account_deleted_immediately",
+        }
+    ),
+    "admin": frozenset(
+        {
+            AuditService.ACTION_CREATE_USER,
+            AuditService.ACTION_UPDATE_USER,
+            AuditService.ACTION_DELETE_USER,
+            AuditService.ACTION_ASSIGN_ROLE,
+            AuditService.ACTION_REMOVE_ROLE,
+        }
+    ),
+    "auth": frozenset(
+        {
+            AuditService.ACTION_LOGIN,
+            AuditService.ACTION_LOGOUT,
+            AuditService.ACTION_REGISTER,
+            AuditService.ACTION_PASSWORD_CHANGE,
+            AuditService.ACTION_PASSWORD_RESET,
+            AuditService.ACTION_TOKEN_REFRESH,
+            AuditService.ACTION_OAUTH_LOGIN,
+        }
+    ),
+    "security": frozenset(
+        {
+            AuditService.ACTION_API_ACCESS,
+            AuditService.ACTION_PERMISSION_DENIED,
+            AuditService.ACTION_RATE_LIMIT_EXCEEDED,
+            AuditService.ACTION_SUPERUSER_BYPASS,
+            AuditService.ACTION_ADMIN_CROSS_OWNER,
+            AuditService.ACTION_VIEW_AUDIT_LOG,
+        }
+    ),
+}
+
+_ACTION_TO_CATEGORY: dict[str, str] = {
+    action: category
+    for category, actions in ACTIONS_BY_CATEGORY.items()
+    for action in actions
+}
+
+
+def category_for_action(action: str) -> str:
+    """Return the audit category for an action.
+
+    Unknown actions fail closed to ``"security"`` so they stay SuperAdmin-only
+    and never leak into a lower tier's view.
+    """
+    return _ACTION_TO_CATEGORY.get(action, "security")

@@ -519,7 +519,28 @@
       "tabAudit": "Audit Logs",
       "tabSubscription": "Subscription",
       "tabGradingSchemes": "Grading Schemes",
-      "auditPlaceholder": "Audit Logs — Coming soon"
+      "auditPlaceholder": "Audit Logs — Coming soon",
+      "audit": {
+        "filterAll": "All",
+        "filterCategory": "Category",
+        "filterStatus": "Status",
+        "filterInstitution": "Institution ID",
+        "loadError": "Failed to load audit logs",
+        "colTime": "Time",
+        "colActor": "Actor",
+        "colCategory": "Category",
+        "colAction": "Action",
+        "colResource": "Resource",
+        "colStatus": "Status",
+        "colIp": "IP address",
+        "colUserAgent": "User agent",
+        "category": {
+          "business": "Business",
+          "admin": "Administration",
+          "auth": "Authentication",
+          "security": "Security"
+        }
+      }
     },
     "promptLibrary": {
       "title": "Prompt Library",

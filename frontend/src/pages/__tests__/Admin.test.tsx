@@ -30,6 +30,10 @@ jest.mock('../CompetencyFrameworkSettingsPage', () => ({
   __esModule: true,
   default: () => <div data-testid="competency-frameworks-settings" />,
 }));
+jest.mock('../../components/admin/AuditLogView', () => ({
+  __esModule: true,
+  default: () => <div data-testid="audit-log-view" />,
+}));
 
 // Mock useAuth
 const mockHasRole = jest.fn();
@@ -96,7 +100,8 @@ describe('Admin Page', () => {
 
       fireEvent.click(screen.getByText('Audit Logs'));
 
-      expect(screen.getByText('Audit Logs — Demnächst verfügbar')).toBeInTheDocument();
+      expect(screen.getByTestId('admin-tab-content-audit')).toBeInTheDocument();
+      expect(screen.getByTestId('audit-log-view')).toBeInTheDocument();
       expect(screen.queryByTestId('admin-tab-content-users')).not.toBeInTheDocument();
     });
 

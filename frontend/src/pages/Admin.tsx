@@ -15,6 +15,7 @@ import CompetencyFrameworkSettingsPage from './CompetencyFrameworkSettingsPage';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/auth';
 import AdminGradingSchemes from './AdminGradingSchemes';
+import AuditLogView from '../components/admin/AuditLogView';
 
 type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'competency-frameworks' | 'grading-schemes';
 
@@ -90,8 +91,8 @@ export const Admin: React.FC = () => {
           </div>
         )}
         {effectiveTab === 'audit' && (
-          <div data-testid="admin-tab-content-audit" className="text-center py-12">
-            <p className="text-gray-500 text-lg">{t('pages.admin.auditPlaceholder')}</p>
+          <div data-testid="admin-tab-content-audit">
+            <AuditLogView isSuperuser={isSuperuser} />
           </div>
         )}
         {effectiveTab === 'subscription' && (

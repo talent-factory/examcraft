@@ -196,7 +196,28 @@
       "tabAudit": "Log di audit",
       "tabSubscription": "Abbonamento",
       "tabGradingSchemes": "Schemi di valutazione",
-      "auditPlaceholder": "Log di audit — Prossimamente disponibile"
+      "auditPlaceholder": "Log di audit — Prossimamente disponibile",
+      "audit": {
+        "filterAll": "Tutti",
+        "filterCategory": "Categoria",
+        "filterStatus": "Stato",
+        "filterInstitution": "ID istituzione",
+        "loadError": "Impossibile caricare i log di audit",
+        "colTime": "Ora",
+        "colActor": "Attore",
+        "colCategory": "Categoria",
+        "colAction": "Azione",
+        "colResource": "Risorsa",
+        "colStatus": "Stato",
+        "colIp": "Indirizzo IP",
+        "colUserAgent": "User agent",
+        "category": {
+          "business": "Business",
+          "admin": "Amministrazione",
+          "auth": "Autenticazione",
+          "security": "Sicurezza"
+        }
+      }
     },
     "promptLibrary": {
       "title": "Libreria prompt",

@@ -196,7 +196,28 @@
       "tabAudit": "Journaux d'audit",
       "tabSubscription": "Abonnement",
       "tabGradingSchemes": "Schèmes de notation",
-      "auditPlaceholder": "Journaux d'audit — Bientôt disponible"
+      "auditPlaceholder": "Journaux d'audit — Bientôt disponible",
+      "audit": {
+        "filterAll": "Tous",
+        "filterCategory": "Catégorie",
+        "filterStatus": "Statut",
+        "filterInstitution": "ID d'institution",
+        "loadError": "Échec du chargement des journaux d'audit",
+        "colTime": "Heure",
+        "colActor": "Acteur",
+        "colCategory": "Catégorie",
+        "colAction": "Action",
+        "colResource": "Ressource",
+        "colStatus": "Statut",
+        "colIp": "Adresse IP",
+        "colUserAgent": "Agent utilisateur",
+        "category": {
+          "business": "Métier",
+          "admin": "Administration",
+          "auth": "Authentification",
+          "security": "Sécurité"
+        }
+      }
     },
     "promptLibrary": {
       "title": "Bibliothèque de prompts",
