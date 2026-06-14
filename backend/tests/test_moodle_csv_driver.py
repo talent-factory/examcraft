@@ -317,6 +317,55 @@ def test_row_with_fewer_columns_is_imported_without_overflow_warning() -> None:
     assert not any("überzählige Spalte" in w for w in payload.warnings)
 
 
+def test_doubled_quotes_in_freetext_answer_do_not_shift_columns() -> None:
+    """Real Moodle exports escape an embedded ``"`` in a free-text answer
+    RFC-4180-style as ``""``. ``csv.Sniffer`` unreliably guesses
+    ``doublequote=False`` for such files (TF-419): it then reads the first
+    ``"`` of a ``""`` pair as the field terminator, so the rest of the
+    comma-rich essay spills into surplus columns and shifts every later
+    answer of that row — silently misgrading it. Only rows whose student
+    happened to type a ``"`` are affected, which is why it looks
+    intermittent (3 of 15 rows in the production report).
+
+    The driver must force standard quoting (``quotechar='"'``,
+    ``doublequote=True``) on top of the sniffed delimiter so the escape is
+    honoured: no overflow, the embedded quote collapses to a single ``"``,
+    and the single-choice answers after it stay aligned.
+    """
+    # Anna's free-text Antwort 1 carries embedded ``""`` amid many commas —
+    # the exact shape that makes csv.Sniffer guess doublequote=False.
+    # Bruno's row is clean (no embedded quote) and must stay unaffected.
+    csv_text = (
+        "Nachname,Vorname,E-Mail-Adresse,Status,"
+        '"Antwort 1","Antwort 2","Antwort 3"\r\n'
+        "Muster,Anna,anna@example.org,Beendet,"
+        '"a) Erstens, zweitens, drittens. Er fragte ""Wie geht das?"" und '
+        'ich, verwirrt, antwortete: ""So nicht, sondern anders."" Dann, '
+        'schliesslich, fertig.",'
+        '"Option B: Variante zwei","Wahr"\r\n'
+        "Beispiel,Bruno,bruno@example.org,Beendet,"
+        '"Kurze Antwort.","Option B: Variante zwei","Wahr"\r\n'
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=make_exam(num_questions=3))
+
+    # No row breaks, no overflow warning fires.
+    assert payload.errors == []
+    assert len(payload.attempts) == 2
+    assert not any("überzählige Spalte" in w for w in payload.warnings)
+
+    anna = next(
+        a for a in payload.attempts if a.student_external_id == "anna@example.org"
+    )
+    given = {ans.exam_question_id: ans.given_answer for ans in anna.answers}
+    # The escaped "" collapses to a single " (not lost, not doubled).
+    assert '"Wie geht das?"' in given[100]
+    assert '""' not in given[100]
+    # The single-choice answers after the quoted essay stay aligned —
+    # this is exactly what shifted (mis-graded) before the fix.
+    assert given[101] == "Option B: Variante zwei"
+    assert given[102] == "Wahr"
+
+
 # ---------------------------------------------------------------------------
 # Mehrfachversuche + Idempotenz
 # ---------------------------------------------------------------------------

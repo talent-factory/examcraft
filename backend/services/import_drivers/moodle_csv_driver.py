@@ -430,18 +430,32 @@ class MoodleCsvDriver(BaseImportDriver):
 
     @staticmethod
     def _sniff_dialect(text: str) -> tuple[type[csv.Dialect] | csv.Dialect, bool]:
-        """Sniff CSV dialect; return (dialect, fallback_used).
+        """Sniff the CSV *delimiter*; force RFC-4180 standard quoting.
 
         ``fallback_used=True`` means csv.Sniffer raised — usually because
         the sample is too uniform or quoting confuses the heuristic.
         Caller surfaces this as a warning so the operator can spot a
         misparsed semicolon CSV.
+
+        csv.Sniffer detects the delimiter reliably but its ``doublequote``
+        guess is not: on Moodle reports whose free-text answers carry an
+        embedded ``"`` (escaped RFC-4180-style as ``""``) it frequently
+        guesses ``doublequote=False``. The reader then treats the first
+        ``"`` of a ``""`` pair as the field terminator and spills the rest
+        of the comma-rich answer into surplus columns, shifting every later
+        answer of that row — silent misgrading (TF-419). Moodle always
+        escapes with doubled quotes, so we keep the sniffed delimiter but
+        pin ``quotechar='"'`` and ``doublequote=True``. The ``csv.excel``
+        fallback already uses both.
         """
         sample = text[:8192]
         try:
-            return csv.Sniffer().sniff(sample, delimiters=";,\t"), False
+            dialect = csv.Sniffer().sniff(sample, delimiters=";,\t")
         except csv.Error:
             return csv.excel, True
+        dialect.quotechar = '"'
+        dialect.doublequote = True
+        return dialect, False
 
     @staticmethod
     def _find_column(
