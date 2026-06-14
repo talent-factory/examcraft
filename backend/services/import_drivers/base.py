@@ -16,7 +16,10 @@ class ExamLike(Protocol):
     """
 
     id: int
-    questions: list[Any]  # ExamQuestion-like: .id, .position
+    # ExamQuestion-like: .id, .position, optional .external_refs (dict,
+    # may carry ``moodle_slot``) and .question.options (list) — the
+    # Moodle drivers read these defensively via getattr.
+    questions: list[Any]
 
 
 class ImportDriverError(Exception):
@@ -38,6 +41,18 @@ class MissingColumnError(ImportDriverError):
 
 class UnparseableCsvError(ImportDriverError):
     """CSV is binary-corrupt or has an unknown encoding."""
+
+
+class ColumnMappingError(ImportDriverError):
+    """Answer columns cannot be safely mapped onto the exam's questions.
+
+    Raised when the structural integrity of the column->question mapping
+    is in doubt -- e.g. answers landing on a choice question match none
+    of its options, which signals the Moodle quiz was reordered (the
+    ``Antwort N`` columns follow Moodle's slot/page order, not
+    ExamCraft's ``position``). Aborting beats silently grading answers
+    against the wrong questions. (TF-422)
+    """
 
 
 class BaseImportDriver(ABC):

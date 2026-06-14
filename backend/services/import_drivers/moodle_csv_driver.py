@@ -8,8 +8,15 @@ Moodle. Tolerant of:
 * UTF-8 with/without BOM, Latin-1 fallback
 * missing optional columns (e.g. ``Versuch``)
 
-Answer columns match ``^(Antwort|Response)\\s*\\d+$`` and are mapped
-position-based onto ``ExamQuestion.position``.
+Answer columns match ``^(Antwort|Response)\\s*\\d+$``. The number ``N``
+in ``Antwort N`` is Moodle's quiz *slot* (page) order, which the
+instructor can reorder independently of ``ExamQuestion.position``. The
+driver therefore keys the column->question mapping on the live slot
+(``external_refs['moodle_slot']``) when every question carries one, and
+falls back to ``position`` otherwise. A structural guardrail aborts the
+import (``ColumnMappingError``) when a choice question's answers match
+none of its options — the signature of a reordered quiz — rather than
+silently grading answers against the wrong question. (TF-422)
 
 Per-row tolerance: malformed individual rows land in ``payload.errors``
 and don't abort the import. Structural problems (missing header,
@@ -30,12 +37,13 @@ import logging
 import re
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import ClassVar
+from typing import ClassVar, Literal, NamedTuple
 
 from pydantic import ValidationError
 
 from services.import_drivers.base import (
     BaseImportDriver,
+    ColumnMappingError,
     EmptyCsvError,
     ExamLike,
     MissingColumnError,
@@ -190,6 +198,56 @@ def _normalise_header(name: str) -> str:
     return " ".join(name.split()).strip().lower()
 
 
+def _normalize_answer(text: object) -> str:
+    """Collapse whitespace + casefold for option/answer comparison."""
+    return " ".join(str(text).split()).casefold()
+
+
+_MIN_CONTAINMENT_LEN = 3
+
+
+def _answer_matches_option(given: str, norm_options: list[str]) -> bool:
+    """True if ``given`` plausibly is one of ``norm_options``.
+
+    Two-way containment tolerates Moodle rendering quirks (e.g. response
+    "Wahr" vs option "A) Wahr", or a multi-select answer that
+    concatenates several option texts). Generous on purpose: the
+    guardrail only acts on a *total* mismatch. (TF-422)
+
+    Containment is gated on ``len(opt) >= _MIN_CONTAINMENT_LEN``: a one-
+    or two-character option (e.g. true/false stored as bare ``"A"``/
+    ``"B"``) would otherwise be a substring of almost any free text and
+    silently defeat the guardrail. Such short options must match exactly.
+    """
+    normalized = _normalize_answer(given)
+    if not normalized:
+        return False
+    for opt in norm_options:
+        if not opt:
+            continue
+        if normalized == opt:
+            return True
+        if len(opt) >= _MIN_CONTAINMENT_LEN and (
+            opt in normalized or normalized in opt
+        ):
+            return True
+    return False
+
+
+class _QuestionIndex(NamedTuple):
+    """Result of mapping ``Antwort N`` column numbers to exam questions.
+
+    Named (rather than a bare tuple) so the two same-shaped ``dict``
+    fields can't be swapped positionally at the call site without the
+    type checker noticing. (TF-422)
+    """
+
+    qid_by_column: dict[int, int]
+    options_by_column: dict[int, list[str] | None]
+    basis: Literal["slot", "position"]
+    warnings: list[str]
+
+
 class MoodleCsvDriver(BaseImportDriver):
     """Reads Moodle "Quiz Responses Export" CSVs."""
 
@@ -273,9 +331,18 @@ class MoodleCsvDriver(BaseImportDriver):
         class_col = self._find_column(header_index, self.CLASS_COLUMNS)
 
         answer_columns = self._find_answer_columns(raw_headers)
-        questions_by_position: dict[int, int] = {
-            q.position: q.id for q in exam.questions
-        }
+        # Map each ``Antwort N`` column number to a question. Legacy
+        # behaviour keys on ``ExamQuestion.position`` (assumes N ==
+        # position). But Moodle numbers its response columns by quiz
+        # *slot* order, which the instructor can reorder independently;
+        # when ``external_refs['moodle_slot']`` records the live slot we
+        # key on that instead (reorder-safe). The dict therefore maps
+        # "the N in 'Antwort N'" -> exam_question_id, regardless of
+        # basis. (TF-422)
+        index = self._index_questions(exam)
+        qid_by_column = index.qid_by_column
+        options_by_column = index.options_by_column
+        mapping_basis = index.basis
 
         rows = list(reader)
         if not rows:
@@ -291,6 +358,7 @@ class MoodleCsvDriver(BaseImportDriver):
                 "row_count": len(rows),
                 "encoding": encoding,
                 "sniffer_fallback": sniffer_fallback,
+                "mapping_basis": mapping_basis,
             },
         )
 
@@ -318,23 +386,25 @@ class MoodleCsvDriver(BaseImportDriver):
                 "Wenn die CSV ;-getrennt ist, prüfe das Quoting."
             )
 
+        payload.warnings.extend(index.warnings)
+
         if not answer_columns:
             payload.warnings.append(
                 "Keine Antwort-Spalten gefunden "
                 "(erwartet: 'Antwort N' oder 'Response N')"
             )
-        elif len(answer_columns) != len(questions_by_position):
+        elif len(answer_columns) != len(qid_by_column):
             payload.warnings.append(
                 f"Spaltenanzahl ({len(answer_columns)}) passt nicht zur "
-                f"Fragenanzahl der Prüfung ({len(questions_by_position)})"
+                f"Fragenanzahl der Prüfung ({len(qid_by_column)})"
             )
 
         # Answer columns without a matching exam question — emit once
         # rather than per row.
-        for col, position in answer_columns:
-            if position not in questions_by_position:
+        for col, column_no in answer_columns:
+            if column_no not in qid_by_column:
                 payload.warnings.append(
-                    f"Spalte '{col}' (Position {position}) hat keine "
+                    f"Spalte '{col}' (Nr. {column_no}) hat keine "
                     f"zugehörige Frage in der Prüfung"
                 )
 
@@ -357,7 +427,7 @@ class MoodleCsvDriver(BaseImportDriver):
                     attempt_col=attempt_col,
                     class_col=class_col,
                     answer_columns=answer_columns,
-                    questions_by_position=questions_by_position,
+                    qid_by_column=qid_by_column,
                 )
             except ValidationError as exc:
                 payload.errors.append(
@@ -395,7 +465,153 @@ class MoodleCsvDriver(BaseImportDriver):
                     "Prüfe, ob die CSV ;-getrennt ist.",
                 )
 
+        # Structural guardrail (TF-422): if a choice question's answers
+        # match none of its options, the column->question mapping is
+        # almost certainly misaligned (Moodle quiz reordered). Abort the
+        # whole import rather than silently grade against wrong questions.
+        self._check_answer_type_consistency(
+            payload, answer_columns, qid_by_column, options_by_column
+        )
+
         return payload
+
+    @staticmethod
+    def _index_questions(exam: ExamLike) -> _QuestionIndex:
+        """Map ``Antwort N`` column numbers to exam questions.
+
+        Returns a ``_QuestionIndex`` whose ``qid_by_column`` maps "the N
+        in 'Antwort N'" -> ``exam_question_id``, ``options_by_column``
+        carries each column's options (or ``None``) for the
+        type-consistency guardrail, and ``basis`` records whether the
+        mapping keyed on ``"slot"`` or ``"position"``.
+
+        Keys on the live Moodle slot (``external_refs['moodle_slot']``)
+        when *every* question carries one — reorder-safe, in the same
+        spirit as (but simpler than) the API driver's per-question
+        resolution. Otherwise falls back to ``ExamQuestion.position``
+        (legacy behaviour) and warns when slot data is partial or
+        contains duplicates. (TF-422)
+        """
+
+        def _slot(q: object) -> int | None:
+            refs = getattr(q, "external_refs", None)
+            if isinstance(refs, dict):
+                slot = refs.get("moodle_slot")
+                if isinstance(slot, bool):
+                    return None
+                if isinstance(slot, int):
+                    return slot
+                if isinstance(slot, str) and slot.strip().isdigit():
+                    return int(slot)
+            return None
+
+        def _options(q: object) -> list[str] | None:
+            question = getattr(q, "question", None)
+            opts = getattr(question, "options", None)
+            return opts if isinstance(opts, list) else None
+
+        questions = list(getattr(exam, "questions", []) or [])
+        slots = [_slot(q) for q in questions]
+        use_slot = bool(questions) and all(s is not None for s in slots)
+
+        warnings: list[str] = []
+        if use_slot and len(set(slots)) != len(slots):
+            # ``moodle_slot`` is not DB-unique (unlike ``position``, which
+            # carries ``uq_exam_position``). A stale/buggy "Moodle-IDs
+            # erfassen" roundtrip can write the same slot to two
+            # questions; keying on it would silently drop the colliding
+            # question's answer column. Fall back to the DB-unique
+            # position and let the guardrail still catch a genuine
+            # reorder. (TF-422)
+            use_slot = False
+            warnings.append(
+                "Doppelte Moodle-Slots erkannt — Zuordnung mehrdeutig, "
+                "Fallback auf Frage-Position. Roundtrip 'Moodle-IDs "
+                "erfassen' erneut ausführen, damit jede Frage einen "
+                "eindeutigen Slot trägt (TF-422)."
+            )
+        elif not use_slot and any(s is not None for s in slots):
+            warnings.append(
+                "Moodle-Slot-Zuordnung nur teilweise erfasst — Fallback auf "
+                "Frage-Position. Roundtrip 'Moodle-IDs erfassen' erneut "
+                "ausführen, damit alle Fragen einen Slot tragen (TF-422)."
+            )
+
+        qid_by_column: dict[int, int] = {}
+        options_by_column: dict[int, list[str] | None] = {}
+        for q, slot in zip(questions, slots):
+            key = slot if use_slot else getattr(q, "position", None)
+            if key is None:
+                continue
+            qid_by_column[key] = q.id
+            options_by_column[key] = _options(q)
+
+        return _QuestionIndex(
+            qid_by_column=qid_by_column,
+            options_by_column=options_by_column,
+            basis="slot" if use_slot else "position",
+            warnings=warnings,
+        )
+
+    @staticmethod
+    def _check_answer_type_consistency(
+        payload: ImportPayload,
+        answer_columns: list[tuple[str, int]],
+        qid_by_column: dict[int, int],
+        options_by_column: dict[int, list[str] | None],
+    ) -> None:
+        """Block imports whose answers can't belong to their mapped question.
+
+        For every column mapped to an *options-bearing* question (single/
+        multiple choice, true/false), a correctly-aligned Moodle response
+        equals — or is contained in — one of the question's options. If a
+        column's non-empty answers match *no* option across *all*
+        attempts, the ``Antwort N`` columns are almost certainly
+        misaligned (Moodle quiz reordered): raise rather than grade
+        against the wrong question.
+
+        Matching is deliberately generous (two-way containment) so genuine
+        single-word responses ("Wahr" vs option "A) Wahr") still match —
+        the check only fires on a *total* mismatch, keeping false-positive
+        blocks of legitimate imports unlikely. Open-ended questions carry
+        no options and are skipped. (TF-422)
+        """
+        given_by_qid: dict[int, list[str]] = defaultdict(list)
+        for attempt in payload.attempts:
+            for ans in attempt.answers:
+                if ans.given_answer:
+                    given_by_qid[ans.exam_question_id].append(ans.given_answer)
+
+        misaligned: list[str] = []
+        for col, column_no in answer_columns:
+            qid = qid_by_column.get(column_no)
+            if qid is None:
+                continue
+            options = options_by_column.get(column_no)
+            if not options:
+                continue  # open-ended / no options → nothing to validate
+            norm_options = [
+                _normalize_answer(o) for o in options if o and str(o).strip()
+            ]
+            if not norm_options:
+                continue
+            given = given_by_qid.get(qid, [])
+            if not given:
+                continue  # everyone skipped this question → no signal
+            matched = sum(1 for g in given if _answer_matches_option(g, norm_options))
+            if matched == 0:
+                misaligned.append(f"'{col}'")
+
+        if misaligned:
+            raise ColumnMappingError(
+                "Spaltenzuordnung fehlgeschlagen: "
+                f"{', '.join(misaligned)} enthält Antworten, die zu keiner "
+                "Option der zugeordneten Frage passen — vermutlich wurde das "
+                "Quiz in Moodle umsortiert (Antwort-Spalten folgen der "
+                "Moodle-Seitenreihenfolge, nicht der ExamCraft-Position). "
+                "Bitte den Moodle-API-Import verwenden oder die "
+                "Fragenreihenfolge in Moodle an die Prüfung angleichen."
+            )
 
     @staticmethod
     def _decode(source: bytes | str) -> tuple[str, str]:
@@ -468,7 +684,11 @@ class MoodleCsvDriver(BaseImportDriver):
 
     @classmethod
     def _find_answer_columns(cls, headers: list[str]) -> list[tuple[str, int]]:
-        """List of ``(col_name, position)`` sorted by position."""
+        """List of ``(col_name, column_no)`` sorted by column number.
+
+        ``column_no`` is the ``N`` in ``Antwort N`` — Moodle's slot/page
+        order, mapped onto a question by ``_index_questions``.
+        """
         matches: list[tuple[str, int]] = []
         for header in headers:
             match = cls.ANSWER_COLUMN_REGEX.match(header.strip())
@@ -534,7 +754,7 @@ class MoodleCsvDriver(BaseImportDriver):
         attempt_col: str | None,
         class_col: str | None,
         answer_columns: list[tuple[str, int]],
-        questions_by_position: dict[int, int],
+        qid_by_column: dict[int, int],
     ) -> None:
         external_id = (row.get(email_col) or "").strip()
         if not external_id:
@@ -600,8 +820,8 @@ class MoodleCsvDriver(BaseImportDriver):
             )
 
         answers: list[AnswerRecord] = []
-        for col, position in answer_columns:
-            question_id = questions_by_position.get(position)
+        for col, column_no in answer_columns:
+            question_id = qid_by_column.get(column_no)
             if question_id is None:
                 continue
             given = (row.get(col) or "").strip() or None

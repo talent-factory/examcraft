@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 from services.import_drivers import (
+    ColumnMappingError,
     EmptyCsvError,
     MissingColumnError,
     MoodleCsvDriver,
@@ -157,9 +158,9 @@ def test_column_count_mismatch_warns() -> None:
     payload = MoodleCsvDriver().parse(csv_text, exam=make_exam(num_questions=2))
 
     assert any("Spaltenanzahl" in w for w in payload.warnings)
-    # Position 3 und 4 haben keine Frage:
-    assert any("Position 3" in w for w in payload.warnings)
-    assert any("Position 4" in w for w in payload.warnings)
+    # Spalte 3 und 4 haben keine Frage:
+    assert any("Nr. 3" in w for w in payload.warnings)
+    assert any("Nr. 4" in w for w in payload.warnings)
     # Es werden trotzdem 2 Antworten persistiert (Pos 1 + 2):
     assert len(payload.attempts[0].answers) == 2
 
@@ -755,3 +756,343 @@ def test_cp1252_export_decodes_with_warning() -> None:
     assert anna.student_external_id == "anna@example.org"
     name = next(s for s in payload.students if s.external_id == "anna@example.org")
     assert name.display_name and "üöä" in name.display_name
+
+
+# --- TF-422: Spalten-zu-Frage-Mapping bei umsortiertem Moodle-Quiz ---------
+
+
+def _exam_with_questions(specs: list[dict], exam_id: int = 77):
+    """Exam stub whose questions carry ``options`` + ``external_refs``.
+
+    Each spec dict supports keys ``position`` (int), ``options``
+    (list[str] | None) and ``moodle_slot`` (int | None). Mirrors the real
+    ``ExamQuestion`` shape (``q.question.options``, ``q.external_refs``)
+    closely enough for the driver's defensive ``getattr`` access.
+
+    Pass ``external_refs`` verbatim to inject a malformed value (a string
+    slot, a bool, a non-dict) for the driver's defensive parsing paths;
+    it overrides the ``moodle_slot`` shorthand.
+    """
+    questions = []
+    for i, spec in enumerate(specs):
+        if "external_refs" in spec:
+            external_refs = spec["external_refs"]
+        else:
+            slot = spec.get("moodle_slot")
+            external_refs = {"moodle_slot": slot} if slot is not None else None
+        questions.append(
+            SimpleNamespace(
+                id=200 + i,
+                position=spec["position"],
+                question=SimpleNamespace(options=spec.get("options")),
+                external_refs=external_refs,
+            )
+        )
+    return SimpleNamespace(id=exam_id, questions=questions)
+
+
+def test_reordered_quiz_blocks_when_choice_column_gets_freetext() -> None:
+    """TF-422: ``Antwort N`` folgt der Moodle-Slot-Reihenfolge. Sortiert
+    der Dozent das Quiz um, landen Freitext-Essays auf SingleChoice-Fragen.
+    Der Guardrail muss den Import abbrechen statt still falsch zu mappen."""
+    exam = _exam_with_questions(
+        [
+            {"position": 1, "options": ["Option A: zuhören", "Option B: nachfragen"]},
+            {"position": 2, "options": ["A) Wahr", "B) Falsch"]},
+            {"position": 3, "options": None},  # open_ended
+            {"position": 4, "options": None},  # open_ended
+        ]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;"
+        "Antwort 1;Antwort 2;Antwort 3;Antwort 4\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "Ein langer Freitext über Kundenkommunikation und Deeskalation;"
+        "Noch ein Essay zur Gesprächsstrategie;"
+        "Option A: zuhören;A) Wahr\n"
+    )
+    with pytest.raises(ColumnMappingError):
+        MoodleCsvDriver().parse(csv_text, exam=exam)
+
+
+def test_aligned_choice_answers_do_not_block() -> None:
+    """Korrekt ausgerichtete Choice-Antworten (passen zu den Optionen)
+    dürfen den Guardrail nicht auslösen."""
+    exam = _exam_with_questions(
+        [
+            {"position": 1, "options": ["Option A: zuhören", "Option B: nachfragen"]},
+            {"position": 2, "options": ["A) Wahr", "B) Falsch"]},
+            {"position": 3, "options": None},
+            {"position": 4, "options": None},
+        ]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;"
+        "Antwort 1;Antwort 2;Antwort 3;Antwort 4\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "Option B: nachfragen;B) Falsch;Ein Freitext-Essay;Noch ein Essay\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    answers = {a.exam_question_id: a.given_answer for a in payload.attempts[0].answers}
+    assert answers[200] == "Option B: nachfragen"
+    assert answers[201] == "B) Falsch"
+
+
+def test_empty_choice_answers_do_not_block() -> None:
+    """Leere/übersprungene Choice-Antworten sind normal und dürfen den
+    Guardrail nicht triggern."""
+    exam = _exam_with_questions([{"position": 1, "options": ["A) Wahr", "B) Falsch"]}])
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    assert payload.attempts
+
+
+def test_slot_mapping_uses_external_refs_for_reordered_quiz() -> None:
+    """TF-422: spiegelt ``external_refs.moodle_slot`` die Live-Moodle-
+    Reihenfolge, wird ``Antwort N`` per Slot gemappt — reorder-sicher."""
+    # position 1 = Choice, liegt nach Reorder auf Moodle-Slot 2;
+    # position 2 = open_ended, liegt auf Slot 1.
+    exam = _exam_with_questions(
+        [
+            {
+                "position": 1,
+                "options": ["Option A: x", "Option B: y"],
+                "moodle_slot": 2,
+            },
+            {"position": 2, "options": None, "moodle_slot": 1},
+        ]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "Ein Freitext-Essay;Option B: y\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    answers = {a.exam_question_id: a.given_answer for a in payload.attempts[0].answers}
+    # Antwort 1 (Slot 1) -> position-2 open_ended (id 201)
+    assert answers[201] == "Ein Freitext-Essay"
+    # Antwort 2 (Slot 2) -> position-1 Choice (id 200)
+    assert answers[200] == "Option B: y"
+
+
+def test_partial_slot_refs_fall_back_to_position_with_warning() -> None:
+    """Sind nur manche Fragen mit ``moodle_slot`` annotiert, ist die
+    Slot-Zuordnung mehrdeutig — Fallback auf ``position`` + Warnung."""
+    exam = _exam_with_questions(
+        [
+            {"position": 1, "options": None, "moodle_slot": 1},
+            {"position": 2, "options": None},  # kein Slot
+        ]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "essay-eins;essay-zwei\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    answers = {a.exam_question_id: a.given_answer for a in payload.attempts[0].answers}
+    assert answers[200] == "essay-eins"  # position 1
+    assert answers[201] == "essay-zwei"  # position 2
+    assert any("Slot" in w for w in payload.warnings)
+
+
+def test_single_word_response_matches_prefixed_option_no_block() -> None:
+    """TF-422: Eine einzelne Antwort "Wahr" muss zur Option "A) Wahr"
+    passen (Zwei-Wege-Containment) — der Guardrail darf einen legitimen
+    Wahr/Falsch-Import nicht fälschlich blockieren."""
+    exam = _exam_with_questions([{"position": 1, "options": ["A) Wahr", "B) Falsch"]}])
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "Wahr\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    answers = {a.exam_question_id: a.given_answer for a in payload.attempts[0].answers}
+    assert answers[200] == "Wahr"
+
+
+def test_multiselect_concatenated_answer_matches_no_block() -> None:
+    """TF-422: Eine Mehrfachauswahl-Antwort, die mehrere Optionstexte
+    aneinanderreiht, enthält jede Option als Teilstring — Containment
+    erkennt das als Treffer (kein Fehlalarm)."""
+    exam = _exam_with_questions(
+        [{"position": 1, "options": ["Option A: zuhören", "Option B: nachfragen"]}]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "Option A: zuhören, Option B: nachfragen\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    answers = {a.exam_question_id: a.given_answer for a in payload.attempts[0].answers}
+    assert answers[200] == "Option A: zuhören, Option B: nachfragen"
+
+
+def test_short_letter_options_still_block_on_total_mismatch() -> None:
+    """TF-422: Einbuchstabige Optionen ("A"/"B") dürfen NICHT per
+    Containment auf beliebigen Freitext matchen (sonst greift der
+    Guardrail nie). Freitext auf solchen Choice-Spalten muss blockieren."""
+    exam = _exam_with_questions([{"position": 1, "options": ["A", "B"]}])
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "Ein langer Freitext, der zufällig ein a enthält\n"
+    )
+    with pytest.raises(ColumnMappingError):
+        MoodleCsvDriver().parse(csv_text, exam=exam)
+
+
+def test_short_letter_option_exact_answer_does_not_block() -> None:
+    """Gegenprobe: Eine exakte einbuchstabige Antwort ("A") passt per
+    Gleichheit zur Option "A" und darf nicht blockieren."""
+    exam = _exam_with_questions([{"position": 1, "options": ["A", "B"]}])
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;A\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    answers = {a.exam_question_id: a.given_answer for a in payload.attempts[0].answers}
+    assert answers[200] == "A"
+
+
+def test_per_column_misalignment_names_only_offending_column() -> None:
+    """TF-422: Bei partiellem Versatz nennt die Fehlermeldung nur die
+    betroffene Spalte (Antwort 2), nicht die korrekt ausgerichtete
+    (Antwort 1) — der Guardrail isoliert pro Spalte."""
+    exam = _exam_with_questions(
+        [
+            {"position": 1, "options": ["Option A: zuhören", "Option B: nachfragen"]},
+            {"position": 2, "options": ["A) Wahr", "B) Falsch"]},
+        ]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "Option A: zuhören;Ein langer Freitext-Essay zur Gesprächsführung\n"
+    )
+    with pytest.raises(ColumnMappingError) as exc:
+        MoodleCsvDriver().parse(csv_text, exam=exam)
+    message = str(exc.value)
+    assert "Antwort 2" in message
+    assert "Antwort 1" not in message
+
+
+def test_mapping_basis_recorded_in_source_metadata() -> None:
+    """TF-422: ``source_metadata['mapping_basis']`` muss den verwendeten
+    Schlüssel ('slot' bzw. 'position') festhalten — sonst bliebe eine
+    stille Regression auf die Position-Zuordnung unbemerkt."""
+    slot_exam = _exam_with_questions(
+        [
+            {"position": 1, "options": None, "moodle_slot": 1},
+            {"position": 2, "options": None, "moodle_slot": 2},
+        ]
+    )
+    position_exam = _exam_with_questions(
+        [{"position": 1, "options": None}, {"position": 2, "options": None}]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "a;b\n"
+    )
+    slot_payload = MoodleCsvDriver().parse(csv_text, exam=slot_exam)
+    position_payload = MoodleCsvDriver().parse(csv_text, exam=position_exam)
+    assert slot_payload.source_metadata["mapping_basis"] == "slot"
+    assert position_payload.source_metadata["mapping_basis"] == "position"
+
+
+def test_digit_string_slot_is_honoured() -> None:
+    """TF-422: ``external_refs.moodle_slot`` aus JSON kann ein Ziffern-
+    String ("2") sein — die Slot-Zuordnung muss ihn wie den int-Slot
+    behandeln (reorder-sicher)."""
+    exam = _exam_with_questions(
+        [
+            {
+                "position": 1,
+                "options": ["Option A: x", "Option B: y"],
+                "external_refs": {"moodle_slot": "2"},
+            },
+            {"position": 2, "options": None, "external_refs": {"moodle_slot": "1"}},
+        ]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "Ein Freitext-Essay;Option B: y\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    answers = {a.exam_question_id: a.given_answer for a in payload.attempts[0].answers}
+    assert payload.source_metadata["mapping_basis"] == "slot"
+    assert answers[201] == "Ein Freitext-Essay"  # Antwort 1 -> Slot 1 (id 201)
+    assert answers[200] == "Option B: y"  # Antwort 2 -> Slot 2 (id 200)
+
+
+def test_bool_slot_is_rejected_and_falls_back_to_position() -> None:
+    """TF-422: ``moodle_slot=True`` ist ein bool (in Python auch ein int)
+    und darf NICHT als Slot 1 gelesen werden — die Frage zählt als
+    'ohne Slot', wodurch der Fallback auf ``position`` greift."""
+    exam = _exam_with_questions(
+        [
+            {"position": 1, "options": None, "external_refs": {"moodle_slot": True}},
+            {"position": 2, "options": None, "moodle_slot": 1},
+        ]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "essay-eins;essay-zwei\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    answers = {a.exam_question_id: a.given_answer for a in payload.attempts[0].answers}
+    assert payload.source_metadata["mapping_basis"] == "position"
+    assert answers[200] == "essay-eins"  # position 1
+    assert answers[201] == "essay-zwei"  # position 2
+    assert any("Slot" in w for w in payload.warnings)
+
+
+def test_non_dict_external_refs_is_ignored() -> None:
+    """TF-422: Ein nicht-dict ``external_refs`` (z. B. eine Liste) darf
+    die Slot-Parsing-Defensive nicht crashen — die Frage gilt als
+    'ohne Slot'."""
+    exam = _exam_with_questions(
+        [
+            {"position": 1, "options": None, "external_refs": ["unerwartet"]},
+            {"position": 2, "options": None, "external_refs": None},
+        ]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "essay-eins;essay-zwei\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    answers = {a.exam_question_id: a.given_answer for a in payload.attempts[0].answers}
+    assert payload.source_metadata["mapping_basis"] == "position"
+    assert answers[200] == "essay-eins"
+
+
+def test_duplicate_slot_falls_back_to_position_with_warning() -> None:
+    """TF-422: ``moodle_slot`` ist nicht DB-eindeutig. Tragen zwei Fragen
+    denselben Slot, ist die Zuordnung mehrdeutig — Fallback auf die
+    DB-eindeutige ``position`` statt eine Frage still zu überschreiben."""
+    exam = _exam_with_questions(
+        [
+            {"position": 1, "options": None, "moodle_slot": 1},
+            {"position": 2, "options": None, "moodle_slot": 1},  # Slot-Kollision
+        ]
+    )
+    csv_text = (
+        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
+        "Anna;Beispiel;anna@example.org;2026-04-30 09:00:00;2026-04-30 09:30:00;"
+        "essay-eins;essay-zwei\n"
+    )
+    payload = MoodleCsvDriver().parse(csv_text, exam=exam)
+    answers = {a.exam_question_id: a.given_answer for a in payload.attempts[0].answers}
+    assert payload.source_metadata["mapping_basis"] == "position"
+    # Beide Fragen behalten ihre eigene Spalte — keine still verlorene Frage.
+    assert answers[200] == "essay-eins"  # position 1
+    assert answers[201] == "essay-zwei"  # position 2
+    assert any("Doppelte Moodle-Slots" in w for w in payload.warnings)

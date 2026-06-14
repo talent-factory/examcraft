@@ -7,6 +7,7 @@ source-agnostic and only operates on the payload.
 
 from services.import_drivers.base import (
     BaseImportDriver,
+    ColumnMappingError,
     ImportDriverError,
     EmptyCsvError,
     MissingColumnError,
@@ -30,6 +31,7 @@ from services.import_drivers.payloads import (
 __all__ = [
     "BaseImportDriver",
     "ImportDriverError",
+    "ColumnMappingError",
     "EmptyCsvError",
     "MissingColumnError",
     "UnparseableCsvError",
