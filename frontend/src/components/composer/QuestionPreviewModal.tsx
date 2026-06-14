@@ -10,6 +10,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { ComposerService, getErrorMessage } from '../../services/ComposerService';
+import MarkdownRenderer from '../MarkdownRenderer';
 import type { ApprovedQuestionDetail } from '../../types/composer';
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -107,9 +108,9 @@ const QuestionPreviewModal: React.FC<QuestionPreviewModalProps> = ({
               )}
             </div>
 
-            <p className="text-[15px] font-medium text-gray-900 whitespace-pre-wrap">
-              {data.question_text}
-            </p>
+            <div className="text-[15px] font-medium text-gray-900">
+              <MarkdownRenderer content={data.question_text} variant="compact" />
+            </div>
 
             {data.options.length > 0 && (
               <ul className="space-y-1.5">
@@ -125,7 +126,9 @@ const QuestionPreviewModal: React.FC<QuestionPreviewModalProps> = ({
                     <span aria-hidden="true" className="mt-0.5">
                       {opt.is_correct ? '✓' : '○'}
                     </span>
-                    <span className="flex-1 min-w-0">{opt.text}</span>
+                    <div className="flex-1 min-w-0">
+                      <MarkdownRenderer content={opt.text} variant="compact" />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -136,9 +139,9 @@ const QuestionPreviewModal: React.FC<QuestionPreviewModalProps> = ({
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                   {t('composer.questionPool.previewModelAnswer')}
                 </p>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap bg-green-50 border border-green-200 rounded px-2.5 py-2">
-                  {data.correct_answer}
-                </p>
+                <div className="text-sm text-gray-800 bg-green-50 border border-green-200 rounded px-2.5 py-2">
+                  <MarkdownRenderer content={data.correct_answer} variant="compact" />
+                </div>
               </div>
             )}
 
@@ -147,7 +150,9 @@ const QuestionPreviewModal: React.FC<QuestionPreviewModalProps> = ({
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                   {t('composer.questionPool.previewExplanation')}
                 </p>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{data.explanation}</p>
+                <div className="text-sm text-gray-700">
+                  <MarkdownRenderer content={data.explanation} variant="compact" />
+                </div>
               </div>
             )}
 

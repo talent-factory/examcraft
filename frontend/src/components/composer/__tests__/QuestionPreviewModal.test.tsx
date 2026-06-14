@@ -141,4 +141,63 @@ describe('QuestionPreviewModal — TF-405', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape', code: 'Escape' });
     expect(baseProps.onClose).toHaveBeenCalledTimes(2);
   });
+
+  // TF-420: Markdown in the preview must be rendered, not shown as raw text.
+  // The react-markdown mock (src/__mocks__/react-markdown.js) renders its
+  // children verbatim inside [data-testid="react-markdown"], so we assert the
+  // raw Markdown source appears under that testid — proving the text was handed
+  // to MarkdownRenderer rather than printed as plain text. These are routing
+  // tests, not rendering tests; the real Markdown transform is never exercised.
+  it('renders question text and answer options as Markdown', async () => {
+    mockComposerService.getApprovedQuestion.mockResolvedValue({
+      ...detail,
+      question_text: '**Kommunikationssituation** in der Schreinerei',
+      options: [
+        { text: 'a) **Strategie** entwickeln', is_correct: true },
+        { text: 'Bubblesort', is_correct: false },
+      ],
+      correct_answer: '',
+      explanation: '_Hinweis:_ adressatengerecht.',
+    });
+    renderModal();
+
+    await screen.findByText('**Kommunikationssituation** in der Schreinerei');
+    const rendered = screen.getAllByTestId('react-markdown').map((el) => el.textContent);
+    expect(rendered).toContain('**Kommunikationssituation** in der Schreinerei');
+    expect(rendered).toContain('a) **Strategie** entwickeln');
+    expect(rendered).toContain('_Hinweis:_ adressatengerecht.');
+  });
+
+  it('renders the model answer as Markdown when there are no options', async () => {
+    mockComposerService.getApprovedQuestion.mockResolvedValue({
+      ...detail,
+      options: [],
+      correct_answer: 'a) **Deeskalation** und Lösungsfindung',
+      explanation: '',
+    });
+    renderModal();
+
+    await screen.findByText('a) **Deeskalation** und Lösungsfindung');
+    const rendered = screen.getAllByTestId('react-markdown').map((el) => el.textContent);
+    expect(rendered).toContain('a) **Deeskalation** und Lösungsfindung');
+  });
+
+  // The model-answer block is gated on `options.length === 0`: when options
+  // exist it must stay hidden, even if correct_answer is set (the options list
+  // already marks the correct one). Guards the asymmetric half of that condition.
+  it('hides the model answer when options are present', async () => {
+    mockComposerService.getApprovedQuestion.mockResolvedValue({
+      ...detail,
+      options: [
+        { text: 'Bubblesort', is_correct: false },
+        { text: 'Heapsort', is_correct: true },
+      ],
+      correct_answer: 'Heapsort',
+      explanation: '',
+    });
+    renderModal();
+
+    await screen.findByText('Heapsort');
+    expect(screen.queryByText('Musterlösung')).not.toBeInTheDocument();
+  });
 });
