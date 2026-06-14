@@ -164,7 +164,7 @@ export class SubmissionsService {
   }): Promise<ImportPreview> {
     const formData = new FormData();
     formData.append('exam_id', String(params.examId));
-    formData.append('driver_name', params.driverName ?? 'moodle_csv');
+    formData.append('driver_name', params.driverName ?? 'moodle_json');
     formData.append('file', params.file);
 
     const response = await safeFetch(`${API_BASE_URL}${ROOT}/import/preview`, {
@@ -185,7 +185,7 @@ export class SubmissionsService {
   }): Promise<ImportJob> {
     const formData = new FormData();
     formData.append('exam_id', String(params.examId));
-    formData.append('driver_name', params.driverName ?? 'moodle_csv');
+    formData.append('driver_name', params.driverName ?? 'moodle_json');
     formData.append('file', params.file);
 
     const response = await safeFetch(`${API_BASE_URL}${ROOT}/import/commit`, {

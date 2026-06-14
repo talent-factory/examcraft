@@ -7,6 +7,7 @@ multi-tenancy.
 from __future__ import annotations
 
 import base64
+import json
 from datetime import date
 from io import BytesIO
 from unittest.mock import MagicMock, patch
@@ -134,12 +135,38 @@ def _client(test_db: Session, user: User) -> TestClient:
     return TestClient(app, raise_server_exceptions=True)
 
 
-_CSV_FIXTURE = (
-    "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
-    "Anna;Beispiel;anna@example.org;2026-05-15 09:00:00;"
-    "2026-05-15 09:30:00;Bern;wahr\n"
-    "Bruno;Muster;bruno@example.org;2026-05-15 09:00:00;"
-    "2026-05-15 09:25:00;Zürich;falsch\n"
+# Question texts mirror ``_make_exam`` so the JSON driver's exact-match
+# stage resolves each ``frageN`` to a unique exam question (TF-423).
+_Q1 = "Hauptstadt der Schweiz?"
+_Q2 = "Bern ist die Hauptstadt der Schweiz."
+
+_JSON_FIXTURE = json.dumps(
+    [
+        [
+            {
+                "vorname": "Anna",
+                "nachname": "Beispiel",
+                "e-mail-adresse": "anna@example.org",
+                "begonnen": "2026-05-15 09:00:00",
+                "beendet": "2026-05-15 09:30:00",
+                "frage1": _Q1,
+                "antwort1": "Bern",
+                "frage2": _Q2,
+                "antwort2": "wahr",
+            },
+            {
+                "vorname": "Bruno",
+                "nachname": "Muster",
+                "e-mail-adresse": "bruno@example.org",
+                "begonnen": "2026-05-15 09:00:00",
+                "beendet": "2026-05-15 09:25:00",
+                "frage1": _Q1,
+                "antwort1": "Zürich",
+                "frage2": _Q2,
+                "antwort2": "falsch",
+            },
+        ]
+    ]
 )
 
 
@@ -147,7 +174,7 @@ def _seed_import(
     test_db: Session,
     exam: Exam,
     *,
-    source: str = _CSV_FIXTURE,
+    source: str = _JSON_FIXTURE,
     triggered_by: int | None = None,
 ):
     """Run the import pipeline directly against the test session.
@@ -163,7 +190,7 @@ def _seed_import(
 
     return ImportService(test_db).commit(
         exam=exam,
-        driver_name="moodle_csv",
+        driver_name="moodle_json",
         source=source.encode("utf-8"),
         triggered_by=triggered_by,
     )
@@ -184,9 +211,13 @@ def test_preview_returns_payload_summary(test_db: Session) -> None:
     response = client.post(
         "/api/v1/submissions/import/preview",
         files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
+            "file": (
+                "klasse.json",
+                BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                "application/json",
+            )
         },
-        data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
+        data={"exam_id": str(exam.id), "driver_name": "moodle_json"},
     )
     assert response.status_code == 200, response.text
     body = response.json()
@@ -209,28 +240,36 @@ def test_preview_rejects_empty_csv(test_db: Session) -> None:
 
     response = client.post(
         "/api/v1/submissions/import/preview",
-        files={"file": ("empty.csv", BytesIO(b""), "text/csv")},
+        files={"file": ("empty.json", BytesIO(b""), "application/json")},
         data={"exam_id": str(exam.id)},
     )
     assert response.status_code == 400
     assert "leer" in response.json()["detail"].lower()
 
 
-def test_preview_rejects_missing_email_column(test_db: Session) -> None:
+def test_preview_rejects_json_without_question_texts(test_db: Session) -> None:
+    """No ``frageN`` keys → no content to map answers by → hard 400.
+
+    This is the JSON analogue of the legacy "missing external_id column"
+    rejection: without the question texts the driver cannot map answers
+    to exam questions at all.
+    """
     inst = _make_institution(test_db)
     user = _make_user(test_db, inst.id)
     exam = _make_exam(test_db, inst.id)
     test_db.commit()
     client = _client(test_db, user)
 
-    bad_csv = b"Vorname;Nachname;Antwort 1\nAnna;Beispiel;A\n"
+    no_frage = json.dumps(
+        [{"e-mail-adresse": "anna@example.org", "antwort1": "Bern"}]
+    ).encode("utf-8")
     response = client.post(
         "/api/v1/submissions/import/preview",
-        files={"file": ("bad.csv", BytesIO(bad_csv), "text/csv")},
+        files={"file": ("bad.json", BytesIO(no_frage), "application/json")},
         data={"exam_id": str(exam.id)},
     )
     assert response.status_code == 400
-    assert "external_id" in response.json()["detail"].lower()
+    assert "fragetexte" in response.json()["detail"].lower()
 
 
 # ---------------------------------------------------------------------------
@@ -254,12 +293,12 @@ def test_commit_enqueues_task_and_returns_queued(test_db: Session) -> None:
             "/api/v1/submissions/import/commit",
             files={
                 "file": (
-                    "klasse.csv",
-                    BytesIO(_CSV_FIXTURE.encode("utf-8")),
-                    "text/csv",
+                    "klasse.json",
+                    BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                    "application/json",
                 )
             },
-            data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
+            data={"exam_id": str(exam.id), "driver_name": "moodle_json"},
         )
 
     assert response.status_code == 202, response.text
@@ -271,11 +310,11 @@ def test_commit_enqueues_task_and_returns_queued(test_db: Session) -> None:
     apply_async.assert_called_once()
     enqueued = apply_async.call_args.kwargs["kwargs"]
     assert enqueued["exam_id"] == exam.id
-    assert enqueued["driver_name"] == "moodle_csv"
+    assert enqueued["driver_name"] == "moodle_json"
     assert enqueued["import_job_id"] == job["id"]
     assert enqueued["triggered_by"] == user.id
     # The worker gets the exact original bytes, not a pre-decoded string.
-    assert base64.b64decode(enqueued["source_b64"]) == _CSV_FIXTURE.encode("utf-8")
+    assert base64.b64decode(enqueued["source_b64"]) == _JSON_FIXTURE.encode("utf-8")
 
     # The queued job is immediately pollable while the worker runs.
     poll = client.get(f"/api/v1/submissions/import-jobs/{job['id']}")
@@ -298,8 +337,8 @@ def test_commit_rejects_malformed_csv_before_enqueue(test_db: Session) -> None:
     with patch("api.submissions.import_submissions.apply_async") as apply_async:
         response = client.post(
             "/api/v1/submissions/import/commit",
-            files={"file": ("empty.csv", BytesIO(b""), "text/csv")},
-            data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
+            files={"file": ("empty.json", BytesIO(b""), "application/json")},
+            data={"exam_id": str(exam.id), "driver_name": "moodle_json"},
         )
 
     assert response.status_code == 400, response.text
@@ -307,8 +346,10 @@ def test_commit_rejects_malformed_csv_before_enqueue(test_db: Session) -> None:
     assert test_db.query(ImportJob).filter(ImportJob.exam_id == exam.id).count() == 0
 
 
-def test_commit_rejects_missing_email_column_before_enqueue(test_db: Session) -> None:
-    """Second malformed-input branch (missing external-id column): same
+def test_commit_rejects_json_without_question_texts_before_enqueue(
+    test_db: Session,
+) -> None:
+    """Second malformed-input branch (no ``frageN`` question texts): same
     contract — 400, no task enqueued, no job row created."""
     inst = _make_institution(test_db)
     user = _make_user(test_db, inst.id)
@@ -316,12 +357,14 @@ def test_commit_rejects_missing_email_column_before_enqueue(test_db: Session) ->
     test_db.commit()
     client = _client(test_db, user)
 
-    bad_csv = b"Vorname;Nachname;Antwort 1\nAnna;Beispiel;A\n"
+    bad_csv = json.dumps(
+        [{"e-mail-adresse": "anna@example.org", "antwort1": "Bern"}]
+    ).encode("utf-8")
     with patch("api.submissions.import_submissions.apply_async") as apply_async:
         response = client.post(
             "/api/v1/submissions/import/commit",
-            files={"file": ("bad.csv", BytesIO(bad_csv), "text/csv")},
-            data={"exam_id": str(exam.id), "driver_name": "moodle_csv"},
+            files={"file": ("bad.json", BytesIO(bad_csv), "application/json")},
+            data={"exam_id": str(exam.id), "driver_name": "moodle_json"},
         )
 
     assert response.status_code == 400, response.text
@@ -415,7 +458,11 @@ def test_cannot_preview_exam_from_other_institution(test_db: Session) -> None:
     response = client.post(
         "/api/v1/submissions/import/preview",
         files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
+            "file": (
+                "klasse.json",
+                BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                "application/json",
+            )
         },
         data={"exam_id": str(exam_b.id)},
     )
@@ -496,7 +543,11 @@ def test_user_without_import_permission_gets_403(test_db: Session) -> None:
     response = client.post(
         "/api/v1/submissions/import/commit",
         files={
-            "file": ("klasse.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")
+            "file": (
+                "klasse.json",
+                BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                "application/json",
+            )
         },
         data={"exam_id": str(exam.id)},
     )
@@ -551,9 +602,9 @@ def test_dozent_with_import_permission_can_commit(test_db: Session) -> None:
             "/api/v1/submissions/import/commit",
             files={
                 "file": (
-                    "klasse.csv",
-                    BytesIO(_CSV_FIXTURE.encode("utf-8")),
-                    "text/csv",
+                    "klasse.json",
+                    BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                    "application/json",
                 )
             },
             data={"exam_id": str(exam.id)},
@@ -578,21 +629,22 @@ def test_upload_too_large_returns_413(test_db: Session) -> None:
     assert len(huge) > 25 * 1024 * 1024
     response = client.post(
         "/api/v1/submissions/import/preview",
-        files={"file": ("huge.csv", BytesIO(huge), "text/csv")},
+        files={"file": ("huge.json", BytesIO(huge), "application/json")},
         data={"exam_id": str(exam.id)},
     )
     assert response.status_code == 413
 
 
-def test_extra_answer_columns_become_warnings_not_validation_error(
+def test_extra_unknown_keys_are_ignored_not_validation_error(
     test_db: Session,
 ) -> None:
-    """Extra columns ⇒ warning, NOT 422.
+    """Unknown export columns ⇒ ignored, NOT 422.
 
-    The driver maps answer columns by ``position`` to ``ExamQuestion``,
-    so a CSV with more answer columns than questions silently drops the
-    surplus and emits a warning. Validation (422 + structured issues)
-    is reserved for *real* schema mismatches; see
+    The real Moodle export carries Status/Dauer/Bewertung columns the
+    driver has no use for. Because answers are mapped by ``frageN``
+    question text (not position), surplus keys are simply ignored — the
+    import succeeds with no row errors and no warnings. Validation (422 +
+    structured issues) is reserved for *real* schema mismatches; see
     :func:`test_validation_error_surfaces_structured_issues_via_422`
     below for the actual 422 path.
     """
@@ -602,17 +654,30 @@ def test_extra_answer_columns_become_warnings_not_validation_error(
     test_db.commit()
     client = _client(test_db, user)
 
-    csv_extra_cols = (
-        "E-Mail-Adresse;Antwort 1;Antwort 2;Antwort 3\n"
-        "extra@test.ch;Bern;wahr;Antwort\n"
-    )
+    with_extra_keys = json.dumps(
+        [
+            [
+                {
+                    "e-mail-adresse": "extra@test.ch",
+                    "status": "Beendet",
+                    "dauer": "1 Stunde 25 Minuten",
+                    "bewertung/10.00": "Bisher nicht bewertet",
+                    "frage1": _Q1,
+                    "antwort1": "Bern",
+                    "frage2": _Q2,
+                    "antwort2": "wahr",
+                }
+            ]
+        ]
+    ).encode("utf-8")
     response = client.post(
         "/api/v1/submissions/import/preview",
-        files={"file": ("ok.csv", BytesIO(csv_extra_cols.encode("utf-8")), "text/csv")},
+        files={"file": ("ok.json", BytesIO(with_extra_keys), "application/json")},
         data={"exam_id": str(exam.id)},
     )
     assert response.status_code == 200
-    assert any("Spaltenanzahl" in w for w in response.json()["warnings"])
+    assert response.json()["errors"] == []
+    assert response.json()["warnings"] == []
 
 
 def test_validation_error_surfaces_structured_issues_via_422(
@@ -644,9 +709,9 @@ def test_validation_error_surfaces_structured_issues_via_422(
             "/api/v1/submissions/import/preview",
             files={
                 "file": (
-                    "ok.csv",
-                    BytesIO(b"E-Mail-Adresse;Antwort 1\nextra@test.ch;Bern\n"),
-                    "text/csv",
+                    "ok.json",
+                    BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                    "application/json",
                 )
             },
             data={"exam_id": str(exam.id)},
@@ -738,9 +803,9 @@ def test_broker_failure_marks_job_failed_and_returns_503(test_db: Session) -> No
             "/api/v1/submissions/import/commit",
             files={
                 "file": (
-                    "klasse.csv",
-                    BytesIO(_CSV_FIXTURE.encode("utf-8")),
-                    "text/csv",
+                    "klasse.json",
+                    BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                    "application/json",
                 )
             },
             data={"exam_id": str(exam.id)},
@@ -786,7 +851,7 @@ def test_enqueue_still_returns_503_when_failure_persist_also_fails() -> None:
             _enqueue_import(
                 db=db,
                 exam=MagicMock(),
-                driver_name="moodle_csv",
+                driver_name="moodle_json",
                 source_bytes=b"x;y\n1;2\n",
                 triggered_by=1,
                 source_metadata={},
@@ -807,12 +872,30 @@ def test_error_log_serialises_as_structured_list(test_db: Session) -> None:
     """ImportJob.error_log on the wire must be ``list[ImportRowErrorOut]``
     (frontend type) not ``list[dict]`` — so a row error has typed
     row_index/reason/step/details fields."""
-    csv_with_bad_row = (
-        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
-        # Row with empty email → Driver records ImportRowError
-        ";Beispiel;;2026-05-15 09:00:00;2026-05-15 09:30:00;Bern;wahr\n"
-        "Bruno;Muster;bruno@example.org;2026-05-15 09:00:00;"
-        "2026-05-15 09:25:00;Bern;wahr\n"
+    json_with_bad_row = json.dumps(
+        [
+            [
+                # Row with empty email → driver records an ImportRowError
+                {
+                    "e-mail-adresse": "",
+                    "frage1": _Q1,
+                    "antwort1": "Bern",
+                    "frage2": _Q2,
+                    "antwort2": "wahr",
+                },
+                {
+                    "vorname": "Bruno",
+                    "nachname": "Muster",
+                    "e-mail-adresse": "bruno@example.org",
+                    "begonnen": "2026-05-15 09:00:00",
+                    "beendet": "2026-05-15 09:25:00",
+                    "frage1": _Q1,
+                    "antwort1": "Bern",
+                    "frage2": _Q2,
+                    "antwort2": "wahr",
+                },
+            ]
+        ]
     )
 
     inst = _make_institution(test_db, slug="error-log-shape")
@@ -823,7 +906,7 @@ def test_error_log_serialises_as_structured_list(test_db: Session) -> None:
     client = _client(test_db, user)
     # The worker produces the partial import + structured error_log; we assert
     # the *wire* shape via the polling endpoint (_import_job_to_out).
-    job = _seed_import(test_db, exam, source=csv_with_bad_row)
+    job = _seed_import(test_db, exam, source=json_with_bad_row)
     assert job.status == "partial"
 
     resp = client.get(f"/api/v1/submissions/import-jobs/{job.id}")
@@ -865,7 +948,13 @@ def test_preview_returns_422_with_issues_when_validation_fails(
     client = _client(test_db, user)
     response = client.post(
         "/api/v1/submissions/import/preview",
-        files={"file": ("ok.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")},
+        files={
+            "file": (
+                "ok.json",
+                BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                "application/json",
+            )
+        },
         data={"exam_id": str(exam.id)},
     )
     assert response.status_code == 422
@@ -895,7 +984,13 @@ def test_preview_returns_500_when_pipeline_crashes_unexpectedly(
     client = _client(test_db, user)
     response = client.post(
         "/api/v1/submissions/import/preview",
-        files={"file": ("ok.csv", BytesIO(_CSV_FIXTURE.encode("utf-8")), "text/csv")},
+        files={
+            "file": (
+                "ok.json",
+                BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                "application/json",
+            )
+        },
         data={"exam_id": str(exam.id)},
     )
     assert response.status_code == 500
@@ -925,7 +1020,7 @@ def test_get_import_summary_returns_counts(test_db: Session) -> None:
     assert body["submission_count"] == 2
     assert body["attempt_count"] == 2
     assert body["student_count"] == 2
-    assert body["by_source"] == [{"source": "moodle_csv", "attempt_count": 2}]
+    assert body["by_source"] == [{"source": "moodle_json", "attempt_count": 2}]
 
 
 def test_delete_import_removes_results_and_writes_audit(test_db: Session) -> None:

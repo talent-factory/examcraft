@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -82,10 +83,20 @@ def exam_simple(test_db: Session, institution: Institution) -> Exam:
     return exam
 
 
-_CSV = (
-    "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1\n"
-    "Anna;Beispiel;anna@example.org;2026-05-15 09:00:00;"
-    "2026-05-15 09:30:00;Bern\n"
+_JSON = json.dumps(
+    [
+        [
+            {
+                "vorname": "Anna",
+                "nachname": "Beispiel",
+                "e-mail-adresse": "anna@example.org",
+                "begonnen": "2026-05-15 09:00:00",
+                "beendet": "2026-05-15 09:30:00",
+                "frage1": "Hauptstadt der Schweiz?",
+                "antwort1": "Bern",
+            }
+        ]
+    ]
 )
 
 
@@ -109,7 +120,7 @@ def test_transient_errors_are_in_autoretry_set() -> None:
 
 
 # Tasks receive base64 of the raw upload bytes (Celery args are JSON-serialised).
-_CSV_B64 = base64.b64encode(_CSV.encode("utf-8")).decode("ascii")
+_JSON_B64 = base64.b64encode(_JSON.encode("utf-8")).decode("ascii")
 
 
 def _create_pending_job(db: Session, *, institution_id: int, exam_id: int) -> int:
@@ -123,7 +134,7 @@ def _create_pending_job(db: Session, *, institution_id: int, exam_id: int) -> in
     job = ImportJob(
         institution_id=institution_id,
         exam_id=exam_id,
-        driver_name="moodle_csv",
+        driver_name="moodle_json",
         status=ImportJobStatus.QUEUED.value,
         rows_processed=0,
         rows_failed=0,
@@ -149,11 +160,11 @@ def test_task_returns_job_summary_on_happy_path(
     ):  # don't let the task close our shared session
         result = import_submissions.run(
             exam_id=exam_simple.id,
-            driver_name="moodle_csv",
-            source_b64=_CSV_B64,
+            driver_name="moodle_json",
+            source_b64=_JSON_B64,
             import_job_id=job_id,
             triggered_by=None,
-            source_metadata={"filename": "klasse.csv"},
+            source_metadata={"filename": "klasse.json"},
         )
 
     assert result["import_job_id"] == job_id
@@ -225,7 +236,7 @@ def test_task_decodes_base64_source_to_raw_bytes(
     job_id = _create_pending_job(
         test_db, institution_id=institution.id, exam_id=exam_simple.id
     )
-    raw_bytes = _CSV.encode("utf-8")
+    raw_bytes = _JSON.encode("utf-8")
     captured: dict[str, object] = {}
     fake_job = MagicMock(id=job_id, status="succeeded", rows_processed=1, rows_failed=0)
 
@@ -241,7 +252,7 @@ def test_task_decodes_base64_source_to_raw_bytes(
         service_cls.return_value.commit.side_effect = _capture
         import_submissions.run(
             exam_id=exam_simple.id,
-            driver_name="moodle_csv",
+            driver_name="moodle_json",
             source_b64=base64.b64encode(raw_bytes).decode("ascii"),
             import_job_id=job_id,
             triggered_by=None,
@@ -271,16 +282,16 @@ def test_retry_reuses_same_job_row_no_duplicate(
     ):
         import_submissions.run(
             exam_id=exam_simple.id,
-            driver_name="moodle_csv",
-            source_b64=_CSV_B64,
+            driver_name="moodle_json",
+            source_b64=_JSON_B64,
             import_job_id=job_id,
             triggered_by=None,
         )
         # Simulate a Celery retry — same job_id, same payload.
         import_submissions.run(
             exam_id=exam_simple.id,
-            driver_name="moodle_csv",
-            source_b64=_CSV_B64,
+            driver_name="moodle_json",
+            source_b64=_JSON_B64,
             import_job_id=job_id,
             triggered_by=None,
         )
@@ -307,8 +318,8 @@ def test_missing_exam_marks_job_failed(
         with pytest.raises(ValueError, match="nicht gefunden"):
             import_submissions.run(
                 exam_id=9_999_999,
-                driver_name="moodle_csv",
-                source_b64=_CSV_B64,
+                driver_name="moodle_json",
+                source_b64=_JSON_B64,
                 import_job_id=job_id,
                 triggered_by=None,
             )
@@ -346,7 +357,7 @@ def test_decode_failure_marks_job_failed_without_retry(
         with pytest.raises((binascii.Error, ValueError)):
             import_submissions.run(
                 exam_id=exam_simple.id,
-                driver_name="moodle_csv",
+                driver_name="moodle_json",
                 source_b64="!!! not valid base64 !!!",
                 import_job_id=job_id,
                 triggered_by=None,
@@ -390,8 +401,8 @@ def test_transient_error_marks_failed_only_on_retry_exhaustion(
                 raw(
                     fake_self,
                     exam_id=exam_simple.id,
-                    driver_name="moodle_csv",
-                    source_b64=_CSV_B64,
+                    driver_name="moodle_json",
+                    source_b64=_JSON_B64,
                     import_job_id=job_id,
                     triggered_by=None,
                 )
@@ -442,7 +453,7 @@ def test_reaper_age_fails_stuck_jobs_only(
         job = ImportJob(
             institution_id=institution.id,
             exam_id=exam_simple.id,
-            driver_name="moodle_csv",
+            driver_name="moodle_json",
             status=status,
             rows_processed=0,
             rows_failed=0,
@@ -499,8 +510,8 @@ def test_session_is_closed_even_when_commit_raises(
         with pytest.raises(RuntimeError, match="boom"):
             import_submissions.run(
                 exam_id=exam_simple.id,
-                driver_name="moodle_csv",
-                source_b64=_CSV_B64,
+                driver_name="moodle_json",
+                source_b64=_JSON_B64,
                 import_job_id=job_id,
                 triggered_by=None,
             )

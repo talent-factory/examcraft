@@ -29,7 +29,7 @@ const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 
 const samplePreview: ImportPreview = {
   exam_id: 42,
-  driver_name: 'moodle_csv',
+  driver_name: 'moodle_json',
   student_count: 2,
   attempt_count: 2,
   students: [
@@ -60,7 +60,7 @@ const samplePreview: ImportPreview = {
 const sampleJob: ImportJob = {
   id: 7,
   exam_id: 42,
-  driver_name: 'moodle_csv',
+  driver_name: 'moodle_json',
   status: 'succeeded',
   rows_processed: 2,
   rows_failed: 0,
@@ -90,7 +90,9 @@ const renderDialog = (
   return { onClose, onImported };
 };
 
-const csvFile = new File(['x'], 'klasse.csv', { type: 'text/csv' });
+const jsonFile = new File(['[[]]'], 'klasse.json', {
+  type: 'application/json',
+});
 
 describe('ImportDialog', () => {
   beforeEach(() => {
@@ -117,9 +119,9 @@ describe('ImportDialog', () => {
     const input = screen
       .getByTestId('import-file-upload')
       .querySelector('input[type=file]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.change(input, { target: { files: [jsonFile] } });
     expect(screen.getByTestId('import-file-name')).toHaveTextContent(
-      'klasse.csv',
+      'klasse.json',
     );
 
     fireEvent.click(screen.getByTestId('import-run-preview'));
@@ -128,8 +130,8 @@ describe('ImportDialog', () => {
       expect(mockSubmissionsService.preview).toHaveBeenCalledWith(
         expect.objectContaining({
           examId: 42,
-          file: csvFile,
-          driverName: 'moodle_csv',
+          file: jsonFile,
+          driverName: 'moodle_json',
         }),
       );
     });
@@ -170,7 +172,7 @@ describe('ImportDialog', () => {
     const input = screen
       .getByTestId('import-file-upload')
       .querySelector('input[type=file]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.change(input, { target: { files: [jsonFile] } });
     fireEvent.click(screen.getByTestId('import-run-preview'));
     await screen.findByTestId('preview-student-count');
 
@@ -207,7 +209,7 @@ describe('ImportDialog', () => {
     const input = screen
       .getByTestId('import-file-upload')
       .querySelector('input[type=file]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.change(input, { target: { files: [jsonFile] } });
     fireEvent.click(screen.getByTestId('import-run-preview'));
     await screen.findByTestId('preview-student-count');
 
@@ -232,7 +234,7 @@ describe('ImportDialog', () => {
     const input = screen
       .getByTestId('import-file-upload')
       .querySelector('input[type=file]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.change(input, { target: { files: [jsonFile] } });
     fireEvent.click(screen.getByTestId('import-run-preview'));
 
     await waitFor(() => {
@@ -258,7 +260,7 @@ describe('ImportDialog', () => {
     const input = screen
       .getByTestId('import-file-upload')
       .querySelector('input[type=file]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.change(input, { target: { files: [jsonFile] } });
     fireEvent.click(screen.getByTestId('import-run-preview'));
 
     await waitFor(() => {
@@ -297,7 +299,7 @@ describe('ImportDialog', () => {
     const input = screen
       .getByTestId('import-file-upload')
       .querySelector('input[type=file]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.change(input, { target: { files: [jsonFile] } });
     fireEvent.click(screen.getByTestId('import-run-preview'));
     await screen.findByTestId('preview-student-count');
 
@@ -341,7 +343,7 @@ describe('ImportDialog', () => {
     const input = screen
       .getByTestId('import-file-upload')
       .querySelector('input[type=file]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.change(input, { target: { files: [jsonFile] } });
     fireEvent.click(screen.getByTestId('import-run-preview'));
     await screen.findByTestId('preview-student-count');
 
@@ -371,7 +373,7 @@ describe('ImportDialog', () => {
     const input = screen
       .getByTestId('import-file-upload')
       .querySelector('input[type=file]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [csvFile] } });
+    fireEvent.change(input, { target: { files: [jsonFile] } });
     fireEvent.click(screen.getByTestId('import-run-preview'));
 
     await screen.findByTestId('preview-student-count');

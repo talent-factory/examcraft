@@ -32,10 +32,13 @@ export type SubmissionGradeStatus = (typeof SUBMISSION_GRADE_STATUSES)[number];
 export const SCORING_STRATEGIES = ['latest', 'best', 'first'] as const;
 export type ScoringStrategy = (typeof SCORING_STRATEGIES)[number];
 
-export const DRIVER_NAMES = ['moodle_csv', 'moodle_api'] as const;
+export const DRIVER_NAMES = ['moodle_json', 'moodle_api'] as const;
 export type DriverName = (typeof DRIVER_NAMES)[number];
 
-export type AttemptSource = DriverName;
+// Stored attempt-source values include the legacy 'moodle_csv': the CSV
+// file-import driver was removed (TF-423, superseded by the JSON driver),
+// but historical imports keep that source value for display.
+export type AttemptSource = DriverName | 'moodle_csv';
 
 // ---------------------------------------------------------------------------
 // Import preview

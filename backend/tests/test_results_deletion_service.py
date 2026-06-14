@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from datetime import date
 
+import json
+
 import pytest
 from sqlalchemy.orm import Session
 
@@ -102,26 +104,62 @@ def _make_exam_with_questions(test_db: Session, institution: Institution) -> Exa
     return exam
 
 
-def _csv_two_students(*, domain: str = "example.org") -> str:
+# Question texts mirror ``_make_exam_with_questions`` so the JSON driver's
+# exact-match stage resolves each ``frageN`` to a unique exam question.
+_Q1 = "Hauptstadt der Schweiz?"
+_Q2 = "Bern ist die Hauptstadt der Schweiz."
+_Q3 = "Erkläre Föderalismus in 3 Sätzen."
+
+
+def _json_two_students(*, domain: str = "example.org") -> bytes:
     """Two students, one attempt each (Anna correct-ish, Bruno wrong)."""
-    return (
-        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;"
-        "Antwort 1;Antwort 2;Antwort 3\n"
-        f"Anna;Beispiel;anna@{domain};2026-05-15 09:00:00;"
-        "2026-05-15 09:30:00;Bern;wahr;Antworttext\n"
-        f"Bruno;Muster;bruno@{domain};2026-05-15 09:00:00;"
-        "2026-05-15 09:25:00;Zürich;falsch;\n"
-    )
+
+    def _row(vorname, nachname, email, a1, a2, a3, beendet):
+        return {
+            "vorname": vorname,
+            "nachname": nachname,
+            "e-mail-adresse": email,
+            "begonnen": "2026-05-15 09:00:00",
+            "beendet": beendet,
+            "frage1": _Q1,
+            "antwort1": a1,
+            "frage2": _Q2,
+            "antwort2": a2,
+            "frage3": _Q3,
+            "antwort3": a3,
+        }
+
+    rows = [
+        _row(
+            "Anna",
+            "Beispiel",
+            f"anna@{domain}",
+            "Bern",
+            "wahr",
+            "Antworttext",
+            "2026-05-15 09:30:00",
+        ),
+        _row(
+            "Bruno",
+            "Muster",
+            f"bruno@{domain}",
+            "Zürich",
+            "falsch",
+            "",
+            "2026-05-15 09:25:00",
+        ),
+    ]
+    return json.dumps([rows]).encode("utf-8")
 
 
 def _seed_import(test_db: Session, exam: Exam, *, domain: str = "example.org") -> None:
     """Run the real import pipeline → 2 students, 2 attempts, 6 answers/grades."""
     ImportService(test_db).commit(
         exam=exam,
-        driver_name="moodle_csv",
-        source=_csv_two_students(domain=domain),
+        driver_name="moodle_json",
+        source=_json_two_students(domain=domain),
         triggered_by=None,
-        source_metadata={"filename": "klasse.csv"},
+        source_metadata={"filename": "klasse.json"},
     )
 
 
@@ -155,7 +193,7 @@ def test_summary_counts_pre_deletion(test_db: Session, exam: Exam) -> None:
     assert summary.attempt_count == 2
     assert summary.student_count == 2
     assert [(s.source, s.attempt_count) for s in summary.by_source] == [
-        ("moodle_csv", 2)
+        ("moodle_json", 2)
     ]
 
 

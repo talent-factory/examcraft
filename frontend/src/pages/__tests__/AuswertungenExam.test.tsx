@@ -55,7 +55,7 @@ jest.mock('../../components/auswertungen/ImportDialog', () => ({
           onImported?.({
             id: 99,
             exam_id: examId,
-            driver_name: 'moodle_csv',
+            driver_name: 'moodle_json',
             status: 'succeeded',
             rows_processed: 1,
             rows_failed: 0,

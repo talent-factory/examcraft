@@ -7,6 +7,7 @@ deterministic grading of MC + true/false answers, plus the
 
 from __future__ import annotations
 
+import json
 from datetime import date
 
 import pytest
@@ -119,18 +120,71 @@ def exam_with_questions(test_db: Session, institution: Institution) -> Exam:
     return exam
 
 
-def _csv_two_students(*, anna_q1: str = "Bern", anna_q2: str = "wahr") -> str:
+# Question texts mirror ``exam_with_questions`` verbatim so the JSON
+# driver's exact-match stage resolves each ``frageN`` to a unique exam
+# question (TF-423: mapping is by question text, not column position).
+_Q1 = "Hauptstadt der Schweiz?"
+_Q2 = "Bern ist die Hauptstadt der Schweiz."
+_Q3 = "Erkläre Föderalismus in der Schweiz in 3 Sätzen."
+
+
+def _attempt_row(
+    *,
+    email: str,
+    vorname: str = "Anna",
+    nachname: str = "Beispiel",
+    begonnen: str | None = "2026-05-15 09:00:00",
+    beendet: str | None = "2026-05-15 09:30:00",
+    a1: str = "Bern",
+    a2: str = "wahr",
+    a3: str = "Antworttext",
+) -> dict:
+    """One student attempt as the Moodle JSON plugin export shapes it."""
+    row: dict[str, object] = {
+        "vorname": vorname,
+        "nachname": nachname,
+        "e-mail-adresse": email,
+    }
+    if begonnen is not None:
+        row["begonnen"] = begonnen
+    if beendet is not None:
+        row["beendet"] = beendet
+    row.update(
+        {
+            "frage1": _Q1,
+            "antwort1": a1,
+            "frage2": _Q2,
+            "antwort2": a2,
+            "frage3": _Q3,
+            "antwort3": a3,
+        }
+    )
+    return row
+
+
+def _json_source(rows: list[dict]) -> bytes:
+    """Serialise like the plugin export: outer ``[[ {row}, ... ]]`` envelope."""
+    return json.dumps([rows]).encode("utf-8")
+
+
+def _json_two_students(*, anna_q1: str = "Bern", anna_q2: str = "wahr") -> bytes:
     """Zwei Studierende mit je einem Versuch.
 
     Anna: anpassbare Antworten. Bruno: alles falsch.
     """
-    return (
-        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;"
-        "Antwort 1;Antwort 2;Antwort 3\n"
-        f"Anna;Beispiel;anna@example.org;2026-05-15 09:00:00;"
-        f"2026-05-15 09:30:00;{anna_q1};{anna_q2};Antworttext\n"
-        "Bruno;Muster;bruno@example.org;2026-05-15 09:00:00;"
-        "2026-05-15 09:25:00;Zürich;falsch;\n"
+    return _json_source(
+        [
+            _attempt_row(email="anna@example.org", a1=anna_q1, a2=anna_q2),
+            _attempt_row(
+                vorname="Bruno",
+                nachname="Muster",
+                email="bruno@example.org",
+                beendet="2026-05-15 09:25:00",
+                a1="Zürich",
+                a2="falsch",
+                a3="",
+            ),
+        ]
     )
 
 
@@ -143,8 +197,8 @@ def test_preview_does_not_persist(test_db: Session, exam_with_questions: Exam) -
     service = ImportService(test_db)
     payload = service.preview(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=_csv_two_students(),
+        driver_name="moodle_json",
+        source=_json_two_students(),
     )
 
     assert len(payload.students) == 2
@@ -162,7 +216,7 @@ def test_validate_rejects_mismatched_exam_id(
 
     payload = ImportPayload(
         exam_id=exam_with_questions.id + 99,  # absichtliche Diskrepanz
-        driver_name="moodle_csv",
+        driver_name="moodle_json",
     )
     with pytest.raises(ImportValidationError, match="exam_id"):
         ImportService._validate_payload(payload, exam_with_questions)
@@ -180,7 +234,7 @@ def test_validate_rejects_question_id_outside_exam(
 
     payload = ImportPayload(
         exam_id=exam_with_questions.id,
-        driver_name="moodle_csv",
+        driver_name="moodle_json",
         attempts=[
             AttemptRecord(
                 student_external_id="anna@example.org",
@@ -206,10 +260,10 @@ def test_commit_persists_students_attempts_grades(
     service = ImportService(test_db)
     job = service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=_csv_two_students(),
+        driver_name="moodle_json",
+        source=_json_two_students(),
         triggered_by=None,
-        source_metadata={"filename": "klasse-fs26.csv"},
+        source_metadata={"filename": "klasse-fs26.json"},
     )
 
     assert job.status == "succeeded"
@@ -229,8 +283,8 @@ def test_anna_gets_full_mc_and_tf_points(
     service = ImportService(test_db)
     service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=_csv_two_students(),  # Anna: Bern + wahr
+        driver_name="moodle_json",
+        source=_json_two_students(),  # Anna: Bern + wahr
         triggered_by=None,
     )
 
@@ -260,8 +314,8 @@ def test_bruno_gets_zero_points_when_wrong(
     service = ImportService(test_db)
     service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=_csv_two_students(),
+        driver_name="moodle_json",
+        source=_json_two_students(),
         triggered_by=None,
     )
 
@@ -281,8 +335,8 @@ def test_grades_have_correct_status_and_correctness(
     service = ImportService(test_db)
     service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=_csv_two_students(),
+        driver_name="moodle_json",
+        source=_json_two_students(),
         triggered_by=None,
     )
     grades = test_db.query(Grade).all()
@@ -303,11 +357,11 @@ def test_re_import_same_csv_creates_no_duplicates(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
     service = ImportService(test_db)
-    csv_text = _csv_two_students()
+    csv_text = _json_two_students()
 
     job1 = service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
+        driver_name="moodle_json",
         source=csv_text,
         triggered_by=None,
     )
@@ -316,7 +370,7 @@ def test_re_import_same_csv_creates_no_duplicates(
     # Zweiter Import mit identischer CSV
     job2 = service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
+        driver_name="moodle_json",
         source=csv_text,
         triggered_by=None,
     )
@@ -335,30 +389,42 @@ def test_second_import_with_new_attempt_adds_only_delta(
     persistiert."""
     service = ImportService(test_db)
 
-    csv_v1 = _csv_two_students()
+    json_v1 = _json_two_students()
     service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=csv_v1,
+        driver_name="moodle_json",
+        source=json_v1,
         triggered_by=None,
     )
 
-    # CSV v2: Anna macht zusätzlich einen zweiten Versuch (anderer
-    # Started-Zeitstempel) — Bruno bleibt gleich.
-    csv_v2 = (
-        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;"
-        "Antwort 1;Antwort 2;Antwort 3\n"
-        "Anna;Beispiel;anna@example.org;2026-05-15 09:00:00;"
-        "2026-05-15 09:30:00;Bern;wahr;Antworttext\n"
-        "Anna;Beispiel;anna@example.org;2026-05-16 10:00:00;"
-        "2026-05-16 10:25:00;Bern;wahr;Bessere Antwort\n"
-        "Bruno;Muster;bruno@example.org;2026-05-15 09:00:00;"
-        "2026-05-15 09:25:00;Zürich;falsch;\n"
+    # v2: Anna macht zusätzlich einen zweiten Versuch (anderer
+    # Started-Zeitstempel) — Bruno bleibt gleich. Reihenfolge erhält die
+    # Versuchs-Nummerierung (1 vor 2), sodass der erste Versuch idempotent
+    # übersprungen und nur der zweite ergänzt wird.
+    json_v2 = _json_source(
+        [
+            _attempt_row(email="anna@example.org"),
+            _attempt_row(
+                email="anna@example.org",
+                begonnen="2026-05-16 10:00:00",
+                beendet="2026-05-16 10:25:00",
+                a3="Bessere Antwort",
+            ),
+            _attempt_row(
+                vorname="Bruno",
+                nachname="Muster",
+                email="bruno@example.org",
+                beendet="2026-05-15 09:25:00",
+                a1="Zürich",
+                a2="falsch",
+                a3="",
+            ),
+        ]
     )
     service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=csv_v2,
+        driver_name="moodle_json",
+        source=json_v2,
         triggered_by=None,
     )
 
@@ -392,35 +458,37 @@ def test_partial_failure_when_some_rows_invalid(
 ) -> None:
     """Eine Zeile ohne E-Mail → row error; Job-Status partial."""
     service = ImportService(test_db)
-    csv_with_bad_row = (
-        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;"
-        "Antwort 1;Antwort 2;Antwort 3\n"
-        ";;;2026-05-15 09:00:00;;;;\n"  # leere E-Mail → error
-        "Anna;Beispiel;anna@example.org;2026-05-15 09:00:00;"
-        "2026-05-15 09:30:00;Bern;wahr;Antworttext\n"
+    json_with_bad_row = _json_source(
+        [
+            {"e-mail-adresse": ""},  # leere E-Mail → error (Index 0)
+            _attempt_row(email="anna@example.org"),
+        ]
     )
     job = service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=csv_with_bad_row,
+        driver_name="moodle_json",
+        source=json_with_bad_row,
         triggered_by=None,
     )
     assert job.status == "partial"
     assert job.rows_failed == 1
     assert job.rows_processed == 1
     assert job.error_log
-    assert job.error_log[0]["row_index"] == 2
+    assert job.error_log[0]["row_index"] == 0
 
 
 def test_failed_job_when_all_rows_invalid(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
     service = ImportService(test_db)
-    csv_all_bad = "Vorname;Nachname;E-Mail-Adresse;Antwort 1\n;;;A\n;;;B\n"
+    # Rows carry frageN (so the column map resolves) but no e-mail → every
+    # row is an identity error: 0 processed, 2 failed → job failed.
+    bad_row = {"e-mail-adresse": "", "frage1": _Q1, "antwort1": "A"}
+    json_all_bad = _json_source([dict(bad_row), dict(bad_row)])
     job = service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=csv_all_bad,
+        driver_name="moodle_json",
+        source=json_all_bad,
         triggered_by=None,
     )
     assert job.status == "failed"
@@ -440,7 +508,7 @@ def test_empty_csv_marks_job_failed(
     with pytest.raises(Exception):
         service.commit(
             exam=exam_with_questions,
-            driver_name="moodle_csv",
+            driver_name="moodle_json",
             source="",
             triggered_by=None,
         )
@@ -470,18 +538,25 @@ def test_latest_strategy_picks_most_recent_attempt(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
     service = ImportService(test_db)
-    csv_two_attempts = (
-        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;"
-        "Antwort 1;Antwort 2;Antwort 3\n"
-        "Anna;Beispiel;anna@example.org;2026-05-15 09:00:00;"
-        "2026-05-15 09:30:00;Zürich;falsch;\n"  # Versuch 1: alles falsch
-        "Anna;Beispiel;anna@example.org;2026-05-16 10:00:00;"
-        "2026-05-16 10:25:00;Bern;wahr;Antwort\n"  # Versuch 2: korrekt
+    json_two_attempts = _json_source(
+        [
+            # Versuch 1: alles falsch
+            _attempt_row(email="anna@example.org", a1="Zürich", a2="falsch", a3=""),
+            # Versuch 2: korrekt
+            _attempt_row(
+                email="anna@example.org",
+                begonnen="2026-05-16 10:00:00",
+                beendet="2026-05-16 10:25:00",
+                a1="Bern",
+                a2="wahr",
+                a3="Antwort",
+            ),
+        ]
     )
     service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=csv_two_attempts,
+        driver_name="moodle_json",
+        source=json_two_attempts,
         triggered_by=None,
     )
     submission = (
@@ -498,18 +573,23 @@ def test_best_strategy_picks_highest_scoring_attempt(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
     service = ImportService(test_db)
-    csv_two_attempts = (
-        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;"
-        "Antwort 1;Antwort 2;Antwort 3\n"
-        "Anna;Beispiel;anna@example.org;2026-05-15 09:00:00;"
-        "2026-05-15 09:30:00;Bern;wahr;Antwort\n"
-        "Anna;Beispiel;anna@example.org;2026-05-16 10:00:00;"
-        "2026-05-16 10:25:00;Zürich;falsch;\n"
+    json_two_attempts = _json_source(
+        [
+            _attempt_row(email="anna@example.org", a1="Bern", a2="wahr", a3="Antwort"),
+            _attempt_row(
+                email="anna@example.org",
+                begonnen="2026-05-16 10:00:00",
+                beendet="2026-05-16 10:25:00",
+                a1="Zürich",
+                a2="falsch",
+                a3="",
+            ),
+        ]
     )
     service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=csv_two_attempts,
+        driver_name="moodle_json",
+        source=json_two_attempts,
         triggered_by=None,
     )
     submission = (
@@ -580,10 +660,10 @@ def test_manual_override_grades_are_preserved_on_reimport(
     """A teacher's manual_override grade must survive a re-import and a
     re-grade cycle — Spec 6.6 says the human always wins."""
     service = ImportService(test_db)
-    csv_text = _csv_two_students()  # Anna correct, Bruno wrong
+    csv_text = _json_two_students()  # Anna correct, Bruno wrong
     service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
+        driver_name="moodle_json",
         source=csv_text,
         triggered_by=None,
     )
@@ -609,7 +689,7 @@ def test_manual_override_grades_are_preserved_on_reimport(
     # Re-import the same CSV; grading runs again.
     service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
+        driver_name="moodle_json",
         source=csv_text,
         triggered_by=None,
     )
@@ -649,8 +729,8 @@ def test_per_submission_grading_failure_isolates_to_error_log(
 
     job = service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=_csv_two_students(),
+        driver_name="moodle_json",
+        source=_json_two_students(),
         triggered_by=None,
     )
 
@@ -699,8 +779,8 @@ def test_sqlalchemy_grading_failure_also_marks_submission_failed(
 
     job = service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=_csv_two_students(),
+        driver_name="moodle_json",
+        source=_json_two_students(),
         triggered_by=None,
     )
 
@@ -732,8 +812,8 @@ def test_unexpected_pipeline_failure_rolls_back_partial_data(
     with pytest.raises(RuntimeError, match="simulated pipeline crash"):
         service.commit(
             exam=exam_with_questions,
-            driver_name="moodle_csv",
-            source=_csv_two_students(),
+            driver_name="moodle_json",
+            source=_json_two_students(),
             triggered_by=None,
         )
 
@@ -765,7 +845,7 @@ def test_validation_failure_collects_all_invalid_question_ids(
 
     payload = ImportPayload(
         exam_id=exam_with_questions.id,
-        driver_name="moodle_csv",
+        driver_name="moodle_json",
         attempts=[
             AttemptRecord(
                 student_external_id="anna@example.org",
@@ -789,19 +869,19 @@ def test_validation_failure_collects_all_invalid_question_ids(
     assert any("99003" in issue for issue in excinfo.value.issues)
 
 
-def test_failed_job_for_unparseable_csv_records_step(
+def test_failed_job_for_unparseable_source_records_step(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
-    """When the driver hard-fails (empty CSV), the job error_log
+    """When the driver hard-fails (invalid JSON), the job error_log
     captures step + exception class so the operator can triage."""
-    from services.import_drivers import EmptyCsvError
+    from services.import_drivers import ImportDriverError
 
     service = ImportService(test_db)
-    with pytest.raises(EmptyCsvError):
+    with pytest.raises(ImportDriverError):
         service.commit(
             exam=exam_with_questions,
-            driver_name="moodle_csv",
-            source="",
+            driver_name="moodle_json",
+            source="not valid json {",
             triggered_by=None,
         )
     job = test_db.query(ImportJob).order_by(ImportJob.id.desc()).first()
@@ -810,7 +890,7 @@ def test_failed_job_for_unparseable_csv_records_step(
     assert job.error_log
     entry = job.error_log[0]
     assert entry.get("step") == "validate"
-    assert "EmptyCsvError" in entry["reason"]
+    assert "ImportDriverError" in entry["reason"]
 
 
 def test_unknown_scoring_strategy_raises(
@@ -826,8 +906,8 @@ def test_unknown_scoring_strategy_raises(
     service = ImportService(test_db)
     service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=_csv_two_students(),
+        driver_name="moodle_json",
+        source=_json_two_students(),
         triggered_by=None,
     )
     submission = test_db.query(Submission).first()
@@ -846,16 +926,33 @@ def test_attempt_with_null_timestamps_does_not_crash_pick_attempt(
     """Missing date columns are tolerated; pick_attempt must order
     safely instead of raising TypeError on None comparison."""
     service = ImportService(test_db)
-    # CSV without 'Begonnen am' / 'Beendet' columns at all
-    csv_no_dates = (
-        "Vorname;Nachname;E-Mail-Adresse;Antwort 1;Antwort 2;Antwort 3\n"
-        "Anna;Beispiel;anna@example.org;Bern;wahr;Antwort\n"
-        "Anna;Beispiel;anna@example.org;Zürich;falsch;Antwort\n"
+    # JSON rows without 'begonnen' / 'beendet' keys at all. Two attempts
+    # for one student → attempt_number disambiguates the source key even
+    # without timestamps.
+    json_no_dates = _json_source(
+        [
+            _attempt_row(
+                email="anna@example.org",
+                begonnen=None,
+                beendet=None,
+                a1="Bern",
+                a2="wahr",
+                a3="Antwort",
+            ),
+            _attempt_row(
+                email="anna@example.org",
+                begonnen=None,
+                beendet=None,
+                a1="Zürich",
+                a2="falsch",
+                a3="Antwort",
+            ),
+        ]
     )
     job = service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=csv_no_dates,
+        driver_name="moodle_json",
+        source=json_no_dates,
         triggered_by=None,
     )
     assert job.status == "succeeded"
@@ -945,17 +1042,26 @@ def test_two_institutions_can_have_overlapping_source_attempt_ids(
     test_db.commit()
 
     # Same email, same timestamp, same attempt_number → identical
-    # source_attempt_id across both tenants.
-    csv = (
-        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1\n"
-        "Anna;Beispiel;anna@example.org;2026-05-15 09:00:00;"
-        "2026-05-15 09:30:00;Bern\n"
+    # source_attempt_id across both tenants. Single-question exam, so the
+    # JSON carries only frage1/antwort1.
+    source = _json_source(
+        [
+            {
+                "vorname": "Anna",
+                "nachname": "Beispiel",
+                "e-mail-adresse": "anna@example.org",
+                "begonnen": "2026-05-15 09:00:00",
+                "beendet": "2026-05-15 09:30:00",
+                "frage1": _Q1,
+                "antwort1": "Bern",
+            }
+        ]
     )
     job_a = ImportService(test_db).commit(
-        exam=exam_a, driver_name="moodle_csv", source=csv, triggered_by=None
+        exam=exam_a, driver_name="moodle_json", source=source, triggered_by=None
     )
     job_b = ImportService(test_db).commit(
-        exam=exam_b, driver_name="moodle_csv", source=csv, triggered_by=None
+        exam=exam_b, driver_name="moodle_json", source=source, triggered_by=None
     )
 
     assert job_a.status == "succeeded"
@@ -977,42 +1083,55 @@ def test_two_institutions_can_have_overlapping_source_attempt_ids(
 def test_persist_attempts_records_unexpected_integrity_error(
     test_db: Session, exam_with_questions: Exam, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Forcing a NOT NULL violation on attempt_number must surface as a
+    """Forcing a CHECK violation on attempt_number must surface as a
     row error (not a silent ``continue``).
     """
-    csv = (
-        "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;"
-        "Antwort 1;Antwort 2;Antwort 3\n"
-        "Anna;Beispiel;anna@example.org;2026-05-15 09:00:00;"
-        "2026-05-15 09:30:00;Bern;wahr;Antwort\n"
+    from services.import_drivers import (
+        AnswerRecord,
+        AttemptRecord,
+        ImportPayload,
+        StudentRef,
     )
+    from services.import_drivers.moodle_json_driver import MoodleJsonDriver
 
-    # Patch _process_row to emit attempt_number=0 (violates the
-    # check_attempt_number_positive constraint).
-    from services.import_drivers.moodle_csv_driver import MoodleCsvDriver as Drv
+    eq_id = exam_with_questions.questions[0].id
 
-    original_extract = Drv._extract_attempt_number
+    def _bad_parse(self, source, *, exam, db=None):  # type: ignore[no-untyped-def]
+        # ``model_construct`` bypasses the pydantic ``ge=1`` guard so
+        # attempt_number=0 actually reaches the DB and trips
+        # ``check_attempt_number_positive`` — the DB-level branch the
+        # service must record rather than silently swallow.
+        bad_attempt = AttemptRecord.model_construct(
+            student_external_id="anna@example.org",
+            attempt_number=0,
+            started_at=None,
+            submitted_at=None,
+            source_attempt_id="anna@example.org||0",
+            answers=[AnswerRecord(exam_question_id=eq_id)],
+            raw_payload={},
+        )
+        return ImportPayload(
+            exam_id=exam.id,
+            driver_name="moodle_json",
+            students=[
+                StudentRef(external_id="anna@example.org", display_name="Anna Beispiel")
+            ],
+            attempts=[bad_attempt],
+        )
 
-    def _zero_attempt(row, col):  # type: ignore[no-untyped-def]
-        # Force attempt_number=0 → CHECK constraint violation
-        return 0, None
-
-    monkeypatch.setattr(Drv, "_extract_attempt_number", staticmethod(_zero_attempt))
+    monkeypatch.setattr(MoodleJsonDriver, "parse", _bad_parse)
 
     job = ImportService(test_db).commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=csv,
+        driver_name="moodle_json",
+        source=b"[]",  # ignored by the patched parse
         triggered_by=None,
     )
-    # Either the parser-level Pydantic validation rejects it (preferred)
-    # or the DB-level CHECK constraint trips and is recorded as a row
-    # error — both paths must be observable on the job.
+    # The DB-level CHECK constraint trips and is recorded as a row error.
     assert job.status in ("failed", "partial")
     assert (job.rows_failed or 0) >= 0
     assert job.error_log  # not None / not empty
-
-    monkeypatch.setattr(Drv, "_extract_attempt_number", staticmethod(original_extract))
+    # monkeypatch auto-restores ``MoodleJsonDriver.parse`` at teardown.
 
 
 # ---------------------------------------------------------------------------
@@ -1086,8 +1205,8 @@ def test_silent_skip_on_missing_student_now_records_row_error(
 
     job = service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=_csv_two_students(),
+        driver_name="moodle_json",
+        source=_json_two_students(),
         triggered_by=None,
     )
     # rows_processed reports actually-persisted attempts (0 here),
@@ -1118,7 +1237,7 @@ def test_create_queued_job_persists_queued_row(
 
     job = service.create_queued_job(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
+        driver_name="moodle_json",
         triggered_by=None,
     )
 
@@ -1126,7 +1245,7 @@ def test_create_queued_job_persists_queued_row(
     assert job.status == ImportJobStatus.QUEUED.value
     assert job.exam_id == exam_with_questions.id
     assert job.institution_id == exam_with_questions.institution_id
-    assert job.driver_name == "moodle_csv"
+    assert job.driver_name == "moodle_json"
     assert job.rows_processed == 0
     assert job.rows_failed == 0
     assert job.started_at is None  # not started until the worker runs commit()
@@ -1143,13 +1262,13 @@ def test_queued_job_is_reused_by_commit_without_duplicate(
     in place (transitioned to a terminal state) — no second ImportJob row."""
     service = ImportService(test_db)
     queued = service.create_queued_job(
-        exam=exam_with_questions, driver_name="moodle_csv", triggered_by=None
+        exam=exam_with_questions, driver_name="moodle_json", triggered_by=None
     )
 
     job = service.commit(
         exam=exam_with_questions,
-        driver_name="moodle_csv",
-        source=_csv_two_students(),
+        driver_name="moodle_json",
+        source=_json_two_students(),
         triggered_by=None,
         import_job_id=queued.id,
     )

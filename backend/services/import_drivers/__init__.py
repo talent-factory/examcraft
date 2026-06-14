@@ -1,6 +1,6 @@
 """Results-import drivers.
 
-A driver wraps reading a source (CSV file, Moodle Web Service, …) and
+A driver wraps reading a source (JSON file, Moodle Web Service, …) and
 returns a uniform ``ImportPayload``. ``ImportService`` is
 source-agnostic and only operates on the payload.
 """
@@ -9,9 +9,6 @@ from services.import_drivers.base import (
     BaseImportDriver,
     ColumnMappingError,
     ImportDriverError,
-    EmptyCsvError,
-    MissingColumnError,
-    UnparseableCsvError,
 )
 from services.import_drivers.moodle_api_driver import (
     MoodleApiAuthError,
@@ -19,7 +16,7 @@ from services.import_drivers.moodle_api_driver import (
     MoodleApiSchemaError,
     MoodleConnectionMissingError,
 )
-from services.import_drivers.moodle_csv_driver import MoodleCsvDriver
+from services.import_drivers.moodle_json_driver import MoodleJsonDriver
 from services.import_drivers.payloads import (
     AnswerRecord,
     AttemptRecord,
@@ -32,10 +29,7 @@ __all__ = [
     "BaseImportDriver",
     "ImportDriverError",
     "ColumnMappingError",
-    "EmptyCsvError",
-    "MissingColumnError",
-    "UnparseableCsvError",
-    "MoodleCsvDriver",
+    "MoodleJsonDriver",
     "MoodleApiDriver",
     "MoodleApiAuthError",
     "MoodleApiSchemaError",

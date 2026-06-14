@@ -31,27 +31,14 @@ class ImportDriverError(Exception):
     """
 
 
-class EmptyCsvError(ImportDriverError):
-    """CSV contains no data rows."""
-
-
-class MissingColumnError(ImportDriverError):
-    """A required column (e.g. external_id) is missing from the header."""
-
-
-class UnparseableCsvError(ImportDriverError):
-    """CSV is binary-corrupt or has an unknown encoding."""
-
-
 class ColumnMappingError(ImportDriverError):
-    """Answer columns cannot be safely mapped onto the exam's questions.
+    """Answers cannot be safely mapped onto the exam's questions.
 
-    Raised when the structural integrity of the column->question mapping
-    is in doubt -- e.g. answers landing on a choice question match none
-    of its options, which signals the Moodle quiz was reordered (the
-    ``Antwort N`` columns follow Moodle's slot/page order, not
-    ExamCraft's ``position``). Aborting beats silently grading answers
-    against the wrong questions. (TF-422)
+    Raised when the structural integrity of the answer->question mapping
+    is in doubt -- e.g. a JSON ``frageN`` text matches 0 or >1 exam
+    questions, or two ``frageN`` columns resolve to the same question.
+    Aborting beats silently grading answers against the wrong questions.
+    (TF-422, TF-423)
     """
 
 
@@ -89,12 +76,13 @@ class BaseImportDriver(ABC):
         Args:
             source: file bytes (uploads), JSON-encoded params, or
                 a quiz id (depending on the driver).
-            exam: target exam (column-to-question mapping via
-                ``position``).
+            exam: target exam. How answers map onto its questions is
+                driver-specific (the JSON driver matches by question
+                text; the API driver by Moodle slot).
             db: optional SQLAlchemy session for drivers that need to
                 load institution-scoped state (e.g. the API driver
-                resolves ``moodle_connections``). The CSV driver
-                ignores this argument.
+                resolves ``moodle_connections``). The file-upload
+                drivers ignore this argument.
 
         Returns:
             Complete payload incl. warnings + per-row errors.

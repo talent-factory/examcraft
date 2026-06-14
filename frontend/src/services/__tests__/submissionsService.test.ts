@@ -35,11 +35,11 @@ const text = (status: number, body: string, statusText = ''): Response =>
     json: jest.fn().mockRejectedValue(new SyntaxError('not json')),
   }) as unknown as Response;
 
-const csvFile = new File(['email\nx@y.ch\n'], 'klasse.csv', { type: 'text/csv' });
+const jsonFile = new File(['[[]]'], 'klasse.json', { type: 'application/json' });
 
 const samplePreview: ImportPreview = {
   exam_id: 42,
-  driver_name: 'moodle_csv',
+  driver_name: 'moodle_json',
   student_count: 1,
   attempt_count: 1,
   students: [{ external_id: 'x@y.ch', display_name: null }],
@@ -61,7 +61,7 @@ const samplePreview: ImportPreview = {
 const sampleJob: ImportJob = {
   id: 7,
   exam_id: 42,
-  driver_name: 'moodle_csv',
+  driver_name: 'moodle_json',
   status: 'succeeded',
   rows_processed: 1,
   rows_failed: 0,
@@ -85,8 +85,8 @@ describe('SubmissionsService', () => {
 
     const result = await SubmissionsService.preview({
       examId: 42,
-      file: csvFile,
-      driverName: 'moodle_csv',
+      file: jsonFile,
+      driverName: 'moodle_json',
     });
 
     expect(result).toEqual(samplePreview);
@@ -96,19 +96,19 @@ describe('SubmissionsService', () => {
     expect((init as RequestInit).body).toBeInstanceOf(FormData);
   });
 
-  it('preview() defaults driverName to moodle_csv', async () => {
+  it('preview() defaults driverName to moodle_json', async () => {
     mockFetch.mockResolvedValueOnce(json(200, samplePreview));
-    await SubmissionsService.preview({ examId: 1, file: csvFile });
+    await SubmissionsService.preview({ examId: 1, file: jsonFile });
     const init = mockFetch.mock.calls[0][1] as RequestInit;
     const fd = init.body as FormData;
-    expect(fd.get('driver_name')).toBe('moodle_csv');
+    expect(fd.get('driver_name')).toBe('moodle_json');
   });
 
   // ----- commit -----------------------------------------------------------
 
   it('commit() returns the persisted ImportJob', async () => {
     mockFetch.mockResolvedValueOnce(json(200, sampleJob));
-    const job = await SubmissionsService.commit({ examId: 42, file: csvFile });
+    const job = await SubmissionsService.commit({ examId: 42, file: jsonFile });
     expect(job).toEqual(sampleJob);
   });
 

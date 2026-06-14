@@ -2,7 +2,7 @@
  * Import dialog for exam results.
  *
  * Two source paths:
- *   - ``moodle_csv``: file upload (default).
+ *   - ``moodle_json``: file upload (default).
  *   - ``moodle_api``: nur sichtbar, wenn die Institution eine
  *     ``moodle_connections``-Eintragung hat. Statt Datei-Upload wird
  *     die Moodle-Quiz-ID erfasst; Preview/Commit gehen an
@@ -125,7 +125,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const { t } = useTranslation();
 
   const [step, setStep] = useState<WizardStep>('source');
-  const [driverName, setDriverName] = useState<DriverName>('moodle_csv');
+  const [driverName, setDriverName] = useState<DriverName>('moodle_json');
   const [file, setFile] = useState<File | null>(null);
   const [quizIdRaw, setQuizIdRaw] = useState('');
   const [hasMoodleConnection, setHasMoodleConnection] = useState<boolean | null>(
@@ -191,7 +191,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
   const resetState = () => {
     setStep('source');
-    setDriverName('moodle_csv');
+    setDriverName('moodle_json');
     setFile(null);
     setQuizIdRaw('');
     setPreview(null);
@@ -479,9 +479,9 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               data-testid="import-driver-radio"
             >
               <FormControlLabel
-                value="moodle_csv"
+                value="moodle_json"
                 control={<Radio />}
-                label={t('auswertungen.importDialog.sourceMoodleCsv')}
+                label={t('auswertungen.importDialog.sourceMoodleJson')}
               />
               <FormControlLabel
                 value="moodle_api"
@@ -509,7 +509,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           </FormControl>
         )}
 
-        {step === 'upload' && driverName === 'moodle_csv' && (
+        {step === 'upload' && driverName === 'moodle_json' && (
           <Box sx={{ textAlign: 'center', py: 4 }}>
             <Button
               component="label"
@@ -521,7 +521,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               <input
                 type="file"
                 hidden
-                accept=".csv,text/csv"
+                accept=".json,application/json"
                 onChange={handleFileChange}
               />
             </Button>
@@ -696,7 +696,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
             variant="contained"
             disabled={
               busy ||
-              (driverName === 'moodle_csv'
+              (driverName === 'moodle_json'
                 ? !file
                 : !quizIdRaw || Number(quizIdRaw) <= 0)
             }

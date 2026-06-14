@@ -43,12 +43,23 @@ class SubmissionGradeStatus(StrEnum):
 
 
 class DriverName(StrEnum):
+    # This enum doubles as the *display* type for stored import_jobs
+    # (``ImportJobOut.driver_name`` deserialises every historical row), so
+    # MOODLE_CSV must stay for backward-compat: the CSV file-import driver was
+    # removed (TF-423, superseded by the JSON driver) but old rows still carry
+    # the value. Creating a NEW csv import is rejected elsewhere — no driver is
+    # registered for it (ImportService.DRIVERS) and it's absent from every
+    # tier's allowlist (auswertung_quotas) — not by this enum, since the create
+    # endpoints validate ``driver_name`` as a plain str, not against DriverName.
     MOODLE_CSV = "moodle_csv"
     MOODLE_API = "moodle_api"
+    MOODLE_JSON = "moodle_json"
 
 
 class AttemptSource(StrEnum):
     """Mirrors DriverName — separate enum so future divergence is type-safe."""
 
+    # MOODLE_CSV retained for historical attempts.source values (TF-423).
     MOODLE_CSV = "moodle_csv"
     MOODLE_API = "moodle_api"
+    MOODLE_JSON = "moodle_json"

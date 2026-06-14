@@ -14,6 +14,8 @@ from __future__ import annotations
 from datetime import date, datetime, timezone, timedelta
 from io import BytesIO
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -308,10 +310,22 @@ def test_submission_quota_blocks_when_limit_exceeded(
 # ---------------------------------------------------------------------------
 
 
-_CSV_FIXTURE = (
-    "Vorname;Nachname;E-Mail-Adresse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
-    "Anna;Beispiel;anna@example.org;2026-05-15 09:00:00;"
-    "2026-05-15 09:30:00;Bern;wahr\n"
+_JSON_FIXTURE = json.dumps(
+    [
+        [
+            {
+                "vorname": "Anna",
+                "nachname": "Beispiel",
+                "e-mail-adresse": "anna@example.org",
+                "begonnen": "2026-05-15 09:00:00",
+                "beendet": "2026-05-15 09:30:00",
+                "frage1": "Q?",
+                "antwort1": "Bern",
+                "frage2": "W?",
+                "antwort2": "wahr",
+            }
+        ]
+    ]
 )
 
 
@@ -334,7 +348,7 @@ def _client(test_db: Session, user: User) -> TestClient:
     return TestClient(app, raise_server_exceptions=True)
 
 
-def test_csv_import_returns_402_for_free_at_4th_exam(test_db: Session) -> None:
+def test_import_returns_402_for_free_at_4th_exam(test_db: Session) -> None:
     inst = _make_institution(test_db, slug="qa-csv-quota", tier="free")
     user = _make_user(test_db, inst.id)
     # 3 import jobs already this month for 3 different exams.
@@ -349,12 +363,12 @@ def test_csv_import_returns_402_for_free_at_4th_exam(test_db: Session) -> None:
         "/api/v1/submissions/import/commit",
         files={
             "file": (
-                "k.csv",
-                BytesIO(_CSV_FIXTURE.encode("utf-8")),
-                "text/csv",
+                "k.json",
+                BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                "application/json",
             )
         },
-        data={"exam_id": str(new_exam.id), "driver_name": "moodle_csv"},
+        data={"exam_id": str(new_exam.id), "driver_name": "moodle_json"},
     )
     assert resp.status_code == 402, resp.text
     body = resp.json()

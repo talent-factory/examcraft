@@ -205,7 +205,7 @@ class Attempt(Base):
 
     source = Column(String(30), nullable=False)
     # 512 covers the worst-case composed key: RFC 5321 max email (254) +
-    # ISO timestamp + separators + attempt_number. ``MoodleCsvDriver._compose_source_attempt_id``
+    # ISO timestamp + separators + attempt_number. ``MoodleJsonDriver._compose_source_attempt_id``
     # documents the format; changing it is a data-migration boundary.
     source_attempt_id = Column(String(512), nullable=True)
     raw_payload = Column(JSON, nullable=True)
@@ -238,7 +238,9 @@ class Attempt(Base):
             "source_attempt_id",
         ),
         CheckConstraint(
-            "source IN ('moodle_csv', 'moodle_api')",
+            # 'moodle_csv' kept for historical rows (TF-423 removed the CSV
+            # driver; the JSON driver writes 'moodle_json').
+            "source IN ('moodle_csv', 'moodle_api', 'moodle_json')",
             name="check_attempt_source",
         ),
         CheckConstraint(
@@ -476,7 +478,8 @@ class ImportJob(Base):
             name="check_import_job_status",
         ),
         CheckConstraint(
-            "driver_name IN ('moodle_csv', 'moodle_api')",
+            # 'moodle_csv' kept for historical import_jobs rows (TF-423).
+            "driver_name IN ('moodle_csv', 'moodle_api', 'moodle_json')",
             name="check_import_job_driver",
         ),
         Index("ix_import_jobs_exam_status", "exam_id", "status"),

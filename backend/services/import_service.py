@@ -50,7 +50,7 @@ from services.import_drivers import (
     ImportPayload,
     ImportRowError,
     MoodleApiDriver,
-    MoodleCsvDriver,
+    MoodleJsonDriver,
 )
 
 
@@ -92,7 +92,7 @@ class ImportService:
     # mutate it at runtime (tests included).
     DRIVERS: Mapping[str, BaseImportDriver] = MappingProxyType(
         {
-            MoodleCsvDriver.name: MoodleCsvDriver(),
+            MoodleJsonDriver.name: MoodleJsonDriver(),
             MoodleApiDriver.name: MoodleApiDriver(),
         }
     )

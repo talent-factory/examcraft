@@ -50,7 +50,7 @@ class AttemptRecord(BaseModel):
     attempt_number: int = Field(default=1, ge=1)
     started_at: datetime | None = None
     submitted_at: datetime | None = None
-    # Idempotency key — re-importing the same CSV must produce the same
+    # Idempotency key — re-importing the same export must produce the same
     # value so a duplicate import is skipped.
     source_attempt_id: str | None = None
     answers: list[AnswerRecord] = Field(default_factory=list)

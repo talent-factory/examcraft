@@ -456,7 +456,7 @@ def _import_job_to_out(job: ImportJob) -> ImportJobOut:
 @router.post("/import/preview", response_model=ImportPreviewOut)
 async def import_preview(
     exam_id: int = Form(...),
-    driver_name: str = Form(DriverName.MOODLE_CSV.value),
+    driver_name: str = Form(DriverName.MOODLE_JSON.value),
     file: UploadFile = File(...),
     current_user: User = Depends(require_permission("submissions:import")),
     db: Session = Depends(get_db),
@@ -502,7 +502,7 @@ async def import_preview(
 @router.post("/import/commit", response_model=ImportJobOut, status_code=202)
 async def import_commit(
     exam_id: int = Form(...),
-    driver_name: str = Form(DriverName.MOODLE_CSV.value),
+    driver_name: str = Form(DriverName.MOODLE_JSON.value),
     file: UploadFile = File(...),
     current_user: User = Depends(require_permission("submissions:import")),
     db: Session = Depends(get_db),

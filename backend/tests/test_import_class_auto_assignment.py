@@ -2,17 +2,22 @@
 
 Verifies that:
 
-* the CSV driver populates ``StudentRef.class_hint`` from the
-  ``Klasse`` / ``Class`` column,
+* the JSON driver populates ``StudentRef.class_hint`` from the
+  ``klasse`` / ``class`` key,
 * ``ImportService`` materialises a ``StudentClass`` and a
   ``StudentClassMembership`` per non-empty hint,
 * re-imports stay idempotent (no duplicate classes or memberships),
 * a pre-existing class with the same name is reused rather than
   duplicated.
+
+The JSON driver maps answers by question text, so each student row carries
+the exam's question texts verbatim (``frageN``) alongside the answers
+(``antwortN``); see ``mem:project_tf423_progress``.
 """
 
 from __future__ import annotations
 
+import json
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -21,18 +26,44 @@ from models.auth import Institution, User, UserStatus
 from models.exam import Exam, ExamQuestion
 from models.question_review import QuestionReview
 from models.student import Student, StudentClass, StudentClassMembership
-from services.import_drivers.moodle_csv_driver import MoodleCsvDriver
+from services.import_drivers.moodle_json_driver import MoodleJsonDriver
 from services.import_service import ImportService
 
 
-_CSV_WITH_CLASS = (
-    "Vorname;Nachname;E-Mail-Adresse;Klasse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
-    "Anna;Beispiel;anna@example.org;INF-23a;2026-05-15 09:00:00;"
-    "2026-05-15 09:30:00;Bern;wahr\n"
-    "Bruno;Muster;bruno@example.org;INF-23b;2026-05-15 09:00:00;"
-    "2026-05-15 09:25:00;Zürich;falsch\n"
-    "Cora;Test;cora@example.org;INF-23a;2026-05-15 09:00:00;"
-    "2026-05-15 09:30:00;Bern;wahr\n"
+# Question texts mirror ``_make_exam`` exactly so the driver's exact-match
+# stage resolves each ``frageN`` to a unique exam question.
+_Q_MC = "Hauptstadt der Schweiz?"
+_Q_TF = "Bern ist die Hauptstadt der Schweiz."
+
+
+def _student(vorname, nachname, email, klasse, mc_answer, tf_answer, *, key="klasse"):
+    row = {
+        "vorname": vorname,
+        "nachname": nachname,
+        "e-mail-adresse": email,
+        "begonnen": "2026-05-15 09:00:00",
+        "beendet": "2026-05-15 09:30:00",
+        "frage1": _Q_MC,
+        "antwort1": mc_answer,
+        "frage2": _Q_TF,
+        "antwort2": tf_answer,
+    }
+    if klasse is not None:
+        row[key] = klasse
+    return row
+
+
+def _json_source(students) -> bytes:
+    """Serialise like the Moodle plugin export: ``[[ {student}, ... ]]``."""
+    return json.dumps([students]).encode("utf-8")
+
+
+_JSON_WITH_CLASS = _json_source(
+    [
+        _student("Anna", "Beispiel", "anna@example.org", "INF-23a", "Bern", "wahr"),
+        _student("Bruno", "Muster", "bruno@example.org", "INF-23b", "Zürich", "falsch"),
+        _student("Cora", "Test", "cora@example.org", "INF-23a", "Bern", "wahr"),
+    ]
 )
 
 
@@ -117,55 +148,61 @@ def _seed_import(test_db: Session, exam: Exam, user: User):
     """
     return ImportService(test_db).commit(
         exam=exam,
-        driver_name="moodle_csv",
-        source=_CSV_WITH_CLASS.encode("utf-8"),
+        driver_name="moodle_json",
+        source=_JSON_WITH_CLASS,
         triggered_by=user.id,
     )
 
 
 # ---------------------------------------------------------------------------
-# Driver — column detection
+# Driver — class-hint detection
 # ---------------------------------------------------------------------------
 
 
-def test_csv_driver_extracts_class_hint(test_db: Session) -> None:
+def test_json_driver_extracts_class_hint(test_db: Session) -> None:
     inst = _make_institution(test_db)
     exam = _make_exam(test_db, inst.id)
     test_db.commit()
 
-    payload = MoodleCsvDriver().parse(_CSV_WITH_CLASS.encode("utf-8"), exam=exam)
+    payload = MoodleJsonDriver().parse(_JSON_WITH_CLASS, exam=exam)
     by_id = {s.external_id: s for s in payload.students}
     assert by_id["anna@example.org"].class_hint == "INF-23a"
     assert by_id["bruno@example.org"].class_hint == "INF-23b"
     assert by_id["cora@example.org"].class_hint == "INF-23a"
 
 
-def test_csv_driver_accepts_english_class_alias(test_db: Session) -> None:
+def test_json_driver_accepts_english_class_alias(test_db: Session) -> None:
     inst = _make_institution(test_db, slug="tf336-classimport-en")
     exam = _make_exam(test_db, inst.id)
     test_db.commit()
 
-    csv_en = (
-        "First name;Surname;Email address;Class;Started;Completed;Answer 1;Answer 2\n"
-        "Anna;Sample;anna@example.org;INF-23a;2026-05-15 09:00:00;"
-        "2026-05-15 09:30:00;Bern;wahr\n"
+    source = _json_source(
+        [
+            _student(
+                "Anna",
+                "Sample",
+                "anna@example.org",
+                "INF-23a",
+                "Bern",
+                "wahr",
+                key="class",
+            )
+        ]
     )
-    payload = MoodleCsvDriver().parse(csv_en.encode("utf-8"), exam=exam)
+    payload = MoodleJsonDriver().parse(source, exam=exam)
     by_id = {s.external_id: s for s in payload.students}
     assert by_id["anna@example.org"].class_hint == "INF-23a"
 
 
-def test_csv_driver_blank_class_is_none(test_db: Session) -> None:
+def test_json_driver_blank_class_is_none(test_db: Session) -> None:
     inst = _make_institution(test_db, slug="tf336-classimport-blank")
     exam = _make_exam(test_db, inst.id)
     test_db.commit()
 
-    csv_blank = (
-        "Vorname;Nachname;E-Mail-Adresse;Klasse;Begonnen am;Beendet;Antwort 1;Antwort 2\n"
-        "Anna;Beispiel;anna@example.org;   ;2026-05-15 09:00:00;"
-        "2026-05-15 09:30:00;Bern;wahr\n"
+    source = _json_source(
+        [_student("Anna", "Beispiel", "anna@example.org", "   ", "Bern", "wahr")]
     )
-    payload = MoodleCsvDriver().parse(csv_blank.encode("utf-8"), exam=exam)
+    payload = MoodleJsonDriver().parse(source, exam=exam)
     assert payload.students[0].class_hint is None
 
 
