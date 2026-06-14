@@ -10,9 +10,35 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _normalize_db_url(url: str) -> str:
+    """Normalize the legacy ``postgres://`` scheme to ``postgresql://``.
+
+    Fly's managed Postgres injects ``DATABASE_URL`` with the deprecated
+    ``postgres://`` scheme, which SQLAlchemy 1.4+ no longer recognizes as a
+    dialect (raises ``NoSuchModuleError: Can't load plugin:
+    sqlalchemy.dialects:postgres``). ``docker-entrypoint.sh`` already rewrites
+    it for the running app, but scripts launched *outside* the entrypoint —
+    e.g. ``fly ssh console -C "python -m premium.scripts.repro.extract ..."``
+    for the repro tooling (TF-424) — bypass that rewrite. Normalizing here, at
+    the single point where the URL is consumed, makes every invocation path
+    robust regardless of how the process was started.
+
+    Only the leading scheme is rewritten, so a ``postgres://`` substring inside
+    a password is never touched. ``postgresql://`` (and driver-qualified
+    variants like ``postgresql+psycopg2://``) pass through unchanged.
+    """
+    prefix = "postgres://"
+    if url.startswith(prefix):
+        return "postgresql://" + url[len(prefix) :]
+    return url
+
+
 # Database URL - für Development verwenden wir PostgreSQL aus Docker
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://examcraft:examcraft_dev@localhost:5432/examcraft"
+DATABASE_URL = _normalize_db_url(
+    os.getenv(
+        "DATABASE_URL", "postgresql://examcraft:examcraft_dev@localhost:5432/examcraft"
+    )
 )
 
 # Engine pool-resilience settings (TF-327): pool_recycle prevents stale

@@ -71,3 +71,55 @@ def test_engine_pool_pre_ping_remains_enabled():
         "pool_pre_ping was disabled — must stay True to validate connections "
         "at checkout (complementary to pool_recycle's preventive recycling)."
     )
+
+
+# --- TF-424: DATABASE_URL scheme normalization -------------------------------
+# Fly's managed Postgres injects DATABASE_URL with the legacy `postgres://`
+# scheme. SQLAlchemy 1.4+ dropped that dialect alias (NoSuchModuleError). The
+# docker entrypoint rewrites it for the running app, but scripts launched
+# outside the entrypoint (e.g. `fly ssh console -C "python -m ..."` for the
+# repro tooling) bypass it. _normalize_db_url makes the URL robust at the single
+# point where it is consumed.
+
+
+def test_normalize_db_url_rewrites_legacy_postgres_scheme():
+    """`postgres://` (Fly legacy) → `postgresql://` so create_engine resolves the dialect."""
+    from database import _normalize_db_url
+
+    assert (
+        _normalize_db_url("postgres://user:pw@host:5432/db")
+        == "postgresql://user:pw@host:5432/db"
+    )
+
+
+def test_normalize_db_url_leaves_postgresql_scheme_untouched():
+    """Already-correct `postgresql://` must pass through verbatim (no double-rewrite)."""
+    from database import _normalize_db_url
+
+    url = "postgresql://user:pw@host:5432/db"
+    assert _normalize_db_url(url) == url
+
+
+def test_normalize_db_url_preserves_driver_qualified_scheme():
+    """Driver-qualified `postgresql+psycopg2://` must not be mangled."""
+    from database import _normalize_db_url
+
+    url = "postgresql+psycopg2://user:pw@host/db"
+    assert _normalize_db_url(url) == url
+
+
+def test_normalize_db_url_only_rewrites_leading_scheme():
+    """A `postgres://` substring inside the password must NOT be rewritten — only the prefix."""
+    from database import _normalize_db_url
+
+    # Pathological but valid: the password literally contains "postgres://".
+    url = "postgres://user:postgres://pw@host/db"
+    assert _normalize_db_url(url) == "postgresql://user:postgres://pw@host/db"
+
+
+def test_normalize_db_url_leaves_non_postgres_urls_untouched():
+    """Non-postgres URLs (e.g. sqlite) pass through unchanged."""
+    from database import _normalize_db_url
+
+    url = "sqlite:///./local.db"
+    assert _normalize_db_url(url) == url

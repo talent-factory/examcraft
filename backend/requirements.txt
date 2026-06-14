@@ -1,5 +1,9 @@
 # FastAPI and ASGI server
-fastapi>=0.117.1
+# Upper-Cap (TF-425): FastAPI 0.137.0 führt _IncludedRouter ein und stellt
+# include_router so um, dass Sub-Routes nicht mehr flach in app.routes liegen
+# (bricht route_paths = [r.path for r in app.routes] in den Tests). 0.136.x ist
+# OK. Cap entfernen, sobald Tests/App auf das neue Routing-Modell migriert sind.
+fastapi>=0.117.1,<0.137
 uvicorn[standard]==0.24.0
 
 # Database
