@@ -52,6 +52,7 @@ import OverrideGradeDialog from '../components/auswertungen/OverrideGradeDialog'
 import ReviewQueue from '../components/auswertungen/ReviewQueue';
 import StatistikPanel from '../components/auswertungen/StatistikPanel';
 import NotenexportPanel from '../components/auswertungen/NotenexportPanel';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const formatPct = (pct: number): string => `${Math.round(pct * 10) / 10}%`;
 
@@ -418,7 +419,10 @@ const AuswertungenExam: React.FC = () => {
                           <TableRow key={answer.id}>
                             <TableCell>#{answer.exam_question_id}</TableCell>
                             <TableCell>
-                              {answer.given_answer ?? '—'}
+                              <MarkdownRenderer
+                                content={answer.given_answer || '—'}
+                                variant="compact"
+                              />
                               {grade?.llm_rationale && (
                                 <Typography
                                   variant="caption"

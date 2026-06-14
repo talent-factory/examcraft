@@ -45,6 +45,7 @@ import { GradesService } from '../../services/gradesService';
 import { ApiError } from '../../services/submissionsService';
 import { ReviewQueueItem } from '../../types/submission';
 import OverrideGradeDialog from './OverrideGradeDialog';
+import MarkdownRenderer from '../MarkdownRenderer';
 
 // Untere Grenze für die Bulk-Konfidenz-Schwelle: 0% würde alle
 // proposed-Grades inklusive der Fail-Soft-Stubs (confidence=0.0)
@@ -486,30 +487,36 @@ const ReviewQueue: React.FC<Props> = ({
                     <Typography variant="caption" color="text.secondary">
                       {t('auswertungen.exam.review.questionLabel')}
                     </Typography>
-                    <Typography variant="body2" sx={{ mb: 1 }}>
-                      {item.question_text}
-                    </Typography>
+                    <Box sx={{ mb: 1 }}>
+                      <MarkdownRenderer
+                        content={item.question_text}
+                        variant="compact"
+                      />
+                    </Box>
 
                     {item.correct_answer && (
                       <>
                         <Typography variant="caption" color="text.secondary">
                           {t('auswertungen.exam.review.correctAnswerLabel')}
                         </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{ mb: 1, fontStyle: 'italic' }}
-                        >
-                          {item.correct_answer}
-                        </Typography>
+                        <Box sx={{ mb: 1 }}>
+                          <MarkdownRenderer
+                            content={item.correct_answer}
+                            variant="compact"
+                          />
+                        </Box>
                       </>
                     )}
 
                     <Typography variant="caption" color="text.secondary">
                       {t('auswertungen.exam.review.studentAnswerLabel')}
                     </Typography>
-                    <Typography variant="body2" sx={{ mb: 1 }}>
-                      {item.given_answer ?? '—'}
-                    </Typography>
+                    <Box sx={{ mb: 1 }}>
+                      <MarkdownRenderer
+                        content={item.given_answer || '—'}
+                        variant="compact"
+                      />
+                    </Box>
 
                     <Divider sx={{ my: 1 }} />
 
@@ -517,9 +524,12 @@ const ReviewQueue: React.FC<Props> = ({
                       {t('auswertungen.exam.review.proposalLabel')}
                     </Typography>
                     {item.rationale && (
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        {item.rationale}
-                      </Typography>
+                      <Box sx={{ mb: 1 }}>
+                        <MarkdownRenderer
+                          content={item.rationale}
+                          variant="compact"
+                        />
+                      </Box>
                     )}
 
                     {(item.matched_aspects.length > 0 ||

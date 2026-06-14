@@ -103,6 +103,42 @@ describe('ReviewQueue', () => {
     expect(screen.getAllByText('Verhalten').length).toBeGreaterThan(0);
   });
 
+  it('renders question, model solution, student answer and rationale via MarkdownRenderer (TF-429)', async () => {
+    mockGradesService.getReviewQueue.mockResolvedValue({
+      total: 1,
+      items: [
+        {
+          ...baseQueue.items[0],
+          grade_id: 11,
+          question_text: '**Praxisszenario:** Erkläre Kapselung.',
+          correct_answer: '**Musterlösung** mit Struktur.',
+          given_answer: '1.) Erster Punkt\n2.) Zweiter Punkt',
+          rationale: '**Vorschlag:** solide Leistung.',
+        },
+      ],
+    });
+    renderQueue();
+    await waitFor(() => {
+      expect(screen.getByTestId('review-card-11')).toBeInTheDocument();
+    });
+
+    // Der react-markdown-Mock rendert children verbatim unter
+    // [data-testid="react-markdown"]. Erscheint der rohe Markdown-Text dort,
+    // ist bewiesen, dass das Feld durch MarkdownRenderer läuft (statt nacktem
+    // <Typography>, das `**` literal anzeigt und Zeilenumbrüche verschluckt).
+    const rendered = screen
+      .getAllByTestId('react-markdown')
+      .map((el) => el.textContent ?? '');
+    expect(rendered).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('**Praxisszenario:** Erkläre Kapselung.'),
+        expect.stringContaining('**Musterlösung** mit Struktur.'),
+        expect.stringContaining('1.) Erster Punkt'),
+        expect.stringContaining('**Vorschlag:** solide Leistung.'),
+      ]),
+    );
+  });
+
   it('approves a grade via the approve button', async () => {
     mockGradesService.approve.mockResolvedValue({
       id: 11,
