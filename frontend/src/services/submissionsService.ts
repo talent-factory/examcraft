@@ -11,6 +11,7 @@
 import {
   ApiErrorKind,
   DriverName,
+  ImportDeletionSummary,
   ImportJob,
   ImportPreview,
   SubmissionDetail,
@@ -204,6 +205,39 @@ export class SubmissionsService {
     );
     await ensureOk(response);
     return (await response.json()) as ImportJob;
+  }
+
+  /**
+   * TF-421: preview how much a result-import delete would remove
+   * (affected students/attempts), to populate the confirmation dialog.
+   */
+  static async getImportSummary(
+    examId: number,
+  ): Promise<ImportDeletionSummary> {
+    const url = `${API_BASE_URL}${ROOT}/import/summary?exam_id=${examId}`;
+    const response = await safeFetch(url, {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+    await ensureOk(response);
+    return (await response.json()) as ImportDeletionSummary;
+  }
+
+  /**
+   * TF-421: delete all imported results of an exam (across every source)
+   * so the operator can re-import cleanly. Requires `submissions:delete`.
+   * Returns the counts that were removed.
+   */
+  static async deleteImport(
+    examId: number,
+  ): Promise<ImportDeletionSummary> {
+    const url = `${API_BASE_URL}${ROOT}/import?exam_id=${examId}`;
+    const response = await safeFetch(url, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    await ensureOk(response);
+    return (await response.json()) as ImportDeletionSummary;
   }
 
   static async listForExam(examId: number): Promise<SubmissionList> {

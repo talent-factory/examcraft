@@ -25,7 +25,16 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session, joinedload
@@ -48,8 +57,13 @@ from services.auswertung_quotas import (
     assert_exam_quota_for_import,
     assert_submission_quota_for_exam,
 )
+from services.audit_service import AuditService
 from services.import_drivers import ImportDriverError
 from services.import_service import ImportService, ImportValidationError
+from services.results_deletion_service import (
+    DeletionSummary,
+    ResultsDeletionService,
+)
 from tasks.import_submissions_task import Base64Str, import_submissions
 from utils.auth_utils import require_permission
 
@@ -127,6 +141,29 @@ class ImportJobOut(BaseModel):
     source_metadata: dict[str, Any] | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
+
+
+class ImportSourceCountOut(BaseModel):
+    model_config = _STRICT_OUT
+
+    source: AttemptSource
+    attempt_count: int
+
+
+class ImportDeletionSummaryOut(BaseModel):
+    """How much a result-import delete would remove (TF-421).
+
+    Used both as the preview (``GET /import/summary``) for the confirmation
+    dialog and as the result of the delete (``DELETE /import``).
+    """
+
+    model_config = _STRICT_OUT
+
+    exam_id: int
+    submission_count: int
+    attempt_count: int
+    student_count: int
+    by_source: list[ImportSourceCountOut] = Field(default_factory=list)
 
 
 class GradeOut(BaseModel):
@@ -546,6 +583,94 @@ async def get_import_job(
     if job is None:
         raise HTTPException(status_code=404, detail="Import-Job nicht gefunden")
     return _import_job_to_out(job)
+
+
+# ---------------------------------------------------------------------------
+# Result-import deletion (TF-421)
+# ---------------------------------------------------------------------------
+
+
+def _deletion_summary_to_out(summary: DeletionSummary) -> ImportDeletionSummaryOut:
+    return ImportDeletionSummaryOut(
+        exam_id=summary.exam_id,
+        submission_count=summary.submission_count,
+        attempt_count=summary.attempt_count,
+        student_count=summary.student_count,
+        by_source=[
+            ImportSourceCountOut(source=sc.source, attempt_count=sc.attempt_count)
+            for sc in summary.by_source
+        ],
+    )
+
+
+@router.get("/import/summary", response_model=ImportDeletionSummaryOut)
+async def get_import_deletion_summary(
+    exam_id: int,
+    current_user: User = Depends(require_permission("submissions:read")),
+    db: Session = Depends(get_db),
+) -> ImportDeletionSummaryOut:
+    """Preview how much ``DELETE /import`` would remove for ``exam_id``.
+
+    Powers the confirmation dialog (affected students/attempts). Read-only —
+    requires only ``submissions:read``.
+    """
+    exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    summary = ResultsDeletionService(db).summary(exam=exam)
+    return _deletion_summary_to_out(summary)
+
+
+@router.delete("/import", response_model=ImportDeletionSummaryOut)
+async def delete_import(
+    exam_id: int,
+    http_request: Request,
+    current_user: User = Depends(require_permission("submissions:delete")),
+    db: Session = Depends(get_db),
+) -> ImportDeletionSummaryOut:
+    """Delete all imported results of an exam, then allow a clean re-import.
+
+    Removes attempts + answers + grades (DB cascade) and the now-empty
+    submissions, across every source. Students and import-job history are
+    kept. RBAC: ``submissions:delete`` (Admin / Dozent). Multi-tenant scoped
+    via :func:`_load_exam_for_user`.
+
+    Writes an audit-log entry **in the same transaction** as the deletion: if
+    the audit write fails, the whole operation rolls back (fail-closed — no
+    silent data loss without a trail), mirroring the superuser-bypass policy.
+    """
+    exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+
+    summary = ResultsDeletionService(db).delete_exam_results(exam=exam)
+
+    audit = AuditService.log_action(
+        db=db,
+        action=AuditService.ACTION_DELETE_RESULT_IMPORT,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_EXAM,
+        resource_id=exam.id,
+        additional_data={
+            "exam_id": exam.id,
+            "submission_count": summary.submission_count,
+            "attempt_count": summary.attempt_count,
+            "student_count": summary.student_count,
+            "by_source": {sc.source: sc.attempt_count for sc in summary.by_source},
+        },
+        request=http_request,
+        commit=True,
+    )
+    if audit is None:
+        # log_action already rolled back the session, undoing the deletion.
+        logger.critical(
+            "delete_import refused: audit log persistence failed "
+            "(exam_id=%s, user_id=%s). Deletion rolled back.",
+            exam.id,
+            current_user.id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Audit-Log nicht verfügbar; Löschung abgebrochen.",
+        )
+
+    return _deletion_summary_to_out(summary)
 
 
 # ---------------------------------------------------------------------------

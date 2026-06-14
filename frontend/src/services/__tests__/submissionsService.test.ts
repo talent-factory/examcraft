@@ -158,6 +158,46 @@ describe('SubmissionsService', () => {
     expect(mockFetch.mock.calls[0][0]).toContain('/api/v1/submissions/import-jobs/7');
   });
 
+  it('getImportSummary() GETs /import/summary with exam_id', async () => {
+    const summary = {
+      exam_id: 42,
+      submission_count: 2,
+      attempt_count: 3,
+      student_count: 2,
+      by_source: [{ source: 'moodle_csv', attempt_count: 3 }],
+    };
+    mockFetch.mockResolvedValueOnce(json(200, summary));
+    const result = await SubmissionsService.getImportSummary(42);
+    expect(result).toEqual(summary);
+    expect(mockFetch.mock.calls[0][0]).toContain(
+      '/api/v1/submissions/import/summary?exam_id=42',
+    );
+  });
+
+  it('deleteImport() issues DELETE /import with exam_id', async () => {
+    const summary = {
+      exam_id: 42,
+      submission_count: 2,
+      attempt_count: 3,
+      student_count: 2,
+      by_source: [{ source: 'moodle_csv', attempt_count: 3 }],
+    };
+    mockFetch.mockResolvedValueOnce(json(200, summary));
+    const result = await SubmissionsService.deleteImport(42);
+    expect(result).toEqual(summary);
+    expect(mockFetch.mock.calls[0][0]).toContain(
+      '/api/v1/submissions/import?exam_id=42',
+    );
+    expect((mockFetch.mock.calls[0][1] as RequestInit).method).toBe('DELETE');
+  });
+
+  it('deleteImport() maps a 403 to an ApiError', async () => {
+    mockFetch.mockResolvedValueOnce(json(403, { detail: 'forbidden' }));
+    const err = await SubmissionsService.deleteImport(42).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.kind).toBe('permission');
+  });
+
   // ----- auth header injection -------------------------------------------
 
   it('attaches Bearer token from localStorage when present', async () => {

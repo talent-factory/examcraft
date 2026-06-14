@@ -51,6 +51,8 @@ class AuditService:
     ACTION_ASSIGN_ROLE = "assign_role"
     ACTION_REMOVE_ROLE = "remove_role"
 
+    ACTION_DELETE_RESULT_IMPORT = "delete_result_import"
+
     ACTION_API_ACCESS = "api_access"
     ACTION_PERMISSION_DENIED = "permission_denied"
     ACTION_RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
@@ -70,6 +72,7 @@ class AuditService:
     RESOURCE_SESSION = "session"
     RESOURCE_ROLE = "role"
     RESOURCE_INSTITUTION = "institution"
+    RESOURCE_EXAM = "exam"
 
     @staticmethod
     def log_action(
@@ -518,6 +521,8 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             "delete_exam",
             "archive_exam",
             "restore_exam",
+            # Result-import lifecycle (api/submissions.py, TF-421)
+            AuditService.ACTION_DELETE_RESULT_IMPORT,
             # GDPR data actions (api/gdpr.py)
             "data_export",
             "deletion_requested",

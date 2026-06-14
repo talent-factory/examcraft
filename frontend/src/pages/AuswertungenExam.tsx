@@ -32,6 +32,7 @@ import {
 import {
   ArrowBack as ArrowBackIcon,
   Close as CloseIcon,
+  DeleteForever as DeleteForeverIcon,
   Upload as UploadIcon,
 } from '@mui/icons-material';
 
@@ -45,6 +46,7 @@ import {
 } from '../types/submission';
 import { ExamDetail } from '../types/composer';
 import ImportDialog from '../components/auswertungen/ImportDialog';
+import DeleteImportDialog from '../components/auswertungen/DeleteImportDialog';
 import SyncMoodleIdsDialog from '../components/auswertungen/SyncMoodleIdsDialog';
 import OverrideGradeDialog from '../components/auswertungen/OverrideGradeDialog';
 import ReviewQueue from '../components/auswertungen/ReviewQueue';
@@ -81,6 +83,7 @@ const AuswertungenExam: React.FC = () => {
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [deleteImportOpen, setDeleteImportOpen] = useState(false);
   const [syncMoodleOpen, setSyncMoodleOpen] = useState(false);
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [overrideAnswer, setOverrideAnswer] = useState<AttemptAnswer | null>(
@@ -164,6 +167,18 @@ const AuswertungenExam: React.FC = () => {
           >
             {t('auswertungen.moodleSync.actionLabel')}
           </Button>
+          {submissionTotal > 0 && (
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteForeverIcon />}
+              onClick={() => setDeleteImportOpen(true)}
+              data-testid="auswertungen-exam-delete-import"
+              sx={{ mr: 1 }}
+            >
+              {t('auswertungen.exam.actionDeleteImport')}
+            </Button>
+          )}
           <Button
             variant="contained"
             startIcon={<UploadIcon />}
@@ -181,7 +196,7 @@ const AuswertungenExam: React.FC = () => {
         )}
       </Box>
     ),
-    [exam, navigate, t],
+    [exam, navigate, t, submissionTotal],
   );
 
   return (
@@ -498,6 +513,18 @@ const AuswertungenExam: React.FC = () => {
           onClose={() => setImportOpen(false)}
           onImported={() => {
             setImportOpen(false);
+            void reload();
+          }}
+        />
+      )}
+      {deleteImportOpen && exam && (
+        <DeleteImportDialog
+          open
+          examId={exam.id}
+          examTitle={exam.title}
+          onClose={() => setDeleteImportOpen(false)}
+          onDeleted={() => {
+            setDeleteImportOpen(false);
             void reload();
           }}
         />

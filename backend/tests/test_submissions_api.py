@@ -899,3 +899,179 @@ def test_preview_returns_500_when_pipeline_crashes_unexpectedly(
         data={"exam_id": str(exam.id)},
     )
     assert response.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# Result-import deletion (TF-421)
+# ---------------------------------------------------------------------------
+
+
+def test_get_import_summary_returns_counts(test_db: Session) -> None:
+    """GET /import/summary previews how much a delete would remove."""
+    inst = _make_institution(test_db, slug="del-summary")
+    user = _make_user(test_db, inst.id, email="summary@test.ch")
+    exam = _make_exam(test_db, inst.id)
+    test_db.commit()
+    _seed_import(test_db, exam)
+
+    client = _client(test_db, user)
+    response = client.get(
+        "/api/v1/submissions/import/summary", params={"exam_id": exam.id}
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["exam_id"] == exam.id
+    assert body["submission_count"] == 2
+    assert body["attempt_count"] == 2
+    assert body["student_count"] == 2
+    assert body["by_source"] == [{"source": "moodle_csv", "attempt_count": 2}]
+
+
+def test_delete_import_removes_results_and_writes_audit(test_db: Session) -> None:
+    """DELETE /import wipes the exam's results and logs an audit entry."""
+    from models.auth import AuditLog
+    from models.submission import Attempt, Submission
+    from services.audit_service import AuditService
+
+    inst = _make_institution(test_db, slug="del-happy")
+    user = _make_user(test_db, inst.id, email="deleter@test.ch")
+    exam = _make_exam(test_db, inst.id)
+    test_db.commit()
+    _seed_import(test_db, exam)
+    assert test_db.query(Submission).count() == 2
+
+    client = _client(test_db, user)
+    response = client.request(
+        "DELETE", "/api/v1/submissions/import", params={"exam_id": exam.id}
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["submission_count"] == 2
+    assert body["attempt_count"] == 2
+    # Results are gone.
+    assert test_db.query(Submission).filter(Submission.exam_id == exam.id).count() == 0
+    assert (
+        test_db.query(Attempt)
+        .join(Submission, Attempt.submission_id == Submission.id)
+        .filter(Submission.exam_id == exam.id)
+        .count()
+        == 0
+    )
+    # An audit entry records who deleted what.
+    audit = (
+        test_db.query(AuditLog)
+        .filter(
+            AuditLog.action == AuditService.ACTION_DELETE_RESULT_IMPORT,
+            AuditLog.resource_id == str(exam.id),
+        )
+        .one_or_none()
+    )
+    assert audit is not None
+    assert audit.user_id == user.id
+
+
+def test_delete_import_without_permission_returns_403(test_db: Session) -> None:
+    """A user lacking submissions:delete (reviewer) is rejected."""
+    from models.auth import Role, UserRole
+
+    inst = _make_institution(test_db, slug="del-rbac")
+    reviewer_role = (
+        test_db.query(Role).filter(Role.name == UserRole.ASSISTANT.value).first()
+    )
+    if reviewer_role is None:
+        reviewer_role = Role(
+            name=UserRole.ASSISTANT.value,
+            display_name="Reviewer",
+            permissions=["submissions:read"],
+            is_system_role=True,
+        )
+        test_db.add(reviewer_role)
+        test_db.flush()
+    assert "submissions:delete" not in (reviewer_role.permissions or [])
+
+    user = User(
+        email="reviewer-del@test.ch",
+        first_name="Re",
+        last_name="Viewer",
+        password_hash="dummy",  # pragma: allowlist secret
+        institution_id=inst.id,
+        status=UserStatus.ACTIVE.value,
+        is_superuser=False,
+    )
+    user.roles.append(reviewer_role)
+    test_db.add(user)
+    exam = _make_exam(test_db, inst.id)
+    test_db.commit()
+
+    client = _client(test_db, user)
+    response = client.request(
+        "DELETE", "/api/v1/submissions/import", params={"exam_id": exam.id}
+    )
+    assert response.status_code == 403, response.text
+
+
+def test_delete_import_cross_institution_returns_404(test_db: Session) -> None:
+    """An exam in another institution is invisible (multi-tenancy)."""
+    from models.submission import Submission
+
+    inst_a = _make_institution(test_db, slug="del-tenant-a")
+    inst_b = _make_institution(test_db, slug="del-tenant-b")
+    user_a = _make_user(test_db, inst_a.id, email="tenant-a@test.ch")
+    exam_b = _make_exam(test_db, inst_b.id)
+    test_db.commit()
+    _seed_import(test_db, exam_b)
+
+    client = _client(test_db, user_a)
+    response = client.request(
+        "DELETE", "/api/v1/submissions/import", params={"exam_id": exam_b.id}
+    )
+
+    assert response.status_code == 404, response.text
+    # Other institution's data is untouched.
+    assert (
+        test_db.query(Submission).filter(Submission.exam_id == exam_b.id).count() == 2
+    )
+
+
+def test_delete_import_aborts_and_rolls_back_when_audit_fails(
+    test_db: Session,
+) -> None:
+    """Fail-closed: if the audit write fails, the deletion is rolled back and
+    the endpoint returns 500 — no data loss without a trail (TF-421)."""
+    from models.submission import Attempt, Submission
+    from services.audit_service import AuditService
+
+    inst = _make_institution(test_db, slug="del-audit-fail")
+    user = _make_user(test_db, inst.id, email="audit-fail@test.ch")
+    exam = _make_exam(test_db, inst.id)
+    test_db.commit()
+    _seed_import(test_db, exam)
+    assert test_db.query(Submission).count() == 2
+
+    # Simulate the real log_action contract on failure: roll back the staged
+    # deletion and return None (the endpoint relies on this rollback).
+    def fake_log_action(*args, db=None, **kwargs):
+        db.rollback()
+        return None
+
+    client = _client(test_db, user)
+    with patch.object(
+        AuditService, "log_action", side_effect=fake_log_action
+    ) as logged:
+        response = client.request(
+            "DELETE", "/api/v1/submissions/import", params={"exam_id": exam.id}
+        )
+
+    assert response.status_code == 500, response.text
+    logged.assert_called_once()
+    # Deletion was rolled back — results survive.
+    assert test_db.query(Submission).filter(Submission.exam_id == exam.id).count() == 2
+    assert (
+        test_db.query(Attempt)
+        .join(Submission, Attempt.submission_id == Submission.id)
+        .filter(Submission.exam_id == exam.id)
+        .count()
+        == 2
+    )

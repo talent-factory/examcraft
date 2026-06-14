@@ -69,6 +69,7 @@
       "loadError": "Prüfung oder Submissions konnten nicht geladen werden.",
       "detailError": "Submission-Detail konnte nicht geladen werden.",
       "actionImport": "Resultate importieren",
+      "actionDeleteImport": "Import löschen",
       "tabSubmissions": "Submissions",
       "tabReview": "Review",
       "tabStatistik": "Statistik",
@@ -146,6 +147,22 @@
           "success": "{{count}} Bewertungen übernommen."
         }
       }
+    },
+    "deleteImportDialog": {
+      "title": "Import löschen — {{examTitle}}",
+      "warningTitle": "Diese Aktion kann nicht rückgängig gemacht werden",
+      "warningBody": "Alle importierten Resultate dieser Prüfung werden gelöscht (Versuche, Antworten und Bewertungen). Danach kannst du die Resultate sauber neu importieren.",
+      "studentCount_one": "{{count}} Studierende:r",
+      "studentCount_other": "{{count}} Studierende",
+      "attemptCount_one": "{{count}} Versuch",
+      "attemptCount_other": "{{count}} Versuche",
+      "submissionCount_one": "{{count}} Submission",
+      "submissionCount_other": "{{count}} Submissions",
+      "bySourceLabel": "Nach Quelle:",
+      "nothingToDelete": "Für diese Prüfung sind keine importierten Resultate vorhanden.",
+      "confirm": "Endgültig löschen",
+      "errorLoad": "Zusammenfassung konnte nicht geladen werden.",
+      "errorDelete": "Löschen fehlgeschlagen."
     },
     "importDialog": {
       "title": "Resultate importieren — {{examTitle}}",

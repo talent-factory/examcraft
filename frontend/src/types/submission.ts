@@ -95,6 +95,24 @@ export interface ImportJob {
 }
 
 // ---------------------------------------------------------------------------
+// Import deletion (TF-421)
+// ---------------------------------------------------------------------------
+
+export interface ImportSourceCount {
+  source: AttemptSource;
+  attempt_count: number;
+}
+
+/** Counts for the delete-confirmation dialog and the delete result. */
+export interface ImportDeletionSummary {
+  exam_id: number;
+  submission_count: number;
+  attempt_count: number;
+  student_count: number;
+  by_source: ImportSourceCount[];
+}
+
+// ---------------------------------------------------------------------------
 // Submissions — list + detail
 // ---------------------------------------------------------------------------
 

@@ -217,6 +217,8 @@ class TestPermissionConsistency:
             "submissions:read",
             "submissions:import",
             "submissions:grade",
+            # TF-421 — delete a result-import (clean re-import).
+            "submissions:delete",
             # TF-335 — Custom Grading-Schemes management permission.
             "grading_schemes:manage",
             # TF-336 — Klassen-/Studi-Stammdaten und Moodle-Connections.

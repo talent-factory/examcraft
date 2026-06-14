@@ -80,6 +80,8 @@ def seed_default_roles(db: Session):
                 "submissions:read",
                 "submissions:import",
                 "submissions:grade",
+                # TF-421: delete a result-import to allow a clean re-import.
+                "submissions:delete",
                 # TF-335: Admin manages institution-scoped Grading-
                 # Schemes; System schemes stay read-only via the API.
                 "grading_schemes:manage",
@@ -116,6 +118,8 @@ def seed_default_roles(db: Session):
                 "submissions:read",
                 "submissions:import",
                 "submissions:grade",
+                # TF-421: Lehrperson can delete a result-import (clean re-import).
+                "submissions:delete",
             ],
             "is_system_role": True,
         },

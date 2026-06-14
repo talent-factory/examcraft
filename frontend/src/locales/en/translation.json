@@ -69,6 +69,7 @@
       "loadError": "Could not load exam or submissions.",
       "detailError": "Could not load submission detail.",
       "actionImport": "Import results",
+      "actionDeleteImport": "Delete import",
       "tabSubmissions": "Submissions",
       "tabReview": "Review",
       "tabStatistik": "Statistics",
@@ -146,6 +147,22 @@
           "success": "{{count}} grades approved."
         }
       }
+    },
+    "deleteImportDialog": {
+      "title": "Delete import — {{examTitle}}",
+      "warningTitle": "This action cannot be undone",
+      "warningBody": "All imported results of this exam will be deleted (attempts, answers and grades). You can then re-import the results cleanly.",
+      "studentCount_one": "{{count}} student",
+      "studentCount_other": "{{count}} students",
+      "attemptCount_one": "{{count}} attempt",
+      "attemptCount_other": "{{count}} attempts",
+      "submissionCount_one": "{{count}} submission",
+      "submissionCount_other": "{{count}} submissions",
+      "bySourceLabel": "By source:",
+      "nothingToDelete": "There are no imported results for this exam.",
+      "confirm": "Delete permanently",
+      "errorLoad": "Could not load the summary.",
+      "errorDelete": "Deletion failed."
     },
     "importDialog": {
       "title": "Import results — {{examTitle}}",
