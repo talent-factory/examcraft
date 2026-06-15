@@ -12,7 +12,7 @@
  * Export aktuell blockiert ist.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -21,10 +21,14 @@ import {
   FormControl,
   FormControlLabel,
   FormLabel,
+  InputLabel,
   Link,
+  ListSubheader,
+  MenuItem,
   Paper,
   Radio,
   RadioGroup,
+  Select,
   Typography,
 } from '@mui/material';
 import { Download as DownloadIcon } from '@mui/icons-material';
@@ -34,7 +38,11 @@ import {
   ExportFormat,
   GradeExportService,
 } from '../../services/gradeExportService';
+import { ComposerService } from '../../services/ComposerService';
+import { GradingSchemesService } from '../../services/gradingSchemesService';
+import { GradingSchemeOut } from '../../types/gradingScheme';
 import { ApiError } from '../../services/submissionsService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface NotenexportPanelProps {
   examId: number;
@@ -58,9 +66,117 @@ const NotenexportPanel: React.FC<NotenexportPanelProps> = ({
   onOpenReview,
 }) => {
   const { t } = useTranslation();
+  const { hasPermission } = useAuth();
   const [format, setFormat] = useState<ExportFormat>('csv');
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Reassigning the scheme goes through PATCH /exams/{id}/grading-scheme,
+  // which requires ``create_exams``. The export tab itself is reachable with
+  // only ``submissions:read`` (e.g. the Assistant role), so a reviewer without
+  // ``create_exams`` would otherwise see a picker that 403s on save. Gate the
+  // whole picker on the same permission the endpoint enforces.
+  const canAssignScheme = hasPermission('create_exams');
+
+  // Per-exam grading scheme (TF-432). The scheme picker is an enhancement on
+  // top of the export — a failed scheme/exam fetch must never block the
+  // download itself, so it lives behind its own ``schemeReady`` flag.
+  const [schemes, setSchemes] = useState<GradingSchemeOut[]>([]);
+  const [schemeId, setSchemeId] = useState<number | null>(null);
+  const [examUpdatedAt, setExamUpdatedAt] = useState<string | null>(null);
+  const [schemeReady, setSchemeReady] = useState(false);
+  const [savingScheme, setSavingScheme] = useState(false);
+  const [schemeMsg, setSchemeMsg] = useState<{
+    severity: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    // Skip the fetch entirely for users who can't reassign — they never see
+    // the picker, so there's no point loading schemes or the exam metadata.
+    if (!canAssignScheme) {
+      setSchemeReady(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [schemesResp, exam] = await Promise.all([
+          GradingSchemesService.list(true),
+          ComposerService.getExam(examId),
+        ]);
+        if (cancelled) return;
+        setSchemes(schemesResp.schemes);
+        setSchemeId(exam.grading_scheme_id ?? null);
+        setExamUpdatedAt(exam.updated_at);
+        setSchemeReady(true);
+      } catch (err) {
+        // Enhancement only — leave the picker hidden, keep export working.
+        // Log so an auth/permission/network failure is observable instead of
+        // collapsing silently into "the picker just isn't there".
+        if (!cancelled) {
+          setSchemeReady(false);
+          console.warn(
+            'NotenexportPanel: grading-scheme metadata load failed',
+            err,
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [examId, canAssignScheme]);
+
+  const handleSchemeChange = async (value: number | null) => {
+    setSavingScheme(true);
+    setSchemeMsg(null);
+    try {
+      const updated = await ComposerService.updateExamGradingScheme(examId, {
+        grading_scheme_id: value,
+        // ``examUpdatedAt`` is always populated before the picker is
+        // interactable (set together with ``schemeReady`` on load), and the
+        // backend requires it for optimistic locking.
+        updated_at: examUpdatedAt ?? '',
+      });
+      setSchemeId(updated.grading_scheme_id ?? null);
+      setExamUpdatedAt(updated.updated_at);
+      setSchemeMsg({
+        severity: 'success',
+        text: t('auswertungen.export.gradingSchemeSaved'),
+      });
+    } catch (err) {
+      // Optimistic-lock clash (409): the exam changed under us. Reload so
+      // the next attempt carries a fresh updated_at, and tell the user.
+      // ``updateExamGradingScheme`` goes through the raw axios ``apiClient``
+      // (status on ``err.response.status``), but read ``ApiError.status`` too
+      // so the 409 branch survives a future switch to a safeFetch-style wrapper.
+      const status =
+        err instanceof ApiError
+          ? err.status
+          : (err as { response?: { status?: number } })?.response?.status;
+      if (status === 409) {
+        try {
+          const exam = await ComposerService.getExam(examId);
+          setSchemeId(exam.grading_scheme_id ?? null);
+          setExamUpdatedAt(exam.updated_at);
+        } catch {
+          /* keep stale value; user can retry */
+        }
+        setSchemeMsg({
+          severity: 'error',
+          text: t('auswertungen.export.gradingSchemeConflict'),
+        });
+      } else {
+        setSchemeMsg({
+          severity: 'error',
+          text: t('auswertungen.export.gradingSchemeError'),
+        });
+      }
+    } finally {
+      setSavingScheme(false);
+    }
+  };
 
   const blocked = pendingCount > 0 || totalSubmissions === 0;
 
@@ -155,6 +271,65 @@ const NotenexportPanel: React.FC<NotenexportPanelProps> = ({
         <Alert severity="error" sx={{ mb: 2 }} data-testid="notenexport-error">
           {error}
         </Alert>
+      )}
+
+      {schemeReady && (
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <FormControl fullWidth size="small">
+            <InputLabel id="exam-grading-scheme-label">
+              {t('auswertungen.export.gradingSchemeLabel')}
+            </InputLabel>
+            <Select
+              labelId="exam-grading-scheme-label"
+              label={t('auswertungen.export.gradingSchemeLabel')}
+              value={schemeId ?? ''}
+              disabled={savingScheme}
+              onChange={(e) =>
+                handleSchemeChange(
+                  e.target.value === '' ? null : Number(e.target.value),
+                )
+              }
+              data-testid="exam-grading-scheme-select"
+            >
+              <MenuItem value="">
+                <em>{t('auswertungen.export.gradingSchemeInherit')}</em>
+              </MenuItem>
+              {schemes.some((s) => s.is_system_scheme) && (
+                <ListSubheader>
+                  {t('auswertungen.export.gradingSchemeSystemGroup')}
+                </ListSubheader>
+              )}
+              {schemes
+                .filter((s) => s.is_system_scheme)
+                .map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+              {schemes.some((s) => !s.is_system_scheme) && (
+                <ListSubheader>
+                  {t('auswertungen.export.gradingSchemeInstitutionGroup')}
+                </ListSubheader>
+              )}
+              {schemes
+                .filter((s) => !s.is_system_scheme)
+                .map((s) => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+            </Select>
+          </FormControl>
+          {schemeMsg && (
+            <Alert
+              severity={schemeMsg.severity}
+              sx={{ mt: 2 }}
+              data-testid="exam-grading-scheme-msg"
+            >
+              {schemeMsg.text}
+            </Alert>
+          )}
+        </Paper>
       )}
 
       <Paper sx={{ p: 3, mb: 3 }}>

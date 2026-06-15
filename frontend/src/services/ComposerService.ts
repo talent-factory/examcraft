@@ -55,6 +55,25 @@ export class ComposerService {
     return response.data;
   }
 
+  /**
+   * Reassign (or clear) the grading scheme of an exam via the dedicated
+   * PATCH endpoint. Unlike `updateExam` (PUT, draft-only) this works on
+   * finalized/exported exams — reassigning the noten-skala is metadata-only.
+   * `grading_scheme_id: null` clears it so the export falls back to the
+   * institution default. `updated_at` is required by the backend for
+   * optimistic locking (mismatch → 409).
+   */
+  static async updateExamGradingScheme(
+    examId: number,
+    data: { grading_scheme_id: number | null; updated_at: string },
+  ): Promise<Exam> {
+    const response = await apiClient.patch(
+      `/api/v1/exams/${examId}/grading-scheme`,
+      data,
+    );
+    return response.data;
+  }
+
   static async deleteExam(examId: number): Promise<void> {
     await apiClient.delete(`/api/v1/exams/${examId}`);
   }

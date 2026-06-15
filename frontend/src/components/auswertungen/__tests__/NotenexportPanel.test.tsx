@@ -14,6 +14,8 @@ import '@testing-library/jest-dom';
 
 import NotenexportPanel from '../NotenexportPanel';
 import { GradeExportService } from '../../../services/gradeExportService';
+import { ComposerService } from '../../../services/ComposerService';
+import { GradingSchemesService } from '../../../services/gradingSchemesService';
 import { ApiError } from '../../../services/submissionsService';
 
 // react-i18next is globally mocked in setupTests.ts to resolve keys
@@ -21,6 +23,17 @@ import { ApiError } from '../../../services/submissionsService';
 
 jest.mock('../../../services/gradeExportService', () => ({
   GradeExportService: { download: jest.fn() },
+}));
+
+jest.mock('../../../services/ComposerService', () => ({
+  ComposerService: {
+    getExam: jest.fn(),
+    updateExamGradingScheme: jest.fn(),
+  },
+}));
+
+jest.mock('../../../services/gradingSchemesService', () => ({
+  GradingSchemesService: { list: jest.fn() },
 }));
 
 jest.mock('../../../services/submissionsService', () => ({
@@ -35,9 +48,44 @@ jest.mock('../../../services/submissionsService', () => ({
   },
 }));
 
+// The scheme picker is gated on the ``create_exams`` permission. Default to
+// granting it so the picker renders; individual tests flip it to false.
+const mockHasPermission = jest.fn<boolean, [string]>(() => true);
+jest.mock('../../../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: mockHasPermission }),
+}));
+
 const mockedDownload = GradeExportService.download as jest.MockedFunction<
   typeof GradeExportService.download
 >;
+const mockedGetExam = ComposerService.getExam as jest.Mock;
+const mockedUpdateScheme =
+  ComposerService.updateExamGradingScheme as jest.Mock;
+const mockedListSchemes = GradingSchemesService.list as jest.Mock;
+
+const SCHEMES = {
+  schemes: [
+    {
+      id: 1,
+      institution_id: null,
+      name: 'Swiss 1.0–6.0',
+      display_format: 'numeric',
+      config: { type: 'linear', min_pct: 0, max_pct: 100, min_grade: 1, max_grade: 6 },
+      is_default_for_institution: false,
+      is_system_scheme: true,
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+    },
+  ],
+};
+
+const EXAM = {
+  id: 42,
+  title: 'Prüfung',
+  status: 'finalized',
+  updated_at: '2026-06-15T10:00:00Z',
+  grading_scheme_id: null,
+};
 
 const renderPanel = (props: {
   totalSubmissions?: number;
@@ -68,6 +116,16 @@ describe('NotenexportPanel', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHasPermission.mockReturnValue(true);
+    // Scheme picker fetches schemes + the exam on mount; default both so
+    // the existing export tests keep rendering without real HTTP.
+    mockedListSchemes.mockResolvedValue(SCHEMES);
+    mockedGetExam.mockResolvedValue({ ...EXAM });
+    mockedUpdateScheme.mockResolvedValue({
+      ...EXAM,
+      grading_scheme_id: 1,
+      updated_at: '2026-06-15T10:05:00Z',
+    });
   });
 
   it('disables download while reviews are pending', () => {
@@ -122,5 +180,144 @@ describe('NotenexportPanel', () => {
     expect(
       await screen.findByText(/Review zuerst abarbeiten/),
     ).toBeInTheDocument();
+  });
+
+  // --- TF-432: per-exam grading scheme picker -----------------------------
+
+  it('renders the per-exam grading scheme picker after load', async () => {
+    renderPanel({ pendingCount: 0 });
+    expect(
+      await screen.findByTestId('exam-grading-scheme-select'),
+    ).toBeInTheDocument();
+    expect(mockedGetExam).toHaveBeenCalledWith(42);
+    expect(mockedListSchemes).toHaveBeenCalled();
+  });
+
+  it('assigns a system scheme via the dedicated PATCH endpoint', async () => {
+    renderPanel({ pendingCount: 0 });
+    await screen.findByTestId('exam-grading-scheme-select');
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    fireEvent.click(
+      await screen.findByRole('option', { name: 'Swiss 1.0–6.0' }),
+    );
+    await waitFor(() =>
+      expect(mockedUpdateScheme).toHaveBeenCalledWith(
+        42,
+        expect.objectContaining({ grading_scheme_id: 1 }),
+      ),
+    );
+  });
+
+  it('clears the scheme back to the institution default (null)', async () => {
+    mockedGetExam.mockResolvedValue({ ...EXAM, grading_scheme_id: 1 });
+    renderPanel({ pendingCount: 0 });
+    await screen.findByTestId('exam-grading-scheme-select');
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    fireEvent.click(
+      await screen.findByRole('option', {
+        name: 'Institutions-Standard verwenden',
+      }),
+    );
+    await waitFor(() =>
+      expect(mockedUpdateScheme).toHaveBeenCalledWith(
+        42,
+        expect.objectContaining({ grading_scheme_id: null }),
+      ),
+    );
+  });
+
+  it('keeps the export usable (and logs) when scheme metadata fails to load', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockedListSchemes.mockRejectedValueOnce(new Error('boom'));
+    renderPanel({ pendingCount: 0 });
+    expect(
+      screen.getByRole('button', { name: /Herunterladen/ }),
+    ).toBeInTheDocument();
+    // The failure is logged, not swallowed silently — so an auth/permission/
+    // network problem stays observable instead of "the picker just vanished".
+    // (Wait on the log, not on picker-absence: the picker is already absent on
+    // the first frame, so a picker-absent waitFor would resolve before the
+    // async catch even runs.)
+    await waitFor(() =>
+      expect(warn).toHaveBeenCalledWith(
+        'NotenexportPanel: grading-scheme metadata load failed',
+        expect.any(Error),
+      ),
+    );
+    expect(
+      screen.queryByTestId('exam-grading-scheme-select'),
+    ).not.toBeInTheDocument();
+    warn.mockRestore();
+  });
+
+  it('shows the success message and reflects the saved scheme after assigning', async () => {
+    renderPanel({ pendingCount: 0 });
+    await screen.findByTestId('exam-grading-scheme-select');
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    fireEvent.click(
+      await screen.findByRole('option', { name: 'Swiss 1.0–6.0' }),
+    );
+    // Success alert is rendered…
+    const msg = await screen.findByTestId('exam-grading-scheme-msg');
+    expect(msg).toHaveTextContent('Notenschema gespeichert.');
+    // …and the Select now reflects the returned grading_scheme_id (1),
+    // i.e. the picker holds the user's choice rather than resetting.
+    expect(screen.getByRole('combobox')).toHaveTextContent('Swiss 1.0–6.0');
+  });
+
+  it('recovers from a 409 conflict: reloads the exam and warns the user', async () => {
+    // First save clashes (409); the component must re-fetch the exam to pick
+    // up a fresh updated_at and surface the conflict message.
+    mockedUpdateScheme.mockRejectedValueOnce({ response: { status: 409 } });
+    mockedGetExam
+      .mockResolvedValueOnce({ ...EXAM })
+      .mockResolvedValueOnce({
+        ...EXAM,
+        grading_scheme_id: 1,
+        updated_at: '2026-06-15T11:00:00Z',
+      });
+    renderPanel({ pendingCount: 0 });
+    await screen.findByTestId('exam-grading-scheme-select');
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    fireEvent.click(
+      await screen.findByRole('option', { name: 'Swiss 1.0–6.0' }),
+    );
+    const msg = await screen.findByTestId('exam-grading-scheme-msg');
+    expect(msg).toHaveTextContent(
+      'Prüfung wurde zwischenzeitlich geändert — bitte erneut versuchen.',
+    );
+    // Mount fetch + the post-409 reload = two getExam calls.
+    expect(mockedGetExam).toHaveBeenCalledTimes(2);
+  });
+
+  it('surfaces a generic error when a non-409 save fails', async () => {
+    mockedUpdateScheme.mockRejectedValueOnce({ response: { status: 500 } });
+    renderPanel({ pendingCount: 0 });
+    await screen.findByTestId('exam-grading-scheme-select');
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    fireEvent.click(
+      await screen.findByRole('option', { name: 'Swiss 1.0–6.0' }),
+    );
+    const msg = await screen.findByTestId('exam-grading-scheme-msg');
+    expect(msg).toHaveTextContent('Notenschema konnte nicht gespeichert werden.');
+    // A 500 is not a conflict — no reload beyond the initial mount fetch.
+    expect(mockedGetExam).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the picker (and skips the fetch) without create_exams permission', async () => {
+    mockHasPermission.mockReturnValue(false);
+    renderPanel({ pendingCount: 0 });
+    // Export still works…
+    expect(
+      screen.getByRole('button', { name: /Herunterladen/ }),
+    ).toBeInTheDocument();
+    // …but the picker is absent and no scheme/exam metadata is fetched.
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('exam-grading-scheme-select'),
+      ).not.toBeInTheDocument(),
+    );
+    expect(mockedListSchemes).not.toHaveBeenCalled();
+    expect(mockedGetExam).not.toHaveBeenCalled();
   });
 });

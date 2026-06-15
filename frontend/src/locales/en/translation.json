@@ -245,7 +245,14 @@
       "errorAuth": "Session expired — please sign in again.",
       "errorPermission": "You do not have permission to export grades.",
       "errorNotFound": "Exam not found.",
-      "errorServer": "Grade export failed — please retry or contact support."
+      "errorServer": "Grade export failed — please retry or contact support.",
+      "gradingSchemeLabel": "Grading scheme for this exam",
+      "gradingSchemeInherit": "Use institution default",
+      "gradingSchemeSystemGroup": "System schemes",
+      "gradingSchemeInstitutionGroup": "Own schemes",
+      "gradingSchemeSaved": "Grading scheme saved.",
+      "gradingSchemeConflict": "Exam changed meanwhile — please retry.",
+      "gradingSchemeError": "Could not save grading scheme."
     },
     "statistik": {
       "errorAuth": "Session expired — please sign in again.",

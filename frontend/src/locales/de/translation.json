@@ -245,7 +245,14 @@
       "errorAuth": "Sitzung abgelaufen — bitte erneut anmelden.",
       "errorPermission": "Keine Berechtigung für den Notenexport.",
       "errorNotFound": "Prüfung nicht gefunden.",
-      "errorServer": "Notenexport fehlgeschlagen — bitte erneut versuchen oder Support kontaktieren."
+      "errorServer": "Notenexport fehlgeschlagen — bitte erneut versuchen oder Support kontaktieren.",
+      "gradingSchemeLabel": "Notenschema für diese Prüfung",
+      "gradingSchemeInherit": "Institutions-Standard verwenden",
+      "gradingSchemeSystemGroup": "System-Schemata",
+      "gradingSchemeInstitutionGroup": "Eigene Schemata",
+      "gradingSchemeSaved": "Notenschema gespeichert.",
+      "gradingSchemeConflict": "Prüfung wurde zwischenzeitlich geändert — bitte erneut versuchen.",
+      "gradingSchemeError": "Notenschema konnte nicht gespeichert werden."
     },
     "statistik": {
       "errorAuth": "Sitzung abgelaufen — bitte erneut anmelden.",

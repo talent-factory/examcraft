@@ -3418,3 +3418,273 @@ class TestApprovedQuestionDetail(
             assert "explanation" not in q
             assert "source_documents" not in q
             assert "competency" not in q
+
+
+class TestExamGradingSchemeEndpoint:
+    """PATCH /api/v1/exams/{id}/grading-scheme — the dedicated reassignment
+    endpoint the TF-432 frontend wires into the Notenexport panel. Unlike PUT
+    it must work on finalized exams (bypasses the draft guard)."""
+
+    @pytest.fixture
+    def gs_db(self, test_engine):
+        yield from _make_committable_session(
+            test_engine, slug="gs-assign-university", email="gsassign@test.com"
+        )
+
+    @pytest.fixture
+    def gs_institution(self, gs_db):
+        from models.auth import Institution
+
+        existing = (
+            gs_db.query(Institution).filter_by(slug="gs-assign-university").first()
+        )
+        if existing:
+            return existing
+        inst = Institution(
+            name="GS Assign University",
+            slug="gs-assign-university",
+            subscription_tier="professional",
+            max_users=-1,
+            max_documents=-1,
+            max_questions_per_month=-1,
+        )
+        gs_db.add(inst)
+        gs_db.commit()
+        gs_db.refresh(inst)
+        return inst
+
+    @pytest.fixture
+    def gs_user(self, gs_db, gs_institution):
+        from models.auth import User, UserStatus
+
+        existing = gs_db.query(User).filter_by(email="gsassign@test.com").first()
+        if existing:
+            return existing
+        user = User(
+            email="gsassign@test.com",
+            first_name="GS",
+            last_name="Assign",
+            password_hash="dummy_hash",  # pragma: allowlist secret
+            institution_id=gs_institution.id,
+            status=UserStatus.ACTIVE.value,
+        )
+        gs_db.add(user)
+        gs_db.commit()
+        gs_db.refresh(user)
+        return user
+
+    @pytest.fixture
+    def swiss_scheme(self, gs_db):
+        from models.grading_scheme import GradingScheme
+
+        existing = (
+            gs_db.query(GradingScheme)
+            .filter_by(institution_id=None, name="Swiss TF432")
+            .first()
+        )
+        if existing:
+            return existing
+        scheme = GradingScheme(
+            institution_id=None,
+            name="Swiss TF432",
+            display_format="numeric",
+            config={
+                "type": "linear_segments",
+                "round_to": 0.1,
+                "segments": [
+                    {"from_pct": 0, "to_pct": 50, "from_grade": 1.0, "to_grade": 4.0},
+                    {"from_pct": 50, "to_pct": 100, "from_grade": 4.0, "to_grade": 6.0},
+                ],
+            },
+            is_default_for_institution=False,
+        )
+        gs_db.add(scheme)
+        gs_db.commit()
+        gs_db.refresh(scheme)
+        return scheme
+
+    @pytest.fixture
+    def mock_user(self, gs_institution, gs_user):
+        return _make_mock_user(institution_id=gs_institution.id, user_id=gs_user.id)
+
+    @pytest.fixture
+    def gs_client(self, gs_db, gs_institution, mock_user):
+        from utils.auth_utils import get_current_user
+        from database import get_db
+        import api.exams as exams_module
+
+        app.include_router(exams_module.router)
+
+        def override_get_db():
+            yield gs_db
+
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+        app.dependency_overrides[get_db] = override_get_db
+        client = TestClient(app, raise_server_exceptions=True)
+        yield client
+        app.dependency_overrides.clear()
+
+    def _finalized_exam(self, gs_client, gs_db) -> int:
+        from models.exam import Exam, ExamStatus
+
+        resp = gs_client.post("/api/v1/exams/", json={"title": "Importierte Prüfung"})
+        assert resp.status_code == 201, resp.text
+        exam_id = resp.json()["id"]
+        # Mark finalized directly — the dedicated PATCH must work post-finalize,
+        # which is exactly the imported-exam case the frontend targets.
+        exam = gs_db.query(Exam).filter(Exam.id == exam_id).one()
+        exam.status = ExamStatus.FINALIZED.value
+        gs_db.commit()
+        return exam_id
+
+    def _updated_at(self, gs_client, exam_id: int) -> str:
+        return gs_client.get(f"/api/v1/exams/{exam_id}").json()["updated_at"]
+
+    def test_assign_system_scheme_to_finalized_exam(
+        self, gs_client, gs_db, swiss_scheme
+    ):
+        exam_id = self._finalized_exam(gs_client, gs_db)
+        resp = gs_client.patch(
+            f"/api/v1/exams/{exam_id}/grading-scheme",
+            json={
+                "grading_scheme_id": swiss_scheme.id,
+                "updated_at": self._updated_at(gs_client, exam_id),
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["grading_scheme_id"] == swiss_scheme.id
+        get_resp = gs_client.get(f"/api/v1/exams/{exam_id}")
+        assert get_resp.json()["grading_scheme_id"] == swiss_scheme.id
+
+    def test_clear_scheme_with_null(self, gs_client, gs_db, swiss_scheme):
+        exam_id = self._finalized_exam(gs_client, gs_db)
+        assigned = gs_client.patch(
+            f"/api/v1/exams/{exam_id}/grading-scheme",
+            json={
+                "grading_scheme_id": swiss_scheme.id,
+                "updated_at": self._updated_at(gs_client, exam_id),
+            },
+        )
+        assert assigned.status_code == 200, assigned.text
+        resp = gs_client.patch(
+            f"/api/v1/exams/{exam_id}/grading-scheme",
+            json={
+                "grading_scheme_id": None,
+                "updated_at": assigned.json()["updated_at"],
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["grading_scheme_id"] is None
+
+    def test_invalid_scheme_rejected_with_422(self, gs_client, gs_db):
+        exam_id = self._finalized_exam(gs_client, gs_db)
+        resp = gs_client.patch(
+            f"/api/v1/exams/{exam_id}/grading-scheme",
+            json={
+                "grading_scheme_id": 999999,
+                "updated_at": self._updated_at(gs_client, exam_id),
+            },
+        )
+        assert resp.status_code == 422, resp.text
+
+    def test_stale_updated_at_returns_409(self, gs_client, gs_db, swiss_scheme):
+        exam_id = self._finalized_exam(gs_client, gs_db)
+        stale = gs_client.get(f"/api/v1/exams/{exam_id}").json()["updated_at"]
+        first = gs_client.patch(
+            f"/api/v1/exams/{exam_id}/grading-scheme",
+            json={"grading_scheme_id": swiss_scheme.id, "updated_at": stale},
+        )
+        assert first.status_code == 200, first.text
+        second = gs_client.patch(
+            f"/api/v1/exams/{exam_id}/grading-scheme",
+            json={"grading_scheme_id": None, "updated_at": stale},
+        )
+        assert second.status_code == 409, second.text
+
+    def test_audit_log_entry_written(self, gs_client, gs_db, swiss_scheme):
+        import json
+
+        from models.auth import AuditLog
+
+        exam_id = self._finalized_exam(gs_client, gs_db)
+        gs_client.patch(
+            f"/api/v1/exams/{exam_id}/grading-scheme",
+            json={
+                "grading_scheme_id": swiss_scheme.id,
+                "updated_at": self._updated_at(gs_client, exam_id),
+            },
+        )
+        entry = (
+            gs_db.query(AuditLog)
+            .filter(
+                AuditLog.action == "update_exam_grading_scheme",
+                AuditLog.resource_id == str(exam_id),
+            )
+            .first()
+        )
+        assert entry is not None
+        # The docstring promises the change is "reconstructable" — the payload
+        # is the load-bearing part, so assert it carries the before/after ids
+        # and the exam status, not just that *some* row exists.
+        payload = json.loads(entry.additional_data)
+        assert payload["previous_grading_scheme_id"] is None
+        assert payload["new_grading_scheme_id"] == swiss_scheme.id
+        assert payload["exam_status"] == "finalized"
+
+    def test_cross_institution_scheme_rejected_with_422(
+        self, gs_client, gs_db, gs_institution
+    ):
+        """An institution-scoped scheme owned by *another* institution must be
+        rejected with 422 — the actual tenant-isolation guard, distinct from
+        the non-existent-id (999999) case. 404 would leak the scheme's
+        existence to a caller in an unrelated institution."""
+        from models.auth import Institution
+        from models.grading_scheme import GradingScheme
+
+        other_inst = Institution(
+            name="Other GS Institution",
+            slug="gs-assign-other-institution",
+            subscription_tier="professional",
+            max_users=-1,
+            max_documents=-1,
+            max_questions_per_month=-1,
+        )
+        gs_db.add(other_inst)
+        gs_db.commit()
+        gs_db.refresh(other_inst)
+        foreign_scheme = GradingScheme(
+            institution_id=other_inst.id,
+            name="Foreign Scheme TF432",
+            display_format="numeric",
+            config={
+                "type": "linear",
+                "min_pct": 0,
+                "max_pct": 100,
+                "min_grade": 1.0,
+                "max_grade": 6.0,
+            },
+            is_default_for_institution=False,
+        )
+        gs_db.add(foreign_scheme)
+        gs_db.commit()
+        gs_db.refresh(foreign_scheme)
+
+        exam_id = self._finalized_exam(gs_client, gs_db)
+        resp = gs_client.patch(
+            f"/api/v1/exams/{exam_id}/grading-scheme",
+            json={
+                "grading_scheme_id": foreign_scheme.id,
+                "updated_at": self._updated_at(gs_client, exam_id),
+            },
+        )
+        assert resp.status_code == 422, resp.text
+
+    def test_missing_updated_at_rejected_with_422(self, gs_client, gs_db, swiss_scheme):
+        """``updated_at`` is required (optimistic-lock contract); omitting it is
+        a 422 from Pydantic, not a silent skip of the lock."""
+        exam_id = self._finalized_exam(gs_client, gs_db)
+        resp = gs_client.patch(
+            f"/api/v1/exams/{exam_id}/grading-scheme",
+            json={"grading_scheme_id": swiss_scheme.id},
+        )
+        assert resp.status_code == 422, resp.text
