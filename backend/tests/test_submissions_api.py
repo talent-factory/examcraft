@@ -322,6 +322,90 @@ def test_commit_enqueues_task_and_returns_queued(test_db: Session) -> None:
     assert poll.json()["status"] == "queued"
 
 
+def test_list_import_jobs_scoped_to_exam(test_db: Session) -> None:
+    """TF-428: the Auswertungen status surface lists an exam's import jobs
+    (with progress fields), scoped to that exam and the institution — so it can
+    show running/finished imports without holding a modal open."""
+    inst = _make_institution(test_db)
+    user = _make_user(test_db, inst.id)
+    exam = _make_exam(test_db, inst.id)
+    other_exam = _make_exam(test_db, inst.id)
+    test_db.commit()
+    client = _client(test_db, user)
+
+    def _commit(target_exam_id: int) -> None:
+        with patch("api.submissions.import_submissions.apply_async"):
+            resp = client.post(
+                "/api/v1/submissions/import/commit",
+                files={
+                    "file": (
+                        "klasse.json",
+                        BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                        "application/json",
+                    )
+                },
+                data={"exam_id": str(target_exam_id), "driver_name": "moodle_json"},
+            )
+            assert resp.status_code == 202, resp.text
+
+    _commit(exam.id)
+    _commit(exam.id)
+    _commit(other_exam.id)
+
+    listing = client.get("/api/v1/submissions/import-jobs", params={"exam_id": exam.id})
+    assert listing.status_code == 200, listing.text
+    body = listing.json()
+    # Only this exam's jobs — not the other exam's.
+    assert body["total"] == 2
+    assert len(body["items"]) == 2
+    assert all(item["exam_id"] == exam.id for item in body["items"])
+    # Progress fields are exposed for the UI (TF-428).
+    assert "graded_total" in body["items"][0]
+    assert "graded_done" in body["items"][0]
+
+
+def test_list_import_jobs_scoped_to_institution(test_db: Session) -> None:
+    """TF-428: the listing is institution-scoped — a user must NOT see another
+    institution's import jobs, even when querying that institution's exam_id
+    directly. This is the cross-tenant guard on ``import_jobs``; the exam-scoped
+    test alone (single institution) cannot prove it."""
+    inst_a = _make_institution(test_db, slug="tf428-inst-a")
+    user_a = _make_user(test_db, inst_a.id, email="a@test.ch")
+    inst_b = _make_institution(test_db, slug="tf428-inst-b")
+    user_b = _make_user(test_db, inst_b.id, email="b@test.ch")
+    exam_b = _make_exam(test_db, inst_b.id)
+    test_db.commit()
+
+    # User B imports into their own exam.
+    with patch("api.submissions.import_submissions.apply_async"):
+        resp = _client(test_db, user_b).post(
+            "/api/v1/submissions/import/commit",
+            files={
+                "file": (
+                    "klasse.json",
+                    BytesIO(_JSON_FIXTURE.encode("utf-8")),
+                    "application/json",
+                )
+            },
+            data={"exam_id": str(exam_b.id), "driver_name": "moodle_json"},
+        )
+        assert resp.status_code == 202, resp.text
+
+    # User A, querying institution B's exam_id, sees nothing — the
+    # institution filter blocks the cross-tenant read.
+    leaked = _client(test_db, user_a).get(
+        "/api/v1/submissions/import-jobs", params={"exam_id": exam_b.id}
+    )
+    assert leaked.status_code == 200, leaked.text
+    assert leaked.json()["total"] == 0
+
+    # Sanity: institution B's own user does see the job.
+    owned = _client(test_db, user_b).get(
+        "/api/v1/submissions/import-jobs", params={"exam_id": exam_b.id}
+    )
+    assert owned.json()["total"] == 1
+
+
 def test_commit_rejects_malformed_csv_before_enqueue(test_db: Session) -> None:
     """The 202-async design rests on validation staying *in front of* the
     enqueue: a malformed upload must be rejected (4xx) and NOTHING enqueued,

@@ -31,6 +31,7 @@ import {
   Alert,
   AlertTitle,
   CircularProgress,
+  LinearProgress,
   Table,
   TableBody,
   TableCell,
@@ -69,7 +70,14 @@ interface ImportDialogProps {
    * exposed so tests can poll fast without fake timers.
    */
   pollIntervalMs?: number;
-  /** Give up polling after this long and surface a timeout error. */
+  /**
+   * @deprecated TF-428: no longer used. The dialog now polls until the job
+   * reaches a terminal status — the backend guarantees one via the import
+   * task's hard ``time_limit`` plus the stuck-job reaper — so there is no
+   * client-side cutoff that could time out before a long free-text grading
+   * run finishes. The user can close the dialog to let the import continue in
+   * the background. Kept optional so existing callers/tests still type-check.
+   */
   pollTimeoutMs?: number;
 }
 
@@ -81,7 +89,6 @@ type WizardStep = 'source' | 'upload' | 'preview' | 'submitting';
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_VISIBLE_ERRORS = 5;
 const DEFAULT_POLL_INTERVAL_MS = 1500;
-const DEFAULT_POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
 // The import commit is async (TF-412): the endpoint returns a ``queued``
 // job and a Celery worker grades it. ``queued``/``running`` are transient;
@@ -120,7 +127,6 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   examTitle,
   onImported,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
-  pollTimeoutMs = DEFAULT_POLL_TIMEOUT_MS,
 }) => {
   const { t } = useTranslation();
 
@@ -273,12 +279,18 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   };
 
   // Poll the async import job until it reaches a terminal status, updating
-  // the visible job state on each tick so the user sees live progress.
+  // the visible job state on each tick so the user sees live n/total progress.
+  //
+  // TF-428: no client-side deadline. A free-text-heavy import legitimately
+  // runs for minutes, and the backend guarantees a terminal state (the task's
+  // hard time_limit + the reap_stuck_import_jobs watchdog), so a wall-clock
+  // cutoff here only ever produced a false "timeout" while the job actually
+  // succeeded. The user can close the dialog at any point and the import keeps
+  // running in the background; polling then stops via the abort signal.
   const pollUntilTerminal = async (
     jobId: number,
     signal: AbortSignal,
   ): Promise<ImportJob> => {
-    const deadline = Date.now() + pollTimeoutMs;
     for (;;) {
       await abortableDelay(pollIntervalMs, signal);
       const polled = await SubmissionsService.getImportJob(jobId);
@@ -288,9 +300,6 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       setJob(polled);
       if (isTerminalStatus(polled.status)) {
         return polled;
-      }
-      if (Date.now() >= deadline) {
-        throw new Error(t('auswertungen.importDialog.importTimeout'));
       }
     }
   };
@@ -662,11 +671,41 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           <Box sx={{ textAlign: 'center', py: 4 }}>
             {!job || !isTerminalStatus(job.status) ? (
               // queued / running: grading happens in the worker (TF-412) —
-              // show progress, not the (error-styled) result alert.
+              // show live n/total progress (TF-428) and make clear the import
+              // continues in the background so the user can close the dialog.
               <>
-                <CircularProgress />
-                <Typography sx={{ mt: 2 }}>
-                  {t('auswertungen.importDialog.submitting')}
+                {job && job.graded_total != null && job.graded_total > 0 ? (
+                  <Box sx={{ px: { xs: 0, sm: 4 } }} data-testid="import-grading-progress">
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(
+                        100,
+                        Math.round(
+                          (job.graded_done / job.graded_total) * 100,
+                        ),
+                      )}
+                    />
+                    <Typography sx={{ mt: 2 }}>
+                      {t('auswertungen.importDialog.gradingProgress', {
+                        done: job.graded_done,
+                        total: job.graded_total,
+                      })}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <>
+                    <CircularProgress />
+                    <Typography sx={{ mt: 2 }}>
+                      {t('auswertungen.importDialog.submitting')}
+                    </Typography>
+                  </>
+                )}
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 2 }}
+                >
+                  {t('auswertungen.importDialog.backgroundHint')}
                 </Typography>
               </>
             ) : (
@@ -677,9 +716,28 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={handleClose} disabled={busy}>
-          {job ? t('common.close') : t('common.cancel')}
-        </Button>
+        {(() => {
+          // TF-428: while the import runs (queued/running), the close button
+          // stays enabled so the user can leave it to finish in the
+          // background instead of being pinned to the spinner. handleClose
+          // aborts only the client poll — the worker keeps grading, and the
+          // Auswertungen status surface then tracks the job.
+          const runningImport =
+            step === 'submitting' && (!job || !isTerminalStatus(job.status));
+          return (
+            <Button
+              onClick={handleClose}
+              disabled={busy && !runningImport}
+              data-testid="import-close"
+            >
+              {runningImport
+                ? t('auswertungen.importDialog.runInBackground')
+                : job
+                  ? t('common.close')
+                  : t('common.cancel')}
+            </Button>
+          );
+        })()}
 
         {step === 'source' && (
           <Button

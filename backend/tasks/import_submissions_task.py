@@ -65,6 +65,14 @@ _TRANSIENT_ERRORS = (OperationalError, DatabaseError, ConnectionError)
     max_retries=2,
     retry_kwargs={"max_retries": 2, "countdown": 30},
     acks_late=True,
+    # TF-428: per-task cap well below the global 3600s. Free-text grading now
+    # runs in parallel, so a healthy import finishes in minutes; if one runs
+    # long enough to hit soft_time_limit a SoftTimeLimitExceeded is raised and
+    # handled like any other failure (terminal FAILED, pollable), instead of a
+    # genuine hang holding a worker slot for the full hour. 1500/1800s aligns
+    # with the 30-min reap_stuck_import_jobs threshold.
+    soft_time_limit=1500,
+    time_limit=1800,
 )
 def import_submissions(  # type: ignore[no-untyped-def]
     self,

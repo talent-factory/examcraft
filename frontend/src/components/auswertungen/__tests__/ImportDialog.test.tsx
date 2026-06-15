@@ -64,6 +64,8 @@ const sampleJob: ImportJob = {
   status: 'succeeded',
   rows_processed: 2,
   rows_failed: 0,
+  graded_total: 2,
+  graded_done: 2,
   error_log: null,
   source_metadata: null,
   started_at: null,
@@ -277,23 +279,30 @@ describe('ImportDialog', () => {
     expect(mockSubmissionsService.commit).not.toHaveBeenCalled();
   });
 
-  test('surfaces a timeout error when the job never reaches a terminal status (TF-412)', async () => {
-    // A hung worker (or a genuinely stuck job) must not spin forever: once
-    // pollTimeoutMs elapses the dialog surfaces an error and returns to the
-    // preview step so the teacher can retry — onImported never fires.
+  test('lets a long-running import finish in the background instead of timing out (TF-428)', async () => {
+    // A free-text-heavy import legitimately runs for minutes. The dialog must
+    // NOT surface a client-side timeout (the backend guarantees a terminal
+    // status via the task time_limit + the reaper); instead it shows live
+    // n/total progress, and the user can close the dialog to let grading
+    // finish in the background — onImported never fires on close, and no
+    // error is shown.
     mockSubmissionsService.preview.mockResolvedValueOnce(samplePreview);
     mockSubmissionsService.commit.mockResolvedValueOnce({
       ...sampleJob,
       status: 'queued',
       rows_processed: 0,
+      graded_total: 4,
+      graded_done: 0,
     });
-    // Always non-terminal → the poll loop only ends via the deadline.
+    // Stays non-terminal with climbing progress — never reaches a deadline.
     mockSubmissionsService.getImportJob.mockResolvedValue({
       ...sampleJob,
       status: 'running',
       rows_processed: 0,
+      graded_total: 4,
+      graded_done: 2,
     });
-    const { onImported } = renderDialog({ pollIntervalMs: 5, pollTimeoutMs: 10 });
+    const { onImported, onClose } = renderDialog({ pollIntervalMs: 5 });
 
     fireEvent.click(screen.getByTestId('import-next-source'));
     const input = screen
@@ -305,8 +314,16 @@ describe('ImportDialog', () => {
 
     fireEvent.click(screen.getByTestId('import-confirm'));
 
-    // The timeout rejects the poll loop → error surfaces, no success callback.
-    await screen.findByTestId('import-error');
+    // Live progress is shown — never a timeout/error alert.
+    await screen.findByTestId('import-grading-progress');
+    expect(screen.queryByTestId('import-error')).toBeNull();
+
+    // The close button stays enabled while the import runs; closing lets the
+    // job finish in the background without an error or a (false) success.
+    const closeBtn = screen.getByTestId('import-close');
+    expect(closeBtn).not.toBeDisabled();
+    fireEvent.click(closeBtn);
+    expect(onClose).toHaveBeenCalled();
     expect(onImported).not.toHaveBeenCalled();
   });
 

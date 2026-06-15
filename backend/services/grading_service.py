@@ -17,6 +17,9 @@ Erzeugung bleibt history-frei — sie wäre Rauschen.
 from __future__ import annotations
 
 import logging
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Iterable
@@ -54,6 +57,21 @@ _FAR_FUTURE = datetime.max.replace(tzinfo=timezone.utc)
 CHANGE_REASON_APPROVED = "approved_by_reviewer"
 CHANGE_REASON_OVERRIDE = "manual_override_by_reviewer"
 CHANGE_REASON_REGRADE = "regrade_after_correct_answer_update"
+
+
+def _grading_concurrency() -> int:
+    """Max parallel free-text LLM calls during an import (TF-428).
+
+    Bounded so a large import does not fan out unbounded Claude requests
+    (rate limits, broker/DB pressure). Tunable via ``CLAUDE_GRADING_CONCURRENCY``;
+    invalid/<1 values fall back to the default.
+    """
+    raw = os.getenv("CLAUDE_GRADING_CONCURRENCY", "5")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 5
+    return value if value >= 1 else 5
 
 
 @dataclass(frozen=True)
@@ -146,14 +164,157 @@ class GradingService:
         return self.llm_grader
 
     # ------------------------------------------------------------------
+    # Parallel free-text pre-grading (TF-428)
+    # ------------------------------------------------------------------
+
+    def precompute_open_ended_outcomes(
+        self, submission_ids: list[int]
+    ) -> dict[int, LlmGradeOutcome]:
+        """Grade every open-ended answer across ``submission_ids`` in parallel.
+
+        The dominant cost of a free-text-heavy result import is N sequential
+        ``LlmGrader.grade()`` calls. Those calls are pure and network-bound
+        (no DB, fail-soft), so we run them through a bounded thread pool and
+        return an ``{answer_id: outcome}`` map. ``grade_submission`` then
+        consumes that map and persists serially on the caller's session — so
+        SQLAlchemy stays single-threaded and the per-submission savepoint /
+        partial-failure semantics are untouched. Only the LLM round-trips are
+        parallelised.
+
+        No-op (returns ``{}``) when there is nothing to grade; callers fall
+        back to the inline serial path transparently.
+        """
+        if not submission_ids:
+            return {}
+
+        attempts = (
+            self.db.query(Attempt)
+            .options(joinedload(Attempt.answers).joinedload(AttemptAnswer.grade))
+            .filter(Attempt.submission_id.in_(submission_ids))
+            .all()
+        )
+        all_answers = [answer for attempt in attempts for answer in attempt.answers]
+        if not all_answers:
+            return {}
+
+        lookup = self._load_question_lookup(all_answers)
+        work: list[tuple[int, dict]] = []
+        for answer in all_answers:
+            existing = answer.grade
+            if existing and existing.status == GradeStatus.MANUAL_OVERRIDE.value:
+                continue  # manual_override is sacrosanct — never re-grade.
+            qmeta = lookup.get(answer.exam_question_id)
+            if qmeta is None or qmeta.question_type != "open_ended":
+                continue  # closed/missing-meta handled inline by the serial path.
+            work.append((answer.id, self._open_ended_inputs(qmeta, answer)))
+
+        if not work:
+            return {}
+
+        # Resolve the institution model once (Enterprise override); each worker
+        # thread builds its own LlmGrader/Anthropic client from it, since the
+        # sync SDK client and the per-model cache are not concurrency-safe.
+        model_for_threads: str | None = None
+        if self._explicit_llm_grader is None:
+            sample = self.db.get(Submission, submission_ids[0])
+            if sample is not None:
+                model_for_threads = getattr(
+                    self._resolve_llm_grader(submission=sample), "model", None
+                )
+
+        thread_state = threading.local()
+
+        def _grade_one(item: tuple[int, dict]) -> tuple[int, LlmGradeOutcome]:
+            answer_id, inputs = item
+            grader = self._thread_grader(thread_state, model_for_threads)
+            try:
+                return answer_id, grader.grade(**inputs)
+            except Exception:  # noqa: BLE001 — isolate per-answer failure
+                # ``LlmGrader.grade`` is contracted never to raise (it returns a
+                # 0-point stub on any API/schema error). This guard is defence
+                # in depth: precompute runs OUTSIDE the per-submission savepoint,
+                # so an escaping exception here would abort the whole import
+                # instead of degrading one answer. Mirror the serial path's
+                # fail-soft behaviour with a 0-point stub for just this answer.
+                logger.exception(
+                    "precompute_open_ended_outcomes: Grading für AttemptAnswer "
+                    "%s fehlgeschlagen — 0-Punkte-Stub, Import läuft weiter",
+                    answer_id,
+                )
+                return answer_id, LlmGradeOutcome(
+                    points_awarded=0.0,
+                    points_max=inputs["points_max"],
+                    confidence=0.0,
+                    rationale="Bewertung fehlgeschlagen (Stub).",
+                    matched_aspects=[],
+                    missing_aspects=[],
+                )
+
+        workers = max(1, min(_grading_concurrency(), len(work)))
+        results: dict[int, LlmGradeOutcome] = {}
+        with ThreadPoolExecutor(
+            max_workers=workers, thread_name_prefix="grade"
+        ) as pool:
+            for answer_id, outcome in pool.map(_grade_one, work):
+                results[answer_id] = outcome
+        logger.info(
+            "precompute_open_ended_outcomes: %d Freitext-Antworten über %d Threads bewertet",
+            len(work),
+            workers,
+        )
+        return results
+
+    def _thread_grader(
+        self, thread_state: threading.local, model: str | None
+    ) -> LlmGrader:
+        """Per-thread ``LlmGrader`` (own Anthropic client) for parallel grading.
+
+        Injected test graders are reused as-is (fakes are trivially safe); in
+        production each worker thread lazily builds one grader bound to the
+        resolved model.
+        """
+        if self._explicit_llm_grader is not None:
+            return self._explicit_llm_grader
+        grader = getattr(thread_state, "grader", None)
+        if grader is None:
+            grader = LlmGrader(model=model) if model else LlmGrader()
+            thread_state.grader = grader
+        return grader
+
+    @staticmethod
+    def _open_ended_inputs(qmeta: _QuestionMeta, answer: AttemptAnswer) -> dict:
+        """Keyword args for ``LlmGrader.grade`` — shared by the parallel and
+        inline paths so they stay in lockstep."""
+        return dict(
+            question_text=qmeta.question_text or "",
+            correct_answer=qmeta.correct_answer or "",
+            given_answer=answer.given_answer,
+            points_max=qmeta.points,
+            explanation=qmeta.explanation,
+            difficulty=qmeta.difficulty,
+            bloom_level=qmeta.bloom_level,
+        )
+
+    # ------------------------------------------------------------------
     # Grading
     # ------------------------------------------------------------------
 
-    def grade_submission(self, submission_id: int) -> Submission:
+    def grade_submission(
+        self,
+        submission_id: int,
+        *,
+        precomputed_open_ended: dict[int, LlmGradeOutcome] | None = None,
+    ) -> Submission:
         """Grade every attempt of a submission and update aggregates.
 
         Idempotent: existing ``manual_override`` grades are preserved
         — the teacher's manual grade wins over automated re-grading.
+
+        ``precomputed_open_ended`` (TF-428): optional ``{answer_id: outcome}``
+        map from ``precompute_open_ended_outcomes`` — when an open-ended answer
+        is present here its LLM call is skipped and the precomputed outcome
+        reused. ``None`` preserves the original inline serial behaviour for
+        non-import callers (manual re-grade endpoints).
 
         Raises:
             SubmissionNotFoundError: when ``submission_id`` does not
@@ -194,13 +355,18 @@ class GradingService:
         # Grade answers across all attempts (not only the graded_attempt).
         # That way 'best' can later switch attempts without re-grading.
         for attempt in attempts:
-            self._grade_attempt_answers(attempt)
+            self._grade_attempt_answers(attempt, precomputed=precomputed_open_ended)
 
         self._aggregate(submission, attempts)
         self.db.flush()
         return submission
 
-    def _grade_attempt_answers(self, attempt: Attempt) -> None:
+    def _grade_attempt_answers(
+        self,
+        attempt: Attempt,
+        *,
+        precomputed: dict[int, LlmGradeOutcome] | None = None,
+    ) -> None:
         if not attempt.answers:
             return
 
@@ -236,7 +402,9 @@ class GradingService:
                 continue
 
             try:
-                outcome = self._compute_outcome(qmeta=qmeta, answer=answer)
+                outcome = self._compute_outcome(
+                    qmeta=qmeta, answer=answer, precomputed=precomputed
+                )
             except UnknownQuestionTypeError:
                 logger.error(
                     "Unbekannter question_type %r für AttemptAnswer %s — "
@@ -254,6 +422,7 @@ class GradingService:
         *,
         qmeta: _QuestionMeta,
         answer: AttemptAnswer,
+        precomputed: dict[int, LlmGradeOutcome] | None = None,
     ) -> GradeOutcome | LlmGradeOutcome:
         if qmeta.question_type in ("single_choice", "multiple_choice", "true_false"):
             return self.grader.grade(
@@ -264,17 +433,14 @@ class GradingService:
                 num_options=len(qmeta.options or []),
             )
         if qmeta.question_type == "open_ended":
+            # TF-428: reuse the outcome already computed in parallel during an
+            # import; only fall back to an inline LLM call when there is none
+            # (non-import callers, or an answer added after pre-grading).
+            if precomputed is not None and answer.id in precomputed:
+                return precomputed[answer.id]
             # LlmGrader fängt API/Schema-Fehler intern ab und liefert
             # einen 0-Punkte-Stub — keine Ausnahme propagiert nach hier.
-            return self.llm_grader.grade(
-                question_text=qmeta.question_text or "",
-                correct_answer=qmeta.correct_answer or "",
-                given_answer=answer.given_answer,
-                points_max=qmeta.points,
-                explanation=qmeta.explanation,
-                difficulty=qmeta.difficulty,
-                bloom_level=qmeta.bloom_level,
-            )
+            return self.llm_grader.grade(**self._open_ended_inputs(qmeta, answer))
         raise UnknownQuestionTypeError(
             f"question_type {qmeta.question_type!r} hat keinen Grading-Pfad"
         )

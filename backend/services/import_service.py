@@ -30,6 +30,7 @@ from typing import Any, Mapping
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
+from database import SessionLocal
 from enums import (
     ImportJobStatus,
     ScoringStrategy,
@@ -55,6 +56,10 @@ from services.import_drivers import (
 
 
 logger = logging.getLogger(__name__)
+
+# Sentinel so _update_import_progress can distinguish "leave column unchanged"
+# from an explicit value (None is not a valid progress value here).
+_UNSET = object()
 
 
 # Constraint names whose violation indicates a benign idempotency race
@@ -194,6 +199,10 @@ class ImportService:
             job.rows_processed = 0
             job.rows_failed = 0
             job.error_log = []
+            # TF-428: reset progress too, else the UI shows the previous run's
+            # "n/total" until grading restarts and overwrites it.
+            job.graded_total = None
+            job.graded_done = 0
         else:
             job = ImportJob(
                 institution_id=exam.institution_id,
@@ -620,10 +629,30 @@ class ImportService:
         log alone is not visible to the operator triaging via the UI.
         """
         failures: list[tuple[int, str, str]] = []
+        submission_ids = [submission.id for submission in submissions]
+        # TF-428: grade all open-ended answers in parallel up front — pure,
+        # network-bound LLM calls, no DB — then persist serially below. This
+        # collapses the dominant serial-LLM cost (free-text grading scales with
+        # students × open-ended questions) without changing the per-submission
+        # savepoint / partial-failure semantics.
+        precomputed = self.grading_service.precompute_open_ended_outcomes(
+            submission_ids
+        )
+        total = len(submissions)
+        self._update_import_progress(job.id, graded_total=total, graded_done=0)
+        # Throttle the live progress writes: each one is its own short
+        # transaction, so for a large import we cap the chatter at ~50 updates
+        # (plus the terminal one) rather than one per submission. The dominant
+        # cost is the LLM grading anyway — sub-percent progress granularity is
+        # not worth a DB round-trip per student.
+        progress_step = max(1, total // 50)
+        done = 0
         for submission in submissions:
             try:
                 with self.db.begin_nested():
-                    self.grading_service.grade_submission(submission.id)
+                    self.grading_service.grade_submission(
+                        submission.id, precomputed_open_ended=precomputed
+                    )
             except Exception as exc:
                 if not isinstance(exc, SQLAlchemyError):
                     # Unexpected exception type — likely a bug in the grading
@@ -655,7 +684,65 @@ class ImportService:
                 submission.grade_status = (
                     SubmissionGradeStatus.IMPORT_GRADING_FAILED.value
                 )
+            # Count every processed submission (graded or failed) so the UI
+            # progress bar advances monotonically to graded_total.
+            done += 1
+            if done == total or done % progress_step == 0:
+                self._update_import_progress(job.id, graded_done=done)
+        # Persist the final progress on the import-job row itself. Live updates
+        # ran through the autonomous session; writing the terminal value here —
+        # only AFTER the loop, never mid-grading — makes the committed row carry
+        # the true total without self.db locking the job row while the
+        # autonomous progress session still needs it.
+        job.graded_total = total
+        job.graded_done = done
         return failures
+
+    def _update_import_progress(
+        self,
+        job_id: int,
+        *,
+        graded_total: int | None = _UNSET,  # type: ignore[assignment]
+        graded_done: int | None = _UNSET,  # type: ignore[assignment]
+    ) -> None:
+        """Write live grading progress on its own short transaction (TF-428).
+
+        The import's main transaction (``self.db``) stays open throughout
+        grading and only commits at the very end, so a counter written through
+        it would be invisible to the polling client until completion. A
+        throwaway session updates just the progress columns and commits
+        immediately, so "n/total" climbs live while grading runs.
+
+        Best-effort: a failed progress write must never abort the import.
+        During grading the progress columns are written ONLY here (never
+        through ``self.db``), so these autonomous commits cannot deadlock
+        against the still-open import transaction. The terminal value is
+        written once on ``self.db`` after the loop (see
+        ``_grade_touched_submissions``), by which point no autonomous writer
+        is left to clobber.
+        """
+        values: dict[str, int] = {}
+        if graded_total is not _UNSET:
+            values["graded_total"] = graded_total
+        if graded_done is not _UNSET:
+            values["graded_done"] = graded_done
+        if not values:
+            return
+        progress_db = SessionLocal()
+        try:
+            progress_db.query(ImportJob).filter(ImportJob.id == job_id).update(
+                values, synchronize_session=False
+            )
+            progress_db.commit()
+        except Exception:  # noqa: BLE001 — progress is strictly best-effort
+            logger.warning(
+                "Konnte Import-Fortschritt für Job %s nicht aktualisieren",
+                job_id,
+                exc_info=True,
+            )
+            progress_db.rollback()
+        finally:
+            progress_db.close()
 
     _CONSTRAINT_NAME_REGEX = re.compile(
         r'violates (?:unique|foreign key|check) constraint "([^"]+)"'

@@ -444,6 +444,16 @@ class ImportJob(Base):
 
     rows_processed = Column(Integer, default=0, nullable=False)
     rows_failed = Column(Integer, default=0, nullable=False)
+    # TF-428: live grading progress so the UI can show "n/total bewertet"
+    # while the (potentially minutes-long) free-text LLM grading runs,
+    # instead of an opaque spinner. ``graded_total`` is the number of
+    # submissions to grade (set once grading starts; NULL while parsing),
+    # ``graded_done`` the count already processed — graded or failed, so the
+    # bar advances monotonically to ``graded_total``. Updated out-of-band via a
+    # short autonomous transaction so progress is visible before the import's
+    # main transaction commits.
+    graded_total = Column(Integer, nullable=True)
+    graded_done = Column(Integer, default=0, nullable=False)
     # error_log shape: list of {row_index: int, reason: str, step?: str,
     # details?: object}. Format intentionally documented by keys, not by
     # producer name — ImportService and the import drivers populate it.

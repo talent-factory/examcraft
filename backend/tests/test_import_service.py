@@ -277,6 +277,57 @@ def test_commit_persists_students_attempts_grades(
     assert test_db.query(Grade).count() == 6
 
 
+def test_import_sets_grading_progress_counters(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """TF-428: the job carries graded_total/graded_done so the UI can show
+    "n/total bewertet" while grading runs. On a clean import both reach the
+    number of graded submissions."""
+    service = ImportService(test_db)
+    job = service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=_json_two_students(),
+        triggered_by=None,
+        source_metadata={"filename": "klasse-fs26.json"},
+    )
+
+    assert job.graded_total == 2
+    assert job.graded_done == 2
+
+
+def test_import_emits_live_progress_updates(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """TF-428: progress is written live (own short transaction) while grading
+    runs, not only as the committed terminal value. The kickoff call announces
+    the total and resets graded_done to 0; a later call reports completion.
+    Asserting the call sequence covers the live path the counter test cannot
+    (it only sees the final committed row)."""
+    service = ImportService(test_db)
+    calls: list[dict] = []
+    original = service._update_import_progress
+
+    def _record(job_id: int, **kwargs: object) -> None:
+        calls.append(kwargs)
+        original(job_id, **kwargs)  # type: ignore[arg-type]
+
+    service._update_import_progress = _record  # type: ignore[assignment, method-assign]
+
+    service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=_json_two_students(),
+        triggered_by=None,
+        source_metadata={"filename": "klasse-fs26.json"},
+    )
+
+    # Kickoff: total announced, done reset to 0.
+    assert {"graded_total": 2, "graded_done": 0} in calls
+    # Live increment reaches completion (done == total).
+    assert any(call.get("graded_done") == 2 for call in calls)
+
+
 def test_anna_gets_full_mc_and_tf_points(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
@@ -720,7 +771,7 @@ def test_per_submission_grading_failure_isolates_to_error_log(
     with step=grading rather than rolling back the whole CSV."""
     service = ImportService(test_db)
 
-    def _boom(_self, _submission_id):
+    def _boom(_self, _submission_id, **_kwargs):
         raise RuntimeError("simulated grading crash")
 
     monkeypatch.setattr(
@@ -770,7 +821,7 @@ def test_sqlalchemy_grading_failure_also_marks_submission_failed(
 
     service = ImportService(test_db)
 
-    def _boom(_self, _submission_id):
+    def _boom(_self, _submission_id, **_kwargs):
         raise OperationalError("simulated DB error", params=None, orig=None)
 
     monkeypatch.setattr(

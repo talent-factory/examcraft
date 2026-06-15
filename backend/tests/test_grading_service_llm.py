@@ -441,6 +441,95 @@ def test_grading_service_passes_question_context_to_llm(test_db: Session) -> Non
 
 
 # ---------------------------------------------------------------------------
+# Parallel pre-grading — precompute_open_ended_outcomes (TF-428)
+# ---------------------------------------------------------------------------
+
+
+def test_precompute_open_ended_returns_outcome_map(test_db: Session) -> None:
+    """The import pre-grades every open-ended answer up front and returns an
+    ``{answer_id: outcome}`` map that ``grade_submission`` later consumes."""
+    submission, answer = _seed_open_ended_submission(test_db)
+
+    fake_llm = MagicMock(spec=LlmGrader)
+    fake_llm.grade.return_value = LlmGradeOutcome(
+        points_awarded=2.0,
+        points_max=4.0,
+        confidence=0.6,
+        rationale="Teilweise.",
+        matched_aspects=["Kapselung"],
+        missing_aspects=["Vererbung"],
+    )
+
+    result = GradingService(
+        test_db, llm_grader=fake_llm
+    ).precompute_open_ended_outcomes([submission.id])
+
+    assert set(result) == {answer.id}
+    assert result[answer.id].points_awarded == 2.0
+    fake_llm.grade.assert_called_once()
+
+
+def test_precompute_open_ended_is_noop_without_ids(test_db: Session) -> None:
+    """No submissions → empty map, no grader calls (callers fall back to the
+    inline serial path transparently)."""
+    assert GradingService(test_db).precompute_open_ended_outcomes([]) == {}
+
+
+def test_precompute_open_ended_is_fail_soft_when_grader_raises(
+    test_db: Session,
+) -> None:
+    """Pre-grading runs OUTSIDE the per-submission savepoint, so a raising
+    grader must degrade to a 0-point stub for that one answer instead of
+    propagating and aborting the whole import (TF-428)."""
+    submission, answer = _seed_open_ended_submission(test_db)
+
+    fake_llm = MagicMock(spec=LlmGrader)
+    fake_llm.grade.side_effect = RuntimeError("simulated grader crash")
+
+    result = GradingService(
+        test_db, llm_grader=fake_llm
+    ).precompute_open_ended_outcomes([submission.id])
+
+    assert result[answer.id].points_awarded == 0.0
+    assert result[answer.id].points_max == 4.0
+
+
+def test_grade_submission_reuses_precomputed_outcome(test_db: Session) -> None:
+    """When an outcome was pre-computed in parallel, ``grade_submission``
+    persists it and does NOT make a second (inline) LLM call (TF-428)."""
+    submission, answer = _seed_open_ended_submission(test_db)
+
+    inline_llm = MagicMock(spec=LlmGrader)
+    inline_llm.grade.return_value = LlmGradeOutcome(
+        points_awarded=1.0,
+        points_max=4.0,
+        confidence=0.1,
+        rationale="should not be used",
+        matched_aspects=[],
+        missing_aspects=[],
+    )
+    precomputed = {
+        answer.id: LlmGradeOutcome(
+            points_awarded=3.5,
+            points_max=4.0,
+            confidence=0.9,
+            rationale="reused from parallel pre-grading",
+            matched_aspects=["Kapselung", "Vererbung"],
+            missing_aspects=[],
+        )
+    }
+
+    GradingService(test_db, llm_grader=inline_llm).grade_submission(
+        submission.id, precomputed_open_ended=precomputed
+    )
+    test_db.refresh(answer)
+
+    assert answer.grade is not None
+    assert answer.grade.points_awarded == 3.5
+    inline_llm.grade.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # Enterprise model-override path — _resolve_llm_grader
 # ---------------------------------------------------------------------------
 

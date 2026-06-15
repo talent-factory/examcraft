@@ -168,7 +168,6 @@
       "title": "Import results — {{examTitle}}",
       "errorPreview": "Preview failed.",
       "errorCommit": "Import failed.",
-      "importTimeout": "The import is taking unusually long — you can check its status later in the job detail.",
       "steps": {
         "source": "Source",
         "upload": "File",
@@ -194,6 +193,9 @@
       "colDisplayName": "Name",
       "confirm": "Import",
       "submitting": "Importing…",
+      "gradingProgress": "{{done}}/{{total}} submissions graded…",
+      "backgroundHint": "Import and grading keep running in the background — you can close this window.",
+      "runInBackground": "Let it run in the background",
       "result": {
         "succeeded": "Import succeeded",
         "partial": "Import partially succeeded",
@@ -202,6 +204,11 @@
         "queued": "Import queued"
       },
       "resultSummary": "{{processed}} processed, {{failed}} faulty."
+    },
+    "importStatus": {
+      "running": "Grading — {{done}}/{{total}} submissions",
+      "runningIndeterminate": "Import running…",
+      "queued": "Import queued…"
     },
     "stats": {
       "loadError": "Failed to load statistics.",

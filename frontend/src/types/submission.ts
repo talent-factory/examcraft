@@ -91,10 +91,21 @@ export interface ImportJob {
   status: ImportJobStatus;
   rows_processed: number;
   rows_failed: number;
+  // TF-428: live grading progress. `graded_total` is null until grading
+  // starts; `graded_done` counts submissions processed so far (graded or
+  // failed). Lets the UI show "n/total bewertet" instead of an opaque spinner.
+  graded_total: number | null;
+  graded_done: number;
   error_log: ImportRowError[] | null;
   source_metadata: Record<string, unknown> | null;
   started_at: string | null;
   finished_at: string | null;
+}
+
+/** Recent import jobs for one exam — drives the Auswertungen status surface. */
+export interface ImportJobList {
+  items: ImportJob[];
+  total: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -46,6 +46,7 @@ import {
 } from '../types/submission';
 import { ExamDetail } from '../types/composer';
 import ImportDialog from '../components/auswertungen/ImportDialog';
+import ImportStatusBanner from '../components/auswertungen/ImportStatusBanner';
 import DeleteImportDialog from '../components/auswertungen/DeleteImportDialog';
 import SyncMoodleIdsDialog from '../components/auswertungen/SyncMoodleIdsDialog';
 import OverrideGradeDialog from '../components/auswertungen/OverrideGradeDialog';
@@ -84,6 +85,9 @@ const AuswertungenExam: React.FC = () => {
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  // TF-428: bumped when the import dialog closes so the status banner re-polls
+  // immediately instead of waiting out its idle interval.
+  const [importPollKey, setImportPollKey] = useState(0);
   const [deleteImportOpen, setDeleteImportOpen] = useState(false);
   const [syncMoodleOpen, setSyncMoodleOpen] = useState(false);
   const [reviewCount, setReviewCount] = useState<number | null>(null);
@@ -232,6 +236,14 @@ const AuswertungenExam: React.FC = () => {
         <Tab label={t('auswertungen.exam.tabStatistik')} value="statistik" />
         <Tab label={t('auswertungen.exam.tabExport')} value="export" />
       </Tabs>
+
+      {tab === 'submissions' && examId ? (
+        <ImportStatusBanner
+          examId={examId}
+          pollKey={importPollKey}
+          onCompleted={reload}
+        />
+      ) : null}
 
       {tab === 'statistik' ? (
         <StatistikPanel examId={examId} />
@@ -514,9 +526,15 @@ const AuswertungenExam: React.FC = () => {
           open
           examId={exam.id}
           examTitle={exam.title}
-          onClose={() => setImportOpen(false)}
+          onClose={() => {
+            setImportOpen(false);
+            // Re-poll the status banner at once: the import may now be running
+            // in the background (TF-428).
+            setImportPollKey((key) => key + 1);
+          }}
           onImported={() => {
             setImportOpen(false);
+            setImportPollKey((key) => key + 1);
             void reload();
           }}
         />

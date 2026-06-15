@@ -13,6 +13,7 @@ import {
   DriverName,
   ImportDeletionSummary,
   ImportJob,
+  ImportJobList,
   ImportPreview,
   SubmissionDetail,
   SubmissionList,
@@ -205,6 +206,24 @@ export class SubmissionsService {
     );
     await ensureOk(response);
     return (await response.json()) as ImportJob;
+  }
+
+  /**
+   * TF-428: list recent import jobs for an exam (newest first) so the
+   * Auswertungen view can surface running/finished imports with live
+   * progress — the import no longer needs a modal-spinner held open.
+   */
+  static async listImportJobs(
+    examId: number,
+    limit = 10,
+  ): Promise<ImportJobList> {
+    const url = `${API_BASE_URL}${ROOT}/import-jobs?exam_id=${examId}&limit=${limit}`;
+    const response = await safeFetch(url, {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+    await ensureOk(response);
+    return (await response.json()) as ImportJobList;
   }
 
   /**

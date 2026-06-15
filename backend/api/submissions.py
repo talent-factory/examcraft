@@ -137,10 +137,26 @@ class ImportJobOut(BaseModel):
     status: ImportJobStatus
     rows_processed: int
     rows_failed: int
+    # TF-428: live grading progress; ``graded_total`` is None until grading
+    # starts, ``graded_done`` counts processed submissions (graded or failed)
+    # so far.
+    graded_total: int | None = None
+    graded_done: int = 0
     error_log: list[ImportRowErrorOut] | None = None
     source_metadata: dict[str, Any] | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
+
+
+class ImportJobListOut(BaseModel):
+    """Recent import jobs for one exam — drives the Auswertungen status surface
+    so the UI can show running/finished imports without pinning a modal open
+    (TF-428)."""
+
+    model_config = _STRICT_OUT
+
+    items: list[ImportJobOut]
+    total: int
 
 
 class ImportSourceCountOut(BaseModel):
@@ -441,6 +457,8 @@ def _import_job_to_out(job: ImportJob) -> ImportJobOut:
         status=ImportJobStatus(job.status),
         rows_processed=job.rows_processed,
         rows_failed=job.rows_failed,
+        graded_total=job.graded_total,
+        graded_done=job.graded_done,
         error_log=structured if structured else None,
         source_metadata=job.source_metadata,
         started_at=job.started_at,
@@ -583,6 +601,32 @@ async def get_import_job(
     if job is None:
         raise HTTPException(status_code=404, detail="Import-Job nicht gefunden")
     return _import_job_to_out(job)
+
+
+@router.get("/import-jobs", response_model=ImportJobListOut)
+async def list_import_jobs(
+    exam_id: int = Query(..., description="Prüfung, deren Import-Jobs gelistet werden"),
+    limit: int = Query(10, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(require_permission("submissions:read")),
+    db: Session = Depends(get_db),
+) -> ImportJobListOut:
+    """Jüngste Import-Jobs einer Prüfung (institutions-scoped, neueste zuerst).
+
+    Speist das Auswertungen-Status-Surface (TF-428): Die Seite pollt diesen
+    Endpoint, um laufende/abgeschlossene Importe mit Live-Fortschritt (n/total)
+    anzuzeigen — der Import muss dafür kein Modal mehr offen halten.
+    """
+    base = db.query(ImportJob).filter(
+        ImportJob.exam_id == exam_id,
+        ImportJob.institution_id == current_user.institution_id,
+    )
+    total = base.count()
+    jobs = base.order_by(ImportJob.created_at.desc()).limit(limit).offset(offset).all()
+    return ImportJobListOut(
+        items=[_import_job_to_out(job) for job in jobs],
+        total=total,
+    )
 
 
 # ---------------------------------------------------------------------------

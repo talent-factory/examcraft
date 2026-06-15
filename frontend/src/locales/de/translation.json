@@ -168,7 +168,6 @@
       "title": "Resultate importieren — {{examTitle}}",
       "errorPreview": "Vorschau fehlgeschlagen.",
       "errorCommit": "Import fehlgeschlagen.",
-      "importTimeout": "Import dauert ungewöhnlich lange — der Status kann später im Job-Detail geprüft werden.",
       "steps": {
         "source": "Quelle",
         "upload": "Datei",
@@ -194,6 +193,9 @@
       "colDisplayName": "Name",
       "confirm": "Importieren",
       "submitting": "Import läuft…",
+      "gradingProgress": "{{done}}/{{total}} Abgaben bewertet…",
+      "backgroundHint": "Import und Bewertung laufen im Hintergrund weiter — du kannst dieses Fenster schliessen.",
+      "runInBackground": "Im Hintergrund laufen lassen",
       "result": {
         "succeeded": "Import erfolgreich",
         "partial": "Import teilweise erfolgreich",
@@ -202,6 +204,11 @@
         "queued": "Import wartet"
       },
       "resultSummary": "{{processed}} verarbeitet, {{failed}} fehlerhaft."
+    },
+    "importStatus": {
+      "running": "Bewertung läuft — {{done}}/{{total}} Abgaben",
+      "runningIndeterminate": "Import läuft…",
+      "queued": "Import wartet…"
     },
     "stats": {
       "loadError": "Statistiken konnten nicht geladen werden.",
