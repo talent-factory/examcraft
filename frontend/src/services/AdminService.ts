@@ -339,6 +339,7 @@ class AdminService {
       domain?: string;
       subscription_tier?: string;
       is_active?: boolean;
+      default_grading_scheme_id?: number | null;
     }
   ): Promise<Institution> {
     const response = await fetch(
@@ -351,8 +352,13 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to update institution');
+      // Parse defensively — a gateway 502/empty-body error has no JSON to
+      // decode, and letting response.json() throw would mask the real
+      // backend detail (e.g. the 422 from an invalid grading scheme).
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        error.detail || `Failed to update institution (HTTP ${response.status})`
+      );
     }
 
     return response.json();
@@ -365,6 +371,7 @@ class AdminService {
     name: string;
     domain: string;
     subscription_tier?: string;
+    default_grading_scheme_id?: number | null;
   }): Promise<Institution> {
     const response = await fetch(
       `${API_BASE_URL}/api/admin/institutions`,
@@ -376,8 +383,10 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to create institution');
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        error.detail || `Failed to create institution (HTTP ${response.status})`
+      );
     }
 
     return response.json();

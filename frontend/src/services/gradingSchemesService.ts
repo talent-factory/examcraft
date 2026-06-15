@@ -85,8 +85,20 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export class GradingSchemesService {
-  static async list(includeSystem = true): Promise<GradingSchemeListOut> {
-    const url = `${API_BASE_URL}${ROOT}?include_system=${includeSystem}`;
+  /**
+   * List grading schemes. By default returns system schemes plus the
+   * caller's own institution schemes. A SuperAdmin may pass
+   * ``institutionId`` to scope institution-owned schemes to a *target*
+   * institution instead (TF-431 admin institution editor).
+   */
+  static async list(
+    includeSystem = true,
+    institutionId?: number | null,
+  ): Promise<GradingSchemeListOut> {
+    let url = `${API_BASE_URL}${ROOT}?include_system=${includeSystem}`;
+    if (institutionId != null) {
+      url += `&institution_id=${institutionId}`;
+    }
     const response = await fetch(url, { headers: authHeaders() });
     return handleResponse<GradingSchemeListOut>(response);
   }

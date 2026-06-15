@@ -91,6 +91,7 @@ class InstitutionResponse(BaseModel):
     max_questions_per_month: int
     is_active: bool
     require_second_reviewer: bool = False
+    default_grading_scheme_id: Optional[int] = None
     created_at: str
 
     class Config:
@@ -776,10 +777,46 @@ async def list_institutions(
             max_questions_per_month=inst.max_questions_per_month,
             is_active=inst.is_active,
             require_second_reviewer=inst.require_second_reviewer,
+            default_grading_scheme_id=inst.default_grading_scheme_id,
             created_at=inst.created_at.isoformat(),
         )
         for inst in institutions
     ]
+
+
+def _validate_default_grading_scheme_id(
+    db: Session,
+    scheme_id: Optional[int],
+    institution_id: Optional[int],
+    locale: str,
+) -> Optional[int]:
+    """Validate a proposed ``Institution.default_grading_scheme_id``.
+
+    A system scheme (``institution_id IS NULL``) is always allowed; an
+    institution-scoped scheme must belong to ``institution_id``. Shares the
+    validation *shape* of ``api.exams._resolve_grading_scheme_id`` (system
+    always allowed, foreign-tenant scheme → 422) so the institution default
+    can never point at a foreign tenant's scheme — but compares against the
+    target ``institution_id`` (the institution being configured) rather than
+    the caller's ``user.institution_id``, because the SuperAdmin actor here
+    legitimately configures *other* tenants. Do not merge the two helpers on
+    that assumption. ``None`` clears the default; ``institution_id=None``
+    (e.g. a not-yet-persisted institution) permits only system schemes.
+    """
+    if scheme_id is None:
+        return None
+
+    from models.grading_scheme import GradingScheme
+
+    scheme = db.query(GradingScheme).filter(GradingScheme.id == scheme_id).one_or_none()
+    if scheme is None or (
+        scheme.institution_id is not None and scheme.institution_id != institution_id
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=t("admin_invalid_grading_scheme", locale=locale),
+        )
+    return scheme_id
 
 
 class UpdateInstitutionRequest(BaseModel):
@@ -790,6 +827,7 @@ class UpdateInstitutionRequest(BaseModel):
     subscription_tier: Optional[str] = None
     is_active: Optional[bool] = None
     require_second_reviewer: Optional[bool] = None
+    default_grading_scheme_id: Optional[int] = None
 
 
 @router.patch("/institutions/{institution_id}", response_model=InstitutionResponse)
@@ -832,6 +870,17 @@ async def update_institution(
     if update_data.require_second_reviewer is not None:
         institution.require_second_reviewer = update_data.require_second_reviewer
 
+    # Default grading scheme — the Note-resolver's institution-wide fallback.
+    # ``model_fields_set`` distinguishes an explicit ``null`` (clear the
+    # default) from an omitted field (leave it untouched).
+    if "default_grading_scheme_id" in update_data.model_fields_set:
+        institution.default_grading_scheme_id = _validate_default_grading_scheme_id(
+            db,
+            update_data.default_grading_scheme_id,
+            institution.id,
+            locale,
+        )
+
     # Update subscription tier and quotas
     if update_data.subscription_tier is not None:
         # Validate tier
@@ -864,6 +913,7 @@ async def update_institution(
         max_questions_per_month=institution.max_questions_per_month,
         is_active=institution.is_active,
         require_second_reviewer=institution.require_second_reviewer,
+        default_grading_scheme_id=institution.default_grading_scheme_id,
         created_at=institution.created_at.isoformat(),
     )
 
@@ -874,6 +924,7 @@ class CreateInstitutionRequest(BaseModel):
     name: str
     domain: str
     subscription_tier: str = "free"
+    default_grading_scheme_id: Optional[int] = None
 
 
 @router.post("/institutions", response_model=InstitutionResponse, status_code=201)
@@ -917,6 +968,19 @@ async def create_institution(
     # Get quotas for tier
     quotas = TIER_QUOTAS[tier]
 
+    # Validate the optional default scheme *before* persisting anything — a
+    # brand-new institution owns no schemes yet, so only a system scheme (or
+    # None) is valid; an institution-scoped id is rejected with 422. Passing
+    # ``institution_id=None`` expresses exactly that (system-only) rule, and
+    # validating up front means a rejection never emits a half-written INSERT
+    # that would otherwise depend on connection-pool rollback to undo.
+    validated_scheme_id = _validate_default_grading_scheme_id(
+        db,
+        institution_data.default_grading_scheme_id,
+        None,
+        locale,
+    )
+
     # Create institution
     institution = Institution(
         name=institution_data.name,
@@ -927,6 +991,7 @@ async def create_institution(
         max_documents=quotas["max_documents"],
         max_questions_per_month=quotas["max_questions_per_month"],
         is_active=True,
+        default_grading_scheme_id=validated_scheme_id,
     )
 
     db.add(institution)
@@ -944,6 +1009,7 @@ async def create_institution(
         max_questions_per_month=institution.max_questions_per_month,
         is_active=institution.is_active,
         require_second_reviewer=institution.require_second_reviewer,
+        default_grading_scheme_id=institution.default_grading_scheme_id,
         created_at=institution.created_at.isoformat(),
     )
 

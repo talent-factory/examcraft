@@ -43,6 +43,7 @@
     "admin_cannot_remove_last_role": "Letzte Rolle kann nicht entfernt werden",
     "admin_institution_not_found": "Institution nicht gefunden",
     "admin_invalid_subscription_tier": "Ungültiger Abonnementtarif",
+    "admin_invalid_grading_scheme": "Ungültiges Notenschema für diese Institution",
     "admin_institution_domain_exists": "Eine Institution mit dieser Domain existiert bereits",
     "admin_transfer_self_forbidden": "SuperAdmin kann sich nicht selbst in eine andere Institution verschieben",
     "admin_transfer_same_institution": "Benutzer ist bereits in dieser Institution",

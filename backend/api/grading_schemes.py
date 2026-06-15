@@ -26,7 +26,7 @@ from ``BaseModel`` subclasses.
 
 import logging
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -170,19 +170,46 @@ def _clear_other_defaults(
 @router.get("", response_model=GradingSchemeListOut)
 async def list_grading_schemes(
     include_system: bool = Query(default=True),
+    institution_id: Optional[int] = Query(
+        default=None,
+        description=(
+            "Scope institution-owned schemes to this institution instead of "
+            "the caller's own. SuperAdmin only; other roles may only pass "
+            "their own institution_id."
+        ),
+    ),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> GradingSchemeListOut:
-    """List system + own institution schemes.
+    """List system + institution schemes.
 
     Read access is granted to every active user — the dropdown in the
     ExamComposer needs to show all schemes regardless of role. Editing
     is gated separately by ``grading_schemes:manage`` on the write
     endpoints.
+
+    By default the institution-owned schemes are scoped to the caller's
+    own institution. A SuperAdmin may pass ``institution_id`` to scope to
+    a *target* institution instead — this backs the admin institution
+    editor (TF-431), where a SuperAdmin configures another tenant's
+    default scheme and must see that tenant's schemes, not their own.
+    A non-SuperAdmin passing a foreign ``institution_id`` gets 403.
     """
+    target_institution_id = current_user.institution_id
+    if institution_id is not None:
+        if (
+            not current_user.is_superuser
+            and institution_id != current_user.institution_id
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Nur SuperAdmins dürfen Schemata anderer Institutionen abrufen",
+            )
+        target_institution_id = institution_id
+
     filters = []
-    if current_user.institution_id is not None:
-        filters.append(GradingScheme.institution_id == current_user.institution_id)
+    if target_institution_id is not None:
+        filters.append(GradingScheme.institution_id == target_institution_id)
     if include_system:
         filters.append(GradingScheme.institution_id.is_(None))
 

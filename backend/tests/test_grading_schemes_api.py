@@ -213,6 +213,65 @@ def test_list_include_system_false_only_returns_own(test_db: Session) -> None:
     assert all(s["institution_id"] == inst.id for s in response.json()["schemes"])
 
 
+def test_list_superadmin_scopes_to_target_institution(test_db: Session) -> None:
+    """A SuperAdmin in inst A passing ``institution_id=B`` sees B's schemes
+    (+ system), not A's — backs the admin institution editor (TF-431)."""
+    inst_a = _make_institution(test_db, slug="tf431-list-a")
+    inst_b = _make_institution(test_db, slug="tf431-list-b")
+    superadmin = _make_user_with_perms(
+        test_db,
+        inst_a.id,
+        permissions=[],
+        email="su@tf431-list.ch",
+        is_superuser=True,
+    )
+    swiss = _make_swiss_system_scheme(test_db)
+
+    a_scheme = GradingScheme(
+        institution_id=inst_a.id,
+        name="A-Skala",
+        display_format="pass_fail",
+        config=_custom_config(),
+        is_default_for_institution=False,
+    )
+    b_scheme = GradingScheme(
+        institution_id=inst_b.id,
+        name="B-Skala",
+        display_format="pass_fail",
+        config=_custom_config(),
+        is_default_for_institution=False,
+    )
+    test_db.add_all([a_scheme, b_scheme])
+    test_db.commit()
+
+    client = _client(test_db, superadmin)
+    response = client.get(f"/api/v1/grading-schemes?institution_id={inst_b.id}")
+    assert response.status_code == 200, response.text
+
+    ids = {s["id"] for s in response.json()["schemes"]}
+    assert b_scheme.id in ids  # target tenant's scheme is visible
+    assert swiss.id in ids  # system schemes always included
+    assert a_scheme.id not in ids  # caller's own tenant is NOT leaked in
+
+
+def test_list_non_superadmin_foreign_institution_id_returns_403(
+    test_db: Session,
+) -> None:
+    inst_a = _make_institution(test_db, slug="tf431-list-c")
+    inst_b = _make_institution(test_db, slug="tf431-list-d")
+    user = _make_user_with_perms(
+        test_db,
+        inst_a.id,
+        permissions=["grading_schemes:manage"],
+        email="dozent@tf431-list.ch",
+    )
+    test_db.commit()
+
+    client = _client(test_db, user)
+    response = client.get(f"/api/v1/grading-schemes?institution_id={inst_b.id}")
+    assert response.status_code == 403, response.text
+
+
 # ---------------------------------------------------------------------------
 # Create
 # ---------------------------------------------------------------------------

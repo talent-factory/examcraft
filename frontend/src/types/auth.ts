@@ -53,6 +53,7 @@ export interface Institution {
   max_documents: number;
   max_questions_per_month: number;
   is_active: boolean;
+  default_grading_scheme_id: number | null;
   created_at: string;
   updated_at?: string;
 }

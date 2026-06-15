@@ -6,7 +6,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService from '../../services/AdminService';
+import { GradingSchemesService } from '../../services/gradingSchemesService';
 import { Institution } from '../../types/auth';
+import { GradingSchemeOut } from '../../types/gradingScheme';
 
 interface InstitutionEditDialogProps {
   institutionId: number | null;
@@ -48,12 +50,14 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gradingSchemes, setGradingSchemes] = useState<GradingSchemeOut[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
     domain: '',
     subscription_tier: 'free',
     is_active: true,
+    default_grading_scheme_id: null as number | null,
   });
 
   const loadInstitution = useCallback(async () => {
@@ -62,7 +66,15 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const institutions = await AdminService.listInstitutions();
+      // Institutions are the critical path; the grading-schemes fetch is
+      // best-effort so an outage there can't block editing name/tier/active.
+      // Scope schemes to the *target* institution so a SuperAdmin editing
+      // another tenant sees that tenant's schemes, not their own (TF-431).
+      const [institutions, schemesResp] = await Promise.all([
+        AdminService.listInstitutions(),
+        GradingSchemesService.list(true, institutionId).catch(() => null),
+      ]);
+      setGradingSchemes(schemesResp?.schemes ?? []);
       const inst = institutions.find((i) => i.id === institutionId);
 
       if (inst) {
@@ -72,6 +84,7 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
           domain: inst.domain || '',
           subscription_tier: inst.subscription_tier,
           is_active: inst.is_active,
+          default_grading_scheme_id: inst.default_grading_scheme_id ?? null,
         });
       } else {
         setError(t('admin.institutionEdit.notFound'));
@@ -232,6 +245,68 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
                 <label htmlFor="is_active" className="ml-2 block text-sm text-gray-700">
                   {t('admin.institutionEdit.isActiveLabel')}
                 </label>
+              </div>
+
+              {/* Default grading scheme — feeds the Note-resolver's
+                  institution-wide fallback (Institution.default_grading_scheme_id). */}
+              <div>
+                <label
+                  htmlFor="default_grading_scheme_id"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  {t('admin.institutionEdit.gradingSchemeLabel')}
+                </label>
+                <select
+                  id="default_grading_scheme_id"
+                  value={formData.default_grading_scheme_id ?? ''}
+                  onChange={(e) => {
+                    // Guard the numeric coercion: a non-integer value must
+                    // not silently become NaN (which serialises to JSON
+                    // null and would *clear* the default rather than error).
+                    const parsed = Number(e.target.value);
+                    setFormData({
+                      ...formData,
+                      default_grading_scheme_id:
+                        e.target.value === '' || !Number.isInteger(parsed)
+                          ? null
+                          : parsed,
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  data-testid="institution-grading-scheme-select"
+                >
+                  <option value="">
+                    {t('admin.institutionEdit.gradingSchemeNone')}
+                  </option>
+                  {gradingSchemes.some((s) => s.is_system_scheme) && (
+                    <optgroup
+                      label={t('admin.institutionEdit.gradingSchemeSystemGroup')}
+                    >
+                      {gradingSchemes
+                        .filter((s) => s.is_system_scheme)
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                  {gradingSchemes.some((s) => !s.is_system_scheme) && (
+                    <optgroup
+                      label={t(
+                        'admin.institutionEdit.gradingSchemeInstitutionGroup',
+                      )}
+                    >
+                      {gradingSchemes
+                        .filter((s) => !s.is_system_scheme)
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                </select>
               </div>
 
               {/* Current Values (Read-only) */}
