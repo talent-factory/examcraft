@@ -28,127 +28,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 # ---------------------------------------------------------------------------
-# System-Grading-Schemes (Spec 4.6)
-# ---------------------------------------------------------------------------
-
-SYSTEM_GRADING_SCHEMES: list[dict] = [
-    {
-        "name": "Swiss 1.0–6.0",
-        "display_format": "numeric",
-        "config": {
-            "type": "linear_segments",
-            "round_to": 0.1,
-            "pass_grade_label": "4.0",
-            "segments": [
-                {
-                    "from_pct": 0,
-                    "to_pct": 50,
-                    "from_grade": 1.0,
-                    "to_grade": 4.0,
-                },
-                {
-                    "from_pct": 50,
-                    "to_pct": 100,
-                    "from_grade": 4.0,
-                    "to_grade": 6.0,
-                },
-            ],
-        },
-    },
-    {
-        "name": "German 1.0–5.0",
-        "display_format": "numeric",
-        "config": {
-            "type": "stepped",
-            "steps": [
-                {"min_pct": 92, "grade_label": "1.0", "is_passing": True},
-                {"min_pct": 81, "grade_label": "2.0", "is_passing": True},
-                {"min_pct": 67, "grade_label": "3.0", "is_passing": True},
-                {"min_pct": 50, "grade_label": "4.0", "is_passing": True},
-                {"min_pct": 0, "grade_label": "5.0", "is_passing": False},
-            ],
-        },
-    },
-    {
-        "name": "Austrian 1–5",
-        "display_format": "numeric",
-        "config": {
-            "type": "stepped",
-            "steps": [
-                {"min_pct": 90, "grade_label": "1", "is_passing": True},
-                {"min_pct": 80, "grade_label": "2", "is_passing": True},
-                {"min_pct": 65, "grade_label": "3", "is_passing": True},
-                {"min_pct": 51, "grade_label": "4", "is_passing": True},
-                {"min_pct": 0, "grade_label": "5", "is_passing": False},
-            ],
-        },
-    },
-    {
-        "name": "French 0–20",
-        "display_format": "numeric",
-        "config": {
-            "type": "linear",
-            "min_pct": 0,
-            "max_pct": 100,
-            "min_grade": 0,
-            "max_grade": 20,
-            "round_to": 0.5,
-            "pass_grade_label": "10",
-        },
-    },
-    {
-        "name": "Dutch 1–10",
-        "display_format": "numeric",
-        "config": {
-            "type": "linear",
-            "min_pct": 0,
-            "max_pct": 100,
-            "min_grade": 1,
-            "max_grade": 10,
-            "round_to": 0.1,
-            "pass_grade_label": "5.5",
-        },
-    },
-    {
-        "name": "ECTS A–F",
-        "display_format": "letter",
-        "config": {
-            "type": "stepped",
-            "steps": [
-                {"min_pct": 90, "grade_label": "A", "is_passing": True},
-                {"min_pct": 80, "grade_label": "B", "is_passing": True},
-                {"min_pct": 65, "grade_label": "C", "is_passing": True},
-                {"min_pct": 55, "grade_label": "D", "is_passing": True},
-                {"min_pct": 50, "grade_label": "E", "is_passing": True},
-                {"min_pct": 0, "grade_label": "F", "is_passing": False},
-            ],
-        },
-    },
-    {
-        "name": "Prozent",
-        "display_format": "numeric",
-        "config": {
-            "type": "linear",
-            "min_pct": 0,
-            "max_pct": 100,
-            "min_grade": 0,
-            "max_grade": 100,
-            "round_to": 0.1,
-            "pass_grade_label": "50",
-        },
-    },
-    {
-        "name": "Pass/Fail",
-        "display_format": "pass_fail",
-        "config": {
-            "type": "stepped",
-            "steps": [
-                {"min_pct": 50, "grade_label": "Pass", "is_passing": True},
-                {"min_pct": 0, "grade_label": "Fail", "is_passing": False},
-            ],
-        },
-    },
-]
+# System-Grading-Schemes (Spec 4.6) leben jetzt in
+# db_seed.SYSTEM_GRADING_SCHEMES (TF-433): Single Source of Truth, geteilt mit
+# dem create_all-Bootstrap (database.py / just repro-reset), der diesen
+# Migrationskörper überspringt. Eingespielt via seed_system_grading_schemes().
 
 
 def upgrade() -> None:
@@ -227,27 +110,11 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # 2) Seed System-Grading-Schemes
     # ------------------------------------------------------------------
-    grading_schemes_seed = sa.table(
-        "grading_schemes",
-        sa.column("institution_id", sa.Integer),
-        sa.column("name", sa.String),
-        sa.column("display_format", sa.String),
-        sa.column("config", sa.JSON),
-        sa.column("is_default_for_institution", sa.Boolean),
-    )
-    op.bulk_insert(
-        grading_schemes_seed,
-        [
-            {
-                "institution_id": None,
-                "name": s["name"],
-                "display_format": s["display_format"],
-                "config": s["config"],
-                "is_default_for_institution": False,
-            }
-            for s in SYSTEM_GRADING_SCHEMES
-        ],
-    )
+    # Single Source: db_seed.SYSTEM_GRADING_SCHEMES, geteilt mit dem create_all-
+    # Bootstrap, der diesen Migrationskörper überspringt (TF-433). Idempotent.
+    from db_seed import seed_system_grading_schemes
+
+    seed_system_grading_schemes(op.get_bind())
 
     # ------------------------------------------------------------------
     # 3) Studierenden-Stammdaten

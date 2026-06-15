@@ -171,6 +171,32 @@ def create_tables():
     _run_migrations_or_create_all()
 
 
+def _seed_system_data():
+    """Seedet Migrations-eingebettete Referenzdaten, die der create_all-Pfad überspringt.
+
+    Der create_all-Bootstrap (Fresh-DB-Zweig + Fallback) baut das Schema aus den
+    Modellen, führt aber keine Migrationskörper aus — Daten-Seeds, die in einer
+    Migration leben (z.B. tf333' SYSTEM_GRADING_SCHEMES), fehlten sonst. Idempotent
+    per Name; bei jedem Bootstrap sicher aufrufbar (TF-433). Im stationären Prod-
+    Betrieb wird der Seed nicht erreicht (DB bereits gestampt → früher return); auf
+    einer erstmalig leeren Prod-DB läuft der Fresh-Zweig und damit der Seed sehr
+    wohl — das ist idempotent und gewollt.
+    """
+    try:
+        from db_seed import seed_system_grading_schemes
+
+        with engine.begin() as conn:
+            inserted = seed_system_grading_schemes(conn)
+        if inserted:
+            print(f"🌱 Seeded {inserted} system grading scheme(s)")
+    except Exception as e:  # noqa: BLE001 — ein Seed-Fehler darf den Boot nie blockieren
+        print(
+            f"⚠️  System-Seed übersprungen ({e}) — grading_schemes evtl. leer; "
+            "Notenauflösung kann fehlschlagen. Manuell nachholbar via "
+            "seed_system_grading_schemes()."
+        )
+
+
 def _run_migrations_or_create_all():
     """
     Fuehre Alembic-Migrationen aus oder erstelle Tabellen direkt.
@@ -223,6 +249,9 @@ def _run_migrations_or_create_all():
                     print("🆕 Fresh database detected — creating schema from models...")
                     Base.metadata.create_all(bind=engine)
                     command.stamp(alembic_cfg, "head")
+                    # create_all überspringt Migrationskörper → Daten-Seeds
+                    # nachholen (TF-433).
+                    _seed_system_data()
                     print(f"✅ Schema created and stamped at {head_rev}")
                     return
 
@@ -266,6 +295,8 @@ def _run_migrations_or_create_all():
             )
 
     Base.metadata.create_all(bind=engine)
+    # create_all überspringt Migrationskörper → Daten-Seeds nachholen (TF-433).
+    _seed_system_data()
     print("Database tables created/verified (create_all fallback)")
 
 
