@@ -54,6 +54,7 @@ import ReviewQueue from '../components/auswertungen/ReviewQueue';
 import StatistikPanel from '../components/auswertungen/StatistikPanel';
 import NotenexportPanel from '../components/auswertungen/NotenexportPanel';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import { reflowMoodleAnswer } from '../utils/moodleAnswerReflow';
 
 const formatPct = (pct: number): string => `${Math.round(pct * 10) / 10}%`;
 
@@ -432,7 +433,7 @@ const AuswertungenExam: React.FC = () => {
                             <TableCell>#{answer.exam_question_id}</TableCell>
                             <TableCell>
                               <MarkdownRenderer
-                                content={answer.given_answer || '—'}
+                                content={reflowMoodleAnswer(answer.given_answer) || '—'}
                                 variant="compact"
                               />
                               {grade?.llm_rationale && (

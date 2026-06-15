@@ -46,6 +46,7 @@ import { ApiError } from '../../services/submissionsService';
 import { ReviewQueueItem } from '../../types/submission';
 import OverrideGradeDialog from './OverrideGradeDialog';
 import MarkdownRenderer from '../MarkdownRenderer';
+import { reflowMoodleAnswer } from '../../utils/moodleAnswerReflow';
 
 // Untere Grenze für die Bulk-Konfidenz-Schwelle: 0% würde alle
 // proposed-Grades inklusive der Fail-Soft-Stubs (confidence=0.0)
@@ -513,7 +514,7 @@ const ReviewQueue: React.FC<Props> = ({
                     </Typography>
                     <Box sx={{ mb: 1 }}>
                       <MarkdownRenderer
-                        content={item.given_answer || '—'}
+                        content={reflowMoodleAnswer(item.given_answer) || '—'}
                         variant="compact"
                       />
                     </Box>
