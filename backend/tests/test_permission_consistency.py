@@ -219,6 +219,8 @@ class TestPermissionConsistency:
             "submissions:grade",
             # TF-421 — delete a result-import (clean re-import).
             "submissions:delete",
+            # TF-435 — push graded feedback (points + comments) back to Moodle.
+            "submissions:moodle_feedback_push",
             # TF-335 — Custom Grading-Schemes management permission.
             "grading_schemes:manage",
             # TF-336 — Klassen-/Studi-Stammdaten und Moodle-Connections.

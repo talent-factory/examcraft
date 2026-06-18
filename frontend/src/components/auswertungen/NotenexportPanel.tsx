@@ -31,13 +31,20 @@ import {
   Select,
   Typography,
 } from '@mui/material';
-import { Download as DownloadIcon } from '@mui/icons-material';
+import {
+  CloudUpload as CloudUploadIcon,
+  Download as DownloadIcon,
+} from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 
 import {
   ExportFormat,
   GradeExportService,
 } from '../../services/gradeExportService';
+import {
+  MoodleFeedbackPushService,
+  PushJob,
+} from '../../services/moodleFeedbackPushService';
 import { ComposerService } from '../../services/ComposerService';
 import { GradingSchemesService } from '../../services/gradingSchemesService';
 import { GradingSchemeOut } from '../../types/gradingScheme';
@@ -70,6 +77,14 @@ const NotenexportPanel: React.FC<NotenexportPanelProps> = ({
   const [format, setFormat] = useState<ExportFormat>('csv');
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // TF-435: push graded feedback (points + per-question comments) back to
+  // Moodle. Gated on the dedicated permission so reviewers without it never
+  // see a button that 403s.
+  const canPushMoodle = hasPermission('submissions:moodle_feedback_push');
+  const [pushing, setPushing] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [pushResult, setPushResult] = useState<PushJob | null>(null);
 
   // Reassigning the scheme goes through PATCH /exams/{id}/grading-scheme,
   // which requires ``create_exams``. The export tab itself is reachable with
@@ -230,6 +245,46 @@ const NotenexportPanel: React.FC<NotenexportPanelProps> = ({
     }
   };
 
+  // TF-435: enqueue the push, then poll the job until it leaves the
+  // queued/processing state (or we hit the safety cap of ~2 minutes).
+  const handleMoodlePush = async () => {
+    setPushing(true);
+    setPushError(null);
+    setPushResult(null);
+    try {
+      const started = await MoodleFeedbackPushService.start(examId);
+      let job = started;
+      for (
+        let i = 0;
+        i < 60 && (job.status === 'queued' || job.status === 'processing');
+        i++
+      ) {
+        await new Promise((r) => setTimeout(r, 2000));
+        job = await MoodleFeedbackPushService.poll(examId, started.id);
+      }
+      setPushResult(job);
+      if (job.status === 'failed') {
+        setPushError(t('auswertungen.moodlePush.errorFailed'));
+      } else if (job.status !== 'completed') {
+        // Poll cap hit while still queued/processing — the push keeps running
+        // server-side. Tell the user rather than showing nothing (which looks
+        // identical to "never clicked"); the backend watchdog terminalizes a
+        // genuinely stuck job.
+        setPushError(
+          t('auswertungen.moodlePush.stillRunning', { jobId: started.id }),
+        );
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setPushError(err.message);
+      } else {
+        setPushError(t('auswertungen.moodlePush.errorServer'));
+      }
+    } finally {
+      setPushing(false);
+    }
+  };
+
   const reviewHint = useMemo(() => {
     if (totalSubmissions === 0) {
       return t('auswertungen.export.noSubmissionsHint');
@@ -376,6 +431,58 @@ const NotenexportPanel: React.FC<NotenexportPanelProps> = ({
           })}
         </Typography>
       </Box>
+
+      {canPushMoodle && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            {t('auswertungen.moodlePush.title')}
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={
+              pushing ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <CloudUploadIcon />
+              )
+            }
+            disabled={blocked || pushing}
+            onClick={handleMoodlePush}
+            data-testid="moodle-push-button"
+          >
+            {t('auswertungen.moodlePush.button')}
+          </Button>
+          {pushError && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {pushError}
+            </Alert>
+          )}
+          {pushResult && pushResult.status === 'completed' && (
+            <Alert
+              // A completed job with per-student failures is NOT a clean
+              // success — derive severity from the counters so a half-failed
+              // push isn't painted green.
+              severity={
+                pushResult.students_failed > 0
+                  ? 'warning'
+                  : pushResult.students_skipped > 0
+                    ? 'info'
+                    : 'success'
+              }
+              sx={{ mt: 1 }}
+              data-testid="moodle-push-result"
+            >
+              {t('auswertungen.moodlePush.result', {
+                pushed: pushResult.students_pushed,
+                total: pushResult.students_total,
+                skipped: pushResult.students_skipped,
+                failed: pushResult.students_failed,
+                transport: pushResult.transport,
+              })}
+            </Alert>
+          )}
+        </Box>
+      )}
     </Box>
   );
 };

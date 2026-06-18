@@ -21,9 +21,15 @@ from models.question_generation_job import QuestionGenerationJob
 
 @pytest.fixture
 def stage(test_db):
-    """Owner-style fixture mirroring test_rag_exams_owner.stage."""
+    """Owner-style fixture mirroring test_rag_exams_owner.stage.
+
+    No hardcoded PK IDs: the CI DB is shared across the suite, and explicit
+    PK inserts collide with autoincremented rows once a sibling test pushes
+    the sequence past the literal value (TF-435 surfaced this when its added
+    user inserts advanced ``users_id_seq`` past 420). Let the DB assign IDs
+    and reference them via ``.id``; namespace email/slug to stay collision-free.
+    """
     inst = Institution(
-        id=420,
         name="RetryAudit",
         slug="retryaudit",
         subscription_tier="professional",
@@ -32,20 +38,19 @@ def stage(test_db):
         max_questions_per_month=1000,
     )
     test_db.add(inst)
+    test_db.flush()
     owner = User(
-        id=420,
         email="owner@retry.ch",
         first_name="O",
         last_name="W",
         password_hash="x",  # pragma: allowlist secret
-        institution_id=420,
+        institution_id=inst.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=False,
     )
     test_db.add(owner)
     test_db.flush()
     job = QuestionGenerationJob(
-        id=650,
         task_id="rag-task-original",
         user_id=owner.id,
         topic="Audit-Coverage",

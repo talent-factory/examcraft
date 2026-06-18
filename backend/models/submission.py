@@ -35,8 +35,10 @@ from sqlalchemy.sql import func
 
 from database import Base
 from enums import (
+    FeedbackTransportName,
     GradeStatus,
     ImportJobStatus,
+    MoodleFeedbackPushStatus,
     ScoringStrategy,
     SubmissionGradeStatus,
 )
@@ -46,6 +48,8 @@ _SUBMISSION_GRADE_STATUSES = frozenset(s.value for s in SubmissionGradeStatus)
 _SCORING_STRATEGIES = frozenset(s.value for s in ScoringStrategy)
 _GRADE_STATUSES = frozenset(s.value for s in GradeStatus)
 _IMPORT_JOB_STATUSES = frozenset(s.value for s in ImportJobStatus)
+_MOODLE_PUSH_STATUSES = frozenset(s.value for s in MoodleFeedbackPushStatus)
+_FEEDBACK_TRANSPORTS = frozenset(t.value for t in FeedbackTransportName)
 
 
 class Submission(Base):
@@ -545,3 +549,110 @@ class MoodleConnection(Base):
 
     def __repr__(self):
         return f"<MoodleConnection(id={self.id}, institution_id={self.institution_id})>"
+
+
+class MoodleFeedbackPushJob(Base):
+    """Lifecycle record of one feedback push back to Moodle (TF-435).
+
+    Mirrors ``ImportJob`` but for the outbound direction (grades +
+    per-question comments → Moodle). ``transport`` records which
+    transport handled the push: ``plugin`` (native per-question via the
+    local_examcraft WS) or ``gradebook`` (bundled feedback block via
+    core_grades_update_grades).
+    """
+
+    __tablename__ = "moodle_feedback_push_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    institution_id = Column(
+        Integer,
+        ForeignKey("institutions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    exam_id = Column(
+        Integer,
+        ForeignKey("exams.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    status = Column(String(20), default="queued", nullable=False)
+    transport = Column(String(20), nullable=True)
+
+    students_total = Column(Integer, default=0, nullable=False)
+    students_pushed = Column(Integer, default=0, nullable=False)
+    students_skipped = Column(Integer, default=0, nullable=False)
+    students_failed = Column(Integer, default=0, nullable=False)
+    error_log = Column(JSON, nullable=True)
+
+    triggered_by = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # One-directional relationships (no back_populates) to avoid touching
+    # the Institution/Exam models.
+    institution = relationship("Institution", foreign_keys=[institution_id])
+    exam = relationship("Exam", foreign_keys=[exam_id])
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('queued', 'processing', 'completed', 'failed')",
+            name="check_moodle_feedback_push_status",
+        ),
+        CheckConstraint(
+            "transport IS NULL OR transport IN ('plugin', 'gradebook')",
+            name="check_moodle_feedback_push_transport",
+        ),
+        CheckConstraint(
+            "students_total >= 0 AND students_pushed >= 0 "
+            "AND students_skipped >= 0 AND students_failed >= 0",
+            name="check_moodle_feedback_push_counters",
+        ),
+        # Once finished, the buckets must account for every counted student.
+        # Only enforced for ``completed`` — queued/processing/failed rows may
+        # carry zeroed or partial counters.
+        CheckConstraint(
+            "status != 'completed' OR "
+            "students_pushed + students_skipped + students_failed = students_total",
+            name="check_moodle_feedback_push_counter_sum",
+        ),
+    )
+
+    @validates("status")
+    def _validate_status(self, _key: str, value: str) -> str:
+        if value not in _MOODLE_PUSH_STATUSES:
+            raise ValueError(
+                f"MoodleFeedbackPushJob.status {value!r} ungültig — erlaubt: "
+                f"{sorted(_MOODLE_PUSH_STATUSES)}"
+            )
+        return value
+
+    @validates("transport")
+    def _validate_transport(self, _key: str, value: str | None) -> str | None:
+        if value is not None and value not in _FEEDBACK_TRANSPORTS:
+            raise ValueError(
+                f"MoodleFeedbackPushJob.transport {value!r} ungültig — erlaubt: "
+                f"{sorted(_FEEDBACK_TRANSPORTS)} oder None"
+            )
+        return value
+
+    def __repr__(self):
+        return (
+            f"<MoodleFeedbackPushJob(id={self.id}, exam_id={self.exam_id}, "
+            f"status={self.status}, transport={self.transport})>"
+        )

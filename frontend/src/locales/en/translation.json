@@ -254,6 +254,14 @@
       "gradingSchemeConflict": "Exam changed meanwhile — please retry.",
       "gradingSchemeError": "Could not save grading scheme."
     },
+    "moodlePush": {
+      "title": "Send grades to Moodle",
+      "button": "Send to Moodle",
+      "result": "{{pushed}} of {{total}} students sent ({{skipped}} skipped, {{failed}} failed) — transport: {{transport}}.",
+      "errorFailed": "The transfer failed. Please check the details in the job log.",
+      "errorServer": "The transfer could not be started. Please try again later.",
+      "stillRunning": "The transfer is still running in the background (job {{jobId}}). Please check again later."
+    },
     "statistik": {
       "errorAuth": "Session expired — please sign in again.",
       "errorPermission": "You do not have permission to view statistics.",

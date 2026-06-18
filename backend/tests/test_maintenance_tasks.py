@@ -387,3 +387,66 @@ def test_reconcile_unknown_state_increments_skipped_unexpected_counter():
     assert result["skipped_unexpected"] == 1
     assert result["reconciled"] == 0
     assert result["errors"] == 0
+
+
+def test_moodle_feedback_reaper_age_fails_stuck_jobs_only(test_db):
+    """``reap_stuck_moodle_feedback_jobs`` (TF-435 watchdog) age-fails push jobs
+    stuck non-terminal past the threshold, so the frontend poll always converges
+    on a terminal status. Fresh and already-terminal rows are untouched."""
+    from models.auth import Institution
+    from models.exam import Exam
+    from models.submission import MoodleFeedbackPushJob
+    from tasks.maintenance_tasks import (
+        _MOODLE_PUSH_STUCK_THRESHOLD,
+        reap_stuck_moodle_feedback_jobs,
+    )
+
+    inst = Institution(
+        name="reaper-inst",
+        slug="reaper-tf435",
+        subscription_tier="free",
+        max_users=1,
+        max_documents=1,
+        max_questions_per_month=1,
+    )
+    test_db.add(inst)
+    test_db.flush()
+    exam = Exam(title="Reaper", status="finalized", institution_id=inst.id)
+    test_db.add(exam)
+    test_db.flush()
+
+    now = datetime.now(timezone.utc)
+    old = now - _MOODLE_PUSH_STUCK_THRESHOLD - timedelta(minutes=10)
+
+    def _job(status: str, created_at: datetime) -> int:
+        job = MoodleFeedbackPushJob(
+            institution_id=inst.id,
+            exam_id=exam.id,
+            status=status,
+            created_at=created_at,
+        )
+        test_db.add(job)
+        test_db.commit()
+        test_db.refresh(job)
+        return job.id
+
+    stuck_queued = _job("queued", old)
+    stuck_processing = _job("processing", old)
+    fresh_queued = _job("queued", now)
+    old_completed = _job("completed", old)  # 0+0+0 == 0 satisfies the sum CHECK
+
+    with (
+        patch("tasks.maintenance_tasks.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+    ):
+        result = reap_stuck_moodle_feedback_jobs.run()
+
+    assert result["reaped"] == 2
+    test_db.expire_all()
+    assert test_db.get(MoodleFeedbackPushJob, stuck_queued).status == "failed"
+    assert test_db.get(MoodleFeedbackPushJob, stuck_processing).status == "failed"
+    assert test_db.get(MoodleFeedbackPushJob, fresh_queued).status == "queued"
+    assert test_db.get(MoodleFeedbackPushJob, old_completed).status == "completed"
+    reaped = test_db.get(MoodleFeedbackPushJob, stuck_queued)
+    assert reaped.finished_at is not None
+    assert reaped.error_log and reaped.error_log[-1]["scope"] == "job"

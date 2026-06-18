@@ -51,6 +51,7 @@ celery_app = Celery(
         "tasks.maintenance_tasks",
         "tasks.diagnostics_tasks",  # TF-359 Sentry worker-pipeline verification
         "tasks.import_submissions_task",  # TF-412 async result import
+        "tasks.moodle_feedback_push_task",  # TF-435 feedback push back to Moodle
     ],
 )
 
@@ -85,6 +86,11 @@ celery_app.conf.beat_schedule = {
     # polling client always converges on a terminal status.
     "reap-stuck-import-jobs-every-5-minutes": {
         "task": "tasks.maintenance_tasks.reap_stuck_import_jobs",
+        "schedule": 300.0,  # 5 Minuten
+    },
+    # TF-435: same watchdog for outbound MoodleFeedbackPushJob rows.
+    "reap-stuck-moodle-feedback-jobs-every-5-minutes": {
+        "task": "tasks.maintenance_tasks.reap_stuck_moodle_feedback_jobs",
         "schedule": 300.0,  # 5 Minuten
     },
 }

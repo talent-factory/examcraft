@@ -254,6 +254,14 @@
       "gradingSchemeConflict": "Prüfung wurde zwischenzeitlich geändert — bitte erneut versuchen.",
       "gradingSchemeError": "Notenschema konnte nicht gespeichert werden."
     },
+    "moodlePush": {
+      "title": "Bewertungen nach Moodle übertragen",
+      "button": "Nach Moodle übertragen",
+      "result": "{{pushed}} von {{total}} Studierenden übertragen ({{skipped}} übersprungen, {{failed}} fehlgeschlagen) — Transport: {{transport}}.",
+      "errorFailed": "Die Übertragung ist fehlgeschlagen. Bitte die Details im Job-Protokoll prüfen.",
+      "errorServer": "Die Übertragung konnte nicht gestartet werden. Bitte später erneut versuchen.",
+      "stillRunning": "Die Übertragung läuft noch im Hintergrund (Job {{jobId}}). Bitte später erneut prüfen."
+    },
     "statistik": {
       "errorAuth": "Sitzung abgelaufen — bitte erneut anmelden.",
       "errorPermission": "Keine Berechtigung für die Statistik-Ansicht.",

@@ -14,9 +14,9 @@ from celery.result import AsyncResult
 
 from celery_app import celery_app
 from database import SessionLocal
-from enums import ImportJobStatus
+from enums import ImportJobStatus, MoodleFeedbackPushStatus
 from models.question_generation_job import QuestionGenerationJob
-from models.submission import ImportJob
+from models.submission import ImportJob, MoodleFeedbackPushJob
 from tasks.question_tasks import _safe_update_job_status
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,17 @@ _IMPORT_STUCK_THRESHOLD = timedelta(minutes=30)
 _IMPORT_NON_TERMINAL_STATUSES = (
     ImportJobStatus.QUEUED.value,
     ImportJobStatus.RUNNING.value,
+)
+
+# TF-435: same age-fail watchdog for the outbound feedback-push jobs. A push
+# job is pre-created ``queued`` and flipped ``processing`` by the worker; a
+# lost message / OOM before the terminal write would leave it non-terminal
+# forever, and the frontend poll (~2 min cap) would then silently show nothing.
+# Same created_at age basis as ImportJob (``queued`` rows have started_at = NULL).
+_MOODLE_PUSH_STUCK_THRESHOLD = timedelta(minutes=30)
+_MOODLE_PUSH_NON_TERMINAL_STATUSES = (
+    MoodleFeedbackPushStatus.QUEUED.value,
+    MoodleFeedbackPushStatus.PROCESSING.value,
 )
 
 # In-Progress-States, die der Watchdog NICHT anfasst — die Tasks laufen tatsächlich.
@@ -261,6 +272,64 @@ def reap_stuck_import_jobs() -> dict[str, int]:
             logger.warning("Reaped %s stuck import_jobs (age-failed)", reaped)
     except Exception:
         logger.exception("reap_stuck_import_jobs failed")
+        session.rollback()
+    finally:
+        session.close()
+
+    return {"reaped": reaped}
+
+
+@celery_app.task(name="tasks.maintenance_tasks.reap_stuck_moodle_feedback_jobs")
+def reap_stuck_moodle_feedback_jobs() -> dict[str, int]:
+    """Age-fail MoodleFeedbackPushJob rows stuck non-terminal (TF-435).
+
+    Mirror of ``reap_stuck_import_jobs`` for the outbound feedback push. A push
+    job is pre-created ``queued`` and flipped ``processing`` by the worker; if
+    the task message is lost or the worker dies before the terminal write, the
+    row sits non-terminal forever and the frontend poll (~2 min cap) silently
+    shows nothing. Age-based on ``created_at``; idempotent.
+    """
+    cutoff = datetime.now(timezone.utc) - _MOODLE_PUSH_STUCK_THRESHOLD
+    threshold_min = int(_MOODLE_PUSH_STUCK_THRESHOLD.total_seconds() // 60)
+    reaped = 0
+
+    session = SessionLocal()
+    try:
+        stuck = (
+            session.query(MoodleFeedbackPushJob)
+            .filter(
+                MoodleFeedbackPushJob.status.in_(_MOODLE_PUSH_NON_TERMINAL_STATUSES),
+                MoodleFeedbackPushJob.created_at < cutoff,
+            )
+            .all()
+        )
+
+        for job in stuck:
+            prior_status = job.status
+            job.status = MoodleFeedbackPushStatus.FAILED.value
+            job.finished_at = datetime.now(timezone.utc)
+            error_log = list(job.error_log or [])
+            error_log.append(
+                {
+                    "scope": "job",
+                    "reason": (
+                        f"Feedback-Push seit über {threshold_min} Minuten in "
+                        f"Status {prior_status!r} — vom Watchdog als "
+                        "fehlgeschlagen markiert (verlorene Broker-Nachricht "
+                        "oder abgestürzter Worker)."
+                    ),
+                }
+            )
+            job.error_log = error_log
+            reaped += 1
+
+        if reaped:
+            session.commit()
+            logger.warning(
+                "Reaped %s stuck moodle_feedback_push_jobs (age-failed)", reaped
+            )
+    except Exception:
+        logger.exception("reap_stuck_moodle_feedback_jobs failed")
         session.rollback()
     finally:
         session.close()

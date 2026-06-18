@@ -354,6 +354,16 @@ async def lifespan(app: FastAPI):
     grade_export_api = importlib.util.module_from_spec(spec_grade_export)
     spec_grade_export.loader.exec_module(grade_export_api)
 
+    # TF-435: push graded feedback (points + comments) back to Moodle.
+    spec_moodle_feedback_push = importlib.util.spec_from_file_location(
+        "core_api_moodle_feedback_push",
+        os.path.join(core_api_path, "moodle_feedback_push.py"),
+    )
+    moodle_feedback_push_api = importlib.util.module_from_spec(
+        spec_moodle_feedback_push
+    )
+    spec_moodle_feedback_push.loader.exec_module(moodle_feedback_push_api)
+
     # TF-337: paginated activity endpoint (own / institution scope).
     # Loaded BEFORE dashboard because dashboard.py imports ActivityType from it.
     # Registered as "api.activity" so the absolute import in dashboard.py resolves.
@@ -459,6 +469,7 @@ async def lifespan(app: FastAPI):
     app.include_router(stats_api.router_exam_stats)
     app.include_router(stats_api.router_submission_stats)
     app.include_router(grade_export_api.router)
+    app.include_router(moodle_feedback_push_api.router)
     app.include_router(dashboard_api.router)
     app.include_router(activity_api.router)
     app.include_router(audit_api.router)

@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import NotenexportPanel from '../NotenexportPanel';
@@ -17,6 +17,7 @@ import { GradeExportService } from '../../../services/gradeExportService';
 import { ComposerService } from '../../../services/ComposerService';
 import { GradingSchemesService } from '../../../services/gradingSchemesService';
 import { ApiError } from '../../../services/submissionsService';
+import { MoodleFeedbackPushService } from '../../../services/moodleFeedbackPushService';
 
 // react-i18next is globally mocked in setupTests.ts to resolve keys
 // against the real DE translation.json — no per-test i18n bootstrap.
@@ -34,6 +35,10 @@ jest.mock('../../../services/ComposerService', () => ({
 
 jest.mock('../../../services/gradingSchemesService', () => ({
   GradingSchemesService: { list: jest.fn() },
+}));
+
+jest.mock('../../../services/moodleFeedbackPushService', () => ({
+  MoodleFeedbackPushService: { start: jest.fn(), poll: jest.fn() },
 }));
 
 jest.mock('../../../services/submissionsService', () => ({
@@ -62,6 +67,8 @@ const mockedGetExam = ComposerService.getExam as jest.Mock;
 const mockedUpdateScheme =
   ComposerService.updateExamGradingScheme as jest.Mock;
 const mockedListSchemes = GradingSchemesService.list as jest.Mock;
+const mockedPushStart = MoodleFeedbackPushService.start as jest.Mock;
+const mockedPushPoll = MoodleFeedbackPushService.poll as jest.Mock;
 
 const SCHEMES = {
   schemes: [
@@ -302,6 +309,158 @@ describe('NotenexportPanel', () => {
     expect(msg).toHaveTextContent('Notenschema konnte nicht gespeichert werden.');
     // A 500 is not a conflict — no reload beyond the initial mount fetch.
     expect(mockedGetExam).toHaveBeenCalledTimes(1);
+  });
+
+  // --- TF-435: Moodle feedback push -------------------------------------
+
+  it('shows the Moodle push button when permitted', () => {
+    renderPanel({ pendingCount: 0 });
+    expect(screen.getByTestId('moodle-push-button')).toBeInTheDocument();
+  });
+
+  it('pushes feedback to Moodle and surfaces the completed result', async () => {
+    mockedPushStart.mockResolvedValueOnce({
+      id: 7,
+      status: 'completed',
+      transport: 'plugin',
+      students_total: 3,
+      students_pushed: 3,
+      students_skipped: 0,
+      students_failed: 0,
+      error_log: null,
+    });
+    renderPanel({ pendingCount: 0 });
+    fireEvent.click(screen.getByTestId('moodle-push-button'));
+    await waitFor(() => expect(mockedPushStart).toHaveBeenCalledWith(42));
+    expect(
+      await screen.findByTestId('moodle-push-result'),
+    ).toBeInTheDocument();
+  });
+
+  it('polls a queued job until it completes, then shows the result', async () => {
+    jest.useFakeTimers();
+    try {
+      mockedPushStart.mockResolvedValueOnce({
+        id: 7,
+        status: 'processing',
+        transport: null,
+        students_total: 0,
+        students_pushed: 0,
+        students_skipped: 0,
+        students_failed: 0,
+        error_log: null,
+      });
+      mockedPushPoll.mockResolvedValueOnce({
+        id: 7,
+        status: 'completed',
+        transport: 'gradebook',
+        students_total: 2,
+        students_pushed: 2,
+        students_skipped: 0,
+        students_failed: 0,
+        error_log: null,
+      });
+      renderPanel({ pendingCount: 0 });
+      fireEvent.click(screen.getByTestId('moodle-push-button'));
+      await act(async () => {
+        await Promise.resolve(); // flush start()
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(2000); // fire the poll backoff
+      });
+      await act(async () => {
+        await Promise.resolve(); // flush poll()
+      });
+      expect(mockedPushPoll).toHaveBeenCalledWith(42, 7);
+      expect(screen.getByTestId('moodle-push-result')).toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('surfaces an ApiError from the push as a user-facing error', async () => {
+    mockedPushStart.mockRejectedValueOnce(
+      new ApiError({
+        kind: 'validation',
+        status: 412,
+        message: 'Keine Moodle-Verbindung konfiguriert.',
+      }),
+    );
+    renderPanel({ pendingCount: 0 });
+    fireEvent.click(screen.getByTestId('moodle-push-button'));
+    expect(
+      await screen.findByText(/Keine Moodle-Verbindung konfiguriert/),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('moodle-push-result')).not.toBeInTheDocument();
+  });
+
+  it('paints a completed-with-failures push as a warning, not success', async () => {
+    // A completed job where most students failed must not read as green success.
+    mockedPushStart.mockResolvedValueOnce({
+      id: 8,
+      status: 'completed',
+      transport: 'plugin',
+      students_total: 3,
+      students_pushed: 1,
+      students_skipped: 0,
+      students_failed: 2,
+      error_log: null,
+    });
+    renderPanel({ pendingCount: 0 });
+    fireEvent.click(screen.getByTestId('moodle-push-button'));
+    const result = await screen.findByTestId('moodle-push-result');
+    expect(result.className).toMatch(/Warning/);
+  });
+
+  it('warns that the push is still running when the poll cap is hit', async () => {
+    jest.useFakeTimers();
+    try {
+      const processing = {
+        id: 9,
+        status: 'processing' as const,
+        transport: null,
+        students_total: 0,
+        students_pushed: 0,
+        students_skipped: 0,
+        students_failed: 0,
+        error_log: null,
+      };
+      mockedPushStart.mockResolvedValueOnce(processing);
+      mockedPushPoll.mockResolvedValue(processing); // never terminalizes
+      renderPanel({ pendingCount: 0 });
+      fireEvent.click(screen.getByTestId('moodle-push-button'));
+      await act(async () => {
+        await Promise.resolve(); // flush start()
+      });
+      // Drive the 60×2s poll loop all the way to its safety cap.
+      for (let i = 0; i < 61; i++) {
+        await act(async () => {
+          jest.advanceTimersByTime(2000);
+        });
+        await act(async () => {
+          await Promise.resolve();
+        });
+      }
+      // No green result; instead the "still running in background" hint.
+      expect(
+        screen.queryByTestId('moodle-push-result'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/läuft noch im Hintergrund/),
+      ).toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('hides the Moodle push button without the push permission', () => {
+    mockHasPermission.mockImplementation(
+      (p: string) => p !== 'submissions:moodle_feedback_push',
+    );
+    renderPanel({ pendingCount: 0 });
+    expect(
+      screen.queryByTestId('moodle-push-button'),
+    ).not.toBeInTheDocument();
   });
 
   it('hides the picker (and skips the fetch) without create_exams permission', async () => {
