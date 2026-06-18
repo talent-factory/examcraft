@@ -8,10 +8,30 @@ import httpx
 import json
 import asyncio
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+# Process-local active-model override (TF-438). Startup validation and runtime
+# fallback record the working model here so that freshly constructed
+# ClaudeService instances — RAGService builds one per Celery task — start from
+# the validated model instead of each repeatedly hitting (and alerting on) a
+# retired primary. Bounded per worker process: the first task pays at most one
+# 404, every subsequent instance starts clean.
+_active_model_override: Optional[str] = None
+
+
+class ModelUnavailableError(Exception):
+    """Raised when every model in the configured fallback chain returns a 404
+    ``not_found_error`` (TF-438).
+
+    A retired model is a *permanent* condition, so callers — notably the Celery
+    question-generation task — must treat this as non-retryable instead of
+    looping forever like the TF-437 incident. It is the fail-fast that PR #149
+    (TF-437) explicitly deferred to this ticket.
+    """
 
 
 class ClaudeService:
@@ -19,13 +39,31 @@ class ClaudeService:
 
     def __init__(self):
         self.api_key = os.getenv("ANTHROPIC_API_KEY")
-        self.base_url = "https://api.anthropic.com/v1/messages"
+        self.api_base_url = "https://api.anthropic.com/v1"
+        self.base_url = f"{self.api_base_url}/messages"
         # Default model. Override per deployment via the CLAUDE_MODEL env var.
         # claude-sonnet-4-6 is the current Sonnet drop-in; the previous default
         # (claude-sonnet-4-20250514) was retired by Anthropic on 2026-06-15 and
         # now returns a 404 not_found_error (TF-437). Keep this in sync with the
         # active model list and the CLAUDE_MODEL secrets in prod.
-        self.model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
+        # A process-local override set by startup validation / runtime fallback
+        # takes precedence so new instances skip a known-retired primary (TF-438).
+        self.model = _active_model_override or os.getenv(
+            "CLAUDE_MODEL", "claude-sonnet-4-6"
+        )
+
+        # TF-438: ordered fallback chain. When the active model returns a 404
+        # not_found_error (Anthropic retired it), requests transparently fall
+        # through to the next model instead of looping (TF-437). Deliberately
+        # curated, NOT auto-latest: a model swap changes quality/cost/token
+        # behaviour, so the chain is explicit. CLAUDE_MODEL_FALLBACK is a
+        # comma-separated, ordered list; the default is one known-good model.
+        fallback_env = os.getenv("CLAUDE_MODEL_FALLBACK", "claude-sonnet-4-5")
+        self.fallback_models = [m.strip() for m in fallback_env.split(",") if m.strip()]
+        # Full candidate list: primary first, then fallbacks, order-preserving
+        # de-dup so an operator can repeat the primary in the fallback list
+        # without it being tried twice.
+        self.model_chain = list(dict.fromkeys([self.model, *self.fallback_models]))
 
         # Rate limiting configuration
         self.max_requests_per_minute = int(os.getenv("CLAUDE_MAX_RPM", "50"))
@@ -36,6 +74,13 @@ class ClaudeService:
         self.retry_delay = float(os.getenv("CLAUDE_RETRY_DELAY", "1.0"))
         # Timeout for API requests (default 120s for large prompts with context)
         self.request_timeout = float(os.getenv("CLAUDE_REQUEST_TIMEOUT", "120.0"))
+        # Short, separate timeout for the lightweight Models-API startup check.
+        # The check is awaited inline at boot, so a slow Models endpoint can delay
+        # startup by at most model_check_timeout seconds, not the 120s request
+        # timeout (TF-438).
+        self.model_check_timeout = float(
+            os.getenv("CLAUDE_MODEL_CHECK_TIMEOUT", "10.0")
+        )
 
         # Cost tracking
         self.cost_per_input_token = 0.003 / 1000  # $3 per million input tokens
@@ -96,32 +141,101 @@ class ClaudeService:
 
         return total_cost
 
+    def _api_headers(self) -> Dict[str, str]:
+        """Shared Anthropic API headers (messages + models endpoints)."""
+        return {
+            "Content-Type": "application/json",
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01",
+        }
+
+    def _activate_model(self, model: str, reason: str) -> None:
+        """Promote ``model`` to the active model so subsequent requests — and
+        newly constructed instances in this process — skip a dead primary
+        (TF-438)."""
+        if model == self.model:
+            return
+        global _active_model_override
+        logger.warning(
+            f"Switching active Claude model '{self.model}' -> '{model}' ({reason})"
+        )
+        self.model = model
+        _active_model_override = model
+
+    def _alert_model_retired(
+        self, retired_model: str, next_model: Optional[str]
+    ) -> None:
+        """Emit a WARN/ERROR log + Sentry alert when a model returns 404 (TF-438)."""
+        if next_model:
+            message = (
+                f"Claude model '{retired_model}' returned 404 not_found_error — "
+                f"falling back to '{next_model}' (TF-438)"
+            )
+            level = "warning"
+            logger.warning(message)
+        else:
+            message = (
+                f"Claude model '{retired_model}' returned 404 not_found_error and "
+                f"the fallback chain is exhausted — generation unavailable (TF-438)"
+            )
+            level = "error"
+            logger.error(message)
+
+        try:
+            from config.sentry import capture_message_with_context
+
+            capture_message_with_context(
+                message,
+                level=level,
+                extra_context={
+                    "retired_model": retired_model,
+                    "next_model": next_model,
+                    "model_chain": self.model_chain,
+                },
+                tags={"component": "claude_service", "issue": "TF-438"},
+            )
+        except Exception:  # pragma: no cover - alerting must not break requests
+            logger.debug("Could not emit Sentry alert for retired model", exc_info=True)
+
     async def _make_api_request_with_retry(
         self, payload: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Make API request with retry logic"""
+        """Make an API request with retry logic and curated model fallback (TF-438).
+
+        Transient errors (network, 5xx, 429) are retried against the *same*
+        model with exponential backoff — they are also retryable upstream
+        (Celery). A 404 ``not_found_error`` is permanent for that model
+        (Anthropic retired it), so instead of burning retries we switch to the
+        next model in the curated fallback chain. When every model returns 404,
+        a :class:`ModelUnavailableError` is raised so the caller fails fast
+        instead of looping (the fail-fast TF-437 deferred here).
+        """
+        # Try the currently-active model first, then the remaining chain.
+        candidates = [self.model] + [m for m in self.model_chain if m != self.model]
         last_exception = None
 
-        for attempt in range(self.max_retries):
-            try:
-                # Check rate limit
-                if not self._check_rate_limit():
-                    wait_time = 60 - (time.time() - min(self.request_timestamps))
-                    logger.warning(f"Rate limit reached, waiting {wait_time:.1f}s")
-                    await asyncio.sleep(wait_time)
+        for model_index, model in enumerate(candidates):
+            payload = {**payload, "model": model}
+            model_retired = False
 
-                self._add_request_timestamp()
+            for attempt in range(self.max_retries):
+                try:
+                    # Check rate limit
+                    if not self._check_rate_limit():
+                        wait_time = 60 - (time.time() - min(self.request_timestamps))
+                        logger.warning(f"Rate limit reached, waiting {wait_time:.1f}s")
+                        await asyncio.sleep(wait_time)
 
-                async with httpx.AsyncClient(timeout=self.request_timeout) as client:
-                    response = await client.post(
-                        self.base_url,
-                        headers={
-                            "Content-Type": "application/json",
-                            "x-api-key": self.api_key,
-                            "anthropic-version": "2023-06-01",
-                        },
-                        json=payload,
-                    )
+                    self._add_request_timestamp()
+
+                    async with httpx.AsyncClient(
+                        timeout=self.request_timeout
+                    ) as client:
+                        response = await client.post(
+                            self.base_url,
+                            headers=self._api_headers(),
+                            json=payload,
+                        )
 
                     if response.status_code == 200:
                         result = response.json()
@@ -133,17 +247,36 @@ class ClaudeService:
                         cost = self._calculate_cost(input_tokens, output_tokens)
 
                         logger.info(
-                            f"Claude API call successful - Cost: ${cost:.4f}, Tokens: {input_tokens}+{output_tokens}"
+                            f"Claude API call successful (model={model}) - "
+                            f"Cost: ${cost:.4f}, Tokens: {input_tokens}+{output_tokens}"
                         )
+                        # Promote a working fallback for subsequent requests
+                        # (no-op when the primary itself succeeded).
+                        if model != self.model:
+                            self._activate_model(model, reason="runtime 404 fallback")
                         return result
 
                     elif response.status_code == 429:  # Rate limited
                         retry_after = int(
                             response.headers.get("retry-after", self.retry_delay)
                         )
+                        # Record so a 429-only exhaustion surfaces the real cause
+                        # (rate limiting) rather than a context-less generic error.
+                        last_exception = Exception(
+                            f"Claude API rate limited (429) for model '{model}'"
+                        )
                         logger.warning(f"Rate limited by API, waiting {retry_after}s")
                         await asyncio.sleep(retry_after)
                         continue
+
+                    elif response.status_code == 404:
+                        # Permanent for this model — do NOT retry the same model.
+                        last_exception = ModelUnavailableError(
+                            f"Claude model '{model}' returned 404 not_found_error: "
+                            f"{response.text}"
+                        )
+                        model_retired = True
+                        break
 
                     else:
                         error_msg = (
@@ -152,29 +285,121 @@ class ClaudeService:
                         logger.error(error_msg)
                         raise Exception(error_msg)
 
-            except Exception as e:
-                last_exception = e
-                # Get detailed error info including exception type
-                error_type = type(e).__name__
-                error_msg = str(e) if str(e) else repr(e)
-                error_detail = f"{error_type}: {error_msg}"
+                except Exception as e:
+                    last_exception = e
+                    # Get detailed error info including exception type
+                    error_type = type(e).__name__
+                    error_msg = str(e) if str(e) else repr(e)
+                    error_detail = f"{error_type}: {error_msg}"
 
-                if attempt < self.max_retries - 1:
-                    wait_time = self.retry_delay * (2**attempt)  # Exponential backoff
-                    logger.warning(
-                        f"Claude API attempt {attempt + 1} failed: {error_detail}, retrying in {wait_time}s"
-                    )
-                    await asyncio.sleep(wait_time)
-                else:
-                    logger.error(
-                        f"Claude API failed after {self.max_retries} attempts: {error_detail}"
-                    )
-                    # Log full traceback for debugging
-                    import traceback
+                    if attempt < self.max_retries - 1:
+                        wait_time = self.retry_delay * (2**attempt)  # backoff
+                        logger.warning(
+                            f"Claude API attempt {attempt + 1} failed (model={model}): "
+                            f"{error_detail}, retrying in {wait_time}s"
+                        )
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error(
+                            f"Claude API failed after {self.max_retries} attempts "
+                            f"(model={model}): {error_detail}"
+                        )
+                        # Log full traceback for debugging
+                        import traceback
 
-                    logger.error(f"Full traceback:\n{traceback.format_exc()}")
+                        logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
+            if model_retired:
+                has_next = model_index < len(candidates) - 1
+                next_model = candidates[model_index + 1] if has_next else None
+                self._alert_model_retired(model, next_model)
+                if has_next:
+                    continue  # try the next model in the chain
+                # Chain exhausted: permanent, non-retryable failure.
+                raise last_exception
+            else:
+                # Transient exhaustion for this model. The model itself is fine,
+                # so do NOT switch models — re-raise so Celery can retry.
+                raise last_exception or Exception("Claude API request failed")
+
+        # Defensive: empty candidate list should never happen.
         raise last_exception or Exception("Claude API request failed")
+
+    async def _is_model_available(self, model: str) -> Optional[bool]:
+        """Query ``GET /v1/models/{id}`` for a single model (TF-438).
+
+        Returns ``True`` if the model is still served, ``False`` on a 404
+        (retired), and ``None`` when the result is indeterminate (network
+        error, timeout, or any other status) so the caller can fail open.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=self.model_check_timeout) as client:
+                response = await client.get(
+                    f"{self.api_base_url}/models/{model}",
+                    headers=self._api_headers(),
+                )
+        except Exception as e:  # network/timeout — indeterminate
+            logger.warning(f"Claude Models API check failed for '{model}': {e}")
+            return None
+
+        if response.status_code == 200:
+            return True
+        if response.status_code == 404:
+            return False
+        logger.warning(
+            f"Claude Models API returned {response.status_code} for '{model}'; "
+            "treating as indeterminate"
+        )
+        return None
+
+    async def validate_active_model(self) -> str:
+        """Validate the active model against the Models API at startup (TF-438).
+
+        Called once at FastAPI/Celery boot so a model retirement is caught at
+        deploy/restart time instead of on the first customer request. Walks the
+        curated chain and activates the first available model; emits an
+        error-log + Sentry alert for each retired model.
+
+        Fail-open: a missing API key, demo mode, or an unreachable Models API
+        never raises — the per-request fallback in
+        :meth:`_make_api_request_with_retry` remains the safety net. Returns the
+        active model after validation.
+        """
+        if self.demo_mode or not self.api_key:
+            logger.info(
+                "Skipping Claude model startup validation (demo mode / no API key)"
+            )
+            return self.model
+
+        candidates = [self.model] + [m for m in self.model_chain if m != self.model]
+
+        for idx, model in enumerate(candidates):
+            available = await self._is_model_available(model)
+
+            if available is None:
+                # Indeterminate — fail open and rely on per-request fallback.
+                logger.warning(
+                    f"Claude model startup validation inconclusive for '{model}' "
+                    "(Models API unreachable); assuming available"
+                )
+                return self.model
+
+            if available:
+                if model != self.model:
+                    self._activate_model(model, reason="startup validation fallback")
+                else:
+                    logger.info(
+                        f"Claude model '{model}' validated as available at startup"
+                    )
+                return model
+
+            # Retired (404) — alert and move to the next candidate.
+            next_model = candidates[idx + 1] if idx + 1 < len(candidates) else None
+            self._alert_model_retired(model, next_model)
+
+        # Whole chain reported unavailable; keep the configured model so the
+        # per-request path can surface a clean ModelUnavailableError later.
+        return self.model
 
     def get_usage_stats(self) -> Dict[str, Any]:
         """Get current usage statistics"""
@@ -476,3 +701,27 @@ def get_claude_service() -> "ClaudeService":
     if _claude_service_instance is None:
         _claude_service_instance = ClaudeService()
     return _claude_service_instance
+
+
+async def validate_claude_model_on_startup() -> None:
+    """Startup hook to validate the active Claude model against the Models API
+    and fall back if it has been retired (TF-438).
+
+    Wired into both the FastAPI lifespan and the Celery worker boot. Fail-open:
+    it never raises, so a flaky Models API or a transient error can never crash
+    startup (it may delay it by at most model_check_timeout). Set
+    ``CLAUDE_SKIP_MODEL_VALIDATION=true`` to disable (tests set this to avoid an
+    external call at boot).
+    """
+    if os.getenv("CLAUDE_SKIP_MODEL_VALIDATION", "false").lower() == "true":
+        logger.info(
+            "Claude model startup validation disabled (CLAUDE_SKIP_MODEL_VALIDATION)"
+        )
+        return
+    try:
+        service = get_claude_service()
+        await service.validate_active_model()
+    except Exception:  # pragma: no cover - startup must never crash on this
+        logger.warning(
+            "Claude model startup validation errored (ignored)", exc_info=True
+        )

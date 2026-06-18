@@ -550,6 +550,46 @@ def test_generate_questions_task_uses_safe_update_on_reject():
     assert args[1] == "FAILURE"
 
 
+def test_generate_questions_task_uses_safe_update_on_model_unavailable():
+    """TF-438: a ModelUnavailableError (whole fallback chain 404) is permanent —
+    it must fail the job immediately via _safe_update_job_status FAILURE and
+    re-raise, NOT fall through to the generic handler that only marks FAILURE on
+    the final retry (which would re-introduce the TF-351 ghost-task symptom)."""
+    from services.claude_service import ModelUnavailableError
+    from tasks.question_tasks import generate_questions_task
+
+    request_data = {
+        "topic": "T",
+        "question_count": 1,
+        "question_types": ["single_choice"],
+        "difficulty": "medium",
+        "language": "de",
+        "document_ids": None,
+        "context_chunks_per_question": 3,
+        "prompt_config": None,
+    }
+
+    with (
+        patch("tasks.question_tasks.RAGService", return_value=MagicMock()),
+        patch(
+            "tasks.question_tasks.run_async",
+            side_effect=ModelUnavailableError("all models returned 404"),
+        ),
+        patch("tasks.question_tasks._safe_update_job_status") as mock_safe,
+    ):
+        generate_questions_task.update_state = MagicMock()
+        try:
+            generate_questions_task.run(request_data, "42")
+            raise AssertionError("expected ModelUnavailableError")
+        except ModelUnavailableError:
+            pass
+
+    # Fail fast: FAILURE recorded immediately, not deferred to the final retry.
+    mock_safe.assert_called_once()
+    args, _ = mock_safe.call_args
+    assert args[1] == "FAILURE"
+
+
 def test_generate_questions_task_uses_safe_update_on_final_retry_failure():
     """Generic exception with retries >= max_retries goes through _safe_update_job_status FAILURE.
 
@@ -1157,6 +1197,17 @@ def test_programming_error_in_dont_autoretry_for():
 
     dont_retry = getattr(generate_questions_task, "dont_autoretry_for", ())
     assert ProgrammingError in dont_retry
+
+
+def test_model_unavailable_error_in_dont_autoretry_for():
+    """TF-438: a fully-retired model chain (every model 404) is permanent. Keep
+    ModelUnavailableError in dont_autoretry_for so Celery cannot resurrect the
+    TF-437 endless-retry loop that burned Claude credits on a dead model."""
+    from services.claude_service import ModelUnavailableError
+    from tasks.question_tasks import generate_questions_task
+
+    dont_retry = getattr(generate_questions_task, "dont_autoretry_for", ())
+    assert ModelUnavailableError in dont_retry
 
 
 # ---------------------------------------------------------------------------

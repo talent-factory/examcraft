@@ -10,6 +10,10 @@ import os
 # Disable rate limiting for tests before importing the app
 os.environ["RATE_LIMIT_ENABLED"] = "false"
 
+# Disable the Claude model startup validation (TF-438) so neither the FastAPI
+# lifespan nor the celeryd_init signal makes a real Models-API call during tests.
+os.environ["CLAUDE_SKIP_MODEL_VALIDATION"] = "true"
+
 # Pydantic v2 builds nested TypeAdapters recursively when FastAPI rebuilds the
 # OpenAPI schema during TestClient lifespan startup. With deeply nested models
 # (RAGExamRequestModel and friends) the default 1000-deep limit can be hit

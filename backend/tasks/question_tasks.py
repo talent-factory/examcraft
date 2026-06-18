@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 from celery_app import celery_app
 from models.question_generation_job import QuestionGenerationJob
+from services.claude_service import ModelUnavailableError
 from tasks.document_tasks import ProgressTask, run_async
 
 logger = logging.getLogger(__name__)
@@ -528,6 +529,7 @@ def _persist_questions(
         ProgrammingError,  # psycopg2-Adapter-/DDL-Fehler — Retry ändert nichts
         IntegrityError,  # FK-Verletzung (z. B. Tag-ID) — Retry ändert nichts
         ValueError,  # Domänenvalidierung (z. B. Tag-Scope) — Retry ändert nichts
+        ModelUnavailableError,  # TF-438: ganze Modell-Kette 404 — permanent
     ),
     retry_kwargs={"max_retries": 4},
     retry_backoff=30,
@@ -659,6 +661,7 @@ def generate_questions_task(
         ProgrammingError,
         IntegrityError,
         ValueError,
+        ModelUnavailableError,  # TF-438: fail fast, kein Endlos-Retry wie TF-437
     ):
         _safe_update_job_status(self.request.id, "FAILURE")
         raise

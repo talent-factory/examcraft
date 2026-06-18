@@ -97,6 +97,16 @@ async def lifespan(app: FastAPI):
 
     create_tables()
 
+    # Startup: Validate the active Claude model against the Models API (TF-438).
+    # Catches a retired model at deploy/restart time and falls back to a curated
+    # alternative, instead of failing on the first customer request. Fail-open.
+    try:
+        from services.claude_service import validate_claude_model_on_startup
+
+        await validate_claude_model_on_startup()
+    except Exception as e:
+        print(f"⚠️  Claude model startup validation skipped: {str(e)}")
+
     # Startup: Seed default roles
     try:
         from utils.seed_roles import seed_default_roles

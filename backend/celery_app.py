@@ -32,6 +32,31 @@ def _init_worker_sentry(**_kwargs):
     init_sentry()
 
 
+@celeryd_init.connect
+def _validate_claude_model(**_kwargs):
+    """Validate the active Claude model against the Models API at worker boot
+    (TF-438).
+
+    Mirrors the FastAPI lifespan check on the worker — the process that runs
+    question generation — so a retired model is caught at restart time and falls
+    back to a curated alternative, instead of looping on the first job (the
+    TF-437 incident). Registered after the Sentry hook so its alert is captured.
+    ``celeryd_init`` runs in the main worker process before the prefork pool
+    spawns, in a plain sync context, so ``asyncio.run`` is safe. Fail-open.
+    """
+    import asyncio
+
+    from services.claude_service import validate_claude_model_on_startup
+
+    try:
+        asyncio.run(validate_claude_model_on_startup())
+    except Exception:
+        logger.warning(
+            "Claude model startup validation failed in worker (ignored)",
+            exc_info=True,
+        )
+
+
 # Celery App Initialization
 celery_app = Celery(
     "examcraft",

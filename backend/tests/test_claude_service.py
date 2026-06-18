@@ -4,9 +4,23 @@ Tests für Claude Service - Rate Limiting, Retry Logic, Cost Tracking
 
 import pytest
 import time
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import os
-from services.claude_service import ClaudeService
+
+import httpx
+
+from services.claude_service import ClaudeService, ModelUnavailableError
+
+
+@pytest.fixture(autouse=True)
+def _reset_active_model_override():
+    """TF-438: the active-model override is process-global; reset it around each
+    test so a promotion in one test never leaks into the next."""
+    import services.claude_service as cs
+
+    cs._active_model_override = None
+    yield
+    cs._active_model_override = None
 
 
 class TestClaudeService:
@@ -269,6 +283,254 @@ class TestClaudeServiceIntegration:
 
             # Nächster Request sollte warten müssen
             assert not service._check_rate_limit()
+
+
+def _resp(status_code, json_data=None, text="", headers=None):
+    """Build a mock httpx.Response (sync .json(), like the real client)."""
+    r = Mock()
+    r.status_code = status_code
+    r.json = Mock(return_value=json_data or {})
+    r.text = text
+    r.headers = headers or {}
+    return r
+
+
+def _client_mock(post_side_effect=None, get_side_effect=None):
+    """Build a mock httpx.AsyncClient usable as an async context manager whose
+    .post/.get are awaitable (AsyncMock) and honour side_effect lists."""
+    client = MagicMock()
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    client.post = AsyncMock(side_effect=post_side_effect)
+    client.get = AsyncMock(side_effect=get_side_effect)
+    return client
+
+
+_OK_BODY = {"usage": {"input_tokens": 10, "output_tokens": 5}}
+
+
+class TestClaudeServiceModelFallback:
+    """TF-438: curated fallback chain + startup Models-API validation."""
+
+    @pytest.fixture
+    def service_with_chain(self):
+        with patch.dict(
+            os.environ,
+            {
+                "ANTHROPIC_API_KEY": "test-api-key",
+                "CLAUDE_MODEL": "model-primary",
+                "CLAUDE_MODEL_FALLBACK": "model-fallback-1,model-fallback-2",
+                "CLAUDE_MAX_RETRIES": "2",
+                "CLAUDE_RETRY_DELAY": "0",
+                "CLAUDE_DEMO_MODE": "false",
+            },
+        ):
+            svc = ClaudeService()
+            svc.request_timestamps = []
+            return svc
+
+    # --- chain construction -------------------------------------------------
+
+    def test_model_chain_dedup_and_strip(self):
+        with patch.dict(
+            os.environ,
+            {
+                "ANTHROPIC_API_KEY": "k",
+                "CLAUDE_MODEL": "a",
+                "CLAUDE_MODEL_FALLBACK": "b, c ,a",
+                "CLAUDE_DEMO_MODE": "false",
+            },
+        ):
+            svc = ClaudeService()
+        assert svc.model == "a"
+        # whitespace stripped, primary not duplicated even if repeated in list
+        assert svc.model_chain == ["a", "b", "c"]
+
+    # --- runtime fallback (_make_api_request_with_retry) --------------------
+
+    @pytest.mark.asyncio
+    async def test_fallback_on_404_uses_next_model(self, service_with_chain):
+        svc = service_with_chain
+        posts = [_resp(404, text="not_found_error"), _resp(200, _OK_BODY)]
+        client = _client_mock(post_side_effect=posts)
+        with (
+            patch("httpx.AsyncClient", return_value=client),
+            patch("config.sentry.capture_message_with_context") as mock_alert,
+        ):
+            result = await svc._make_api_request_with_retry(
+                {"model": "model-primary", "messages": []}
+            )
+        assert result == _OK_BODY
+        # working fallback promoted for subsequent requests
+        assert svc.model == "model-fallback-1"
+        # one call per model — a 404 must NOT consume same-model retries
+        assert client.post.await_count == 2
+        mock_alert.assert_called_once()
+        # the fallback request carried the new model in its payload
+        assert client.post.await_args_list[1].kwargs["json"]["model"] == (
+            "model-fallback-1"
+        )
+
+    @pytest.mark.asyncio
+    async def test_chain_exhaustion_raises_model_unavailable(self, service_with_chain):
+        svc = service_with_chain
+        posts = [_resp(404, text="not_found_error") for _ in range(3)]
+        client = _client_mock(post_side_effect=posts)
+        with (
+            patch("httpx.AsyncClient", return_value=client),
+            patch("config.sentry.capture_message_with_context") as mock_alert,
+        ):
+            with pytest.raises(ModelUnavailableError):
+                await svc._make_api_request_with_retry(
+                    {"model": "model-primary", "messages": []}
+                )
+        assert client.post.await_count == 3  # one per model, no looping
+        assert mock_alert.call_count == 3  # alert per retired model
+        # final alert signals an exhausted chain
+        assert mock_alert.call_args_list[-1].kwargs["extra_context"]["next_model"] is (
+            None
+        )
+
+    @pytest.mark.asyncio
+    async def test_transient_error_retries_same_model_no_fallback(
+        self, service_with_chain
+    ):
+        svc = service_with_chain  # CLAUDE_MAX_RETRIES=2
+        posts = [_resp(500, text="boom"), _resp(500, text="boom")]
+        client = _client_mock(post_side_effect=posts)
+        with (
+            patch("httpx.AsyncClient", return_value=client),
+            patch("asyncio.sleep", new=AsyncMock()),
+        ):
+            with pytest.raises(Exception) as exc_info:
+                await svc._make_api_request_with_retry(
+                    {"model": "model-primary", "messages": []}
+                )
+        # a 5xx is transient: retried on the SAME model, not a fallback trigger
+        assert not isinstance(exc_info.value, ModelUnavailableError)
+        assert client.post.await_count == 2  # max_retries on the same model
+        assert svc.model == "model-primary"  # unchanged
+
+    @pytest.mark.asyncio
+    async def test_404_then_transient_does_not_advance_or_escalate(
+        self, service_with_chain
+    ):
+        svc = service_with_chain  # max_retries=2; chain: primary, fb-1, fb-2
+        # primary 404 -> switch to fb-1; fb-1 returns 5xx twice (transient).
+        posts = [
+            _resp(404, text="not_found_error"),
+            _resp(500, text="boom"),
+            _resp(500, text="boom"),
+        ]
+        client = _client_mock(post_side_effect=posts)
+        with (
+            patch("httpx.AsyncClient", return_value=client),
+            patch("config.sentry.capture_message_with_context"),
+            patch("asyncio.sleep", new=AsyncMock()),
+        ):
+            with pytest.raises(Exception) as exc_info:
+                await svc._make_api_request_with_retry(
+                    {"model": "model-primary", "messages": []}
+                )
+        # A transient on a fallback is re-raised (retryable upstream), NOT
+        # escalated to ModelUnavailableError and NOT advanced to model-fallback-2.
+        assert not isinstance(exc_info.value, ModelUnavailableError)
+        assert client.post.await_count == 3  # primary 404 + 2 retries on fb-1
+        assert svc.model == "model-primary"  # no 200 success -> no promotion
+
+    @pytest.mark.asyncio
+    async def test_runtime_fallback_persists_for_new_instances(
+        self, service_with_chain
+    ):
+        svc = service_with_chain
+        posts = [_resp(404, text="not_found_error"), _resp(200, _OK_BODY)]
+        client = _client_mock(post_side_effect=posts)
+        with (
+            patch("httpx.AsyncClient", return_value=client),
+            patch("config.sentry.capture_message_with_context"),
+        ):
+            await svc._make_api_request_with_retry(
+                {"model": "model-primary", "messages": []}
+            )
+        # A freshly constructed instance (RAGService builds one per task) starts
+        # from the promoted model, not the retired primary — no env change.
+        with patch.dict(
+            os.environ,
+            {
+                "ANTHROPIC_API_KEY": "k",
+                "CLAUDE_MODEL": "model-primary",
+                "CLAUDE_MODEL_FALLBACK": "model-fallback-1",
+                "CLAUDE_DEMO_MODE": "false",
+            },
+        ):
+            fresh = ClaudeService()
+        assert fresh.model == "model-fallback-1"
+
+    # --- startup validation (validate_active_model) -------------------------
+
+    @pytest.mark.asyncio
+    async def test_validate_switches_on_retired_primary(self, service_with_chain):
+        svc = service_with_chain
+        gets = [_resp(404), _resp(200)]  # primary retired, first fallback live
+        client = _client_mock(get_side_effect=gets)
+        with (
+            patch("httpx.AsyncClient", return_value=client),
+            patch("config.sentry.capture_message_with_context") as mock_alert,
+        ):
+            active = await svc.validate_active_model()
+        assert active == "model-fallback-1"
+        assert svc.model == "model-fallback-1"
+        assert client.get.await_count == 2
+        mock_alert.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_validate_all_retired_keeps_model_and_alerts(
+        self, service_with_chain
+    ):
+        svc = service_with_chain
+        client = _client_mock(get_side_effect=[_resp(404), _resp(404), _resp(404)])
+        with (
+            patch("httpx.AsyncClient", return_value=client),
+            patch("config.sentry.capture_message_with_context") as mock_alert,
+        ):
+            active = await svc.validate_active_model()
+        # keep configured model so the per-request path raises ModelUnavailableError
+        assert active == "model-primary"
+        assert mock_alert.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_validate_indeterminate_fails_open(self, service_with_chain):
+        svc = service_with_chain
+        client = _client_mock(get_side_effect=httpx.ConnectError("unreachable"))
+        with patch("httpx.AsyncClient", return_value=client):
+            active = await svc.validate_active_model()
+        assert active == "model-primary"  # fail-open: assume available
+        assert svc.model == "model-primary"
+
+    @pytest.mark.asyncio
+    async def test_validate_unexpected_status_fails_open(self, service_with_chain):
+        svc = service_with_chain
+        # A non-200/non-404 Models-API status (e.g. 500/403) is indeterminate:
+        # fail open on the first candidate, keep the configured model, do not
+        # cascade the chain as retired.
+        client = _client_mock(get_side_effect=[_resp(500)])
+        with patch("httpx.AsyncClient", return_value=client):
+            active = await svc.validate_active_model()
+        assert active == "model-primary"
+        assert svc.model == "model-primary"
+        assert client.get.await_count == 1  # first indeterminate short-circuits
+
+    @pytest.mark.asyncio
+    async def test_validate_skipped_in_demo_mode(self):
+        with patch.dict(
+            os.environ,
+            {"ANTHROPIC_API_KEY": "", "CLAUDE_DEMO_MODE": "true"},
+        ):
+            svc = ClaudeService()
+        with patch("httpx.AsyncClient") as mock_client:
+            active = await svc.validate_active_model()
+        assert active == svc.model
+        mock_client.assert_not_called()  # no Models-API call in demo mode
 
 
 if __name__ == "__main__":
