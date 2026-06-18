@@ -42,7 +42,7 @@ def get_bloom_levels(client, questions: list[dict]) -> list[dict]:
     questions_text = json.dumps(questions, ensure_ascii=False, indent=2)
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=1024,
         messages=[
             {

@@ -20,9 +20,12 @@ class ClaudeService:
     def __init__(self):
         self.api_key = os.getenv("ANTHROPIC_API_KEY")
         self.base_url = "https://api.anthropic.com/v1/messages"
-        # Using Claude Sonnet 4 (latest stable model as of 2025)
-        # Previous models (claude-3-*) are being deprecated
-        self.model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+        # Default model. Override per deployment via the CLAUDE_MODEL env var.
+        # claude-sonnet-4-6 is the current Sonnet drop-in; the previous default
+        # (claude-sonnet-4-20250514) was retired by Anthropic on 2026-06-15 and
+        # now returns a 404 not_found_error (TF-437). Keep this in sync with the
+        # active model list and the CLAUDE_MODEL secrets in prod.
+        self.model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 
         # Rate limiting configuration
         self.max_requests_per_minute = int(os.getenv("CLAUDE_MAX_RPM", "50"))
