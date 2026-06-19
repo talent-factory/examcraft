@@ -86,10 +86,16 @@ class ClaudeService:
         self.cost_per_input_token = 0.003 / 1000  # $3 per million input tokens
         self.cost_per_output_token = 0.015 / 1000  # $15 per million output tokens
 
-        # Demo mode fallback
+        # Demo mode fallback.
+        # TF-439: Der Gateway-Pfad braucht KEINEN direkten ANTHROPIC_API_KEY.
+        # Ist der Gateway aktiv, darf ein fehlender Key NICHT in den Demo-Modus
+        # fallen (sonst raisen generate_questions/generate_exam_async, bevor der
+        # Gateway-Zweig erreicht wird, und der Schalter ist wirkungslos).
+        from services import llm_gateway
+
         self.demo_mode = (
-            not self.api_key or os.getenv("CLAUDE_DEMO_MODE", "false").lower() == "true"
-        )
+            not self.api_key and not llm_gateway.gateway_enabled()
+        ) or os.getenv("CLAUDE_DEMO_MODE", "false").lower() == "true"
 
         # Rate limiting tracking
         self.request_timestamps = []
@@ -443,6 +449,14 @@ class ClaudeService:
             topic, difficulty, question_count, question_types, language
         )
 
+        # TF-439: Gateway-Pfad (typisierter Output) oder Legacy-httpx.
+        from services import llm_gateway
+
+        if llm_gateway.gateway_enabled():
+            from services.gateway_generator import generate_questions_via_gateway
+
+            return await generate_questions_via_gateway(prompt)
+
         payload = {
             "model": self.model,
             "max_tokens": min(self.max_tokens_per_request, 4000),
@@ -490,32 +504,66 @@ class ClaudeService:
                         "Claude API is not configured. Cannot generate questions."
                     )
 
-                # Send custom prompt directly to Claude API
-                payload = {
-                    "model": self.model,
-                    "max_tokens": min(self.max_tokens_per_request, 4000),
-                    "messages": [{"role": "user", "content": custom_prompt}],
-                }
+                from services import llm_gateway
 
-                result = await self._make_api_request_with_retry(payload)
-                content = result["content"][0]["text"]
+                if llm_gateway.gateway_enabled():
+                    from pydantic_ai.exceptions import ModelHTTPError
 
-                # Custom prompts können Markdown oder JSON zurückgeben
-                # Versuche JSON zu parsen, aber akzeptiere auch Markdown
-                try:
-                    questions = self._parse_claude_response(content, topic, difficulty)
-                except Exception as e:
-                    logger.warning(
-                        f"Could not parse as JSON, returning raw Markdown: {e}"
+                    from services.gateway_generator import (
+                        generate_questions_via_gateway,
+                        generate_raw_via_gateway,
                     )
-                    # Wenn JSON-Parsing fehlschlägt, gib Markdown als einzelne "Frage" zurück
-                    questions = [
-                        {
-                            "question": content,
-                            "type": "markdown",
-                            "raw_output": True,
-                        }
-                    ]
+
+                    try:
+                        questions = await generate_questions_via_gateway(custom_prompt)
+                    # Transport-/Modellfehler durchreichen (TF-438-Klassifizierung):
+                    # ModelUnavailableError = permanent (fail-fast),
+                    # ModelHTTPError = transient (retrybar). Nur ein echtes
+                    # Typed-Output-/Parsing-Versagen darf auf Roh-Markdown
+                    # zurückfallen — sonst maskiert der Fallback eine 5xx-Blip.
+                    except (ModelUnavailableError, ModelHTTPError):
+                        raise
+                    except Exception as e:  # typisierter Output fehlgeschlagen
+                        logger.warning(
+                            f"Gateway typed parse failed, returning raw Markdown: {e}"
+                        )
+                        content = await generate_raw_via_gateway(custom_prompt)
+                        questions = [
+                            {
+                                "question": content,
+                                "type": "markdown",
+                                "raw_output": True,
+                            }
+                        ]
+                else:
+                    # Send custom prompt directly to Claude API
+                    payload = {
+                        "model": self.model,
+                        "max_tokens": min(self.max_tokens_per_request, 4000),
+                        "messages": [{"role": "user", "content": custom_prompt}],
+                    }
+
+                    result = await self._make_api_request_with_retry(payload)
+                    content = result["content"][0]["text"]
+
+                    # Custom prompts können Markdown oder JSON zurückgeben
+                    # Versuche JSON zu parsen, aber akzeptiere auch Markdown
+                    try:
+                        questions = self._parse_claude_response(
+                            content, topic, difficulty
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Could not parse as JSON, returning raw Markdown: {e}"
+                        )
+                        # Wenn JSON-Parsing fehlschlägt, gib Markdown als einzelne "Frage" zurück
+                        questions = [
+                            {
+                                "question": content,
+                                "type": "markdown",
+                                "raw_output": True,
+                            }
+                        ]
 
                 return {
                     "questions": questions,
@@ -718,6 +766,16 @@ async def validate_claude_model_on_startup() -> None:
             "Claude model startup validation disabled (CLAUDE_SKIP_MODEL_VALIDATION)"
         )
         return
+
+    from services import llm_gateway
+
+    if llm_gateway.gateway_enabled():
+        logger.info(
+            "Claude model startup validation skipped (Gateway aktiv; "
+            "Gateway besitzt eigene Health/Fallback) — TF-439"
+        )
+        return
+
     try:
         service = get_claude_service()
         await service.validate_active_model()

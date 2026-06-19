@@ -15,7 +15,8 @@ Architektur-Entscheidungen:
   Frage + Musterlösung + Erklärung + Bewertungsregeln) trägt
   ``cache_control: ephemeral``; nur die Studi-Antwort ist variabel.
   Erwarteter Effekt ab dem 2. Studi pro Prüfung: deutlich reduzierte
-  Token-Kosten (Spec 6.3, DoD-Kriterium ``cache-hit-rate > 80%``).
+  Token-Kosten (Grading-Spec §6.3 — Zielwert ``cache-hit-rate > 80%``,
+  Prod-Canary-Metrik, noch zu verifizieren; nicht die TF-439-Spec).
 * **Strict Schema.** Die Modell-Antwort wird mit Pydantic validiert.
   Bei Schema-Verletzung fällt der Grader auf einen 0-Punkte-Stub mit
   ``confidence=0.0`` zurück, sodass die Lehrperson das Item garantiert
@@ -95,9 +96,22 @@ class LlmGrader:
 
     def __init__(self, *, client=None, model: str | None = None) -> None:
         self._client = client
-        self.model = model or _DEFAULT_MODEL
         api_key = os.getenv("ANTHROPIC_API_KEY")
-        self.demo_mode = client is None and not api_key
+        from services import llm_gateway
+
+        # Gateway-Pfad hat Vorrang vor dem Anthropic-Direkt-Pfad.
+        self._gateway = client is None and llm_gateway.gateway_enabled()
+
+        # Fix 1: Kein expliziter model-Override → logischen Alias wählen,
+        # damit rohe Modell-IDs nie die Gateway-Allowlist treffen (TF-439).
+        if model is not None:
+            self.model = model
+        elif self._gateway:
+            self.model = llm_gateway.ALIAS_GRADING
+        else:
+            self.model = _DEFAULT_MODEL
+        # Demo-Mode nur, wenn weder Client, noch Gateway, noch API-Key vorhanden.
+        self.demo_mode = client is None and not self._gateway and not api_key
         if self.demo_mode:
             logger.warning(
                 "LlmGrader: ANTHROPIC_API_KEY nicht gesetzt — offene "
@@ -196,6 +210,61 @@ class LlmGrader:
         self._client = Anthropic(timeout=_DEFAULT_TIMEOUT_S)
         return self._client
 
+    def _client_or_create_gateway(self):
+        """Holt oder erstellt den OpenAI-SDK-Client gegen den Gateway.
+
+        Modulattribut-Zugriff (``llm_gateway.make_openai_client``) statt
+        direktem Funktionsaufruf, damit Tests via monkeypatch greifen.
+        """
+        from services import llm_gateway
+
+        return llm_gateway.make_openai_client()
+
+    def _call_gateway(self, question_block: str, student_block: str) -> OpenEndedGrade:
+        """Sendet den Grading-Call über den LiteLLM-Gateway (OpenAI-Wire).
+
+        Prompt-Caching wird via ``cache_control``-Felder in den Content-
+        Parts transportiert; LiteLLM leitet sie als Anthropic-Header durch.
+        System- und Fragen-Block sind statisch pro Frage (Cache-Kandidaten);
+        der Studi-Block variiert und trägt deshalb kein ``cache_control``.
+        """
+        client = self._client_or_create_gateway()
+        # Fix 2: Grading-Timeout explizit setzen — make_openai_client() setzt
+        # kein Timeout (OpenAI-SDK-Default ~600 s würde Celery-Worker blockieren).
+        response = client.chat.completions.create(
+            model=self.model,
+            max_tokens=_DEFAULT_MAX_TOKENS,
+            timeout=_DEFAULT_TIMEOUT_S,
+            messages=[
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": SYSTEM_PROMPT,
+                            "cache_control": {"type": "ephemeral"},
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": question_block,
+                            "cache_control": {"type": "ephemeral"},
+                        },
+                        {"type": "text", "text": student_block},
+                    ],
+                },
+            ],
+        )
+        choices = getattr(response, "choices", None) or []
+        if not choices:
+            raise ValueError("Gateway-Antwort enthielt keine Choices")
+        text = getattr(choices[0].message, "content", "") or ""
+        return self._parse_response(text)
+
     def _call_model(
         self,
         *,
@@ -207,7 +276,6 @@ class LlmGrader:
         difficulty: str | None,
         bloom_level: str | None,
     ) -> OpenEndedGrade:
-        client = self._client_or_create()
         question_block = build_question_context_block(
             question_text=question_text,
             correct_answer=correct_answer,
@@ -218,6 +286,11 @@ class LlmGrader:
         )
         student_block = build_student_answer_block(given_answer)
 
+        # Zweig: Gateway (OpenAI-Wire) statt Anthropic-Direkt
+        if self._gateway:
+            return self._call_gateway(question_block, student_block)
+
+        client = self._client_or_create()
         response = client.messages.create(
             model=self.model,
             max_tokens=_DEFAULT_MAX_TOKENS,
