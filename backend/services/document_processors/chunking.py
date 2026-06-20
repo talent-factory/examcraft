@@ -53,6 +53,10 @@ def _split_to_char_limit(text: str, max_chars: int) -> List[str]:
     aneinandergehängt ergeben den Eingabetext (Whitespace zwischen Wörtern
     wird wie im Wort-Fenster-Pfad zu einfachen Leerzeichen normalisiert).
     """
+    if max_chars < 1:
+        raise ValueError(f"max_chars must be >= 1, got {max_chars}")
+    if not text:
+        return []
     if len(text) <= max_chars:
         return [text]
 
@@ -104,6 +108,12 @@ def create_chunks(
     ``chunk_index``-Nummerierung läuft fortlaufend über *alle* emittierten
     Chunks — auch über die durch den Zeichen-Split entstandenen — damit die
     daraus abgeleiteten Qdrant-Point-IDs eindeutig bleiben.
+
+    Hinweis: Passt der Text in ein einzelnes Wort-Fenster
+    (``len(words) <= chunk_size``) und unter ``max_chars``, bleibt der
+    Original-Whitespace erhalten; sobald gefenstert oder zeichen-gesplittet
+    wird, wird Whitespace zwischen Wörtern zu einfachen Leerzeichen
+    normalisiert (bestehendes Verhalten des ``" ".join``-Pfads).
     """
     if not text or not text.strip():
         return []
@@ -130,6 +140,8 @@ def create_chunks(
             metadata["word_count"] = len(piece.split())
             metadata["char_count"] = len(piece)
             if total_parts > 1:
+                # 1-basiert ("Teil 1 von N"), bewusst anders als das 0-basierte
+                # chunk_index.
                 metadata["char_split_part"] = part_no
                 metadata["char_split_parts"] = total_parts
             chunks.append(
@@ -156,6 +168,8 @@ def create_chunks(
         _emit(chunk_text, {"start_word": start, "end_word": end})
 
         start = end - chunk_overlap
+        # Nach dem Fenster, das das Wort-Ende erreicht (end == len(words)), ist
+        # alles emittiert — abbrechen, bevor ein reines Overlap-Fenster folgt.
         if start >= len(words) - chunk_overlap:
             break
 

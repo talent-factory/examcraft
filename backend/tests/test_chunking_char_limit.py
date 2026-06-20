@@ -59,6 +59,19 @@ class TestSplitToCharLimit:
         assert all(len(p) <= 100 for p in pieces)
         assert _strip_ws("".join(pieces)) == _strip_ws(text)
 
+    def test_word_exactly_at_limit_is_not_hard_split(self):
+        # Guard ist `len(word) > max_chars`, also bleibt ein Wort der Länge
+        # genau max_chars ungeteilt.
+        word = "C" * 100
+        assert _split_to_char_limit(word, 100) == [word]
+
+    def test_empty_text_returns_empty_list(self):
+        assert _split_to_char_limit("", 100) == []
+
+    def test_max_chars_below_one_raises(self):
+        with pytest.raises(ValueError):
+            _split_to_char_limit("anything", 0)
+
 
 class TestCreateChunksCharLimit:
     def test_oversized_blob_split_into_multiple_full_chunks(self):
@@ -125,11 +138,29 @@ class TestCreateChunksCharLimit:
         indices = [c.chunk_index for c in chunks]
         assert indices == list(range(len(chunks)))
 
-    def test_word_count_invariant_holds_after_split(self):
-        # Bestehende Zusage: word_count <= chunk_size pro Chunk.
-        blob = "w" * 5000
-        chunks = create_chunks(blob, chunk_size=1000, chunk_overlap=200, max_chars=1000)
+    def test_multiwindow_no_overlap_preserves_all_content(self):
+        # Mehrere Wort-Fenster (Overlap=0, also keine Duplizierung) MIT einem
+        # Mega-Wort: der Multi-Window-Pfad darf weder am Fenster-Übergang noch
+        # beim Zeichen-Split Inhalt verlieren.
+        words = ["alpha"] * 1500
+        words[700] = "M" * 3000
+        text = " ".join(words)
 
+        chunks = create_chunks(text, chunk_size=1000, chunk_overlap=0, max_chars=1000)
+
+        assert all(len(c.content) <= 1000 for c in chunks)
+        assert [c.chunk_index for c in chunks] == list(range(len(chunks)))
+        assert _strip_ws("".join(c.content for c in chunks)) == _strip_ws(text)
+
+    def test_word_count_invariant_holds_after_windowing(self):
+        # Bestehende Zusage: word_count <= chunk_size pro Chunk. Multi-Wort-Doku
+        # über der Fenstergrösse, unter dem Zeichen-Cap (kein Char-Split).
+        text = " ".join(["lorem"] * 2500)
+        chunks = create_chunks(
+            text, chunk_size=1000, chunk_overlap=200, max_chars=12000
+        )
+
+        assert len(chunks) > 1
         assert all(c.metadata["word_count"] <= 1000 for c in chunks)
 
 
