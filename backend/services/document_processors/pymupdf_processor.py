@@ -14,6 +14,7 @@ import markdown
 import re
 
 from services.docling_service import DocumentChunk, ProcessedDocument
+from .chunking import DEFAULT_MAX_CHARS_PER_CHUNK, create_chunks
 from services.document_errors import (
     BINARY_CONTENT,
     EMPTY_DOCUMENT,
@@ -142,6 +143,7 @@ class PyMuPDFProcessor:
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         enable_ocr: bool = False,
+        max_chars_per_chunk: int = DEFAULT_MAX_CHARS_PER_CHUNK,
     ):
         """
         Initialize PyMuPDF Processor
@@ -151,9 +153,13 @@ class PyMuPDFProcessor:
             chunk_overlap: Überlappung zwischen Chunks in Wörtern
             enable_ocr: Wenn True, wird für gescannte Seiten Tesseract-OCR
                 aktiviert (erfordert ein installiertes Tesseract + TESSDATA_PREFIX).
+            max_chars_per_chunk: Generische Zeichen-Obergrenze pro Chunk
+                (TF-445). Über-lange Inhalte werden inhaltserhaltend in mehrere
+                Chunks gesplittet, statt am Embedding-Boundary getrunct zu werden.
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        self.max_chars_per_chunk = max_chars_per_chunk
         # OCR-Eskalation (TF-360): wenn aktiviert, extrahiert _process_pdf den
         # Text gescannter Seiten via Tesseract (PyMuPDF get_textpage_ocr).
         self.enable_ocr = enable_ocr
@@ -699,44 +705,9 @@ class PyMuPDFProcessor:
 
     def _create_chunks(self, text: str) -> List[DocumentChunk]:
         """Erstelle Text-Chunks für RAG-Processing"""
-        if not text or not text.strip():
-            return []
-
-        chunks = []
-        words = text.split()
-
-        if len(words) <= self.chunk_size:
-            chunks.append(
-                DocumentChunk(
-                    content=text, chunk_index=0, metadata={"word_count": len(words)}
-                )
-            )
-            return chunks
-
-        start = 0
-        chunk_index = 0
-
-        while start < len(words):
-            end = min(start + self.chunk_size, len(words))
-            chunk_words = words[start:end]
-            chunk_text = " ".join(chunk_words)
-
-            chunks.append(
-                DocumentChunk(
-                    content=chunk_text,
-                    chunk_index=chunk_index,
-                    metadata={
-                        "word_count": len(chunk_words),
-                        "start_word": start,
-                        "end_word": end,
-                    },
-                )
-            )
-
-            start = end - self.chunk_overlap
-            chunk_index += 1
-
-            if start >= len(words) - self.chunk_overlap:
-                break
-
-        return chunks
+        return create_chunks(
+            text,
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            max_chars=self.max_chars_per_chunk,
+        )

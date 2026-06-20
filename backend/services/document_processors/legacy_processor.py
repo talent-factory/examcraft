@@ -12,6 +12,7 @@ import markdown
 import re
 
 from services.docling_service import DocumentChunk, ProcessedDocument
+from .chunking import DEFAULT_MAX_CHARS_PER_CHUNK, create_chunks
 from services.document_errors import (
     EMPTY_DOCUMENT,
     UNSUPPORTED_FORMAT,
@@ -31,16 +32,25 @@ class LegacyProcessor:
     - markdown für Markdown-Verarbeitung
     """
 
-    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+    def __init__(
+        self,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200,
+        max_chars_per_chunk: int = DEFAULT_MAX_CHARS_PER_CHUNK,
+    ):
         """
         Initialize Legacy Processor
 
         Args:
             chunk_size: Maximale Anzahl Wörter pro Chunk
             chunk_overlap: Überlappung zwischen Chunks in Wörtern
+            max_chars_per_chunk: Generische Zeichen-Obergrenze pro Chunk
+                (TF-445). Über-lange Inhalte werden inhaltserhaltend in mehrere
+                Chunks gesplittet, statt am Embedding-Boundary getrunct zu werden.
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        self.max_chars_per_chunk = max_chars_per_chunk
         self.supported_types = {
             "application/pdf": self._process_pdf,
             "application/msword": self._process_doc,
@@ -272,44 +282,9 @@ class LegacyProcessor:
 
     def _create_chunks(self, text: str) -> List[DocumentChunk]:
         """Erstelle Text-Chunks für RAG-Processing"""
-        if not text or not text.strip():
-            return []
-
-        chunks = []
-        words = text.split()
-
-        if len(words) <= self.chunk_size:
-            chunks.append(
-                DocumentChunk(
-                    content=text, chunk_index=0, metadata={"word_count": len(words)}
-                )
-            )
-            return chunks
-
-        start = 0
-        chunk_index = 0
-
-        while start < len(words):
-            end = min(start + self.chunk_size, len(words))
-            chunk_words = words[start:end]
-            chunk_text = " ".join(chunk_words)
-
-            chunks.append(
-                DocumentChunk(
-                    content=chunk_text,
-                    chunk_index=chunk_index,
-                    metadata={
-                        "word_count": len(chunk_words),
-                        "start_word": start,
-                        "end_word": end,
-                    },
-                )
-            )
-
-            start = end - self.chunk_overlap
-            chunk_index += 1
-
-            if start >= len(words) - self.chunk_overlap:
-                break
-
-        return chunks
+        return create_chunks(
+            text,
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            max_chars=self.max_chars_per_chunk,
+        )
