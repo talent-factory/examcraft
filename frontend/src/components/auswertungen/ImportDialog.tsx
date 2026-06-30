@@ -340,10 +340,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         finalJob = await pollUntilTerminal(result.id, controller.signal);
       }
 
-      // Only signal completion when nothing failed — partial / failed
-      // imports must keep the dialog open so the user reads the alert
-      // before the parent page navigates / reloads.
-      if (finalJob.status === 'succeeded') {
+      // Only signal completion when nothing failed AND something was actually
+      // persisted. partial / failed imports keep the dialog open so the user
+      // reads the alert before the parent page navigates / reloads; TF-500: an
+      // all-duplicates import (status succeeded, rows_processed === 0) does too,
+      // so the "no new results" info is read instead of being skipped past on a
+      // hollow success.
+      if (finalJob.status === 'succeeded' && finalJob.rows_processed > 0) {
         onImported?.(finalJob);
       }
     } catch (err) {
@@ -376,8 +379,23 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   )[step];
 
   const renderJobResult = (j: ImportJob) => {
-    const severity =
-      j.status === 'succeeded'
+    const skippedDuplicates = Number(
+      (j.source_metadata?.attempts_skipped_idempotent as number | undefined) ??
+        0,
+    );
+    // TF-500: a "successful" import that persisted nothing because every row
+    // was an already-imported duplicate is shown as an informational outcome,
+    // not a plain green success. "0 verarbeitet" under a success banner reads
+    // as "nothing happened / silently broken" — exactly the confusion that hid
+    // the cross-exam idempotency bug. This also covers the legitimate case of
+    // re-importing the same file into the same exam.
+    const allDuplicates =
+      j.status === 'succeeded' &&
+      j.rows_processed === 0 &&
+      skippedDuplicates > 0;
+    const severity = allDuplicates
+      ? 'info'
+      : j.status === 'succeeded'
         ? 'success'
         : j.status === 'partial'
           ? 'warning'
@@ -388,13 +406,19 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     return (
       <Alert severity={severity} data-testid="import-result">
         <AlertTitle>
-          {t(`auswertungen.importDialog.result.${j.status}`)}
+          {allDuplicates
+            ? t('auswertungen.importDialog.result.allDuplicates')
+            : t(`auswertungen.importDialog.result.${j.status}`)}
         </AlertTitle>
         <Typography variant="body2">
-          {t('auswertungen.importDialog.resultSummary', {
-            processed: j.rows_processed,
-            failed: j.rows_failed,
-          })}
+          {allDuplicates
+            ? t('auswertungen.importDialog.allDuplicatesSummary', {
+                skipped: skippedDuplicates,
+              })
+            : t('auswertungen.importDialog.resultSummary', {
+                processed: j.rows_processed,
+                failed: j.rows_failed,
+              })}
         </Typography>
         {errorRows.length > 0 && (
           <Box sx={{ mt: 1.5 }} data-testid="import-result-errors">

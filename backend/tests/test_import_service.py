@@ -249,6 +249,27 @@ def test_validate_rejects_question_id_outside_exam(
     assert any("exam_question_id" in iss for iss in excinfo.value.issues)
 
 
+def test_validate_rejects_empty_attempts(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """Zero-attempt payload ⇒ Hard-Failure, not a hollow 0-row success.
+
+    A source that parses to no attempts must fail loud at the validation
+    boundary so the job is recorded as failed — otherwise it reaches
+    _finalise_job as status=succeeded / rows_processed=0, the same
+    misleading-success class TF-500 set out to eliminate.
+    """
+    from services.import_drivers import ImportPayload
+
+    payload = ImportPayload(
+        exam_id=exam_with_questions.id,
+        driver_name="moodle_json",
+        attempts=[],
+    )
+    with pytest.raises(ImportValidationError, match="keine Versuche"):
+        ImportService._validate_payload(payload, exam_with_questions)
+
+
 # ---------------------------------------------------------------------------
 # Commit + Grading
 # ---------------------------------------------------------------------------
@@ -426,6 +447,13 @@ def test_re_import_same_csv_creates_no_duplicates(
         triggered_by=None,
     )
     assert job2.status == "succeeded"
+    # All-duplicates outcome must be durably distinguishable from a real
+    # import at the job level (TF-500): nothing persisted, and the skip count
+    # is surfaced into source_metadata so the API/UI can render the "info"
+    # banner instead of a hollow green "0 verarbeitet" success. The frontend
+    # test mocks this contract — assert the backend actually emits it.
+    assert job2.rows_processed == 0
+    assert (job2.source_metadata or {}).get("attempts_skipped_idempotent") == 2
     # Keine zusätzlichen Versuche / Antworten / Grades:
     assert test_db.query(Attempt).count() == 2
     assert test_db.query(AttemptAnswer).count() == 6
@@ -497,6 +525,120 @@ def test_second_import_with_new_attempt_adds_only_delta(
         .all()
     )
     assert len(bruno_attempts) == 1  # idempotent skipped
+
+
+def _make_exam_with_same_questions(
+    test_db: Session, institution: Institution, *, title: str
+) -> Exam:
+    """Zweite Prüfung mit denselben Fragetexten wie ``exam_with_questions``.
+
+    Eigene ``QuestionReview``-Zeilen mit identischem Text — der JSON-Driver
+    matcht über Text, nicht über IDs, also mappt dieselbe Quelle auf beide
+    Prüfungen. Spiegelt die Prod-Realität (zwei separate Prüfungen mit
+    identischen Fragen in derselben Institution).
+    """
+    mc_q = QuestionReview(
+        question_text=_Q1,
+        question_type="single_choice",
+        options=["A) Zürich", "B) Bern", "C) Genf", "D) Basel"],
+        correct_answer="Bern",
+        difficulty="easy",
+        topic="Geografie",
+        institution_id=institution.id,
+    )
+    tf_q = QuestionReview(
+        question_text=_Q2,
+        question_type="true_false",
+        correct_answer="wahr",
+        difficulty="easy",
+        topic="Geografie",
+        institution_id=institution.id,
+    )
+    open_q = QuestionReview(
+        question_text=_Q3,
+        question_type="open_ended",
+        correct_answer="Drei-Ebenen-System aus Bund, Kantonen, Gemeinden …",
+        difficulty="medium",
+        topic="Politik",
+        institution_id=institution.id,
+    )
+    test_db.add_all([mc_q, tf_q, open_q])
+    test_db.flush()
+
+    exam = Exam(
+        title=title,
+        course="ABU",
+        exam_date=date(2026, 5, 15),
+        passing_percentage=50.0,
+        total_points=10.0,
+        status="finalized",
+        language="de",
+        institution_id=institution.id,
+    )
+    test_db.add(exam)
+    test_db.flush()
+    test_db.add_all(
+        [
+            ExamQuestion(exam_id=exam.id, question_id=mc_q.id, position=1, points=4.0),
+            ExamQuestion(exam_id=exam.id, question_id=tf_q.id, position=2, points=1.0),
+            ExamQuestion(
+                exam_id=exam.id, question_id=open_q.id, position=3, points=5.0
+            ),
+        ]
+    )
+    test_db.commit()
+    test_db.refresh(exam)
+    return exam
+
+
+def test_same_source_attempt_imports_into_two_exams_same_institution(
+    test_db: Session, exam_with_questions: Exam, institution: Institution
+) -> None:
+    """TF-500: Derselbe Moodle-Attempt muss in ZWEI verschiedene Prüfungen
+    derselben Institution importiert werden können.
+
+    Regression: Der Idempotenz-Check dedupte institutions-weit auf
+    ``(institution_id, source, source_attempt_id)`` — ohne ``exam_id``, und die
+    DB-Unique-Constraint war ebenso institutions-scoped. Ein zweiter Import
+    derselben Moodle-Resultate in eine *andere* Prüfung lief dadurch still leer
+    (``rows_processed=0, status=succeeded``), die Prüfung blieb leer. Der
+    Idempotenz-Schutz darf nur denselben Attempt in dieselbe Prüfung
+    deduplizieren, nicht prüfungsübergreifend.
+    """
+    service = ImportService(test_db)
+    source = _json_two_students()
+
+    job_a = service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=source,
+        triggered_by=None,
+    )
+    assert job_a.rows_processed == 2
+
+    exam_b = _make_exam_with_same_questions(
+        test_db, institution, title="Zweite Prüfung gleiche Fragen"
+    )
+
+    # Identische Quelle (gleiche source_attempt_ids) in die ZWEITE Prüfung.
+    job_b = service.commit(
+        exam=exam_b,
+        driver_name="moodle_json",
+        source=source,
+        triggered_by=None,
+    )
+    assert job_b.status == "succeeded"
+    # Vor dem Fix: 0 (alle als institutions-weites Duplikat übersprungen).
+    assert job_b.rows_processed == 2
+
+    subs_a = (
+        test_db.query(Submission)
+        .filter(Submission.exam_id == exam_with_questions.id)
+        .count()
+    )
+    subs_b = test_db.query(Submission).filter(Submission.exam_id == exam_b.id).count()
+    assert subs_a == 2
+    assert subs_b == 2
 
 
 # ---------------------------------------------------------------------------
@@ -1200,11 +1342,11 @@ def test_extract_constraint_name_from_message_fallback() -> None:
         params={},
         orig=Exception(
             "duplicate key value violates unique constraint "
-            '"uq_attempts_inst_source_attempt_id"\nDETAIL: Key (...)=(...) already exists.'
+            '"uq_attempts_submission_source_attempt_id"\nDETAIL: Key (...)=(...) already exists.'
         ),
     )
     name = ImportService._extract_constraint_name(fake)
-    assert name == "uq_attempts_inst_source_attempt_id"
+    assert name == "uq_attempts_submission_source_attempt_id"
 
 
 def test_extract_constraint_name_returns_none_when_unparseable() -> None:

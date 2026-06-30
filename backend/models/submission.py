@@ -192,11 +192,11 @@ class Attempt(Base):
         nullable=False,
         index=True,
     )
-    # institution_id is denormalised onto attempts so the (source,
-    # source_attempt_id) idempotency key can be scoped per tenant —
-    # otherwise two institutions with overlapping Moodle exports
-    # collide on a globally-unique constraint and one tenant's import
-    # is silently skipped.
+    # institution_id is denormalised onto attempts for tenant-scoped
+    # queries/analytics. It is *not* part of the idempotency key (TF-500):
+    # uniqueness is scoped per ``submission_id`` (i.e. per exam+student),
+    # so the same Moodle attempt can legitimately be imported into two
+    # different exams of the same institution.
     institution_id = Column(
         Integer,
         ForeignKey("institutions.id", ondelete="CASCADE"),
@@ -229,17 +229,19 @@ class Attempt(Base):
         UniqueConstraint(
             "submission_id", "attempt_number", name="uq_attempts_submission_number"
         ),
+        # TF-500: idempotency is scoped per submission (= per exam+student),
+        # not per institution. The old institution-wide key collided across
+        # exams — the same Moodle attempt (same email + start time) could only
+        # ever be imported into ONE exam per institution; a second import into
+        # a different exam was silently skipped (0 rows, status=succeeded). The
+        # index this constraint creates also supports the inner probe of the
+        # dedup lookup in ``ImportService._load_existing_source_ids`` (which is
+        # itself exam-scoped via ``submissions.exam_id``).
         UniqueConstraint(
-            "institution_id",
+            "submission_id",
             "source",
             "source_attempt_id",
-            name="uq_attempts_inst_source_attempt_id",
-        ),
-        Index(
-            "ix_attempts_inst_source_lookup",
-            "institution_id",
-            "source",
-            "source_attempt_id",
+            name="uq_attempts_submission_source_attempt_id",
         ),
         CheckConstraint(
             # 'moodle_csv' kept for historical rows (TF-423 removed the CSV

@@ -201,9 +201,11 @@
         "partial": "Import teilweise erfolgreich",
         "failed": "Import fehlgeschlagen",
         "running": "Import läuft",
-        "queued": "Import wartet"
+        "queued": "Import wartet",
+        "allDuplicates": "Keine neuen Resultate importiert"
       },
-      "resultSummary": "{{processed}} verarbeitet, {{failed}} fehlerhaft."
+      "resultSummary": "{{processed}} verarbeitet, {{failed}} fehlerhaft.",
+      "allDuplicatesSummary": "Alle {{skipped}} Versuche waren bereits importiert (Duplikate) — es wurde nichts Neues hinzugefügt."
     },
     "importStatus": {
       "running": "Bewertung läuft — {{done}}/{{total}} Abgaben",

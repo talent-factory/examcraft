@@ -222,7 +222,54 @@ describe('ImportDialog', () => {
     });
     // import-result only renders once a *terminal* status is reached (queued/
     // running show the spinner), so finding it confirms polling completed.
-    await screen.findByTestId('import-result');
+    const result = await screen.findByTestId('import-result');
+    // A 0-row *failed* import must stay an error — never be mistaken for the
+    // 0-row all-duplicates "info" case (which requires status=succeeded).
+    expect(result).toHaveTextContent('Import fehlgeschlagen');
+    expect(result).not.toHaveTextContent('Keine neuen Resultate importiert');
+    expect(onImported).not.toHaveBeenCalled();
+  });
+
+  test('all-duplicates import shows an info result and does not navigate away (TF-500)', async () => {
+    mockSubmissionsService.preview.mockResolvedValueOnce(samplePreview);
+    mockSubmissionsService.commit.mockResolvedValueOnce({
+      ...sampleJob,
+      status: 'queued',
+      rows_processed: 0,
+    });
+    // Terminal: succeeded, but nothing persisted — every attempt was an
+    // already-imported duplicate (attempts_skipped_idempotent > 0). Without
+    // the TF-500 handling this rendered a green "success" with "0 processed",
+    // which reads as a silent no-op.
+    mockSubmissionsService.getImportJob.mockResolvedValueOnce({
+      ...sampleJob,
+      status: 'succeeded',
+      rows_processed: 0,
+      rows_failed: 0,
+      graded_total: 0,
+      graded_done: 0,
+      source_metadata: { attempts_skipped_idempotent: 2 },
+    });
+    const { onImported } = renderDialog({ pollIntervalMs: 5 });
+
+    fireEvent.click(screen.getByTestId('import-next-source'));
+    const input = screen
+      .getByTestId('import-file-upload')
+      .querySelector('input[type=file]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [jsonFile] } });
+    fireEvent.click(screen.getByTestId('import-run-preview'));
+    await screen.findByTestId('preview-student-count');
+
+    fireEvent.click(screen.getByTestId('import-confirm'));
+
+    const result = await screen.findByTestId('import-result');
+    // The all-duplicates banner only renders in the `allDuplicates` branch,
+    // which is the sole code path that sets severity='info'. Asserting its
+    // text proves both the informational rendering and that the skip count
+    // (2) flowed through — without coupling to MUI's internal class names.
+    expect(result).toHaveTextContent('Keine neuen Resultate importiert');
+    expect(result).toHaveTextContent('Alle 2 Versuche waren bereits importiert');
+    // A hollow success must keep the dialog open (no parent navigation).
     expect(onImported).not.toHaveBeenCalled();
   });
 

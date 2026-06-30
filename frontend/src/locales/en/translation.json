@@ -201,9 +201,11 @@
         "partial": "Import partially succeeded",
         "failed": "Import failed",
         "running": "Import running",
-        "queued": "Import queued"
+        "queued": "Import queued",
+        "allDuplicates": "No new results imported"
       },
-      "resultSummary": "{{processed}} processed, {{failed}} faulty."
+      "resultSummary": "{{processed}} processed, {{failed}} faulty.",
+      "allDuplicatesSummary": "All {{skipped}} attempts were already imported (duplicates) — nothing new was added."
     },
     "importStatus": {
       "running": "Grading — {{done}}/{{total}} submissions",

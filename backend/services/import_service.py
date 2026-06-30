@@ -4,7 +4,8 @@ Source-agnostic via the driver registry. Pipeline:
 
 1. Driver loads source → ``ImportPayload``
 2. Validate against exam (every ``exam_question_id`` belongs to the exam)
-3. Idempotency check via ``(institution_id, source, source_attempt_id)``
+3. Idempotency check via ``(submission_id, source, source_attempt_id)``
+   (per exam+student; TF-500 — was institution-wide and collided across exams)
 4. Upsert students via ``(institution_id, external_id)``
 5. Persist attempts + answers in a transaction
 6. Submission aggregation → ``graded_attempt_id`` per ``scoring_strategy``
@@ -68,7 +69,8 @@ _UNSET = object()
 _BENIGN_RACE_CONSTRAINTS = frozenset(
     {
         "uq_attempts_submission_number",
-        "uq_attempts_inst_source_attempt_id",
+        # TF-500: per-submission idempotency key (was institution-wide).
+        "uq_attempts_submission_source_attempt_id",
     }
 )
 
@@ -280,6 +282,19 @@ class ImportService:
                 f"Payload-exam_id {payload.exam_id} != exam.id {exam.id}"
             )
 
+        # Fail loud on an empty source: nothing parsed at all — no attempts AND
+        # no error rows (wrong export, empty Moodle session). Such a payload
+        # would otherwise reach _finalise_job as status=succeeded /
+        # rows_processed=0 — a hollow green "0 verarbeitet" success
+        # indistinguishable from a real import (same misleading-success class
+        # as the TF-500 cross-exam bug). Reject it here so the job is recorded
+        # as failed with a readable reason. (An all-rows-invalid source has
+        # payload.errors and already fails correctly via the row-error path.)
+        if not payload.attempts and not payload.errors:
+            raise ImportValidationError(
+                "Quelldatei enthält keine Versuche — nichts zu importieren."
+            )
+
         valid_question_ids = {q.id for q in exam.questions}
         issues: list[str] = []
         for attempt_idx, attempt in enumerate(payload.attempts):
@@ -475,8 +490,10 @@ class ImportService:
     ) -> list[Submission]:
         """Persist new attempts + answers; return touched submissions.
 
-        Idempotent on ``(institution_id, source, source_attempt_id)``:
-        a known attempt is skipped (no update). Skips and unexpected
+        Idempotent on ``(submission_id, source, source_attempt_id)``
+        (per exam+student; TF-500): a known attempt is skipped (no
+        update). The dedup lookup is exam-scoped — see
+        ``_load_existing_source_ids``. Skips and unexpected
         IntegrityErrors are surfaced as ``payload.errors`` so they show
         up on the import job rather than vanishing silently.
 
@@ -489,9 +506,7 @@ class ImportService:
         if not payload.attempts:
             return []
 
-        existing_source_ids = self._load_existing_source_ids(
-            payload, institution_id=exam.institution_id
-        )
+        existing_source_ids = self._load_existing_source_ids(payload, exam=exam)
         submissions_by_student: dict[int, Submission] = {}
         touched_submissions: dict[int, Submission] = {}
         attempts_persisted = 0
@@ -769,8 +784,16 @@ class ImportService:
         return None
 
     def _load_existing_source_ids(
-        self, payload: ImportPayload, *, institution_id: int
+        self, payload: ImportPayload, *, exam: Exam
     ) -> set[tuple[str, str]]:
+        """Existing ``(source, source_attempt_id)`` pairs for THIS exam.
+
+        TF-500: scoped to the target exam via ``submissions.exam_id``. The same
+        Moodle attempt (same ``source_attempt_id`` = email|start|N) may
+        legitimately be imported into a *different* exam of the same
+        institution, so the idempotency lookup must not reach across exams —
+        otherwise the second exam's import is silently skipped to zero rows.
+        """
         candidate_ids = [
             a.source_attempt_id for a in payload.attempts if a.source_attempt_id
         ]
@@ -779,8 +802,9 @@ class ImportService:
 
         rows = (
             self.db.query(Attempt.source, Attempt.source_attempt_id)
+            .join(Submission, Submission.id == Attempt.submission_id)
             .filter(
-                Attempt.institution_id == institution_id,
+                Submission.exam_id == exam.id,
                 Attempt.source == payload.driver_name,
                 Attempt.source_attempt_id.in_(candidate_ids),
             )
