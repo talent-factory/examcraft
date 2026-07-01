@@ -892,6 +892,20 @@ async def update_exam(
         db.rollback()
         logger.error("Database error in update_exam for exam %s: %s", exam_id, exc)
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+    # TF-504: metadata updates were silent while create/delete/grading-scheme
+    # were audited — close the asymmetry.
+    from services.audit_service import AuditService
+
+    AuditService.log_action(
+        db,
+        action="update_exam",
+        status=AuditService.STATUS_SUCCESS,
+        user_id=current_user.id,
+        resource_type="exam",
+        resource_id=str(exam.id),
+        request=http_request,
+        additional_data={"changed_fields": sorted(update_data.keys())},
+    )
     logger.info(f"Updated exam {exam_id} by user {current_user.id}")
     return _exam_to_out(exam)
 
@@ -1267,6 +1281,23 @@ async def update_exam_question(
         )
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
 
+    from services.audit_service import AuditService
+
+    AuditService.log_action(
+        db,
+        action="update_exam_question",
+        status=AuditService.STATUS_SUCCESS,
+        user_id=current_user.id,
+        resource_type="exam",
+        resource_id=str(exam.id),
+        request=http_request,
+        additional_data={
+            "exam_question_id": eq_id,
+            "points": request.points,
+            "section": request.section,
+        },
+    )
+
     return _exam_detail_to_out(exam)
 
 
@@ -1323,6 +1354,19 @@ async def remove_exam_question(
             "Database error in remove_exam_question for exam %s: %s", exam_id, exc
         )
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+
+    from services.audit_service import AuditService
+
+    AuditService.log_action(
+        db,
+        action="remove_exam_question",
+        status=AuditService.STATUS_SUCCESS,
+        user_id=current_user.id,
+        resource_type="exam",
+        resource_id=str(exam.id),
+        request=request,
+        additional_data={"exam_question_id": eq_id},
+    )
 
     return _exam_detail_to_out(exam)
 

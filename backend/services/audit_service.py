@@ -565,9 +565,12 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             AuditService.ACTION_REJECT_QUESTION,
             AuditService.ACTION_EDIT_QUESTION,
             AuditService.ACTION_DELETE_QUESTION,
-            # Exam lifecycle (api/exams.py)
+            # Exam lifecycle (api/exams.py); TF-504 adds metadata + question edits
             "create_exam",
+            "update_exam",
             "update_exam_grading_scheme",
+            "update_exam_question",
+            "remove_exam_question",
             "delete_exam",
             "archive_exam",
             "restore_exam",

@@ -570,6 +570,7 @@ async def create_question_review(
             AuditService.ACTION_CREATE_QUESTION,
             current_user.id,
             question.id,
+            request=http_request,
             additional_data={
                 "topic": question.topic,
                 "difficulty": question.difficulty,
@@ -710,6 +711,23 @@ async def edit_question(
             )
             db.add(history)
             db.commit()
+
+        # TF-504: question edits were only recorded in review_history, not in
+        # audit_logs (the edit action was defined but emitted by no code path,
+        # unlike create/approve/reject/delete which are audited). Store only the
+        # changed-field *keys* here — the full old/new values already live in
+        # review_history, so duplicating them into audit_logs would bloat the row
+        # without adding signal.
+        from services.audit_service import AuditService
+
+        AuditService.log_question_action(
+            db,
+            AuditService.ACTION_EDIT_QUESTION,
+            current_user.id,
+            question.id,
+            request=http_request,
+            additional_data={"changed_fields": sorted(changed_fields.keys())},
+        )
 
         logger.info(f"Edited question {question_id} by {current_user.email}")
         return _attach_reviewer_info(question, db)
@@ -879,6 +897,7 @@ async def approve_question(
             AuditService.ACTION_APPROVE_QUESTION,
             current_user.id,
             question_id,
+            request=http_request,
             additional_data={"reason": request.reason, "topic": question.topic},
         )
 
@@ -959,6 +978,7 @@ async def reject_question(
             AuditService.ACTION_REJECT_QUESTION,
             current_user.id,
             question_id,
+            request=http_request,
             additional_data={"reason": request.reason, "topic": question.topic},
         )
 
