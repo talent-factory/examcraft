@@ -57,12 +57,9 @@ _RESERVED_ACTIONS = {
         "audits creation in TF-503"
     ),
     "ACTION_DELETE_USER": "no user-delete endpoint exists yet",
-    "ACTION_ASSIGN_ROLE": (
-        "emitted by admin.py in TF-502 (#159); reserved until that merges"
-    ),
-    "ACTION_REMOVE_ROLE": (
-        "emitted by admin.py in TF-502 (#159); reserved until that merges"
-    ),
+    # ACTION_ASSIGN_ROLE / ACTION_REMOVE_ROLE were reserved pending TF-502 (#159);
+    # that PR is now on develop and admin.py emits both, so they are reachable and
+    # no longer reserved (test_reserved_actions_are_not_reachable enforces this).
     "ACTION_OAUTH_LOGIN": (
         "core OAuth callback audit not yet wired (separate follow-up)"
     ),
