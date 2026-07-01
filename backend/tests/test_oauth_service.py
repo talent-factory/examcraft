@@ -259,3 +259,38 @@ def test_new_oauth_user_writes_create_user_audit(
         "registration_method": "oauth",
         "email_verified": True,
     }
+
+
+def test_existing_oauth_user_login_does_not_duplicate_create_user_audit(
+    test_db: Session, oauth_service: OAuthService
+):
+    """TF-505: a returning OAuth user (same provider_user_id/email on a
+    second login) must not write a second create_user audit row — only the
+    initial account creation is audited, mirroring the password-registration
+    path where re-login never re-triggers a create_user event."""
+    user_info = {
+        "email": "returning@unmatched-oauth-domain.example",
+        "first_name": "Returning",
+        "last_name": "User",
+        "name": "Returning User",
+        "provider_user_id": "google-returning-1",
+        "email_verified": True,
+    }
+    token = {"access_token": "t", "refresh_token": "r"}
+
+    user = oauth_service.find_or_create_user_from_oauth(
+        provider="google", user_info=user_info, token=token
+    )
+    oauth_service.find_or_create_user_from_oauth(
+        provider="google", user_info=user_info, token=token
+    )
+
+    rows = (
+        test_db.query(AuditLog)
+        .filter(
+            AuditLog.action == AuditService.ACTION_CREATE_USER,
+            AuditLog.resource_id == str(user.id),
+        )
+        .all()
+    )
+    assert len(rows) == 1
