@@ -15,6 +15,7 @@ from database import get_db
 from models.auth import User, Role, Institution, UserStatus
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_superuser, get_current_user
+from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
@@ -411,6 +412,23 @@ async def update_user(
     db.commit()
     db.refresh(user)
 
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_UPDATE_USER,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_USER,
+        resource_id=user.id,
+        additional_data={
+            "target_user_id": user.id,
+            "changed_fields": [
+                f
+                for f in ("first_name", "last_name", "email")
+                if getattr(request, f) is not None
+            ],
+        },
+        request=http_request,
+    )
+
     logger.info(f"User updated by admin: {user.email} (ID: {user.id})")
 
     # Build role responses
@@ -489,6 +507,16 @@ async def update_user_status(
     user.status = request.status.value
     db.commit()
     db.refresh(user)
+
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_UPDATE_USER,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_USER,
+        resource_id=user.id,
+        additional_data={"target_user_id": user.id, "new_status": user.status},
+        request=http_request,
+    )
 
     logger.info(f"User status updated by admin: {user.email} -> {user.status}")
 
@@ -576,6 +604,16 @@ async def assign_role_to_user(
     user.roles.append(role)
     db.commit()
     db.refresh(user)
+
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_ASSIGN_ROLE,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_USER,
+        resource_id=user.id,
+        additional_data={"role_id": role.id, "role_name": role.name},
+        request=http_request,
+    )
 
     logger.info(f"Role '{role.name}' assigned to user {user.email} by admin")
 
@@ -670,6 +708,16 @@ async def remove_role_from_user(
     user.roles.remove(role)
     db.commit()
     db.refresh(user)
+
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_REMOVE_ROLE,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_USER,
+        resource_id=user.id,
+        additional_data={"role_id": role.id, "role_name": role.name},
+        request=request,
+    )
 
     logger.info(f"Role '{role.name}' removed from user {user.email} by admin")
 
@@ -855,20 +903,29 @@ async def update_institution(
             status_code=404, detail=t("admin_institution_not_found", locale=locale)
         )
 
-    # Update fields
+    # Update fields. ``changed_fields`` tracks only guards that actually
+    # fired, so the audit entry reflects what was applied — not merely what
+    # the client sent (a field set to its current value, or sent as an
+    # unused key, would otherwise be over-reported as changed).
+    changed_fields: list[str] = []
+
     if update_data.name is not None:
         institution.name = update_data.name
         # Update slug from name
         institution.slug = update_data.name.lower().replace(" ", "-")
+        changed_fields.append("name")
 
     if update_data.domain is not None:
         institution.domain = update_data.domain
+        changed_fields.append("domain")
 
     if update_data.is_active is not None:
         institution.is_active = update_data.is_active
+        changed_fields.append("is_active")
 
     if update_data.require_second_reviewer is not None:
         institution.require_second_reviewer = update_data.require_second_reviewer
+        changed_fields.append("require_second_reviewer")
 
     # Default grading scheme — the Note-resolver's institution-wide fallback.
     # ``model_fields_set`` distinguishes an explicit ``null`` (clear the
@@ -880,6 +937,7 @@ async def update_institution(
             institution.id,
             locale,
         )
+        changed_fields.append("default_grading_scheme_id")
 
     # Update subscription tier and quotas
     if update_data.subscription_tier is not None:
@@ -893,6 +951,7 @@ async def update_institution(
             )
 
         institution.subscription_tier = tier.value
+        changed_fields.append("subscription_tier")
 
         # Sync quotas from tier_quotas DB table (single source of truth)
         from utils.tenant_utils import sync_institution_quotas
@@ -901,6 +960,19 @@ async def update_institution(
 
     db.commit()
     db.refresh(institution)
+
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_UPDATE_INSTITUTION,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_INSTITUTION,
+        resource_id=institution.id,
+        additional_data={
+            "changed_fields": sorted(changed_fields),
+            "subscription_tier": institution.subscription_tier,
+        },
+        request=request,
+    )
 
     return InstitutionResponse(
         id=institution.id,
@@ -997,6 +1069,20 @@ async def create_institution(
     db.add(institution)
     db.commit()
     db.refresh(institution)
+
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_CREATE_INSTITUTION,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_INSTITUTION,
+        resource_id=institution.id,
+        additional_data={
+            "name": institution.name,
+            "domain": institution.domain,
+            "subscription_tier": institution.subscription_tier,
+        },
+        request=request,
+    )
 
     return InstitutionResponse(
         id=institution.id,

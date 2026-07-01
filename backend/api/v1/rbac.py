@@ -11,6 +11,7 @@ from datetime import datetime
 
 from database import get_db
 from services.rbac_service import RBACService
+from services.audit_service import AuditService
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_user, get_current_active_user
 from models.auth import User
@@ -228,6 +229,21 @@ async def create_role(
             created_by=current_user.id,
         )
 
+        # Best-effort: RBACService besitzt die Transaktion (committet intern),
+        # daher kein fail-closed möglich ohne Service-Refactor. Die Rolle ist
+        # bereits persistiert; ein Audit-Fehler darf den Call nicht kippen.
+        AuditService.log_event_best_effort(
+            db=db,
+            action=AuditService.ACTION_CREATE_ROLE,
+            user_id=current_user.id,
+            resource_type=AuditService.RESOURCE_ROLE,
+            resource_id=role.id,
+            additional_data={
+                "name": role.name,
+                "feature_count": len(request.feature_ids or []),
+            },
+        )
+
         features = rbac_service.get_role_features(role.id)
         role_dict = RoleResponse.from_orm(role).dict()
         role_dict["features"] = [FeatureResponse.from_orm(f) for f in features]
@@ -253,6 +269,19 @@ async def update_role_features(
     try:
         role = rbac_service.update_role_features(
             role_id=role_id, feature_ids=request.feature_ids
+        )
+
+        # Best-effort (Service-owned transaction, siehe create_role).
+        AuditService.log_event_best_effort(
+            db=db,
+            action=AuditService.ACTION_UPDATE_ROLE,
+            user_id=current_user.id,
+            resource_type=AuditService.RESOURCE_ROLE,
+            resource_id=role.id,
+            additional_data={
+                "role_id": role_id,
+                "feature_count": len(request.feature_ids or []),
+            },
         )
 
         features = rbac_service.get_role_features(role.id)

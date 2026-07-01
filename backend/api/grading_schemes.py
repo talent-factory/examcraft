@@ -28,7 +28,7 @@ import logging
 from datetime import datetime
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -39,6 +39,7 @@ from models.auth import Institution, User
 from models.exam import Exam
 from models.grading_scheme import GradingScheme, GradingSchemeConfig
 from utils.auth_utils import require_permission, get_current_active_user
+from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -242,6 +243,7 @@ async def get_grading_scheme(
 @router.post("", response_model=GradingSchemeOut, status_code=201)
 async def create_grading_scheme(
     payload: GradingSchemeCreate,
+    request: Request,
     current_user: User = Depends(require_permission("grading_schemes:manage")),
     db: Session = Depends(get_db),
 ) -> GradingSchemeOut:
@@ -280,6 +282,20 @@ async def create_grading_scheme(
         logger.error("grading_schemes create db error: %s", exc)
         raise HTTPException(status_code=500, detail="Datenbankfehler")
 
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_CREATE_GRADING_SCHEME,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_GRADING_SCHEME,
+        resource_id=scheme.id,
+        additional_data={
+            "name": scheme.name,
+            "institution_id": scheme.institution_id,
+            "is_default_for_institution": scheme.is_default_for_institution,
+        },
+        request=request,
+    )
+
     return _to_out(scheme)
 
 
@@ -287,6 +303,7 @@ async def create_grading_scheme(
 async def update_grading_scheme(
     scheme_id: int,
     payload: GradingSchemeUpdate,
+    request: Request,
     current_user: User = Depends(require_permission("grading_schemes:manage")),
     db: Session = Depends(get_db),
 ) -> GradingSchemeOut:
@@ -326,12 +343,23 @@ async def update_grading_scheme(
         logger.error("grading_schemes update db error: %s", exc)
         raise HTTPException(status_code=500, detail="Datenbankfehler")
 
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_UPDATE_GRADING_SCHEME,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_GRADING_SCHEME,
+        resource_id=scheme.id,
+        additional_data={"changed_fields": sorted(update.keys())},
+        request=request,
+    )
+
     return _to_out(scheme)
 
 
 @router.delete("/{scheme_id}", status_code=204)
 async def delete_grading_scheme(
     scheme_id: int,
+    request: Request,
     current_user: User = Depends(require_permission("grading_schemes:manage")),
     db: Session = Depends(get_db),
 ) -> None:
@@ -376,6 +404,12 @@ async def delete_grading_scheme(
             ),
         )
 
+    # Capture identifying fields before the row is gone — needed for the audit
+    # entry after a successful delete.
+    deleted_scheme_id = scheme.id
+    deleted_scheme_name = scheme.name
+    deleted_institution_id = scheme.institution_id
+
     db.delete(scheme)
     try:
         db.commit()
@@ -393,3 +427,16 @@ async def delete_grading_scheme(
         db.rollback()
         logger.error("grading_schemes delete db error: %s", exc)
         raise HTTPException(status_code=500, detail="Datenbankfehler")
+
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_DELETE_GRADING_SCHEME,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_GRADING_SCHEME,
+        resource_id=deleted_scheme_id,
+        additional_data={
+            "name": deleted_scheme_name,
+            "institution_id": deleted_institution_id,
+        },
+        request=request,
+    )
