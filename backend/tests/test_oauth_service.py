@@ -4,10 +4,13 @@ Tests for OAuth Service - User Data Update Functionality
 Tests TF-192: OAuth Login should update user data (first_name, last_name, avatar_url)
 """
 
+import json
+
 import pytest
 from sqlalchemy.orm import Session
 
-from models.auth import User, OAuthAccount, Institution
+from models.auth import AuditLog, User, OAuthAccount, Institution
+from services.audit_service import AuditService
 from services.oauth_service import OAuthService
 
 
@@ -215,3 +218,44 @@ def test_oauth_user_routed_to_default_institution_is_not_admin(
     role_names = [r.name for r in user.roles]
     assert "admin" not in role_names
     assert "viewer" in role_names
+
+
+# --------------------------------------------------------------------------- #
+# TF-503: audit coverage for new OAuth user creation
+# --------------------------------------------------------------------------- #
+def test_new_oauth_user_writes_create_user_audit(
+    test_db: Session, oauth_service: OAuthService
+):
+    """A brand-new OAuth sign-up (no existing account/email match) must write
+    exactly one create_user audit row, since it's PII-generating account
+    creation analogous to the password-registration path."""
+    user = oauth_service.find_or_create_user_from_oauth(
+        provider="google",
+        user_info={
+            "email": "brandnew@unmatched-oauth-domain.example",
+            "first_name": "Brand",
+            "last_name": "New",
+            "name": "Brand New",
+            "provider_user_id": "google-brandnew-1",
+            "email_verified": True,
+        },
+        token={"access_token": "t", "refresh_token": "r"},
+    )
+
+    rows = (
+        test_db.query(AuditLog)
+        .filter(
+            AuditLog.action == AuditService.ACTION_CREATE_USER,
+            AuditLog.resource_id == str(user.id),
+        )
+        .all()
+    )
+    assert len(rows) == 1
+    assert rows[0].user_id == user.id
+    assert rows[0].status == AuditService.STATUS_SUCCESS
+    data = json.loads(rows[0].additional_data)
+    assert data == {
+        "oauth_provider": "google",
+        "registration_method": "oauth",
+        "email_verified": True,
+    }

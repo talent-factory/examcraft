@@ -63,6 +63,10 @@ class AuditService:
     ACTION_CREATE_RESULT_IMPORT = "create_result_import"
     ACTION_DELETE_RESULT_IMPORT = "delete_result_import"
 
+    ACTION_CREATE_PROMPT = "create_prompt"
+    ACTION_UPDATE_PROMPT = "update_prompt"
+    ACTION_DELETE_PROMPT = "delete_prompt"
+
     ACTION_API_ACCESS = "api_access"
     ACTION_PERMISSION_DENIED = "permission_denied"
     ACTION_RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
@@ -83,6 +87,7 @@ class AuditService:
     RESOURCE_ROLE = "role"
     RESOURCE_INSTITUTION = "institution"
     RESOURCE_EXAM = "exam"
+    RESOURCE_PROMPT = "prompt"
     RESOURCE_GRADING_SCHEME = "grading_scheme"
 
     @staticmethod
@@ -600,6 +605,11 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             AuditService.ACTION_DELETE_USER,
             AuditService.ACTION_ASSIGN_ROLE,
             AuditService.ACTION_REMOVE_ROLE,
+            # Prompt-Mutationen — jede Sichtbarkeitsstufe (auch private), da
+            # dieselbe Aktion auch institutions-/systemweite Prompts betrifft.
+            AuditService.ACTION_CREATE_PROMPT,
+            AuditService.ACTION_UPDATE_PROMPT,
+            AuditService.ACTION_DELETE_PROMPT,
             # Custom-Rollen (api/v1/rbac.py, TF-502)
             AuditService.ACTION_CREATE_ROLE,
             AuditService.ACTION_UPDATE_ROLE,

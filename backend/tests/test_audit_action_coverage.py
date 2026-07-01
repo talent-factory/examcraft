@@ -9,11 +9,13 @@ question-edit action, which was defined and categorised yet written by no code
 path until TF-504 wired it.
 
 Detection scans the call-site layers (``api`` / ``services`` / ``tasks`` /
-``middleware``), excluding ``audit_service.py`` itself: there the constants are
-defined AND referenced by the taxonomy + the convenience wrappers, and neither
-of those is an *emission*. An action emitted only through a convenience wrapper
-(``log_login`` → ``ACTION_LOGIN``) counts as reachable when that wrapper is
-called at a scanned call site.
+``middleware``) of ``core/backend`` plus the ``premium/backend`` and
+``enterprise/backend`` sibling tiers (skipped when absent, e.g. in the
+core-only mirror), excluding ``audit_service.py`` itself: there the constants
+are defined AND referenced by the taxonomy + the convenience wrappers, and
+neither of those is an *emission*. An action emitted only through a
+convenience wrapper (``log_login`` → ``ACTION_LOGIN``) counts as reachable
+when that wrapper is called at a scanned call site.
 
 Comments are stripped before scanning and constant references are matched in
 their qualified ``AuditService.ACTION_X`` form, so a mere *mention* of a
@@ -31,7 +33,15 @@ from pathlib import Path
 from services.audit_service import ACTIONS_BY_CATEGORY, AuditService
 
 _BACKEND = Path(__file__).resolve().parents[1]
+_REPO_ROOT = _BACKEND.parents[1]
 _SCAN_DIRS = ("api", "services", "tasks", "middleware")
+# Sibling tiers with their own call sites (e.g. premium prompt endpoints,
+# enterprise OAuth). Absent in the core-only mirror, hence the exists() guard
+# below rather than a hard dependency.
+_SIBLING_BACKENDS = (
+    _REPO_ROOT / "premium" / "backend",
+    _REPO_ROOT / "enterprise" / "backend",
+)
 
 # Actions whose ``action=`` lives inside a convenience wrapper in
 # audit_service.py; reachable when the wrapper is called at a call site.
@@ -52,14 +62,13 @@ _RESERVED_ACTIONS = {
     "ACTION_PROCESS_DOCUMENT": (
         "document processing is a system/background step, not a user-facing audit event"
     ),
-    "ACTION_CREATE_USER": (
-        "no admin user-create endpoint on develop; enterprise OAuth signup "
-        "audits creation in TF-503"
-    ),
     "ACTION_DELETE_USER": "no user-delete endpoint exists yet",
     # ACTION_ASSIGN_ROLE / ACTION_REMOVE_ROLE were reserved pending TF-502 (#159);
     # that PR is now on develop and admin.py emits both, so they are reachable and
     # no longer reserved (test_reserved_actions_are_not_reachable enforces this).
+    # ACTION_CREATE_USER was reserved pending TF-503 (#160); both the core and
+    # enterprise OAuth signup paths now emit it and the scan covers enterprise/,
+    # so it's reachable and no longer reserved.
     "ACTION_OAUTH_LOGIN": (
         "core OAuth callback audit not yet wired (separate follow-up)"
     ),
@@ -107,14 +116,15 @@ def _strip_comments(src: str) -> str:
 
 def _call_site_source() -> str:
     parts = []
-    for name in _SCAN_DIRS:
-        root = _BACKEND / name
-        if not root.exists():
-            continue
-        for path in root.rglob("*.py"):
-            if path.name == "audit_service.py":
+    for backend in (_BACKEND, *_SIBLING_BACKENDS):
+        for name in _SCAN_DIRS:
+            root = backend / name
+            if not root.exists():
                 continue
-            parts.append(_strip_comments(path.read_text(encoding="utf-8")))
+            for path in root.rglob("*.py"):
+                if path.name == "audit_service.py":
+                    continue
+                parts.append(_strip_comments(path.read_text(encoding="utf-8")))
     return "\n".join(parts)
 
 

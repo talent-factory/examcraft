@@ -14,6 +14,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.auth import User, OAuthAccount, Institution, Role, UserRole
+from services.audit_service import AuditService
 
 
 logger = logging.getLogger(__name__)
@@ -404,5 +405,21 @@ class OAuthService:
 
         self.db.commit()
         self.db.refresh(new_user)
+
+        # TF-503: OAuth-User-Erstellung ist PII-erzeugend (analog create_user).
+        # Best-effort (log_action fängt eigene Fehler ab); der User ist bereits
+        # committet und darf durch ein Audit-Problem nicht verloren gehen.
+        AuditService.log_action(
+            db=self.db,
+            action=AuditService.ACTION_CREATE_USER,
+            user_id=new_user.id,
+            resource_type=AuditService.RESOURCE_USER,
+            resource_id=new_user.id,
+            additional_data={
+                "oauth_provider": provider,
+                "registration_method": "oauth",
+                "email_verified": new_user.is_email_verified,
+            },
+        )
 
         return new_user
