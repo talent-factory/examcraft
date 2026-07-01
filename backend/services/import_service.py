@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 import re
 import traceback
+import uuid
 from datetime import datetime, timezone
 from types import MappingProxyType
 from typing import Any, Mapping
@@ -45,6 +46,7 @@ from models.submission import (
     ImportJob,
     Submission,
 )
+from services.audit_service import AuditService
 from services.grading_service import GradingService
 from services.import_drivers import (
     BaseImportDriver,
@@ -262,7 +264,70 @@ class ImportService:
 
         self.db.commit()
         self.db.refresh(job)
+
+        # TF-501: best-effort audit trail for import *creation* (counterpart
+        # to the fail-closed delete_result_import). The job is already durably
+        # committed above, so a failing audit write must never roll back or
+        # block the import — it is swallowed inside the helper.
+        self._log_import_audit(
+            job, exam=exam, driver_name=driver_name, triggered_by=triggered_by
+        )
         return job
+
+    def _log_import_audit(
+        self,
+        job: ImportJob,
+        *,
+        exam: Exam,
+        driver_name: str,
+        triggered_by: int | None,
+    ) -> None:
+        """Persist a best-effort ``create_result_import`` audit entry.
+
+        Called only after the import has been durably committed. The audit
+        ``status`` mirrors ``job.status`` rather than always claiming
+        success: a ``FAILED`` job persisted zero rows, so it is audited as
+        a failure, while ``SUCCEEDED``/``PARTIAL`` both created at least
+        some student PII and are audited as success. The ``try`` guards
+        against unexpected raises (e.g. during argument construction, or
+        any raise from ``log_action`` itself, though its own body already
+        swallows its exceptions) so a committed import is never undone by
+        an audit failure. The job itself is always recorded in
+        ``import_jobs`` regardless.
+        """
+        audit_status = (
+            AuditService.STATUS_FAILURE
+            if job.status == ImportJobStatus.FAILED.value
+            else AuditService.STATUS_SUCCESS
+        )
+        try:
+            AuditService.log_action(
+                db=self.db,
+                action=AuditService.ACTION_CREATE_RESULT_IMPORT,
+                status=audit_status,
+                user_id=triggered_by,
+                resource_type=AuditService.RESOURCE_EXAM,
+                resource_id=exam.id,
+                additional_data={
+                    "import_job_id": job.id,
+                    "driver_name": driver_name,
+                    "job_status": job.status,
+                    "rows_processed": job.rows_processed,
+                    "rows_failed": job.rows_failed,
+                },
+            )
+        except Exception:
+            # Logged at error level (not warning) so this reaches Sentry the
+            # same way log_action's own internal failure path does — a
+            # swallowed audit failure must still be observable, not silent.
+            error_id = uuid.uuid4().hex
+            logger.error(
+                "TF-501: audit log for import_job %s could not be written "
+                "[error_id=%s]",
+                job.id,
+                error_id,
+                exc_info=True,
+            )
 
     @classmethod
     def _get_driver(cls, name: str) -> BaseImportDriver:

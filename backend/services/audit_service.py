@@ -51,6 +51,7 @@ class AuditService:
     ACTION_ASSIGN_ROLE = "assign_role"
     ACTION_REMOVE_ROLE = "remove_role"
 
+    ACTION_CREATE_RESULT_IMPORT = "create_result_import"
     ACTION_DELETE_RESULT_IMPORT = "delete_result_import"
 
     ACTION_API_ACCESS = "api_access"
@@ -521,7 +522,10 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             "delete_exam",
             "archive_exam",
             "restore_exam",
-            # Result-import lifecycle (api/submissions.py, TF-421)
+            # Result-import lifecycle (TF-501 create, TF-421 delete).
+            # Both anchor on the exam and create/remove student PII, so they
+            # share the "business" tier visible to Institution-Admins.
+            AuditService.ACTION_CREATE_RESULT_IMPORT,
             AuditService.ACTION_DELETE_RESULT_IMPORT,
             # GDPR data actions (api/gdpr.py)
             "data_export",

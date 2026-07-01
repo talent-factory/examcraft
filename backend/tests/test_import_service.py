@@ -1472,3 +1472,294 @@ def test_queued_job_is_reused_by_commit_without_duplicate(
         ImportJobStatus.PARTIAL.value,
     }
     assert test_db.query(ImportJob).count() == 1
+
+
+# ---------------------------------------------------------------------------
+# Audit-Trail (TF-501): das Anlegen eines Imports erzeugt Studierenden-PII
+# und muss — symmetrisch zum fail-closed ``delete_result_import`` — eine
+# Audit-Spur hinterlassen. Hier best-effort: ein fehlschlagender Audit-Write
+# darf den bereits committeten Import nicht zurückrollen.
+# ---------------------------------------------------------------------------
+
+
+def test_commit_writes_create_result_import_audit_log(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    from models.auth import AuditLog
+
+    service = ImportService(test_db)
+    job = service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=_json_two_students(),
+        triggered_by=None,
+        source_metadata={"filename": "klasse-fs26.json"},
+    )
+    assert job.status == ImportJobStatus.SUCCEEDED.value
+
+    rows = (
+        test_db.query(AuditLog).filter(AuditLog.action == "create_result_import").all()
+    )
+    assert len(rows) == 1
+    entry = rows[0]
+    assert entry.resource_type == "exam"
+    assert entry.resource_id == str(exam_with_questions.id)
+    assert entry.status == "success"
+    data = json.loads(entry.additional_data)
+    assert data["import_job_id"] == job.id
+    assert data["driver_name"] == "moodle_json"
+    assert data["rows_processed"] == job.rows_processed
+    assert data["rows_failed"] == job.rows_failed
+
+
+def test_commit_audit_log_records_triggering_user(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """TF-501: der Audit-Eintrag hält fest, WER die PII angelegt hat."""
+    from models.auth import AuditLog, User, UserStatus
+
+    user = User(
+        email="importer@tf501.test",
+        password_hash="x",
+        first_name="Imp",
+        last_name="Orter",
+        institution_id=exam_with_questions.institution_id,
+        status=UserStatus.ACTIVE.value,
+        is_email_verified=True,
+        registration_method="password",
+    )
+    test_db.add(user)
+    test_db.flush()
+
+    ImportService(test_db).commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=_json_two_students(),
+        triggered_by=user.id,
+        source_metadata={},
+    )
+
+    entry = (
+        test_db.query(AuditLog).filter(AuditLog.action == "create_result_import").one()
+    )
+    assert entry.user_id == user.id
+
+
+def test_commit_succeeds_even_if_audit_write_fails(
+    test_db: Session, exam_with_questions: Exam, monkeypatch
+) -> None:
+    """TF-501: Audit ist best-effort. Ein fehlschlagender Audit-Write darf den
+    bereits durabel committeten Import weder scheitern lassen noch zurückrollen."""
+    from services.audit_service import AuditService
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("audit backend down")
+
+    monkeypatch.setattr(AuditService, "log_action", staticmethod(_boom))
+
+    job = ImportService(test_db).commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=_json_two_students(),
+        triggered_by=None,
+        source_metadata={},
+    )
+
+    assert job.status == ImportJobStatus.SUCCEEDED.value
+    assert job.rows_processed == 2
+    assert test_db.query(Submission).count() == 2
+
+
+def test_commit_logs_error_when_audit_write_fails(
+    test_db: Session, exam_with_questions: Exam, monkeypatch
+) -> None:
+    """A swallowed audit failure must still be observable — otherwise a
+    regression to ``except Exception: pass`` would pass
+    ``test_commit_succeeds_even_if_audit_write_fails`` undetected.
+
+    Patches ``import_service.logger`` directly instead of using ``caplog``:
+    the full backend suite disables log propagation elsewhere, so
+    ``caplog``-based assertions are green in isolation but red in CI.
+    """
+    from unittest.mock import patch
+
+    import services.import_service as import_service_module
+    from services.audit_service import AuditService
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("audit backend down")
+
+    monkeypatch.setattr(AuditService, "log_action", staticmethod(_boom))
+
+    with patch.object(import_service_module.logger, "error") as mock_error:
+        job = ImportService(test_db).commit(
+            exam=exam_with_questions,
+            driver_name="moodle_json",
+            source=_json_two_students(),
+            triggered_by=None,
+            source_metadata={},
+        )
+
+    assert job.status == ImportJobStatus.SUCCEEDED.value
+    mock_error.assert_called_once()
+    logged_args = " ".join(str(a) for c in mock_error.call_args_list for a in c.args)
+    assert str(job.id) in logged_args
+
+
+def test_commit_audits_failed_job_as_failure_not_success(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """A FAILED job (every row invalid, 0 rows persisted) must not be
+    audited as a false "success" — the audit status has to mirror
+    ``job.status``, since no student PII was actually created."""
+    from models.auth import AuditLog
+
+    service = ImportService(test_db)
+    bad_row = {"e-mail-adresse": "", "frage1": _Q1, "antwort1": "A"}
+    json_all_bad = _json_source([dict(bad_row), dict(bad_row)])
+
+    job = service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=json_all_bad,
+        triggered_by=None,
+    )
+    assert job.status == ImportJobStatus.FAILED.value
+    assert job.rows_processed == 0
+
+    entry = (
+        test_db.query(AuditLog).filter(AuditLog.action == "create_result_import").one()
+    )
+    assert entry.status == "failure"
+    data = json.loads(entry.additional_data)
+    assert data["job_status"] == "failed"
+    assert data["rows_processed"] == 0
+    assert data["rows_failed"] == 2
+
+
+def test_commit_audits_partial_job_with_matching_row_counts(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """A PARTIAL job still persisted student PII for the good rows, so it
+    is audited as a success — but the payload must reflect the actual
+    failed-row count, not just the all-success happy path."""
+    from models.auth import AuditLog
+
+    service = ImportService(test_db)
+    json_with_bad_row = _json_source(
+        [
+            {"e-mail-adresse": ""},
+            _attempt_row(email="anna@example.org"),
+        ]
+    )
+    job = service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=json_with_bad_row,
+        triggered_by=None,
+    )
+    assert job.status == ImportJobStatus.PARTIAL.value
+
+    entry = (
+        test_db.query(AuditLog).filter(AuditLog.action == "create_result_import").one()
+    )
+    assert entry.status == "success"
+    data = json.loads(entry.additional_data)
+    assert data["job_status"] == "partial"
+    assert data["rows_processed"] == job.rows_processed == 1
+    assert data["rows_failed"] == job.rows_failed == 1
+
+
+def test_commit_writes_no_audit_entry_when_pipeline_raises(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """An exception path (driver/validation error) must not leave a
+    ``create_result_import`` audit row behind — the import never durably
+    succeeded, so there is nothing to attest to. A well-intentioned
+    refactor moving the audit call into a ``finally`` would otherwise
+    start writing false-success audits for hard failures unnoticed."""
+    from models.auth import AuditLog
+
+    service = ImportService(test_db)
+    with pytest.raises(Exception):
+        service.commit(
+            exam=exam_with_questions,
+            driver_name="moodle_json",
+            source="",
+            triggered_by=None,
+        )
+
+    assert (
+        test_db.query(AuditLog)
+        .filter(AuditLog.action == "create_result_import")
+        .count()
+        == 0
+    )
+
+
+def test_commit_writes_no_audit_entry_for_unknown_driver(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """``UnknownDriverError`` raises before any ``ImportJob`` even exists —
+    there is nothing to audit."""
+    from models.auth import AuditLog
+
+    service = ImportService(test_db)
+    with pytest.raises(ImportValidationError, match="Unbekannter Driver"):
+        service.commit(
+            exam=exam_with_questions,
+            driver_name="ilias_csv",
+            source="dummy",
+            triggered_by=None,
+        )
+
+    assert (
+        test_db.query(AuditLog)
+        .filter(AuditLog.action == "create_result_import")
+        .count()
+        == 0
+    )
+
+
+def test_commit_writes_single_audit_entry_after_retry_on_same_job(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """A transient-failure retry reusing ``import_job_id`` (the Celery
+    retry path) must not leave duplicate audit entries once the retry
+    succeeds — only the successful attempt is audited."""
+    from models.auth import AuditLog
+
+    service = ImportService(test_db)
+    queued = service.create_queued_job(
+        exam=exam_with_questions, driver_name="moodle_json", triggered_by=None
+    )
+
+    with pytest.raises(Exception):
+        service.commit(
+            exam=exam_with_questions,
+            driver_name="moodle_json",
+            source="",
+            triggered_by=None,
+            import_job_id=queued.id,
+        )
+    assert (
+        test_db.query(AuditLog)
+        .filter(AuditLog.action == "create_result_import")
+        .count()
+        == 0
+    )
+
+    job = service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=_json_two_students(),
+        triggered_by=None,
+        import_job_id=queued.id,
+    )
+    assert job.status == ImportJobStatus.SUCCEEDED.value
+    assert (
+        test_db.query(AuditLog)
+        .filter(AuditLog.action == "create_result_import")
+        .count()
+        == 1
+    )
