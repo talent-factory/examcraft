@@ -262,3 +262,17 @@ describe('Sidebar Component — item rendering', () => {
     });
   });
 });
+
+describe('Sidebar Component — layout', () => {
+  it('applies the viewport-minus-navbar height as an arbitrary Tailwind value', () => {
+    // Regression (TF-506): 'screen-minus-nav' was previously registered under
+    // theme.extend.minHeight but consumed via the h-* utility (which reads
+    // theme.height, not minHeight), so the class never generated any CSS and
+    // the sidebar had no explicit height at all.
+    const { container } = renderAt('/dashboard');
+
+    const aside = container.querySelector('aside');
+    expect(aside).not.toBeNull();
+    expect(aside).toHaveClass('h-[calc(100vh_-_64px)]');
+  });
+});

@@ -41,9 +41,6 @@ module.exports = {
         'sidebar': '256px',
         'sidebar-collapsed': '80px',
       },
-      minHeight: {
-        'screen-minus-nav': 'calc(100vh - 64px)',
-      },
       transitionDuration: {
         '250': '250ms',
       },

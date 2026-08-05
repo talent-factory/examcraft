@@ -359,6 +359,24 @@ describe('GenerationTasksBar', () => {
     warnSpy.mockRestore();
   });
 
+  // TF-506: right was 16, which overlapped the HelpWidget FAB
+  // (help/HelpWidget.tsx: right 24 + 56px width = occupies 24-80px from the
+  // viewport edge). right: 88 leaves an 8px gap past that FAB.
+  test('positions the fixed panel clear of the HelpWidget FAB', () => {
+    const activeTask = makeTask({ status: 'STARTED', progress: 10 });
+
+    mockUseGenerationTasks.mockReturnValue({
+      activeTasks: [activeTask],
+      completedTasks: [],
+      dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
+    });
+
+    const { container } = render(<GenerationTasksBar />, { wrapper: Wrapper });
+
+    expect(container.firstChild).toHaveStyle({ position: 'fixed', bottom: '16px', right: '88px' });
+  });
+
   test('collapses and expands on toggle click', () => {
     const activeTask = makeTask({ status: 'STARTED', progress: 20, topic: 'Toggle Test' });
 

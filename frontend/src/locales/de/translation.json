@@ -17,14 +17,12 @@
       "aktivitaeten": "Aktivitäten",
       "documents": "Dokumente",
       "questionGeneration": "Fragengenerierung",
-      "reviewQueue": "Review Queue",
       "examComposer": "Prüfungskomponist",
       "auswertungen": "Auswertungen",
       "auswertungenKlassen": "Klassen",
       "auswertungenStudierende": "Studierende",
       "documentChat": "Dokument-Chat",
       "promptLibrary": "Prompt-Bibliothek",
-      "admin": "Admin",
       "tagSettings": "Tag-Verwaltung",
       "moodleConnection": "Moodle-Verbindung",
       "pricing": "Preise",
@@ -538,7 +536,6 @@
       "viewAllActivities": "Alle Aktivitäten anzeigen →"
     },
     "documents": {
-      "title": "Dokumentenbibliothek",
       "subtitle": "Verwalte deine Lehrmaterialien und Dokumente",
       "uploadTitle": "Neues Dokument hochladen",
       "myDocuments": "Meine Dokumente"
@@ -584,7 +581,6 @@
       }
     },
     "promptLibrary": {
-      "title": "Prompt Library",
       "subtitle": "Verwalte System- und User-Prompts für KI-Agents"
     },
     "billing": {
@@ -1621,7 +1617,6 @@
       "errorReorder": "Reihenfolge konnte nicht gespeichert werden."
     },
     "examList": {
-      "title": "Exam Composer",
       "subtitle": "Stelle Prüfungen aus genehmigten Fragen zusammen",
       "newExam": "+ Neue Prüfung",
       "closeError": "Fehlermeldung schliessen",
@@ -1911,6 +1906,37 @@
       "changing": "Ändern...",
       "setPassword": "Passwort festlegen",
       "changePassword": "Passwort ändern"
+    },
+    "permissions": {
+      "create_documents": "Dokumente erstellen",
+      "delete_documents": "Dokumente löschen",
+      "documents_read": "Dokumente ansehen",
+      "create_questions": "Fragen erstellen",
+      "edit_questions": "Fragen bearbeiten",
+      "delete_questions": "Fragen löschen",
+      "review_questions": "Fragen prüfen",
+      "view_questions": "Fragen ansehen",
+      "create_exams": "Prüfungen erstellen",
+      "edit_exams": "Prüfungen bearbeiten",
+      "delete_exams": "Prüfungen löschen",
+      "view_exams": "Prüfungen ansehen",
+      "submissions_read": "Abgaben ansehen",
+      "submissions_grade": "Abgaben bewerten",
+      "submissions_delete": "Abgaben löschen",
+      "submissions_import": "Abgaben importieren",
+      "submissions_moodle_feedback_push": "Moodle-Feedback senden",
+      "students_manage": "Studierende verwalten",
+      "grading_schemes_manage": "Bewertungsschemata verwalten",
+      "prompt_create": "Prompts erstellen",
+      "prompt_read": "Prompts ansehen",
+      "prompt_update": "Prompts bearbeiten",
+      "prompt_delete": "Prompts löschen",
+      "moodle_configure": "Moodle konfigurieren",
+      "manage_institutions": "Institutionen verwalten",
+      "manage_roles": "Rollen verwalten",
+      "manage_settings": "Einstellungen verwalten",
+      "manage_users": "Benutzer verwalten",
+      "view_analytics": "Analysen ansehen"
     }
   },
   "guards": {

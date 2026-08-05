@@ -132,4 +132,20 @@ describe('useRoleBasedNavigation - grouping', () => {
     expect(result.current.hasAccess('/documents')).toBe(true);
     expect(result.current.hasAccess('/admin')).toBe(false);
   });
+
+  it('resolves the admin and review labels from their page-title i18n keys (TF-506)', () => {
+    // Regression: these labels previously came from nav.sidebar.admin /
+    // nav.sidebar.reviewQueue, which had drifted from the H1s the /admin and
+    // /questions/review pages actually render. They now share
+    // pages.admin.title / pages.review.title, so this catches either key
+    // reverting or being mistyped.
+    mockUser = { is_superuser: true };
+    mockHasPermission.mockReturnValue(true);
+
+    const { result } = renderHook(() => useRoleBasedNavigation());
+    const byPath = (path: string) => result.current.navigationItems.find((i) => i.path === path);
+
+    expect(byPath('/admin')?.label).toBe('Admin-Panel');
+    expect(byPath('/questions/review')?.label).toBe('Fragen-Review');
+  });
 });

@@ -236,7 +236,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
 
   return (
     <aside
-      className={`fixed left-0 top-16 h-screen-minus-nav bg-white border-r border-gray-200 transition-all duration-250 z-40 ${
+      // Höhe = Viewport minus 64px Navbar. Ursprünglich war 'screen-minus-nav'
+      // unter theme.extend.minHeight konfiguriert — falscher Theme-Key für eine
+      // h-*-Utility (die zieht theme.height, nicht minHeight), daher hat
+      // 'h-screen-minus-nav' nie CSS erzeugt und die Sidebar hatte gar keine
+      // Höhe. Fix als Arbitrary-Value statt Korrektur des Theme-Keys, weil
+      // tailwind.config.js im Dev-Container nicht gemountet ist (nur src/) —
+      // Config-Änderungen bräuchten sonst einen Image-Rebuild (TF-506).
+      className={`fixed left-0 top-16 h-[calc(100vh_-_64px)] bg-white border-r border-gray-200 transition-all duration-250 z-40 ${
         isOpen ? 'w-sidebar' : 'w-sidebar-collapsed'
       }`}
     >

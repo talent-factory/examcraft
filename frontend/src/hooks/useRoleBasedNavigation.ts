@@ -85,7 +85,9 @@ export const useRoleBasedNavigation = (): RoleBasedNavigation => {
             requiredPermissions: ['create_questions'],
           },
           {
-            label: t('nav.sidebar.reviewQueue'),
+            // TF-506: umgekehrte Richtung zu den H1-Fixes in Documents.tsx etc. —
+            // hier folgt das Sidebar-Label dem Seitentitel-Key, nicht umgekehrt
+            label: t('pages.review.title'),
             path: '/questions/review',
             icon: '✅',
             requiredPermissions: ['review_questions'],
@@ -146,7 +148,9 @@ export const useRoleBasedNavigation = (): RoleBasedNavigation => {
         label: t('nav.groups.administration'),
         items: [
           {
-            label: t('nav.sidebar.admin'),
+            // TF-506: umgekehrte Richtung zu den H1-Fixes in Documents.tsx etc. —
+            // hier folgt das Sidebar-Label dem Seitentitel-Key, nicht umgekehrt
+            label: t('pages.admin.title'),
             path: '/admin',
             icon: '⚙️',
             requiredRoles: [UserRole.ADMIN],

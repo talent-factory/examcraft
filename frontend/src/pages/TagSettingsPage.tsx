@@ -19,6 +19,7 @@ import {
 import { Edit, Archive, Unarchive, Merge, Delete as DeleteIcon, Search as SearchIcon } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { tagsApi, type Tag } from '../api/tagsApi';
 import { useAuth } from '../contexts/AuthContext';
 import TagRenameInline from '../components/tags/TagRenameInline';
@@ -45,6 +46,7 @@ const loadFilter = (): FilterMode => {
 
 const TagSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const { hasPermission, user } = useAuth();
   const isAdmin = hasPermission('manage_settings');
   const isSuperuser = user?.is_superuser === true;
@@ -147,8 +149,9 @@ const TagSettingsPage: React.FC = () => {
   return (
     <Box sx={{ p: 3, maxWidth: 800 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        {/* TF-506: Titel nutzt den Sidebar-Key, damit Seitentitel und Navigation synchron bleiben */}
         <Typography variant="h5" fontWeight="bold">
-          Tag-Verwaltung
+          {t('nav.sidebar.tagSettings')}
         </Typography>
       </Box>
 

@@ -17,14 +17,12 @@
       "aktivitaeten": "Activity",
       "documents": "Documents",
       "questionGeneration": "Question Generation",
-      "reviewQueue": "Review Queue",
       "examComposer": "Exam Composer",
       "auswertungen": "Evaluations",
       "auswertungenKlassen": "Classes",
       "auswertungenStudierende": "Students",
       "documentChat": "Document Chat",
       "promptLibrary": "Prompt Library",
-      "admin": "Admin",
       "tagSettings": "Tag Management",
       "moodleConnection": "Moodle connection",
       "pricing": "Pricing",
@@ -538,7 +536,6 @@
       "viewAllActivities": "View all activity →"
     },
     "documents": {
-      "title": "Document Library",
       "subtitle": "Manage your teaching materials and documents",
       "uploadTitle": "Upload New Document",
       "myDocuments": "My Documents"
@@ -584,7 +581,6 @@
       }
     },
     "promptLibrary": {
-      "title": "Prompt Library",
       "subtitle": "Manage system and user prompts for AI agents"
     },
     "billing": {
@@ -1621,7 +1617,6 @@
       "errorReorder": "Could not save order."
     },
     "examList": {
-      "title": "Exam Composer",
       "subtitle": "Compose exams from approved questions",
       "newExam": "+ New Exam",
       "closeError": "Dismiss error",
@@ -1911,6 +1906,37 @@
       "changing": "Changing...",
       "setPassword": "Set Password",
       "changePassword": "Change Password"
+    },
+    "permissions": {
+      "create_documents": "Create documents",
+      "delete_documents": "Delete documents",
+      "documents_read": "View documents",
+      "create_questions": "Create questions",
+      "edit_questions": "Edit questions",
+      "delete_questions": "Delete questions",
+      "review_questions": "Review questions",
+      "view_questions": "View questions",
+      "create_exams": "Create exams",
+      "edit_exams": "Edit exams",
+      "delete_exams": "Delete exams",
+      "view_exams": "View exams",
+      "submissions_read": "View submissions",
+      "submissions_grade": "Grade submissions",
+      "submissions_delete": "Delete submissions",
+      "submissions_import": "Import submissions",
+      "submissions_moodle_feedback_push": "Push Moodle feedback",
+      "students_manage": "Manage students",
+      "grading_schemes_manage": "Manage grading schemes",
+      "prompt_create": "Create prompts",
+      "prompt_read": "View prompts",
+      "prompt_update": "Edit prompts",
+      "prompt_delete": "Delete prompts",
+      "moodle_configure": "Configure Moodle",
+      "manage_institutions": "Manage institutions",
+      "manage_roles": "Manage roles",
+      "manage_settings": "Manage settings",
+      "manage_users": "Manage users",
+      "view_analytics": "View analytics"
     }
   },
   "guards": {

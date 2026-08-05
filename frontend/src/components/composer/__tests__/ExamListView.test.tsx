@@ -544,14 +544,14 @@ describe('ExamListView', () => {
   // -------------------------------------------------------------------------
 
   describe('header', () => {
-    it('renders the Exam Composer heading', async () => {
+    it('renders the Prüfungskomponist heading', async () => {
       mockComposerService.listExams.mockResolvedValue({ total: 0, exams: [] });
 
       render(<ExamListView onSelectExam={mockOnSelectExam} />, {
         wrapper: createWrapper(),
       });
 
-      expect(screen.getByText('Exam Composer')).toBeInTheDocument();
+      expect(screen.getByText('Prüfungskomponist')).toBeInTheDocument();
     });
 
     it('renders the search input', async () => {

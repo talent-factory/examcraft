@@ -43,8 +43,9 @@ export const Documents: React.FC = () => {
 
       {/* Header */}
       <div>
+        {/* TF-506: H1 nutzt den Sidebar-Key, damit Titel und Navigation synchron bleiben */}
         <h1 className="text-3xl font-bold text-gray-900">
-          {t('pages.documents.title')}
+          {t('nav.sidebar.documents')}
         </h1>
         <p className="text-gray-600 mt-2">
           {t('pages.documents.subtitle')}

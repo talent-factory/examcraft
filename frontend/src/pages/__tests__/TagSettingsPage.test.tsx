@@ -46,6 +46,17 @@ beforeEach(() => {
   mockListTags.mockResolvedValue(makeTags());
 });
 
+describe('Titel', () => {
+  it('rendert den Titel über den Sidebar-i18n-Key (TF-506)', async () => {
+    // Regression: der Titel war zuvor hartcodiertes Deutsch ("Tag-Verwaltung"
+    // direkt im JSX), dadurch für en/fr/it nie übersetzbar. Jetzt via
+    // nav.sidebar.tagSettings, damit er wie der Rest der App übersetzt wird.
+    renderPage();
+    await screen.findByText('#EigenTag');
+    expect(screen.getByText('Tag-Verwaltung')).toBeInTheDocument();
+  });
+});
+
 // Section headers render with a count suffix, e.g. "Meine Tags (1)". Tests
 // match the header text via regex so they don't break when the count changes.
 describe('Nicht-Admin Dozent', () => {

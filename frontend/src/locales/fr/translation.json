@@ -17,11 +17,9 @@
       "aktivitaeten": "Activité",
       "documents": "Documents",
       "questionGeneration": "Génération de questions",
-      "reviewQueue": "File de révision",
       "examComposer": "Compositeur d'examen",
       "documentChat": "Chat de documents",
       "promptLibrary": "Bibliothèque de prompts",
-      "admin": "Admin",
       "tagSettings": "Gestion des tags",
       "pricing": "Tarifs",
       "profile": "Profil",
@@ -174,7 +172,6 @@
       "viewAllActivities": "Voir toute l'activité →"
     },
     "documents": {
-      "title": "Bibliothèque de documents",
       "subtitle": "Gérez vos supports de cours et documents",
       "uploadTitle": "Télécharger un nouveau document",
       "myDocuments": "Mes documents"
@@ -220,7 +217,6 @@
       }
     },
     "promptLibrary": {
-      "title": "Bibliothèque de prompts",
       "subtitle": "Gérez les prompts système et utilisateur pour les agents IA"
     },
     "billing": {
@@ -1190,7 +1186,6 @@
       "errorReorder": "Impossible d'enregistrer l'ordre."
     },
     "examList": {
-      "title": "Compositeur d'examen",
       "subtitle": "Composez des examens à partir de questions approuvées",
       "newExam": "+ Nouvel examen",
       "closeError": "Fermer l'erreur",
@@ -1475,6 +1470,37 @@
       "changing": "Modification...",
       "setPassword": "Définir le mot de passe",
       "changePassword": "Changer le mot de passe"
+    },
+    "permissions": {
+      "create_documents": "Créer des documents",
+      "delete_documents": "Supprimer des documents",
+      "documents_read": "Consulter les documents",
+      "create_questions": "Créer des questions",
+      "edit_questions": "Modifier des questions",
+      "delete_questions": "Supprimer des questions",
+      "review_questions": "Réviser des questions",
+      "view_questions": "Consulter les questions",
+      "create_exams": "Créer des examens",
+      "edit_exams": "Modifier des examens",
+      "delete_exams": "Supprimer des examens",
+      "view_exams": "Consulter les examens",
+      "submissions_read": "Consulter les copies",
+      "submissions_grade": "Évaluer les copies",
+      "submissions_delete": "Supprimer les copies",
+      "submissions_import": "Importer des copies",
+      "submissions_moodle_feedback_push": "Envoyer le feedback Moodle",
+      "students_manage": "Gérer les étudiants",
+      "grading_schemes_manage": "Gérer les barèmes",
+      "prompt_create": "Créer des prompts",
+      "prompt_read": "Consulter les prompts",
+      "prompt_update": "Modifier des prompts",
+      "prompt_delete": "Supprimer des prompts",
+      "moodle_configure": "Configurer Moodle",
+      "manage_institutions": "Gérer les institutions",
+      "manage_roles": "Gérer les rôles",
+      "manage_settings": "Gérer les paramètres",
+      "manage_users": "Gérer les utilisateurs",
+      "view_analytics": "Consulter les analyses"
     }
   },
   "guards": {

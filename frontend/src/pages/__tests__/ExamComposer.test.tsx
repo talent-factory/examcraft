@@ -64,13 +64,13 @@ describe('ExamComposer', () => {
   // -------------------------------------------------------------------------
 
   describe('default view', () => {
-    it('renders ExamListView by default (shows Exam Composer heading)', async () => {
+    it('renders ExamListView by default (shows Prüfungskomponist heading)', async () => {
       mockComposerService.listExams.mockResolvedValue(emptyListResponse);
 
       render(<ExamComposer />, { wrapper: createWrapper() });
 
       // ExamListView renders this heading
-      expect(screen.getByText('Exam Composer')).toBeInTheDocument();
+      expect(screen.getByText('Prüfungskomponist')).toBeInTheDocument();
     });
 
     it('does NOT render ExamBuilderView initially', async () => {
@@ -159,7 +159,7 @@ describe('ExamComposer', () => {
 
       await waitFor(() => {
         expect(screen.queryByTestId('exam-builder-view')).not.toBeInTheDocument();
-        expect(screen.getByText('Exam Composer')).toBeInTheDocument();
+        expect(screen.getByText('Prüfungskomponist')).toBeInTheDocument();
       });
     });
 

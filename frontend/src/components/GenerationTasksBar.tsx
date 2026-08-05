@@ -112,7 +112,9 @@ const GenerationTasksBar: React.FC = () => {
       sx={{
         position: 'fixed',
         bottom: 16,
-        right: 16,
+        // 88 = HelpWidget-FAB (right: 24 + 56px Breite, help/HelpWidget.tsx) + 8px Abstand,
+        // damit dieses Panel nicht unter dem FAB verschwindet (TF-506).
+        right: 88,
         zIndex: 1300,
         width: 320,
         borderRadius: 2,

@@ -47,6 +47,11 @@ pydantic==2.13.4                    # pydantic-ai 1.x floor (ag-ui-protocol dep;
 pydantic-settings==2.14.1          # bumped mit pydantic (war 2.7.0)
 pydantic-ai==1.0.15                 # PydanticAI for ChatBot (Gateway-Pfad: OpenAIChatModel + OpenAIProvider)
 anthropic==0.79.0                   # Exakter Pin: pydantic-ai 1.0.15 braucht UserLocation in beta_web_search_tool_20250305_param (ab 0.80.0 entfernt); 0.79.0 ist letzte Version mit diesem Symbol + vollem cache_control-Support
+opentelemetry-api==1.43.0           # Exakter Pin: pydantic-ai-slim 1.0.15 importiert intern opentelemetry._events
+                                     # (pydantic_ai/messages.py), das Events-API/-SDK wurde in opentelemetry-api/-sdk
+                                     # 1.44.0 komplett entfernt -> ModuleNotFoundError beim Test-Collect. pydantic-ai
+                                     # deklariert nur einen offenen Floor (>=1.28.0), daher hier explizit gedeckelt.
+opentelemetry-sdk==1.43.0           # Muss mit opentelemetry-api im Lockstep bleiben (gleiches Release, s.o.)
 email-validator>=2.3.0              # Email validation for Pydantic EmailStr
 
 # Security

@@ -130,7 +130,8 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">{t('composer.examList.title')}</h1>
+          {/* TF-506: H1 nutzt den Sidebar-Key, damit Titel und Navigation synchron bleiben */}
+          <h1 className="text-3xl font-bold text-gray-900">{t('nav.sidebar.examComposer')}</h1>
           <p className="text-gray-600 mt-2">{t('composer.examList.subtitle')}</p>
         </div>
         <button

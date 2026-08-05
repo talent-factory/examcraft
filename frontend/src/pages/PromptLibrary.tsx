@@ -26,8 +26,9 @@ export const PromptLibrary: React.FC = () => {
     <div className="space-y-6" data-testid="prompts-content">
       {/* Header */}
       <div>
+        {/* TF-506: H1 nutzt den Sidebar-Key, damit Titel und Navigation synchron bleiben */}
         <h1 className="text-3xl font-bold text-gray-900">
-          {t('pages.promptLibrary.title')}
+          {t('nav.sidebar.promptLibrary')}
         </h1>
         <p className="text-gray-600 mt-2">
           {t('pages.promptLibrary.subtitle')}

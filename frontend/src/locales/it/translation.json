@@ -17,11 +17,9 @@
       "aktivitaeten": "Attività",
       "documents": "Documenti",
       "questionGeneration": "Generazione domande",
-      "reviewQueue": "Coda di revisione",
       "examComposer": "Compositore esami",
       "documentChat": "Chat documenti",
       "promptLibrary": "Libreria prompt",
-      "admin": "Admin",
       "tagSettings": "Gestione tag",
       "pricing": "Prezzi",
       "profile": "Profilo",
@@ -174,7 +172,6 @@
       "viewAllActivities": "Vedi tutte le attività →"
     },
     "documents": {
-      "title": "Libreria documenti",
       "subtitle": "Gestisci i tuoi materiali didattici e documenti",
       "uploadTitle": "Carica nuovo documento",
       "myDocuments": "I miei documenti"
@@ -220,7 +217,6 @@
       }
     },
     "promptLibrary": {
-      "title": "Libreria prompt",
       "subtitle": "Gestisci i prompt di sistema e utente per gli agenti IA"
     },
     "billing": {
@@ -1190,7 +1186,6 @@
       "errorReorder": "Impossibile salvare l'ordine."
     },
     "examList": {
-      "title": "Compositore esami",
       "subtitle": "Componi esami da domande approvate",
       "newExam": "+ Nuovo esame",
       "closeError": "Chiudi errore",
@@ -1475,6 +1470,37 @@
       "changing": "Modifica...",
       "setPassword": "Imposta password",
       "changePassword": "Cambia password"
+    },
+    "permissions": {
+      "create_documents": "Creare documenti",
+      "delete_documents": "Eliminare documenti",
+      "documents_read": "Visualizzare documenti",
+      "create_questions": "Creare domande",
+      "edit_questions": "Modificare domande",
+      "delete_questions": "Eliminare domande",
+      "review_questions": "Revisionare domande",
+      "view_questions": "Visualizzare domande",
+      "create_exams": "Creare esami",
+      "edit_exams": "Modificare esami",
+      "delete_exams": "Eliminare esami",
+      "view_exams": "Visualizzare esami",
+      "submissions_read": "Visualizzare consegne",
+      "submissions_grade": "Valutare consegne",
+      "submissions_delete": "Eliminare consegne",
+      "submissions_import": "Importare consegne",
+      "submissions_moodle_feedback_push": "Inviare feedback Moodle",
+      "students_manage": "Gestire studenti",
+      "grading_schemes_manage": "Gestire schemi di valutazione",
+      "prompt_create": "Creare prompt",
+      "prompt_read": "Visualizzare prompt",
+      "prompt_update": "Modificare prompt",
+      "prompt_delete": "Eliminare prompt",
+      "moodle_configure": "Configurare Moodle",
+      "manage_institutions": "Gestire istituzioni",
+      "manage_roles": "Gestire ruoli",
+      "manage_settings": "Gestire impostazioni",
+      "manage_users": "Gestire utenti",
+      "view_analytics": "Visualizzare analisi"
     }
   },
   "guards": {

@@ -16,11 +16,7 @@ jest.mock('../../../api/apiClient', () => ({
   apiClient: { interceptors: { request: { use: jest.fn() }, response: { use: jest.fn() } } },
 }));
 
-// Mock NavigationBar
-jest.mock('../NavigationBar', () => ({
-  NavigationBar: () => <div data-testid="navigation-bar">Navigation Bar</div>,
-}));
-
+// NavigationBar bewusst nicht gemockt: der echte <nav> muss rendern, damit der fixed/top-0-Test greift
 // Mock Sidebar
 jest.mock('../Sidebar', () => ({
   Sidebar: () => <div data-testid="sidebar">Sidebar</div>,
@@ -38,13 +34,14 @@ const renderWithRouter = (component: React.ReactElement) => {
 
 describe('DashboardLayout Component', () => {
   it('renders navigation bar', () => {
-    renderWithRouter(
+    const { container } = renderWithRouter(
       <DashboardLayout>
         <div>Test Content</div>
       </DashboardLayout>
     );
 
-    expect(screen.getByTestId('navigation-bar')).toBeInTheDocument();
+    const nav = container.querySelector('nav');
+    expect(nav).toBeInTheDocument();
   });
 
   it('renders sidebar', () => {
@@ -92,5 +89,18 @@ describe('DashboardLayout Component', () => {
 
     const main = container.querySelector('main');
     expect(main).toHaveClass('ml-sidebar');
+  });
+
+  it('renders the navigation bar as a fixed element', () => {
+    const { container } = renderWithRouter(
+      <DashboardLayout>
+        <div>Test Content</div>
+      </DashboardLayout>
+    );
+
+    const nav = container.querySelector('nav');
+    expect(nav).not.toBeNull();
+    expect(nav).toHaveClass('fixed');
+    expect(nav).toHaveClass('top-0');
   });
 });
