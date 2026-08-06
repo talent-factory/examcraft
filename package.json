@@ -1,6 +1,6 @@
 {
   "name": "examcraft-monorepo",
-  "version": "1.8.7",
+  "version": "1.8.8",
   "private": true,
   "description": "ExamCraft AI - Bun Workspace Monorepo",
   "workspaces": [
