@@ -23,16 +23,38 @@ logger = logging.getLogger(__name__)
 
 
 class GeneratedQuestion(BaseModel):
-    """Eine generierte Prüfungsfrage (entspricht dem bisherigen JSON-Shape)."""
+    """Eine generierte Prüfungsfrage (entspricht dem bisherigen JSON-Shape).
+
+    TF-594: PydanticAI zwingt das Modell über dieses Schema per Tool-Call
+    (``model_dump()`` verwirft unbekannte Felder ohne Warnung — verifiziert,
+    kein ``model_extra``). War das Schema enger als ein Custom-Prompt-Output
+    (z. B. ``sample_answer``/``evaluation_criteria`` bei open_ended,
+    ``correct_answers`` bei multiple_choice, ``bloom_level``/
+    ``competency_code``/``ln_level`` bei TF-400-Kompetenzrahmen), gingen
+    diese Felder beim getypten Gateway-Call still verloren — obwohl
+    ``rag_service._convert_to_rag_question`` sie längst korrekt ausliest.
+    Der Legacy-Pfad (``claude_service._parse_claude_response``, reines
+    ``json.loads`` ohne Schema) kannte dieses Problem nicht, weil er jedes
+    Feld unverändert durchreicht. Alle Zusatzfelder sind rein additiv/
+    optional — bestehende single_choice/true_false-Generierung bleibt
+    unverändert.
+    """
 
     id: str
     type: str
     question: str
+    question_text: Optional[str] = None
     options: Optional[List[str]] = None
     correct_answer: Optional[str] = None
+    correct_answers: Optional[List[str]] = None
     explanation: Optional[str] = None
     difficulty: Optional[str] = None
     topic: Optional[str] = None
+    sample_answer: Optional[str] = None
+    evaluation_criteria: Optional[str] = None
+    bloom_level: Optional[int] = None
+    competency_code: Optional[str] = None
+    ln_level: Optional[int] = None
 
 
 class GeneratedQuestions(BaseModel):
