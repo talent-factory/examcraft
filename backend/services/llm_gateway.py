@@ -50,9 +50,26 @@ def gateway_timeout() -> float:
 
     Ohne expliziten Wert blockiert der OpenAI-SDK-Default (~600 s) bei
     hängendem Gateway einen Celery-Worker. 30 s ist die gleiche Schranke
-    wie im Grading-Pfad (TF-439 „Fix 2"); pro Call-Site überschreibbar.
+    wie im Grading-Pfad (TF-439 „Fix 2"); pro Call-Site überschreibbar
+    (siehe ``make_pydantic_model``/``make_openai_client``'s ``timeout``-Param,
+    z. B. ``gateway_generation_timeout`` für die Fragengenerierung).
     """
     return float(os.getenv("LLM_GATEWAY_TIMEOUT", "30.0"))
+
+
+def gateway_generation_timeout() -> float:
+    """Request-Timeout (Sekunden) speziell für die Fragengenerierung (TF-593).
+
+    30 s (``gateway_timeout``) reicht für kurze Calls (Grading, Embeddings,
+    Chat/Wizard-Turns), ist aber für lange, gut ausgearbeitete Custom-Prompts
+    (z. B. Freitextfragen mit Musterlösung + Bewertungsraster + Kompetenz-
+    Zuordnung, >20k Zeichen) zu knapp — Claude braucht dafür regelmässig
+    länger, der Call timet aus, retryt intern und lässt danach den ganzen
+    Celery-Task (bis zu 4× mit 30-300 s Backoff) neu anlaufen. 120 s deckt
+    sich mit dem Timeout des Legacy-Direktpfads (``ClaudeService``) für
+    exakt denselben Call.
+    """
+    return float(os.getenv("LLM_GATEWAY_GENERATION_TIMEOUT", "120.0"))
 
 
 def _require_gateway_key() -> str:
@@ -97,12 +114,16 @@ def make_openai_client():
     )
 
 
-def make_pydantic_model(alias: str):
+def make_pydantic_model(alias: str, timeout: float | None = None):
     """PydanticAI-Modell gegen den Gateway (Generierung, Chatbot, Wizard).
 
     Der Provider erhält einen ``AsyncOpenAI``-Client mit Default-Timeout,
     damit auch Generierung/Chat/Wizard nicht unbegrenzt auf einem
     hängenden Gateway warten (TF-439 „Fix 2", einheitlich für alle Pfade).
+
+    ``timeout`` überschreibt ``gateway_timeout()`` für Call-Sites mit
+    abweichendem Zeitbudget (TF-593: Fragengenerierung braucht bei langen
+    Custom-Prompts mehr als die 30-s-Default-Schranke).
     """
     from openai import AsyncOpenAI
     from pydantic_ai.models.openai import OpenAIChatModel
@@ -111,6 +132,6 @@ def make_pydantic_model(alias: str):
     client = AsyncOpenAI(
         base_url=gateway_base_url(),
         api_key=_require_gateway_key(),
-        timeout=gateway_timeout(),
+        timeout=timeout if timeout is not None else gateway_timeout(),
     )
     return OpenAIChatModel(alias, provider=OpenAIProvider(openai_client=client))

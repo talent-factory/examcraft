@@ -65,6 +65,31 @@ def test_gateway_timeout_default_and_override(monkeypatch):
     assert m.gateway_timeout() == 12.5
 
 
+def test_gateway_generation_timeout_default_and_override(monkeypatch):
+    """TF-593: dedizierter, grosszügigerer Timeout für die Fragengenerierung
+    (lange Custom-Prompts brauchen regelmässig >30s), unabhängig vom
+    generischen gateway_timeout()-Default für Grading/Embeddings/Chat/Wizard."""
+    m = _reload(monkeypatch, url="http://gw:4000", key="k")
+    monkeypatch.delenv("LLM_GATEWAY_GENERATION_TIMEOUT", raising=False)
+    assert m.gateway_generation_timeout() == 120.0
+    monkeypatch.setenv("LLM_GATEWAY_GENERATION_TIMEOUT", "90.0")
+    assert m.gateway_generation_timeout() == 90.0
+
+
+def test_make_pydantic_model_timeout_override(monkeypatch):
+    """make_pydantic_model's `timeout` param must win over gateway_timeout(),
+    so gateway_generator._build_agent can request the longer generation
+    timeout without changing the shared 30s default for other call sites."""
+    m = _reload(monkeypatch, url="http://gw:4000", key="sk-x")
+    monkeypatch.setenv("LLM_GATEWAY_TIMEOUT", "30.0")
+
+    default_model = m.make_pydantic_model(m.ALIAS_GENERATION)
+    assert default_model.client.timeout == 30.0
+
+    overridden_model = m.make_pydantic_model(m.ALIAS_GENERATION, timeout=120.0)
+    assert overridden_model.client.timeout == 120.0
+
+
 def test_make_client_fails_fast_without_key(monkeypatch):
     """Gateway-URL gesetzt, aber kein Virtual Key ⇒ RuntimeError statt leerem Bearer."""
     import pytest

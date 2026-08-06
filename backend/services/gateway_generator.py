@@ -40,8 +40,18 @@ class GeneratedQuestions(BaseModel):
 
 
 def _build_agent(output_type):
-    """Agent gegen den Gateway-Generierungs-Alias bauen."""
-    model = llm_gateway.make_pydantic_model(llm_gateway.ALIAS_GENERATION)
+    """Agent gegen den Gateway-Generierungs-Alias bauen.
+
+    TF-593: nutzt ``gateway_generation_timeout()`` (120 s) statt des
+    generischen 30-s-``gateway_timeout()`` — lange Custom-Prompts (z. B.
+    Freitextfragen mit Musterlösung + Bewertungsraster + Kompetenz-
+    Zuordnung) brauchen regelmässig mehr als 30 s und liefen sonst in
+    Timeout → interner Retry → Celery-Task-Retry, sichtbar als
+    minutenlanges Hängen bei "Context geladen" im Fortschrittsbalken.
+    """
+    model = llm_gateway.make_pydantic_model(
+        llm_gateway.ALIAS_GENERATION, timeout=llm_gateway.gateway_generation_timeout()
+    )
     return Agent(model, output_type=output_type)
 
 
