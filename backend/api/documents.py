@@ -15,6 +15,7 @@ from fastapi import (
     BackgroundTasks,
 )
 from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
+from fastapi.concurrency import run_in_threadpool
 from typing import Annotated, List, Literal, Optional
 from sqlalchemy import func, or_, and_, select, union_all
 from sqlalchemy.exc import SQLAlchemyError
@@ -1144,7 +1145,7 @@ def _resolve_media_type(document) -> str:
     return media_type
 
 
-def _build_document_file_response(
+async def _build_document_file_response(
     document, *, locale: str, inline: bool, caller_id: int | None = None
 ):
     """Return a FastAPI response carrying the document's original bytes.
@@ -1164,6 +1165,13 @@ def _build_document_file_response(
     Callers MUST allow ``HTTPException`` raised here to propagate; the outer
     endpoint catches generic ``Exception`` and would otherwise mask the
     intended 404/403/503 status as a 500.
+
+    NOTE (TF-595): the S3 branch runs ``storage_service.download_file`` via
+    ``run_in_threadpool``. Prod runs a single uvicorn worker (``--workers 1``,
+    see ``Dockerfile.fly``), so this is one process with one event loop for
+    the whole app — calling the blocking ``boto3`` download directly here
+    would freeze every other request (for every user) for the entire
+    download, not just this one. Bigger document → longer freeze.
     """
     headers = {
         "Content-Disposition": _content_disposition(
@@ -1192,7 +1200,10 @@ def _build_document_file_response(
     # S3-backed file
     if document.file_path.startswith("uploads/") and storage_service.is_configured:
         try:
-            file_data = storage_service.download_file(document.file_path)
+            # Blocking boto3 call — MUST run off the event loop (TF-595).
+            file_data = await run_in_threadpool(
+                storage_service.download_file, document.file_path
+            )
         except FileNotFoundError:
             raise HTTPException(
                 status_code=404,
@@ -1287,7 +1298,7 @@ async def download_document(
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
-        return _build_document_file_response(
+        return await _build_document_file_response(
             document, locale=locale, inline=False, caller_id=current_user.id
         )
 
@@ -1333,7 +1344,7 @@ async def get_document_raw(
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, locale=locale)
 
-        return _build_document_file_response(
+        return await _build_document_file_response(
             document, locale=locale, inline=True, caller_id=current_user.id
         )
 

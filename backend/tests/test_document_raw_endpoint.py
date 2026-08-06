@@ -270,6 +270,61 @@ def test_raw_s3_backed_file_returns_streaming_inline(stage_data, monkeypatch):
     assert "filename*=UTF-8''S3%20Paper.pdf" in disposition
 
 
+def test_raw_s3_download_does_not_block_event_loop(stage_data, monkeypatch):
+    """TF-595: prod runs a single uvicorn worker (--workers 1, Dockerfile.fly),
+    so a blocking storage_service.download_file() call inside the async route
+    freezes the *entire* backend for every user, not just this request — the
+    bigger the document, the longer the freeze.
+
+    Regression guard: run a concurrent "ticker" task alongside the S3-backed
+    /raw call while download_file is artificially slow. If download_file runs
+    directly on the event loop, the ticker never gets scheduled during the
+    sleep and barely increments. If it's offloaded to a thread (the fix),
+    the ticker keeps ticking while the download is in flight.
+    """
+    import time
+
+    from api import documents as documents_api
+
+    def _slow_download(_path):
+        time.sleep(0.25)
+        return b"%PDF-1.4 slow S3 payload"
+
+    fake = _FakeStorageService(download_fn=_slow_download)
+    monkeypatch.setattr(documents_api, "storage_service", fake)
+
+    async def scenario():
+        ticks = 0
+        stop = False
+
+        async def ticker():
+            nonlocal ticks
+            while not stop:
+                ticks += 1
+                await asyncio.sleep(0.005)
+
+        ticker_task = asyncio.create_task(ticker())
+        await get_document_raw(
+            document_id=stage_data.s3.id,
+            request=None,
+            current_user=stage_data.owner,
+            db=_db_from_stage(stage_data),
+        )
+        stop = True
+        await ticker_task
+        return ticks
+
+    ticks = asyncio.run(scenario())
+    # ~0.25s of sleep at a 0.005s tick interval yields ~50 ticks when the
+    # event loop stays free. If the download blocks the loop, ticks stays
+    # at 0 or 1. 5 is a generous floor well below "unblocked" and well
+    # above "blocked", so this isn't flaky under CI scheduling jitter.
+    assert ticks > 5, (
+        f"only {ticks} ticks during the S3 download — the event loop was "
+        "blocked (storage_service.download_file must run in a thread)"
+    )
+
+
 def test_raw_s3_file_not_found_returns_404(stage_data, monkeypatch):
     """S3-Pfad: download_file wirft FileNotFoundError → 404."""
     from api import documents as documents_api
