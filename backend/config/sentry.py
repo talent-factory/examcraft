@@ -111,15 +111,27 @@ def init_sentry():
         # Error Filtering
         before_send=filter_errors,
         # Ignore specific errors
-        ignore_errors=[
-            # HTTP exceptions
-            "HTTPException",
-            # Validation errors
-            "ValidationError",
-            "RequestValidationError",
-            # Database connection errors in development
-            "OperationalError" if environment == "development" else None,
-        ],
+        #
+        # BUGFIX (TF-592): a bare `"OperationalError" if environment ==
+        # "development" else None` here used to leave a literal `None` in
+        # this list for every non-development environment. sentry_sdk's
+        # `Client._is_ignored_error()` calls `issubclass(error, ignored_error)`
+        # for any non-string entry — with `ignored_error=None` that raises
+        # `TypeError: issubclass() arg 2 must be a class, a tuple of classes,
+        # or a union` for EVERY exception Sentry tried to capture in prod/
+        # staging, masking the real error (e.g. an LLM-Gateway timeout) behind
+        # an unrelated TypeError. Build the list with a plain conditional
+        # instead of `... else None` so no falsy placeholder ever lands here.
+        ignore_errors=(
+            [
+                # HTTP exceptions
+                "HTTPException",
+                # Validation errors
+                "ValidationError",
+                "RequestValidationError",
+            ]
+            + (["OperationalError"] if environment == "development" else [])
+        ),
     )
 
     logging.info(f"[Sentry] Initialized for {environment} with version {version}")

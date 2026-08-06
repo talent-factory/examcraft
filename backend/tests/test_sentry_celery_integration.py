@@ -173,6 +173,63 @@ def test_worker_error_endpoint_returns_503_when_broker_unreachable(monkeypatch):
     assert resp.status_code == 503
 
 
+@pytest.mark.parametrize("environment", ["production", "staging", "test"])
+def test_init_sentry_ignore_errors_has_no_none_entries(monkeypatch, environment):
+    """TF-592 regression: `"OperationalError" if environment == "development"
+    else None` used to leave a literal `None` in `ignore_errors` for every
+    non-development environment. sentry_sdk's `Client._is_ignored_error()`
+    calls `issubclass(error, ignored_error)` for any non-string entry — with
+    `ignored_error=None` that raises `TypeError: issubclass() arg 2 must be a
+    class, a tuple of classes, or a union` for EVERY exception Sentry tried to
+    capture, masking the real error (e.g. an LLM-Gateway timeout) behind an
+    unrelated TypeError. Every entry must be a string in every environment
+    other than development."""
+    captured = {}
+    monkeypatch.setattr(sentry_sdk, "init", lambda **kwargs: captured.update(kwargs))
+    monkeypatch.setenv("ENABLE_SENTRY", "true")
+    monkeypatch.setenv("SENTRY_DSN", _FAKE_DSN)
+    monkeypatch.setenv("ENVIRONMENT", environment)
+
+    from config.sentry import init_sentry
+
+    init_sentry()
+
+    ignore_errors = captured["ignore_errors"]
+    assert None not in ignore_errors
+    assert all(isinstance(entry, str) for entry in ignore_errors)
+
+
+def test_init_sentry_ignore_errors_survives_real_sentry_matching(monkeypatch):
+    """Exercises the exact sentry_sdk code path from the production traceback:
+    `Client._is_ignored_error()` iterating `ignore_errors` and calling
+    `issubclass(error, ignored_error)` on non-string entries. Before the fix
+    this raised `TypeError: issubclass() arg 2 must be a class, a tuple of
+    classes, or a union` for an unrelated exception (here: TimeoutError,
+    standing in for the openai.APITimeoutError seen in prod) — proving the
+    bug masked real errors rather than merely being a lint nit."""
+    captured = {}
+    monkeypatch.setattr(sentry_sdk, "init", lambda **kwargs: captured.update(kwargs))
+    monkeypatch.setenv("ENABLE_SENTRY", "true")
+    monkeypatch.setenv("SENTRY_DSN", _FAKE_DSN)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+
+    from config.sentry import init_sentry
+
+    init_sentry()
+
+    client = sentry_sdk.Client(dsn=_FAKE_DSN, ignore_errors=captured["ignore_errors"])
+    try:
+        raise TimeoutError("Request timed out.")
+    except TimeoutError:
+        import sys
+
+        exc_info = sys.exc_info()
+
+    # Must not raise TypeError, and a real (non-ignored) error must not be
+    # swallowed either.
+    assert client._is_ignored_error({}, {"exc_info": exc_info}) is False
+
+
 def test_init_sentry_noop_when_dsn_missing(monkeypatch):
     """Enable-guard other half: flag on but no DSN must still be a no-op, so a
     misconfigured deploy never calls sentry_sdk.init with a None DSN."""
