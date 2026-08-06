@@ -53,6 +53,7 @@ In der Detailansicht sehen Sie:
 | Erklärung | Begründung für die korrekte Antwort |
 | Quellenangabe | Textabschnitt aus dem Quelldokument |
 | Zuverlässigkeitswert | Einschätzung der KI-Konfidenz (0–1) |
+| Handlungskompetenz & LN | Falls beim Generieren ein [Kompetenzrahmen](kompetenzrahmen.md) gewählt wurde: Kompetenz-Code und Leistungsniveau (z. B. `B3 · LN 2`) als Chip auf der Fragekarte |
 
 Prüfen Sie besonders:
 - Ist der Fragetext klar und eindeutig formuliert?

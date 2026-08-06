@@ -41,6 +41,8 @@ In der Dokumentenbibliothek:
 - **Fragetypen**: Multiple Choice, Offene Fragen, True/False
 - **Schwierigkeitsgrad**: Einfach / Mittel / Schwer
 - **Prompt-Vorlage**: Wählen Sie ein Prompt-Template mit Live-Vorschau
+- **Kompetenzrahmen** (optional): Wählen Sie einen [Kompetenzrahmen](kompetenzrahmen.md), damit jede generierte
+  Frage automatisch einer Handlungskompetenz und deren LN-Stufe (1–4) zugeordnet wird
 
 ### 3. Generierung starten
 

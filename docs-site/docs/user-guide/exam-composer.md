@@ -48,7 +48,9 @@ Die Notenskala beeinflusst den [Notenexport](notenexport.md). Sie kann jederzeit
 Wählen Sie Fragen aus der Liste der genehmigten Fragen:
 
 - Klicken Sie auf **+ Hinzufügen** neben jeder gewünschten Frage
-- Nutzen Sie die Filter um gezielt Fragen nach **Fragetyp**, **Schwierigkeit** oder **Quelldokument** zu finden
+- Nutzen Sie die Filter um gezielt Fragen nach **Fragetyp**, **Schwierigkeit**, **Quelldokument** oder —
+  sofern Fragen einem [Kompetenzrahmen](kompetenzrahmen.md) zugeordnet sind — nach **Handlungskompetenz**
+  und **LN-Stufe** zu finden
 - Die Gesamtanzahl der ausgewählten Fragen wird oben angezeigt
 
 !!! tip "Ausgewogene Prüfung zusammenstellen"
