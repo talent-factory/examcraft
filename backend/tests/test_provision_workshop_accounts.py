@@ -19,6 +19,10 @@ def test_creates_institution_and_accounts(test_db):
     )
     assert institution is not None
     assert institution.is_active is True
+    assert institution.subscription_tier == "enterprise"
+    assert institution.max_users == -1
+    assert institution.max_documents == -1
+    assert institution.max_questions_per_month == -1
     assert result["institution_id"] == institution.id
 
     users = test_db.query(User).filter(User.institution_id == institution.id).all()

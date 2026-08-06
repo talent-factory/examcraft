@@ -2,24 +2,23 @@
 Provisioning fiktiven Institution + 20 wiederverwendbaren Demo-Accounts
 in Produktion.
 
-Sessions laufen daher parallel auf gemeinsamen Accounts — wir bauen kein
+Sessions laufen daher sequentiell auf gemeinsamen Accounts — wir bauen
 ein einziger Account-Pool statt 60 Einzel-Accounts (siehe docs/superpowers/specs/2026-08-06-bwz-lyss-workshop-inputreferat-design.md).
 
 Idempotent: mehrfacher Aufruf legt weder Institution noch Accounts doppelt an,
 sondern aktualisiert Passwort/Status/Rolle bestehender Zeilen.
 """
 
+import logging
 import os
 import sys
-import logging
-from datetime import datetime
 
-from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models.auth import User, Role, Institution, UserStatus, UserRole
+from models.auth import Institution, Role, User, UserRole, UserStatus
 from services.auth_service import AuthService
 from utils.seed_roles import seed_default_roles
 
@@ -29,7 +28,7 @@ INSTITUTION_NAME = "BWZ Lyss Workshop"
 INSTITUTION_SLUG = "bwz-lyss-workshop-2026"
 EMAIL_DOMAIN = "examcraft-demo.local"
 ACCOUNT_COUNT = 20
-DEFAULT_PASSWORD = "Workshop2026!"
+DEFAULT_PASSWORD = "BwzLyss2026"
 
 
 def _get_or_create_institution(db: Session) -> Institution:
@@ -43,6 +42,10 @@ def _get_or_create_institution(db: Session) -> Institution:
             name=INSTITUTION_NAME,
             slug=INSTITUTION_SLUG,
             is_active=True,
+            subscription_tier="enterprise",
+            max_users=-1,
+            max_documents=-1,
+            max_questions_per_month=-1,
             created_at=func.now(),
         )
         db.add(institution)
@@ -69,7 +72,7 @@ def _get_or_create_user(
         user = User(
             email=email,
             first_name="Workshop",
-            last_name=f"Account {index:02d}",
+            last_name=f"Teilnehmer {index:02d}",
             password_hash=password_hash,
             institution_id=institution.id,
             status=UserStatus.ACTIVE.value,
@@ -98,9 +101,6 @@ def provision_workshop_accounts(
 ) -> dict:
     """Provisioning idempotent: Institution + Account-Pool."""
     seed_default_roles(db)
-
-    # Refresh session to get newly created roles
-    db.refresh(db.query(Role).first())
 
     dozent_role = db.query(Role).filter(Role.name == UserRole.DOZENT.value).first()
     if dozent_role is None:
@@ -134,8 +134,15 @@ if __name__ == "__main__":
     from database import SessionLocal
 
     session = SessionLocal()
-    result = provision_workshop_accounts(session)
-    print(f"✓ Institution ID: {result['institution_id']}")
-    print(f"✓ Institution Slug: {result['institution_slug']}")
-    print(f"✓ Accounts: {len(result['accounts'])}")
-    session.close()
+    try:
+        result = provision_workshop_accounts(session)
+        print(f"\n✓ Institution: {result['institution_slug']}")
+        print(f"✓ Accounts provisioned: {len(result['accounts'])}\n")
+        print("=" * 70)
+        print(f"{'Email':<40} | {'Password':<28}")
+        print("-" * 70)
+        for account in result["accounts"]:
+            print(f"{account['email']:<40} | {account['password']:<28}")
+        print("=" * 70)
+    finally:
+        session.close()
