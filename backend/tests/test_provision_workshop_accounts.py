@@ -2,6 +2,7 @@
 + 20 wiederverwendbaren Demo-Accounts. Muss idempotent sein, da das Skript
 notfalls ein zweites Mal gegen Prod laufen könnte (z.B. nach einem Abbruch)."""
 
+from api.auth import LoginRequest
 from models.auth import Institution, User, UserRole
 from services.auth_service import AuthService
 from scripts.provision_workshop_accounts import (
@@ -60,4 +61,18 @@ def test_account_emails_are_unique_and_patterned(test_db):
     emails = [a["email"] for a in result["accounts"]]
     assert len(emails) == len(set(emails))
     assert all(e.startswith("workshop-lyss-") for e in emails)
-    assert all(e.endswith("@examcraft-demo.local") for e in emails)
+    assert all(e.endswith("@demo.examcraft-api.fly.dev") for e in emails)
+
+
+def test_account_emails_pass_login_schema_validation(test_db):
+    """Regression test: Verify provisioned emails validate against the real LoginRequest schema.
+    This catches issues where reserved/special-use TLDs (.local, .test, .invalid) are rejected
+    by Pydantic EmailStr validators, preventing login even though accounts exist in the DB."""
+    result = provision_workshop_accounts(test_db, password="TestPass123")
+
+    for account in result["accounts"]:
+        # This should not raise ValidationError
+        login_request = LoginRequest(
+            email=account["email"], password=account["password"]
+        )
+        assert login_request.email == account["email"]

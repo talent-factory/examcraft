@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 INSTITUTION_NAME = "BWZ Lyss Workshop"
 INSTITUTION_SLUG = "bwz-lyss-workshop-2026"
-EMAIL_DOMAIN = "examcraft-demo.local"
+EMAIL_DOMAIN = "demo.examcraft-api.fly.dev"
 ACCOUNT_COUNT = 20
 DEFAULT_PASSWORD = "BwzLyss2026"
 
