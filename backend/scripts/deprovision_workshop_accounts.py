@@ -1,7 +1,14 @@
 """Räumt die BWZ-Lyss-Workshop-Institution (07.08.2026) wieder auf.
 
 MANUELL auszuführen von Daniel nach Abschluss des dritten Durchgangs —
-kein automatischer Trigger. Nutzung identisch zu provision_workshop_accounts.py:
+kein automatischer Trigger.
+
+Muss vor der Ausführung separat in den laufenden Prod-Container hochgeladen
+werden (kein Redeploy, siehe Task 3 im Implementierungsplan):
+    fly ssh sftp put core/backend/scripts/deprovision_workshop_accounts.py \\
+        scripts/deprovision_workshop_accounts.py -a examcraft-api
+
+Danach im Container ausführen:
     python scripts/deprovision_workshop_accounts.py
 """
 
@@ -12,6 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import SessionLocal
@@ -36,9 +44,23 @@ def deprovision_workshop_accounts(db: Session) -> int:
         return 0
 
     user_count = len(institution.users)
-    db.delete(institution)
-    db.commit()
-    logger.info(f"Institution '{INSTITUTION_SLUG}' inkl. {user_count} Accounts gelöscht.")
+    try:
+        db.delete(institution)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        logger.error(
+            "Löschen fehlgeschlagen (IntegrityError) — vermutlich blockiert eine "
+            "abhängige Zeile ohne Cascade-Delete den Löschvorgang (z.B. eine "
+            "Prompt-Wizard-Session eines Workshop-Users, siehe "
+            "premium/backend/models/wizard.py:WizardSession.user_id). "
+            "Transaktion wurde zurückgerollt, keine Daten wurden geändert."
+        )
+        raise
+
+    logger.info(
+        f"Institution '{INSTITUTION_SLUG}' inkl. {user_count} Accounts gelöscht."
+    )
     return user_count
 
 

@@ -47,11 +47,7 @@ def test_is_idempotent(test_db):
     )
     assert len(institutions) == 1
 
-    users = (
-        test_db.query(User)
-        .filter(User.institution_id == institutions[0].id)
-        .all()
-    )
+    users = test_db.query(User).filter(User.institution_id == institutions[0].id).all()
     assert len(users) == ACCOUNT_COUNT
 
 

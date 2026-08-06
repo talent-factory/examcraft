@@ -1,12 +1,19 @@
 """BWZ-Lyss-Workshop (07.08.2026, Inputreferat "ExamCraft AI"): idempotentes
-Provisioning fiktiven Institution + 20 wiederverwendbaren Demo-Accounts
+Provisioning einer fiktiven Institution + 20 wiederverwendbaren Demo-Accounts
 in Produktion.
 
-Sessions laufen daher sequentiell auf gemeinsamen Accounts — wir bauen
-ein einziger Account-Pool statt 60 Einzel-Accounts (siehe docs/superpowers/specs/2026-08-06-bwz-lyss-workshop-inputreferat-design.md).
+Sessions laufen sequentiell (nicht parallel, max. 20 Personen gleichzeitig
+aktiv) — daher ein einziger wiederverwendeter Account-Pool statt 60
+Einzel-Accounts (siehe docs/superpowers/specs/2026-08-06-bwz-lyss-workshop-inputreferat-design.md).
 
 Idempotent: mehrfacher Aufruf legt weder Institution noch Accounts doppelt an,
 sondern aktualisiert Passwort/Status/Rolle bestehender Zeilen.
+
+Das Passwort wird bewusst NICHT im Skript hardcodiert, sondern ausschliesslich
+zur Laufzeit aus der Umgebungsvariable WORKSHOP_PASSWORD gelesen: `core/`
+wird von `.github/workflows/mirror.yml` bei jedem Push nach `develop`/`main`
+automatisch in den öffentlichen Mirror `talent-factory/examcraft` gepusht —
+ein Klartext-Passwort in dieser Datei würde damit sofort öffentlich.
 """
 
 import logging
@@ -28,7 +35,6 @@ INSTITUTION_NAME = "BWZ Lyss Workshop"
 INSTITUTION_SLUG = "bwz-lyss-workshop-2026"
 EMAIL_DOMAIN = "demo.examcraft-api.fly.dev"
 ACCOUNT_COUNT = 20
-DEFAULT_PASSWORD = "BwzLyss2026"
 
 
 def _get_or_create_institution(db: Session) -> Institution:
@@ -97,7 +103,7 @@ def _get_or_create_user(
 
 
 def provision_workshop_accounts(
-    db: Session, password: str = DEFAULT_PASSWORD, count: int = ACCOUNT_COUNT
+    db: Session, password: str, count: int = ACCOUNT_COUNT
 ) -> dict:
     """Provisioning idempotent: Institution + Account-Pool."""
     seed_default_roles(db)
@@ -133,9 +139,16 @@ def provision_workshop_accounts(
 if __name__ == "__main__":
     from database import SessionLocal
 
+    password = os.environ.get("WORKSHOP_PASSWORD")
+    if not password:
+        raise RuntimeError(
+            "WORKSHOP_PASSWORD ist nicht gesetzt. Bitte vor dem Ausführen "
+            "exportieren, z.B.: export WORKSHOP_PASSWORD='<Passwort>'"
+        )
+
     session = SessionLocal()
     try:
-        result = provision_workshop_accounts(session)
+        result = provision_workshop_accounts(session, password)
         print(f"\n✓ Institution: {result['institution_slug']}")
         print(f"✓ Accounts provisioned: {len(result['accounts'])}\n")
         print("=" * 70)
