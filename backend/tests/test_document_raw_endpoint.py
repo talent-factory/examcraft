@@ -244,10 +244,20 @@ class _FakeStorageService:
         return self._download_fn(path)
 
 
-def test_raw_s3_backed_file_returns_streaming_inline(stage_data, monkeypatch):
-    """S3-Pfad: file_path beginnt mit 'uploads/' und Storage-Service ist
-    konfiguriert → StreamingResponse mit inline-Disposition aus den
-    download_file-Bytes."""
+def test_raw_s3_backed_file_returns_plain_response_inline(stage_data, monkeypatch):
+    """TF-596: S3-Pfad muss eine *plain* ``Response`` liefern, nicht mehr
+    ``StreamingResponse(io.BytesIO(...))``.
+
+    ``file_data`` liegt an dieser Stelle bereits vollständig im Speicher
+    (TF-595 lädt es komplett via run_in_threadpool). ``StreamingResponse``
+    mit einem nicht-async Iterable (``io.BytesIO``) fällt in Starlette auf
+    ``iterate_in_threadpool`` zurück, das PRO CHUNK einen eigenen
+    Thread-Dispatch macht — und Iteration über ``BytesIO`` ist zeilenbasiert
+    (bricht bei jedem ``\\n``-Byte), was bei binären PDF-Daten ~1 Chunk pro
+    ~240 Bytes ergibt. Für ein 11.86 MB PDF sind das ~49k Chunks/Dispatches.
+    ``Response(content=file_data, ...)`` sendet die Bytes als einzelnen
+    Body-Write ohne Iteration.
+    """
     from api import documents as documents_api
     from fastapi.responses import StreamingResponse
 
@@ -261,13 +271,73 @@ def test_raw_s3_backed_file_returns_streaming_inline(stage_data, monkeypatch):
         db=_db_from_stage(stage_data),
     )
 
-    assert isinstance(response, StreamingResponse)
+    assert isinstance(response, Response)
+    assert not isinstance(response, StreamingResponse)
+    assert response.body == fake_pdf_bytes
     assert response.media_type == "application/pdf"
     disposition = response.headers["content-disposition"]
     assert disposition.startswith("inline;")
     # RFC 6266: spaces (and any non-token char) are percent-encoded.
     assert 'filename="S3%20Paper.pdf"' in disposition
     assert "filename*=UTF-8''S3%20Paper.pdf" in disposition
+
+
+def test_raw_s3_pdf_sets_identity_content_encoding_to_skip_gzip(
+    stage_data, monkeypatch
+):
+    """TF-596: PDF-Bytes sind bereits komprimiert (FlateDecode-Streams) —
+    GZipMiddleware (main.py, minimum_size=1000, kein Content-Type-Ausschluss)
+    würde sie sonst zusätzlich CPU-teuer und ergebnislos re-komprimieren.
+    ``Content-Encoding: identity`` signalisiert Starlettes GZipMiddleware,
+    dass die Response bereits "encoded" ist, und sie überspringt die
+    Kompression (siehe ``IdentityResponder.content_encoding_set``-Check)."""
+    from api import documents as documents_api
+
+    fake_pdf_bytes = b"%PDF-1.4 fake S3 payload"
+    fake = _FakeStorageService(download_fn=lambda path: fake_pdf_bytes)
+    monkeypatch.setattr(documents_api, "storage_service", fake)
+
+    response = _call_raw(
+        document_id=stage_data.s3.id,
+        current_user=stage_data.owner,
+        db=_db_from_stage(stage_data),
+    )
+
+    assert response.headers["content-encoding"] == "identity"
+
+
+def test_raw_s3_text_document_keeps_gzip_eligible(stage_data, monkeypatch):
+    """Gegenprobe: nicht-binäre/komprimierbare Formate (z. B. text/plain)
+    dürfen weiterhin von GZipMiddleware komprimiert werden — kein
+    Content-Encoding-Header wird gesetzt, damit die Middleware frei
+    entscheiden kann."""
+    from api import documents as documents_api
+
+    db = _db_from_stage(stage_data)
+    s3_text_doc = Document(
+        id=705,
+        filename="s3-notes.txt",
+        original_filename="S3 Notes.txt",
+        file_path="uploads/inst-400/s3-notes.txt",
+        file_size=64,
+        mime_type="text/plain",
+        status=DocumentStatus.PROCESSED,
+        institution_id=400,
+        user_id=400,
+    )
+    db.add(s3_text_doc)
+    db.commit()
+
+    fake = _FakeStorageService(download_fn=lambda path: b"plain text notes")
+    monkeypatch.setattr(documents_api, "storage_service", fake)
+
+    response = _call_raw(
+        document_id=705,
+        current_user=stage_data.owner,
+        db=db,
+    )
+
+    assert "content-encoding" not in response.headers
 
 
 def test_raw_s3_download_does_not_block_event_loop(stage_data, monkeypatch):

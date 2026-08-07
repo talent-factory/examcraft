@@ -14,7 +14,7 @@ from fastapi import (
     Request,
     BackgroundTasks,
 )
-from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.concurrency import run_in_threadpool
 from typing import Annotated, List, Literal, Optional
 from sqlalchemy import func, or_, and_, select, union_all
@@ -23,7 +23,6 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, field_validator, model_validator
 import mimetypes
 import os
-import io
 from math import ceil
 from urllib.parse import quote
 
@@ -1145,6 +1144,20 @@ def _resolve_media_type(document) -> str:
     return media_type
 
 
+# Formats whose bytes are already compressed internally (PDF FlateDecode
+# streams, Office Open XML / zip containers, ...). GZipMiddleware re-running
+# DEFLATE over them costs real CPU for ~0% size reduction (TF-596).
+_PRECOMPRESSED_MEDIA_TYPE_PREFIXES = (
+    "application/pdf",
+    "application/zip",
+    "application/vnd.openxmlformats-officedocument.",
+)
+
+
+def _is_precompressed_media_type(media_type: str) -> bool:
+    return media_type.startswith(_PRECOMPRESSED_MEDIA_TYPE_PREFIXES)
+
+
 async def _build_document_file_response(
     document, *, locale: str, inline: bool, caller_id: int | None = None
 ):
@@ -1247,8 +1260,25 @@ async def _build_document_file_response(
                 status_code=500,
                 detail=t("documents_download_storage_failed", locale=locale),
             )
-        return StreamingResponse(
-            io.BytesIO(file_data),
+        # Response(content=...), NOT StreamingResponse(io.BytesIO(...)) (TF-596):
+        # file_data is already fully in memory at this point (downloaded
+        # above). io.BytesIO is not an AsyncIterable, so StreamingResponse
+        # falls back to Starlette's iterate_in_threadpool(), which dispatches
+        # ONE thread-pool call per iteration item. Iterating a BytesIO uses
+        # the file-object line protocol (splits on b"\n"), not fixed blocks —
+        # for binary PDF bytes that is ~1 chunk per ~240 bytes, i.e. ~49k
+        # thread dispatches for an 11.86 MB PDF (empirically measured).
+        # A plain Response sends the bytes as a single body write instead.
+        if _is_precompressed_media_type(media_type):
+            # Already-compressed binary formats (PDF, Office Open XML, zip)
+            # gain nothing from GZipMiddleware and pay full CPU cost for it
+            # (compression runs synchronously on the event loop — the same
+            # class of blocking TF-595 removed from the S3 download itself).
+            # Content-Encoding makes GZipMiddleware treat the body as already
+            # encoded and skip compression.
+            headers = {**headers, "Content-Encoding": "identity"}
+        return Response(
+            content=file_data,
             media_type=media_type,
             headers=headers,
         )
