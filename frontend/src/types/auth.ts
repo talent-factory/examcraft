@@ -60,9 +60,15 @@ export interface Institution {
 
 export interface Role {
   id: number;
-  name: UserRole;
+  name: string;
   display_name: string;
-  description: string;
+  // Nullable: matches the backend's Role.description (Column(Text,
+  // nullable=True)) and api.admin.RoleResponse.description: Optional[str].
+  // A role created via POST /api/admin/roles with no description, or a
+  // system role seeded without one, legitimately has description: null —
+  // treating it as always a `string` here let call sites assume they could
+  // safely call string methods on it (TF-603 review follow-up).
+  description: string | null;
   permissions: string[];
   is_system_role: boolean;
   created_at: string;

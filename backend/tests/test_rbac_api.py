@@ -233,42 +233,6 @@ def test_get_role_by_id(api_client):
     assert len(role["features"]) == 1
 
 
-def test_create_role(api_client):
-    """Test POST /api/v1/rbac/roles"""
-    token = get_auth_token(api_client)
-
-    response = api_client.post(
-        "/api/v1/rbac/roles",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "name": "new_test_role",
-            "display_name": "New Test Role",
-            "description": "A new test role",
-            "feature_ids": ["feat_api_test_1", "feat_api_test_2"],
-        },
-    )
-
-    assert response.status_code == 201
-    role = response.json()
-    assert role["name"] == "new_test_role"
-    assert len(role["features"]) == 2
-
-
-def test_update_role_features(api_client):
-    """Test PUT /api/v1/rbac/roles/{role_id}/features"""
-    token = get_auth_token(api_client)
-
-    response = api_client.put(
-        "/api/v1/rbac/roles/role_api_test/features",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"feature_ids": ["feat_api_test_1", "feat_api_test_2"]},
-    )
-
-    assert response.status_code == 200
-    role = response.json()
-    assert len(role["features"]) == 2
-
-
 # ============================================
 # SUBSCRIPTION TIER ENDPOINTS (PUBLIC)
 # ============================================

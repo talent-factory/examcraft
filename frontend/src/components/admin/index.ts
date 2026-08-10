@@ -16,9 +16,6 @@ export { InstitutionCreateDialog } from './InstitutionCreateDialog';
 export { InstitutionManagementPage } from './InstitutionManagementPage';
 
 // RBAC Management
-export { default as RoleList } from './RoleList';
-export { default as RoleEditorDialog } from './RoleEditorDialog';
-export { default as RoleManagementPage } from './RoleManagementPage';
 export { default as FeaturePermissionsMatrix } from './FeaturePermissionsMatrix';
 export { default as SubscriptionTierOverview } from './SubscriptionTierOverview';
 

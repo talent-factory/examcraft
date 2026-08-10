@@ -10,7 +10,7 @@ jest.mock('../../components/admin/UserManagementPage', () => ({
 jest.mock('../../components/admin/InstitutionManagementPage', () => ({
   InstitutionManagementPage: () => <div data-testid="institution-management" />,
 }));
-jest.mock('../../components/admin/RoleManagementPage', () => ({
+jest.mock('../AdminRoles', () => ({
   __esModule: true,
   default: () => <div data-testid="role-management" />,
 }));

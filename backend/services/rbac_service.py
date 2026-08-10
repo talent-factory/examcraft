@@ -3,7 +3,7 @@ RBAC Service für ExamCraft AI
 Implementiert Permission Checks, Quota Management, Role Management und Audit Logging
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from datetime import datetime, timedelta
@@ -251,72 +251,6 @@ class RBACService:
     # ============================================
     # ROLE MANAGEMENT
     # ============================================
-
-    def create_custom_role(
-        self,
-        name: str,
-        display_name: str,
-        description: Optional[str],
-        feature_ids: List[str],
-        created_by: int,
-    ) -> RBACRole:
-        """
-        Erstellt eine neue Custom-Rolle mit zugeordneten Features.
-        """
-        # Validierung: Name darf nur lowercase, alphanumeric, underscore
-        if not name.replace("_", "").isalnum() or name != name.lower():
-            raise ValueError(
-                "Role name must be lowercase alphanumeric with underscores"
-            )
-
-        # Prüfen ob Name bereits existiert
-        existing = self.db.query(RBACRole).filter(RBACRole.name == name).first()
-        if existing:
-            raise ValueError(f"Role with name '{name}' already exists")
-
-        role = RBACRole(
-            id=f"role_{name}",
-            name=name,
-            display_name=display_name,
-            description=description,
-            is_system_role=False,
-            is_active=True,
-            created_by=str(created_by),
-        )
-        self.db.add(role)
-        self.db.flush()
-
-        # Features zuordnen
-        for feature_id in feature_ids:
-            role_feature = RoleFeature(role_id=role.id, feature_id=feature_id)
-            self.db.add(role_feature)
-
-        self.db.commit()
-        self.db.refresh(role)
-        return role
-
-    def update_role_features(self, role_id: str, feature_ids: List[str]) -> RBACRole:
-        """
-        Aktualisiert die Features einer Rolle.
-        """
-        role = self.db.query(RBACRole).filter(RBACRole.id == role_id).first()
-        if not role:
-            raise ValueError(f"Role '{role_id}' not found")
-
-        if role.is_system_role:
-            raise ValueError("Cannot modify features of system roles")
-
-        # Lösche bestehende Mappings
-        self.db.query(RoleFeature).filter(RoleFeature.role_id == role_id).delete()
-
-        # Neue Mappings erstellen
-        for feature_id in feature_ids:
-            role_feature = RoleFeature(role_id=role_id, feature_id=feature_id)
-            self.db.add(role_feature)
-
-        self.db.commit()
-        self.db.refresh(role)
-        return role
 
     def list_roles(
         self, include_system_roles: bool = True, include_inactive: bool = False

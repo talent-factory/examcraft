@@ -194,46 +194,6 @@ class Institution(Base):
     def __repr__(self):
         return f"<Institution(id={self.id}, name='{self.name}', slug='{self.slug}')>"
 
-    def has_feature(self, feature: str) -> bool:
-        """
-        Prüft ob Institution ein Feature hat (basierend auf Tier + manuelle Overrides)
-
-        Args:
-            feature: Feature-Name (z.B. "document_chatbot")
-
-        Returns:
-            True wenn Feature verfügbar
-        """
-        from backend.config.features import (
-            SubscriptionTier,
-            Feature,
-            has_feature as tier_has_feature,
-        )
-
-        # Manuelle Feature-Overrides haben Vorrang
-        if self.features_enabled and feature in self.features_enabled:
-            return True
-
-        # Sonst: Prüfe gegen Tier
-        try:
-            tier = SubscriptionTier(self.subscription_tier)
-            feature_enum = Feature(feature)
-            return tier_has_feature(tier, feature_enum)
-        except (ValueError, KeyError):
-            return False
-
-    def get_quota(self, quota_name: str) -> int:
-        """
-        Gibt Quota-Limit zurück (nutzt DB-Werte statt Config)
-
-        Args:
-            quota_name: z.B. "max_documents"
-
-        Returns:
-            Quota-Limit (-1 für unlimited)
-        """
-        return getattr(self, quota_name, 0)
-
 
 class Role(Base):
     """
@@ -420,33 +380,13 @@ class User(Base):
         if self.is_superuser:
             return True
 
-        import json
+        from utils.permissions import parse_role_permissions
 
         for role in self.roles:
-            if role.permissions:
-                # Parse permissions from JSON string or set string to list
-                if isinstance(role.permissions, str):
-                    try:
-                        # Try JSON format first
-                        perms = json.loads(role.permissions)
-                    except (json.JSONDecodeError, TypeError):
-                        # Try set format: {perm1,perm2,perm3}
-                        if role.permissions.startswith(
-                            "{"
-                        ) and role.permissions.endswith("}"):
-                            perms_str = role.permissions[1:-1]  # Remove { }
-                            perms = [
-                                p.strip() for p in perms_str.split(",") if p.strip()
-                            ]
-                        else:
-                            perms = []
-                elif isinstance(role.permissions, list):
-                    perms = role.permissions
-                else:
-                    perms = []
-
-                if permission in perms:
-                    return True
+            if role.permissions and permission in parse_role_permissions(
+                role.permissions
+            ):
+                return True
         return False
 
 

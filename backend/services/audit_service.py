@@ -52,6 +52,7 @@ class AuditService:
     ACTION_REMOVE_ROLE = "remove_role"
     ACTION_CREATE_ROLE = "create_role"
     ACTION_UPDATE_ROLE = "update_role"
+    ACTION_DELETE_ROLE = "delete_role"
 
     ACTION_CREATE_INSTITUTION = "create_institution"
     ACTION_UPDATE_INSTITUTION = "update_institution"
@@ -613,6 +614,7 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             # Custom-Rollen (api/v1/rbac.py, TF-502)
             AuditService.ACTION_CREATE_ROLE,
             AuditService.ACTION_UPDATE_ROLE,
+            AuditService.ACTION_DELETE_ROLE,
             # Institutions-Verwaltung (api/admin.py, TF-502)
             AuditService.ACTION_CREATE_INSTITUTION,
             AuditService.ACTION_UPDATE_INSTITUTION,

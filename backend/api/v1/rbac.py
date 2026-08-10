@@ -6,12 +6,11 @@ REST API für RBAC Management (Roles, Features, Permissions, Quotas)
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from datetime import datetime
 
 from database import get_db
 from services.rbac_service import RBACService
-from services.audit_service import AuditService
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_user, get_current_active_user
 from models.auth import User
@@ -37,7 +36,15 @@ class FeatureResponse(BaseModel):
         from_attributes = True
 
 
-class RoleResponse(BaseModel):
+class RBACRoleResponse(BaseModel):
+    """Response schema for RBACRole (feature-tier "System A" roles).
+
+    Named distinctly from api.admin.RoleResponse (permission-based "System B"
+    roles, models.auth.Role) — the two describe unrelated domain concepts and
+    were previously both called RoleResponse in different modules, which is
+    confusing when navigating by symbol name (TF-603 review follow-up).
+    """
+
     id: str
     name: str
     display_name: str
@@ -48,17 +55,6 @@ class RoleResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class CreateRoleRequest(BaseModel):
-    name: str = Field(..., pattern="^[a-z0-9_]+$")
-    display_name: str
-    description: Optional[str] = None
-    feature_ids: List[str]
-
-
-class UpdateRoleFeaturesRequest(BaseModel):
-    feature_ids: List[str]
 
 
 class SubscriptionTierResponse(BaseModel):
@@ -156,7 +152,7 @@ async def get_feature(
 # ============================================
 
 
-@router.get("/roles", response_model=List[RoleResponse])
+@router.get("/roles", response_model=List[RBACRoleResponse])
 async def list_roles(
     include_system_roles: bool = True,
     include_inactive: bool = False,
@@ -175,14 +171,14 @@ async def list_roles(
     result = []
     for role in roles:
         features = rbac_service.get_role_features(role.id)
-        role_dict = RoleResponse.from_orm(role).dict()
+        role_dict = RBACRoleResponse.from_orm(role).dict()
         role_dict["features"] = [FeatureResponse.from_orm(f) for f in features]
         result.append(role_dict)
 
     return result
 
 
-@router.get("/roles/{role_id}", response_model=RoleResponse)
+@router.get("/roles/{role_id}", response_model=RBACRoleResponse)
 async def get_role(
     role_id: str,
     request: Request,
@@ -202,94 +198,9 @@ async def get_role(
     rbac_service = RBACService(db)
     features = rbac_service.get_role_features(role.id)
 
-    role_dict = RoleResponse.from_orm(role).dict()
+    role_dict = RBACRoleResponse.from_orm(role).dict()
     role_dict["features"] = [FeatureResponse.from_orm(f) for f in features]
     return role_dict
-
-
-@router.post("/roles", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
-async def create_role(
-    request: CreateRoleRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Erstellt eine neue Custom-Rolle.
-    Nur für Admins.
-    """
-    # TODO: Check if user is admin
-    rbac_service = RBACService(db)
-
-    try:
-        role = rbac_service.create_custom_role(
-            name=request.name,
-            display_name=request.display_name,
-            description=request.description,
-            feature_ids=request.feature_ids,
-            created_by=current_user.id,
-        )
-
-        # Best-effort: RBACService besitzt die Transaktion (committet intern),
-        # daher kein fail-closed möglich ohne Service-Refactor. Die Rolle ist
-        # bereits persistiert; ein Audit-Fehler darf den Call nicht kippen.
-        AuditService.log_event_best_effort(
-            db=db,
-            action=AuditService.ACTION_CREATE_ROLE,
-            user_id=current_user.id,
-            resource_type=AuditService.RESOURCE_ROLE,
-            resource_id=role.id,
-            additional_data={
-                "name": role.name,
-                "feature_count": len(request.feature_ids or []),
-            },
-        )
-
-        features = rbac_service.get_role_features(role.id)
-        role_dict = RoleResponse.from_orm(role).dict()
-        role_dict["features"] = [FeatureResponse.from_orm(f) for f in features]
-        return role_dict
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.put("/roles/{role_id}/features", response_model=RoleResponse)
-async def update_role_features(
-    role_id: str,
-    request: UpdateRoleFeaturesRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Aktualisiert die Features einer Rolle.
-    Nur für Admins. System-Rollen können nicht geändert werden.
-    """
-    # TODO: Check if user is admin
-    rbac_service = RBACService(db)
-
-    try:
-        role = rbac_service.update_role_features(
-            role_id=role_id, feature_ids=request.feature_ids
-        )
-
-        # Best-effort (Service-owned transaction, siehe create_role).
-        AuditService.log_event_best_effort(
-            db=db,
-            action=AuditService.ACTION_UPDATE_ROLE,
-            user_id=current_user.id,
-            resource_type=AuditService.RESOURCE_ROLE,
-            resource_id=role.id,
-            additional_data={
-                "role_id": role_id,
-                "feature_count": len(request.feature_ids or []),
-            },
-        )
-
-        features = rbac_service.get_role_features(role.id)
-        role_dict = RoleResponse.from_orm(role).dict()
-        role_dict["features"] = [FeatureResponse.from_orm(f) for f in features]
-        return role_dict
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ============================================

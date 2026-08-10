@@ -321,54 +321,6 @@ def test_increment_resource_usage(rbac_db):
 # ============================================
 
 
-def test_create_custom_role(rbac_db):
-    """Test creating a custom role"""
-    service = RBACService(rbac_db)
-
-    role = service.create_custom_role(
-        name="custom_reviewer",
-        display_name="Custom Reviewer",
-        description="Custom role for reviewers",
-        feature_ids=["feat_test_gen", "feat_test_mgmt"],
-        created_by=1,
-    )
-
-    assert role.name == "custom_reviewer"
-    assert role.display_name == "Custom Reviewer"
-    assert role.is_system_role is False
-    assert role.is_active is True
-
-
-def test_update_role_features(rbac_db):
-    """Test updating role features"""
-    service = RBACService(rbac_db)
-
-    # Create custom role
-    role = service.create_custom_role(
-        name="test_role",
-        display_name="Test Role",
-        description="Test",
-        feature_ids=["feat_test_gen"],
-        created_by=1,
-    )
-
-    # Update features
-    updated_role = service.update_role_features(
-        role.id, ["feat_test_gen", "feat_test_mgmt", "feat_admin"]
-    )
-
-    features = service.get_role_features(updated_role.id)
-    assert len(features) == 3
-
-
-def test_cannot_update_system_role_features(rbac_db):
-    """Test that system roles cannot be modified"""
-    service = RBACService(rbac_db)
-
-    with pytest.raises(ValueError, match="Cannot modify features of system roles"):
-        service.update_role_features("role_admin", ["feat_test_gen"])
-
-
 @pytest.mark.skipif(IN_CI, reason="Seed data adds extra roles beyond test expectations")
 def test_list_roles(rbac_db):
     """Test listing roles"""

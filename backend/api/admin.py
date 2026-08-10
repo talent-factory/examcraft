@@ -9,13 +9,13 @@ from sqlalchemy import or_
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 import logging
-import json
 
 from database import get_db
 from models.auth import User, Role, Institution, UserStatus
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_superuser, get_current_user
 from services.audit_service import AuditService
+from utils.permissions import KNOWN_PERMISSIONS, parse_role_permissions
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
@@ -77,6 +77,34 @@ class RoleResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PermissionResponse(BaseModel):
+    """Permission response for GET /api/admin/permissions"""
+
+    key: str
+    label: str
+    category: str
+
+    class Config:
+        from_attributes = True
+
+
+class CreateRoleRequest(BaseModel):
+    """Request-Body zum Erstellen einer neuen Rolle (TF-603)."""
+
+    name: str = Field(..., min_length=1, max_length=50, pattern="^[a-z0-9_-]+$")
+    display_name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = None
+    permissions: List[str] = Field(default_factory=list)
+
+
+class UpdateRoleRequest(BaseModel):
+    """Request-Body zum Bearbeiten einer Rolle (TF-603)."""
+
+    display_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = None
+    permissions: Optional[List[str]] = None
 
 
 class InstitutionResponse(BaseModel):
@@ -325,14 +353,8 @@ async def get_user(
     # Build role responses with parsed permissions
     role_responses = []
     for role in user.roles:
-        permissions = role.permissions
-        if isinstance(permissions, str):
-            try:
-                permissions = json.loads(permissions)
-            except json.JSONDecodeError:
-                permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
+        # Parse permissions using consistent logic with User.has_permission()
+        permissions = parse_role_permissions(role.permissions)
 
         role_responses.append(
             RoleResponse(
@@ -434,14 +456,8 @@ async def update_user(
     # Build role responses
     role_responses = []
     for role in user.roles:
-        permissions = role.permissions
-        if isinstance(permissions, str):
-            try:
-                permissions = json.loads(permissions)
-            except json.JSONDecodeError:
-                permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
+        # Parse permissions using consistent logic with User.has_permission()
+        permissions = parse_role_permissions(role.permissions)
 
         role_responses.append(
             RoleResponse(
@@ -523,22 +539,13 @@ async def update_user_status(
     # Build role responses
     role_responses = []
     for role in user.roles:
-        permissions = role.permissions
-        if isinstance(permissions, str):
-            try:
-                permissions = json.loads(permissions)
-            except json.JSONDecodeError:
-                permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
-
         role_responses.append(
             RoleResponse(
                 id=role.id,
                 name=role.name,
                 display_name=role.display_name,
                 description=role.description,
-                permissions=permissions,
+                permissions=parse_role_permissions(role.permissions),
                 is_system_role=role.is_system_role,
                 created_at=role.created_at.isoformat(),
             )
@@ -620,22 +627,13 @@ async def assign_role_to_user(
     # Build role responses
     role_responses = []
     for r in user.roles:
-        permissions = r.permissions
-        if isinstance(permissions, str):
-            try:
-                permissions = json.loads(permissions)
-            except json.JSONDecodeError:
-                permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
-
         role_responses.append(
             RoleResponse(
                 id=r.id,
                 name=r.name,
                 display_name=r.display_name,
                 description=r.description,
-                permissions=permissions,
+                permissions=parse_role_permissions(r.permissions),
                 is_system_role=r.is_system_role,
                 created_at=r.created_at.isoformat(),
             )
@@ -724,22 +722,13 @@ async def remove_role_from_user(
     # Build role responses
     role_responses = []
     for r in user.roles:
-        permissions = r.permissions
-        if isinstance(permissions, str):
-            try:
-                permissions = json.loads(permissions)
-            except json.JSONDecodeError:
-                permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
-
         role_responses.append(
             RoleResponse(
                 id=r.id,
                 name=r.name,
                 display_name=r.display_name,
                 description=r.description,
-                permissions=permissions,
+                permissions=parse_role_permissions(r.permissions),
                 is_system_role=r.is_system_role,
                 created_at=r.created_at.isoformat(),
             )
@@ -761,6 +750,43 @@ async def remove_role_from_user(
     )
 
 
+@router.get("/permissions", response_model=List[PermissionResponse])
+async def list_permissions(
+    current_user: User = Depends(get_current_superuser),
+    db: Session = Depends(get_db),
+):
+    """
+    GET /api/admin/permissions
+
+    Returns all known permissions with their labels and categories.
+    Requires superuser role.
+
+    Response: List[PermissionResponse] with {key, label, category}
+    """
+    permissions = [
+        PermissionResponse(
+            key=key,
+            label=data["label"],
+            category=data["category"],
+        )
+        for key, data in KNOWN_PERMISSIONS.items()
+    ]
+    return permissions
+
+
+def _validate_known_permissions(permissions: List[str], locale: str = "de") -> None:
+    unknown = set(permissions) - set(KNOWN_PERMISSIONS.keys())
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=t(
+                "admin_unknown_permissions",
+                locale=locale,
+                permissions=", ".join(sorted(unknown)),
+            ),
+        )
+
+
 @router.get("/roles", response_model=List[RoleResponse])
 async def list_roles(
     current_user: User = Depends(get_current_superuser),
@@ -776,14 +802,8 @@ async def list_roles(
 
     role_responses = []
     for role in roles:
-        permissions = role.permissions
-        if isinstance(permissions, str):
-            try:
-                permissions = json.loads(permissions)
-            except json.JSONDecodeError:
-                permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
+        # Parse permissions using consistent logic with User.has_permission()
+        permissions = parse_role_permissions(role.permissions)
 
         role_responses.append(
             RoleResponse(
@@ -798,6 +818,163 @@ async def list_roles(
         )
 
     return role_responses
+
+
+@router.post("/roles", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
+async def create_role(
+    role_data: CreateRoleRequest,
+    request: Request,
+    current_user: User = Depends(get_current_superuser),
+    db: Session = Depends(get_db),
+):
+    """Erstellt eine neue Rolle (Superuser only). Siehe TF-603 Design-Doc."""
+    locale = get_request_locale(request, current_user)
+    _validate_known_permissions(role_data.permissions, locale)
+
+    existing = db.query(Role).filter(Role.name == role_data.name).first()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=t("admin_role_already_exists", locale=locale, name=role_data.name),
+        )
+
+    role = Role(
+        name=role_data.name,
+        display_name=role_data.display_name,
+        description=role_data.description,
+        permissions=role_data.permissions,
+        is_system_role=False,
+    )
+    db.add(role)
+    db.commit()
+    db.refresh(role)
+
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_CREATE_ROLE,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_ROLE,
+        resource_id=role.id,
+        additional_data={
+            "name": role.name,
+            "permission_count": len(role_data.permissions or []),
+        },
+    )
+
+    return RoleResponse(
+        id=role.id,
+        name=role.name,
+        display_name=role.display_name,
+        description=role.description,
+        permissions=role_data.permissions,
+        is_system_role=role.is_system_role,
+        created_at=role.created_at.isoformat(),
+    )
+
+
+@router.patch("/roles/{role_id}", response_model=RoleResponse)
+async def update_role(
+    role_id: int,
+    role_data: UpdateRoleRequest,
+    request: Request,
+    current_user: User = Depends(get_current_superuser),
+    db: Session = Depends(get_db),
+):
+    """Bearbeitet eine existierende Rolle (Superuser only). Siehe TF-603 Design-Doc."""
+    locale = get_request_locale(request, current_user)
+    role = db.query(Role).filter(Role.id == role_id).first()
+
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("admin_role_not_found", locale=locale),
+        )
+
+    if role_data.permissions is not None:
+        _validate_known_permissions(role_data.permissions, locale)
+        role.permissions = role_data.permissions
+
+    if role_data.display_name is not None:
+        role.display_name = role_data.display_name
+
+    if role_data.description is not None:
+        role.description = role_data.description
+
+    db.commit()
+    db.refresh(role)
+
+    # Parse permissions using consistent logic with other endpoints
+    permissions = parse_role_permissions(role.permissions)
+
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_UPDATE_ROLE,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_ROLE,
+        resource_id=role.id,
+        additional_data={
+            "role_id": role.id,
+            "name": role.name,
+            # Vollständige Permission-Liste NACH dem Update, nicht nur die
+            # Tatsache einer Änderung — sicherheitsrelevant, da eine globale
+            # Rolle wie "admin" plattformweit wirkt (TF-603 Review Finding 2).
+            "permissions": permissions,
+        },
+    )
+
+    return RoleResponse(
+        id=role.id,
+        name=role.name,
+        display_name=role.display_name,
+        description=role.description,
+        permissions=permissions,
+        is_system_role=role.is_system_role,
+        created_at=role.created_at.isoformat(),
+    )
+
+
+@router.delete("/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_role(
+    role_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_superuser),
+    db: Session = Depends(get_db),
+):
+    """Löscht eine Rolle (Superuser only). 409 bei Systemrolle oder falls noch
+    mindestens ein Benutzer zugewiesen ist."""
+    locale = get_request_locale(request, current_user)
+    role = db.query(Role).filter(Role.id == role_id).first()
+    if not role:
+        raise HTTPException(
+            status_code=404, detail=t("admin_role_not_found", locale=locale)
+        )
+    if role.is_system_role:
+        raise HTTPException(
+            status_code=409, detail=t("admin_role_is_system", locale=locale)
+        )
+    if role.users:
+        raise HTTPException(
+            status_code=409,
+            detail=t("admin_role_has_users", locale=locale, count=len(role.users)),
+        )
+
+    # Attribute vor dem Delete/Commit einfangen: SQLAlchemy expired die
+    # Instanz standardmässig nach dem Commit, ein Zugriff auf role.name
+    # danach würde einen Refresh der bereits gelöschten Zeile auslösen.
+    role_name = role.name
+    was_system_role = role.is_system_role
+
+    db.delete(role)
+    db.commit()
+
+    AuditService.log_event_best_effort(
+        db=db,
+        action=AuditService.ACTION_DELETE_ROLE,
+        user_id=current_user.id,
+        resource_type=AuditService.RESOURCE_ROLE,
+        resource_id=role_id,
+        additional_data={"name": role_name, "was_system_role": was_system_role},
+    )
 
 
 @router.get("/institutions", response_model=List[InstitutionResponse])
@@ -1220,22 +1397,13 @@ async def transfer_user_to_institution(
 
     role_responses = []
     for role in user.roles:
-        permissions = role.permissions
-        if isinstance(permissions, str):
-            try:
-                permissions = json.loads(permissions)
-            except json.JSONDecodeError:
-                permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
-
         role_responses.append(
             RoleResponse(
                 id=role.id,
                 name=role.name,
                 display_name=role.display_name,
                 description=role.description,
-                permissions=permissions,
+                permissions=parse_role_permissions(role.permissions),
                 is_system_role=role.is_system_role,
                 created_at=role.created_at.isoformat(),
             )

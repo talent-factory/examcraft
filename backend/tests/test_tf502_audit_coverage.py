@@ -30,9 +30,7 @@ from database import get_db
 from main import app
 from models.auth import AuditLog, Institution, Role, User, UserStatus
 from models.grading_scheme import GradingScheme
-from models.rbac import RBACRole
 from services.audit_service import AuditService
-from services.rbac_service import RBACService
 from utils.auth_utils import get_current_active_user, get_current_user
 
 
@@ -118,19 +116,6 @@ def _scheme(db: Session, institution_id: int, name: str = "Skala") -> GradingSch
     db.add(scheme)
     db.flush()
     return scheme
-
-
-def _rbac_role(db: Session, name: str, actor_id: int) -> RBACRole:
-    """Seeds a custom RBACRole directly via the service (mirrors how
-    create_role itself persists one) so update_role_features has a target
-    without depending on the create_role endpoint under test."""
-    return RBACService(db).create_custom_role(
-        name=name,
-        display_name=f"Role {name}",
-        description=None,
-        feature_ids=[],
-        created_by=actor_id,
-    )
 
 
 def _audit(db: Session, action: str) -> list[AuditLog]:
@@ -384,53 +369,88 @@ def test_admin_remove_role_from_user_is_audited(test_db: Session) -> None:
 
 
 # ---------------------------------------------------------------------------
-# RBAC custom roles (api/v1/rbac.py)
+# Admin roles (api/admin.py, TF-603)
 # ---------------------------------------------------------------------------
 
 
-def test_rbac_create_role_is_audited(test_db: Session) -> None:
+def test_admin_create_role_is_audited(test_db: Session) -> None:
     inst = _institution(test_db)
     actor = _actor(test_db, inst.id)
     test_db.commit()
 
     resp = _client(test_db, actor).post(
-        "/api/v1/rbac/roles",
+        "/api/admin/roles",
         json={
             "name": "tf502_custom_role",
             "display_name": "TF502 Custom Role",
-            "feature_ids": [],
+            "permissions": [],
         },
     )
     assert resp.status_code == 201, resp.text
+    role_id = resp.json()["id"]
 
     rows = _audit(test_db, "create_role")
     assert len(rows) == 1
     assert rows[0].user_id == actor.id
     assert rows[0].resource_type == "role"
-    assert rows[0].resource_id == "role_tf502_custom_role"
+    assert rows[0].resource_id == str(role_id)
     data = _data(rows[0])
     assert data["name"] == "tf502_custom_role"
-    assert data["feature_count"] == 0
+    assert data["permission_count"] == 0
 
 
-def test_rbac_update_role_features_is_audited(test_db: Session) -> None:
+def test_admin_update_role_is_audited(test_db: Session) -> None:
     inst = _institution(test_db)
     actor = _actor(test_db, inst.id)
-    role = _rbac_role(test_db, "tf502_update_target", actor.id)
+    role = Role(
+        name="tf502_update_target",
+        display_name="TF502 Update Target",
+        permissions=["manage_org_units"],
+        is_system_role=False,
+    )
+    test_db.add(role)
     test_db.commit()
+    test_db.refresh(role)
 
-    resp = _client(test_db, actor).put(
-        f"/api/v1/rbac/roles/{role.id}/features",
-        json={"feature_ids": []},
+    resp = _client(test_db, actor).patch(
+        f"/api/admin/roles/{role.id}",
+        json={"permissions": ["manage_org_units", "manage_settings"]},
     )
     assert resp.status_code == 200, resp.text
 
     rows = _audit(test_db, "update_role")
     assert len(rows) == 1
-    assert rows[0].resource_id == role.id
+    assert rows[0].resource_id == str(role.id)
     data = _data(rows[0])
     assert data["role_id"] == role.id
-    assert data["feature_count"] == 0
+    assert data["name"] == "tf502_update_target"
+
+
+def test_admin_delete_role_is_audited(test_db: Session) -> None:
+    inst = _institution(test_db)
+    actor = _actor(test_db, inst.id)
+    role = Role(
+        name="tf502_delete_target",
+        display_name="TF502 Delete Target",
+        permissions=["manage_org_units"],
+        is_system_role=False,
+    )
+    test_db.add(role)
+    test_db.commit()
+    test_db.refresh(role)
+    role_id = role.id
+
+    resp = _client(test_db, actor).delete(f"/api/admin/roles/{role_id}")
+    assert resp.status_code == 204, resp.text
+
+    rows = _audit(test_db, "delete_role")
+    assert len(rows) == 1
+    assert rows[0].user_id == actor.id
+    assert rows[0].resource_type == "role"
+    assert rows[0].resource_id == str(role_id)
+    data = _data(rows[0])
+    assert data["name"] == "tf502_delete_target"
+    assert data["was_system_role"] is False
 
 
 # ---------------------------------------------------------------------------

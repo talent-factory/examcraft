@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UserManagementPage } from '../components/admin/UserManagementPage';
 import { InstitutionManagementPage } from '../components/admin/InstitutionManagementPage';
-import RoleManagementPage from '../components/admin/RoleManagementPage';
+import AdminRoles from './AdminRoles';
 import SubscriptionTierOverview from '../components/admin/SubscriptionTierOverview';
 import HelpFeedbackQueue from '../components/admin/HelpFeedbackQueue';
 import TagSettingsPage from './TagSettingsPage';
@@ -90,7 +90,7 @@ export const Admin: React.FC = () => {
         )}
         {effectiveTab === 'roles' && (
           <div data-testid="admin-tab-content-roles">
-            <RoleManagementPage />
+            <AdminRoles />
           </div>
         )}
         {effectiveTab === 'audit' && (
