@@ -30,6 +30,10 @@ jest.mock('../CompetencyFrameworkSettingsPage', () => ({
   __esModule: true,
   default: () => <div data-testid="competency-frameworks-settings" />,
 }));
+jest.mock('../AdminOrgUnits', () => ({
+  __esModule: true,
+  default: () => <div data-testid="org-units-management" />,
+}));
 jest.mock('../../components/admin/AuditLogView', () => ({
   __esModule: true,
   default: () => <div data-testid="audit-log-view" />,
@@ -144,6 +148,30 @@ describe('Admin Page', () => {
 
       expect(screen.getByTestId('admin-tab-content-competency-frameworks')).toBeInTheDocument();
       expect(screen.getByTestId('competency-frameworks-settings')).toBeInTheDocument();
+    });
+
+    it('shows and switches to Organisationseinheiten tab when permitted', () => {
+      mockHasRole.mockReturnValue(true);
+      mockHasPermission.mockImplementation(
+        (permission: string) => permission === 'manage_org_units',
+      );
+
+      render(<Admin />);
+
+      expect(screen.getByText('Organisationseinheiten')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Organisationseinheiten'));
+
+      expect(screen.getByTestId('admin-tab-content-org-units')).toBeInTheDocument();
+      expect(screen.getByTestId('org-units-management')).toBeInTheDocument();
+    });
+
+    it('hides Organisationseinheiten tab without the permission', () => {
+      mockHasRole.mockReturnValue(true);
+      mockHasPermission.mockReturnValue(false);
+
+      render(<Admin />);
+
+      expect(screen.queryByText('Organisationseinheiten')).not.toBeInTheDocument();
     });
   });
 

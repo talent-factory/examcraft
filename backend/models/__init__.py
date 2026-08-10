@@ -50,6 +50,7 @@ from models.tag_merge_log import TagMergeLog
 from models.competency import CompetencyFramework, Competency
 from models.grading_scheme import GradingScheme
 from models.student import Student, StudentClass, StudentClassMembership
+from models.org_unit import OrgUnit, UserOrgUnit
 from models.submission import (
     Submission,
     Attempt,
@@ -109,6 +110,9 @@ __all__ = [
     "Student",
     "StudentClass",
     "StudentClassMembership",
+    # Org-Unit-Hierarchie (Abteilung/Team)
+    "OrgUnit",
+    "UserOrgUnit",
     # Submissions / grades / import
     "Submission",
     "Attempt",

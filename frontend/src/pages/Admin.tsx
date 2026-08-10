@@ -15,9 +15,10 @@ import CompetencyFrameworkSettingsPage from './CompetencyFrameworkSettingsPage';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/auth';
 import AdminGradingSchemes from './AdminGradingSchemes';
+import AdminOrgUnits from './AdminOrgUnits';
 import AuditLogView from '../components/admin/AuditLogView';
 
-type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'competency-frameworks' | 'grading-schemes';
+type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'competency-frameworks' | 'grading-schemes' | 'org-units';
 
 interface TabConfig {
   key: AdminTab;
@@ -31,6 +32,7 @@ export const Admin: React.FC = () => {
   const isSuperuser = user?.is_superuser ?? false;
   const isAdmin = isSuperuser || hasRole(UserRole.ADMIN);
   const canManageGradingSchemes = hasPermission('grading_schemes:manage');
+  const canManageOrgUnits = hasPermission('manage_org_units');
 
   const tabs: TabConfig[] = [
     { key: 'users', label: t('pages.admin.tabUsers'), visible: true },
@@ -41,6 +43,7 @@ export const Admin: React.FC = () => {
     { key: 'tags', label: t('nav.sidebar.tagSettings', 'Tag-Verwaltung'), visible: isAdmin },
     { key: 'competency-frameworks', label: t('nav.sidebar.competencyFrameworks', 'Kompetenzrahmen'), visible: isAdmin },
     { key: 'grading-schemes', label: t('pages.admin.tabGradingSchemes'), visible: canManageGradingSchemes },
+    { key: 'org-units', label: t('pages.admin.tabOrgUnits'), visible: canManageOrgUnits },
     { key: 'help-feedback', label: 'Help Feedback', visible: isSuperuser },
   ].filter((t): t is TabConfig => t.visible);
 
@@ -113,6 +116,11 @@ export const Admin: React.FC = () => {
         {effectiveTab === 'grading-schemes' && (
           <div data-testid="admin-tab-content-grading-schemes">
             <AdminGradingSchemes />
+          </div>
+        )}
+        {effectiveTab === 'org-units' && (
+          <div data-testid="admin-tab-content-org-units">
+            <AdminOrgUnits />
           </div>
         )}
         {effectiveTab === 'help-feedback' && (

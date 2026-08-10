@@ -91,6 +91,10 @@ def seed_default_roles(db: Session):
                 # sowie Moodle-Web-Service-Verbindungen.
                 "students:manage",
                 "moodle:configure",
+                # Org-Unit-Hierarchie Stufe 0: Admin verwaltet die
+                # institutionsinterne Abteilungs-/Team-Hierarchie (CRUD +
+                # Mitgliedschaften).
+                "manage_org_units",
             ],
             "is_system_role": True,
         },

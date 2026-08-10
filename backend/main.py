@@ -303,6 +303,14 @@ async def lifespan(app: FastAPI):
     student_classes_api = importlib.util.module_from_spec(spec_student_classes)
     spec_student_classes.loader.exec_module(student_classes_api)
 
+    # Org-Unit-Hierarchie (Abteilung/Team) — Stufe 0 Fundament.
+    spec_org_units = importlib.util.spec_from_file_location(
+        "core_api_org_units",
+        os.path.join(core_api_path, "org_units.py"),
+    )
+    org_units_api = importlib.util.module_from_spec(spec_org_units)
+    spec_org_units.loader.exec_module(org_units_api)
+
     # TF-336: Studi-Verlauf-Endpoints.
     spec_students = importlib.util.spec_from_file_location(
         "core_api_students",
@@ -469,6 +477,7 @@ async def lifespan(app: FastAPI):
     app.include_router(submissions_api.router)
     app.include_router(submissions_api.exams_alias_router)
     app.include_router(student_classes_api.router)
+    app.include_router(org_units_api.router)
     app.include_router(students_api.router)
     app.include_router(moodle_connections_api.router)
     app.include_router(moodle_roundtrip_api.router)

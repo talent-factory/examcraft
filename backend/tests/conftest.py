@@ -49,6 +49,7 @@ import models.question_generation_job  # noqa: F401
 import models.tag  # noqa: F401
 import models.tag_merge_log  # noqa: F401
 import models.competency  # noqa: F401
+import models.org_unit  # noqa: F401
 
 # Skip test files that need major fixture updates for current DB schema
 collect_ignore_glob = [

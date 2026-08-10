@@ -187,6 +187,9 @@ class Institution(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    org_units = relationship(
+        "OrgUnit", back_populates="institution", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Institution(id={self.id}, name='{self.name}', slug='{self.slug}')>"
@@ -382,6 +385,9 @@ class User(Base):
     )
     oauth_accounts = relationship(
         "OAuthAccount", back_populates="user", cascade="all, delete-orphan"
+    )
+    org_unit_memberships = relationship(
+        "UserOrgUnit", back_populates="user", cascade="all, delete-orphan"
     )
 
     # Table constraints
