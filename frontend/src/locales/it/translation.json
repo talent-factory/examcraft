@@ -296,6 +296,7 @@
       "never": "Mai",
       "btnEdit": "Modifica",
       "btnRoles": "Ruoli",
+      "btnOrgUnits": "Unità org.",
       "btnDeactivate": "Disattiva",
       "btnActivate": "Attiva",
       "paginationPrevious": "Precedente",
@@ -336,6 +337,7 @@
       "students": "Studenti pseudonimizzati",
       "classes": "Classi",
       "submissions": "Consegne / Tentativi",
+      "orgUnitMembershipsWarning": "{{count}} appartenenza/e a unità organizzative verranno rimosse (specifiche dell'istituzione, senza equivalente nell'istituzione di destinazione).",
       "confirmTitle": "Conferma trasferimento",
       "confirmIntro": "Stai per spostare {{user}} da {{source}} → {{target}}.",
       "confirmTransferred": "Da trasferire:",
@@ -484,6 +486,21 @@
       "failedLoad": "Impossibile caricare i dati",
       "failedAssign": "Impossibile assegnare il ruolo",
       "failedRemove": "Impossibile rimuovere il ruolo"
+    },
+    "orgUnitAssignment": {
+      "title": "Gestisci unità organizzative",
+      "currentOrgUnits": "Unità organizzative attuali",
+      "availableOrgUnits": "Unità organizzative disponibili",
+      "btnRemove": "Rimuovi",
+      "btnAssign": "Assegna",
+      "noOrgUnits": "Non assegnato ad alcuna unità organizzativa",
+      "allOrgUnitsAssigned": "Assegnato a tutte le unità organizzative",
+      "rolePlaceholder": "es. Responsabile",
+      "close": "Chiudi",
+      "failedLoad": "Impossibile caricare i dati",
+      "failedAssign": "Impossibile assegnare",
+      "failedRemove": "Impossibile rimuovere",
+      "crossInstitutionNotice": "Le unità organizzative possono essere assegnate solo all'interno della propria istituzione."
     },
     "subscriptionTier": {
       "title": "Livelli di abbonamento",

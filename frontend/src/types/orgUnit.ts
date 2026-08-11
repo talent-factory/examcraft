@@ -23,3 +23,11 @@ export interface OrgUnitUpdate {
   parent_org_unit_id?: number | null;
   move_to_root?: boolean;
 }
+
+export interface OrgUnitMember {
+  org_unit_id: number;
+  name: string;
+  unit_type: string;
+  parent_org_unit_id: number | null;
+  role: string | null;
+}

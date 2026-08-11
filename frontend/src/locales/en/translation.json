@@ -723,6 +723,7 @@
       "never": "Never",
       "btnEdit": "Edit",
       "btnRoles": "Roles",
+      "btnOrgUnits": "Org Units",
       "btnDeactivate": "Deactivate",
       "btnActivate": "Activate",
       "paginationPrevious": "Previous",
@@ -763,6 +764,7 @@
       "students": "Pseudonymous students",
       "classes": "Classes",
       "submissions": "Submissions / Attempts",
+      "orgUnitMembershipsWarning": "{{count}} org-unit membership(s) will be removed (institution-scoped, no equivalent in the target institution).",
       "confirmTitle": "Confirm transfer",
       "confirmIntro": "You are about to move {{user}} from {{source}} → {{target}}.",
       "confirmTransferred": "To transfer:",
@@ -911,6 +913,21 @@
       "failedLoad": "Failed to load data",
       "failedAssign": "Failed to assign role",
       "failedRemove": "Failed to remove role"
+    },
+    "orgUnitAssignment": {
+      "title": "Manage Organizational Units",
+      "currentOrgUnits": "Current Organizational Units",
+      "availableOrgUnits": "Available Organizational Units",
+      "btnRemove": "Remove",
+      "btnAssign": "Assign",
+      "noOrgUnits": "Not assigned to any organizational unit",
+      "allOrgUnitsAssigned": "Assigned to all organizational units",
+      "rolePlaceholder": "e.g. Team Lead",
+      "close": "Close",
+      "failedLoad": "Failed to load data",
+      "failedAssign": "Failed to assign",
+      "failedRemove": "Failed to remove",
+      "crossInstitutionNotice": "Org units can only be assigned within your own institution."
     },
     "subscriptionTier": {
       "title": "Subscription Tiers",

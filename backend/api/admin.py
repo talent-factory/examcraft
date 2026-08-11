@@ -59,6 +59,36 @@ def _require_write_access(
     )
 
 
+def _build_org_unit_responses(user: User) -> List["OrgUnitMembershipOut"]:
+    """Build list of org_unit memberships for a user (TF-602).
+
+    Filters to memberships whose OrgUnit still belongs to the user's
+    *current* institution. This is defense-in-depth, not the primary
+    guard: institution transfer (user_institution_transfer_service.py)
+    now clears org_unit_memberships unconditionally, so this should
+    normally have nothing to filter. It stays here anyway to fail safe
+    against any future code path that changes `institution_id` without
+    going through that service, and against a foreign-institution
+    OrgUnit's name/hierarchy otherwise leaking to admins who have no
+    business seeing it (review fix, TF-602).
+    """
+    result = []
+    for membership in user.org_unit_memberships:
+        org_unit = membership.org_unit
+        if org_unit is None or org_unit.institution_id != user.institution_id:
+            continue
+        result.append(
+            OrgUnitMembershipOut(
+                org_unit_id=org_unit.id,
+                name=org_unit.name,
+                unit_type=org_unit.unit_type,
+                parent_org_unit_id=org_unit.parent_org_unit_id,
+                role=membership.role,
+            )
+        )
+    return result
+
+
 def _require_admin_or_superuser(current_user: User, locale: str = "de") -> None:
     """Raise 403 unless the user is a superuser or an institution admin.
 
@@ -164,6 +194,19 @@ class UserListItem(BaseModel):
         from_attributes = True
 
 
+class OrgUnitMembershipOut(BaseModel):
+    """OrgUnit membership for user detail response (TF-602)."""
+
+    org_unit_id: int
+    name: str
+    unit_type: str
+    parent_org_unit_id: Optional[int]
+    role: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
 class UserDetailResponse(BaseModel):
     """User detail response"""
 
@@ -174,6 +217,7 @@ class UserDetailResponse(BaseModel):
     institution_id: int
     institution_name: str
     roles: List[RoleResponse]
+    org_units: List[OrgUnitMembershipOut]
     status: str
     is_superuser: bool
     last_login_at: Optional[str]
@@ -245,11 +289,15 @@ class TransferPreviewResponse(BaseModel):
     target_institution_name: str
     transferable: TransferPreviewCountsModel
     excluded: TransferExcludedCountsModel
+    # Org-unit memberships that will be cleared (not moved, not "excluded" —
+    # they have no equivalent in the target institution). TF-602 review fix.
+    org_unit_memberships: int
 
 
 class TransferUserResponse(BaseModel):
     user: UserDetailResponse
     transferred: TransferPreviewCountsModel
+    org_unit_memberships_cleared: int
 
 
 # ============================================================================
@@ -394,6 +442,7 @@ async def get_user(
         institution_id=user.institution_id,
         institution_name=user.institution.name if user.institution else "N/A",
         roles=role_responses,
+        org_units=_build_org_unit_responses(user),
         status=user.status,
         is_superuser=user.is_superuser,
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
@@ -497,6 +546,7 @@ async def update_user(
         institution_id=user.institution_id,
         institution_name=user.institution.name if user.institution else "N/A",
         roles=role_responses,
+        org_units=_build_org_unit_responses(user),
         status=user.status,
         is_superuser=user.is_superuser,
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
@@ -577,6 +627,7 @@ async def update_user_status(
         institution_id=user.institution_id,
         institution_name=user.institution.name if user.institution else "N/A",
         roles=role_responses,
+        org_units=_build_org_unit_responses(user),
         status=user.status,
         is_superuser=user.is_superuser,
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
@@ -665,6 +716,7 @@ async def assign_role_to_user(
         institution_id=user.institution_id,
         institution_name=user.institution.name if user.institution else "N/A",
         roles=role_responses,
+        org_units=_build_org_unit_responses(user),
         status=user.status,
         is_superuser=user.is_superuser,
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
@@ -760,6 +812,7 @@ async def remove_role_from_user(
         institution_id=user.institution_id,
         institution_name=user.institution.name if user.institution else "N/A",
         roles=role_responses,
+        org_units=_build_org_unit_responses(user),
         status=user.status,
         is_superuser=user.is_superuser,
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
@@ -1344,6 +1397,7 @@ async def preview_user_transfer(
             classes=preview.excluded.classes,
             submissions=preview.excluded.submissions,
         ),
+        org_unit_memberships=preview.org_unit_memberships,
     )
 
 
@@ -1442,6 +1496,7 @@ async def transfer_user_to_institution(
             institution_id=user.institution_id,
             institution_name=user.institution.name if user.institution else "N/A",
             roles=role_responses,
+            org_units=_build_org_unit_responses(user),
             status=user.status,
             is_superuser=user.is_superuser,
             last_login_at=user.last_login_at.isoformat()
@@ -1456,4 +1511,5 @@ async def transfer_user_to_institution(
             questions=stats.questions,
             tags=stats.tags,
         ),
+        org_unit_memberships_cleared=stats.org_unit_memberships_cleared,
     )

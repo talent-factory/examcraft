@@ -331,6 +331,14 @@ const StepSelect: React.FC<StepSelectProps> = ({
                   </li>
                 </ul>
               </div>
+
+              {preview.org_unit_memberships > 0 && (
+                <p className="text-sm text-amber-600" data-testid="itd-org-units-warning">
+                  {t('admin.institutionTransfer.orgUnitMembershipsWarning', {
+                    count: preview.org_unit_memberships,
+                  })}
+                </p>
+              )}
             </>
           )}
 
@@ -431,6 +439,13 @@ const StepConfirm: React.FC<StepConfirmProps> = ({
                   .join(', ')}
               </p>
             </div>
+          )}
+          {preview.org_unit_memberships > 0 && (
+            <p className="text-amber-600" data-testid="itd-confirm-org-units-warning">
+              {t('admin.institutionTransfer.orgUnitMembershipsWarning', {
+                count: preview.org_unit_memberships,
+              })}
+            </p>
           )}
           <p className="text-amber-600 font-medium">
             {t('admin.institutionTransfer.confirmIrreversible')}

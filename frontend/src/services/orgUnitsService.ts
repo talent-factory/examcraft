@@ -33,4 +33,16 @@ export class OrgUnitsService {
   static async remove(orgUnitId: number): Promise<void> {
     return deleteVoid(`${ROOT}/${orgUnitId}`);
   }
+
+  static async addMember(
+    orgUnitId: number,
+    userId: number,
+    role?: string | null,
+  ): Promise<{ user_id: number; org_unit_id: number }> {
+    return postJson(`${ROOT}/${orgUnitId}/members`, { user_id: userId, role: role ?? null });
+  }
+
+  static async removeMember(orgUnitId: number, userId: number): Promise<void> {
+    return deleteVoid(`${ROOT}/${orgUnitId}/members/${userId}`);
+  }
 }

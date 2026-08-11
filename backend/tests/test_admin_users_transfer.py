@@ -36,10 +36,12 @@ def test_transfer_response_model_serializes():
             documents=3, exams=1, questions=2, tags=0
         ),
         excluded=TransferExcludedCountsModel(students=10, classes=2, submissions=50),
+        org_unit_memberships=5,
     )
     data = resp.model_dump()
     assert data["transferable"]["documents"] == 3
     assert data["excluded"]["submissions"] == 50
+    assert data["org_unit_memberships"] == 5
 
 
 # ============================================================================
@@ -284,6 +286,53 @@ def test_transfer_endpoint_happy_path(
     test_db.refresh(doc)
     assert doc.institution_id == target_institution.id
     assert doc.pending_reindex is True
+
+
+def test_transfer_endpoint_clears_org_unit_memberships(
+    client_superuser,
+    test_db,
+    test_institution,
+    target_institution,
+    user_in_source,
+):
+    """Org-unit memberships are cleared on transfer (TF-602 review fix).
+
+    UserOrgUnit rows have no equivalent in the target institution's org-unit
+    hierarchy, so they must not survive the move — otherwise they leak the
+    source institution's org-unit names to the target institution's admins
+    and become permanently unremovable through the admin UI (see the
+    module docstring on user_institution_transfer_service.py).
+    """
+    from models.org_unit import OrgUnit, UserOrgUnit
+
+    org_unit = OrgUnit(
+        institution_id=test_institution.id,
+        parent_org_unit_id=None,
+        unit_type="abteilung",
+        name="Informatik",
+    )
+    test_db.add(org_unit)
+    test_db.flush()
+    test_db.add(
+        UserOrgUnit(user_id=user_in_source.id, org_unit_id=org_unit.id, role="Mitglied")
+    )
+    test_db.commit()
+
+    r = client_superuser.post(
+        f"/api/admin/users/{user_in_source.id}/transfer",
+        json={"target_institution_id": target_institution.id},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["org_unit_memberships_cleared"] == 1
+    assert body["user"]["org_units"] == []
+
+    remaining = (
+        test_db.query(UserOrgUnit)
+        .filter(UserOrgUnit.user_id == user_in_source.id)
+        .count()
+    )
+    assert remaining == 0
 
 
 def test_transfer_endpoint_dispatches_reindex(

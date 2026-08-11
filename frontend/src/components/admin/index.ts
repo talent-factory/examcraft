@@ -7,6 +7,7 @@
 export { UserList } from './UserList';
 export { UserEditDialog } from './UserEditDialog';
 export { RoleAssignmentDialog } from './RoleAssignmentDialog';
+export { OrgUnitAssignmentDialog } from './OrgUnitAssignmentDialog';
 export { UserManagementPage } from './UserManagementPage';
 
 // Institution Management

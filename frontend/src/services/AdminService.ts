@@ -4,6 +4,7 @@
  */
 
 import { Role, Institution, UserStatus } from '../types/auth';
+import { OrgUnitMember } from '../types/orgUnit';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -38,6 +39,7 @@ export interface UserDetailResponse {
   institution_id: number;
   institution_name: string;
   roles: Role[];
+  org_units: OrgUnitMember[];
   status: string;
   is_superuser: boolean;
   last_login_at?: string;
@@ -96,11 +98,15 @@ export interface TransferPreviewResponse {
   target_institution_name: string;
   transferable: TransferPreviewCounts;
   excluded: TransferExcludedCounts;
+  /** Org-unit memberships that will be cleared by the transfer (TF-602). */
+  org_unit_memberships: number;
 }
 
 export interface TransferUserResponse {
   user: UserDetailResponse;
   transferred: TransferPreviewCounts;
+  /** Org-unit memberships actually cleared by the transfer (TF-602). */
+  org_unit_memberships_cleared: number;
 }
 
 class AdminService {

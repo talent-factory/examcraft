@@ -723,6 +723,7 @@
       "never": "Nie",
       "btnEdit": "Bearbeiten",
       "btnRoles": "Rollen",
+      "btnOrgUnits": "Org-Units",
       "btnDeactivate": "Deaktivieren",
       "btnActivate": "Aktivieren",
       "paginationPrevious": "Zurück",
@@ -763,6 +764,7 @@
       "students": "Pseudonyme Studierende",
       "classes": "Klassen",
       "submissions": "Submissions / Attempts",
+      "orgUnitMembershipsWarning": "{{count}} Organisationseinheiten-Mitgliedschaft(en) werden dabei entfernt (institutsgebunden, keine Entsprechung in der Ziel-Institution).",
       "confirmTitle": "Transfer bestätigen",
       "confirmIntro": "Sie sind im Begriff, {{user}} von {{source}} → {{target}} zu verschieben.",
       "confirmTransferred": "Transferiert werden:",
@@ -911,6 +913,21 @@
       "failedLoad": "Daten konnten nicht geladen werden",
       "failedAssign": "Rolle konnte nicht zugewiesen werden",
       "failedRemove": "Rolle konnte nicht entfernt werden"
+    },
+    "orgUnitAssignment": {
+      "title": "Organisationseinheiten verwalten",
+      "currentOrgUnits": "Aktuelle Organisationseinheiten",
+      "availableOrgUnits": "Verfügbare Organisationseinheiten",
+      "btnRemove": "Entfernen",
+      "btnAssign": "Zuweisen",
+      "noOrgUnits": "Keiner Organisationseinheit zugewiesen",
+      "allOrgUnitsAssigned": "Allen Organisationseinheiten zugewiesen",
+      "rolePlaceholder": "z. B. Leiter",
+      "close": "Schliessen",
+      "failedLoad": "Daten konnten nicht geladen werden",
+      "failedAssign": "Zuweisung fehlgeschlagen",
+      "failedRemove": "Entfernen fehlgeschlagen",
+      "crossInstitutionNotice": "Org-Units können nur innerhalb der eigenen Institution zugewiesen werden."
     },
     "subscriptionTier": {
       "title": "Abonnement-Stufen",

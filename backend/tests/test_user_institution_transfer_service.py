@@ -62,10 +62,16 @@ def test_transfer_stats_dataclass():
     from services.user_institution_transfer_service import TransferStats
 
     stats = TransferStats(
-        documents=2, exams=1, questions=4, tags=0, document_ids=[1, 2]
+        documents=2,
+        exams=1,
+        questions=4,
+        tags=0,
+        org_unit_memberships_cleared=3,
+        document_ids=[1, 2],
     )
     assert stats.documents == 2
     assert stats.document_ids == [1, 2]
+    assert stats.org_unit_memberships_cleared == 3
 
 
 def test_preview_counts_and_excluded_counts():
@@ -80,6 +86,7 @@ def test_preview_counts_and_excluded_counts():
     tp = TransferPreview(
         transferable=p,
         excluded=e,
+        org_unit_memberships=5,
         source_institution_id=1,
         source_institution_name="S",
         target_institution_id=2,
@@ -87,6 +94,7 @@ def test_preview_counts_and_excluded_counts():
     )
     assert tp.transferable.documents == 3
     assert tp.excluded.submissions == 50
+    assert tp.org_unit_memberships == 5
 
 
 def test_transfer_error_carries_code_and_status():

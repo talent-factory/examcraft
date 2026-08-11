@@ -7,6 +7,19 @@ remain visible under the new institution scope.
 Out of scope: Students, StudentClasses, Submissions — these belong to
 the institution organizationally, not to the individual user/lecturer.
 Global tags (institution_id IS NULL) stay unchanged.
+
+Org-unit memberships (UserOrgUnit) are always cleared, unconditionally
+(TF-602 review fix): OrgUnits are themselves institution-scoped, so a
+membership pointing at a source-institution OrgUnit has no equivalent in
+the target institution and can never be legitimately "kept". Leaving it
+in place is actively harmful, not just stale — it leaks the source
+institution's org-unit names to the target institution's admins
+(_build_org_unit_responses has no institution filter) and renders an
+unremovable "Entfernen" row in the admin UI (the org-unit lookup behind
+DELETE /org-units/{id}/members/{user_id} is scoped to the *admin's*
+institution, so a foreign-institution membership 404s forever). Unlike
+documents/exams/questions/tags there is no flag for this — it is not a
+choice the admin makes per transfer.
 """
 
 from __future__ import annotations
@@ -20,6 +33,7 @@ from sqlalchemy import func
 from models.auth import Institution, User
 from models.document import Document
 from models.exam import Exam
+from models.org_unit import UserOrgUnit
 from models.question_review import QuestionReview
 from models.student import Student, StudentClass
 from models.submission import Attempt
@@ -156,6 +170,11 @@ class ExcludedCounts:
 class TransferPreview:
     transferable: PreviewCounts
     excluded: ExcludedCounts
+    # Org-unit memberships that will be cleared (not moved, not excluded —
+    # they have no equivalent in the target institution). Separate from
+    # `excluded` because that bucket means "stays untouched"; this one means
+    # "will be removed". See module docstring (TF-602).
+    org_unit_memberships: int
     source_institution_id: int
     source_institution_name: str
     target_institution_id: int
@@ -170,6 +189,7 @@ class TransferStats:
     exams: int
     questions: int
     tags: int
+    org_unit_memberships_cleared: int
     document_ids: list[int]
 
 
@@ -257,6 +277,11 @@ def preview_transfer(
         .filter(Attempt.institution_id == source_iid)
         .scalar()
     )
+    org_unit_memberships = (
+        db.query(func.count(UserOrgUnit.org_unit_id))
+        .filter(UserOrgUnit.user_id == user_id)
+        .scalar()
+    )
 
     return TransferPreview(
         transferable=PreviewCounts(
@@ -270,6 +295,7 @@ def preview_transfer(
             classes=int(classes or 0),
             submissions=int(submissions or 0),
         ),
+        org_unit_memberships=int(org_unit_memberships or 0),
         source_institution_id=source_iid,
         source_institution_name=source_name,
         target_institution_id=target_institution_id,
@@ -374,6 +400,17 @@ def transfer_user(
                 db, user_id, old_iid, target_institution_id
             )
 
+        # Org-unit memberships — always cleared, unconditionally (no flag,
+        # unlike documents/exams/questions/tags above). See module
+        # docstring: OrgUnits are institution-scoped and the target
+        # institution's hierarchy has no equivalent to map a source-side
+        # membership onto (TF-602 review fix).
+        org_units_cleared = (
+            db.query(UserOrgUnit)
+            .filter(UserOrgUnit.user_id == user_id)
+            .delete(synchronize_session=False)
+        )
+
         # 6. Audit log — AuditService.log_action runs db.commit() internally as
         # its final step. It catches its own internal exceptions, rolls back,
         # and returns None on failure. We MUST detect that None and surface
@@ -397,6 +434,7 @@ def transfer_user(
                     "exams": exams_moved,
                     "questions": questions_moved,
                     "tags": tags_moved,
+                    "org_unit_memberships_cleared": org_units_cleared,
                 },
             },
         )
@@ -413,7 +451,7 @@ def transfer_user(
 
     logger.info(
         "Institution transfer: user_id=%d %d -> %d by actor=%d "
-        "(docs=%d exams=%d questions=%d tags=%d)",
+        "(docs=%d exams=%d questions=%d tags=%d org_unit_memberships_cleared=%d)",
         user_id,
         old_iid,
         target_institution_id,
@@ -422,6 +460,7 @@ def transfer_user(
         exams_moved,
         questions_moved,
         tags_moved,
+        org_units_cleared,
     )
 
     return TransferStats(
@@ -429,5 +468,6 @@ def transfer_user(
         exams=exams_moved,
         questions=questions_moved,
         tags=tags_moved,
+        org_unit_memberships_cleared=org_units_cleared,
         document_ids=document_ids,
     )

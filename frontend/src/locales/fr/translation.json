@@ -296,6 +296,7 @@
       "never": "Jamais",
       "btnEdit": "Modifier",
       "btnRoles": "Rôles",
+      "btnOrgUnits": "Unités org.",
       "btnDeactivate": "Désactiver",
       "btnActivate": "Activer",
       "paginationPrevious": "Précédent",
@@ -336,6 +337,7 @@
       "students": "Étudiants pseudonymisés",
       "classes": "Classes",
       "submissions": "Soumissions / Tentatives",
+      "orgUnitMembershipsWarning": "{{count}} appartenance(s) à une unité organisationnelle seront supprimées (liées à l'institution, sans équivalent dans l'institution cible).",
       "confirmTitle": "Confirmer le transfert",
       "confirmIntro": "Vous êtes sur le point de déplacer {{user}} de {{source}} → {{target}}.",
       "confirmTransferred": "À transférer :",
@@ -484,6 +486,21 @@
       "failedLoad": "Impossible de charger les données",
       "failedAssign": "Impossible d'assigner le rôle",
       "failedRemove": "Impossible de retirer le rôle"
+    },
+    "orgUnitAssignment": {
+      "title": "Gérer les unités organisationnelles",
+      "currentOrgUnits": "Unités organisationnelles actuelles",
+      "availableOrgUnits": "Unités organisationnelles disponibles",
+      "btnRemove": "Retirer",
+      "btnAssign": "Assigner",
+      "noOrgUnits": "Aucune unité organisationnelle assignée",
+      "allOrgUnitsAssigned": "Toutes les unités organisationnelles assignées",
+      "rolePlaceholder": "p. ex. Responsable",
+      "close": "Fermer",
+      "failedLoad": "Impossible de charger les données",
+      "failedAssign": "Impossible d'assigner",
+      "failedRemove": "Impossible de retirer",
+      "crossInstitutionNotice": "Les unités organisationnelles ne peuvent être assignées qu'au sein de sa propre institution."
     },
     "subscriptionTier": {
       "title": "Niveaux d'abonnement",

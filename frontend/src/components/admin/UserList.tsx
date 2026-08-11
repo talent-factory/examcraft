@@ -8,10 +8,12 @@ import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../../utils/dateLocale';
 import AdminService, { UserListItem, ListUsersParams } from '../../services/AdminService';
 import { UserStatus } from '../../types/auth';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface UserListProps {
   onEditUser: (userId: number) => void;
   onManageRoles: (userId: number) => void;
+  onManageOrgUnits: (userId: number) => void;
   onRefresh?: () => void;
   canEdit?: boolean;
 }
@@ -19,10 +21,13 @@ interface UserListProps {
 export const UserList: React.FC<UserListProps> = ({
   onEditUser,
   onManageRoles,
+  onManageOrgUnits,
   onRefresh,
   canEdit = false,
 }) => {
   const { t, i18n } = useTranslation();
+  const { hasPermission } = useAuth();
+  const canManageOrgUnits = hasPermission('manage_org_units');
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -278,6 +283,15 @@ export const UserList: React.FC<UserListProps> = ({
                         >
                           {t('admin.userList.btnRoles')}
                         </button>
+                        {canManageOrgUnits && (
+                          <button
+                            onClick={() => onManageOrgUnits(user.id)}
+                            className="text-teal-600 hover:text-teal-900"
+                            data-testid={`ul-btn-org-units-${user.id}`}
+                          >
+                            {t('admin.userList.btnOrgUnits')}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleStatusToggle(user.id, user.status)}
                           className={user.status === UserStatus.ACTIVE ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}

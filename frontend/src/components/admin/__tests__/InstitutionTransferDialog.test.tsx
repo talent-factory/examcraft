@@ -59,6 +59,7 @@ const mockPreview = {
   target_institution_name: 'Target',
   transferable: { documents: 5, exams: 2, questions: 10, tags: 1 },
   excluded: { students: 50, classes: 3, submissions: 200 },
+  org_unit_memberships: 0,
 };
 
 describe('InstitutionTransferDialog', () => {
@@ -160,6 +161,7 @@ describe('InstitutionTransferDialog', () => {
     (AdminService.transferUser as jest.Mock).mockResolvedValue({
       user: { ...mockUser, institution_id: 2 },
       transferred: mockPreview.transferable,
+      org_unit_memberships_cleared: 0,
     });
     const onSuccess = jest.fn();
     render(
@@ -194,6 +196,39 @@ describe('InstitutionTransferDialog', () => {
       expect(AdminService.transferUser).toHaveBeenCalled();
       expect(onSuccess).toHaveBeenCalled();
     });
+  });
+
+  it('shows org-unit-memberships warning on select and confirm steps when > 0 (TF-602)', async () => {
+    (AdminService.previewTransfer as jest.Mock).mockResolvedValue({
+      ...mockPreview,
+      org_unit_memberships: 2,
+    });
+    render(
+      <InstitutionTransferDialog
+        user={mockUser as any}
+        institutions={mockInstitutions as any}
+        isOpen={true}
+        onClose={jest.fn()}
+        onSuccess={jest.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '2' } });
+
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+    });
+
+    expect(await screen.findByTestId('itd-org-units-warning')).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /admin\.institutionTransfer\.next/,
+      }),
+    );
+
+    expect(
+      await screen.findByTestId('itd-confirm-org-units-warning'),
+    ).toBeInTheDocument();
   });
 
   it('debounces preview calls — rapid changes result in single fetch', async () => {
