@@ -5,13 +5,14 @@ Dependencies für Token Validation und User Authentication
 
 import logging
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models.auth import User, UserStatus
 from services.auth_service import AuthService
+from services.translation_service import get_request_locale, t
 
 logger = logging.getLogger(__name__)
 
@@ -114,11 +115,14 @@ async def get_current_active_user(
     return current_user
 
 
-async def get_current_superuser(current_user: User = Depends(get_current_user)) -> User:
+async def get_current_superuser(
+    request: Request, current_user: User = Depends(get_current_user)
+) -> User:
     """
     FastAPI Dependency: Get current superuser
 
     Args:
+        request: Current request, used to resolve the response locale
         current_user: Current user from get_current_user
 
     Returns:
@@ -128,8 +132,10 @@ async def get_current_superuser(current_user: User = Depends(get_current_user)) 
         HTTPException: If user is not a superuser
     """
     if not current_user.is_superuser:
+        locale = get_request_locale(request, current_user)
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=t("admin_insufficient_permissions", locale=locale),
         )
 
     return current_user

@@ -59,6 +59,24 @@ def _require_write_access(
     )
 
 
+def _require_admin_or_superuser(current_user: User, locale: str = "de") -> None:
+    """Raise 403 unless the user is a superuser or an institution admin.
+
+    Used for read endpoints on resources that are not institution-scoped
+    (e.g. the global roles catalog) but must still stay hidden from
+    regular non-admin users. The corresponding *write* endpoints keep
+    stricter, superuser-only guards where that is intentional (see TF-603
+    design doc — roles themselves are global and only superusers may
+    create/edit/delete them).
+    """
+    if current_user.is_superuser or _is_admin_role(current_user):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=t("admin_insufficient_permissions", locale=locale),
+    )
+
+
 # ============================================================================
 # Pydantic Models (Request/Response Schemas)
 # ============================================================================
@@ -789,15 +807,21 @@ def _validate_known_permissions(permissions: List[str], locale: str = "de") -> N
 
 @router.get("/roles", response_model=List[RoleResponse])
 async def list_roles(
-    current_user: User = Depends(get_current_superuser),
+    request: Request,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    List all roles (Superuser only)
+    List all roles (Superuser or Institution-Admin)
 
-    - Returns all available roles
-    - Requires 'manage_users' permission
+    - Returns the global roles catalog (read-only)
+    - Institution-Admins need this to render the role-assignment UI for
+      users in their own institution; the write endpoints below
+      (create/update/delete) stay superuser-only since roles are global.
     """
+    locale = get_request_locale(request, current_user)
+    _require_admin_or_superuser(current_user, locale)
+
     roles = db.query(Role).all()
 
     role_responses = []

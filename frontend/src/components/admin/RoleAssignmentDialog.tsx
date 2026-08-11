@@ -27,6 +27,12 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Tracks specifically whether the initial catalog load (getUser + listRoles)
+  // failed, as opposed to a later assign/remove action failing. Gating the
+  // role sections on this — rather than on `error` in general — means a
+  // failed assign/remove still leaves the (perfectly valid) already-loaded
+  // role lists visible so the admin can see current state and retry.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
   const loadData = useCallback(async () => {
@@ -35,6 +41,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
     try {
       setLoading(true);
       setError(null);
+      setLoadFailed(false);
 
       const [userData, rolesData] = await Promise.all([
         AdminService.getUser(userId),
@@ -45,6 +52,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
       setAllRoles(rolesData);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('admin.roleAssignment.failedLoad'));
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -141,104 +149,117 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
                       </div>
                     )}
 
-                    {/* Current Roles */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-3">{t('admin.roleAssignment.currentRoles')}</h4>
-                      {user && user.roles.length > 0 ? (
-                        <div className="space-y-2">
-                          {user.roles.map((role) => (
-                            <div
-                              key={role.id}
-                              className="flex items-start justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
-                            >
-                              <div className="flex-1">
-                                <div className="flex items-center">
-                                  <span className="font-medium text-gray-900">{role.display_name}</span>
-                                  {role.is_system_role && (
-                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                      {t('admin.roleAssignment.systemBadge')}
-                                    </span>
-                                  )}
-                                </div>
-                                {role.description && (
-                                  <p className="text-sm text-gray-600 mt-1">{role.description}</p>
-                                )}
-                                <div className="mt-2">
+                    {/* Current Roles / Available Roles — only meaningful once the
+                        catalog actually loaded. Gated on `loadFailed` (not the
+                        more general `error`) so that a later assign/remove
+                        failure — which also sets `error` — still leaves the
+                        already-loaded, still-valid role lists visible instead
+                        of hiding them along with the error banner. Only the
+                        initial-load failure hides these sections, since at
+                        that point `user`/`allRoles` are empty-but-not-
+                        legitimate and would otherwise show misleading
+                        "no roles" / "all roles assigned" fallback text. */}
+                    {!loadFailed && (
+                      <>
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-900 mb-3">{t('admin.roleAssignment.currentRoles')}</h4>
+                          {user && user.roles.length > 0 ? (
+                            <div className="space-y-2">
+                              {user.roles.map((role) => (
+                                <div
+                                  key={role.id}
+                                  className="flex items-start justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
+                                >
+                                  <div className="flex-1">
+                                    <div className="flex items-center">
+                                      <span className="font-medium text-gray-900">{role.display_name}</span>
+                                      {role.is_system_role && (
+                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                          {t('admin.roleAssignment.systemBadge')}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {role.description && (
+                                      <p className="text-sm text-gray-600 mt-1">{role.description}</p>
+                                    )}
+                                    <div className="mt-2">
+                                      <button
+                                        onClick={() => setSelectedRole(selectedRole?.id === role.id ? null : role)}
+                                        className="text-xs text-blue-600 hover:text-blue-800"
+                                      >
+                                        {selectedRole?.id === role.id ? t('admin.roleAssignment.hidePermissions') : t('admin.roleAssignment.showPermissions')}
+                                      </button>
+                                    </div>
+                                    {selectedRole?.id === role.id && (
+                                      <div className="mt-2 p-2 bg-white rounded border border-blue-100">
+                                        <div className="flex flex-wrap gap-1">
+                                          {role.permissions.map((perm, idx) => (
+                                            <span
+                                              key={idx}
+                                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
+                                            >
+                                              {perm}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                   <button
-                                    onClick={() => setSelectedRole(selectedRole?.id === role.id ? null : role)}
-                                    className="text-xs text-blue-600 hover:text-blue-800"
+                                    onClick={() => handleRemoveRole(role.id)}
+                                    disabled={processing || user.roles.length === 1}
+                                    className="ml-4 text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title={user.roles.length === 1 ? t('admin.roleAssignment.cantRemoveLast') : t('admin.roleAssignment.removeRoleTitle')}
                                   >
-                                    {selectedRole?.id === role.id ? t('admin.roleAssignment.hidePermissions') : t('admin.roleAssignment.showPermissions')}
+                                    {t('admin.roleAssignment.btnRemove')}
                                   </button>
                                 </div>
-                                {selectedRole?.id === role.id && (
-                                  <div className="mt-2 p-2 bg-white rounded border border-blue-100">
-                                    <div className="flex flex-wrap gap-1">
-                                      {role.permissions.map((perm, idx) => (
-                                        <span
-                                          key={idx}
-                                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
-                                        >
-                                          {perm}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                              <button
-                                onClick={() => handleRemoveRole(role.id)}
-                                disabled={processing || user.roles.length === 1}
-                                className="ml-4 text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                title={user.roles.length === 1 ? t('admin.roleAssignment.cantRemoveLast') : t('admin.roleAssignment.removeRoleTitle')}
-                              >
-                                {t('admin.roleAssignment.btnRemove')}
-                              </button>
+                              ))}
                             </div>
-                          ))}
+                          ) : (
+                            <p className="text-sm text-gray-500">{t('admin.roleAssignment.noRoles')}</p>
+                          )}
                         </div>
-                      ) : (
-                        <p className="text-sm text-gray-500">{t('admin.roleAssignment.noRoles')}</p>
-                      )}
-                    </div>
 
-                    {/* Available Roles */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-3">{t('admin.roleAssignment.availableRoles')}</h4>
-                      {getAvailableRoles().length > 0 ? (
-                        <div className="space-y-2">
-                          {getAvailableRoles().map((role) => (
-                            <div
-                              key={role.id}
-                              className="flex items-start justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg"
-                            >
-                              <div className="flex-1">
-                                <div className="flex items-center">
-                                  <span className="font-medium text-gray-900">{role.display_name}</span>
-                                  {role.is_system_role && (
-                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                      {t('admin.roleAssignment.systemBadge')}
-                                    </span>
-                                  )}
+                        {/* Available Roles */}
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-900 mb-3">{t('admin.roleAssignment.availableRoles')}</h4>
+                          {getAvailableRoles().length > 0 ? (
+                            <div className="space-y-2">
+                              {getAvailableRoles().map((role) => (
+                                <div
+                                  key={role.id}
+                                  className="flex items-start justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg"
+                                >
+                                  <div className="flex-1">
+                                    <div className="flex items-center">
+                                      <span className="font-medium text-gray-900">{role.display_name}</span>
+                                      {role.is_system_role && (
+                                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                          {t('admin.roleAssignment.systemBadge')}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {role.description && (
+                                      <p className="text-sm text-gray-600 mt-1">{role.description}</p>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => handleAssignRole(role.id)}
+                                    disabled={processing}
+                                    className="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {t('admin.roleAssignment.btnAssign')}
+                                  </button>
                                 </div>
-                                {role.description && (
-                                  <p className="text-sm text-gray-600 mt-1">{role.description}</p>
-                                )}
-                              </div>
-                              <button
-                                onClick={() => handleAssignRole(role.id)}
-                                disabled={processing}
-                                className="ml-4 text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {t('admin.roleAssignment.btnAssign')}
-                              </button>
+                              ))}
                             </div>
-                          ))}
+                          ) : (
+                            <p className="text-sm text-gray-500">{t('admin.roleAssignment.allRolesAssigned')}</p>
+                          )}
                         </div>
-                      ) : (
-                        <p className="text-sm text-gray-500">{t('admin.roleAssignment.allRolesAssigned')}</p>
-                      )}
-                    </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

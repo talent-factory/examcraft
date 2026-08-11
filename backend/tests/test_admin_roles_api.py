@@ -764,3 +764,177 @@ def test_delete_nonexistent_role_returns_404(client_superuser, test_db):
     """Test that DELETE /api/admin/roles/{id} returns 404 for a nonexistent role."""
     response = client_superuser.delete("/api/admin/roles/99999")
     assert response.status_code == 404
+
+
+# ============================================================================
+# TF-621: GET /api/admin/roles must be readable by Institution-Admins too
+# ============================================================================
+
+
+@pytest.fixture
+def admin_role(test_db) -> Role:
+    """Get-or-create the 'admin' system role.
+
+    main.py's startup lifespan also seeds this role (see seed_roles.py);
+    the get-or-create here keeps the fixture independent of whether that
+    lifespan has already run for a given TestClient in this test module.
+    """
+    role = test_db.query(Role).filter(Role.name == "admin").first()
+    if not role:
+        role = Role(
+            name="admin",
+            display_name="Administrator",
+            permissions=[],
+            is_system_role=True,
+        )
+        test_db.add(role)
+        test_db.commit()
+        test_db.refresh(role)
+    return role
+
+
+@pytest.fixture
+def institution_admin(test_db, admin_role) -> User:
+    """A non-superuser with the 'admin' role — an Institution-Admin."""
+    inst = _make_institution(test_db, "test-inst-instadmin")
+    user = User(
+        email="instadmin@example.com",
+        password_hash="hashed_password",
+        first_name="Institution",
+        last_name="Admin",
+        institution_id=inst.id,
+        status=UserStatus.ACTIVE.value,
+        is_superuser=False,
+    )
+    user.roles.append(admin_role)
+    test_db.add(user)
+    test_db.commit()
+    test_db.refresh(user)
+    return user
+
+
+@pytest.fixture
+def client_institution_admin(test_db, institution_admin):
+    """TestClient with Institution-Admin (non-superuser + 'admin' role) override."""
+    app.dependency_overrides[get_db] = lambda: test_db
+    app.dependency_overrides[get_current_user] = lambda: institution_admin
+    client = TestClient(app)
+    yield client
+    app.dependency_overrides.clear()
+
+
+def test_list_roles_allows_institution_admin(client_institution_admin):
+    """TF-621: an Institution-Admin (non-superuser) can read the roles catalog.
+
+    Before the fix, GET /api/admin/roles was gated by get_current_superuser,
+    so the "Benutzerrollen verwalten" modal was unusable for Institution-
+    Admins even though POST/DELETE /users/{id}/roles already allowed them.
+    """
+    response = client_institution_admin.get("/api/admin/roles")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+def test_list_roles_still_requires_admin_or_superuser(client_non_superuser):
+    """TF-621: a plain user (neither admin nor superuser) is still rejected."""
+    response = client_non_superuser.get("/api/admin/roles")
+    assert response.status_code == 403
+
+
+def test_list_roles_superuser_still_allowed(client_superuser):
+    """Regression guard: superuser access to GET /api/admin/roles keeps working."""
+    response = client_superuser.get("/api/admin/roles")
+    assert response.status_code == 200
+
+
+def test_list_roles_error_message_is_localized(client_non_superuser):
+    """TF-621: the 403 detail from _require_admin_or_superuser is translated
+    via t(), not a hardcoded English string. No Accept-Language header is
+    sent, so the default locale ("de") applies.
+    """
+    response = client_non_superuser.get("/api/admin/roles")
+    assert response.status_code == 403
+    detail = response.json()["detail"]
+    assert detail != "Not enough permissions"
+    assert detail == "Unzureichende Berechtigungen für diese Aktion"
+
+
+def test_create_role_error_message_is_localized(client_non_superuser):
+    """TF-621: get_current_superuser's 403 detail (used by the roles
+    write-endpoints, e.g. POST /api/admin/roles) is now translated via t()
+    instead of the old hardcoded English "Not enough permissions" string.
+    """
+    response = client_non_superuser.post(
+        "/api/admin/roles",
+        json={"name": "tf621_probe_role", "display_name": "Probe", "permissions": []},
+    )
+    assert response.status_code == 403
+    detail = response.json()["detail"]
+    assert detail != "Not enough permissions"
+    assert detail == "Unzureichende Berechtigungen für diese Aktion"
+
+
+# ============================================================================
+# TF-621: the roles write-endpoints must stay superuser-only, i.e. an
+# Institution-Admin's newly-granted read access to GET /api/admin/roles must
+# NOT extend to POST/PATCH/DELETE. _require_admin_or_superuser and
+# get_current_superuser are intentionally two different guards (see the
+# docstring on _require_admin_or_superuser in api/admin.py) — these tests
+# pin that boundary so a future refactor that merges the two guards would
+# be caught here.
+# ============================================================================
+
+
+def test_create_role_still_requires_superuser_for_institution_admin(
+    client_institution_admin,
+):
+    """TF-621: an Institution-Admin cannot create global roles."""
+    response = client_institution_admin.post(
+        "/api/admin/roles",
+        json={
+            "name": "tf621_instadmin_create_probe",
+            "display_name": "Probe",
+            "permissions": [],
+        },
+    )
+    assert response.status_code == 403
+
+
+def test_update_role_still_requires_superuser_for_institution_admin(
+    client_institution_admin, test_db
+):
+    """TF-621: an Institution-Admin cannot update global roles."""
+    role = Role(
+        name="tf621-instadmin-update-target",
+        display_name="Update Target",
+        permissions=[],
+        is_system_role=False,
+    )
+    test_db.add(role)
+    test_db.commit()
+    test_db.refresh(role)
+
+    response = client_institution_admin.patch(
+        f"/api/admin/roles/{role.id}",
+        json={"display_name": "Attempted Update"},
+    )
+    assert response.status_code == 403
+
+
+def test_delete_role_still_requires_superuser_for_institution_admin(
+    client_institution_admin, test_db
+):
+    """TF-621: an Institution-Admin cannot delete global roles."""
+    role = Role(
+        name="tf621-instadmin-delete-target",
+        display_name="Delete Target",
+        permissions=[],
+        is_system_role=False,
+    )
+    test_db.add(role)
+    test_db.commit()
+    test_db.refresh(role)
+
+    response = client_institution_admin.delete(f"/api/admin/roles/{role.id}")
+    assert response.status_code == 403
+    assert test_db.query(Role).filter(Role.id == role.id).first() is not None
