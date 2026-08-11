@@ -63,6 +63,7 @@
     "documents_rename_invalid_chars": "Display name contains invalid control characters",
     "documents_visibility_no_institution": "Cannot share with institution: no institution assigned",
     "documents_visibility_owner_only": "Only the owner can change visibility",
+    "documents_visibility_invalid_org_unit": "Cannot share with team: no valid Org-Unit of your own provided",
     "documents_rename_owner_only": "Only the owner can rename this document",
     "documents_patch_no_fields": "At least one field (display name or visibility) must be provided",
     "documents_content_not_available": "Document content is not available",

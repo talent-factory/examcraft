@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -21,7 +21,9 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
-  Tooltip
+  Tooltip,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   CloudUpload,
@@ -33,12 +35,15 @@ import {
   TextSnippet,
   Cancel,
   LockOutlined,
-  Business
+  Business,
+  Groups
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { DocumentService } from '../services/DocumentService';
+import { OrgUnitsService } from '../services/orgUnitsService';
+import { OrgUnitOut } from '../types/orgUnit';
 import { DocumentUploadResponse, DocumentProcessingResponse, DocumentVisibility } from '../types/document';
 
 interface UploadFile {
@@ -81,6 +86,25 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const hasInstitution = Boolean(user?.institution_id);
   const institutionName = user?.institution?.name ?? '';
   const [visibility, setVisibility] = useState<DocumentVisibility>(DocumentVisibility.PRIVATE);
+  // Team scope (TF-620): 'team' visibility requires picking one of the
+  // uploader's own OrgUnit memberships — fetched once on mount.
+  const [myOrgUnits, setMyOrgUnits] = useState<OrgUnitOut[]>([]);
+  const [orgUnitId, setOrgUnitId] = useState<number | ''>('');
+  const [orgUnitsLoadError, setOrgUnitsLoadError] = useState(false);
+  const hasOrgUnits = myOrgUnits.length > 0;
+  const isIncompleteTeamSelection =
+    visibility === DocumentVisibility.TEAM && orgUnitId === '';
+
+  useEffect(() => {
+    OrgUnitsService.mine()
+      .then(res => { setMyOrgUnits(res.items); setOrgUnitsLoadError(false); })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load Org-Unit memberships:', err);
+        setMyOrgUnits([]);
+        setOrgUnitsLoadError(true);
+      });
+  }, []);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles: UploadFile[] = acceptedFiles.map(file => ({
@@ -203,8 +227,12 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           : f
       ));
 
-      // Upload file with the batch visibility selection (TF-354)
-      const uploadResult = await DocumentService.uploadDocument(file, visibility);
+      // Upload file with the batch visibility selection (TF-354/TF-620)
+      const uploadResult = await DocumentService.uploadDocument(
+        file,
+        visibility,
+        visibility === DocumentVisibility.TEAM && orgUnitId !== '' ? orgUnitId : null,
+      );
 
       // Check if cancelled
       if (abortController.signal.aborted) {
@@ -364,6 +392,31 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             }
           />
           <Tooltip
+            title={
+              hasOrgUnits
+                ? ''
+                : orgUnitsLoadError
+                  ? t('components.documentUpload.orgUnitsLoadError')
+                  : t('components.documentUpload.visibilityNoOrgUnit')
+            }
+            placement="right"
+          >
+            {/* span keeps the tooltip working while the control is disabled */}
+            <span>
+              <FormControlLabel
+                value={DocumentVisibility.TEAM}
+                control={<Radio />}
+                disabled={!hasOrgUnits || isUploading}
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Groups fontSize="small" />
+                    {t('components.documentUpload.visibilityTeam')}
+                  </Box>
+                }
+              />
+            </span>
+          </Tooltip>
+          <Tooltip
             title={hasInstitution ? '' : t('components.documentUpload.visibilityNoInstitution')}
             placement="right"
           >
@@ -383,6 +436,27 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             </span>
           </Tooltip>
         </RadioGroup>
+        {visibility === DocumentVisibility.TEAM && (
+          <FormControl size="small" sx={{ mt: 1, ml: 4, minWidth: 220 }}>
+            <Select
+              displayEmpty
+              value={orgUnitId}
+              onChange={(e) => setOrgUnitId(e.target.value as number | '')}
+              disabled={isUploading}
+              renderValue={(value) =>
+                value === ''
+                  ? t('components.documentUpload.orgUnitPickerPlaceholder')
+                  : myOrgUnits.find(ou => ou.id === value)?.name ?? ''
+              }
+            >
+              {myOrgUnits.map(ou => (
+                <MenuItem key={ou.id} value={ou.id}>
+                  {ou.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
       </FormControl>
 
       {/* Upload Queue */}
@@ -397,7 +471,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 <Button
                   variant="contained"
                   onClick={startUpload}
-                  disabled={isUploading || uploadFiles.every(f => f.status === 'completed')}
+                  disabled={
+                    isUploading ||
+                    isIncompleteTeamSelection ||
+                    uploadFiles.every(f => f.status === 'completed')
+                  }
                   startIcon={<CloudUpload />}
                 >
                   {isUploading ? t('components.documentUpload.uploading') : t('components.documentUpload.startUpload')}

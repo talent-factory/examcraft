@@ -144,7 +144,7 @@ def vis_data(test_db):
 
 
 def _visible_ids(user, db):
-    q = filter_documents_for_user(db.query(Document), user)
+    q = filter_documents_for_user(db.query(Document), user, db)
     return {d.id for d in q.all()}
 
 
@@ -183,10 +183,12 @@ def test_superuser_bypasses_filter(vis_data, test_db):
         ("superuser", "doc_institution", True),
     ],
 )
-def test_is_document_visible_for_permutations(vis_data, user_attr, doc_attr, expected):
+def test_is_document_visible_for_permutations(
+    vis_data, test_db, user_attr, doc_attr, expected
+):
     user = getattr(vis_data, user_attr)
     doc = getattr(vis_data, doc_attr)
-    assert is_document_visible_for(user, doc) is expected
+    assert is_document_visible_for(user, doc, test_db) is expected
 
 
 # ---------------------------------------------------------------------------

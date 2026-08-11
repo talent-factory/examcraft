@@ -63,6 +63,7 @@
     "documents_rename_invalid_chars": "Le nom d'affichage contient des caractères de contrôle invalides",
     "documents_visibility_no_institution": "Partage avec l'institution impossible : aucune institution attribuée",
     "documents_visibility_owner_only": "Seul le propriétaire peut modifier la visibilité",
+    "documents_visibility_invalid_org_unit": "Partage avec l'équipe impossible : aucune unité organisationnelle propre valide indiquée",
     "documents_rename_owner_only": "Seul le propriétaire peut renommer ce document",
     "documents_patch_no_fields": "Au moins un champ (nom d'affichage ou visibilité) doit être fourni",
     "documents_content_not_available": "Le contenu du document n'est pas disponible",

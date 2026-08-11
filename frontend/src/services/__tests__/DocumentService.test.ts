@@ -1,5 +1,5 @@
 import { DocumentService } from '../DocumentService';
-import { Document, DocumentStatus, DocumentUploadResponse, DocumentProcessingResponse } from '../../types/document';
+import { Document, DocumentStatus, DocumentUploadResponse, DocumentProcessingResponse, DocumentVisibility } from '../../types/document';
 
 jest.mock('../../api/apiClient');
 
@@ -110,6 +110,91 @@ describe('DocumentService', () => {
 
       await expect(DocumentService.uploadDocument(mockFile))
         .rejects.toThrow('Network error');
+    });
+
+    // TF-620: these run against the REAL uploadDocument implementation
+    // (unlike the component tests, which mock the whole service) — they
+    // catch a wrong field name or a wrong `visibility === TEAM` guard that
+    // component-level mocked-service tests can't see.
+    it('appends org_unit_id to the multipart body when visibility=team', async () => {
+      const mockFile = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockUploadResponse,
+      } as Response);
+
+      await DocumentService.uploadDocument(mockFile, DocumentVisibility.TEAM, 42);
+
+      const body = mockFetch.mock.calls[0][1]!.body as FormData;
+      expect(body.get('visibility')).toBe('team');
+      expect(body.get('org_unit_id')).toBe('42');
+    });
+
+    it('omits org_unit_id when visibility=team but no org unit was picked', async () => {
+      const mockFile = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockUploadResponse,
+      } as Response);
+
+      await DocumentService.uploadDocument(mockFile, DocumentVisibility.TEAM, null);
+
+      const body = mockFetch.mock.calls[0][1]!.body as FormData;
+      expect(body.get('org_unit_id')).toBeNull();
+    });
+
+    it('ignores a supplied orgUnitId when visibility is not team', async () => {
+      const mockFile = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockUploadResponse,
+      } as Response);
+
+      await DocumentService.uploadDocument(mockFile, DocumentVisibility.PRIVATE, 42);
+
+      const body = mockFetch.mock.calls[0][1]!.body as FormData;
+      expect(body.get('visibility')).toBe('private');
+      expect(body.get('org_unit_id')).toBeNull();
+    });
+  });
+
+  describe('updateVisibility', () => {
+    it('includes org_unit_id in the PATCH body when visibility=team', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDocument,
+      } as Response);
+
+      await DocumentService.updateVisibility(1, DocumentVisibility.TEAM, 42);
+
+      const call = mockFetch.mock.calls[0];
+      expect(call[0]).toBe('http://localhost:8000/api/v1/documents/1');
+      const body = JSON.parse(call[1]!.body as string);
+      expect(body).toEqual({ visibility: 'team', org_unit_id: 42 });
+    });
+
+    it('omits org_unit_id from the PATCH body for non-team visibility', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDocument,
+      } as Response);
+
+      await DocumentService.updateVisibility(1, DocumentVisibility.INSTITUTION);
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1]!.body as string);
+      expect(body).toEqual({ visibility: 'institution' });
+    });
+
+    it('propagates the backend error detail on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        json: async () => ({ detail: 'Cannot share with team: no valid Org-Unit' }),
+      } as Response);
+
+      await expect(DocumentService.updateVisibility(1, DocumentVisibility.TEAM, 42))
+        .rejects.toThrow('Cannot share with team: no valid Org-Unit');
     });
   });
 

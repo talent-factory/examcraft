@@ -547,7 +547,7 @@ async def list_documents_with_questions(
     )
     # Visibility-aware (TF-354): don't leak titles of colleagues' private docs
     # to other institution members. SuperUser bypass handled in the helper.
-    query = filter_documents_for_user(query, current_user)
+    query = filter_documents_for_user(query, current_user, db)
     results = query.group_by(Document.id).order_by(Document.original_filename).all()
     # Use Document.title resolver so users see display_name overrides + the
     # filtered metadata title instead of "1" / "Untitled" leftovers.

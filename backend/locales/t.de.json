@@ -63,6 +63,7 @@
     "documents_rename_invalid_chars": "Anzeigename enthält ungültige Steuerzeichen",
     "documents_visibility_no_institution": "Freigabe an die Institution nicht möglich: keine Institution zugeordnet",
     "documents_visibility_owner_only": "Nur der Eigentümer darf die Sichtbarkeit ändern",
+    "documents_visibility_invalid_org_unit": "Team-Freigabe nicht möglich: keine gültige eigene Org-Unit angegeben",
     "documents_rename_owner_only": "Nur der Eigentümer darf dieses Dokument umbenennen",
     "documents_patch_no_fields": "Mindestens ein Feld (Anzeigename oder Sichtbarkeit) muss angegeben werden",
     "documents_content_not_available": "Dokumentinhalt nicht verfügbar",

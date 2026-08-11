@@ -27,6 +27,7 @@ import {
   Check,
   Close,
   Edit,
+  Groups,
   LockOutlined,
   MoreVert,
 } from '@mui/icons-material';
@@ -240,6 +241,16 @@ const DocumentList: React.FC<DocumentListProps> = ({
   };
 
   const renderVisibilityIcon = (doc: Document) => {
+    if (doc.visibility === DocumentVisibility.TEAM) {
+      const label = doc.org_unit_name
+        ? t('components.documentLibrary.visibilityTeam', { orgUnit: doc.org_unit_name })
+        : t('components.documentLibrary.visibilityTeamGeneric', 'Team');
+      return (
+        <Tooltip title={label}>
+          <Groups fontSize="small" color="primary" />
+        </Tooltip>
+      );
+    }
     const isInstitution = doc.visibility === DocumentVisibility.INSTITUTION;
     const VisIcon = isInstitution ? Business : LockOutlined;
     const label = isInstitution

@@ -13,6 +13,15 @@ export class OrgUnitsService {
     return getJson<OrgUnitListOut>(ROOT);
   }
 
+  /**
+   * OrgUnits the current user is a member of (TF-620). Unlike `list()`, this
+   * is not gated by `manage_org_units` — any authenticated user needs it to
+   * pick a target OrgUnit for the `team` document visibility tier.
+   */
+  static async mine(): Promise<OrgUnitListOut> {
+    return getJson<OrgUnitListOut>(`${ROOT}/mine`);
+  }
+
   static async create(payload: OrgUnitCreate): Promise<OrgUnitOut> {
     return postJson<OrgUnitOut>(ROOT, payload);
   }

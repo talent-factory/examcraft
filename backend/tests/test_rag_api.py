@@ -442,7 +442,18 @@ class TestRAGAPI:
         mock_query.order_by.return_value = mock_query
         mock_query.all.return_value = [mock_processed_document]
 
-        with patch.object(TenantFilter, "filter_by_tenant", return_value=mock_query):
+        with (
+            patch.object(TenantFilter, "filter_by_tenant", return_value=mock_query),
+            patch(
+                "utils.document_visibility.get_user_accessible_org_unit_ids",
+                return_value=set(),
+            ),
+        ):
+            # TF-620: filter_documents_for_user now also resolves the
+            # caller's accessible Org-Units for the 'team' visibility branch
+            # — mock_db is a blanket Mock, so that lookup is stubbed out here
+            # rather than routed through mock_query (which this test uses for
+            # the main document query/stats assertions instead).
             response = auth_client.get("/api/v1/rag/available-documents")
 
         assert response.status_code == 200
@@ -686,7 +697,15 @@ class TestRAGAPIIntegration:
         mock_query.order_by.return_value = mock_query
         mock_query.all.return_value = [mock_doc]
 
-        with patch.object(TenantFilter, "filter_by_tenant", return_value=mock_query):
+        with (
+            patch.object(TenantFilter, "filter_by_tenant", return_value=mock_query),
+            patch(
+                "utils.document_visibility.get_user_accessible_org_unit_ids",
+                return_value=set(),
+            ),
+        ):
+            # TF-620: see test_get_available_documents_success for why this
+            # extra patch is needed alongside the TenantFilter one.
             docs_response = auth_client.get("/api/v1/rag/available-documents")
             assert docs_response.status_code == 200
             assert docs_response.json()["total_documents"] == 1
@@ -705,7 +724,16 @@ class TestRAGAPIIntegration:
                 return_value=Mock(institution_id=1, user_id=42),
             ),
             patch("services.rag_service.rag_service") as mock_rag_service,
+            patch(
+                "utils.document_visibility.get_user_accessible_org_unit_ids",
+                return_value=set(),
+            ),
         ):
+            # TF-620: retrieve_context now also resolves the caller's
+            # accessible Org-Units once per request (not once per document)
+            # before the visibility check loop — mock_db is a blanket Mock,
+            # so that lookup is stubbed out here too (same reason as
+            # test_get_available_documents_success above).
             mock_rag_service.retrieve_context = AsyncMock(return_value=mock_context)
             context_response = auth_client.post(
                 "/api/v1/rag/retrieve-context",
@@ -723,7 +751,14 @@ class TestRAGAPIIntegration:
             patch("api.rag_exams.generate_questions_task") as mock_task,
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
+            patch(
+                "utils.document_visibility.get_user_accessible_org_unit_ids",
+                return_value=set(),
+            ),
         ):
+            # TF-620: generate_rag_exam also resolves the caller's accessible
+            # Org-Units once per request before the visibility check loop —
+            # same reason as the retrieve-context block above.
             mock_doc_service.get_document_by_id.return_value = mock_doc
             mock_task.apply_async.return_value = MagicMock()
             mock_job_cls.return_value = MagicMock()

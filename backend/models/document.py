@@ -92,18 +92,23 @@ class DocumentStatus(enum.Enum):
 
 
 class DocumentVisibility(enum.Enum):
-    """Who may see a document (TF-354 privacy fix).
+    """Who may see a document (TF-354 privacy fix, TF-620 Org-Unit scoping).
 
     - ``PRIVATE``: only the owner (``user_id``) sees the document.
+    - ``TEAM``: members of the document's Org-Unit (``org_unit_id`` —
+      department or team, see ``models.org_unit``) see it, including members
+      of an ancestor Org-Unit (hierarchical, via
+      ``services.org_unit_service.get_user_accessible_org_unit_ids``).
     - ``INSTITUTION``: every member of the owner's institution sees it.
 
-    The DB enum stores the lowercase *values* ("private"/"institution"),
+    The DB enum stores the lowercase *values* ("private"/"team"/"institution"),
     not the member names — see ``values_callable`` on the column. This is a
     deliberate divergence from ``DocumentStatus`` (which stores names) so the
     on-disk labels match the spec and the API/UI contract.
     """
 
     PRIVATE = "private"
+    TEAM = "team"
     INSTITUTION = "institution"
 
 
@@ -115,10 +120,24 @@ class Document(Base):
     # such a row consistently when institution_id is set. Enforced in the DB so no
     # write path (current or future) can create the illegal state (TF-354). After
     # migration A every row is 'private', so none violate this.
+    #
+    # Team-visible documents (TF-620): "shared with my team" is meaningless
+    # without an Org-Unit to scope it to. Unlike institution_id (a dual-purpose
+    # multi-tenancy marker set on every row regardless of visibility, so only
+    # the one-directional implication above holds), org_unit_id exists solely
+    # to scope team visibility — nothing else ever sets it — so the full
+    # biconditional is both correct and cheap to enforce in the DB: it must be
+    # NULL for every other visibility, not just non-NULL for 'team'. This
+    # closes the write-path-discipline gap that a hand-written app-layer
+    # check alone would leave (see the org_unit_id column comment below).
     __table_args__ = (
         CheckConstraint(
             "visibility <> 'institution' OR institution_id IS NOT NULL",
             name="ck_documents_institution_visibility_requires_institution",
+        ),
+        CheckConstraint(
+            "(visibility = 'team') = (org_unit_id IS NOT NULL)",
+            name="ck_documents_team_visibility_requires_org_unit",
         ),
     )
 
@@ -144,6 +163,19 @@ class Document(Base):
     institution_id = Column(
         Integer,
         ForeignKey("institutions.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
+    # Org-Unit scoping (TF-620): set if and only if visibility='team' — the DB
+    # constraint ck_documents_team_visibility_requires_org_unit enforces both
+    # directions (not just "team requires a value"). No ondelete cascade —
+    # deleting a referenced Org-Unit is rejected at the DB level and mapped to
+    # a 409 by services.org_unit_service.delete_org_unit; see that module's
+    # docstring for why CASCADE/SET NULL are both wrong here.
+    org_unit_id = Column(
+        Integer,
+        ForeignKey("org_units.id"),
         nullable=True,
         index=True,
     )
@@ -251,6 +283,7 @@ class Document(Base):
             "mime_type": self.mime_type,
             "status": self.status.value if self.status else None,
             "visibility": self.visibility.value if self.visibility else None,
+            "org_unit_id": self.org_unit_id,
             "user_id": self.user_id,
             "metadata": self.doc_metadata,
             "content_preview": self.content_preview[:200] + "..."

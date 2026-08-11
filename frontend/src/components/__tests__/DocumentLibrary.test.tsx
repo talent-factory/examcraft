@@ -272,11 +272,12 @@ describe('DocumentLibrary TF-355 paginated', () => {
     fireEvent.click(saveBtn);
 
     // updateVisibility called only for owned doc (id=10), not for foreign doc (id=20)
+    // 3rd arg (orgUnitId) is undefined here — TF-620 only sends it for 'team'.
     await waitFor(() => {
-      expect(DS.updateVisibility).toHaveBeenCalledWith(10, expect.any(String));
+      expect(DS.updateVisibility).toHaveBeenCalledWith(10, expect.any(String), undefined);
     });
     await waitFor(() => {
-      expect(DS.updateVisibility).not.toHaveBeenCalledWith(20, expect.any(String));
+      expect(DS.updateVisibility).not.toHaveBeenCalledWith(20, expect.any(String), undefined);
     });
 
     // Snackbar summary contains "übersprungen" (skipped count)

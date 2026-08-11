@@ -18,6 +18,15 @@ describe('OrgUnitsService', () => {
     expect(result).toEqual({ items: [] });
   });
 
+  it('mine() calls getJson with the org-units mine path (TF-620)', async () => {
+    mockedHttpClient.getJson.mockResolvedValue({ items: [] });
+
+    const result = await OrgUnitsService.mine();
+
+    expect(mockedHttpClient.getJson).toHaveBeenCalledWith('/api/v1/org-units/mine');
+    expect(result).toEqual({ items: [] });
+  });
+
   it('create() posts the payload to the org-units root path', async () => {
     const created = {
       id: 1,

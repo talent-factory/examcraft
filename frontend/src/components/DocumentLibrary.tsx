@@ -58,6 +58,8 @@ import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../utils/dateLocale';
 import { useAuth } from '../contexts/AuthContext';
 import { DocumentService } from '../services/DocumentService';
+import { OrgUnitsService } from '../services/orgUnitsService';
+import { OrgUnitOut } from '../types/orgUnit';
 import { Document, DocumentStatus, DocumentVisibility, DocumentStats, DocumentTag, DocumentListParams } from '../types/document';
 import DocumentVisibilityDialog from './DocumentVisibilityDialog';
 import { useDocumentLibraryParams } from './documents/useDocumentLibraryParams';
@@ -331,6 +333,20 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const institutionName = user?.institution?.name ?? '';
   const isOwner = (document: Document): boolean =>
     user != null && document.user_id != null && document.user_id === user.id;
+
+  // TF-620: caller's own Org-Unit memberships, for the 'team' visibility
+  // option in DocumentVisibilityDialog. Fetched once, not per dialog open.
+  const [myOrgUnits, setMyOrgUnits] = useState<OrgUnitOut[]>([]);
+  const [orgUnitsLoadError, setOrgUnitsLoadError] = useState(false);
+  useEffect(() => {
+    OrgUnitsService.mine()
+      .then(res => { setMyOrgUnits(res.items); setOrgUnitsLoadError(false); })
+      .catch((err) => {
+        console.error('Failed to load Org-Unit memberships:', err);
+        setMyOrgUnits([]);
+        setOrgUnitsLoadError(true);
+      });
+  }, []);
 
   // --- TF-355: server-side pagination + filtering ---
   // `view` drives the toolbar toggle; card-vs-list rendering is Phase 3
@@ -763,13 +779,16 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     setVisibilityError(null);
   };
 
-  const handleSaveVisibility = async (newVisibility: DocumentVisibility) => {
+  const handleSaveVisibility = async (
+    newVisibility: DocumentVisibility,
+    orgUnitId?: number | null,
+  ) => {
     const target = visibilityDialog.document;
     if (!target) return;
     try {
       setSavingVisibility(true);
       setVisibilityError(null);
-      const updated = await DocumentService.updateVisibility(target.id, newVisibility);
+      const updated = await DocumentService.updateVisibility(target.id, newVisibility, orgUnitId);
       setDocuments(prev =>
         prev.map(d => (d.id === updated.id ? { ...d, ...updated } : d)),
       );
@@ -861,7 +880,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     if (bulkVisibilitySaving) return;
     setBulkVisibilityDialog({ open: false });
   };
-  const handleBulkVisibilitySave = async (v: DocumentVisibility) => {
+  const handleBulkVisibilitySave = async (v: DocumentVisibility, orgUnitId?: number | null) => {
     // base counts on current page's selection only — cross-page bulk is out of scope
     const onPageSelected = selectedDocs();
     const owned = onPageSelected.filter(isOwner);
@@ -872,7 +891,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     setBulkVisibilitySaving(true);
     for (const d of owned) {
       try {
-        await DocumentService.updateVisibility(d.id, v);
+        await DocumentService.updateVisibility(d.id, v, orgUnitId);
         changed++;
       } catch (err) {
         failed++;
@@ -1943,12 +1962,15 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         </DialogActions>
       </Dialog>
 
-      {/* Visibility quick-edit dialog (TF-354) */}
+      {/* Visibility quick-edit dialog (TF-354/TF-620) */}
       <DocumentVisibilityDialog
         open={visibilityDialog.open}
         current={visibilityDialog.document?.visibility ?? DocumentVisibility.PRIVATE}
+        currentOrgUnitId={visibilityDialog.document?.org_unit_id ?? null}
         institutionName={institutionName}
         hasInstitution={hasInstitution}
+        orgUnits={myOrgUnits}
+        orgUnitsLoadError={orgUnitsLoadError}
         saving={savingVisibility}
         error={visibilityError}
         onClose={handleCloseVisibility}
@@ -1964,6 +1986,8 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         current={null}
         institutionName={institutionName}
         hasInstitution={hasInstitution}
+        orgUnits={myOrgUnits}
+        orgUnitsLoadError={orgUnitsLoadError}
         saving={bulkVisibilitySaving}
         onClose={handleCloseBulkVisibility}
         onSave={handleBulkVisibilitySave}

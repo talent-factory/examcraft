@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models.auth import User
-from models.org_unit import KNOWN_UNIT_TYPES, OrgUnit
+from models.org_unit import KNOWN_UNIT_TYPES, OrgUnit, UserOrgUnit
 from services.org_unit_service import (
     assign_user_to_org_unit,
     create_org_unit,
@@ -24,7 +24,7 @@ from services.org_unit_service import (
     remove_user_from_org_unit,
     validate_sibling_name_unique,
 )
-from utils.auth_utils import require_permission
+from utils.auth_utils import get_current_active_user, require_permission
 
 
 _STRICT_OUT = ConfigDict(extra="forbid")
@@ -155,6 +155,35 @@ async def list_org_units(
     return OrgUnitListOut(items=[_to_out(row, counts.get(row.id, 0)) for row in rows])
 
 
+@router.get("/mine", response_model=OrgUnitListOut)
+async def list_my_org_units(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> OrgUnitListOut:
+    """OrgUnits the caller is a member of (TF-620).
+
+    Deliberately **not** gated by ``manage_org_units`` — every authenticated
+    user needs this to pick a target OrgUnit for the ``team`` document
+    visibility tier, not just admins. Scoped to the caller's own
+    ``UserOrgUnit`` memberships within their institution (no institution-wide
+    listing here; that stays admin-only via ``list_org_units`` above).
+    """
+    if current_user.institution_id is None:
+        return OrgUnitListOut(items=[])
+    rows = (
+        db.query(OrgUnit)
+        .join(UserOrgUnit, UserOrgUnit.org_unit_id == OrgUnit.id)
+        .filter(
+            UserOrgUnit.user_id == current_user.id,
+            OrgUnit.institution_id == current_user.institution_id,
+        )
+        .order_by(OrgUnit.name)
+        .all()
+    )
+    counts = get_descendant_counts_for_institution(db, current_user.institution_id)
+    return OrgUnitListOut(items=[_to_out(row, counts.get(row.id, 0)) for row in rows])
+
+
 @router.post("", response_model=OrgUnitOut, status_code=status.HTTP_201_CREATED)
 async def create_org_unit_endpoint(
     body: OrgUnitCreateIn,
@@ -272,7 +301,10 @@ async def delete_org_unit_endpoint(
     org_unit = _load_org_unit_for_user(
         db=db, user=current_user, org_unit_id=org_unit_id
     )
-    delete_org_unit(db, org_unit)
+    try:
+        delete_org_unit(db, org_unit)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

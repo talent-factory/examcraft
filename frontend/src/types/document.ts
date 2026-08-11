@@ -12,9 +12,10 @@ export enum DocumentStatus {
   ERROR = 'error'
 }
 
-/** Document sharing scope (TF-354). Mirrors the backend DocumentVisibility enum. */
+/** Document sharing scope (TF-354/TF-620). Mirrors the backend DocumentVisibility enum. */
 export enum DocumentVisibility {
   PRIVATE = 'private',
+  TEAM = 'team',
   INSTITUTION = 'institution'
 }
 
@@ -72,6 +73,10 @@ export interface Document {
   mime_type: string;
   status: DocumentStatus;
   visibility?: DocumentVisibility;
+  // Set only when visibility=team (TF-620).
+  org_unit_id?: number | null;
+  // Resolved OrgUnit.name, for display — set only when org_unit_id is set.
+  org_unit_name?: string | null;
   created_at: string;
   processed_at?: string;
   file_size?: number;

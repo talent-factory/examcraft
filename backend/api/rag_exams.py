@@ -32,6 +32,7 @@ from utils.auth_utils import (
 from utils.document_visibility import (
     filter_documents_for_user,
     is_document_visible_for,
+    get_accessible_org_unit_ids_for,
 )
 import logging
 
@@ -176,11 +177,21 @@ async def generate_rag_exam(
     try:
         # Validiere Document IDs falls angegeben
         if request.document_ids:
+            # Computed once per request, not once per document (TF-620 perf
+            # fix) — is_document_visible_for's team-visibility branch would
+            # otherwise re-run the hierarchical Org-Unit membership lookup
+            # for every id in a client-supplied document_ids list.
+            accessible_org_unit_ids = get_accessible_org_unit_ids_for(current_user, db)
             for doc_id in request.document_ids:
                 document = document_service.get_document_by_id(doc_id, db)
                 # Visibility-Check (TF-354): 404 statt 403 — ein fremdes
                 # privates Dokument darf nicht über den RAG-Pfad leaken.
-                if not document or not is_document_visible_for(current_user, document):
+                if not document or not is_document_visible_for(
+                    current_user,
+                    document,
+                    db,
+                    accessible_org_unit_ids=accessible_org_unit_ids,
+                ):
                     raise HTTPException(
                         status_code=404,
                         detail=t("rag_document_not_found", locale=locale),
@@ -544,11 +555,19 @@ async def retrieve_context(
     try:
         # Validiere Document IDs falls angegeben
         if request.document_ids:
+            # Computed once per request, not once per document (TF-620 perf
+            # fix) — see generate_exam_from_documents for the same pattern.
+            accessible_org_unit_ids = get_accessible_org_unit_ids_for(current_user, db)
             for doc_id in request.document_ids:
                 document = document_service.get_document_by_id(doc_id, db)
                 # Visibility-Check (TF-354): 404 statt 403 — ein fremdes
                 # privates Dokument darf nicht über den RAG-Pfad leaken.
-                if not document or not is_document_visible_for(current_user, document):
+                if not document or not is_document_visible_for(
+                    current_user,
+                    document,
+                    db,
+                    accessible_org_unit_ids=accessible_org_unit_ids,
+                ):
                     raise HTTPException(
                         status_code=404,
                         detail=t("rag_document_not_found", locale=locale),
@@ -610,7 +629,7 @@ async def get_available_documents(
         # Visibility-aware (TF-354): konsistent mit list_documents — eigene
         # Docs + institution-geteilte Docs der eigenen Institution.
         query = db.query(Document)
-        query = filter_documents_for_user(query, current_user)
+        query = filter_documents_for_user(query, current_user, db)
 
         if processed_only:
             query = query.filter(Document.status == DocumentStatus.PROCESSED)

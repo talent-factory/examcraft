@@ -63,6 +63,7 @@
     "documents_rename_invalid_chars": "Il nome visualizzato contiene caratteri di controllo non validi",
     "documents_visibility_no_institution": "Condivisione con l'istituzione non possibile: nessuna istituzione assegnata",
     "documents_visibility_owner_only": "Solo il proprietario può modificare la visibilità",
+    "documents_visibility_invalid_org_unit": "Condivisione con il team non possibile: nessuna unità organizzativa propria valida indicata",
     "documents_rename_owner_only": "Solo il proprietario può rinominare questo documento",
     "documents_patch_no_fields": "È necessario fornire almeno un campo (nome visualizzato o visibilità)",
     "documents_content_not_available": "Contenuto del documento non disponibile",

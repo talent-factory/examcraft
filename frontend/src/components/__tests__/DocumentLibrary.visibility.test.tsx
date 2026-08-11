@@ -10,6 +10,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { MemoryRouter } from 'react-router-dom';
 import DocumentLibrary from '../DocumentLibrary';
 import { DocumentService } from '../../services/DocumentService';
+import { OrgUnitsService } from '../../services/orgUnitsService';
 import { Document, DocumentStatus, DocumentVisibility } from '../../types/document';
 
 jest.mock('react-i18next', () => ({
@@ -29,6 +30,9 @@ jest.mock('../../contexts/AuthContext', () => ({
 
 jest.mock('../../services/DocumentService');
 const mockDocumentService = DocumentService as jest.Mocked<typeof DocumentService>;
+
+jest.mock('../../services/orgUnitsService');
+const mockOrgUnitsService = OrgUnitsService as jest.Mocked<typeof OrgUnitsService>;
 
 const theme = createTheme();
 const wrap = (ui: React.ReactElement) => (
@@ -67,6 +71,7 @@ beforeEach(() => {
     user: { id: 42, institution_id: 7, institution: { id: 7, name: 'Test University' } },
   });
   mockDocumentService.listDocumentTags.mockResolvedValue([]);
+  mockOrgUnitsService.mine.mockResolvedValue({ items: [] });
 });
 
 describe('DocumentLibrary visibility (TF-354)', () => {
@@ -108,6 +113,7 @@ describe('DocumentLibrary visibility (TF-354)', () => {
       expect(mockDocumentService.updateVisibility).toHaveBeenCalledWith(
         1,
         DocumentVisibility.INSTITUTION,
+        undefined,
       );
     });
   });
@@ -124,5 +130,93 @@ describe('DocumentLibrary visibility (TF-354)', () => {
     expect(
       screen.queryByLabelText('components.documentLibrary.visibilityEditAria'),
     ).not.toBeInTheDocument();
+  });
+
+  it('logs and gracefully falls back when loading Org-Unit memberships fails', async () => {
+    // Regression for the bug where a rejected OrgUnitsService.mine() call was
+    // silently swallowed into an empty list with no trace anywhere (TF-620).
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockOrgUnitsService.mine.mockRejectedValue(new Error('network down'));
+    mockDocumentService.listDocuments.mockResolvedValue(paged([makeDoc({})]));
+    render(wrap(<DocumentLibrary />));
+    await screen.findByText('My Document');
+
+    await waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to load Org-Unit memberships:',
+        expect.any(Error),
+      );
+    });
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  describe('team visibility (TF-620)', () => {
+    const teamOrgUnits = [
+      {
+        id: 42,
+        parent_org_unit_id: null,
+        unit_type: 'team',
+        name: 'Backend',
+        descendant_count: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    it('owner can switch to team visibility and pick an Org-Unit', async () => {
+      mockOrgUnitsService.mine.mockResolvedValue({ items: teamOrgUnits });
+      mockDocumentService.listDocuments.mockResolvedValue(paged([makeDoc({})]));
+      mockDocumentService.updateVisibility.mockResolvedValue(
+        makeDoc({ visibility: DocumentVisibility.TEAM, org_unit_id: 42 }),
+      );
+      render(wrap(<DocumentLibrary />));
+      await screen.findByText('My Document');
+
+      fireEvent.click(screen.getByLabelText('components.documentLibrary.visibilityEditAria'));
+      expect(await screen.findByText('components.documentVisibility.title')).toBeInTheDocument();
+
+      // Order: private, team, institution — Team must be enabled now that
+      // the caller has an Org-Unit membership.
+      await waitFor(() => {
+        const radios = screen.getAllByRole('radio') as HTMLInputElement[];
+        expect(radios[1]).not.toBeDisabled();
+      });
+      fireEvent.click((screen.getAllByRole('radio') as HTMLInputElement[])[1]);
+
+      // Save stays disabled until an Org-Unit is picked (isIncompleteTeamSelection).
+      const saveButton = screen.getByRole('button', {
+        name: 'components.documentVisibility.save',
+      });
+      expect(saveButton).toBeDisabled();
+
+      fireEvent.mouseDown(
+        screen.getByText('components.documentVisibility.orgUnitPickerPlaceholder'),
+      );
+      fireEvent.click(screen.getByText('Backend'));
+
+      expect(saveButton).not.toBeDisabled();
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockDocumentService.updateVisibility).toHaveBeenCalledWith(
+          1,
+          DocumentVisibility.TEAM,
+          42,
+        );
+      });
+    });
+
+    it('team radio stays disabled when the caller has no Org-Unit memberships', async () => {
+      mockDocumentService.listDocuments.mockResolvedValue(paged([makeDoc({})]));
+      render(wrap(<DocumentLibrary />));
+      await screen.findByText('My Document');
+
+      fireEvent.click(screen.getByLabelText('components.documentLibrary.visibilityEditAria'));
+      await screen.findByText('components.documentVisibility.title');
+
+      const radios = screen.getAllByRole('radio') as HTMLInputElement[];
+      expect(radios[1]).toBeDisabled();
+    });
   });
 });

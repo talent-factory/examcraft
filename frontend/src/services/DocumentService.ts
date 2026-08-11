@@ -49,16 +49,22 @@ export class DocumentService {
   /**
    * Upload a document file.
    *
-   * @param visibility Sharing scope (TF-354). Defaults to `private` so an
-   *   upload is owner-only unless the user explicitly shares it.
+   * @param visibility Sharing scope (TF-354/TF-620). Defaults to `private` so
+   *   an upload is owner-only unless the user explicitly shares it.
+   * @param orgUnitId Target OrgUnit for `visibility=team` — required by the
+   *   backend in that case, ignored otherwise.
    */
   static async uploadDocument(
     file: File,
     visibility: DocumentVisibility = DocumentVisibility.PRIVATE,
+    orgUnitId?: number | null,
   ): Promise<DocumentUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('visibility', visibility);
+    if (visibility === DocumentVisibility.TEAM && orgUnitId != null) {
+      formData.append('org_unit_id', String(orgUnitId));
+    }
 
     // For FormData, we must NOT set Content-Type header
     // The browser will set it automatically with the correct multipart/form-data boundary
@@ -181,16 +187,24 @@ export class DocumentService {
   }
 
   /**
-   * Update a document's visibility (TF-354). Owner-only on the backend.
+   * Update a document's visibility (TF-354/TF-620). Owner-only on the backend.
+   *
+   * @param orgUnitId Target OrgUnit when switching to (or re-scoping within)
+   *   `visibility=team`. Omit when switching to `private`/`institution`.
    */
   static async updateVisibility(
     documentId: number,
     visibility: DocumentVisibility,
+    orgUnitId?: number | null,
   ): Promise<Document> {
+    const body: { visibility: DocumentVisibility; org_unit_id?: number } = { visibility };
+    if (visibility === DocumentVisibility.TEAM && orgUnitId != null) {
+      body.org_unit_id = orgUnitId;
+    }
     const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}`, {
       method: 'PATCH',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify({ visibility }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

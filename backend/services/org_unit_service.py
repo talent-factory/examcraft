@@ -10,11 +10,15 @@ Design: docs/superpowers/specs/2026-08-07-org-unit-hierarchie-design.md
 
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.org_unit import OrgUnit, UserOrgUnit
+
+logger = logging.getLogger(__name__)
 
 # Alle drei rekursiven CTEs tragen einen ``path``-Array-Guard
 # (``NOT o.id = ANY(d.path)``), obwohl der Schreibpfad (``would_create_cycle``
@@ -271,10 +275,51 @@ def delete_org_unit(db: Session, org_unit: OrgUnit) -> int:
     also vorher (via GET) angezeigt und bestaetigt werden; dieser Rueckgabewert
     dient nur der Rueckmeldung/Protokollierung durch den Aufrufer, nicht der
     Bestaetigung selbst.
+
+    Raises ``ValueError`` (-> 409 beim Aufrufer) wenn noch Dokumente auf diese
+    -- oder eine ihrer Nachfahren-OrgUnits -- via ``visibility='team'``
+    verweisen (TF-620): ``documents.org_unit_id`` hat bewusst kein
+    ``ON DELETE CASCADE/SET NULL`` (siehe Migration
+    ``tf620_doc_org_unit_scope``), also schlaegt der DB-seitige FK hier mit
+    einem ``IntegrityError`` fehl statt Dokumente stillschweigend zu loeschen
+    oder in einen Constraint-Verletzungs-Zustand zu bringen.
     """
     descendant_count = len(get_descendant_ids(db, org_unit.id)) - 1
     db.delete(org_unit)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        # ``documents.org_unit_id`` is the only FK onto org_units without
+        # ON DELETE CASCADE/SET NULL today (see docstring), so it's the only
+        # thing that can raise here in practice -- but don't just assume
+        # that's the cause: inspect the actual constraint name so a future
+        # non-cascading FK onto org_units doesn't get silently mislabeled
+        # with this specific message, and log the raw exception either way
+        # so a wrong guess is still debuggable (409s are typically treated
+        # as expected client errors and never reach error tracking) (TF-620).
+        constraint_name = getattr(
+            getattr(exc.orig, "diag", None), "constraint_name", None
+        )
+        logger.warning(
+            "delete_org_unit(id=%s, name=%r) failed on IntegrityError "
+            "(constraint=%s): %s",
+            org_unit.id,
+            org_unit.name,
+            constraint_name,
+            exc,
+            exc_info=True,
+        )
+        if constraint_name is None or "org_unit_id" in constraint_name.lower():
+            raise ValueError(
+                f"OrgUnit '{org_unit.name}' kann nicht geloescht werden: "
+                "noch Dokumente mit Team-Sichtbarkeit auf diese oder eine "
+                "untergeordnete OrgUnit beschraenkt"
+            ) from exc
+        raise ValueError(
+            f"OrgUnit '{org_unit.name}' kann nicht geloescht werden: "
+            "wird noch von anderen Datensaetzen referenziert"
+        ) from exc
     return descendant_count
 
 

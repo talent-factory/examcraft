@@ -699,6 +699,54 @@ def test_delete_org_unit_with_active_member_cascades_membership(
     assert remaining is None
 
 
+def test_delete_org_unit_referenced_by_document_returns_409(test_db: Session) -> None:
+    """API-layer counterpart to
+    test_tf620_team_org_unit_visibility.test_delete_org_unit_referenced_by_document_raises
+    -- that test only exercises the service function's ValueError; this one
+    verifies the ValueError -> HTTPException(409) mapping in
+    delete_org_unit_endpoint itself (TF-620)."""
+    from models.document import Document, DocumentStatus, DocumentVisibility
+
+    inst = _make_institution(test_db, slug="orgunit-api-409-doc")
+    admin = _make_user_with_perms(
+        test_db,
+        inst.id,
+        permissions=["manage_org_units"],
+        email="delete-doc-ref-admin@orgunit-api.ch",
+    )
+    test_db.commit()
+
+    client = _client(test_db, admin)
+    abteilung = client.post(
+        "/api/v1/org-units",
+        json={"unit_type": "abteilung", "name": "A", "parent_org_unit_id": None},
+    ).json()
+
+    doc = Document(
+        filename="ref.pdf",
+        original_filename="ref.pdf",
+        file_path="/tmp/ref.pdf",
+        file_size=1,
+        mime_type="application/pdf",
+        status=DocumentStatus.PROCESSED,
+        institution_id=inst.id,
+        user_id=admin.id,
+        visibility=DocumentVisibility.TEAM,
+        org_unit_id=abteilung["id"],
+    )
+    test_db.add(doc)
+    test_db.commit()
+
+    delete_response = client.delete(f"/api/v1/org-units/{abteilung['id']}")
+    assert delete_response.status_code == 409
+    assert "Dokumente" in delete_response.json()["detail"]
+
+    # The org unit must still exist -- the failed delete didn't half-apply.
+    assert (
+        test_db.query(OrgUnit).filter_by(id=abteilung["id"]).one_or_none() is not None
+    )
+
+
 def test_assign_and_remove_member(test_db: Session) -> None:
     inst = _make_institution(test_db, slug="orgunit-api-members")
     admin = _make_user_with_perms(

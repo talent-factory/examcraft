@@ -39,6 +39,7 @@ from services.quality_assessor import EscalationState
 from services.vector_service_factory import vector_service
 from models.document import Document, DocumentStatus, DocumentVisibility
 from models.auth import User
+from models.org_unit import OrgUnit
 from models.tag import Tag, DocumentTag, DocumentPersonalTag
 from utils.document_tags import (
     visible_tags_for_user,
@@ -54,6 +55,7 @@ from utils.document_visibility import (
     assert_document_visible_for,
     filter_documents_for_user,
 )
+from services.org_unit_service import get_user_accessible_org_unit_ids
 from tasks.document_tasks import process_document as celery_process_document
 import logging
 
@@ -94,7 +96,11 @@ class DocumentResponse(BaseModel):
     file_size: int
     mime_type: str
     status: str
-    visibility: Optional[str] = None  # 'private' | 'institution' (TF-354)
+    visibility: Optional[str] = (
+        None  # 'private' | 'team' | 'institution' (TF-354/TF-620)
+    )
+    org_unit_id: Optional[int] = None  # Set only when visibility='team' (TF-620)
+    org_unit_name: Optional[str] = None  # Resolved OrgUnit.name, for UI display
     user_id: Optional[int]  # Fixed: user_id is Integer in database, not String
     metadata: Optional[dict]
     content_preview: Optional[str]
@@ -137,6 +143,7 @@ class DocumentPatchRequest(BaseModel):
 
     display_name: Optional[str] = None
     visibility: Optional[DocumentVisibility] = None
+    org_unit_id: Optional[int] = None
 
     @field_validator("display_name")
     @classmethod
@@ -164,14 +171,20 @@ class DocumentPatchRequest(BaseModel):
         # override). An explicit ``visibility: null`` does NOT count: the
         # endpoint skips a null visibility, so a body of ``{"visibility": null}``
         # would be a silent 200 no-op. Requiring a non-null visibility here turns
-        # that dead request into a 422 instead.
+        # that dead request into a 422 instead. ``org_unit_id`` follows the same
+        # non-null rule (TF-620) — e.g. re-scoping an already team-visible
+        # document to a different OrgUnit without also touching ``visibility``.
         has_display = "display_name" in self.model_fields_set
         has_visibility = (
             "visibility" in self.model_fields_set and self.visibility is not None
         )
-        if not (has_display or has_visibility):
+        has_org_unit_id = (
+            "org_unit_id" in self.model_fields_set and self.org_unit_id is not None
+        )
+        if not (has_display or has_visibility or has_org_unit_id):
             raise ValueError(
-                "At least one of 'display_name' or 'visibility' must be provided"
+                "At least one of 'display_name', 'visibility' or "
+                "'org_unit_id' must be provided"
             )
         return self
 
@@ -203,6 +216,7 @@ class UploadResponse(BaseModel):
 async def upload_document(
     file: UploadFile = File(...),
     visibility: DocumentVisibility = Form(DocumentVisibility.PRIVATE),
+    org_unit_id: Optional[int] = Form(None),
     http_request: Request = None,
     current_user: User = Depends(require_permission("create_documents")),
     db: Session = Depends(get_db),
@@ -213,8 +227,13 @@ async def upload_document(
     **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
 
     - **file**: Dokument zum Upload (PDF, DOC, DOCX, TXT, MD)
-    - **visibility**: `private` (nur ich, Default) oder `institution` (geteilt).
-      `institution` ist nur erlaubt, wenn der User einer Institution angehört.
+    - **visibility**: `private` (nur ich, Default), `team` (geteilt mit einer
+      eigenen OrgUnit) oder `institution` (geteilt). `institution` ist nur
+      erlaubt, wenn der User einer Institution angehört; `team` erfordert
+      zusätzlich **org_unit_id** (siehe unten).
+    - **org_unit_id**: Ziel-OrgUnit für `visibility=team`. Muss eine OrgUnit
+      sein, der der Uploader selbst angehört (via GET
+      `/api/v1/org-units/mine`) — sonst 400.
 
     Returns:
         UploadResponse mit Document ID und Status
@@ -223,15 +242,39 @@ async def upload_document(
     """
     locale = get_request_locale(http_request, current_user)
 
-    # Visibility (TF-354): validate up front so we never persist a file we
-    # then reject. 'institution' requires the user to belong to one.
-    if visibility == DocumentVisibility.INSTITUTION and not current_user.institution_id:
-        raise HTTPException(
-            status_code=400,
-            detail=t("documents_visibility_no_institution", locale=locale),
-        )
-
     try:
+        # Visibility (TF-354): validate up front so we never persist a file
+        # we then reject. 'institution' requires the user to belong to one.
+        # Inside the try/except below (TF-620 fix) so an unexpected DB error
+        # from either check gets the same structured logging + localized
+        # 500 as the rest of this endpoint, instead of falling through to
+        # FastAPI's default handler.
+        if (
+            visibility == DocumentVisibility.INSTITUTION
+            and not current_user.institution_id
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=t("documents_visibility_no_institution", locale=locale),
+            )
+
+        # Visibility (TF-620): 'team' requires org_unit_id, and it must be
+        # one of the uploader's own OrgUnit memberships (not any OrgUnit in
+        # the institution — see GET /org-units/mine).
+        if visibility == DocumentVisibility.TEAM:
+            accessible = (
+                get_user_accessible_org_unit_ids(
+                    db, current_user.id, current_user.institution_id
+                )
+                if current_user.institution_id
+                else set()
+            )
+            if org_unit_id is None or org_unit_id not in accessible:
+                raise HTTPException(
+                    status_code=400,
+                    detail=t("documents_visibility_invalid_org_unit", locale=locale),
+                )
+
         # Check document limit for institution
         from utils.tenant_utils import SubscriptionLimits
 
@@ -260,6 +303,10 @@ async def upload_document(
         # Set institution_id for multi-tenancy + visibility (TF-354)
         document.institution_id = current_user.institution_id
         document.visibility = visibility
+        # TF-620: org_unit_id only meaningful for visibility=team — validated above.
+        document.org_unit_id = (
+            org_unit_id if visibility == DocumentVisibility.TEAM else None
+        )
         document.status = DocumentStatus.QUEUED  # Set to QUEUED for async processing
         db.commit()
         db.refresh(document)
@@ -368,7 +415,7 @@ async def list_documents(
     """Paginated, filterable, sortable document list with embedded stats (TF-355)."""
     locale = get_request_locale(request, current_user)
     try:
-        base = filter_documents_for_user(db.query(Document), current_user)
+        base = filter_documents_for_user(db.query(Document), current_user, db)
         if visibility == "own":
             base = base.filter(Document.user_id == current_user.id)
         elif visibility == "shared":
@@ -466,10 +513,14 @@ async def list_documents(
         # groups the rows in Python; _document_response_with_tags is reused for
         # the single-document endpoints.
         tags_by_doc = _document_tags_map([doc.id for doc in rows], current_user, db)
+        # Same batching rationale as tags_by_doc — one query for the whole
+        # page's Org-Unit names instead of one per team-visible row (TF-620).
+        org_unit_names = _org_unit_names_map([doc.org_unit_id for doc in rows], db)
         documents = []
         for doc in rows:
             doc_dict = doc.to_dict()
             doc_dict["tags"] = tags_by_doc.get(doc.id, [])
+            doc_dict["org_unit_name"] = org_unit_names.get(doc.org_unit_id)
             documents.append(DocumentResponse(**doc_dict))
         return DocumentListResponse(
             documents=documents,
@@ -618,7 +669,7 @@ async def get_document(
             )
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
-        assert_document_visible_for(current_user, document, locale=locale)
+        assert_document_visible_for(current_user, document, db, locale=locale)
 
         return _document_response_with_tags(document, current_user, db)
 
@@ -649,10 +700,14 @@ async def update_document(
       overrides the auto-extracted title; ``null``/empty/whitespace clears the
       override (falls back to the metadata-then-filename resolver). Allowed for
       any document the caller can see.
-    - **visibility**: ``private``/``institution``. **Owner-only** (SuperUser may
-      also change it) — a non-owner gets 403 even within the same institution.
-      ``institution`` requires the document to belong to an institution. Every
-      effective change is written to the audit log.
+    - **visibility**: ``private``/``team``/``institution``. **Owner-only**
+      (SuperUser may also change it) — a non-owner gets 403 even within the
+      same institution. ``institution`` requires the document to belong to an
+      institution; ``team`` requires **org_unit_id** (below). Every effective
+      change is written to the audit log.
+    - **org_unit_id**: target OrgUnit for ``visibility=team`` (own membership
+      only — see GET ``/org-units/mine``). Providing it without a resulting
+      ``visibility=team`` is a 400; leaving ``team`` clears it automatically.
 
     At least one field must be provided (422 otherwise). Field-level validation
     (length, control characters, enum membership) happens in
@@ -672,7 +727,7 @@ async def update_document(
             )
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
-        assert_document_visible_for(current_user, document, locale=locale)
+        assert_document_visible_for(current_user, document, db, locale=locale)
 
         fields_set = payload.model_fields_set
 
@@ -704,6 +759,7 @@ async def update_document(
                 )
 
         # --- Visibility: stricter — owner-only (SuperUser bypass preserved). ---
+        visibility_changed = False
         if "visibility" in fields_set and payload.visibility is not None:
             new_visibility = payload.visibility
             is_owner = (
@@ -725,6 +781,7 @@ async def update_document(
             if document.visibility != new_visibility:
                 old_visibility = document.visibility
                 document.visibility = new_visibility
+                visibility_changed = True
                 audit_entries.append(
                     {
                         "field": "visibility",
@@ -743,11 +800,106 @@ async def update_document(
                 if new_visibility != DocumentVisibility.INSTITUTION:
                     detach_institution_tags(db, document)
 
+        # --- Org-Unit scope (TF-620): tied to visibility='team'. Owner-only,
+        # same rule as visibility itself — a colleague who merely *sees* a
+        # team-scoped doc must not be able to move it to another OrgUnit. ---
+        org_unit_id_provided = (
+            "org_unit_id" in fields_set and payload.org_unit_id is not None
+        )
+        if org_unit_id_provided:
+            is_owner = (
+                document.user_id is not None and document.user_id == current_user.id
+            )
+            if not is_owner and not current_user.is_superuser:
+                raise HTTPException(
+                    status_code=403,
+                    detail=t("documents_visibility_owner_only", locale=locale),
+                )
+
+        effective_visibility = document.visibility  # reflects any change above
+        # Whether THIS request actually touches the team scope. A patch that
+        # only renames display_name on an already-team document must not
+        # re-validate org-unit membership at all (TF-620 fix) — it neither
+        # reads nor writes org_unit_id/visibility.
+        scope_touched = org_unit_id_provided or visibility_changed
+        if effective_visibility == DocumentVisibility.TEAM:
+            new_org_unit_id = (
+                payload.org_unit_id if org_unit_id_provided else document.org_unit_id
+            )
+            if scope_touched and not current_user.is_superuser:
+                # Only re-validate the CALLER's org-unit membership when this
+                # request actually sets/changes the scope. SuperUser keeps
+                # the same bypass preserved everywhere else in this endpoint
+                # (owner checks above) — without it, a SuperUser editing any
+                # team-visible document outside their own membership would
+                # always get a 400, even on an unrelated field (TF-620 fix).
+                accessible = (
+                    get_user_accessible_org_unit_ids(
+                        db, current_user.id, current_user.institution_id
+                    )
+                    if current_user.institution_id
+                    else set()
+                )
+                if new_org_unit_id is None or new_org_unit_id not in accessible:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=t(
+                            "documents_visibility_invalid_org_unit", locale=locale
+                        ),
+                    )
+            elif new_org_unit_id is None:
+                # Defensive/normally unreachable: the DB constraint requires
+                # org_unit_id whenever visibility=team, so an existing team
+                # document always already has one. Guards against ever
+                # persisting team visibility with no scope (e.g. a SuperUser
+                # flipping visibility to 'team' without supplying
+                # org_unit_id) if that invariant is ever violated upstream.
+                raise HTTPException(
+                    status_code=400,
+                    detail=t("documents_visibility_invalid_org_unit", locale=locale),
+                )
+            if document.org_unit_id != new_org_unit_id:
+                old_org_unit_id = document.org_unit_id
+                document.org_unit_id = new_org_unit_id
+                audit_entries.append(
+                    {
+                        "field": "org_unit_id",
+                        "old_org_unit_id": old_org_unit_id,
+                        "new_org_unit_id": new_org_unit_id,
+                    }
+                )
+        elif org_unit_id_provided:
+            # org_unit_id supplied without a resulting visibility='team' —
+            # reject rather than silently drop a client-provided field.
+            # Checked BEFORE the "left team" cleanup below: otherwise a
+            # simultaneous {visibility: <non-team>, org_unit_id: X} patch
+            # would silently clear org_unit_id instead of rejecting it
+            # (TF-620 fix).
+            raise HTTPException(
+                status_code=400,
+                detail=t("documents_visibility_invalid_org_unit", locale=locale),
+            )
+        elif visibility_changed and document.org_unit_id is not None:
+            # Left 'team' visibility — clear the now-meaningless scope so no
+            # row keeps a stale org_unit_id under private/institution.
+            old_org_unit_id = document.org_unit_id
+            document.org_unit_id = None
+            audit_entries.append(
+                {
+                    "field": "org_unit_id",
+                    "old_org_unit_id": old_org_unit_id,
+                    "new_org_unit_id": None,
+                }
+            )
+
         # Build the response dict BEFORE persisting so a serialisation failure
         # cannot mask an already-persisted change as a generic 500. Tags are
         # unchanged by a patch, so loading them here (pre-commit) is safe.
         response_payload = document.to_dict()
         response_payload["tags"] = _document_tag_outs(document, current_user, db)
+        response_payload["org_unit_name"] = _resolve_org_unit_name(
+            document.org_unit_id, db
+        )
 
         if audit_entries:
             # Both a rename and a visibility flip are privileged changes to
@@ -819,7 +971,7 @@ def _load_owned_document(document_id: int, current_user: User, db: Session, loca
         raise HTTPException(
             status_code=404, detail=t("documents_not_found", locale=locale)
         )
-    assert_document_visible_for(current_user, document, locale=locale)
+    assert_document_visible_for(current_user, document, db, locale=locale)
     is_owner = document.user_id is not None and document.user_id == current_user.id
     if not is_owner and not current_user.is_superuser:
         raise HTTPException(
@@ -842,7 +994,7 @@ def _load_visible_document(document_id: int, current_user: User, db: Session, lo
         raise HTTPException(
             status_code=404, detail=t("documents_not_found", locale=locale)
         )
-    assert_document_visible_for(current_user, document, locale=locale)
+    assert_document_visible_for(current_user, document, db, locale=locale)
     is_owner = (
         document.user_id is not None and document.user_id == current_user.id
     ) or current_user.is_superuser
@@ -854,7 +1006,32 @@ def _document_response_with_tags(
 ) -> DocumentResponse:
     doc_dict = document.to_dict()
     doc_dict["tags"] = _document_tag_outs(document, current_user, db)
+    doc_dict["org_unit_name"] = _resolve_org_unit_name(document.org_unit_id, db)
     return DocumentResponse(**doc_dict)
+
+
+def _resolve_org_unit_name(org_unit_id, db: Session):
+    """Single-document lookup of an OrgUnit's display name (TF-620).
+
+    Used by the single-document response paths (GET/PATCH); the paginated
+    list endpoint uses ``_org_unit_names_map`` instead to avoid an N+1.
+    """
+    if org_unit_id is None:
+        return None
+    return db.query(OrgUnit.name).filter(OrgUnit.id == org_unit_id).scalar()
+
+
+def _org_unit_names_map(org_unit_ids, db: Session) -> "dict[int, str]":
+    """Batch lookup of OrgUnit names for a page of documents (TF-620).
+
+    Mirrors ``_document_tags_map``'s batching rationale: one query per page
+    instead of one per row.
+    """
+    ids = {oid for oid in org_unit_ids if oid is not None}
+    if not ids:
+        return {}
+    rows = db.query(OrgUnit.id, OrgUnit.name).filter(OrgUnit.id.in_(ids)).all()
+    return {row[0]: row[1] for row in rows}
 
 
 def _document_tag_outs(
@@ -1326,7 +1503,7 @@ async def download_document(
             )
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
-        assert_document_visible_for(current_user, document, locale=locale)
+        assert_document_visible_for(current_user, document, db, locale=locale)
 
         return await _build_document_file_response(
             document, locale=locale, inline=False, caller_id=current_user.id
@@ -1372,7 +1549,7 @@ async def get_document_raw(
             )
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
-        assert_document_visible_for(current_user, document, locale=locale)
+        assert_document_visible_for(current_user, document, db, locale=locale)
 
         return await _build_document_file_response(
             document, locale=locale, inline=True, caller_id=current_user.id
@@ -1418,7 +1595,7 @@ async def get_document_status(
             )
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
-        assert_document_visible_for(current_user, document, locale=locale)
+        assert_document_visible_for(current_user, document, db, locale=locale)
 
         # Get Celery task status if task_id exists
         task_status = None
@@ -1667,7 +1844,7 @@ async def get_document_content(
             )
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
-        assert_document_visible_for(current_user, document, locale=locale)
+        assert_document_visible_for(current_user, document, db, locale=locale)
 
         # Hole vollständigen Inhalt vom Document Service
         content = await document_service.get_full_document_content(document_id, db)
@@ -1729,7 +1906,7 @@ async def get_document_chunks(
             )
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
-        assert_document_visible_for(current_user, document, locale=locale)
+        assert_document_visible_for(current_user, document, db, locale=locale)
 
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(
@@ -1795,7 +1972,7 @@ async def get_document_chunks_paginated(
             )
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
-        assert_document_visible_for(current_user, document, locale=locale)
+        assert_document_visible_for(current_user, document, db, locale=locale)
 
         if document.status != DocumentStatus.PROCESSED:
             raise HTTPException(
