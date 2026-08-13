@@ -19,6 +19,7 @@ import {
   NavigationGroup,
 } from '../../hooks/useRoleBasedNavigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { SIDEBAR_REVEAL_NAV_EVENT, SidebarRevealNavDetail } from './sidebarNavReveal';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -100,6 +101,75 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
   useEffect(() => {
     writeStoredGroups([...expandedGroups]);
   }, [expandedGroups]);
+
+  // External reveal requests (TF-604): the onboarding tour highlights nav links
+  // by data-testid, but a collapsed group renders no items at all — the tour
+  // used to silently skip those steps. Expanding is additive, like the
+  // active-route rule above.
+  useEffect(() => {
+    const handleReveal = (event: Event) => {
+      const path = (event as CustomEvent<SidebarRevealNavDetail>).detail?.path;
+      if (!path) return;
+
+      let owner: NavigationGroup | undefined;
+      let ownerParentPath: string | undefined;
+      for (const group of navigationGroups) {
+        if (group.items.some((item) => item.path === path)) {
+          owner = group;
+          break;
+        }
+        const parentItem = group.items.find((item) =>
+          item.children?.some((child) => child.path === path),
+        );
+        if (parentItem) {
+          owner = group;
+          ownerParentPath = parentItem.path;
+          break;
+        }
+      }
+      // Unknown route -- filtered out by RBAC, the user's nav context not
+      // loaded yet, or not in the nav config at all (see sidebarNavReveal.ts
+      // for why these can't be told apart here). Logged at debug level: this
+      // branch only runs when a Sidebar IS mounted and DID receive the
+      // event, so a log here at least confirms that much -- unlike "no
+      // Sidebar mounted", which produces no signal anywhere by construction
+      // (fire-and-forget event, review fix for observability).
+      if (!owner) {
+        console.debug('[sidebar] reveal request for unresolved route:', path);
+        return;
+      }
+
+      const ownerId = owner.id;
+      setExpandedGroups((prev) => {
+        if (prev.has(ownerId)) return prev;
+        const next = new Set(prev);
+        next.add(ownerId);
+        return next;
+      });
+
+      // Review fix: a route nested under item.children needs its parent
+      // item's own expandedItems entry too -- the group being open isn't
+      // enough, the submenu additionally gates on isExpanded (renderNavItem
+      // below). Without this, revealing a child route would open the group,
+      // still never render the link, and the caller's poll would time out —
+      // reproducing this PR's own bug one level deeper. Currently unreachable
+      // (no group in useRoleBasedNavigation defines children yet), kept
+      // correct so the reveal mechanism doesn't silently break the day one
+      // does.
+      if (ownerParentPath) {
+        const parentPath = ownerParentPath;
+        setExpandedItems((prev) => {
+          if (prev.has(parentPath)) return prev;
+          const next = new Set(prev);
+          next.add(parentPath);
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener(SIDEBAR_REVEAL_NAV_EVENT, handleReveal);
+    return () => window.removeEventListener(SIDEBAR_REVEAL_NAV_EVENT, handleReveal);
+  }, [navigationGroups]);
 
   // Auto-expand items whose child route is currently open.
   useEffect(() => {

@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MemoryRouter } from 'react-router-dom';
+import { SIDEBAR_REVEAL_NAV_EVENT, SidebarRevealNavDetail } from '../../layout/sidebarNavReveal';
 
 // Capture driver.js calls so tests can trigger callbacks
 let capturedHighlightConfig: any = null;
@@ -110,24 +111,153 @@ describe('HelpOnboarding — confirmation dialog', () => {
 });
 
 describe('HelpOnboarding — nav_selector not in DOM', () => {
-  it('calls onSkipStep to skip when nav_selector element is absent', async () => {
-    // Remove the nav element injected by beforeEach so this test has it absent
+  it('calls onSkipStep to skip when nav_selector element stays absent', async () => {
+    // Remove the nav element injected by beforeEach so this test has it absent.
+    // Nothing answers the reveal request (no sidebar), so the step is skipped
+    // once the reveal budget is exhausted.
     navDocumentsEl?.remove();
 
     const onSkipStep = jest.fn().mockResolvedValue(undefined);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    // Fake timers (review fix): the real-timer version of this test only had
+    // ~250ms margin over the ~550ms worst case (500ms budget + one 50ms poll
+    // tick), which is thin under a loaded/parallel CI runner. Advancing fake
+    // timers makes the wait deterministic and exact instead of "hopefully
+    // enough margin".
+    jest.useFakeTimers();
 
-    renderOnboarding({
-      active: true,
-      status: { ...mockStatus, current_step: 1 },
-      steps: [doneStep, navStep, doneStep],
-      onSkipStep,
-    });
+    try {
+      renderOnboarding({
+        active: true,
+        status: { ...mockStatus, current_step: 1 },
+        steps: [doneStep, navStep, doneStep],
+        onSkipStep,
+      });
 
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 50));
-    });
+      // This Jest install exposes only legacy-style fake timers (no
+      // jest.advanceTimersByTimeAsync) -- advance synchronously inside
+      // act(async () => ...) so the microtask queue (onSkipStep's .then)
+      // still gets a chance to flush between timer callbacks.
+      await act(async () => {
+        jest.advanceTimersByTime(600);
+      });
 
-    expect(onSkipStep).toHaveBeenCalledWith(1);
+      expect(onSkipStep).toHaveBeenCalledWith(1);
+      // TF-604: skipping must no longer be silent.
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Step 1 skipped'));
+    } finally {
+      warnSpy.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe('HelpOnboarding — nav_selector already in DOM (fast path)', () => {
+  it('highlights synchronously without dispatching a reveal request', () => {
+    // navDocumentsEl is already in the DOM from beforeEach -- the opposite
+    // fixture from the collapsed-sidebar tests below. This locks in the PR's
+    // own stated goal ("ein bereits gerenderter Link wird weiterhin synchron
+    // gehighlightet — kein zusätzliches Flackern") as a dedicated assertion
+    // instead of relying on it as an incidental side effect of the unrelated
+    // confirmation-dialog tests above (review fix).
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+    const onSkipStep = jest.fn().mockResolvedValue(undefined);
+
+    try {
+      renderOnboarding({
+        active: true,
+        status: { ...mockStatus, current_step: 1 },
+        steps: [doneStep, navStep, doneStep],
+        onSkipStep,
+      });
+
+      // No wait on purpose: if the fast path regressed to always going
+      // through waitForNavElement's setTimeout chain, this assertion fails
+      // immediately rather than needing a timing-dependent wait to notice.
+      expect(mockHighlight).toHaveBeenCalled();
+      expect(capturedHighlightConfig?.element).toBe("[data-testid='nav-documents']");
+      expect(onSkipStep).not.toHaveBeenCalled();
+
+      const revealDispatched = dispatchSpy.mock.calls.some(
+        ([event]) => (event as CustomEvent).type === SIDEBAR_REVEAL_NAV_EVENT,
+      );
+      expect(revealDispatched).toBe(false);
+    } finally {
+      dispatchSpy.mockRestore();
+    }
+  });
+});
+
+describe('HelpOnboarding — collapsed sidebar group (TF-604)', () => {
+  /**
+   * Stand-in for the Sidebar: renders the nav link only once a reveal request
+   * for its route arrives — mirroring a collapsed group whose items are not in
+   * the DOM until it is expanded.
+   */
+  const mountCollapsedSidebar = (route: string, testId: string) => {
+    let el: HTMLElement | null = null;
+    const listener = (event: Event) => {
+      const detail = (event as CustomEvent<SidebarRevealNavDetail>).detail;
+      if (detail?.path !== route || el) return;
+      el = document.createElement('a');
+      el.setAttribute('data-testid', testId);
+      document.body.appendChild(el);
+    };
+    window.addEventListener(SIDEBAR_REVEAL_NAV_EVENT, listener);
+    return () => {
+      window.removeEventListener(SIDEBAR_REVEAL_NAV_EVENT, listener);
+      el?.remove();
+    };
+  };
+
+  it('reveals the nav link and highlights it instead of skipping the step', async () => {
+    navDocumentsEl?.remove();
+    const cleanup = mountCollapsedSidebar('/documents', 'nav-documents');
+    const onSkipStep = jest.fn().mockResolvedValue(undefined);
+
+    try {
+      renderOnboarding({
+        active: true,
+        status: { ...mockStatus, current_step: 1 },
+        steps: [doneStep, navStep, doneStep],
+        onSkipStep,
+      });
+
+      await act(async () => {
+        await new Promise(r => setTimeout(r, 200));
+      });
+
+      expect(onSkipStep).not.toHaveBeenCalled();
+      expect(capturedHighlightConfig?.element).toBe("[data-testid='nav-documents']");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('also reveals links for steps without an explicit nav_selector', async () => {
+    // Selector derived from the route — same collapsed-group problem.
+    const derivedStep: OnboardingStep = { ...navStep, nav_selector: null };
+    navDocumentsEl?.remove();
+    const cleanup = mountCollapsedSidebar('/documents', 'nav-documents');
+    const onSkipStep = jest.fn().mockResolvedValue(undefined);
+
+    try {
+      renderOnboarding({
+        active: true,
+        status: { ...mockStatus, current_step: 1 },
+        steps: [doneStep, derivedStep, doneStep],
+        onSkipStep,
+      });
+
+      await act(async () => {
+        await new Promise(r => setTimeout(r, 200));
+      });
+
+      expect(onSkipStep).not.toHaveBeenCalled();
+      expect(capturedHighlightConfig?.element).toBe("[data-testid='nav-documents']");
+    } finally {
+      cleanup();
+    }
   });
 });
 

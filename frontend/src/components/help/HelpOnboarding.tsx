@@ -17,7 +17,63 @@ import {
   Button,
   Typography,
 } from '@mui/material';
+import * as Sentry from '@sentry/react';
 import { OnboardingStatus } from '../../services/HelpService';
+import { requestSidebarNavReveal } from '../layout/sidebarNavReveal';
+
+/**
+ * How long to wait for a nav link to show up after asking the sidebar to
+ * reveal its group (TF-604). Only spent when the link is missing initially.
+ * Revealing goes through a React state update + re-render on the Sidebar
+ * side, not a synchronous DOM write, so it can take more than one poll tick —
+ * the budget (10 ticks at the default interval) is deliberately generous
+ * rather than tuned to a measured "usually resolves in N ticks" figure.
+ */
+const NAV_REVEAL_TIMEOUT_MS = 500;
+const NAV_REVEAL_POLL_MS = 50;
+
+/**
+ * Resolve a nav element, asking the sidebar to open its group if it is not in
+ * the DOM yet. Resolves with `null` once the budget is exhausted — this does
+ * NOT necessarily mean the link is RBAC-filtered for this user; it also
+ * covers the route not being in the nav config at all, or the sidebar's user
+ * context not being loaded yet. Callers should treat `null` as "not
+ * reachable via the sidebar right now", not as a confirmed permission check.
+ *
+ * `isCancelled`/`registerTimeout` let the caller cancel a pending poll on
+ * unmount (TF-604 review fix): without them, an in-flight poll outlives an
+ * unmounted HelpOnboarding and its resolution can fire a stale API write
+ * (`onSkipStep`) or inject a driver.js overlay nothing will ever clean up.
+ * When `isCancelled()` is true the returned promise is left permanently
+ * pending — deliberately, so `.then()` on the caller's side never runs.
+ */
+const waitForNavElement = (
+  selector: string,
+  route: string | null,
+  isCancelled: () => boolean,
+  registerTimeout: (id: ReturnType<typeof setTimeout>) => void,
+): Promise<Element | null> => {
+  const existing = document.querySelector(selector);
+  if (existing) return Promise.resolve(existing);
+  // Without a route the sidebar cannot resolve a group — nothing to ask for.
+  if (!route) return Promise.resolve(null);
+
+  requestSidebarNavReveal(route);
+
+  return new Promise((resolve) => {
+    const deadline = Date.now() + NAV_REVEAL_TIMEOUT_MS;
+    const poll = () => {
+      if (isCancelled()) return;
+      const el = document.querySelector(selector);
+      if (el || Date.now() >= deadline) {
+        resolve(el);
+        return;
+      }
+      registerTimeout(setTimeout(poll, NAV_REVEAL_POLL_MS));
+    };
+    registerTimeout(setTimeout(poll, NAV_REVEAL_POLL_MS));
+  });
+};
 
 export interface OnboardingStep {
   step: number;
@@ -90,6 +146,50 @@ const HelpOnboarding: React.FC<HelpOnboardingProps> = ({
     }
   }, []);
 
+  // ── SKIPPING ────────────────────────────────────────────────────
+
+  // Forward ref to allow mutual recursion between startStep and the highlight
+  // callbacks below.
+  const startStepRef = useRef<(stepIdx: number) => void>(() => {});
+
+  // TF-604 review fix: waitForNavElement's poll chain has no cleanup of its
+  // own (it is a plain module-level function, not a hook) — these let the
+  // unmount effect near the bottom of this component cancel a pending poll
+  // instead of letting it resolve against an unmounted component.
+  const isUnmountedRef = useRef(false);
+  const pendingPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Record the step as skipped and move on.
+   *
+   * Skipping is a legitimate path (a step whose route the user has no access
+   * to), but it used to be completely silent — which is how TF-604 hid a whole
+   * broken tour behind a "completed" flag. console.warn makes it visible to
+   * anyone with devtools open; Sentry.captureMessage (same pattern as
+   * Aktivitaeten.tsx) makes it visible without anyone needing to be looking —
+   * the BWZ-Lyss workshop bug went unnoticed precisely because nobody was.
+   */
+  const skipAndAdvance = useCallback(
+    (stepIdx: number, reason: string) => {
+      const step = stepsRef.current[stepIdx];
+      console.warn(`[onboarding] Step ${step?.step} skipped: ${reason}`);
+      Sentry.captureMessage('[onboarding] step skipped', {
+        level: 'warning',
+        tags: { feature: 'onboarding', step: step?.step },
+        extra: { reason },
+      });
+      onSkipStep(step.step).then(() => {
+        const next = stepIdx + 1;
+        if (next < stepsRef.current.length) {
+          startStepRef.current(next);
+        } else {
+          onTourComplete();
+        }
+      });
+    },
+    [onSkipStep, onTourComplete],
+  );
+
   // ── SPOTLIGHTING ────────────────────────────────────────────────
 
   const highlightStep = useCallback(
@@ -117,14 +217,7 @@ const HelpOnboarding: React.FC<HelpOnboardingProps> = ({
 
       const el = document.querySelector(step.highlight_selector!);
       if (!el) {
-        onSkipStep(step.step).then(() => {
-          const next = stepIdx + 1;
-          if (next < stepsRef.current.length) {
-            startStepRef.current(next);
-          } else {
-            onTourComplete();
-          }
-        });
+        skipAndAdvance(stepIdx, `highlight element ${step.highlight_selector} not in DOM`);
         return;
       }
 
@@ -171,40 +264,14 @@ const HelpOnboarding: React.FC<HelpOnboardingProps> = ({
       driverRef.current = d;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [locale, destroyDriver, onCompleteStep, onTourComplete],
+    [locale, destroyDriver, onCompleteStep, onTourComplete, skipAndAdvance],
   );
 
   // ── NAVIGATING ──────────────────────────────────────────────────
 
-  const highlightNavStep = useCallback(
-    (stepIdx: number, navSelectorOverride?: string) => {
+  const showNavHighlight = useCallback(
+    (stepIdx: number, navSelector: string) => {
       const step = stepsRef.current[stepIdx];
-      const navSelector = navSelectorOverride ?? step?.nav_selector;
-      if (!navSelector) {
-        // No nav link to guide — skip step rather than waiting silently
-        onSkipStep(step.step).then(() => {
-          const next = stepIdx + 1;
-          if (next < stepsRef.current.length) {
-            startStepRef.current(next);
-          } else {
-            onTourComplete();
-          }
-        });
-        return;
-      }
-
-      // Skip immediately if nav element is not in DOM — no flicker, no delay
-      if (!document.querySelector(navSelector)) {
-        onSkipStep(step.step).then(() => {
-          const next = stepIdx + 1;
-          if (next < stepsRef.current.length) {
-            startStepRef.current(next);
-          } else {
-            onTourComplete();
-          }
-        });
-        return;
-      }
 
       destroyDriver();
       pendingSpotlightRef.current = stepIdx;
@@ -242,7 +309,45 @@ const HelpOnboarding: React.FC<HelpOnboardingProps> = ({
       driverRef.current = d;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [locale, destroyDriver, onCompleteStep, onTourComplete],
+    [locale, destroyDriver],
+  );
+
+  const highlightNavStep = useCallback(
+    (stepIdx: number, navSelector: string) => {
+      const step = stepsRef.current[stepIdx];
+
+      // Fast path: link already rendered — highlight synchronously, no flicker.
+      if (document.querySelector(navSelector)) {
+        showNavHighlight(stepIdx, navSelector);
+        return;
+      }
+
+      // TF-604: a missing link usually means its sidebar group is collapsed
+      // (TF-372 renders group items conditionally), not that the user lacks
+      // access. Ask the sidebar to open the group and retry before skipping.
+      waitForNavElement(
+        navSelector,
+        step.route,
+        () => isUnmountedRef.current,
+        (id) => { pendingPollTimeoutRef.current = id; },
+      ).then((el) => {
+        // Review fix: the user may have navigated to the step's own route
+        // while the reveal was pending. Highlighting a nav link for a page
+        // that's already open produces no click/navigation, so the tour
+        // would stall until manually aborted — re-enter startStep so it
+        // re-evaluates fresh and takes the "already there" branch instead.
+        if (step.route && locationRef.current.pathname === step.route) {
+          startStepRef.current(stepIdx);
+          return;
+        }
+        if (el) {
+          showNavHighlight(stepIdx, navSelector);
+        } else {
+          skipAndAdvance(stepIdx, `nav element ${navSelector} not in DOM after reveal`);
+        }
+      });
+    },
+    [showNavHighlight, skipAndAdvance],
   );
 
   // ── TAB_NAVIGATING ────────────────────────────────────────────────
@@ -258,14 +363,7 @@ const HelpOnboarding: React.FC<HelpOnboardingProps> = ({
       // If tab button not in DOM (tab not visible for this user) — skip step
       const tabEl = document.querySelector(step.tab_selector);
       if (!tabEl) {
-        onSkipStep(step.step).then(() => {
-          const next = stepIdx + 1;
-          if (next < stepsRef.current.length) {
-            startStepRef.current(next);
-          } else {
-            onTourComplete();
-          }
-        });
+        skipAndAdvance(stepIdx, `tab element ${step.tab_selector} not in DOM`);
         return;
       }
 
@@ -317,13 +415,10 @@ const HelpOnboarding: React.FC<HelpOnboardingProps> = ({
       observer.observe(document.body, { childList: true, subtree: true });
       observerRef.current = observer;
     },
-    [locale, destroyDriver, disconnectObserver, onCompleteStep, onSkipStep, onTourComplete, highlightStep],
+    [locale, destroyDriver, disconnectObserver, skipAndAdvance, highlightStep],
   );
 
   // ── ROUTING LOGIC ───────────────────────────────────────────────
-
-  // Forward ref to allow mutual recursion between startStep and highlightStep
-  const startStepRef = useRef<(stepIdx: number) => void>(() => {});
 
   const startStep = useCallback(
     (stepIdx: number) => {
@@ -344,27 +439,16 @@ const HelpOnboarding: React.FC<HelpOnboardingProps> = ({
         return;
       }
 
-      if (step.nav_selector) {
-        highlightNavStep(stepIdx);
-      } else {
-        // No explicit nav_selector — derive it from the route (matches Sidebar data-testid pattern)
-        const derivedSelector = `[data-testid='nav-${step.route.slice(1).replace(/\//g, '-')}']`;
-        if (document.querySelector(derivedSelector)) {
-          highlightNavStep(stepIdx, derivedSelector);
-        } else {
-          // Nav element not in DOM → user has no access to this route → skip step
-          onSkipStep(step.step).then(() => {
-            const next = stepIdx + 1;
-            if (next < stepsRef.current.length) {
-              startStepRef.current(next);
-            } else {
-              onTourComplete();
-            }
-          });
-        }
-      }
+      // Without an explicit nav_selector, derive it from the route (matches the
+      // Sidebar data-testid pattern). highlightNavStep handles a link that is
+      // not in the DOM — reveal first, skip only if it stays absent.
+      // `||` (not `??`): an empty-string nav_selector must also fall through
+      // to the derived selector — `document.querySelector('')` throws a
+      // SyntaxError and would kill the tour outright (review fix).
+      const derivedSelector = `[data-testid='nav-${step.route.slice(1).replace(/\//g, '-')}']`;
+      highlightNavStep(stepIdx, step.nav_selector || derivedSelector);
     },
-    [highlightStep, highlightTabStep, highlightNavStep, onCompleteStep, onSkipStep, onTourComplete],
+    [highlightStep, highlightTabStep, highlightNavStep, onCompleteStep, onTourComplete],
   );
 
   useEffect(() => { startStepRef.current = startStep; }, [startStep]);
@@ -421,7 +505,22 @@ const HelpOnboarding: React.FC<HelpOnboardingProps> = ({
   }, [active]);
 
   // Cleanup on unmount
-  useEffect(() => () => { destroyDriver(); disconnectObserver(); }, [destroyDriver, disconnectObserver]);
+  useEffect(
+    () => () => {
+      // Review fix: stop any in-flight waitForNavElement poll immediately
+      // (clearTimeout) and flip isUnmountedRef so a poll tick already queued
+      // in the event loop bails out via its isCancelled() check instead of
+      // resolving into a stale showNavHighlight/skipAndAdvance call.
+      isUnmountedRef.current = true;
+      if (pendingPollTimeoutRef.current) {
+        clearTimeout(pendingPollTimeoutRef.current);
+        pendingPollTimeoutRef.current = null;
+      }
+      destroyDriver();
+      disconnectObserver();
+    },
+    [destroyDriver, disconnectObserver],
+  );
 
   // ── CONFIRMATION DIALOG ─────────────────────────────────────────
 

@@ -3,9 +3,10 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Sidebar } from '../Sidebar';
+import { requestSidebarNavReveal } from '../sidebarNavReveal';
 import { AuthProvider } from '../../../contexts/AuthContext';
 
 // Mock apiClient (uses axios ESM which Jest cannot transform)
@@ -151,6 +152,61 @@ describe('Sidebar Component — groups', () => {
     renderAt('/admin');
     expect(screen.getByText('Dashboard')).toBeInTheDocument(); // restored, still open
     expect(screen.getByText('Admin')).toBeInTheDocument(); // active → force-opened
+  });
+
+  describe('external reveal requests (TF-604)', () => {
+    it('expands the group owning the requested route', () => {
+      renderAt('/dashboard');
+      expect(screen.queryByText('Admin')).not.toBeInTheDocument();
+
+      act(() => requestSidebarNavReveal('/admin'));
+
+      // The link must now be in the DOM so the onboarding tour can highlight it.
+      expect(screen.getByTestId('nav-admin')).toBeInTheDocument();
+    });
+
+    it('leaves already-open groups untouched for an unknown route', () => {
+      renderAt('/dashboard');
+      // Pre-open a non-active group by hand so the no-op is proven against
+      // arbitrary existing state, not just the fixture's own default (review
+      // fix: the previous version only checked the state the component
+      // happens to initialize into, which a routing bug could satisfy by
+      // accident).
+      fireEvent.click(screen.getByTestId('nav-group-administration'));
+      expect(screen.getByText('Admin')).toBeInTheDocument();
+
+      act(() => requestSidebarNavReveal('/does-not-exist'));
+
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('Admin')).toBeInTheDocument();
+    });
+
+    it('stops listening after unmount', () => {
+      const { unmount } = renderAt('/dashboard');
+      unmount();
+
+      // No sidebar mounted — the request must not throw or resurrect state.
+      expect(() => act(() => requestSidebarNavReveal('/admin'))).not.toThrow();
+      expect(screen.queryByText('Admin')).not.toBeInTheDocument();
+    });
+
+    it('is idempotent: revealing an already-expanded group repeatedly stays a no-op', () => {
+      // The active group ("overview") is already expanded on mount. A tour
+      // with several steps in the same group can legitimately fire multiple
+      // reveal requests for it -- each one beyond the first must be a true
+      // no-op (review fix; the underlying `prev.has(owner.id)` guard existed
+      // before but had no dedicated test).
+      renderAt('/dashboard');
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+
+      act(() => requestSidebarNavReveal('/dashboard'));
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+
+      act(() => requestSidebarNavReveal('/dashboard'));
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      // Nothing else got pulled open as a side effect of the repeated calls.
+      expect(screen.queryByText('Admin')).not.toBeInTheDocument();
+    });
   });
 
   describe('icon-only mode (isOpen=false)', () => {
