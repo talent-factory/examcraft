@@ -232,6 +232,50 @@ def test_delete_org_unit_returns_descendant_count(test_db):
     assert test_db.query(OrgUnit).filter(OrgUnit.id == team.id).one_or_none() is None
 
 
+def test_create_org_unit_with_nonexistent_role_id_raises_role_specific_error(test_db):
+    """TF-637 review fix: the ``except IntegrityError`` block pre-dates the
+    ``role_id`` FK and was written only for the sibling-name-unique-index
+    race. A dangling ``role_id`` (e.g. the Role was deleted between the
+    API's validation check and this commit -- a TOCTOU window) must not be
+    silently mislabeled as "name already exists"; it needs its own,
+    correctly-attributed error message instead."""
+    inst = _make_institution(test_db, slug="orgunit-svc-bad-role-create")
+
+    with pytest.raises(ValueError, match="Verliehene Rolle"):
+        create_org_unit(
+            test_db,
+            institution_id=inst.id,
+            unit_type="team",
+            name="Team Backend",
+            parent_org_unit_id=None,
+            role_id=999999,
+        )
+
+
+def test_move_org_unit_with_dangling_staged_role_id_raises_role_specific_error(
+    test_db,
+):
+    """Same TOCTOU window as above, but reached via move_org_unit's commit:
+
+    api/org_units.py::update_org_unit_endpoint stages ``role_id`` directly
+    on the ORM object *before* calling move_org_unit when a reparent is
+    requested in the same PATCH -- move_org_unit's commit persists the
+    whole pending transaction, role_id included."""
+    inst = _make_institution(test_db, slug="orgunit-svc-bad-role-move")
+    abteilung, team, _subteam = _make_three_level_tree(test_db, inst)
+    other = create_org_unit(
+        test_db,
+        institution_id=inst.id,
+        unit_type="abteilung",
+        name="HR",
+        parent_org_unit_id=None,
+    )
+    team.role_id = 999999  # staged, not yet committed -- simulates the API layer
+
+    with pytest.raises(ValueError, match="Verliehene Rolle"):
+        move_org_unit(test_db, team, other.id)
+
+
 def test_assign_and_remove_user_membership(test_db):
     inst = _make_institution(test_db, slug="orgunit-crud-membership")
     abteilung = create_org_unit(

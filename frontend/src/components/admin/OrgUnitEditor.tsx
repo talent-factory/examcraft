@@ -30,6 +30,8 @@ import {
 import { OrgUnitOut } from '../../types/orgUnit';
 import { OrgUnitsService } from '../../services/orgUnitsService';
 import { ApiError } from '../../services/submissionsService';
+import AdminService from '../../services/AdminService';
+import { Role } from '../../types/auth';
 
 export interface OrgUnitEditorProps {
   open: boolean;
@@ -73,6 +75,8 @@ const OrgUnitEditor: React.FC<OrgUnitEditorProps> = ({
   const [name, setName] = useState('');
   const [unitType, setUnitType] = useState('');
   const [parentOrgUnitId, setParentOrgUnitId] = useState<number | ''>('');
+  const [roleId, setRoleId] = useState<number | ''>('');
+  const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,13 +86,37 @@ const OrgUnitEditor: React.FC<OrgUnitEditorProps> = ({
       setName(orgUnit.name);
       setUnitType(orgUnit.unit_type);
       setParentOrgUnitId(orgUnit.parent_org_unit_id ?? '');
+      setRoleId(orgUnit.role_id ?? '');
     } else {
       setName('');
       setUnitType('');
       setParentOrgUnitId('');
+      setRoleId('');
     }
     setError(null);
   }, [open, orgUnit]);
+
+  // Granted Role picker (TF-637): reuses the same role catalogue as
+  // RoleAssignmentDialog.tsx (GET /api/admin/roles) rather than introducing
+  // a second source of truth for "which roles exist".
+  //
+  // Review fix: a failed fetch used to be swallowed into an empty list
+  // with no signal, indistinguishable from "this institution genuinely
+  // has no roles" -- an admin opening the dialog during a transient API
+  // hiccup would silently lose the ability to set a Granted Role, with no
+  // indication anything went wrong. Surfaced via the same `error`/`Alert`
+  // mechanism handleSave already uses below, matching the pattern
+  // RoleAssignmentDialog.tsx uses for the identical call.
+  useEffect(() => {
+    if (!open) return;
+    AdminService.listRoles()
+      .then(setAllRoles)
+      .catch(err => {
+        console.error('Failed to load role catalogue for OrgUnitEditor', err);
+        setAllRoles([]);
+        setError(t('admin.orgUnits.failedLoadRoles'));
+      });
+  }, [open, t]);
 
   const excludedParentIds = useMemo(
     () => (orgUnit ? descendantIds(allOrgUnits, orgUnit.id) : new Set<number>()),
@@ -113,17 +141,20 @@ const OrgUnitEditor: React.FC<OrgUnitEditorProps> = ({
     setError(null);
     try {
       const parentValue = parentOrgUnitId === '' ? null : parentOrgUnitId;
+      const roleValue = roleId === '' ? null : roleId;
       if (isEdit && orgUnit) {
         await OrgUnitsService.update(orgUnit.id, {
           name,
           parent_org_unit_id: parentValue,
           move_to_root: parentValue === null,
+          role_id: roleValue,
         });
       } else {
         await OrgUnitsService.create({
           name,
           unit_type: unitType,
           parent_org_unit_id: parentValue,
+          role_id: roleValue,
         });
       }
       onSaved();
@@ -195,6 +226,22 @@ const OrgUnitEditor: React.FC<OrgUnitEditorProps> = ({
           {parentOptions.map(option => (
             <MenuItem key={option.id} value={option.id}>
               {option.name}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          select
+          label={t('admin.orgUnits.fieldGrantedRole')}
+          value={roleId}
+          onChange={e => setRoleId(e.target.value === '' ? '' : Number(e.target.value))}
+          fullWidth
+          margin="normal"
+          SelectProps={{ 'data-testid': 'ou-editor-field-role' } as never}
+        >
+          <MenuItem value="">{t('admin.orgUnits.fieldGrantedRoleNone')}</MenuItem>
+          {allRoles.map(role => (
+            <MenuItem key={role.id} value={role.id}>
+              {role.display_name}
             </MenuItem>
           ))}
         </TextField>

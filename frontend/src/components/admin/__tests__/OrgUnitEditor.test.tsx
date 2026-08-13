@@ -5,6 +5,10 @@
  * create/edit dialog (name + unit_type dropdown + parent selection), the
  * move_to_root wiring on edit, and the cycle-prevention filter that excludes
  * a unit's own descendants from its parent dropdown.
+ *
+ * TF-637 adds the Granted Role picker: which Role (if any) this OrgUnit
+ * grants to its direct members. Distinct from the Membership Label free
+ * text (OrgUnitAssignmentDialog.tsx) -- see CONTEXT.md.
  */
 
 import React from 'react';
@@ -14,10 +18,20 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 import OrgUnitEditor from '../OrgUnitEditor';
 import { OrgUnitsService } from '../../../services/orgUnitsService';
+import AdminService from '../../../services/AdminService';
 import { OrgUnitOut } from '../../../types/orgUnit';
+import { Role } from '../../../types/auth';
 
 jest.mock('../../../services/orgUnitsService');
+jest.mock('../../../services/AdminService', () => ({
+  __esModule: true,
+  default: {
+    listRoles: jest.fn(),
+  },
+}));
+
 const mockedService = OrgUnitsService as jest.Mocked<typeof OrgUnitsService>;
+const mockedAdminService = AdminService as jest.Mocked<typeof AdminService>;
 
 const theme = createTheme();
 const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -31,8 +45,23 @@ function makeUnit(overrides: Partial<OrgUnitOut> = {}): OrgUnitOut {
     unit_type: 'abteilung',
     name: 'Informatik',
     descendant_count: 0,
+    role_id: null,
+    role_name: null,
     created_at: '2026-08-07T00:00:00Z',
     updated_at: '2026-08-07T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function makeRole(overrides: Partial<Role> = {}): Role {
+  return {
+    id: 1,
+    name: 'backend_grader',
+    display_name: 'Backend-Grader',
+    description: null,
+    permissions: [],
+    is_system_role: false,
+    created_at: '2026-08-01T00:00:00Z',
     ...overrides,
   };
 }
@@ -44,7 +73,10 @@ async function selectDropdownOption(labelName: string, optionName: string) {
   fireEvent.click(option);
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockedAdminService.listRoles.mockResolvedValue([]);
+});
 
 describe('OrgUnitEditor — create', () => {
   it('submits unit_type from the dropdown, not free text', async () => {
@@ -76,6 +108,7 @@ describe('OrgUnitEditor — create', () => {
       name: 'Backend-Team',
       unit_type: 'team',
       parent_org_unit_id: null,
+      role_id: null,
     });
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     await waitFor(() => expect(onClose).toHaveBeenCalled());
@@ -123,7 +156,78 @@ describe('OrgUnitEditor — create', () => {
       name: 'Backend',
       unit_type: 'team',
       parent_org_unit_id: 1,
+      role_id: null,
     });
+  });
+
+  it('offers a "none" option plus every role from the catalogue', async () => {
+    mockedAdminService.listRoles.mockResolvedValue([
+      makeRole({ id: 1, display_name: 'Backend-Grader' }),
+      makeRole({ id: 2, display_name: 'Frontend-Grader' }),
+    ]);
+
+    render(
+      <Wrapper>
+        <OrgUnitEditor open orgUnit={null} allOrgUnits={[]} onClose={jest.fn()} onSaved={jest.fn()} />
+      </Wrapper>,
+    );
+
+    await waitFor(() => expect(mockedAdminService.listRoles).toHaveBeenCalled());
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Verliehene Rolle' }));
+    expect(screen.getByRole('option', { name: '— Keine —' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Backend-Grader' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Frontend-Grader' })).toBeInTheDocument();
+  });
+
+  it('sends the selected role_id on create', async () => {
+    mockedAdminService.listRoles.mockResolvedValue([
+      makeRole({ id: 5, display_name: 'Backend-Grader' }),
+    ]);
+    mockedService.create.mockResolvedValue(makeUnit());
+
+    render(
+      <Wrapper>
+        <OrgUnitEditor open orgUnit={null} allOrgUnits={[]} onClose={jest.fn()} onSaved={jest.fn()} />
+      </Wrapper>,
+    );
+
+    await waitFor(() => expect(mockedAdminService.listRoles).toHaveBeenCalled());
+    fireEvent.change(screen.getByTestId('ou-editor-field-name'), {
+      target: { value: 'Team Backend' },
+    });
+    await selectDropdownOption('Typ', 'Team');
+    await selectDropdownOption('Verliehene Rolle', 'Backend-Grader');
+
+    fireEvent.click(screen.getByTestId('ou-editor-btn-save'));
+
+    await waitFor(() => expect(mockedService.create).toHaveBeenCalledTimes(1));
+    expect(mockedService.create).toHaveBeenCalledWith({
+      name: 'Team Backend',
+      unit_type: 'team',
+      parent_org_unit_id: null,
+      role_id: 5,
+    });
+  });
+
+  // TF-637 review fix: a failed role-catalogue fetch must be surfaced to
+  // the user, not silently swallowed into an empty (and indistinguishable
+  // from "no roles exist") dropdown.
+  it('shows an error when the role catalogue fails to load', async () => {
+    mockedAdminService.listRoles.mockRejectedValue(new Error('network error'));
+
+    render(
+      <Wrapper>
+        <OrgUnitEditor open orgUnit={null} allOrgUnits={[]} onClose={jest.fn()} onSaved={jest.fn()} />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByTestId('ou-editor-error')).toHaveTextContent(
+      'Rollen-Katalog konnte nicht geladen werden',
+    );
+    // the picker itself must still render, just with no selectable roles
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Verliehene Rolle' }));
+    expect(screen.getByRole('option', { name: '— Keine —' })).toBeInTheDocument();
+    expect(screen.getAllByRole('option')).toHaveLength(1);
   });
 });
 
@@ -203,6 +307,7 @@ describe('OrgUnitEditor — edit', () => {
       name: 'Backend',
       parent_org_unit_id: null,
       move_to_root: true,
+      role_id: null,
     });
   });
 
@@ -232,6 +337,53 @@ describe('OrgUnitEditor — edit', () => {
       name: 'Backend',
       parent_org_unit_id: 3,
       move_to_root: false,
+      role_id: null,
+    });
+  });
+
+  it('preselects the currently granted role', async () => {
+    mockedAdminService.listRoles.mockResolvedValue([
+      makeRole({ id: 5, display_name: 'Backend-Grader' }),
+      makeRole({ id: 6, display_name: 'Frontend-Grader' }),
+    ]);
+    const unit = makeUnit({ role_id: 5, role_name: 'Backend-Grader' });
+
+    render(
+      <Wrapper>
+        <OrgUnitEditor open orgUnit={unit} allOrgUnits={[unit]} onClose={jest.fn()} onSaved={jest.fn()} />
+      </Wrapper>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Verliehene Rolle' })).toHaveTextContent(
+        'Backend-Grader',
+      ),
+    );
+  });
+
+  it('sends the cleared role_id when "none" is (re-)selected', async () => {
+    mockedAdminService.listRoles.mockResolvedValue([
+      makeRole({ id: 5, display_name: 'Backend-Grader' }),
+    ]);
+    const unit = makeUnit({ role_id: 5, role_name: 'Backend-Grader' });
+    mockedService.update.mockResolvedValue(makeUnit());
+
+    render(
+      <Wrapper>
+        <OrgUnitEditor open orgUnit={unit} allOrgUnits={[unit]} onClose={jest.fn()} onSaved={jest.fn()} />
+      </Wrapper>,
+    );
+
+    await waitFor(() => expect(mockedAdminService.listRoles).toHaveBeenCalled());
+    await selectDropdownOption('Verliehene Rolle', '— Keine —');
+    fireEvent.click(screen.getByTestId('ou-editor-btn-save'));
+
+    await waitFor(() => expect(mockedService.update).toHaveBeenCalledTimes(1));
+    expect(mockedService.update).toHaveBeenCalledWith(1, {
+      name: 'Informatik',
+      parent_org_unit_id: null,
+      move_to_root: true,
+      role_id: null,
     });
   });
 });

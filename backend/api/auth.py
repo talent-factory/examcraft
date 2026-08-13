@@ -570,6 +570,61 @@ async def logout(
     return None
 
 
+def _effective_role_responses(user: User) -> List[RoleResponse]:
+    """RoleResponse entries for a user's direct roles + active Granted Roles.
+
+    TF-637 review fix: ``has_permission()`` (models/auth.py) treats a Role
+    granted via direct Org-Unit membership as additive to a user's direct
+    roles, but this endpoint previously built ``roles[]`` from
+    ``current_user.roles`` only. The frontend (``AuthContext.tsx``'s
+    ``hasPermission``/``hasRole``, ``PermissionGuard.tsx``) reads
+    permissions exclusively from that ``roles[]`` list -- so a user who
+    passed every backend permission check via a Granted Role saw no UI for
+    it. Folding Granted Roles into the same list (rather than inventing a
+    second frontend concept) fixes that without any frontend change.
+
+    Deduplicated by role id, since a user can hold the same Role both
+    directly and via one or more Org-Unit grants. Only *active* grants are
+    included, mirroring ``has_permission()``'s ``is_active`` check -- an
+    inactive granted role shouldn't appear to authorize UI the backend
+    would then reject.
+
+    Centralized here (was previously duplicated verbatim between GET and
+    PATCH ``/me``) so the permissions-parsing logic and this dedup rule
+    can't drift between the two call sites.
+    """
+    from utils.permissions import parse_role_permissions
+
+    seen_role_ids: set[int] = set()
+    effective_roles: list[Role] = []
+    for role in user.roles:
+        if role.id not in seen_role_ids:
+            seen_role_ids.add(role.id)
+            effective_roles.append(role)
+    for membership in user.org_unit_memberships:
+        granted_role = membership.org_unit.role
+        if (
+            granted_role
+            and granted_role.is_active
+            and granted_role.id not in seen_role_ids
+        ):
+            seen_role_ids.add(granted_role.id)
+            effective_roles.append(granted_role)
+
+    return [
+        RoleResponse(
+            id=role.id,
+            name=role.name,
+            display_name=role.display_name,
+            description=role.description,
+            permissions=parse_role_permissions(role.permissions),
+            is_system_role=role.is_system_role,
+            created_at=role.created_at.isoformat(),
+        )
+        for role in effective_roles
+    ]
+
+
 @router.get("/me", response_model=UserProfileResponse)
 async def get_current_user_profile(
     current_user: User = Depends(get_current_active_user),
@@ -581,41 +636,9 @@ async def get_current_user_profile(
     - Includes institution and roles with permissions
     """
 
-    # Build role responses with parsed permissions
-    role_responses = []
-    for role in current_user.roles:
-        # Parse permissions from JSON string or PostgreSQL array literal
-        permissions = role.permissions
-        if isinstance(permissions, str):
-            try:
-                parsed = json.loads(permissions)
-                if isinstance(parsed, list):
-                    permissions = parsed
-                else:
-                    # json.loads("{}") returns a dict — treat as empty
-                    permissions = []
-            except json.JSONDecodeError:
-                # Handle PostgreSQL array literal: {a,b,c}
-                if permissions.startswith("{") and permissions.endswith("}"):
-                    permissions = [
-                        p.strip() for p in permissions[1:-1].split(",") if p.strip()
-                    ]
-                else:
-                    permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
-
-        role_responses.append(
-            RoleResponse(
-                id=role.id,
-                name=role.name,
-                display_name=role.display_name,
-                description=role.description,
-                permissions=permissions,
-                is_system_role=role.is_system_role,
-                created_at=role.created_at.isoformat(),
-            )
-        )
+    # Direct roles + active Granted Roles from Org-Unit membership
+    # (TF-637) -- see _effective_role_responses for why they're merged here.
+    role_responses = _effective_role_responses(current_user)
 
     institution_resp = None
     if current_user.institution:
@@ -699,41 +722,9 @@ async def update_current_user_profile(
 
     logger.info(f"User profile updated: {current_user.email} (ID: {current_user.id})")
 
-    # Build role responses with parsed permissions
-    role_responses = []
-    for role in current_user.roles:
-        # Parse permissions from JSON string or PostgreSQL array literal
-        permissions = role.permissions
-        if isinstance(permissions, str):
-            try:
-                parsed = json.loads(permissions)
-                if isinstance(parsed, list):
-                    permissions = parsed
-                else:
-                    # json.loads("{}") returns a dict — treat as empty
-                    permissions = []
-            except json.JSONDecodeError:
-                # Handle PostgreSQL array literal: {a,b,c}
-                if permissions.startswith("{") and permissions.endswith("}"):
-                    permissions = [
-                        p.strip() for p in permissions[1:-1].split(",") if p.strip()
-                    ]
-                else:
-                    permissions = []
-        elif not isinstance(permissions, list):
-            permissions = []
-
-        role_responses.append(
-            RoleResponse(
-                id=role.id,
-                name=role.name,
-                display_name=role.display_name,
-                description=role.description,
-                permissions=permissions,
-                is_system_role=role.is_system_role,
-                created_at=role.created_at.isoformat(),
-            )
-        )
+    # Direct roles + active Granted Roles from Org-Unit membership
+    # (TF-637) -- see _effective_role_responses for why they're merged here.
+    role_responses = _effective_role_responses(current_user)
 
     institution_resp = None
     if current_user.institution:

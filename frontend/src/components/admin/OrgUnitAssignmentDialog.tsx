@@ -23,6 +23,15 @@ function orgUnitLabel(name: string, parentOrgUnitId: number | null, allOrgUnits:
   return parent ? `${name} (${parent.name})` : name;
 }
 
+// TF-637: a current membership only carries the org_unit_id + Membership
+// Label (free text, e.g. "Leiter") -- the Granted Role lives on the OrgUnit
+// itself, so it's looked up from allOrgUnits rather than the membership.
+// Kept as its own row from the Membership Label (Variant B from the
+// prototype) so the two concepts never visually merge -- see CONTEXT.md.
+function grantedRoleNameFor(orgUnitId: number, allOrgUnits: OrgUnitOut[]): string | null {
+  return allOrgUnits.find(u => u.id === orgUnitId)?.role_name ?? null;
+}
+
 export const OrgUnitAssignmentDialog: React.FC<OrgUnitAssignmentDialogProps> = ({
   userId,
   isOpen,
@@ -161,34 +170,48 @@ export const OrgUnitAssignmentDialog: React.FC<OrgUnitAssignmentDialogProps> = (
                       </h4>
                       {user && user.org_units.length > 0 ? (
                         <div className="space-y-2">
-                          {user.org_units.map(membership => (
-                            <div
-                              key={membership.org_unit_id}
-                              className="flex items-start justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
-                              data-testid={`ouad-current-${membership.org_unit_id}`}
-                            >
-                              <div className="flex-1">
-                                <div className="flex items-center">
-                                  <span className="font-medium text-gray-900">
-                                    {orgUnitLabel(membership.name, membership.parent_org_unit_id, allOrgUnits)}
-                                  </span>
+                          {user.org_units.map(membership => {
+                            const grantedRoleName = grantedRoleNameFor(
+                              membership.org_unit_id,
+                              allOrgUnits,
+                            );
+                            return (
+                              <div
+                                key={membership.org_unit_id}
+                                className="flex items-start justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
+                                data-testid={`ouad-current-${membership.org_unit_id}`}
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center">
+                                    <span className="font-medium text-gray-900">
+                                      {orgUnitLabel(membership.name, membership.parent_org_unit_id, allOrgUnits)}
+                                    </span>
+                                  </div>
+                                  {grantedRoleName && (
+                                    <p className="text-sm text-emerald-700 mt-1.5">
+                                      <span className="font-normal opacity-80">
+                                        {t('admin.orgUnitAssignment.grantedRoleLabel')}
+                                      </span>{' '}
+                                      {grantedRoleName}
+                                    </p>
+                                  )}
+                                  {membership.role && (
+                                    <p className="text-sm text-gray-600 mt-1">{membership.role}</p>
+                                  )}
                                 </div>
-                                {membership.role && (
-                                  <p className="text-sm text-gray-600 mt-1">{membership.role}</p>
+                                {!isCrossInstitution && (
+                                  <button
+                                    onClick={() => handleRemove(membership.org_unit_id)}
+                                    disabled={processing}
+                                    className="ml-4 text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    data-testid={`ouad-btn-remove-${membership.org_unit_id}`}
+                                  >
+                                    {t('admin.orgUnitAssignment.btnRemove')}
+                                  </button>
                                 )}
                               </div>
-                              {!isCrossInstitution && (
-                                <button
-                                  onClick={() => handleRemove(membership.org_unit_id)}
-                                  disabled={processing}
-                                  className="ml-4 text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                  data-testid={`ouad-btn-remove-${membership.org_unit_id}`}
-                                >
-                                  {t('admin.orgUnitAssignment.btnRemove')}
-                                </button>
-                              )}
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-sm text-gray-500">{t('admin.orgUnitAssignment.noOrgUnits')}</p>
@@ -220,6 +243,14 @@ export const OrgUnitAssignmentDialog: React.FC<OrgUnitAssignmentDialogProps> = (
                                     {orgUnitLabel(unit.name, unit.parent_org_unit_id, allOrgUnits)}
                                   </span>
                                 </div>
+                                {unit.role_name && (
+                                  <p className="text-sm text-emerald-700 mt-1.5">
+                                    <span className="font-normal opacity-80">
+                                      {t('admin.orgUnitAssignment.grantedRoleLabel')}
+                                    </span>{' '}
+                                    {unit.role_name}
+                                  </p>
+                                )}
                                 <input
                                   type="text"
                                   value={roleInputs[unit.id] ?? ''}

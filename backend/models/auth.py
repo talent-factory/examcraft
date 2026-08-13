@@ -383,10 +383,34 @@ class User(Base):
         from utils.permissions import parse_role_permissions
 
         for role in self.roles:
-            if role.permissions and permission in parse_role_permissions(
-                role.permissions
+            # TF-637 review fix: is_active is now checked here too, not only
+            # on the Granted Role loop below -- before this fix, Role.is_active
+            # was defined on the model but never consulted anywhere, so
+            # deactivating a role only partially revoked it (Org-Unit-granted
+            # instances stopped working, direct assignments didn't).
+            if (
+                role.is_active
+                and role.permissions
+                and permission in parse_role_permissions(role.permissions)
             ):
                 return True
+
+        # Granted Role (TF-637): a permission is also inherited from the
+        # Role that an OrgUnit grants to its *direct* members. Additive to
+        # the loop above, and deliberately NOT cascaded through the
+        # composite hierarchy the way Access Scope
+        # (get_user_accessible_org_unit_ids) is -- see
+        # docs/adr/0003-granted-role-not-cascading.md.
+        for membership in self.org_unit_memberships:
+            granted_role = membership.org_unit.role
+            if (
+                granted_role
+                and granted_role.is_active
+                and granted_role.permissions
+                and permission in parse_role_permissions(granted_role.permissions)
+            ):
+                return True
+
         return False
 
 

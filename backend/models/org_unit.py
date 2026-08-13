@@ -48,6 +48,17 @@ class OrgUnit(Base):
     )
     unit_type = Column(String(50), nullable=False)
     name = Column(String(200), nullable=False)
+    # Granted Role (TF-637): the Role this OrgUnit grants to its *direct*
+    # members. Additive to their own direct role assignments, and does NOT
+    # cascade through the composite hierarchy the way access-scope does --
+    # see docs/adr/0003-granted-role-not-cascading.md. Consumed by
+    # User.has_permission() (models/auth.py), not by anything in this file.
+    role_id = Column(
+        Integer,
+        ForeignKey("roles.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -67,6 +78,7 @@ class OrgUnit(Base):
     memberships = relationship(
         "UserOrgUnit", back_populates="org_unit", cascade="all, delete-orphan"
     )
+    role = relationship("Role")
 
     def __repr__(self):
         return (

@@ -39,6 +39,8 @@ function makeUnit(overrides: Partial<OrgUnitOut> = {}): OrgUnitOut {
     unit_type: 'abteilung',
     name: 'Informatik',
     descendant_count: 0,
+    role_id: null,
+    role_name: null,
     created_at: '2026-08-07T00:00:00Z',
     updated_at: '2026-08-07T00:00:00Z',
     ...overrides,
@@ -84,6 +86,57 @@ describe('OrgUnitAssignmentDialog', () => {
 
     expect(await screen.findByTestId('ouad-current-1')).toHaveTextContent('Informatik');
     expect(screen.getByTestId('ouad-available-2')).toHaveTextContent('Backend-Team (Informatik)');
+  });
+
+  // TF-637: Granted Role is a separate row from the Membership Label
+  // (`membership.role`, free text like "Leiter") -- Variant B from the
+  // prototype, https://claude.ai/code/artifact/d4df5f67-49de-49d4-9d19-b2abe2e0213a
+  it('shows the granted role of a current membership on its own row, separate from the membership label', async () => {
+    mockedAdminService.getUser.mockResolvedValue(
+      makeUser({
+        org_units: [
+          {
+            org_unit_id: 2,
+            name: 'Backend-Team',
+            unit_type: 'team',
+            parent_org_unit_id: null,
+            role: 'Leiter',
+          },
+        ],
+      }),
+    );
+    mockedOrgUnitsService.list.mockResolvedValue({
+      items: [makeUnit({ id: 2, name: 'Backend-Team', role_id: 5, role_name: 'Backend-Grader' })],
+    });
+
+    render(<OrgUnitAssignmentDialog userId={7} isOpen onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    const row = await screen.findByTestId('ouad-current-2');
+    expect(row).toHaveTextContent('Backend-Grader');
+    expect(row).toHaveTextContent('Leiter');
+  });
+
+  it('shows the granted role of an available org unit', async () => {
+    mockedAdminService.getUser.mockResolvedValue(makeUser());
+    mockedOrgUnitsService.list.mockResolvedValue({
+      items: [makeUnit({ id: 2, name: 'Backend-Team', role_id: 5, role_name: 'Backend-Grader' })],
+    });
+
+    render(<OrgUnitAssignmentDialog userId={7} isOpen onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    expect(await screen.findByTestId('ouad-available-2')).toHaveTextContent('Backend-Grader');
+  });
+
+  it('shows no "verleiht:" row when the org unit has no granted role', async () => {
+    mockedAdminService.getUser.mockResolvedValue(makeUser());
+    mockedOrgUnitsService.list.mockResolvedValue({
+      items: [makeUnit({ id: 2, name: 'Backend-Team' })],
+    });
+
+    render(<OrgUnitAssignmentDialog userId={7} isOpen onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    const row = await screen.findByTestId('ouad-available-2');
+    expect(row).not.toHaveTextContent('verleiht');
   });
 
   it('assigns the selected org unit with the entered role', async () => {

@@ -3,7 +3,7 @@
 Design: docs/superpowers/specs/2026-08-07-org-unit-hierarchie-design.md
 """
 
-from models.auth import Institution, User, UserStatus
+from models.auth import Institution, Role, User, UserStatus
 from models.org_unit import OrgUnit, UserOrgUnit
 
 
@@ -96,3 +96,39 @@ def test_user_can_belong_to_multiple_org_units(test_db):
         test_db.query(UserOrgUnit).filter(UserOrgUnit.user_id == user.id).all()
     )
     assert {m.org_unit_id for m in memberships} == {abteilung_a.id, abteilung_b.id}
+
+
+def test_deleting_granted_role_clears_role_id_not_the_org_unit(test_db):
+    """TF-637: ``role_id`` uses ``ondelete=SET NULL``, not ``CASCADE``.
+
+    The only prior FK-to-roles precedent (``user_roles.role_id``) is CASCADE,
+    but that's a pure junction table -- here ``role_id`` lives directly on
+    ``org_units``, so CASCADE would delete the OrgUnit itself when its
+    Granted Role is removed. This is a DB-level FK action (not a SQLAlchemy
+    ORM cascade -- ``OrgUnit.role`` has no cascade configured), so it has to
+    be exercised against the real database to mean anything.
+    """
+    inst = _make_institution(test_db, slug="orgunit-model-role-delete")
+    role = Role(
+        name="granted-role-delete-test",
+        display_name="Backend-Grader",
+        permissions=["submissions:grade"],
+    )
+    test_db.add(role)
+    test_db.flush()
+    team = OrgUnit(
+        institution_id=inst.id,
+        unit_type="team",
+        name="Team Backend",
+        role_id=role.id,
+    )
+    test_db.add(team)
+    test_db.commit()
+    team_id = team.id
+
+    test_db.delete(role)
+    test_db.commit()
+
+    survivor = test_db.query(OrgUnit).filter(OrgUnit.id == team_id).one_or_none()
+    assert survivor is not None, "OrgUnit must survive its Granted Role being deleted"
+    assert survivor.role_id is None

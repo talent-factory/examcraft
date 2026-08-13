@@ -7,10 +7,11 @@ import logging
 from typing import Optional
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from database import get_db
 from models.auth import User, UserStatus
+from models.org_unit import OrgUnit, UserOrgUnit
 from services.auth_service import AuthService
 from services.translation_service import get_request_locale, t
 
@@ -67,10 +68,24 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Get user from database with roles (needed for permission checks)
+    # Get user from database with roles (needed for permission checks).
+    # TF-637 review fix: has_permission() now also walks
+    # org_unit_memberships -> org_unit -> role (Granted Role) on every call
+    # where the direct-role loop above doesn't already match -- i.e. on the
+    # entire 403 path, and any request whose permission comes from a
+    # Granted Role. Without eager-loading that chain here, each of those
+    # calls issues 1 + 2N lazy queries (N = number of org-unit
+    # memberships) on this already-hot dependency. selectinload (not
+    # joinedload) for the one-to-many memberships collection avoids a
+    # fan-out join against the single-row User query above.
     user = (
         db.query(User)
-        .options(joinedload(User.roles))
+        .options(
+            joinedload(User.roles),
+            selectinload(User.org_unit_memberships)
+            .joinedload(UserOrgUnit.org_unit)
+            .joinedload(OrgUnit.role),
+        )
         .filter(User.id == int(user_id))
         .first()
     )

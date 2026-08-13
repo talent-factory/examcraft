@@ -181,6 +181,7 @@ def create_org_unit(
     unit_type: str,
     name: str,
     parent_org_unit_id: int | None,
+    role_id: int | None = None,
 ) -> OrgUnit:
     if parent_org_unit_id is not None:
         parent = (
@@ -208,6 +209,7 @@ def create_org_unit(
         unit_type=unit_type,
         name=name,
         parent_org_unit_id=parent_org_unit_id,
+        role_id=role_id,
     )
     db.add(org_unit)
     try:
@@ -218,7 +220,32 @@ def create_org_unit(
         # (ix_org_units_unique_sibling_name / ix_org_units_unique_root_name)
         # fangen einen gleichzeitigen Duplikat-Insert ab, der die Vor-Prüfung
         # umgangen hat, statt ihn als 500 durchschlagen zu lassen.
+        #
+        # TF-637 review fix: das war der einzige mögliche IntegrityError-
+        # Grund, bis role_id (FK auf roles.id) dazukam -- wird eine Role
+        # zwischen dem role_id-Validierungs-Check in der API und diesem
+        # Commit geloescht (TOCTOU-Fenster), verletzt der INSERT stattdessen
+        # die FK-Constraint, nicht den Sibling-Name-Unique-Index. Denselben
+        # Namenskonflikt-Text dafuer auszugeben waere irrefuehrend und
+        # unauffindbar -- Constraint-Name inspizieren + immer loggen, wie in
+        # delete_org_unit (gleiches Prinzip, andere FK).
         db.rollback()
+        constraint_name = getattr(
+            getattr(exc.orig, "diag", None), "constraint_name", None
+        )
+        logger.warning(
+            "create_org_unit(name=%r, institution_id=%s) failed on "
+            "IntegrityError (constraint=%s): %s",
+            name,
+            institution_id,
+            constraint_name,
+            exc,
+            exc_info=True,
+        )
+        if constraint_name is not None and "role_id" in constraint_name.lower():
+            raise ValueError(
+                "Verliehene Rolle existiert nicht mehr -- bitte erneut waehlen"
+            ) from exc
         raise ValueError(
             f"OrgUnit '{name}' existiert bereits auf dieser Ebene"
         ) from exc
@@ -258,8 +285,30 @@ def move_org_unit(
     try:
         db.commit()
     except IntegrityError as exc:
-        # Gleicher Race-Fallback wie in create_org_unit.
+        # Gleicher Race-Fallback wie in create_org_unit -- inkl. desselben
+        # TF-637-Nachtrags: dieser Commit kann auch einen bereits auf
+        # ``org_unit`` gestagten (aber ungecommitteten) ``role_id``-Wert
+        # aus dem Aufrufer (api/org_units.py::update_org_unit_endpoint)
+        # mit-committen, wenn ein Reparent gleichzeitig angefragt wurde --
+        # also denselben Constraint-Namen inspizieren statt den
+        # Sibling-Name-Konflikt anzunehmen.
         db.rollback()
+        constraint_name = getattr(
+            getattr(exc.orig, "diag", None), "constraint_name", None
+        )
+        logger.warning(
+            "move_org_unit(id=%s, name=%r) failed on IntegrityError "
+            "(constraint=%s): %s",
+            org_unit.id,
+            org_unit.name,
+            constraint_name,
+            exc,
+            exc_info=True,
+        )
+        if constraint_name is not None and "role_id" in constraint_name.lower():
+            raise ValueError(
+                "Verliehene Rolle existiert nicht mehr -- bitte erneut waehlen"
+            ) from exc
         raise ValueError(
             f"OrgUnit '{org_unit.name}' existiert bereits auf dieser Ebene"
         ) from exc

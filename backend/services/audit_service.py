@@ -57,6 +57,18 @@ class AuditService:
     ACTION_CREATE_INSTITUTION = "create_institution"
     ACTION_UPDATE_INSTITUTION = "update_institution"
 
+    # TF-637: Granted Role (an OrgUnit granting a Role to its direct
+    # members) -- org_units.py had no audit coverage before this; the rest
+    # of its CRUD stays unaudited (pre-existing gap, out of scope, see
+    # docs/superpowers/specs/2026-08-13-org-unit-rbac-vererbung-design.md).
+    # Membership assign/remove is audited too: on an OrgUnit that carries a
+    # Granted Role, adding/removing a member is the step that actually
+    # confers/revokes the resulting permissions (review fix, TF-637).
+    ACTION_SET_ORG_UNIT_ROLE = "set_org_unit_role"
+    ACTION_CLEAR_ORG_UNIT_ROLE = "clear_org_unit_role"
+    ACTION_ASSIGN_ORG_UNIT_MEMBER = "assign_org_unit_member"
+    ACTION_REMOVE_ORG_UNIT_MEMBER = "remove_org_unit_member"
+
     ACTION_CREATE_GRADING_SCHEME = "create_grading_scheme"
     ACTION_UPDATE_GRADING_SCHEME = "update_grading_scheme"
     ACTION_DELETE_GRADING_SCHEME = "delete_grading_scheme"
@@ -90,6 +102,7 @@ class AuditService:
     RESOURCE_EXAM = "exam"
     RESOURCE_PROMPT = "prompt"
     RESOURCE_GRADING_SCHEME = "grading_scheme"
+    RESOURCE_ORG_UNIT = "org_unit"
 
     @staticmethod
     def log_action(
@@ -618,6 +631,14 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             # Institutions-Verwaltung (api/admin.py, TF-502)
             AuditService.ACTION_CREATE_INSTITUTION,
             AuditService.ACTION_UPDATE_INSTITUTION,
+            # Granted Role via OrgUnit (api/org_units.py, TF-637) -- same
+            # "who can see what a user is permitted to do" category as
+            # ACTION_ASSIGN_ROLE/ACTION_REMOVE_ROLE above, since it's an
+            # equivalent way of granting/revoking permissions.
+            AuditService.ACTION_SET_ORG_UNIT_ROLE,
+            AuditService.ACTION_CLEAR_ORG_UNIT_ROLE,
+            AuditService.ACTION_ASSIGN_ORG_UNIT_MEMBER,
+            AuditService.ACTION_REMOVE_ORG_UNIT_MEMBER,
         }
     ),
     "auth": frozenset(
