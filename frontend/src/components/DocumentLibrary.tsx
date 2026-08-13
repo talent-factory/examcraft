@@ -323,6 +323,24 @@ const OriginalDocumentContent: React.FC<OriginalDocumentContentProps> = ({ doc }
   );
 };
 
+/**
+ * True for a 403 from the API (DocumentFetchError). Duck-typed rather than
+ * `instanceof` so it also holds for errors crossing a module mock boundary.
+ * Checks both `name` and `status` — same stricter pattern already used for
+ * OriginalDocumentContent's fetch errors above — so an unrelated object that
+ * merely happens to carry a `.status === 403` isn't misread as a permission
+ * failure.
+ */
+const isPermissionDenied = (err: unknown): boolean => {
+  const maybeFetchErr = err as { name?: string; status?: number } | null;
+  return (
+    maybeFetchErr != null &&
+    typeof maybeFetchErr === 'object' &&
+    maybeFetchErr.name === 'DocumentFetchError' &&
+    maybeFetchErr.status === 403
+  );
+};
+
 const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   onCreateRAGExam,
   refreshTrigger
@@ -586,7 +604,28 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     );
   };
 
-  // TF-355 Phase 3: rename handler for list view (independent of card-view state)
+  // Prefer the backend detail — for a 403 that is the localized
+  // `documents_rename_owner_only` text, which explains the restriction the
+  // generic fallback cannot (TF-606). A blank/whitespace-only message (e.g.
+  // the backend omitted `detail`) is treated as no message at all, so the
+  // localized default below is used instead of an empty or English
+  // statusText-derived string leaking through.
+  const renameErrorMessage = (err: unknown): string => {
+    const message =
+      err && typeof err === 'object' && 'message' in err ? (err as Error).message : '';
+    return typeof message === 'string' && message.trim().length > 0
+      ? message
+      : t('components.documentLibrary.renameError', 'Umbenennen fehlgeschlagen');
+  };
+
+  // TF-355 Phase 3: rename handler for list view (independent of card-view state).
+  //
+  // Contract with DocumentList's handleSaveRename (TF-606): this resolves
+  // normally for both a successful rename AND a 403 (owner-only, never
+  // retryable — the error is already surfaced via setError, and the caller
+  // should close its inline editor same as on success). It rejects for any
+  // other failure so the caller can keep its editor open with the typed
+  // value intact, mirroring the card-view's handleSaveRename below.
   const handleRenameDocument = async (id: number, name: string) => {
     const trimmed = name.trim();
     const payload = trimmed.length === 0 ? null : trimmed;
@@ -595,11 +634,10 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       setDocuments(prev => prev.map(d => (d.id === updated.id ? { ...d, ...updated } : d)));
       setError(null);
     } catch (err) {
-      setError(
-        err && typeof err === 'object' && 'message' in err
-          ? (err as Error).message
-          : t('components.documentLibrary.renameError', 'Umbenennen fehlgeschlagen'),
-      );
+      setError(renameErrorMessage(err));
+      if (!isPermissionDenied(err)) {
+        throw err;
+      }
     }
   };
 
@@ -757,11 +795,15 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       setEditingValue('');
       setError(null);
     } catch (err) {
-      setError(
-        err && typeof err === 'object' && 'message' in err
-          ? (err as Error).message
-          : t('components.documentLibrary.renameError', 'Umbenennen fehlgeschlagen'),
-      );
+      setError(renameErrorMessage(err));
+      // A 403 means the rename was never permitted (owner-only) — e.g. the
+      // caller lost ownership while the field was open. Retrying can't
+      // succeed, so close the editor instead of inviting another attempt.
+      // Any other failure keeps the field (and the typed value) alive.
+      if (isPermissionDenied(err)) {
+        setEditingDocumentId(null);
+        setEditingValue('');
+      }
     } finally {
       setRenaming(false);
     }
@@ -1402,18 +1444,26 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                       >
                         {document.title}
                       </Typography>
-                      <Tooltip title={t('components.documentLibrary.renameTooltip', 'Umbenennen')}>
-                        <IconButton
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStartRename(document);
-                          }}
-                          sx={{ opacity: 0.6, '&:hover': { opacity: 1 } }}
-                        >
-                          <Edit fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {/* Renaming is owner-only on the backend (403,
+                          documents_rename_owner_only). Gate the pencil the
+                          same way the list view does — without it, every
+                          viewer of a shared document could open the inline
+                          editor and only hit the wall on save (TF-606). */}
+                      {isOwner(document) && (
+                        <Tooltip title={t('components.documentLibrary.renameTooltip', 'Umbenennen')}>
+                          <IconButton
+                            size="small"
+                            aria-label={t('components.documentLibrary.renameTooltip', 'Umbenennen')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartRename(document);
+                            }}
+                            sx={{ opacity: 0.6, '&:hover': { opacity: 1 } }}
+                          >
+                            <Edit fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Stack>
                   )}
 

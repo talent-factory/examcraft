@@ -198,6 +198,72 @@ describe('DocumentService', () => {
     });
   });
 
+  describe('renameDocument', () => {
+    it('PATCHes display_name and returns the updated document', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...mockDocument, display_name: 'Neuer Titel' }),
+      } as Response);
+
+      const result = await DocumentService.renameDocument(1, 'Neuer Titel');
+
+      const call = mockFetch.mock.calls[0];
+      expect(call[0]).toBe('http://localhost:8000/api/v1/documents/1');
+      expect(call[1]!.method).toBe('PATCH');
+      expect(JSON.parse(call[1]!.body as string)).toEqual({ display_name: 'Neuer Titel' });
+      expect(result.display_name).toBe('Neuer Titel');
+    });
+
+    // TF-606: callers (DocumentLibrary's isPermissionDenied) branch on both
+    // `.status` and `.name === 'DocumentFetchError'` — assert both here so a
+    // regression to a plain `Error` is caught even though every component
+    // test fabricates its own error object rather than exercising the
+    // service.
+    it('throws a DocumentFetchError carrying the 403 status and backend detail on an owner-only rejection', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+        json: async () => ({ detail: 'Nur der Eigentümer darf dieses Dokument umbenennen' }),
+      } as Response);
+
+      await expect(DocumentService.renameDocument(1, 'Neuer Titel')).rejects.toMatchObject({
+        name: 'DocumentFetchError',
+        status: 403,
+        message: 'Nur der Eigentümer darf dieses Dokument umbenennen',
+      });
+    });
+
+    // A blank/missing `detail` must not leak an English statusText-derived
+    // message — callers (DocumentLibrary.renameErrorMessage) fall back to a
+    // localized default only when the message is empty.
+    it('leaves the message blank when the backend omits detail', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: async () => ({}),
+      } as Response);
+
+      await expect(DocumentService.renameDocument(1, 'Neuer Titel')).rejects.toMatchObject({
+        name: 'DocumentFetchError',
+        status: 500,
+        message: '',
+      });
+    });
+
+    // A failed fetch() itself (offline, DNS, CORS) — no HTTP response at all
+    // — must surface as status 0, same convention as getDocumentRaw.
+    it('throws a DocumentFetchError with status 0 when the network call itself fails', async () => {
+      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await expect(DocumentService.renameDocument(1, 'Neuer Titel')).rejects.toMatchObject({
+        name: 'DocumentFetchError',
+        status: 0,
+      });
+    });
+  });
+
   describe('processDocument', () => {
     it('processes document successfully', async () => {
       mockFetch.mockResolvedValueOnce({

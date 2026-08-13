@@ -167,20 +167,37 @@ export class DocumentService {
    * Set or clear the user-editable display name for a document.
    * Pass null to clear the override and fall back to the resolver chain
    * (filtered metadata title → original filename).
+   *
+   * Throws {@link DocumentFetchError} so callers can distinguish a 403
+   * (owner-only, never retryable) from a transient failure (TF-606).
+   * `status === 0` means the network call itself failed (offline, DNS,
+   * CORS) — no HTTP response was received — same convention as
+   * {@link getDocumentRaw}. The message is the backend's `detail` when
+   * present; otherwise it's left blank so the caller's localized fallback
+   * is used instead of an English statusText-derived string.
    */
   static async renameDocument(
     documentId: number,
     displayName: string | null,
   ): Promise<Document> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}`, {
-      method: 'PATCH',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify({ display_name: displayName }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}`, {
+        method: 'PATCH',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ display_name: displayName }),
+      });
+    } catch (e) {
+      throw new DocumentFetchError(
+        e && typeof e === 'object' && 'message' in e ? (e as Error).message : 'Network error',
+        0,
+      );
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to rename document: ${response.statusText}`);
+      const detail = typeof errorData.detail === 'string' ? errorData.detail.trim() : '';
+      throw new DocumentFetchError(detail, response.status);
     }
 
     return response.json();

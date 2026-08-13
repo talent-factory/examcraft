@@ -696,10 +696,12 @@ async def update_document(
 ):
     """Update a document's display name and/or visibility.
 
-    - **display_name**: rename behaviour unchanged — a non-empty string
-      overrides the auto-extracted title; ``null``/empty/whitespace clears the
-      override (falls back to the metadata-then-filename resolver). Allowed for
-      any document the caller can see.
+    - **display_name**: a non-empty string overrides the auto-extracted title;
+      ``null``/empty/whitespace clears the override (falls back to the
+      metadata-then-filename resolver). **Owner-only** (SuperUser may also
+      rename) — a non-owner gets 403 even within the same institution, since
+      the name is shared state visible to every institution member
+      (TF-399/TF-606).
     - **visibility**: ``private``/``team``/``institution``. **Owner-only**
       (SuperUser may also change it) — a non-owner gets 403 even within the
       same institution. ``institution`` requires the document to belong to an

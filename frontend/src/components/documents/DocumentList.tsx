@@ -53,6 +53,13 @@ export interface DocumentListProps {
   onToggleSelectAll: () => void;
   onSortChange: (sort: DocumentSort) => void;
   onPreview: (document: Document) => void;
+  /**
+   * Save a rename. Resolves on success and on a non-retryable failure (e.g.
+   * a 403 — already surfaced to the user by the caller); the inline editor
+   * closes in both cases. Rejects for a retryable failure (network error,
+   * 500, ...) so the editor and the typed value stay open for another
+   * attempt (TF-606).
+   */
   onRename: (id: number, name: string) => void | Promise<void>;
   onMenu: (event: React.MouseEvent<HTMLElement>, documentId: number) => void;
   isOwner: (document: Document) => boolean;
@@ -163,9 +170,18 @@ const DocumentList: React.FC<DocumentListProps> = ({
     try {
       setRenaming(true);
       await onRename(doc.id, editingValue);
-      // Clear edit state only on success
+      // onRename resolved: either the rename succeeded, or it hit a
+      // non-retryable failure that's already been surfaced elsewhere — both
+      // close the editor (TF-606).
       setEditingId(null);
       setEditingValue('');
+    } catch {
+      // onRename rejected: a retryable failure. Keep the field and the
+      // typed value alive instead of forcing a retype (TF-606). The error
+      // itself is already surfaced by onRename before it rejects; nothing
+      // further to do here. handleSaveRename is called fire-and-forget from
+      // JSX event handlers below, so this catch also prevents an unhandled
+      // promise rejection.
     } finally {
       setRenaming(false);
     }

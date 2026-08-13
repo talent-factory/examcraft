@@ -7,6 +7,9 @@
  * (3) Clicking a row checkbox calls onToggleSelect with that doc's id.
  * (4) Clicking the header checkbox calls onToggleSelectAll.
  * (5) Inline rename: Enter saves, Escape cancels.
+ * (6) Rename pencil is hidden from non-owners.
+ * (7) Inline rename: a rejected onRename keeps the editor + typed value open
+ *     (TF-606 — mirrors the card view's keep-open-on-retryable-failure).
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -155,5 +158,36 @@ describe('DocumentList', () => {
 
     // The text field should be gone (back to display mode)
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  // (6) Rename is owner-only on the backend — non-owners must not see the
+  // pencil at all (TF-606, mirrors the card-view guard).
+  it('(6) hides the rename pencil for a non-owner', () => {
+    render(wrap(<DocumentList {...defaultProps} isOwner={() => false} />));
+    expect(screen.queryByRole('button', { name: 'Umbenennen' })).not.toBeInTheDocument();
+  });
+
+  // (7) A rejected onRename (retryable failure) must not close the editor —
+  // otherwise the typed value is silently discarded (TF-606). onRename
+  // resolves for success *and* for a non-retryable failure (see
+  // DocumentLibrary.handleRenameDocument); it only rejects to signal "keep
+  // this open".
+  it('(7) inline rename: a rejected onRename keeps the editor and typed value open', async () => {
+    const onRename = jest.fn().mockRejectedValue(new Error('network error'));
+    render(wrap(<DocumentList {...defaultProps} onRename={onRename} />));
+
+    const renameButtons = screen.getAllByRole('button', { name: 'Umbenennen' });
+    fireEvent.click(renameButtons[0]);
+
+    const textField = screen.getByRole('textbox');
+    fireEvent.change(textField, { target: { value: 'Neuer Titel' } });
+    fireEvent.keyDown(textField, { key: 'Enter', code: 'Enter' });
+    expect(onRename).toHaveBeenCalledWith(doc1.id, 'Neuer Titel');
+
+    // The rejection must not throw an unhandled promise rejection (jest would
+    // fail the test), and the field must stay open with the typed value.
+    await waitFor(() => {
+      expect(screen.getByRole('textbox')).toHaveValue('Neuer Titel');
+    });
   });
 });
