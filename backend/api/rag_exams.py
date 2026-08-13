@@ -642,6 +642,16 @@ async def get_available_documents(
             doc_info = {
                 "id": doc.id,
                 "filename": doc.original_filename,
+                # TF-605: Die Dokumentauswahl der Fragengenerierung soll den in
+                # der Bibliothek vergebenen Namen zeigen, nicht den Upload-
+                # Dateinamen. `title` löst die Fallback-Kette display_name →
+                # doc_metadata['title'] → original_filename (ohne Endung) auf
+                # und ist damit praktisch nie leer (nur bei verletztem
+                # Schema-Invariant — dann warnt die Property und liefert "");
+                # `display_name` bleibt als rohes Override daneben stehen
+                # (analog Document.to_dict()).
+                "title": doc.title,
+                "display_name": doc.display_name,
                 "mime_type": doc.mime_type,
                 "status": doc.status.value,
                 "created_at": doc.created_at.isoformat() if doc.created_at else None,

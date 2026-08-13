@@ -153,6 +153,10 @@ class TestRAGAPI:
         doc = Mock(spec=Document)
         doc.id = 1
         doc.original_filename = "test_document.txt"
+        # TF-605: title/display_name werden vom available-documents Endpoint
+        # ausgeliefert — als Mock-Attribute wären sie nicht serialisierbar.
+        doc.display_name = None
+        doc.title = "test_document"
         doc.mime_type = "text/plain"
         doc.status = DocumentStatus.PROCESSED
         doc.vector_collection = "test_collection"
@@ -461,6 +465,89 @@ class TestRAGAPI:
         assert data["total_documents"] == 1
         assert data["processed_documents"] == 1
 
+    def test_get_available_documents_exposes_display_title(self, auth_client, mock_db):
+        """TF-605: Response führt den Anzeigenamen, nicht nur den Upload-Namen.
+
+        Ohne ``title``/``display_name`` kann die Fragengenerierung den in der
+        Dokumentbibliothek vergebenen Namen gar nicht anzeigen und fällt auf
+        ``original_filename`` (inkl. Endung) zurück. Bewusst mit einer echten
+        ``Document``-Instanz statt einem Mock, damit die Fallback-Kette der
+        ``title``-Property real durchlaufen wird.
+        """
+
+        doc = Document(
+            id=7,
+            original_filename="2026-02-03_Skript_Kapitel_3_final_v2.pdf",
+            display_name="Kapitel 3 — Normalisierung",
+            mime_type="application/pdf",
+            status=DocumentStatus.PROCESSED,
+            vector_collection="test_collection",
+            doc_metadata={"total_chunks": 5},
+            file_size=1024,
+            institution_id=1,
+            user_id=42,  # == mock_user.id → owner-visible (TF-354 filter)
+        )
+
+        mock_query = Mock()
+        mock_db.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.all.return_value = [doc]
+
+        with (
+            patch.object(TenantFilter, "filter_by_tenant", return_value=mock_query),
+            patch(
+                "utils.document_visibility.get_user_accessible_org_unit_ids",
+                return_value=set(),
+            ),
+        ):
+            response = auth_client.get("/api/v1/rag/available-documents")
+
+        assert response.status_code == 200
+        doc_info = response.json()["documents"][0]
+        assert doc_info["title"] == "Kapitel 3 — Normalisierung"
+        assert doc_info["display_name"] == "Kapitel 3 — Normalisierung"
+        # filename bleibt erhalten — bestehende Consumer dürfen nicht brechen
+        assert doc_info["filename"] == "2026-02-03_Skript_Kapitel_3_final_v2.pdf"
+
+    def test_get_available_documents_title_falls_back_to_filename(
+        self, auth_client, mock_db
+    ):
+        """TF-605: Ohne Umbenennung liefert ``title`` den Dateinamen ohne Endung."""
+
+        doc = Document(
+            id=8,
+            original_filename="Vorlesung.pdf",
+            display_name=None,
+            mime_type="application/pdf",
+            status=DocumentStatus.PROCESSED,
+            vector_collection="test_collection",
+            doc_metadata=None,
+            file_size=1024,
+            institution_id=1,
+            user_id=42,
+        )
+
+        mock_query = Mock()
+        mock_db.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.all.return_value = [doc]
+
+        with (
+            patch.object(TenantFilter, "filter_by_tenant", return_value=mock_query),
+            patch(
+                "utils.document_visibility.get_user_accessible_org_unit_ids",
+                return_value=set(),
+            ),
+        ):
+            response = auth_client.get("/api/v1/rag/available-documents")
+
+        assert response.status_code == 200
+        doc_info = response.json()["documents"][0]
+        assert doc_info["title"] == "Vorlesung"
+        assert doc_info["display_name"] is None
+
     def test_get_supported_question_types(self):
         """Test Supported Question Types Endpoint (no auth required)"""
 
@@ -681,6 +768,9 @@ class TestRAGAPIIntegration:
         mock_doc = Mock()
         mock_doc.id = 1
         mock_doc.original_filename = "integration_test.txt"
+        # TF-605: siehe mock_processed_document — Endpoint liefert beide Felder.
+        mock_doc.display_name = None
+        mock_doc.title = "integration_test"
         mock_doc.status = DocumentStatus.PROCESSED
         mock_doc.vector_collection = "test"
         mock_doc.doc_metadata = {}

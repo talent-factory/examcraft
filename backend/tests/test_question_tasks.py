@@ -1643,3 +1643,188 @@ def test_persist_questions_generation_metadata_defaults_to_none():
     persisted = _capture_persisted_question(fake_question)
 
     assert persisted.generation_metadata is None
+
+
+# ===========================================================================
+# TF-605: source_document_ids join-key fix in _persist_questions
+#
+# TF-605 changed RAGQuestion.source_documents from filenames to display
+# titles for the provenance UI. Titles are free text and can differ
+# arbitrarily from Document.original_filename, so linking QuestionSourceDocument
+# rows can no longer rely on matching source_documents against filenames.
+# These tests pin the fix: _persist_questions must prefer the parallel
+# source_document_ids field (document primary keys) when present, and only
+# fall back to filename-matching for callers that don't supply it.
+# ===========================================================================
+
+
+class _DocumentQueryStubSession:
+    """Stub SessionLocal whose `Document.id, Document.original_filename` query
+    returns a fixed set of rows, and which records every QuestionSourceDocument
+    merged so tests can assert on the resulting (question_id, document_id) links."""
+
+    def __init__(self, doc_rows):
+        # doc_rows: list of (id, original_filename) tuples
+        self._doc_rows = doc_rows
+        self._objs = []
+        self.merged = []
+
+    def add(self, obj):
+        self._objs.append(obj)
+
+    def query(self, *args, **_kwargs):
+        first = args[0] if args else None
+        class_name = getattr(getattr(first, "class_", None), "__name__", "")
+
+        from types import SimpleNamespace
+
+        rows = (
+            [SimpleNamespace(id=i, original_filename=f) for i, f in self._doc_rows]
+            if class_name == "Document"
+            else []
+        )
+
+        class _Q:
+            def filter(self, *_a, **_kw):
+                return self
+
+            def all(self):
+                return rows
+
+        return _Q()
+
+    def merge(self, obj):
+        if obj.__class__.__name__ == "QuestionSourceDocument":
+            self.merged.append((obj.question_id, obj.document_id))
+        return obj
+
+    def flush(self):
+        counter = [0]
+        for obj in self._objs:
+            if obj.__class__.__name__ == "QuestionReview":
+                counter[0] += 1
+                obj.id = counter[0]
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+
+def test_persist_questions_links_via_source_document_ids_when_title_differs_from_filename():
+    """TF-605: source_documents now carries the display title, which can
+    legitimately differ from Document.original_filename. Linking must still
+    succeed by going through source_document_ids instead."""
+    from types import SimpleNamespace
+    from tasks.question_tasks import _persist_questions
+
+    fake_question = SimpleNamespace(
+        question_text="Was ist die 3NF?",
+        question_type="open_ended",
+        options=None,
+        correct_answer="Transitive Abhängigkeiten entfallen",
+        explanation="…",
+        difficulty="medium",
+        source_chunks=[],
+        # Title — deliberately does NOT match any original_filename below.
+        source_documents=["Kapitel 3 — Normalisierung"],
+        source_document_ids=[7],
+        confidence_score=0.9,
+        bloom_level=3,
+    )
+
+    session = _DocumentQueryStubSession(
+        doc_rows=[(7, "2026-02-03_Skript_final_v2.pdf")]
+    )
+
+    _persist_questions(
+        questions=[fake_question],
+        exam_id="exam_tf605",
+        topic="Normalisierung",
+        language="de",
+        user_id=42,
+        institution_id=1,
+        db=session,
+    )
+
+    assert session.merged == [(1, 7)], (
+        "Expected QuestionSourceDocument(question_id=1, document_id=7) via "
+        "source_document_ids — filename-based matching would have found "
+        "nothing since the title doesn't match original_filename."
+    )
+
+
+def test_persist_questions_ignores_source_document_ids_outside_institution():
+    """An id not present in this institution's Document table (e.g. the
+    document was deleted between retrieval and persistence, or a
+    cross-tenant id somehow slipped through) must not be linked."""
+    from types import SimpleNamespace
+    from tasks.question_tasks import _persist_questions
+
+    fake_question = SimpleNamespace(
+        question_text="Q?",
+        question_type="open_ended",
+        options=None,
+        correct_answer="A",
+        explanation="…",
+        difficulty="medium",
+        source_chunks=[],
+        source_documents=["Ghost Document"],
+        source_document_ids=[999],
+        confidence_score=0.5,
+        bloom_level=None,
+    )
+
+    session = _DocumentQueryStubSession(doc_rows=[(7, "Skript.pdf")])
+
+    _persist_questions(
+        questions=[fake_question],
+        exam_id="exam_tf605_ghost",
+        topic="t",
+        language="de",
+        user_id=1,
+        institution_id=1,
+        db=session,
+    )
+
+    assert session.merged == []
+
+
+def test_persist_questions_falls_back_to_filename_matching_without_source_document_ids():
+    """Callers that don't supply source_document_ids (older replayed jobs,
+    non-Premium question sources) must still link via filename matching —
+    the pre-TF-605 behavior, preserved as a fallback."""
+    from types import SimpleNamespace
+    from tasks.question_tasks import _persist_questions
+
+    # Bewusst KEIN source_document_ids-Attribut → testet getattr(..., None).
+    fake_question = SimpleNamespace(
+        question_text="Q?",
+        question_type="open_ended",
+        options=None,
+        correct_answer="A",
+        explanation="…",
+        difficulty="medium",
+        source_chunks=[],
+        source_documents=["Skript.pdf"],
+        confidence_score=0.5,
+        bloom_level=None,
+    )
+
+    session = _DocumentQueryStubSession(doc_rows=[(7, "Skript.pdf")])
+
+    _persist_questions(
+        questions=[fake_question],
+        exam_id="exam_tf605_fallback",
+        topic="t",
+        language="de",
+        user_id=1,
+        institution_id=1,
+        db=session,
+    )
+
+    assert session.merged == [(1, 7)]

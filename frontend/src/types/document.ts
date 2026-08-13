@@ -223,6 +223,9 @@ export interface RAGContextSummary {
   source_documents: Array<{
     id: number;
     filename: string;
+    /** TF-605: Anzeigename aus der Dokumentbibliothek — für die Anzeige dem
+     *  `filename` vorziehen. Optional, weil ältere Responses ihn nicht führen. */
+    title?: string;
     chunks_used: number;
   }>;
   context_length: number;

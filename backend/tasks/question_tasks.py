@@ -285,6 +285,11 @@ def _persist_questions(
                 )
             }
         reviews = []
+        # TF-605: paired alongside `reviews` so the source-document linking
+        # loop below can read `question.source_document_ids` (if the caller
+        # supplies it) without depending on a Premium dataclass at the Core
+        # tier — duck-typed via getattr, same pattern as generation_metadata.
+        question_pairs: list[tuple[Any, Any]] = []
         for question in questions:
             # explanation can be str, list, or dict — Premium RAG open_ended rubrics
             # may return a dict. Serialize consistently so the TEXT column always
@@ -404,6 +409,7 @@ def _persist_questions(
             )
             db.add(question_review)
             reviews.append(question_review)
+            question_pairs.append((question, question_review))
 
         db.flush()
 
@@ -435,13 +441,24 @@ def _persist_questions(
                 for tag_id in tag_ids:
                     db.add(QuestionTag(question_id=review.id, tag_id=tag_id))
 
-        # Build filename→document_id lookup for this institution (best-effort)
+        # Build lookups for this institution's documents (best-effort).
+        # TF-605: `question_review.source_documents` now carries the resolved
+        # *display title* (Document.title), not the raw upload filename — a
+        # deliberate change for the review UI's provenance display. That
+        # means it can no longer double as a join key against
+        # Document.original_filename (titles are free-text and not even
+        # guaranteed unique). Linking therefore prefers `doc_ids` sourced
+        # straight from `question.source_document_ids` (the primary keys
+        # the RAG retrieval actually resolved) below; `filename_to_doc_id`
+        # remains only as a fallback for callers that don't supply ids
+        # (older replayed jobs, tests, non-Premium question sources).
         if institution_id is not None:
             all_docs = (
                 db.query(Document.id, Document.original_filename)
                 .filter(Document.institution_id == institution_id)
                 .all()
             )
+            valid_doc_ids = {d.id for d in all_docs}
             filename_to_doc_id = {d.original_filename: d.id for d in all_docs}
         else:
             # No institution_id → no QuestionSourceDocument rows can be
@@ -453,11 +470,13 @@ def _persist_questions(
                 "linking for %d questions; TF-321 filter will not see them",
                 len(reviews),
             )
+            valid_doc_ids = set()
             filename_to_doc_id = {}
 
         review_ids = []
+        unmatched_ids: set[int] = set()
         unmatched_filenames: set[str] = set()
-        for question_review in reviews:
+        for question, question_review in question_pairs:
             history = ReviewHistory(
                 question_id=question_review.id,
                 action="created",
@@ -468,31 +487,57 @@ def _persist_questions(
             db.add(history)
             review_ids.append(question_review.id)
 
-            # Link to source documents in the normalised join table
-            # RAG returns one entry per chunk, so the same filename can appear
-            # multiple times when a document contributes several chunks.
-            # dict.fromkeys deduplicates while preserving order.
-            for fname in dict.fromkeys(question_review.source_documents or []):
-                doc_id = filename_to_doc_id.get(fname)
-                if doc_id:
-                    db.merge(
-                        QuestionSourceDocument(
-                            question_id=question_review.id, document_id=doc_id
+            # Link to source documents in the normalised join table.
+            # `dict.fromkeys` deduplicates while preserving order (RAG
+            # returns one entry per chunk, so the same document can appear
+            # multiple times when it contributes several chunks).
+            doc_ids = getattr(question, "source_document_ids", None) or []
+            if doc_ids:
+                for doc_id in dict.fromkeys(doc_ids):
+                    if doc_id in valid_doc_ids:
+                        db.merge(
+                            QuestionSourceDocument(
+                                question_id=question_review.id,
+                                document_id=doc_id,
+                            )
                         )
-                    )
-                elif filename_to_doc_id:
-                    # Filename present in question metadata but not in the
-                    # institution's Document table — most likely filename
-                    # normalization drift (e.g. underscores vs. spaces,
-                    # case). De-duplicate the warning since the same source
-                    # filename usually appears across multiple questions.
-                    unmatched_filenames.add(fname)
+                    elif valid_doc_ids:
+                        # Id present in question metadata but not in the
+                        # institution's Document table — e.g. the document
+                        # was deleted between retrieval and persistence.
+                        unmatched_ids.add(doc_id)
+            else:
+                # No ids supplied — fall back to matching source_documents
+                # (title or filename, depending on the caller) against
+                # Document.original_filename. Kept for callers that predate
+                # source_document_ids; expect most of these to miss now
+                # that source_documents holds titles (see comment above).
+                for name in dict.fromkeys(question_review.source_documents or []):
+                    doc_id = filename_to_doc_id.get(name)
+                    if doc_id:
+                        db.merge(
+                            QuestionSourceDocument(
+                                question_id=question_review.id, document_id=doc_id
+                            )
+                        )
+                    elif filename_to_doc_id:
+                        unmatched_filenames.add(name)
 
+        if unmatched_ids:
+            logger.warning(
+                "persist_questions.source_document_id_unmatched institution=%s "
+                "count=%d sample=%s — document_id from RAG retrieval not found "
+                "in this institution's Document table (deleted between "
+                "retrieval and persistence?)",
+                institution_id,
+                len(unmatched_ids),
+                sorted(unmatched_ids)[:5],
+            )
         if unmatched_filenames:
             logger.warning(
                 "persist_questions.source_document_unmatched institution=%s "
                 "count=%d sample=%s — TF-321 source filter will miss linked "
-                "questions for these filenames; check RAG metadata vs. "
+                "questions for these names; check RAG metadata vs. "
                 "Document.original_filename for normalization drift",
                 institution_id,
                 len(unmatched_filenames),
