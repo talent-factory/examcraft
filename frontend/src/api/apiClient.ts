@@ -1,11 +1,12 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { withTokenRefreshLock, ACCESS_TOKEN_KEY, RefreshTrigger } from './tokenRefreshLock';
 
-const ACCESS_TOKEN_KEY = 'examcraft_access_token';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 let refreshPromise: Promise<void> | null = null;
 let tokenRefreshCallback: (() => Promise<void>) | null = null;
 let logoutCallback: (() => Promise<void>) | null = null;
+let adoptStoredTokensCallback: (() => Promise<void>) | null = null;
 
 export function setTokenRefreshCallback(fn: () => Promise<void>): void {
   tokenRefreshCallback = fn;
@@ -15,22 +16,52 @@ export function setLogoutCallback(fn: () => Promise<void>): void {
   logoutCallback = fn;
 }
 
-// Single entry point for token refresh — all paths (axios interceptor,
-// fetch interceptor, proactive timer) must go through this so concurrent
-// callers share one inflight refresh instead of racing for a rotating
-// refresh token.
-export async function executeTokenRefresh(): Promise<void> {
-  if (!refreshPromise) {
-    refreshPromise = (async () => {
+// Called when another tab won the refresh race — the fresh tokens are already
+// in localStorage and only need to be pulled into this tab's auth state.
+// Must throw if nothing usable was adopted (mirrors the `rotate` contract
+// below) rather than resolving silently, or a lost adoption looks like a
+// successful refresh to every caller of executeTokenRefresh.
+export function setAdoptStoredTokensCallback(fn: () => Promise<void>): void {
+  adoptStoredTokensCallback = fn;
+}
+
+// Single entry point for token refresh — all interceptor/timer paths (axios
+// interceptor, fetch interceptor, proactive timer) must go through this so
+// concurrent callers share one inflight refresh instead of racing for a
+// rotating refresh token. `refreshPromise` deduplicates within this tab, the
+// Web Lock inside withTokenRefreshLock deduplicates across tabs (TF-607).
+// The one exception is AuthContext's mount-time flow, which calls
+// withTokenRefreshLock directly — safe because it only runs once, before the
+// timer or either interceptor has anything to race against.
+export async function executeTokenRefresh(trigger: RefreshTrigger = 'unknown'): Promise<void> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = withTokenRefreshLock(
+    async () => {
       if (!tokenRefreshCallback) {
         throw new Error('No token refresh callback registered');
       }
       await tokenRefreshCallback();
-    })().finally(() => { refreshPromise = null; });
-  }
+    },
+    async () => {
+      if (!adoptStoredTokensCallback) {
+        throw new Error('No adopt-stored-tokens callback registered');
+      }
+      await adoptStoredTokensCallback();
+    },
+    trigger,
+  ).finally(() => { refreshPromise = null; });
+
   return refreshPromise;
 }
 
+// Local-only teardown by design (TF-607): AuthContext registers this as
+// `clearLocalSession`, not `logout` — `logout` calls AuthService.logout(),
+// which revokes *every* session of the user on the backend. Escalating a
+// single request's auth failure to a full server-side revoke would sign the
+// user out of every open tab and device, not just recover this one.
 export function triggerAuthLogout(): void {
   if (logoutCallback) {
     logoutCallback().catch((err) => {
@@ -56,7 +87,7 @@ export function setupFetchInterceptor(): void {
     if (url.includes('/api/auth/')) return response;
 
     try {
-      await executeTokenRefresh();
+      await executeTokenRefresh('fetch-401');
     } catch (err) {
       console.error('[apiClient] Fetch refresh failed:', err);
       triggerAuthLogout();
@@ -106,7 +137,7 @@ apiClient.interceptors.response.use(
     originalRequest._retry = true;
 
     try {
-      await executeTokenRefresh();
+      await executeTokenRefresh('axios-401');
     } catch (refreshErr) {
       console.error('[apiClient] Axios refresh failed:', refreshErr);
       triggerAuthLogout();

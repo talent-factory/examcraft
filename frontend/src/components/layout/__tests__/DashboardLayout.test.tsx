@@ -12,6 +12,7 @@ import { AuthProvider } from '../../../contexts/AuthContext';
 jest.mock('../../../api/apiClient', () => ({
   setTokenRefreshCallback: jest.fn(),
   setLogoutCallback: jest.fn(),
+  setAdoptStoredTokensCallback: jest.fn(),
   setupFetchInterceptor: jest.fn(),
   apiClient: { interceptors: { request: { use: jest.fn() }, response: { use: jest.fn() } } },
 }));

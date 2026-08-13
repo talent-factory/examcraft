@@ -69,7 +69,12 @@ export { useRoleBasedNavigation } from './hooks/useRoleBasedNavigation';
 // API Client
 // ============================================================================
 
-export { apiClient, setTokenRefreshCallback, setLogoutCallback } from './api/apiClient';
+export {
+  apiClient,
+  setTokenRefreshCallback,
+  setLogoutCallback,
+  setAdoptStoredTokensCallback,
+} from './api/apiClient';
 
 // ============================================================================
 // Utils

@@ -144,7 +144,7 @@ async function withAuthRetry(makeRequest: () => Promise<Response>): Promise<Resp
   const response = await makeRequest();
   if (response.status !== 401) return response;
   try {
-    await executeTokenRefresh();
+    await executeTokenRefresh('httpClient-401');
   } catch (err) {
     console.error('[httpClient] Refresh failed in withAuthRetry:', err);
     triggerAuthLogout();
