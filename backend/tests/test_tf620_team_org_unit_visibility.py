@@ -34,7 +34,7 @@ from api.documents import (
     upload_document,
 )
 from api.org_units import list_my_org_units
-from models.auth import Institution, User, UserStatus
+from models.auth import Institution, Role, User, UserStatus
 from models.document import Document, DocumentStatus, DocumentVisibility
 from models.org_unit import OrgUnit, UserOrgUnit
 from services.org_unit_service import delete_org_unit
@@ -121,6 +121,18 @@ def team_data(test_db):
     team_member = _user(test_db, 7201, "teammate@tf620.ch", inst.id)
     abteilung_member = _user(test_db, 7202, "abtchef@tf620.ch", inst.id)
     outsider = _user(test_db, 7203, "outsider@tf620.ch", inst.id)
+    # No org-unit membership at all — same "unrelated colleague" shape as
+    # ``outsider``, but additionally holds documents:read_all (TF-640).
+    read_all_admin = _user(test_db, 7209, "readall@tf620.ch", inst.id)
+    read_all_role = Role(
+        name="institution-reader",
+        display_name="Institution Reader",
+        permissions=["documents:read_all"],
+        is_active=True,
+    )
+    test_db.add(read_all_role)
+    test_db.flush()
+    read_all_admin.roles.append(read_all_role)
 
     test_db.add_all(
         [
@@ -143,6 +155,7 @@ def team_data(test_db):
         team_member=team_member,
         abteilung_member=abteilung_member,
         outsider=outsider,
+        read_all_admin=read_all_admin,
         doc_team=doc_team,
     )
 
@@ -241,6 +254,25 @@ def test_team_doc_not_visible_to_unrelated_colleague(team_data, test_db):
 
 def test_team_doc_visible_to_owner_regardless_of_membership(team_data, test_db):
     assert is_document_visible_for(team_data["owner"], team_data["doc_team"], test_db)
+
+
+def test_team_doc_visible_to_read_all_admin_without_org_unit_membership(
+    team_data, test_db
+):
+    """TF-640: the Institution-Admin read-all bypass is checked before the
+    TEAM/org-unit branch and must not be shadowed by it — an admin with zero
+    org-unit memberships (same shape as ``outsider``, who is correctly denied
+    above) still sees a TEAM-visibility doc via documents:read_all."""
+    assert is_document_visible_for(
+        team_data["read_all_admin"], team_data["doc_team"], test_db
+    )
+    ids = {
+        d.id
+        for d in filter_documents_for_user(
+            test_db.query(Document), team_data["read_all_admin"], test_db
+        ).all()
+    }
+    assert team_data["doc_team"].id in ids
 
 
 def test_team_doc_not_visible_to_sibling_org_unit_member(team_data, test_db):

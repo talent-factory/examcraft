@@ -10,6 +10,9 @@ Covers spec section 5.6:
   institution → 400.
 * Alembic migration A: new rows default to ``private`` + indexes exist.
 * RAG paths (available-documents + generate-exam) respect visibility.
+* Institution-Admin ``documents:read_all`` bypass (TF-640): sees every
+  document within their own institution regardless of ``visibility``, never
+  crosses institution boundaries, and grants no edit rights (read-only).
 
 Endpoint functions are called directly (no TestClient/lifespan) — same pattern
 as ``test_documents_superuser_access.py``. Calling them directly also bypasses
@@ -28,7 +31,9 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy import text
 
 from api.documents import (
+    AttachTagsRequest,
     DocumentPatchRequest,
+    attach_document_tags,
     download_document,
     get_document,
     get_document_chunks,
@@ -46,7 +51,7 @@ from api.rag_exams import (
     get_available_documents,
     retrieve_context,
 )
-from models.auth import AuditLog, Institution, User, UserStatus
+from models.auth import AuditLog, Institution, Role, User, UserStatus
 from models.document import Document, DocumentStatus, DocumentVisibility
 from utils.document_visibility import (
     filter_documents_for_user,
@@ -61,12 +66,17 @@ def _run(coro):
 
 @pytest.fixture
 def vis_data(test_db):
-    """Two institutions, four users, one private + one institution doc.
+    """Two institutions, users, one private + one institution doc (+ one
+    private doc in the foreign institution).
 
-    - ``owner`` (inst A) owns both documents.
+    - ``owner`` (inst A) owns both inst-A documents.
     - ``colleague`` (inst A) — same institution, not the owner.
-    - ``foreigner`` (inst B) — different institution.
+    - ``foreigner`` (inst B) — different institution, owns ``doc_foreign``.
     - ``superuser`` (inst A, is_superuser) — bypasses the filter.
+    - ``admin_read_all`` (inst A) — holds ``documents:read_all`` via a
+      deliberately non-admin-named custom role (``institution-reader``), to
+      prove the bypass is permission-based, not a role-name check (TF-639/
+      TF-640).
     """
     inst_a = Institution(
         id=700,
@@ -105,10 +115,21 @@ def vis_data(test_db):
     colleague = _user(701, "colleague@vis.ch", 700)
     foreigner = _user(702, "foreigner@vis.ch", 701)
     superuser = _user(703, "super@vis.ch", 700, superuser=True)
-    test_db.add_all([owner, colleague, foreigner, superuser])
+    admin_read_all = _user(704, "readall@vis.ch", 700)
+    test_db.add_all([owner, colleague, foreigner, superuser, admin_read_all])
     test_db.flush()
 
-    def _doc(did, visibility):
+    read_all_role = Role(
+        name="institution-reader",
+        display_name="Institution Reader",
+        permissions=["documents:read_all"],
+        is_active=True,
+    )
+    test_db.add(read_all_role)
+    test_db.flush()
+    admin_read_all.roles.append(read_all_role)
+
+    def _doc(did, visibility, *, institution_id=700, owner_id=700):
         return Document(
             id=did,
             filename=f"{did}.pdf",
@@ -117,24 +138,32 @@ def vis_data(test_db):
             file_size=10,
             mime_type="application/pdf",
             status=DocumentStatus.PROCESSED,
-            institution_id=700,
-            user_id=700,
+            institution_id=institution_id,
+            user_id=owner_id,
             visibility=visibility,
             vector_collection=f"doc_{did}",
         )
 
     doc_private = _doc(700, DocumentVisibility.PRIVATE)
     doc_institution = _doc(701, DocumentVisibility.INSTITUTION)
-    test_db.add_all([doc_private, doc_institution])
+    # Foreign-institution doc — proves the read_all bypass never crosses the
+    # institution boundary, unlike SuperUser (TF-640).
+    doc_foreign = _doc(
+        702, DocumentVisibility.PRIVATE, institution_id=701, owner_id=702
+    )
+    test_db.add_all([doc_private, doc_institution, doc_foreign])
     test_db.commit()
+    test_db.refresh(admin_read_all)
 
     return SimpleNamespace(
         owner=owner,
         colleague=colleague,
         foreigner=foreigner,
         superuser=superuser,
+        admin_read_all=admin_read_all,
         doc_private=doc_private,
         doc_institution=doc_institution,
+        doc_foreign=doc_foreign,
     )
 
 
@@ -181,6 +210,12 @@ def test_superuser_bypasses_filter(vis_data, test_db):
         ("foreigner", "doc_institution", False),
         ("superuser", "doc_private", True),
         ("superuser", "doc_institution", True),
+        # Institution-Admin read_all bypass (TF-640): sees every doc within
+        # its own institution regardless of visibility, but never a doc
+        # belonging to a foreign institution.
+        ("admin_read_all", "doc_private", True),
+        ("admin_read_all", "doc_institution", True),
+        ("admin_read_all", "doc_foreign", False),
     ],
 )
 def test_is_document_visible_for_permutations(
@@ -189,6 +224,156 @@ def test_is_document_visible_for_permutations(
     user = getattr(vis_data, user_attr)
     doc = getattr(vis_data, doc_attr)
     assert is_document_visible_for(user, doc, test_db) is expected
+
+
+def test_read_all_admin_sees_colleague_private_doc_in_filter(vis_data, test_db):
+    """TF-640: ``documents:read_all`` makes ``filter_documents_for_user``
+    surface a colleague's PRIVATE doc, but a foreign-institution doc — even
+    a PRIVATE one this user doesn't own — stays out of reach."""
+    ids = _visible_ids(vis_data.admin_read_all, test_db)
+    assert {700, 701} <= ids
+    assert 702 not in ids
+
+
+def test_read_all_admin_sees_colleague_private_doc_via_get_document(vis_data, test_db):
+    """TF-640: the bypass must also cover single-doc fetch, not just the list
+    query filter — ``get_document`` routes through ``is_document_visible_for``
+    via ``assert_document_visible_for``."""
+    resp = _run(
+        get_document(
+            document_id=700,
+            request=None,
+            current_user=vis_data.admin_read_all,
+            db=test_db,
+        )
+    )
+    assert resp.id == 700
+
+
+def test_read_all_admin_gets_404_on_foreign_institution_doc(vis_data, test_db):
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            get_document(
+                document_id=702,
+                request=None,
+                current_user=vis_data.admin_read_all,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 404
+
+
+def test_read_all_admin_cannot_edit_colleague_private_doc(vis_data, test_db):
+    """TF-640/ADR-0004: the bypass is read-only — it makes the private doc
+    visible (no longer a 404) but the pre-existing owner-only check still
+    rejects the write (403), unlike a SuperUser."""
+    payload = DocumentPatchRequest(visibility=DocumentVisibility.INSTITUTION)
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            update_document(
+                document_id=700,
+                payload=payload,
+                request=None,
+                current_user=vis_data.admin_read_all,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 403
+    test_db.refresh(vis_data.doc_private)
+    assert vis_data.doc_private.visibility == DocumentVisibility.PRIVATE
+
+
+def test_read_all_admin_cannot_attach_personal_tag_to_colleague_private_doc(
+    vis_data, test_db
+):
+    """TF-640/ADR-0004: attaching a personal tag is a state-changing action
+    gated behind visibility (TF-399's ``_load_visible_document``), so the
+    read-only read_all bypass must not unlock it — 404, same as anyone else
+    who can't otherwise see the document. The admin can still read the doc
+    (see ``test_read_all_admin_sees_colleague_private_doc_via_get_document``);
+    only the *mutation* stays out of reach."""
+    from models.tag import Tag
+
+    user_tag = Tag(name="Meta-Tag", scope="user", created_by=vis_data.admin_read_all.id)
+    test_db.add(user_tag)
+    test_db.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            attach_document_tags(
+                document_id=700,
+                body=AttachTagsRequest(tag_ids=[user_tag.id]),
+                request=None,
+                current_user=vis_data.admin_read_all,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 404
+
+
+def test_read_all_admin_still_sees_own_orphaned_document(vis_data, test_db):
+    """Regression: the read_all bypass's institution-scoped query filter must
+    OR with ownership, not replace it — otherwise granting a read permission
+    would remove visibility of the admin's own document whose institution_id
+    is NULL (e.g. uploaded before institution assignment) or points at a
+    different institution (e.g. after a SuperAdmin reassignment)."""
+    orphan = Document(
+        id=705,
+        filename="orphan.pdf",
+        original_filename="orphan.pdf",
+        file_path="/tmp/orphan.pdf",
+        file_size=10,
+        mime_type="application/pdf",
+        status=DocumentStatus.PROCESSED,
+        institution_id=None,
+        user_id=vis_data.admin_read_all.id,
+        visibility=DocumentVisibility.PRIVATE,
+        vector_collection="doc_705",
+    )
+    test_db.add(orphan)
+    test_db.commit()
+
+    assert is_document_visible_for(vis_data.admin_read_all, orphan, test_db)
+    ids = _visible_ids(vis_data.admin_read_all, test_db)
+    assert 705 in ids
+
+
+def test_admin_named_role_without_permission_does_not_bypass(vis_data, test_db):
+    """Mirror of the fixture's non-admin-named-role proof: an *admin-sounding*
+    role without ``documents:read_all`` must NOT bypass either — the check is
+    permission-based, not a role-name heuristic in either direction.
+
+    ``Role.name`` is globally unique (not per-institution) and the real
+    seeded "admin" role already exists in the shared full-suite CI database,
+    so this deliberately uses a distinct, TF-640-namespaced name rather than
+    literally "admin" (which would also defeat the test's own premise, since
+    the real seeded admin role *does* carry ``documents:read_all``).
+    """
+    faux_admin = User(
+        id=706,
+        email="fauxadmin@vis.ch",
+        first_name="F",
+        last_name="L",
+        password_hash="x",
+        institution_id=700,
+        status=UserStatus.ACTIVE.value,
+    )
+    test_db.add(faux_admin)
+    test_db.flush()
+    admin_role = Role(
+        name="tf640-admin-lookalike",
+        display_name="Administrator",
+        permissions=["documents:read"],  # no read_all
+        is_active=True,
+    )
+    test_db.add(admin_role)
+    test_db.flush()
+    faux_admin.roles.append(admin_role)
+    test_db.commit()
+
+    assert not is_document_visible_for(faux_admin, vis_data.doc_private, test_db)
+    ids = _visible_ids(faux_admin, test_db)
+    assert 700 not in ids
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +403,12 @@ def test_list_colleague_hides_private(vis_data, test_db):
     ids = _list_ids(vis_data.colleague, test_db)
     assert 701 in ids
     assert 700 not in ids
+
+
+def test_list_read_all_admin_sees_colleague_private_not_foreign(vis_data, test_db):
+    ids = _list_ids(vis_data.admin_read_all, test_db)
+    assert {700, 701} <= ids
+    assert 702 not in ids
 
 
 def test_list_foreigner_sees_neither(vis_data, test_db):

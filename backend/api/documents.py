@@ -990,13 +990,22 @@ def _load_visible_document(document_id: int, current_user: User, db: Session, lo
     ``user``-scope (personal) tag operations are allowed for anyone who can see
     the document (TF-399). The shared-vs-personal permission is decided per tag
     downstream, where shared assignments still require ownership.
+
+    ``allow_read_all_bypass=False``: attaching/detaching a personal tag is a
+    state-changing action, so the Institution-Admin ``documents:read_all``
+    bypass (TF-640) must not unlock it — that bypass is read-only by design
+    (ADR-0004). A read_all holder therefore gets the same 404 here as anyone
+    else who can't otherwise see the document; they can still read it via
+    ``GET /documents/{id}``, which *does* honor the bypass.
     """
     document = document_service.get_document_by_id(document_id, db)
     if not document:
         raise HTTPException(
             status_code=404, detail=t("documents_not_found", locale=locale)
         )
-    assert_document_visible_for(current_user, document, db, locale=locale)
+    assert_document_visible_for(
+        current_user, document, db, locale=locale, allow_read_all_bypass=False
+    )
     is_owner = (
         document.user_id is not None and document.user_id == current_user.id
     ) or current_user.is_superuser
