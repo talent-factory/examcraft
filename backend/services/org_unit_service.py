@@ -325,13 +325,15 @@ def delete_org_unit(db: Session, org_unit: OrgUnit) -> int:
     dient nur der Rueckmeldung/Protokollierung durch den Aufrufer, nicht der
     Bestaetigung selbst.
 
-    Raises ``ValueError`` (-> 409 beim Aufrufer) wenn noch Dokumente auf diese
-    -- oder eine ihrer Nachfahren-OrgUnits -- via ``visibility='team'``
-    verweisen (TF-620): ``documents.org_unit_id`` hat bewusst kein
-    ``ON DELETE CASCADE/SET NULL`` (siehe Migration
-    ``tf620_doc_org_unit_scope``), also schlaegt der DB-seitige FK hier mit
-    einem ``IntegrityError`` fehl statt Dokumente stillschweigend zu loeschen
-    oder in einen Constraint-Verletzungs-Zustand zu bringen.
+    Raises ``ValueError`` (-> 409 beim Aufrufer) wenn noch Dokumente oder
+    Prompts auf diese -- oder eine ihrer Nachfahren-OrgUnits -- via
+    ``visibility='team'`` verweisen (TF-620/TF-641): sowohl
+    ``documents.org_unit_id`` als auch ``prompts.org_unit_id`` haben bewusst
+    kein ``ON DELETE CASCADE/SET NULL`` (siehe Migrationen
+    ``tf620_doc_org_unit_scope`` bzw. ``tf641_prompt_org_unit_scope``), also
+    schlaegt der DB-seitige FK hier mit einem ``IntegrityError`` fehl statt
+    die referenzierenden Zeilen stillschweigend zu loeschen oder in einen
+    Constraint-Verletzungs-Zustand zu bringen.
     """
     descendant_count = len(get_descendant_ids(db, org_unit.id)) - 1
     db.delete(org_unit)
@@ -339,14 +341,18 @@ def delete_org_unit(db: Session, org_unit: OrgUnit) -> int:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        # ``documents.org_unit_id`` is the only FK onto org_units without
-        # ON DELETE CASCADE/SET NULL today (see docstring), so it's the only
-        # thing that can raise here in practice -- but don't just assume
-        # that's the cause: inspect the actual constraint name so a future
-        # non-cascading FK onto org_units doesn't get silently mislabeled
-        # with this specific message, and log the raw exception either way
-        # so a wrong guess is still debuggable (409s are typically treated
-        # as expected client errors and never reach error tracking) (TF-620).
+        # ``documents.org_unit_id`` and ``prompts.org_unit_id`` are the only
+        # FKs onto org_units without ON DELETE CASCADE/SET NULL today (see
+        # docstring), so one of the two is the only thing that can raise here
+        # in practice -- but don't just assume which: inspect the actual
+        # constraint name so a future non-cascading FK onto org_units doesn't
+        # get silently mislabeled with either specific message (TF-641
+        # regression: the message stayed hardcoded to "Dokumente" after
+        # prompts.org_unit_id was added, misleading admins about which
+        # resource actually blocks the delete), and log the raw exception
+        # either way so a wrong guess is still debuggable (409s are typically
+        # treated as expected client errors and never reach error tracking)
+        # (TF-620/TF-641).
         constraint_name = getattr(
             getattr(exc.orig, "diag", None), "constraint_name", None
         )
@@ -359,15 +365,23 @@ def delete_org_unit(db: Session, org_unit: OrgUnit) -> int:
             exc,
             exc_info=True,
         )
-        if constraint_name is None or "org_unit_id" in constraint_name.lower():
+        if constraint_name is not None and "prompt" in constraint_name.lower():
+            blocking_resource = "Prompts"
+        elif constraint_name is not None and "document" in constraint_name.lower():
+            blocking_resource = "Dokumente"
+        elif constraint_name is None or "org_unit_id" in constraint_name.lower():
+            # Matches the FK but the naming convention doesn't tell us which
+            # table -- name both rather than guess and mislabel.
+            blocking_resource = "Dokumente oder Prompts"
+        else:
             raise ValueError(
                 f"OrgUnit '{org_unit.name}' kann nicht geloescht werden: "
-                "noch Dokumente mit Team-Sichtbarkeit auf diese oder eine "
-                "untergeordnete OrgUnit beschraenkt"
+                "wird noch von anderen Datensaetzen referenziert"
             ) from exc
         raise ValueError(
             f"OrgUnit '{org_unit.name}' kann nicht geloescht werden: "
-            "wird noch von anderen Datensaetzen referenziert"
+            f"noch {blocking_resource} mit Team-Sichtbarkeit auf diese oder "
+            "eine untergeordnete OrgUnit beschraenkt"
         ) from exc
     return descendant_count
 
