@@ -95,6 +95,17 @@ def seed_default_roles(db: Session):
                 # institutionsinterne Abteilungs-/Team-Hierarchie (CRUD +
                 # Mitgliedschaften).
                 "manage_org_units",
+                # TF-639: Institutions-Admin-Immer-Lesezugriff pro
+                # Ressourcentyp (nur Lesen). Drei der fünf sind aktuell noch
+                # unenforced (Fragen/Prüfungen/Competency-Frameworks haben
+                # noch keine Visibility-Stufe) — wird hier bereits geseedet,
+                # damit kein Ressourcen-Ticket seed_roles.py separat
+                # anfassen muss.
+                "documents:read_all",
+                "prompt:read_all",
+                "questions:read_all",
+                "exams:read_all",
+                "competencies:read_all",
             ],
             "is_system_role": True,
         },

@@ -26,3 +26,22 @@ def test_known_permissions_entries_have_label_and_category():
     for key, meta in KNOWN_PERMISSIONS.items():
         assert meta.get("label"), f"{key} fehlt ein label"
         assert meta.get("category"), f"{key} fehlt eine category"
+
+
+def test_known_permissions_has_institution_admin_read_all_bypass_permissions():
+    # TF-639: Institutions-Admin-Immer-Lesezugriff pro Ressourcentyp.
+    # "prompt:read_all" ist bewusst Singular (matcht prompt:read/update/
+    # delete/create), die anderen vier Plural (matchen documents:read /
+    # ihre jeweilige Ressourcen-Kategorie).
+    expected_category_by_permission = {
+        "documents:read_all": "Dokumente",
+        "prompt:read_all": "Prompts",
+        "questions:read_all": "Fragen",
+        "exams:read_all": "Prüfungen",
+        "competencies:read_all": "Kompetenzen",
+    }
+    for permission, category in expected_category_by_permission.items():
+        assert permission in KNOWN_PERMISSIONS, (
+            f"{permission} fehlt in KNOWN_PERMISSIONS"
+        )
+        assert KNOWN_PERMISSIONS[permission]["category"] == category

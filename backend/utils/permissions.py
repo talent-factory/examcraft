@@ -70,6 +70,31 @@ _KNOWN_PERMISSIONS: dict[str, PermissionMeta] = {
     "prompt:read": {"label": "Prompts einsehen", "category": "Prompts"},
     "prompt:update": {"label": "Prompts bearbeiten", "category": "Prompts"},
     "prompt:delete": {"label": "Prompts löschen", "category": "Prompts"},
+    # TF-639: Institutions-Admin-Immer-Lesezugriff pro Ressourcentyp (nur
+    # Lesen, kein Edit/Delete-Bypass — siehe utils/resource_visibility.py).
+    # "prompt:read_all" ist bewusst Singular, um mit der bestehenden
+    # prompt:*-Familie konsistent zu bleiben; die anderen vier sind Plural,
+    # analog zu "documents:read".
+    "documents:read_all": {
+        "label": "Alle Dokumente einsehen (Institutions-Admin)",
+        "category": "Dokumente",
+    },
+    "prompt:read_all": {
+        "label": "Alle Prompts einsehen (Institutions-Admin)",
+        "category": "Prompts",
+    },
+    "questions:read_all": {
+        "label": "Alle Fragen einsehen (Institutions-Admin)",
+        "category": "Fragen",
+    },
+    "exams:read_all": {
+        "label": "Alle Prüfungen einsehen (Institutions-Admin)",
+        "category": "Prüfungen",
+    },
+    "competencies:read_all": {
+        "label": "Alle Kompetenz-Frameworks einsehen (Institutions-Admin)",
+        "category": "Kompetenzen",
+    },
 }
 
 # Read-only view: prevents accidental mutation of the single source of truth
