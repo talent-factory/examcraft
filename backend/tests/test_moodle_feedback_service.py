@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from models.exam import Exam, ExamQuestion
-from models.question_review import QuestionReview
+from models.question_review import QuestionReview, QuestionReviewVisibility
 from models.student import Student
 from models.submission import (
     Attempt,
@@ -33,8 +33,15 @@ def _crypto_env(monkeypatch):
 
 
 def _qr(db):
+    # TF-642: no institution_id here (this helper isn't tenant-scoped), so
+    # visibility must be PRIVATE — the default INSTITUTION would trip
+    # ck_question_reviews_institution_visibility_requires_institution.
     qr = QuestionReview(
-        question_text="?", question_type="single_choice", difficulty="easy", topic="x"
+        question_text="?",
+        question_type="single_choice",
+        difficulty="easy",
+        topic="x",
+        visibility=QuestionReviewVisibility.PRIVATE,
     )
     db.add(qr)
     db.flush()

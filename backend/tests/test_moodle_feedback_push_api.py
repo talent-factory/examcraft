@@ -70,7 +70,11 @@ def _exam(db: Session, inst_id: int, *, with_quiz_id: bool = True) -> Exam:
     db.add(exam)
     db.flush()
     qr = QuestionReview(
-        question_text="?", question_type="single_choice", difficulty="easy", topic="x"
+        question_text="?",
+        question_type="single_choice",
+        difficulty="easy",
+        topic="x",
+        institution_id=inst_id,  # TF-642: default visibility='institution' requires this
     )
     db.add(qr)
     db.flush()

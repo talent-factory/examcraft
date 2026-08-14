@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from datetime import datetime
 
 from main import app
-from models.question_review import ReviewStatus
+from models.question_review import QuestionReviewVisibility, ReviewStatus
 
 
 class TestQuestionReviewAPI:
@@ -112,6 +112,11 @@ class TestQuestionReviewAPI:
         mock.competency_id = None
         mock.ln_level = None
         mock.competency = None
+        # TF-642: Fragenpool-Sichtbarkeit explizit setzen — sonst liefert der
+        # Mock ein Mock-Attribut, das Pydantic (str / Optional[int]) nicht
+        # validieren kann (gleiches Muster wie TF-383/TF-400 oben).
+        mock.visibility = QuestionReviewVisibility.INSTITUTION
+        mock.org_unit_id = None
         return mock
 
     # ==================== GET /api/v1/questions/review ====================

@@ -15,6 +15,7 @@ from utils.question_options import normalize_options
 from database import get_db
 from models.question_review import (
     QuestionReview,
+    QuestionReviewVisibility,
     ReviewComment,
     ReviewHistory,
     ReviewStatus,
@@ -23,6 +24,7 @@ from models.auth import User
 from models.tag import Tag, QuestionTag
 from api.tags import TagOut
 from schemas.generation_metadata import GenerationMetadata
+from services.org_unit_service import get_user_accessible_org_unit_ids
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_active_user, require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -112,6 +114,12 @@ def _question_to_dict(
         "competency_id": question.competency_id,
         "ln_level": question.ln_level,
         "competency": _serialize_competency(question),
+        # TF-642: Fragenpool-Sichtbarkeit — informativ hier (Review-Queue
+        # filtert nicht danach, siehe utils/question_visibility.py).
+        "visibility": (
+            question.visibility.value if question.visibility is not None else None
+        ),
+        "org_unit_id": question.org_unit_id,
     }
 
 
@@ -190,6 +198,11 @@ class QuestionReviewUpdate(BaseModel):
     difficulty: Optional[str] = Field(None, pattern="^(easy|medium|hard)$")
     bloom_level: Optional[int] = Field(None, ge=1, le=6)
     estimated_time_minutes: Optional[int] = Field(None, ge=1, le=180)
+    # TF-642: Sichtbarkeit im Fragenpool ändern. org_unit_id nur zusammen mit
+    # visibility="team" zulässig (siehe _resolve_question_visibility_update)
+    # — muss eine Org-Unit sein, der der Bearbeitende selbst angehört.
+    visibility: Optional[str] = Field(None, pattern="^(private|team|institution)$")
+    org_unit_id: Optional[int] = None
 
 
 class ReviewActionRequest(BaseModel):
@@ -270,6 +283,10 @@ class QuestionReviewResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     tags: List[TagOut] = []
+    # TF-642: Fragenpool-Sichtbarkeit (governs list_approved_questions only —
+    # siehe utils/question_visibility.py). Nicht die Review-Queue-Sichtbarkeit.
+    visibility: str = "institution"
+    org_unit_id: Optional[int] = None
 
     # TF-330: legacy records store ``options`` as a dict keyed by
     # 'A'/'B'/'C'/'D'. Normalize on read so the API never 500s on these rows.
@@ -277,6 +294,16 @@ class QuestionReviewResponse(BaseModel):
     @classmethod
     def _normalize_options(cls, value: Any) -> Any:
         return normalize_options(value)
+
+    # TF-642: ``question.visibility`` is a ``QuestionReviewVisibility`` enum
+    # member when this model is built ``from_attributes`` off the ORM object
+    # directly (e.g. edit_question's return) — normalize to the plain string
+    # value the field declares. ``_question_to_dict`` already passes a plain
+    # string, so this is a no-op there.
+    @field_validator("visibility", mode="before")
+    @classmethod
+    def _normalize_visibility(cls, value: Any) -> Any:
+        return value.value if isinstance(value, QuestionReviewVisibility) else value
 
     class Config:
         from_attributes = True
@@ -594,6 +621,100 @@ async def create_question_review(
         )
 
 
+def _resolve_question_visibility_update(
+    question: QuestionReview,
+    request: QuestionReviewUpdate,
+    user: User,
+    db: Session,
+) -> Optional[tuple]:
+    """TF-642: validate a visibility/org_unit_id change on ``PUT .../edit``.
+
+    Mirrors premium's ``_resolve_prompt_tier`` (TF-641): ``team`` visibility
+    requires an ``org_unit_id`` the editor themselves has (hierarchical)
+    access to, via ``get_user_accessible_org_unit_ids`` — any other
+    visibility clears ``org_unit_id``. Returns ``None`` when neither field
+    ends up changed (nothing to apply), else the validated
+    ``(QuestionReviewVisibility, Optional[int])`` pair to assign.
+
+    Ownership-gated (owner or superuser only), unlike the rest of this
+    endpoint's fields, which stay permission+institution scoped per the
+    /grilling TF-642 decision — that decision covers *pre-existing*
+    review-workflow mutation (question_text, difficulty, ...), not this new
+    access-control surface. Mirrors Document/TF-620's identical rule ("a
+    colleague who merely *sees* a team-scoped doc must not be able to move
+    it") rather than the broader edit-permission gate.
+    """
+    if request.visibility is None and request.org_unit_id is None:
+        return None
+
+    is_owner = question.created_by is not None and question.created_by == user.id
+    if not is_owner and not user.is_superuser:
+        raise HTTPException(
+            status_code=403,
+            detail="Nur der Ersteller oder ein SuperUser darf die Sichtbarkeit ändern.",
+        )
+
+    new_visibility = (
+        QuestionReviewVisibility(request.visibility)
+        if request.visibility is not None
+        else question.visibility
+    )
+    new_org_unit_id = (
+        request.org_unit_id if request.org_unit_id is not None else question.org_unit_id
+    )
+
+    if new_visibility == QuestionReviewVisibility.TEAM:
+        if new_org_unit_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail=("Team-Sichtbarkeit erfordert eine Org-Unit (org_unit_id)."),
+            )
+        # SuperUser bugfix: validating against the ACTING user's own
+        # membership would reject a superuser re-tiering someone else's
+        # question, since a superuser typically isn't a member of the
+        # question's own Org-Unit at all — mirrors the Document/TF-620
+        # update-path superuser gate and Prompt/TF-641's
+        # skip_org_unit_membership_check.
+        if not user.is_superuser:
+            accessible = (
+                get_user_accessible_org_unit_ids(db, user.id, user.institution_id)
+                if user.institution_id
+                else set()
+            )
+            if new_org_unit_id not in accessible:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Team-Sichtbarkeit erfordert eine eigene Org-Unit "
+                        "(org_unit_id), der du selbst angehörst."
+                    ),
+                )
+    elif new_visibility == QuestionReviewVisibility.INSTITUTION:
+        # Bugfix: an orphaned question (institution_id IS NULL — reachable by
+        # a superuser via _get_scoped_question's tenant-filter bypass) would
+        # otherwise pass validation here and then trip
+        # ck_question_reviews_institution_visibility_requires_institution on
+        # commit, surfacing as an opaque 500 through edit_question's broad
+        # except-Exception handler instead of this clear 400. Mirrors
+        # documents.py's identical guard (documents_visibility_no_institution).
+        if question.institution_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Institutions-Sichtbarkeit erfordert eine Institution.",
+            )
+        new_org_unit_id = None
+    else:
+        new_org_unit_id = None
+
+    if (
+        new_visibility == question.visibility
+        and new_org_unit_id == question.org_unit_id
+    ):
+        return None
+
+    return new_visibility, new_org_unit_id
+
+
 @router.put("/{question_id}/edit", response_model=QuestionReviewResponse)
 async def edit_question(
     question_id: int,
@@ -684,6 +805,29 @@ async def edit_question(
                 "new": request.estimated_time_minutes,
             }
             question.estimated_time_minutes = request.estimated_time_minutes
+
+        visibility_update = _resolve_question_visibility_update(
+            question, request, current_user, db
+        )
+        if visibility_update is not None:
+            new_visibility, new_org_unit_id = visibility_update
+            # Bugfix: record each field that actually changed independently
+            # — moving a TEAM question between Org-Units with visibility
+            # unchanged previously still wrote {"visibility": {"old": "team",
+            # "new": "team"}}, an entry that reads as "nothing changed" while
+            # the accessible audience for the question actually did.
+            if new_visibility != question.visibility:
+                changed_fields["visibility"] = {
+                    "old": question.visibility.value if question.visibility else None,
+                    "new": new_visibility.value,
+                }
+            if new_org_unit_id != question.org_unit_id:
+                changed_fields["org_unit_id"] = {
+                    "old": question.org_unit_id,
+                    "new": new_org_unit_id,
+                }
+            question.visibility = new_visibility
+            question.org_unit_id = new_org_unit_id
 
         # Set status to EDITED if changes were made
         if changed_fields:

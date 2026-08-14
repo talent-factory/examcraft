@@ -84,13 +84,15 @@ def _insert_review(
             INSERT INTO question_reviews (
                 id, question_text, question_type, options, correct_answer,
                 difficulty, topic, language, source_chunks, source_documents,
-                confidence_score, review_status, exam_id, created_by, created_at
+                confidence_score, review_status, exam_id, created_by, created_at,
+                institution_id
             )
             VALUES (
                 :id, :question_text, :question_type, NULL, :correct_answer,
                 :difficulty, :topic, :language,
                 CAST(:source_chunks AS jsonb), CAST(:source_documents AS jsonb),
-                :confidence_score, :review_status, :exam_id, :created_by, NOW()
+                :confidence_score, :review_status, :exam_id, :created_by, NOW(),
+                :institution_id
             )
             """
         ),
@@ -108,6 +110,8 @@ def _insert_review(
             "review_status": "pending",
             "exam_id": "exam-tf403",
             "created_by": user_id,
+            # TF-642: default visibility='institution' requires institution_id.
+            "institution_id": 40399,
         },
     )
 

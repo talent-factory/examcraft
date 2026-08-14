@@ -53,13 +53,15 @@ def _insert_review(test_db, *, review_id: int, options, user_id: int = 9999) -> 
             INSERT INTO question_reviews (
                 id, question_text, question_type, options, correct_answer,
                 difficulty, topic, language, source_chunks, source_documents,
-                confidence_score, review_status, exam_id, created_by, created_at
+                confidence_score, review_status, exam_id, created_by, created_at,
+                visibility
             )
             VALUES (
                 :id, :question_text, :question_type, CAST(:options AS jsonb),
                 :correct_answer, :difficulty, :topic, :language,
                 CAST(:source_chunks AS jsonb), CAST(:source_documents AS jsonb),
-                :confidence_score, :review_status, :exam_id, :created_by, NOW()
+                :confidence_score, :review_status, :exam_id, :created_by, NOW(),
+                'private'
             )
             """
         ),

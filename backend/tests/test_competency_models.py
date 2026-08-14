@@ -119,6 +119,7 @@ def test_deleting_competency_sets_question_review_competency_id_null(test_db):
         question_type="single_choice",
         difficulty="medium",
         topic="Kommunikation",
+        institution_id=inst.id,  # TF-642: default visibility='institution' requires this
         competency_id=comp.id,
         ln_level=3,
     )
@@ -174,6 +175,7 @@ def test_question_review_links_competency(test_db):
         question_type="single_choice",
         difficulty="medium",
         topic="Kommunikation",
+        institution_id=inst.id,  # TF-642: default visibility='institution' requires this
         competency_id=comp.id,
         ln_level=3,
     )

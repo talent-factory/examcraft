@@ -24,6 +24,10 @@ from services.translation_service import t, get_request_locale
 from utils.auth_utils import require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
 from utils.document_visibility import filter_documents_for_user
+from utils.question_visibility import (
+    assert_question_visible_for,
+    filter_questions_for_user,
+)
 from services.point_utils import suggest_points
 from services.exam_export_service import (
     MarkdownExporter,
@@ -598,13 +602,14 @@ async def list_approved_questions(
     db: Session = Depends(get_db),
 ):
     """Browse approved questions for exam composition."""
-    tenant_context = get_tenant_context(current_user)
     query = db.query(QuestionReview).filter(
         QuestionReview.review_status == ReviewStatus.APPROVED.value,
         # TF-396: archivierte Fragen nicht zur Wiederverwendung anbieten
         QuestionReview.archived_at.is_(None),
     )
-    query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
+    # TF-642: visibility-aware Fragenpool (private/team/institution +
+    # questions:read_all-Bypass), ersetzt die reine Institution-Schranke.
+    query = filter_questions_for_user(query, current_user, db)
 
     if topic:
         query = query.filter(QuestionReview.topic.ilike(f"%{topic}%"))
@@ -1184,7 +1189,6 @@ async def add_questions(
 
     max_pos = max((eq.position for eq in exam.questions), default=0)
     existing_qids = {eq.question_id for eq in exam.questions}
-    tenant_context = get_tenant_context(current_user)
 
     for qid in request.question_ids:
         if qid in existing_qids:
@@ -1196,7 +1200,19 @@ async def add_questions(
                 status_code=404, detail=t("exams_question_not_found", locale=locale)
             )
 
-        TenantFilter.verify_tenant_access(question, tenant_context)
+        # TF-642 bugfix: this previously checked only institution membership
+        # (TenantFilter.verify_tenant_access), letting any create_exams
+        # holder add a colleague's PRIVATE or off-team TEAM question just by
+        # guessing its numeric id — completely bypassing the visibility model
+        # this ticket introduces for the rest of the Fragenpool. 404 (not
+        # 403) so a hidden question stays indistinguishable from a missing
+        # one, same convention as assert_document_visible_for (TF-640).
+        assert_question_visible_for(
+            current_user,
+            question,
+            db,
+            detail=t("exams_question_not_found", locale=locale),
+        )
 
         if question.review_status != ReviewStatus.APPROVED.value:
             raise HTTPException(
@@ -1541,13 +1557,14 @@ def _build_candidate_query(
     exam: Exam, request: AutoFillRequest, current_user: User, db: Session
 ):
     """Build filtered query for approved question candidates."""
-    tenant_context = get_tenant_context(current_user)
     query = db.query(QuestionReview).filter(
         QuestionReview.review_status == ReviewStatus.APPROVED.value,
         # TF-396: archivierte Fragen nicht zur Wiederverwendung anbieten
         QuestionReview.archived_at.is_(None),
     )
-    query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
+    # TF-642: gleicher Fragenpool wie list_approved_questions — Auto-Compose
+    # darf keine Fragen vorschlagen, die die manuelle Suche verbirgt.
+    query = filter_questions_for_user(query, current_user, db)
 
     # Exclude already-added and user-excluded questions
     existing_qids = {eq.question_id for eq in exam.questions}

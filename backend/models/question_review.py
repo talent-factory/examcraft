@@ -10,6 +10,7 @@ from sqlalchemy import (
     Text,
     Float,
     DateTime,
+    Enum,
     ForeignKey,
     JSON,
     CheckConstraint,
@@ -29,6 +30,41 @@ class ReviewStatus(str, enum.Enum):
     REJECTED = "rejected"  # Abgelehnt
     EDITED = "edited"  # Bearbeitet (wartet auf erneute Genehmigung)
     IN_REVIEW = "in_review"  # Wird gerade überprüft
+
+
+class QuestionReviewVisibility(enum.Enum):
+    """Who may reuse a question outside the review workflow (TF-642).
+
+    Governs the exam-composition reuse pool ("Fragenpool",
+    ``api.exams.list_approved_questions``) and nothing else — deliberately
+    NOT the Review-Queue (``api.question_review.get_review_queue``) or any
+    review-workflow mutation (edit/approve/reject/archive/delete). Those stay
+    permission + institution scoped exactly as before this field existed: a
+    reviewer holding ``review_questions``/``edit_questions``/etc. still sees
+    and acts on every institution question regardless of its visibility
+    (/grilling decision, TF-642 — reviewing isn't "browsing", so it shouldn't
+    lose access to a colleague's draft). Mirrors ``DocumentVisibility``
+    (TF-354/TF-620) and ``PromptVisibility`` (TF-410/TF-641).
+
+    - ``PRIVATE``: only the creator (``created_by``) may reuse it.
+    - ``TEAM``: members of the question's Org-Unit (``org_unit_id``) may
+      reuse it, hierarchically
+      (``services.org_unit_service.get_user_accessible_org_unit_ids``).
+    - ``INSTITUTION``: every member of the creator's institution may reuse
+      it. Default — matches the pre-TF-642 status quo (every question was
+      reachable institution-wide via ``TenantFilter`` alone), so introducing
+      this field is not a behavior break for existing or newly generated
+      rows (TF-638 decision).
+
+    A user holding ``questions:read_all`` (Institution-Admin bypass,
+    TF-639/utils/resource_visibility.py) sees every question within their own
+    institution regardless of visibility, same as the Document/Prompt bypass
+    — read-only, never crosses institutions.
+    """
+
+    PRIVATE = "private"
+    TEAM = "team"
+    INSTITUTION = "institution"
 
 
 class QuestionReview(Base):
@@ -110,6 +146,34 @@ class QuestionReview(Base):
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )  # User who created the question
 
+    # Org-Unit scoping (TF-642): set iff visibility='team' — enforced by
+    # ck_question_reviews_team_visibility_requires_org_unit (both directions).
+    # No ondelete cascade — deleting a referenced Org-Unit is rejected at the
+    # DB level (services.org_unit_service.delete_org_unit), mirrors
+    # Document/TF-620 and Prompt/TF-641.
+    org_unit_id = Column(
+        Integer,
+        ForeignKey("org_units.id"),
+        nullable=True,
+        index=True,
+    )
+
+    # Visibility (TF-642): governs the Fragenpool reuse pool + its
+    # single-question preview only — see QuestionReviewVisibility docstring
+    # for what it deliberately does NOT govern (Review-Queue, mutation).
+    # Default 'institution' preserves pre-TF-642 behavior.
+    visibility = Column(
+        Enum(
+            QuestionReviewVisibility,
+            name="questionreviewvisibility",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        default=QuestionReviewVisibility.INSTITUTION,
+        server_default=QuestionReviewVisibility.INSTITUTION.value,
+        index=True,
+    )
+
     # Exam Association
     exam_id = Column(String(100), nullable=True, index=True)  # RAG Exam ID
 
@@ -164,6 +228,18 @@ class QuestionReview(Base):
         CheckConstraint(
             "ln_level IS NULL OR (ln_level >= 1 AND ln_level <= 4)",
             name="check_ln_level_range",
+        ),
+        # TF-642: mirrors Document/TF-354 — an institution-visible question
+        # must belong to an institution.
+        CheckConstraint(
+            "visibility <> 'institution' OR institution_id IS NOT NULL",
+            name="ck_question_reviews_institution_visibility_requires_institution",
+        ),
+        # TF-642: mirrors Document/TF-620 and Prompt/TF-641 — biconditional,
+        # enforces both directions (team ⇒ has org_unit, and vice versa).
+        CheckConstraint(
+            "(visibility = 'team') = (org_unit_id IS NOT NULL)",
+            name="ck_question_reviews_team_visibility_requires_org_unit",
         ),
     )
 
