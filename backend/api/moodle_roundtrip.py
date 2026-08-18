@@ -23,7 +23,10 @@ Moodle umgeordnet hat, muss sie den Endpoint nach der Umordnung erneut
 aufrufen — wir überschreiben die alten Refs.
 
 Multi-Tenancy: ``Exam.institution_id`` muss zum aufrufenden User
-passen (404 bei Fremd-Institution).
+passen (404 bei Fremd-Institution), UND ``ExamVisibility`` (TF-643) muss
+den Zugriff erlauben — dieser Endpoint ist eine Mutation und wird daher
+genauso gegated wie jeder andere exam-mutierende Endpoint (siehe
+``api.exams._get_exam_or_404``).
 
 RBAC: ``submissions:import`` reicht — die Lehrperson, die importiert,
 ist auch die, die die Slot-Mappings pflegt. Das vermeidet einen Hop
@@ -43,6 +46,7 @@ from models.auth import User
 from models.exam import Exam
 from models.submission import MoodleConnection
 from utils.auth_utils import require_permission
+from utils.exam_visibility import assert_exam_visible_for
 from utils.secret_encryption import SecretEncryptionError, decrypt_secret
 
 
@@ -130,17 +134,27 @@ class SyncMoodleQuestionIdsOut(BaseModel):
 
 
 def _load_exam(db: Session, user: User, exam_id: int) -> Exam:
+    """Load exam by id, 404 unless institution matches AND ``user`` has
+    ExamVisibility access (TF-643) — syncing Moodle question ids is a
+    mutation, so this is gated exactly like every other exam-mutation
+    endpoint (``allow_read_all_bypass=False``, ``require_same_institution=
+    True``; see ``api.exams._get_exam_or_404``)."""
     exam = (
         db.query(Exam)
         .options(joinedload(Exam.questions))
-        .filter(
-            Exam.id == exam_id,
-            Exam.institution_id == user.institution_id,
-        )
+        .filter(Exam.id == exam_id)
         .one_or_none()
     )
     if exam is None:
         raise HTTPException(status_code=404, detail="Prüfung nicht gefunden")
+    assert_exam_visible_for(
+        user,
+        exam,
+        db,
+        detail="Prüfung nicht gefunden",
+        allow_read_all_bypass=False,
+        require_same_institution=True,
+    )
     return exam
 
 

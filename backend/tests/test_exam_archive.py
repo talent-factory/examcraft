@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from main import app
 from models.auth import Institution, User, UserStatus, Role, AuditLog
-from models.exam import Exam
+from models.exam import Exam, ExamVisibility
 from models.student import Student
 from models.submission import Submission
 from utils.auth_utils import get_current_user, get_current_active_user
@@ -137,6 +137,7 @@ def make_exam(
     status="draft",
     archived_at=None,
     title="Musterprüfung",
+    visibility=None,
 ):
     exam = Exam(
         title=title,
@@ -147,6 +148,8 @@ def make_exam(
         created_by=created_by,
         archived_at=archived_at,
     )
+    if visibility is not None:
+        exam.visibility = visibility
     db.add(exam)
     db.flush()
     return exam
@@ -463,9 +466,14 @@ def test_delete_forbidden_with_only_create_exams(ea_db, ea_client):
 
 
 def test_archive_foreign_tenant_denied(ea_db, ea_client):
-    """Fremder Tenant: ``_get_exam_or_404`` → ``TenantFilter.verify_tenant_access``
-    verweigert mit 403 (das Exam-Subsystem prüft Zugriff nach dem Laden, anders
-    als der Fragen-Pfad, der bereits in der Query filtert und 404 liefert)."""
+    """Fremder Tenant: ``_get_exam_or_404`` → ``assert_exam_visible_for``
+    verweigert mit 404, nicht 403 (TF-643 — vorher ``TenantFilter
+    .verify_tenant_access``, das 403 warf; seit TF-643 läuft der komplette
+    Exam-Zugriff, inkl. Mutation, durch dieselbe Sichtbarkeitsprüfung wie
+    Documents/Questions, die bewusst 404 statt 403 liefert, um die Existenz
+    einer fremden Ressource nicht zu leaken — siehe
+    ``assert_exam_visible_for``'s eigenes Docstring in
+    utils/exam_visibility.py, wo diese Begründung tatsächlich steht)."""
     inst_a = make_institution(ea_db, "e3a")
     inst_b = make_institution(ea_db, "e3b")
     actor = make_user_with_role(ea_db, inst_a.id, "e3", ["create_exams"])
@@ -474,4 +482,28 @@ def test_archive_foreign_tenant_denied(ea_db, ea_client):
     login(ea_client, actor)
 
     resp = ea_client.post(f"/api/v1/exams/{foreign.id}/archive", json={})
-    assert resp.status_code == 403
+    assert resp.status_code == 404
+
+
+def test_archive_read_all_bypass_denied_for_same_institution_private_exam(
+    ea_db, ea_client
+):
+    """PR #193 review gap: the read-all-bypass-exclusion coverage only ever
+    exercised update_exam/delete_exam directly; archive_exam itself was only
+    tested for the cross-institution case above. A same-institution
+    ``exams:read_all`` admin must be denied archiving a colleague's PRIVATE
+    exam too — ``allow_read_all_bypass=False`` at the archive call site must
+    actually hold."""
+    inst = make_institution(ea_db, "e4")
+    creator = make_user_with_role(ea_db, inst.id, "e4creator", ["create_exams"])
+    admin = make_user_with_role(
+        ea_db, inst.id, "e4admin", ["create_exams", "exams:read_all"]
+    )
+    priv = make_exam(ea_db, inst.id, creator.id, visibility=ExamVisibility.PRIVATE)
+    ea_db.commit()
+    login(ea_client, admin)
+
+    resp = ea_client.post(f"/api/v1/exams/{priv.id}/archive", json={})
+    assert resp.status_code == 404
+    ea_db.refresh(priv)
+    assert priv.archived_at is None

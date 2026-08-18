@@ -11,6 +11,7 @@ from sqlalchemy import (
     Float,
     Date,
     DateTime,
+    Enum,
     ForeignKey,
     UniqueConstraint,
     CheckConstraint,
@@ -26,6 +27,47 @@ class ExamStatus(str, enum.Enum):
     DRAFT = "draft"
     FINALIZED = "finalized"
     EXPORTED = "exported"
+
+
+class ExamVisibility(enum.Enum):
+    """Who may browse/open an exam outside its owner (TF-643).
+
+    Governs ``api.exams.list_exams`` and ``api.exams.get_exam`` (plus, per
+    ``allow_read_all_bypass=False``, every exam-mutation endpoint reachable
+    via ``_get_exam_or_404`` — see that function's docstring). Mirrors
+    ``DocumentVisibility`` (TF-354/TF-620), ``PromptVisibility``
+    (TF-410/TF-641) and ``QuestionReviewVisibility`` (TF-642).
+
+    - ``PRIVATE``: only the creator (``created_by``) may see it.
+    - ``TEAM``: members of the exam's Org-Unit (``org_unit_id``) may see it,
+      hierarchically (``services.org_unit_service.get_user_accessible_org_unit_ids``).
+    - ``INSTITUTION``: every member of the creator's institution may see it.
+      Default — matches the pre-TF-643 status quo (every exam was reachable
+      institution-wide via ``TenantFilter`` alone), so introducing this field
+      is not a behavior break for existing or newly created rows (TF-638
+      decision).
+
+    A user holding ``exams:read_all`` (Institution-Admin bypass,
+    TF-639/utils/resource_visibility.py) sees every exam within their own
+    institution regardless of visibility, same as the Document/Prompt/
+    Question bypass — read-only (never grants mutation), never crosses
+    institutions.
+
+    Deliberately independent of ``ExamStatus`` (DRAFT/FINALIZED/EXPORTED) —
+    visibility applies uniformly across the exam lifecycle, no special-casing
+    (/grilling decision, TF-643). Also deliberately independent of
+    ``submissions:grade``/``submissions:read`` — the grading pipeline keeps
+    bypassing browsing visibility exactly as before (institution-flat via
+    ``submissions.py::_load_exam_for_user``), same /grilling decision. And a
+    private/team question embedded into a wider-visibility exam via
+    ``ExamQuestion`` follows the *exam's* visibility from that point on — see
+    ``utils.question_visibility`` module docstring for the question-side half
+    of that decision.
+    """
+
+    PRIVATE = "private"
+    TEAM = "team"
+    INSTITUTION = "institution"
 
 
 class Exam(Base):
@@ -65,6 +107,32 @@ class Exam(Base):
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
+    )
+
+    # Org-Unit scoping (TF-643): set iff visibility='team' — enforced by
+    # ck_exams_team_visibility_requires_org_unit (both directions). No
+    # ondelete cascade — deleting a referenced Org-Unit is rejected at the
+    # DB level (services.org_unit_service.delete_org_unit), mirrors
+    # Document/TF-620, Prompt/TF-641 and Question/TF-642.
+    org_unit_id = Column(
+        Integer,
+        ForeignKey("org_units.id"),
+        nullable=True,
+        index=True,
+    )
+
+    # Visibility (TF-643): see ExamVisibility docstring for exact scope.
+    # Default 'institution' preserves pre-TF-643 behavior.
+    visibility = Column(
+        Enum(
+            ExamVisibility,
+            name="examvisibility",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        default=ExamVisibility.INSTITUTION,
+        server_default=ExamVisibility.INSTITUTION.value,
         index=True,
     )
 
@@ -116,6 +184,19 @@ class Exam(Base):
     __table_args__ = (
         CheckConstraint(
             "status IN ('draft', 'finalized', 'exported')", name="check_exam_status"
+        ),
+        # TF-643: mirrors Document/TF-354. Unlike Document/QuestionReview,
+        # Exam.institution_id is NOT NULL (see column above), so this
+        # constraint can never actually fire today — kept as
+        # defense-in-depth should the column ever become nullable.
+        CheckConstraint(
+            "visibility <> 'institution' OR institution_id IS NOT NULL",
+            name="ck_exams_institution_visibility_requires_institution",
+        ),
+        # TF-643: mirrors Document/TF-620, Prompt/TF-641, Question/TF-642.
+        CheckConstraint(
+            "(visibility = 'team') = (org_unit_id IS NOT NULL)",
+            name="ck_exams_team_visibility_requires_org_unit",
         ),
     )
 

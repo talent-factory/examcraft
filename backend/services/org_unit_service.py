@@ -325,13 +325,14 @@ def delete_org_unit(db: Session, org_unit: OrgUnit) -> int:
     dient nur der Rueckmeldung/Protokollierung durch den Aufrufer, nicht der
     Bestaetigung selbst.
 
-    Raises ``ValueError`` (-> 409 beim Aufrufer) wenn noch Dokumente, Prompts
-    oder Fragen auf diese -- oder eine ihrer Nachfahren-OrgUnits -- via
-    ``visibility='team'`` verweisen (TF-620/TF-641/TF-642): ``documents.
-    org_unit_id``, ``prompts.org_unit_id`` und ``question_reviews.
-    org_unit_id`` haben alle drei bewusst kein ``ON DELETE CASCADE/SET NULL``
-    (siehe Migrationen ``tf620_doc_org_unit_scope``,
-    ``tf641_prompt_org_unit_scope`` bzw. ``tf642_question_visibility``), also
+    Raises ``ValueError`` (-> 409 beim Aufrufer) wenn noch Dokumente, Prompts,
+    Fragen oder Prüfungen auf diese -- oder eine ihrer Nachfahren-OrgUnits --
+    via ``visibility='team'`` verweisen (TF-620/TF-641/TF-642/TF-643):
+    ``documents.org_unit_id``, ``prompts.org_unit_id``, ``question_reviews.
+    org_unit_id`` und ``exams.org_unit_id`` haben alle vier bewusst kein
+    ``ON DELETE CASCADE/SET NULL`` (siehe Migrationen
+    ``tf620_doc_org_unit_scope``, ``tf641_prompt_org_unit_scope``,
+    ``tf642_question_visibility`` bzw. ``tf643_exam_visibility``), also
     schlaegt der DB-seitige FK hier mit einem ``IntegrityError`` fehl statt
     die referenzierenden Zeilen stillschweigend zu loeschen oder in einen
     Constraint-Verletzungs-Zustand zu bringen.
@@ -374,10 +375,12 @@ def delete_org_unit(db: Session, org_unit: OrgUnit) -> int:
             blocking_resource = "Dokumente"
         elif constraint_name is not None and "question" in constraint_name.lower():
             blocking_resource = "Fragen"
+        elif constraint_name is not None and "exam" in constraint_name.lower():
+            blocking_resource = "Prüfungen"
         elif constraint_name is None or "org_unit_id" in constraint_name.lower():
             # Matches the FK but the naming convention doesn't tell us which
-            # table -- name all three rather than guess and mislabel.
-            blocking_resource = "Dokumente, Prompts oder Fragen"
+            # table -- name all four rather than guess and mislabel.
+            blocking_resource = "Dokumente, Prompts, Fragen oder Prüfungen"
         else:
             raise ValueError(
                 f"OrgUnit '{org_unit.name}' kann nicht geloescht werden: "

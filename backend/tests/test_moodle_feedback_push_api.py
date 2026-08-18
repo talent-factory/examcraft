@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from main import app
 from models.auth import Institution, Role, User, UserStatus
-from models.exam import Exam, ExamQuestion
+from models.exam import Exam, ExamQuestion, ExamVisibility
 from models.question_review import QuestionReview
 from models.submission import MoodleConnection, MoodleFeedbackPushJob
 from utils.auth_utils import get_current_active_user, get_current_user
@@ -181,6 +181,30 @@ def test_push_404_cross_tenant_exam(test_db: Session) -> None:
 
     client = _client(test_db, user_b)
     resp = client.post(f"/api/v1/exams/{exam_a.id}/moodle/push-feedback")
+    assert resp.status_code == 404
+
+
+def test_push_404_same_institution_colleague_without_visibility(
+    test_db: Session,
+) -> None:
+    """PR #193 review: ``_ensure_exam_for_user`` used to be institution-flat
+    with no ExamVisibility check at all — now gated like every other exam
+    mutation (``allow_read_all_bypass=False``, ``require_same_institution=
+    True``). A same-institution colleague who genuinely holds
+    ``submissions:moodle_feedback_push`` but has no visibility into a
+    PRIVATE exam created by someone else must still get 404 — RBAC
+    permission alone is no longer sufficient."""
+    inst = _institution(test_db, slug="tf435y")
+    owner = _user(test_db, inst.id, email="owner@test.ch")
+    colleague = _user(test_db, inst.id, email="colleague@test.ch")
+    exam = _exam(test_db, inst.id)
+    exam.created_by = owner.id
+    exam.visibility = ExamVisibility.PRIVATE
+    _connection(test_db, inst.id)
+    test_db.commit()
+
+    client = _client(test_db, colleague)
+    resp = client.post(f"/api/v1/exams/{exam.id}/moodle/push-feedback")
     assert resp.status_code == 404
 
 

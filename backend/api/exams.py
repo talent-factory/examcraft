@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models.exam import Exam, ExamQuestion, ExamStatus
+from models.exam import Exam, ExamQuestion, ExamStatus, ExamVisibility
 from models.auth import User
 from models.document import Document
 from models.question_review import QuestionReview, ReviewStatus, QuestionSourceDocument
@@ -28,6 +28,8 @@ from utils.question_visibility import (
     assert_question_visible_for,
     filter_questions_for_user,
 )
+from utils.exam_visibility import assert_exam_visible_for, filter_exams_for_user
+from services.org_unit_service import get_user_accessible_org_unit_ids
 from services.point_utils import suggest_points
 from services.exam_export_service import (
     MarkdownExporter,
@@ -63,6 +65,11 @@ class ExamCreate(BaseModel):
     default_document_ids: Optional[List[int]] = None
     # TF-335: omit ⇒ inherit Institution-Default at create time.
     grading_scheme_id: Optional[int] = None
+    # TF-643: omit ⇒ 'institution' (matches the DB column default). team
+    # visibility requires org_unit_id — validated by
+    # _resolve_exam_visibility_for_create.
+    visibility: Optional[str] = Field(None, pattern="^(private|team|institution)$")
+    org_unit_id: Optional[int] = None
 
 
 class ExamUpdate(BaseModel):
@@ -76,6 +83,11 @@ class ExamUpdate(BaseModel):
     language: Optional[str] = Field(None, pattern="^(de|en)$")
     default_document_ids: Optional[List[int]] = None
     grading_scheme_id: Optional[int] = None
+    # TF-643: change the exam's visibility (owner/SuperUser only, see
+    # _resolve_exam_visibility_update). org_unit_id only meaningful together
+    # with visibility="team".
+    visibility: Optional[str] = Field(None, pattern="^(private|team|institution)$")
+    org_unit_id: Optional[int] = None
     updated_at: datetime = Field(..., description="For optimistic locking")
 
 
@@ -137,6 +149,9 @@ class ExamOut(BaseModel):
     question_count: int = 0
     default_document_ids: Optional[List[int]] = None
     grading_scheme_id: Optional[int] = None
+    # TF-643: Sichtbarkeit — siehe ExamVisibility-Docstring.
+    visibility: str = "institution"
+    org_unit_id: Optional[int] = None
     # Archiv-Achse (TF-398) — orthogonal zu ``status``.
     archived_at: Optional[datetime] = None
     archived_by: Optional[int] = None
@@ -168,8 +183,37 @@ class ExamArchiveRequest(BaseModel):
 
 
 def _get_exam_or_404(
-    exam_id: int, db: Session, current_user: User, locale: str = "de"
+    exam_id: int,
+    db: Session,
+    current_user: User,
+    locale: str = "de",
+    *,
+    allow_read_all_bypass: bool = True,
 ) -> Exam:
+    """Load an exam by id, 404 if it doesn't exist or isn't visible.
+
+    Backs every exam endpoint below — both the single read endpoint
+    (``get_exam``) and every mutation endpoint (update/update-grading-scheme/
+    delete/archive/restore/add-questions/update-question/remove-question/
+    reorder/auto-fill/finalize/unfinalize/export).
+    Per ADR-0004 the ``exams:read_all`` bypass must stay read-only, so
+    ``allow_read_all_bypass`` defaults ``True`` here (safe for the read
+    endpoint) and every mutating call site below passes ``False`` explicitly
+    (TF-640's gotcha, mirrored here — see ``utils.exam_visibility
+    .is_exam_visible_for``).
+
+    ``allow_read_all_bypass=False`` also derives
+    ``require_same_institution=True`` for the visibility check, so a
+    mutating call additionally closes the one gap the bypass flag alone
+    doesn't: an exam creator whose ``institution_id`` has drifted from their
+    exam's (e.g. after an institution transfer that left exams behind) can
+    still *see* the exam but can no longer mutate it — mirrors
+    ``utils.auth_utils.enforce_resource_access``'s ``require_same_institution``,
+    which Documents use for the same purpose. Deriving it here (rather than a
+    second kwarg at each of the 13 call sites below) means a future
+    mutation endpoint can't forget it the way TF-640's original gotcha was
+    possible to forget ``allow_read_all_bypass=False`` itself.
+    """
     exam = (
         db.query(Exam)
         .options(joinedload(Exam.questions).joinedload(ExamQuestion.question))
@@ -178,8 +222,14 @@ def _get_exam_or_404(
     )
     if not exam:
         raise HTTPException(status_code=404, detail=t("exams_not_found", locale=locale))
-    tenant_context = get_tenant_context(current_user)
-    TenantFilter.verify_tenant_access(exam, tenant_context)
+    assert_exam_visible_for(
+        current_user,
+        exam,
+        db,
+        detail=t("exams_not_found", locale=locale),
+        allow_read_all_bypass=allow_read_all_bypass,
+        require_same_institution=not allow_read_all_bypass,
+    )
     return exam
 
 
@@ -214,6 +264,9 @@ def _exam_to_out(exam: Exam, has_submissions: Optional[bool] = None) -> dict:
         "question_count": len(exam.questions) if exam.questions else 0,
         "default_document_ids": exam.default_document_ids,
         "grading_scheme_id": exam.grading_scheme_id,
+        # TF-643: exam.visibility is an ExamVisibility enum member.
+        "visibility": exam.visibility.value,
+        "org_unit_id": exam.org_unit_id,
         "archived_at": exam.archived_at,
         "archived_by": exam.archived_by,
         "archive_reason": exam.archive_reason,
@@ -316,6 +369,57 @@ def _exam_detail_to_out(exam: Exam) -> dict:
     return data
 
 
+def _resolve_exam_visibility_for_create(
+    request: "ExamCreate", user: User, db: Session
+) -> tuple:
+    """TF-643: validate visibility/org_unit_id at exam creation time.
+
+    Simpler than :func:`_resolve_exam_visibility_update` — no ownership gate
+    needed (the creator is always the owner of the row they're about to
+    create). Defaults to INSTITUTION (mirrors the DB column default) when
+    omitted. Mirrors ``question_review._resolve_question_visibility_update``'s
+    TEAM branch; the INSTITUTION-on-orphan guard from that function has no
+    equivalent here — unlike ``QuestionReview.institution_id``,
+    ``Exam.institution_id`` is NOT NULL, so it can't happen.
+    """
+    visibility = (
+        ExamVisibility(request.visibility)
+        if request.visibility is not None
+        else ExamVisibility.INSTITUTION
+    )
+    org_unit_id = request.org_unit_id
+
+    if visibility == ExamVisibility.TEAM:
+        if org_unit_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Team-Sichtbarkeit erfordert eine Org-Unit (org_unit_id).",
+            )
+        # SuperUser bugfix (mirrors question_review._resolve_question_visibility_update,
+        # TF-642): validating against the ACTING user's own membership would
+        # reject a superuser, who typically belongs to no Org-Unit and often
+        # has institution_id=None — they may set ANY org_unit_id on behalf of
+        # its actual owners.
+        if not user.is_superuser:
+            accessible = (
+                get_user_accessible_org_unit_ids(db, user.id, user.institution_id)
+                if user.institution_id
+                else set()
+            )
+            if org_unit_id not in accessible:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Team-Sichtbarkeit erfordert eine eigene Org-Unit "
+                        "(org_unit_id), der du selbst angehörst."
+                    ),
+                )
+    else:
+        org_unit_id = None
+
+    return visibility, org_unit_id
+
+
 # --- CRUD Endpoints ---
 
 
@@ -334,6 +438,9 @@ async def create_exam(
         explicit_id=request.grading_scheme_id,
         fall_back_to_institution_default=True,
     )
+    visibility, org_unit_id = _resolve_exam_visibility_for_create(
+        request, current_user, db
+    )
     exam = Exam(
         title=request.title,
         course=request.course,
@@ -347,6 +454,8 @@ async def create_exam(
         created_by=current_user.id,
         default_document_ids=request.default_document_ids,
         grading_scheme_id=grading_scheme_id,
+        visibility=visibility,
+        org_unit_id=org_unit_id,
     )
     db.add(exam)
     try:
@@ -393,15 +502,14 @@ async def list_exams(
     current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
-    """List exams for the current user's institution.
+    """List exams visible to the current user (TF-643).
 
     Default blendet archivierte Prüfungen aus (``archived_at IS NULL``).
     ``archived_only`` zeigt ausschliesslich archivierte; ``include_archived``
     zeigt aktive + archivierte. ``archived_only`` hat Vorrang (TF-398).
     """
-    tenant_context = get_tenant_context(current_user)
     query = db.query(Exam)
-    query = TenantFilter.filter_by_tenant(query, Exam, tenant_context)
+    query = filter_exams_for_user(query, current_user, db)
 
     if archived_only:
         query = query.filter(Exam.archived_at.isnot(None))
@@ -854,6 +962,87 @@ async def get_exam(
     return _exam_detail_to_out(exam)
 
 
+def _resolve_exam_visibility_update(
+    exam: Exam,
+    fields: dict,
+    user: User,
+    db: Session,
+) -> Optional[dict]:
+    """TF-643: validate a visibility/org_unit_id change on ``PUT /{exam_id}``.
+
+    Mirrors ``question_review._resolve_question_visibility_update`` (TF-642).
+    Adapted to ``update_exam``'s ``exclude_unset``-based partial-update
+    convention: ``fields`` only contains the keys the caller actually sent
+    (popped from ``update_data`` before this runs), so an explicit
+    ``"org_unit_id": null`` still clears it even when ``visibility`` isn't
+    resent in the same request — whereas ``update_data.get(...) is not None``
+    couldn't distinguish "sent null" from "omitted".
+
+    Ownership-gated (owner or SuperUser only), unlike the rest of
+    ``update_exam``'s permission+institution-scoped fields — mirrors
+    Document/TF-620's identical rule: a colleague who merely *sees* a
+    team-scoped exam (e.g. via the visibility filter) must not be able to
+    move it to a different Org-Unit or make it institution-wide.
+
+    Returns ``None`` when visibility/org_unit_id weren't touched, else the
+    ``{"visibility": ExamVisibility, "org_unit_id": Optional[int]}`` pair to
+    apply.
+    """
+    if not fields:
+        return None
+
+    new_visibility = (
+        ExamVisibility(fields["visibility"])
+        if fields.get("visibility") is not None
+        else exam.visibility
+    )
+    new_org_unit_id = (
+        fields["org_unit_id"] if "org_unit_id" in fields else exam.org_unit_id
+    )
+
+    if new_visibility == exam.visibility and new_org_unit_id == exam.org_unit_id:
+        # No-op: exclude_unset only proves the caller sent the key, not that
+        # it changes anything — e.g. an explicit "visibility": null resolves
+        # right back to the exam's current value. Don't force the
+        # ownership gate below on a request that isn't actually touching
+        # visibility; a non-owner colleague editing an unrelated field
+        # (title, etc.) shouldn't 403 just because their client serialized
+        # an unset optional field as null.
+        return None
+
+    is_owner = exam.created_by is not None and exam.created_by == user.id
+    if not is_owner and not user.is_superuser:
+        raise HTTPException(
+            status_code=403,
+            detail="Nur der Ersteller oder ein SuperUser darf die Sichtbarkeit ändern.",
+        )
+
+    if new_visibility == ExamVisibility.TEAM:
+        if new_org_unit_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Team-Sichtbarkeit erfordert eine Org-Unit (org_unit_id).",
+            )
+        if not user.is_superuser:
+            accessible = (
+                get_user_accessible_org_unit_ids(db, user.id, user.institution_id)
+                if user.institution_id
+                else set()
+            )
+            if new_org_unit_id not in accessible:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Team-Sichtbarkeit erfordert eine eigene Org-Unit "
+                        "(org_unit_id), der du selbst angehörst."
+                    ),
+                )
+    else:
+        new_org_unit_id = None
+
+    return {"visibility": new_visibility, "org_unit_id": new_org_unit_id}
+
+
 @router.put("/{exam_id}", response_model=ExamOut)
 async def update_exam(
     exam_id: int,
@@ -864,7 +1053,9 @@ async def update_exam(
 ):
     """Update exam metadata. Requires updated_at for optimistic locking."""
     locale = get_request_locale(http_request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
     _require_draft(exam, locale)
 
     # Optimistic locking — compare at microsecond precision with UTC normalisation
@@ -876,6 +1067,14 @@ async def update_exam(
             )
 
     update_data = request.model_dump(exclude_unset=True, exclude={"updated_at"})
+    # TF-643: pulled out of the generic setattr loop below — needs
+    # ownership-gated validation (_resolve_exam_visibility_update), not a
+    # raw string assignment.
+    visibility_fields = {
+        key: update_data.pop(key)
+        for key in ("visibility", "org_unit_id")
+        if key in update_data
+    }
     if "grading_scheme_id" in update_data:
         update_data["grading_scheme_id"] = _resolve_grading_scheme_id(
             db=db,
@@ -885,6 +1084,18 @@ async def update_exam(
         )
     for field, value in update_data.items():
         setattr(exam, field, value)
+
+    old_visibility, old_org_unit_id = exam.visibility, exam.org_unit_id
+    visibility_update = _resolve_exam_visibility_update(
+        exam, visibility_fields, current_user, db
+    )
+    if visibility_update is not None:
+        exam.visibility = visibility_update["visibility"]
+        exam.org_unit_id = visibility_update["org_unit_id"]
+        if exam.visibility != old_visibility:
+            update_data["visibility"] = exam.visibility.value
+        if exam.org_unit_id != old_org_unit_id:
+            update_data["org_unit_id"] = exam.org_unit_id
 
     try:
         db.commit()
@@ -931,7 +1142,9 @@ async def update_exam_grading_scheme(
     so the export falls back to the institution default at render time.
     """
     locale = get_request_locale(http_request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
 
     # Optimistic locking — same shape as PUT /{exam_id}. Reassignment
     # is rare but two lehrpersons editing in parallel must not silently
@@ -1005,7 +1218,9 @@ async def delete_exam(
     ``exam_questions`` ab.
     """
     locale = get_request_locale(request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
 
     block = _exam_delete_block_reason(db, exam, locale)
     if block is not None:
@@ -1074,7 +1289,9 @@ async def archive_exam(
     sicher). **Required Permission:** ``create_exams`` (Komponist). (TF-398)
     """
     locale = get_request_locale(http_request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
     if exam.archived_at is not None:
         raise HTTPException(
             status_code=409,
@@ -1118,7 +1335,9 @@ async def restore_exam(
     archiviert. **Required Permission:** ``create_exams``. (TF-398)
     """
     locale = get_request_locale(http_request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
     if exam.archived_at is None:
         raise HTTPException(
             status_code=409,
@@ -1184,7 +1403,9 @@ async def add_questions(
 ):
     """Add approved questions to exam with auto-suggested points."""
     locale = get_request_locale(http_request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
     _require_draft(exam, locale)
 
     max_pos = max((eq.position for eq in exam.questions), default=0)
@@ -1260,7 +1481,9 @@ async def update_exam_question(
 ):
     """Update points or section of a question in the exam."""
     locale = get_request_locale(http_request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
     _require_draft(exam, locale)
 
     eq = (
@@ -1327,7 +1550,9 @@ async def remove_exam_question(
 ):
     """Remove a question from the exam and re-number remaining positions."""
     locale = get_request_locale(request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
     _require_draft(exam, locale)
 
     eq = (
@@ -1397,7 +1622,9 @@ async def reorder_questions(
 ):
     """Batch reorder questions in the exam."""
     locale = get_request_locale(http_request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
     _require_draft(exam, locale)
 
     eq_map = {eq.id: eq for eq in exam.questions}
@@ -1518,7 +1745,9 @@ async def auto_fill_questions(
     Composition mode: constraint-based greedy optimization with optional preview.
     """
     locale = get_request_locale(http_request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
     _require_draft(exam, locale)
 
     if request.is_composition_mode:
@@ -1781,7 +2010,9 @@ async def finalize_exam(
 ):
     """Finalize exam. Validates all questions are still approved."""
     locale = get_request_locale(request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
     _require_draft(exam, locale)
 
     if not exam.questions:
@@ -1825,7 +2056,9 @@ async def unfinalize_exam(
 ):
     """Revert exam from finalized/exported to draft."""
     locale = get_request_locale(request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
     if exam.status not in (ExamStatus.FINALIZED.value, ExamStatus.EXPORTED.value):
         raise HTTPException(
             status_code=400, detail=t("exams_already_draft", locale=locale)
@@ -1860,7 +2093,9 @@ async def export_exam(
 ):
     """Export exam in specified format (md, json, moodle)."""
     locale = get_request_locale(request, current_user)
-    exam = _get_exam_or_404(exam_id, db, current_user, locale)
+    exam = _get_exam_or_404(
+        exam_id, db, current_user, locale, allow_read_all_bypass=False
+    )
 
     if exam.status == ExamStatus.DRAFT.value:
         raise HTTPException(

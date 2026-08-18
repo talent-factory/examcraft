@@ -23,8 +23,8 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from main import app
-from models.auth import Institution, User, UserStatus
-from models.exam import Exam, ExamQuestion
+from models.auth import Institution, Role, User, UserStatus
+from models.exam import Exam, ExamQuestion, ExamVisibility
 from models.question_review import QuestionReview
 from models.submission import MoodleConnection
 from services.exam_export_service import MoodleXmlExporter
@@ -111,6 +111,37 @@ def _setup_exam(db: Session, institution_id: int) -> Exam:
     )
     db.flush()
     return exam
+
+
+def _make_permissioned_user(
+    db: Session, institution_id: int, *, email: str, permissions: list[str]
+) -> User:
+    """Non-superuser with a real Role carrying exactly ``permissions`` —
+    unlike ``_make_user`` (always ``is_superuser=True``, which bypasses
+    every institution/visibility check including the ones this module
+    tests). Used where a test needs RBAC + institution/visibility
+    boundaries to actually apply, not just permission-layer 403s."""
+    user = User(
+        email=email,
+        first_name="U",
+        last_name="X",
+        password_hash="dummy",  # pragma: allowlist secret
+        institution_id=institution_id,
+        status=UserStatus.ACTIVE.value,
+        is_superuser=False,
+    )
+    db.add(user)
+    db.flush()
+    role = Role(
+        name=f"role-{email}",
+        display_name="Test Role",
+        permissions=json.dumps(permissions),
+    )
+    db.add(role)
+    db.flush()
+    user.roles.append(role)
+    db.flush()
+    return user
 
 
 def _client(test_db: Session, user: User) -> TestClient:
@@ -380,15 +411,57 @@ def test_sync_rejects_non_positive_question_id(test_db: Session) -> None:
 
 
 def test_sync_404_for_other_institution(test_db: Session) -> None:
+    """PR #193 review follow-up: this must use a non-superuser actor.
+    ``_load_exam`` now routes through ``assert_exam_visible_for`` (TF-643
+    gating fix), whose FIRST check is an unconditional superuser bypass —
+    same as every other exam-mutation endpoint (``_get_exam_or_404``,
+    ``enforce_resource_access``, ...). A real superuser genuinely CAN sync
+    a foreign institution's exam now, by design; this test needs an actor
+    for whom the institution boundary actually applies."""
     inst_a = _make_institution(test_db, slug="tf336-rt-5a")
     inst_b = _make_institution(test_db, slug="tf336-rt-5b")
     exam_a = _setup_exam(test_db, inst_a.id)
-    user_b = _make_user(test_db, inst_b.id)
+    user_b = _make_permissioned_user(
+        test_db,
+        inst_b.id,
+        email="userb@test.ch",
+        permissions=["submissions:import"],
+    )
     test_db.commit()
 
     client = _client(test_db, user_b)
     resp = client.post(
         f"/api/v1/exams/{exam_a.id}/sync-moodle-question-ids",
+        json={"moodle_quiz_id": 7},
+    )
+    assert resp.status_code == 404
+
+
+def test_sync_404_for_same_institution_colleague_without_visibility(
+    test_db: Session,
+) -> None:
+    """PR #193 review: ``_load_exam`` used to be institution-flat with no
+    ExamVisibility check at all — now gated like every other exam mutation
+    (``allow_read_all_bypass=False``, ``require_same_institution=True``).
+    A same-institution colleague who genuinely holds ``submissions:import``
+    but has no visibility into a PRIVATE exam created by someone else must
+    still get 404 — RBAC permission alone is no longer sufficient."""
+    inst = _make_institution(test_db, slug="tf336-rt-vis")
+    owner = _make_user(test_db, inst.id)
+    exam = _setup_exam(test_db, inst.id)
+    exam.created_by = owner.id
+    exam.visibility = ExamVisibility.PRIVATE
+    colleague = _make_permissioned_user(
+        test_db,
+        inst.id,
+        email="colleague-tf336-rt-vis@test.ch",
+        permissions=["submissions:import"],
+    )
+    test_db.commit()
+
+    client = _client(test_db, colleague)
+    resp = client.post(
+        f"/api/v1/exams/{exam.id}/sync-moodle-question-ids",
         json={"moodle_quiz_id": 7},
     )
     assert resp.status_code == 404

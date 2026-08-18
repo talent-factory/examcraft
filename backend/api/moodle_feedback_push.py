@@ -4,7 +4,9 @@
   job (202 + job record), then poll:
 * ``GET  /api/v1/exams/{exam_id}/moodle/push-feedback/{job_id}``.
 
-Multi-Tenancy via Exam-Institution-Check; RBAC:
+Multi-Tenancy: institution match AND ``ExamVisibility`` (TF-643) — a
+same-institution colleague without visibility into a PRIVATE/off-team exam
+gets 404, same as every other exam mutation. RBAC:
 ``submissions:moodle_feedback_push``. The actual transport (plugin vs.
 gradebook) is chosen by the background service.
 """
@@ -26,6 +28,7 @@ from models.submission import MoodleConnection, MoodleFeedbackPushJob
 from services.audit_service import AuditService
 from tasks.moodle_feedback_push_task import push_moodle_feedback
 from utils.auth_utils import require_permission
+from utils.exam_visibility import assert_exam_visible_for
 
 logger = logging.getLogger(__name__)
 
@@ -56,16 +59,22 @@ PushJobOut.model_rebuild()
 
 
 def _ensure_exam_for_user(db: Session, user: User, exam_id: int) -> Exam:
-    exam = (
-        db.query(Exam)
-        .filter(
-            Exam.id == exam_id,
-            Exam.institution_id == user.institution_id,
-        )
-        .one_or_none()
-    )
+    """Load exam by id, 404 unless institution matches AND ``user`` has
+    ExamVisibility access (TF-643) — pushing feedback is a mutation, so this
+    is gated exactly like every other exam-mutation endpoint
+    (``allow_read_all_bypass=False``, ``require_same_institution=True``; see
+    ``api.exams._get_exam_or_404``)."""
+    exam = db.query(Exam).filter(Exam.id == exam_id).one_or_none()
     if exam is None:
         raise HTTPException(status_code=404, detail="Prüfung nicht gefunden")
+    assert_exam_visible_for(
+        user,
+        exam,
+        db,
+        detail="Prüfung nicht gefunden",
+        allow_read_all_bypass=False,
+        require_same_institution=True,
+    )
     return exam
 
 
