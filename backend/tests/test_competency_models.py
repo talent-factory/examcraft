@@ -1,6 +1,10 @@
 """Modell-Tests für Kompetenzrahmen (TF-400)."""
 
-from models.competency import CompetencyFramework, Competency
+from models.competency import (
+    CompetencyFramework,
+    CompetencyFrameworkVisibility,
+    Competency,
+)
 
 
 def _institution(test_db):
@@ -46,22 +50,29 @@ def test_create_framework_with_competencies(test_db):
 
     loaded = test_db.query(CompetencyFramework).filter_by(id=fw.id).one()
     assert loaded.module_code == "B"
-    assert loaded.visibility == "institution"
+    # TF-644: visibility ist ein CompetencyFrameworkVisibility-Enum-Member,
+    # kein reiner String mehr (native PG-Enum statt String(20)+CHECK).
+    assert loaded.visibility == CompetencyFrameworkVisibility.INSTITUTION
     assert loaded.is_archived is False
     assert loaded.competencies[0].code == "B1"
     assert loaded.competencies[0].descriptors[0]["ln_level"] == 2
 
 
-def test_visibility_check_constraint_rejects_bad_value(test_db):
+def test_visibility_rejects_bad_value(test_db):
+    """TF-644: visibility ist seit der Promotion auf ein natives PG-Enum
+    (``competencyframeworkvisibility``) kein reiner String+CHECK mehr — ein
+    unbekannter Wert scheitert als ``DataError`` (invalid enum label) statt
+    als ``IntegrityError`` (CHECK-Constraint-Verletzung, TF-400-Status quo).
+    """
     import pytest
-    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.exc import DataError
 
     inst = _institution(test_db)
     fw = CompetencyFramework(
         name="Bad", rendered_text="x", institution_id=inst.id, visibility="public"
     )
     test_db.add(fw)
-    with pytest.raises(IntegrityError):
+    with pytest.raises(DataError):
         test_db.commit()
     test_db.rollback()
 

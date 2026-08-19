@@ -2411,6 +2411,7 @@
     "archivedBadge": "Archiviert",
     "visibility": {
       "private": "Privat",
+      "team": "Team",
       "institution": "Institution"
     },
     "form": {
@@ -2420,6 +2421,9 @@
       "renderedText": "Kompetenzen-Volltext",
       "renderedTextHelper": "Wird wörtlich als {{ competencies }} in die Generierung übernommen.",
       "visibility": "Sichtbarkeit",
+      "orgUnit": "Org-Unit",
+      "orgUnitsLoadError": "Team-Liste konnte nicht geladen werden. Bitte später erneut versuchen.",
+      "noOrgUnit": "Keiner Org-Unit zugeordnet",
       "language": "Sprache",
       "save": "Speichern",
       "cancel": "Abbrechen"

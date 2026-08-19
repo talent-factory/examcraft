@@ -1,23 +1,37 @@
-"""Kompetenzrahmen-API (HKB/Modul + HK) für ExamCraft AI (TF-400)."""
+"""Kompetenzrahmen-API (HKB/Modul + HK) für ExamCraft AI (TF-400).
+
+Sichtbarkeit (private/team/institution) + ``competencies:read_all``-Bypass
+seit TF-644 — siehe ``models.competency.CompetencyFrameworkVisibility`` und
+``utils.competency_visibility``.
+"""
 
 import logging
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models.auth import User
-from models.competency import CompetencyFramework, Competency
+from models.competency import (
+    CompetencyFramework,
+    CompetencyFrameworkVisibility,
+    Competency,
+)
+from services.org_unit_service import get_user_accessible_org_unit_ids
 from utils.auth_utils import get_current_active_user, require_permission
 from utils.competency_parser import parse_competencies
+from utils.competency_visibility import (
+    assert_framework_visible_for,
+    filter_frameworks_for_user,
+)
 
 logger = logging.getLogger(__name__)
 
-Visibility = Literal["private", "institution"]
+Visibility = Literal["private", "team", "institution"]
 
 router = APIRouter(
     prefix="/api/v1/competency-frameworks", tags=["Competency Frameworks"]
@@ -63,6 +77,9 @@ class FrameworkCreate(BaseModel):
     rendered_text: str = Field(..., min_length=1)
     language: str = "de"
     visibility: Visibility = "institution"
+    # TF-644: only meaningful together with visibility="team"; validated +
+    # cleared by _resolve_framework_visibility_for_create.
+    org_unit_id: Optional[int] = None
     competencies: List[CompetencyIn] = Field(default_factory=list)
 
 
@@ -73,6 +90,8 @@ class FrameworkUpdate(BaseModel):
     rendered_text: Optional[str] = Field(None, min_length=1)
     language: Optional[str] = None
     visibility: Optional[Visibility] = None
+    # TF-644: validated + cleared by _resolve_framework_visibility_update.
+    org_unit_id: Optional[int] = None
 
 
 class FrameworkOut(BaseModel):
@@ -83,27 +102,47 @@ class FrameworkOut(BaseModel):
     rendered_text: str
     language: str
     institution_id: Optional[int] = None
+    org_unit_id: Optional[int] = None
     created_by: Optional[int] = None
     visibility: Visibility
     is_archived: bool
     competencies: List[CompetencyOut] = Field(default_factory=list)
 
+    # TF-644: fw.visibility is a CompetencyFrameworkVisibility enum member
+    # when this model is built from_attributes off the ORM object directly
+    # (every endpoint below does) — normalize to the plain string value the
+    # field declares. Mirrors question_review.QuestionReviewOut's identical
+    # _normalize_visibility validator (TF-642).
+    @field_validator("visibility", mode="before")
+    @classmethod
+    def _normalize_visibility(cls, value):
+        return (
+            value.value if isinstance(value, CompetencyFrameworkVisibility) else value
+        )
+
     model_config = {"from_attributes": True}
 
 
-def _visible_query(db: Session, user: User):
-    """Frameworks der eigenen Institution; private nur für den Ersteller."""
-    return db.query(CompetencyFramework).filter(
-        CompetencyFramework.institution_id == user.institution_id,
-        (CompetencyFramework.visibility == "institution")
-        | (CompetencyFramework.created_by == user.id),
-    )
-
-
 def _get_for_write(fw_id: int, user: User, db: Session) -> CompetencyFramework:
-    fw = _visible_query(db, user).filter(CompetencyFramework.id == fw_id).first()
+    """TF-644: fetch a framework for a mutation endpoint (update/archive/
+    unarchive).
+
+    Visibility check runs with ``allow_read_all_bypass=False`` (ADR-0004:
+    ``competencies:read_all`` stays strictly read-only, mirrors Document/
+    Prompt/Question/Exam) and ``require_same_institution=True`` (mutations
+    need the stricter institution-drift-proof check, mirrors
+    ``exam_visibility``/``document_visibility``). Preserves the pre-TF-644
+    behaviour that a non-owner ``manage_settings`` admin still can't reach a
+    colleague's *private* framework — visibility is checked first, the
+    owner-or-admin write gate only decides what an already-visible framework
+    may do.
+    """
+    fw = db.query(CompetencyFramework).filter(CompetencyFramework.id == fw_id).first()
     if not fw:
         raise HTTPException(status_code=404, detail="Kompetenzrahmen nicht gefunden.")
+    assert_framework_visible_for(
+        user, fw, db, allow_read_all_bypass=False, require_same_institution=True
+    )
     is_admin = user.has_permission("manage_settings")
     if not is_admin and fw.created_by != user.id:
         raise HTTPException(status_code=403, detail="Zugriff verweigert.")
@@ -116,7 +155,7 @@ async def list_frameworks(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    q = _visible_query(db, current_user)
+    q = filter_frameworks_for_user(db.query(CompetencyFramework), current_user, db)
     if not include_archived:
         q = q.filter(CompetencyFramework.is_archived == False)  # noqa: E712
     return q.order_by(func.lower(CompetencyFramework.name)).all()
@@ -184,19 +223,79 @@ def _commit_or_conflict(db: Session, user_id: int) -> None:
         )
 
 
+def _resolve_framework_visibility_for_create(
+    body: "FrameworkCreate", user: User, db: Session
+) -> tuple:
+    """TF-644: validate visibility/org_unit_id at framework creation time.
+
+    Mirrors ``exams._resolve_exam_visibility_for_create`` — no ownership
+    gate needed (the creator is always the owner of the row they're about
+    to create). Unlike ``Exam.institution_id`` (NOT NULL),
+    ``CompetencyFramework.institution_id`` IS nullable — mirrors
+    ``question_review``'s orphan guard: a user without an institution can't
+    create an institution-wide framework (would trip
+    ``ck_competency_frameworks_inst_vis_requires_institution``
+    as an opaque 500 via ``_commit_or_conflict`` otherwise).
+    """
+    visibility = CompetencyFrameworkVisibility(body.visibility)
+    org_unit_id = body.org_unit_id
+
+    if (
+        visibility == CompetencyFrameworkVisibility.INSTITUTION
+        and user.institution_id is None
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Institutions-Sichtbarkeit erfordert eine Institution.",
+        )
+
+    if visibility == CompetencyFrameworkVisibility.TEAM:
+        if org_unit_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Team-Sichtbarkeit erfordert eine Org-Unit (org_unit_id).",
+            )
+        # SuperUser bugfix (mirrors question_review/exam): validating against
+        # the ACTING user's own membership would reject a superuser, who
+        # typically belongs to no Org-Unit and often has institution_id=None
+        # — they may set ANY org_unit_id on behalf of its actual owners.
+        if not user.is_superuser:
+            accessible = (
+                get_user_accessible_org_unit_ids(db, user.id, user.institution_id)
+                if user.institution_id
+                else set()
+            )
+            if org_unit_id not in accessible:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Team-Sichtbarkeit erfordert eine eigene Org-Unit "
+                        "(org_unit_id), der du selbst angehörst."
+                    ),
+                )
+    else:
+        org_unit_id = None
+
+    return visibility, org_unit_id
+
+
 @router.post("", response_model=FrameworkOut, status_code=201)
 async def create_framework(
     body: FrameworkCreate,
     current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db),
 ):
+    visibility, org_unit_id = _resolve_framework_visibility_for_create(
+        body, current_user, db
+    )
     fw = CompetencyFramework(
         name=body.name.strip(),
         module_code=body.module_code,
         description=body.description,
         rendered_text=body.rendered_text,
         language=body.language,
-        visibility=body.visibility,
+        visibility=visibility,
+        org_unit_id=org_unit_id,
         institution_id=current_user.institution_id,
         created_by=current_user.id,
     )
@@ -244,11 +343,95 @@ async def get_framework(
     db: Session = Depends(get_db),
 ):
     fw = (
-        _visible_query(db, current_user).filter(CompetencyFramework.id == fw_id).first()
+        filter_frameworks_for_user(db.query(CompetencyFramework), current_user, db)
+        .filter(CompetencyFramework.id == fw_id)
+        .first()
     )
     if not fw:
         raise HTTPException(status_code=404, detail="Kompetenzrahmen nicht gefunden.")
     return fw
+
+
+def _resolve_framework_visibility_update(
+    fw: CompetencyFramework,
+    fields: dict,
+    user: User,
+    db: Session,
+) -> Optional[dict]:
+    """TF-644: validate a visibility/org_unit_id change on ``PUT /{fw_id}``.
+
+    Mirrors ``exams._resolve_exam_visibility_update``, adapted to
+    ``update_framework``'s ``exclude_unset``-based partial-update convention.
+
+    Unlike Exam/QuestionReview (broader permission+institution-scoped write
+    gate, needing a narrower owner-or-SuperUser restriction specifically for
+    visibility), entry to ``update_framework`` already runs through
+    ``_get_for_write``'s owner-or-``manage_settings``-admin gate for the
+    *entire* endpoint — there is no separate ownership-only restriction to
+    add here: an admin trusted with full write access to this framework may
+    also re-tier it (still subject to the Org-Unit membership check below
+    unless they're a SuperUser).
+
+    Returns ``None`` when visibility/org_unit_id weren't touched, else the
+    ``{"visibility": CompetencyFrameworkVisibility, "org_unit_id":
+    Optional[int]}`` pair to apply.
+    """
+    if not fields:
+        return None
+
+    new_visibility = (
+        CompetencyFrameworkVisibility(fields["visibility"])
+        if fields.get("visibility") is not None
+        else fw.visibility
+    )
+    new_org_unit_id = (
+        fields["org_unit_id"] if "org_unit_id" in fields else fw.org_unit_id
+    )
+
+    if new_visibility == fw.visibility and new_org_unit_id == fw.org_unit_id:
+        # No-op: exclude_unset only proves the caller sent the key, not that
+        # it changes anything — mirrors exams._resolve_exam_visibility_update.
+        return None
+
+    if (
+        new_visibility == CompetencyFrameworkVisibility.INSTITUTION
+        and fw.institution_id is None
+    ):
+        # Bugfix: an orphaned framework (institution_id IS NULL) would
+        # otherwise pass validation here and then trip
+        # ck_competency_frameworks_inst_vis_requires_institution
+        # on commit, surfacing as an opaque 500 via _commit_or_conflict
+        # instead of this clear 400. Mirrors question_review's identical
+        # guard.
+        raise HTTPException(
+            status_code=400,
+            detail="Institutions-Sichtbarkeit erfordert eine Institution.",
+        )
+
+    if new_visibility == CompetencyFrameworkVisibility.TEAM:
+        if new_org_unit_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Team-Sichtbarkeit erfordert eine Org-Unit (org_unit_id).",
+            )
+        if not user.is_superuser:
+            accessible = (
+                get_user_accessible_org_unit_ids(db, user.id, user.institution_id)
+                if user.institution_id
+                else set()
+            )
+            if new_org_unit_id not in accessible:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Team-Sichtbarkeit erfordert eine eigene Org-Unit "
+                        "(org_unit_id), der du selbst angehörst."
+                    ),
+                )
+    else:
+        new_org_unit_id = None
+
+    return {"visibility": new_visibility, "org_unit_id": new_org_unit_id}
 
 
 @router.put("/{fw_id}", response_model=FrameworkOut)
@@ -260,6 +443,18 @@ async def update_framework(
 ):
     fw = _get_for_write(fw_id, current_user, db)
     fields = body.model_dump(exclude_unset=True)
+    # TF-644: visibility/org_unit_id are validated together (team requires a
+    # membership-checked org_unit_id) — pop them out of the generic
+    # attribute loop below and apply the resolved, validated pair instead.
+    visibility_fields = {
+        k: fields.pop(k) for k in ("visibility", "org_unit_id") if k in fields
+    }
+    visibility_update = _resolve_framework_visibility_update(
+        fw, visibility_fields, current_user, db
+    )
+    if visibility_update is not None:
+        fw.visibility = visibility_update["visibility"]
+        fw.org_unit_id = visibility_update["org_unit_id"]
     for field, value in fields.items():
         setattr(fw, field, value)
     # TF-400: bei geändertem rendered_text die strukturierten HKs neu ableiten

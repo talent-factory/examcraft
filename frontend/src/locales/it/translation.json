@@ -1943,6 +1943,7 @@
     },
     "visibility": {
       "private": "Private",
+      "team": "Team",
       "institution": "Institution"
     },
     "form": {
@@ -1952,6 +1953,9 @@
       "renderedText": "Competencies full text",
       "renderedTextHelper": "Injected verbatim as {{ competencies }} into generation.",
       "visibility": "Visibility",
+      "orgUnit": "Org-Unit",
+      "orgUnitsLoadError": "Could not load team list. Please try again later.",
+      "noOrgUnit": "Not a member of any Org-Unit",
       "language": "Language",
       "save": "Save",
       "cancel": "Cancel"

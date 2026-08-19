@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   TextField,
   MenuItem,
   Button,
+  FormHelperText,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import type {
   FrameworkVisibility,
   FrameworkCreatePayload,
 } from '../../types/competencyFramework';
+import { OrgUnitsService } from '../../services/orgUnitsService';
+import type { OrgUnitOut } from '../../types/orgUnit';
 
 export interface FrameworkFormValues {
   name: string;
@@ -18,6 +21,8 @@ export interface FrameworkFormValues {
   rendered_text: string;
   language: string;
   visibility: FrameworkVisibility;
+  // TF-644: nur bei visibility='team' relevant/gesetzt.
+  org_unit_id: number | null;
 }
 
 interface Props {
@@ -35,6 +40,7 @@ const EMPTY: FrameworkFormValues = {
   rendered_text: '',
   language: 'de',
   visibility: 'institution',
+  org_unit_id: null,
 };
 
 const CompetencyFrameworkForm: React.FC<Props> = ({
@@ -46,11 +52,34 @@ const CompetencyFrameworkForm: React.FC<Props> = ({
 }) => {
   const { t } = useTranslation();
   const [values, setValues] = useState<FrameworkFormValues>({ ...EMPTY, ...initial });
+  // TF-644: team-Sichtbarkeit erfordert eine der eigenen Org-Unit-
+  // Mitgliedschaften — einmalig beim Mount geladen, mirrors DocumentUpload.
+  const [myOrgUnits, setMyOrgUnits] = useState<OrgUnitOut[]>([]);
+  const [orgUnitsLoadError, setOrgUnitsLoadError] = useState(false);
+
+  useEffect(() => {
+    OrgUnitsService.mine()
+      .then((res) => {
+        setMyOrgUnits(res.items);
+        setOrgUnitsLoadError(false);
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load Org-Unit memberships:', err);
+        setMyOrgUnits([]);
+        setOrgUnitsLoadError(true);
+      });
+  }, []);
 
   const set = <K extends keyof FrameworkFormValues>(key: K, value: FrameworkFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }));
 
-  const canSubmit = values.name.trim().length > 0 && values.rendered_text.trim().length > 0;
+  const isIncompleteTeamSelection =
+    values.visibility === 'team' && values.org_unit_id === null;
+  const canSubmit =
+    values.name.trim().length > 0 &&
+    values.rendered_text.trim().length > 0 &&
+    !isIncompleteTeamSelection;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -61,6 +90,7 @@ const CompetencyFrameworkForm: React.FC<Props> = ({
       rendered_text: values.rendered_text,
       language: values.language,
       visibility: values.visibility,
+      org_unit_id: values.visibility === 'team' ? values.org_unit_id : undefined,
     });
   };
 
@@ -98,17 +128,52 @@ const CompetencyFrameworkForm: React.FC<Props> = ({
         minRows={8}
         helperText={t('competencyFrameworks.form.renderedTextHelper')}
       />
-      <Box sx={{ display: 'flex', gap: 2 }}>
+      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <TextField
           select
           label={t('competencyFrameworks.form.visibility')}
           value={values.visibility}
-          onChange={(e) => set('visibility', e.target.value as FrameworkVisibility)}
+          onChange={(e) => {
+            const next = e.target.value as FrameworkVisibility;
+            set('visibility', next);
+            // TF-644: leaving 'team' clears the now-irrelevant org_unit_id,
+            // mirrors update_framework's server-side clearing behaviour.
+            if (next !== 'team') set('org_unit_id', null);
+          }}
           sx={{ minWidth: 180 }}
         >
           <MenuItem value="institution">{t('competencyFrameworks.visibility.institution')}</MenuItem>
+          <MenuItem value="team">{t('competencyFrameworks.visibility.team')}</MenuItem>
           <MenuItem value="private">{t('competencyFrameworks.visibility.private')}</MenuItem>
         </TextField>
+        {values.visibility === 'team' && (
+          <Box>
+            <TextField
+              select
+              label={t('competencyFrameworks.form.orgUnit')}
+              value={values.org_unit_id ?? ''}
+              onChange={(e) =>
+                set('org_unit_id', e.target.value === '' ? null : Number(e.target.value))
+              }
+              error={isIncompleteTeamSelection}
+              disabled={myOrgUnits.length === 0}
+              sx={{ minWidth: 200 }}
+            >
+              {myOrgUnits.map((ou) => (
+                <MenuItem key={ou.id} value={ou.id}>
+                  {ou.name}
+                </MenuItem>
+              ))}
+            </TextField>
+            {orgUnitsLoadError ? (
+              <FormHelperText error>
+                {t('competencyFrameworks.form.orgUnitsLoadError')}
+              </FormHelperText>
+            ) : myOrgUnits.length === 0 ? (
+              <FormHelperText>{t('competencyFrameworks.form.noOrgUnit')}</FormHelperText>
+            ) : null}
+          </Box>
+        )}
         <TextField
           select
           label={t('competencyFrameworks.form.language')}

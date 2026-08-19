@@ -171,6 +171,7 @@ const CompetencyFrameworkSettingsPage: React.FC = () => {
                     rendered_text: editing.rendered_text,
                     language: editing.language,
                     visibility: editing.visibility,
+                    org_unit_id: editing.org_unit_id,
                   }
                 : undefined
             }

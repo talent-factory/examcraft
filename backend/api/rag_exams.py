@@ -34,6 +34,7 @@ from utils.document_visibility import (
     is_document_visible_for,
     get_accessible_org_unit_ids_for,
 )
+from utils.competency_visibility import is_framework_visible_for
 import logging
 
 logger = logging.getLogger(__name__)
@@ -91,35 +92,77 @@ class RAGExamRequestModel(BaseModel):
     )
 
 
-def resolve_competencies_text(db, framework_id, override, institution_id):
-    """Resolve the {{ competencies }} value: free-text override wins; else the
-    selected framework's rendered_text (institution-scoped, nicht archiviert);
-    else None.
+def resolve_framework_for_user(db, framework_id, user):
+    """Resolve+visibility-check a ``framework_id`` for ``user``: exists,
+    not archived, same institution, and visible per
+    ``utils.competency_visibility.is_framework_visible_for`` (private/team/
+    institution + ``competencies:read_all`` admin bypass). Returns the
+    ``CompetencyFramework`` or ``None`` (also for ``framework_id is None``).
 
-    Ein explizit gewähltes, aber nicht auflösbares ``framework_id`` (gelöscht,
-    archiviert oder fremde Institution) wird geloggt — sonst generiert die Prüfung
-    still ohne Kompetenz-Bezug, obwohl der Nutzer ein Framework gewählt hat.
+    Shared by ``resolve_competencies_text`` (drives the ``{{ competencies }}``
+    text injected into the generation prompt) and ``generate_rag_exam``
+    (drives the ``framework_id`` persisted onto the generated questions for
+    competency-code tagging in ``tasks.question_tasks._persist_questions``).
+
+    TF-644 follow-up (PR #194 review): before this split, ``generate_rag_exam``
+    passed the raw, unchecked ``request.framework_id`` straight into
+    ``RAGExamRequest``/``_persist_questions``, whose ``Competency`` lookup has
+    no institution/visibility filter of its own — so even though
+    ``resolve_competencies_text`` correctly withheld the *text* for an
+    invisible/cross-tenant framework, its id still reached competency-code
+    tagging, and a model-emitted ``competency_code`` colliding with one in
+    that hidden framework would set ``question_reviews.competency_id`` to a
+    competency the requesting user was never allowed to see — surfaced back
+    to them via ``CompetencyBrief``. Both callers now resolve through this
+    single gate so an unresolvable/invisible id can never reach either path.
     """
-    if override and override.strip():
-        return override
     if framework_id is None:
         return None
     fw = (
         db.query(CompetencyFramework)
         .filter(
             CompetencyFramework.id == framework_id,
-            CompetencyFramework.institution_id == institution_id,
+            CompetencyFramework.institution_id == user.institution_id,
             CompetencyFramework.is_archived.is_(False),
         )
         .first()
     )
+    if fw is None or not is_framework_visible_for(user, fw, db):
+        return None
+    return fw
+
+
+def resolve_competencies_text(db, framework_id, override, user):
+    """Resolve the {{ competencies }} value: free-text override wins; else the
+    selected framework's rendered_text (institution-scoped, nicht archiviert,
+    für ``user`` sichtbar); else None.
+
+    Ein explizit gewähltes, aber nicht auflösbares ``framework_id`` (gelöscht,
+    archiviert, fremde Institution oder — seit TF-644 — für ``user`` nicht
+    sichtbar) wird geloggt — sonst generiert die Prüfung still ohne
+    Kompetenz-Bezug, obwohl der Nutzer ein Framework gewählt hat.
+
+    TF-644: vor dieser Änderung ignorierte die Framework-Auswahl visibility
+    komplett — jedes institutionsweite Framework war per direkt gesetztem
+    ``framework_id`` wählbar, auch ein privates/team-gescoptes Framework
+    eines anderen Users (das Frontend-Dropdown ist ``list_frameworks``-
+    gefiltert, aber die API selbst prüfte nichts). Mirrors wie TF-643 die
+    analoge Moodle-Endpunkt-Lücke bei Exams geschlossen hat.
+    """
+    if override and override.strip():
+        return override
+    if framework_id is None:
+        return None
+    fw = resolve_framework_for_user(db, framework_id, user)
     if fw is None:
         logger.warning(
             "resolve_competencies_text: framework_id=%s nicht auflösbar "
-            "(gelöscht/archiviert/fremde Institution=%s) — Kompetenz-Injektion "
-            "entfällt für diese Generierung",
+            "(gelöscht/archiviert/fremde Institution/nicht sichtbar für "
+            "user=%s, institution=%s) — Kompetenz-Injektion entfällt für "
+            "diese Generierung",
             framework_id,
-            institution_id,
+            user.id,
+            user.institution_id,
         )
         return None
     return fw.rendered_text
@@ -268,7 +311,16 @@ async def generate_rag_exam(
             db,
             framework_id=request.framework_id,
             override=request.competencies_override,
-            institution_id=current_user.institution_id,
+            user=current_user,
+        )
+        # TF-644 review follow-up: persist the *resolved* (visibility-checked)
+        # framework id, not the raw client-supplied one — see
+        # resolve_framework_for_user's docstring. request.framework_id alone
+        # would let an invisible/cross-tenant framework's id reach
+        # tasks.question_tasks._persist_questions' unfiltered Competency
+        # lookup even though its text is correctly withheld above.
+        resolved_framework = resolve_framework_for_user(
+            db, request.framework_id, current_user
         )
 
         rag_request = RAGExamRequest(
@@ -281,7 +333,7 @@ async def generate_rag_exam(
             context_chunks_per_question=request.context_chunks_per_question,
             prompt_config=prompt_config_dict,
             tag_ids=request.tag_ids,
-            framework_id=request.framework_id,
+            framework_id=resolved_framework.id if resolved_framework else None,
             competencies=competencies_text,
         )
         request_data = rag_request.model_dump(mode="json")
