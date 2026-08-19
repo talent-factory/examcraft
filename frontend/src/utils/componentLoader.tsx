@@ -306,7 +306,11 @@ export const loadRAGService = async (): Promise<any> => {
       /* webpackChunkName: "rag-service" */
       '@examcraft/premium'
     );
-    return module.RAGService || module.default;
+    // TF-626: Der frueher hier stehende Fallback `|| module.default` konnte
+    // nie greifen — premium/frontend/src/index.ts hat nur `export *`, und das
+    // re-exportiert bewusst keinen Default. Er war lediglich unsichtbar, weil
+    // dieses Modul nie typgeprueft wurde.
+    return module.RAGService;
   } catch (err) {
     console.error('[componentLoader] Failed to load premium RAGService:', err);
     return null;

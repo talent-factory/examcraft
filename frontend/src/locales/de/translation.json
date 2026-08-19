@@ -2196,7 +2196,7 @@
       "confidencePercent": "{{value}}% Konfidenz",
       "sourceCoverage": "Quellenabdeckung",
       "sourceCoveragePercent": "{{value}}% Quellenabdeckung",
-      "chunksUsed": "Textabschnitte verwendet",
+      "chunksUsed": "{{count}} Textabschnitte verwendet",
       "questionNumber": "Frage {{number}}",
       "modelAnswer": "Musterlösung:",
       "back": "Zurück",

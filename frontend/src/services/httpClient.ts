@@ -15,8 +15,7 @@
  * share the same identity.
  */
 
-import { ApiError } from './submissionsService';
-import type { ApiErrorKind } from '../types/submission';
+import { ApiError, statusToKind } from './submissionsService';
 import { executeTokenRefresh, triggerAuthLogout } from '../api/apiClient';
 
 export { ApiError };
@@ -33,22 +32,6 @@ export function authHeaders(extra: HeadersInit = {}): HeadersInit {
     ...extra,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
-}
-
-
-function statusToKind(status: number): ApiErrorKind {
-  if (status === 401) return 'auth';
-  if (status === 403) return 'permission';
-  if (status === 404) return 'not_found';
-  if (status === 413) return 'too_large';
-  // 402 falls under "permission" semantically — the user lacks
-  // *paid* access. The frontend's QuotaBanner reads ``status === 402``
-  // explicitly, so this label is just for telemetry/grouping.
-  if (status === 402) return 'permission';
-  if (status === 422 || status === 400) return 'validation';
-  if (status === 409) return 'validation';
-  if (status >= 500) return 'server';
-  return 'unknown';
 }
 
 

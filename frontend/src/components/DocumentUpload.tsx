@@ -438,7 +438,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         </RadioGroup>
         {visibility === DocumentVisibility.TEAM && (
           <FormControl size="small" sx={{ mt: 1, ml: 4, minWidth: 220 }}>
-            <Select
+            {/* TF-626: Generic explizit setzen. Ohne ihn leitet MUI den
+                Value-Typ als `number` ab, und `value === ''` unten galt als
+                unmoeglicher Vergleich (TS2367) — obwohl '' der reale
+                Platzhalter-Zustand ist. */}
+            <Select<number | ''>
               displayEmpty
               value={orgUnitId}
               onChange={(e) => setOrgUnitId(e.target.value as number | '')}

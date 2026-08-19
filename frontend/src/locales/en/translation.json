@@ -2196,7 +2196,7 @@
       "confidencePercent": "{{value}}% confidence",
       "sourceCoverage": "Source Coverage",
       "sourceCoveragePercent": "{{value}}% source coverage",
-      "chunksUsed": "Text chunks used",
+      "chunksUsed": "{{count}} text chunks used",
       "questionNumber": "Question {{number}}",
       "modelAnswer": "Model Answer:",
       "back": "Back",

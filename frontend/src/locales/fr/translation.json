@@ -1752,7 +1752,7 @@
       "quality": "Qualité :",
       "confidence": "Confiance",
       "sourceCoverage": "Couverture des sources",
-      "chunksUsed": "Extraits de texte utilisés",
+      "chunksUsed": "{{count}} extraits de texte utilisés",
       "questionNumber": "Question {{number}}",
       "modelAnswer": "Réponse modèle :",
       "back": "Retour",

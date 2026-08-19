@@ -1,4 +1,5 @@
 import { PromptConfig } from './prompt';
+import type { SupportedLanguage } from './auth';
 
 export enum DocumentStatus {
   // Async-processing lifecycle (mirrors backend models.document.DocumentStatus).
@@ -271,15 +272,29 @@ export interface DifficultyLevel {
   description: string;
 }
 
-export interface SupportedLanguage {
-  code: string;
+// TF-626: Hiess `SupportedLanguage` und kollidierte damit im Barrel
+// (types/index.ts) mit dem gleichnamigen Union-Typ aus auth.ts
+// ('de' | 'en' | 'fr' | 'it'). TypeScript loeste die Mehrdeutigkeit auf,
+// indem es den Namen aus dem Re-Export ganz herausnahm (TS2308) — beide
+// Typen waren ueber `@examcraft/core/types` also gar nicht erreichbar.
+// Dieser hier ist ein API-DTO (Eintrag in QuestionTypesResponse), nicht die
+// Spracheinstellung des Nutzers.
+//
+// TF-626-Review (Suggestion): `code` war zuvor `string` — der einzige
+// tatsaechliche Erzeuger (core/backend/api/rag_exams.py:supported_languages)
+// gibt aber ausschliesslich Werte aus exakt derselben Menge wie
+// `SupportedLanguage` aus auth.ts ('de' | 'en' | 'fr' | 'it') zurueck. Ohne
+// diese Kopplung wuerde ein Tippfehler im Backend ('deu', 'DE') hier
+// stillschweigend durchgehen.
+export interface SupportedLanguageOption {
+  code: SupportedLanguage;
   name: string;
 }
 
 export interface QuestionTypesResponse {
   supported_types: QuestionTypeInfo[];
   difficulty_levels: DifficultyLevel[];
-  supported_languages: SupportedLanguage[];
+  supported_languages: SupportedLanguageOption[];
 }
 
 /** State of a single generation task tracked by GenerationTasksContext */

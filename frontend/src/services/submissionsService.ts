@@ -44,12 +44,34 @@ export class ApiError extends Error {
   }
 }
 
-function statusToKind(status: number): ApiErrorKind {
+/**
+ * Kanonisches HTTP-Status → `ApiErrorKind`-Mapping (TF-626-Review).
+ *
+ * Vorher pflegte praktisch jeder Service (httpClient, activityService,
+ * gradesService, gradingSchemesService, gradeExportService,
+ * moodleFeedbackPushService) eine eigene, leicht abweichende Kopie dieser
+ * Funktion — u.a. deshalb kannte keine von ihnen `409 → 'conflict'`, obwohl
+ * `gradingSchemesService`/`gradeExportService` genau das schon zur Laufzeit
+ * auswarfen. Diese Datei ist der natuerliche gemeinsame Ort: `ApiError`
+ * selbst ist bereits hier definiert und wird von allen anderen Services
+ * importiert (siehe `import { ApiError } from './submissionsService'` dort).
+ *
+ * Exportiert, damit andere Services sie statt einer eigenen Kopie
+ * importieren — siehe httpClient.ts, activityService.ts, gradesService.ts,
+ * gradingSchemesService.ts, gradeExportService.ts,
+ * moodleFeedbackPushService.ts.
+ */
+export function statusToKind(status: number): ApiErrorKind {
   if (status === 401) return 'auth';
   if (status === 403) return 'permission';
+  // 402 faellt semantisch unter "permission" — der Nutzer hat keinen
+  // *bezahlten* Zugriff. QuotaBanner liest `status === 402` direkt; dieses
+  // Label dient nur Telemetrie/Gruppierung (uebernommen aus httpClient.ts).
+  if (status === 402) return 'permission';
   if (status === 404) return 'not_found';
+  if (status === 409) return 'conflict';
   if (status === 413) return 'too_large';
-  if (status === 422 || status === 400) return 'validation';
+  if (status === 400 || status === 412 || status === 422) return 'validation';
   if (status >= 500) return 'server';
   return 'unknown';
 }

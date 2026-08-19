@@ -8,6 +8,7 @@ import {
   ActivityType,
 } from '../types/activity';
 import { ApiErrorKind } from '../types/submission';
+import { statusToKind } from './submissionsService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const ROOT = '/api/v1/activity';
@@ -32,16 +33,6 @@ export class ApiError extends Error {
     this.detail = params.detail;
     this.issues = params.issues ?? [];
   }
-}
-
-function statusToKind(status: number): ApiErrorKind {
-  if (status === 401) return 'auth';
-  if (status === 403) return 'permission';
-  if (status === 404) return 'not_found';
-  if (status === 413) return 'too_large';
-  if (status === 422 || status === 400) return 'validation';
-  if (status >= 500) return 'server';
-  return 'unknown';
 }
 
 async function readErrorBody(

@@ -7,7 +7,7 @@
  * submissions_grade_export_blocked_pending_review.
  */
 
-import { ApiError } from './submissionsService';
+import { ApiError, statusToKind } from './submissionsService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -50,16 +50,9 @@ export class GradeExportService {
         }
       }
       throw new ApiError({
-        kind:
-          response.status === 401
-            ? 'auth'
-            : response.status === 403
-            ? 'permission'
-            : response.status === 404
-            ? 'not_found'
-            : response.status === 409
-            ? 'conflict'
-            : 'server',
+        // TF-626-Review: kanonisches Mapping statt eigener Ternary — siehe
+        // submissionsService.ts (statusToKind).
+        kind: statusToKind(response.status),
         status: response.status,
         message:
           typeof detail === 'string'

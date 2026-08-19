@@ -152,7 +152,9 @@ export const DocumentVisibilityDialog: React.FC<DocumentVisibilityDialogProps> =
         </RadioGroup>
         {value === DocumentVisibility.TEAM && (
           <FormControl size="small" sx={{ mt: 1, ml: 4, minWidth: 220 }}>
-            <Select
+            {/* TF-626: siehe DocumentUpload.tsx — Generic explizit, sonst
+                gilt der '' -Vergleich in renderValue als unmoeglich. */}
+            <Select<number | ''>
               displayEmpty
               value={orgUnitId ?? ''}
               onChange={(e) => setOrgUnitId(e.target.value === '' ? null : Number(e.target.value))}

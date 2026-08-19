@@ -8,7 +8,7 @@
  * codes.
  */
 
-import { ApiError } from './submissionsService';
+import { ApiError, statusToKind } from './submissionsService';
 import {
   GradingSchemeCreate,
   GradingSchemeListOut,
@@ -38,8 +38,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
     const body = await response.json();
     detail = body.detail;
     if (Array.isArray(body.detail)) {
-      issues = body.detail
-        .map((d: { msg?: string }) => d?.msg)
+      issues = (body.detail as Array<{ msg?: string }>)
+        .map((d) => d?.msg)
         .filter((m): m is string => typeof m === 'string');
     }
   } catch {
@@ -65,18 +65,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
       ? detail
       : `Request failed (${response.status})`;
   throw new ApiError({
-    kind:
-      response.status === 401
-        ? 'auth'
-        : response.status === 403
-        ? 'permission'
-        : response.status === 404
-        ? 'not_found'
-        : response.status === 409
-        ? 'conflict'
-        : response.status === 422
-        ? 'validation'
-        : 'server',
+    // TF-626-Review: vorher eine inline-Ternary, die nur einen Teil der
+    // Codes kannte und alles Unbekannte auf 'server' abbildete (statt
+    // 'unknown' wie ueberall sonst) — jetzt dasselbe kanonische Mapping wie
+    // jeder andere Service, siehe submissionsService.ts.
+    kind: statusToKind(response.status),
     status: response.status,
     message,
     detail,

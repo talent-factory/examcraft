@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@examcraft/core": ["./src/lib"],
+      "@examcraft/core/*": ["./src/*"]
+    }
+  }
+}

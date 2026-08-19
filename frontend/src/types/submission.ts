@@ -265,6 +265,11 @@ export type ApiErrorKind =
   | 'permission'
   | 'validation'
   | 'not_found'
+  // TF-626: 'conflict' wird von gradingSchemesService fuer HTTP 409 erzeugt
+  // und in AdminGradingSchemes/NotenexportPanel abgefragt, fehlte hier aber.
+  // Die Abfragen galten dem Typ als unmoeglich (TS2367/TS2678), obwohl sie zur
+  // Laufzeit greifen.
+  | 'conflict'
   | 'too_large'
   | 'server'
   | 'unknown';

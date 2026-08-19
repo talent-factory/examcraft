@@ -6,8 +6,7 @@
  * conventions of GradeExportService.
  */
 
-import { ApiError } from './submissionsService';
-import { ApiErrorKind } from '../types/submission';
+import { ApiError, statusToKind } from './submissionsService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -32,15 +31,6 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-function kindForStatus(status: number): ApiErrorKind {
-  if (status === 401) return 'auth';
-  if (status === 403) return 'permission';
-  if (status === 404) return 'not_found';
-  if (status === 400 || status === 412 || status === 422) return 'validation';
-  if (status >= 500) return 'server';
-  return 'unknown';
-}
-
 async function parseJob(response: Response, action: string): Promise<PushJob> {
   if (!response.ok) {
     let detail: unknown;
@@ -51,7 +41,7 @@ async function parseJob(response: Response, action: string): Promise<PushJob> {
       /* non-JSON error body */
     }
     throw new ApiError({
-      kind: kindForStatus(response.status),
+      kind: statusToKind(response.status),
       status: response.status,
       message:
         typeof detail === 'string'
