@@ -8,6 +8,7 @@ import {
   Button,
   TextField,
   FormControl,
+  FormHelperText,
   InputLabel,
   Select,
   MenuItem,
@@ -29,6 +30,8 @@ import { UserRole } from '../../types/auth';
 import MarkdownRenderer from '../MarkdownRenderer';
 import TagAutocomplete from '../shared/TagAutocomplete';
 import { tagsApi, type Tag, type TagValue, isPendingTag } from '../../api/tagsApi';
+import { OrgUnitsService } from '../../services/orgUnitsService';
+import { OrgUnitOut } from '../../types/orgUnit';
 
 /** TF-397: a prompt's managed tags arrive as {id, name}; lift them into the
  * TagValue shape the shared TagAutocomplete works with. */
@@ -129,6 +132,21 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
   // TF-397: managed prompt-tags selected via the autocomplete (Tag | PendingTag).
   const [selectedTags, setSelectedTags] = useState<TagValue[]>([]);
 
+  // TF-641: caller's own Org-Unit memberships, for the 'team' visibility tier.
+  // Fetched once, not re-fetched on every visibility change.
+  const [myOrgUnits, setMyOrgUnits] = useState<OrgUnitOut[]>([]);
+  const [orgUnitsLoadError, setOrgUnitsLoadError] = useState(false);
+  useEffect(() => {
+    OrgUnitsService.mine()
+      .then((res) => { setMyOrgUnits(res.items); setOrgUnitsLoadError(false); })
+      .catch((err) => {
+        console.error('Failed to load Org-Unit memberships:', err);
+        setMyOrgUnits([]);
+        setOrgUnitsLoadError(true);
+      });
+  }, []);
+  const hasOrgUnits = myOrgUnits.length > 0;
+
   const [formData, setFormData] = useState<Partial<Prompt>>({
     name: '',
     content: '',
@@ -139,7 +157,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     is_active: false,
     // TF-410: new prompts default to the most private tier.
     visibility: PromptVisibility.PRIVATE,
-    is_institution_default: false
+    is_institution_default: false,
+    org_unit_id: null
   });
 
   const loadPrompt = useCallback(async () => {
@@ -175,9 +194,17 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     }
   }, [promptId, initialData]);
 
+  // TF-641: 'team' visibility requires a target Org-Unit.
+  const isIncompleteTeamSelection =
+    formData.visibility === PromptVisibility.TEAM && !formData.org_unit_id;
+
   const handleSave = async () => {
     if (!formData.name || !formData.content || !formData.category || !formData.use_case) {
       setError(t('admin.promptEditor.validationRequired'));
+      return;
+    }
+    if (isIncompleteTeamSelection) {
+      setError(t('admin.promptEditor.teamOrgUnitRequired'));
       return;
     }
 
@@ -204,9 +231,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
           category: formData.category,
           use_case: formData.use_case,
           tag_ids,
-          // TF-410: tier changes (permission-checked server-side).
+          // TF-410/TF-641: tier changes (permission-checked server-side).
           visibility: formData.visibility,
           is_institution_default: formData.is_institution_default,
+          org_unit_id: formData.org_unit_id,
         });
         const versionBumped = result.version > (formData.version ?? 1);
         setFormData(result);
@@ -224,9 +252,10 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
           description: formData.description,
           is_active: formData.is_active ?? false,
           tag_ids,
-          // TF-410: chosen visibility tier (permission-checked server-side).
+          // TF-410/TF-641: chosen visibility tier (permission-checked server-side).
           visibility: formData.visibility,
           is_institution_default: formData.is_institution_default,
+          org_unit_id: formData.org_unit_id,
         });
         setSuccess(t('admin.promptEditor.successCreated'));
       }
@@ -269,7 +298,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
             variant="contained"
             startIcon={saving ? <CircularProgress size={20} /> : <Save />}
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || isIncompleteTeamSelection}
           >
             {saving ? t('admin.promptEditor.btnSaving') : t('admin.promptEditor.btnSave')}
           </Button>
@@ -410,8 +439,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
               </Select>
             </FormControl>
 
-            {/* Visibility tier (TF-410) */}
-            <FormControl fullWidth sx={{ mb: 2 }}>
+            {/* Visibility tier (TF-410, TEAM added in TF-641) */}
+            <FormControl fullWidth sx={{ mb: formData.visibility === PromptVisibility.TEAM ? 1 : 2 }}>
               <InputLabel id="visibility-label">
                 {t('admin.promptEditor.visibilityLabel')}
               </InputLabel>
@@ -420,20 +449,29 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                 value={formData.visibility ?? PromptVisibility.PRIVATE}
                 label={t('admin.promptEditor.visibilityLabel')}
                 disabled={saving}
-                onChange={(e: SelectChangeEvent) =>
+                onChange={(e: SelectChangeEvent) => {
+                  const nextVisibility = e.target.value as PromptVisibility;
                   setFormData({
                     ...formData,
-                    visibility: e.target.value as PromptVisibility,
+                    visibility: nextVisibility,
                     // institution_default is only valid for the institution tier
                     is_institution_default:
-                      e.target.value === PromptVisibility.INSTITUTION
+                      nextVisibility === PromptVisibility.INSTITUTION
                         ? formData.is_institution_default
                         : false,
-                  })
-                }
+                    // org_unit_id is only meaningful for the team tier (TF-641)
+                    org_unit_id:
+                      nextVisibility === PromptVisibility.TEAM
+                        ? formData.org_unit_id
+                        : null,
+                  });
+                }}
               >
                 <MenuItem value={PromptVisibility.PRIVATE}>
                   {t('admin.promptEditor.visibilityPrivate')}
+                </MenuItem>
+                <MenuItem value={PromptVisibility.TEAM}>
+                  {t('admin.promptEditor.visibilityTeam')}
                 </MenuItem>
                 <MenuItem value={PromptVisibility.INSTITUTION}>
                   {t('admin.promptEditor.visibilityInstitution')}
@@ -445,6 +483,42 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                 )}
               </Select>
             </FormControl>
+
+            {/* Org-Unit picker — team tier only (TF-641) */}
+            {formData.visibility === PromptVisibility.TEAM && (
+              <FormControl fullWidth sx={{ mb: 2 }} error={isIncompleteTeamSelection}>
+                <Select
+                  displayEmpty
+                  inputProps={{ 'aria-label': t('admin.promptEditor.orgUnitPickerPlaceholder') }}
+                  value={formData.org_unit_id ?? ''}
+                  disabled={saving}
+                  onChange={(e: SelectChangeEvent<number | string>) =>
+                    setFormData({
+                      ...formData,
+                      org_unit_id: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
+                  renderValue={(v) =>
+                    v === ''
+                      ? t('admin.promptEditor.orgUnitPickerPlaceholder')
+                      : myOrgUnits.find((ou) => ou.id === v)?.name ?? ''
+                  }
+                >
+                  {myOrgUnits.map((ou) => (
+                    <MenuItem key={ou.id} value={ou.id}>
+                      {ou.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {!hasOrgUnits && (
+                  <FormHelperText>
+                    {orgUnitsLoadError
+                      ? t('admin.promptEditor.orgUnitsLoadError')
+                      : t('admin.promptEditor.noOrgUnit')}
+                  </FormHelperText>
+                )}
+              </FormControl>
+            )}
 
             {/* Institution default — admin-only, institution tier only (TF-410) */}
             {isAdmin && formData.visibility === PromptVisibility.INSTITUTION && (

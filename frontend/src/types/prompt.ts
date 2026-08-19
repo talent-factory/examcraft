@@ -35,11 +35,13 @@ export interface PromptTag {
 }
 
 /**
- * Prompt visibility tier (TF-410). Mirrors the backend ``PromptVisibility``.
- * Reading widens downward; editing stays narrow (see ``can_edit`` on Prompt).
+ * Prompt visibility tier (TF-410, TEAM added in TF-641). Mirrors the backend
+ * ``PromptVisibility``. Reading widens downward; editing stays narrow (see
+ * ``can_edit`` on Prompt).
  */
 export enum PromptVisibility {
   PRIVATE = 'private',
+  TEAM = 'team',
   INSTITUTION = 'institution',
   SYSTEM = 'system'
 }
@@ -70,6 +72,8 @@ export interface Prompt {
   visibility?: PromptVisibility;
   is_institution_default?: boolean;
   owner_id?: number | null;
+  /** TF-641: target Org-Unit when visibility === TEAM; null/undefined otherwise. */
+  org_unit_id?: number | null;
   /** Computed for the requesting user: may they edit this prompt? */
   can_edit?: boolean;
 }

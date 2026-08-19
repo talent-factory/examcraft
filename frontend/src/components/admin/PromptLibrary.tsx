@@ -25,7 +25,7 @@ import { promptsApi, Prompt } from '../../api/promptsApi';
 import { PromptVisibility } from '../../types/prompt';
 import type { TFunction } from 'i18next';
 
-/** TF-410: small chip describing a prompt's visibility tier. */
+/** TF-410/TF-641: small chip describing a prompt's visibility tier. */
 const renderVisibilityChip = (prompt: Prompt, t: TFunction) => {
   if (prompt.visibility === PromptVisibility.SYSTEM) {
     return (
@@ -33,6 +33,16 @@ const renderVisibilityChip = (prompt: Prompt, t: TFunction) => {
         label={t('admin.promptLibrary.visibilitySystem')}
         size="small"
         color="secondary"
+        variant="outlined"
+      />
+    );
+  }
+  if (prompt.visibility === PromptVisibility.TEAM) {
+    return (
+      <Chip
+        label={t('admin.promptLibrary.visibilityTeam')}
+        size="small"
+        color="primary"
         variant="outlined"
       />
     );
