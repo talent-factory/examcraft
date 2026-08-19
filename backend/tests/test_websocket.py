@@ -327,7 +327,7 @@ class TestWebSocketDisconnect:
 @pytest.fixture
 def ws_module():
     """Lädt das websocket-Modul (wie ws_app) und gibt es zurück, damit reine
-    Hilfsfunktionen wie _user_facing_error direkt getestet werden können."""
+    Hilfsfunktionen wie user_facing_task_error direkt getestet werden können."""
     import sys
 
     ws_path = os.path.join(os.path.dirname(__file__), "..", "api", "v1", "websocket.py")
@@ -345,22 +345,22 @@ class TestUserFacingError:
 
     def test_no_context_maps_to_actionable_message(self, ws_module):
         # Genau der Prod-Fehler aus TF-358.
-        msg = ws_module._user_facing_error(
+        msg = ws_module.user_facing_task_error(
             ValueError("No context available for question generation")
         )
         assert "durchsuchbaren Inhalt" in msg
-        assert msg != ws_module._GENERIC_TASK_ERROR
+        assert msg != ws_module.GENERIC_TASK_ERROR
 
     def test_no_relevant_context_maps_to_actionable_message(self, ws_module):
-        msg = ws_module._user_facing_error(
+        msg = ws_module.user_facing_task_error(
             ValueError("No relevant context found for topic: Foo")
         )
         assert "durchsuchbaren Inhalt" in msg
 
     def test_unknown_question_type_maps_to_actionable_message(self, ws_module):
-        msg = ws_module._user_facing_error(ValueError("Unknown question type: xyz"))
+        msg = ws_module.user_facing_task_error(ValueError("Unknown question type: xyz"))
         assert "Fragetyp" in msg
-        assert msg != ws_module._GENERIC_TASK_ERROR
+        assert msg != ws_module.GENERIC_TASK_ERROR
 
     def test_unknown_error_falls_back_to_generic_no_leak(self, ws_module):
         # Interna (Tabellennamen, Stacktrace-Fragmente) dürfen NICHT durchsickern.
@@ -368,13 +368,13 @@ class TestUserFacingError:
             "IntegrityError: duplicate key value violates unique constraint "
             '"question_source_doc_pkey" DETAIL: Key (id)=(42) at /app/secret.py'
         )
-        msg = ws_module._user_facing_error(leaky)
-        assert msg == ws_module._GENERIC_TASK_ERROR
+        msg = ws_module.user_facing_task_error(leaky)
+        assert msg == ws_module.GENERIC_TASK_ERROR
         assert "question_source_doc" not in msg
         assert "secret" not in msg
 
     def test_none_info_falls_back_to_generic(self, ws_module):
-        assert ws_module._user_facing_error(None) == ws_module._GENERIC_TASK_ERROR
+        assert ws_module.user_facing_task_error(None) == ws_module.GENERIC_TASK_ERROR
 
     def test_maps_via_stable_code_independent_of_message(self, ws_module):
         # TF-358: Mapping muss über den stabilen .code greifen, auch wenn die
@@ -382,12 +382,12 @@ class TestUserFacingError:
         # Umformulierung/Lokalisierung). Die typisierten Fehler leben in core.
         from services.rag_errors import NoContextError, UnknownQuestionTypeError
 
-        no_ctx = ws_module._user_facing_error(
+        no_ctx = ws_module.user_facing_task_error(
             NoContextError("völlig andere Formulierung ohne Schlüsselwörter")
         )
         assert "durchsuchbaren Inhalt" in no_ctx
 
-        unknown_type = ws_module._user_facing_error(
+        unknown_type = ws_module.user_facing_task_error(
             UnknownQuestionTypeError("anderer Text")
         )
         assert "Fragetyp" in unknown_type

@@ -17,54 +17,11 @@ from models.auth import User
 from models.document import Document
 from schemas.task import TaskStatus, TaskStatusMessage
 from services.auth_service import AuthService
-from services.rag_errors import NO_CONTEXT, UNKNOWN_QUESTION_TYPE
+from services.rag_errors import GENERIC_TASK_ERROR, user_facing_task_error
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["websocket"])
-
-
-# Generische Fallback-Meldung für unbekannte Task-Fehler. Bewusst nichts-
-# sagend gegenüber dem User, um keine internen Details/PII zu leaken.
-_GENERIC_TASK_ERROR = "Verarbeitung fehlgeschlagen. Bitte erneut versuchen."
-
-
-def _user_facing_error(raw_info: object) -> str:
-    """Mappe eine (technische) Task-Exception auf eine sichere, handlungs-
-    leitende deutsche User-Meldung (TF-358).
-
-    Der echte Fehler wird vom Aufrufer geloggt; hier wird er NICHT an den User
-    durchgereicht. Nur explizit bekannte Fehlerklassen erhalten eine konkrete
-    Meldung — alles andere fällt auf eine generische Meldung zurück, damit
-    keine internen Details oder personenbezogenen Daten zum Client gelangen.
-
-    Matching primär über den stabilen ``code`` der RAG-Fehler (siehe
-    ``services.rag_errors``) — robust gegen Umformulierung/Lokalisierung. Der
-    Substring-Fallback greift, falls Celery den Exception-Typ bei der
-    Serialisierung verloren hat und nur noch die Roh-Message überlebt.
-    """
-    code = getattr(raw_info, "code", None)
-    text = str(raw_info or "").lower()
-
-    if (
-        code == NO_CONTEXT
-        or "no context available" in text
-        or "no relevant context found" in text
-    ):
-        return (
-            "Die ausgewählten Dokumente enthalten zu wenig durchsuchbaren "
-            "Inhalt für die Fragengenerierung. Bitte zusätzliche oder "
-            "umfangreichere Dokumente auswählen oder die Anzahl der Fragen "
-            "reduzieren."
-        )
-
-    if code == UNKNOWN_QUESTION_TYPE or "unknown question type" in text:
-        return (
-            "Der gewählte Fragetyp wird nicht unterstützt. Bitte einen anderen "
-            "Fragetyp auswählen."
-        )
-
-    return _GENERIC_TASK_ERROR
 
 
 # Modul-Level-Singleton — nur für Single-Instance-Deployment.
@@ -363,13 +320,13 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
 
             elif state in (TaskStatus.FAILURE, TaskStatus.REVOKED):
                 raw_info = task_data["info"]
-                user_message = _user_facing_error(raw_info)
+                user_message = user_facing_task_error(raw_info)
                 # Echten Fehler server-seitig vollständig loggen (mit Traceback,
                 # falls vorhanden); dem User nur die sichere, handlungsleitende
                 # Meldung senden — keine rohen Interna/PII (TF-358). Unbekannte
                 # Fehlerklassen (generischer Fallback) explizit markieren, damit
                 # auf neue, ungemappte Fehler alertbar ist.
-                unmapped = user_message == _GENERIC_TASK_ERROR
+                unmapped = user_message == GENERIC_TASK_ERROR
                 logger.error(
                     "Task %s failed (%s): %r",
                     task_id,

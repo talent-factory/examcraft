@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, act, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../AuthContext';
+import { readSessionSnapshot, writeSessionSnapshot } from '../../utils/sessionSnapshot';
 
 jest.mock('../../services/AuthService', () => ({
   __esModule: true,
@@ -164,6 +165,39 @@ describe('AuthContext — token refresh', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
+  it('clears wizard snapshots on logout (TF-608)', async () => {
+    // sessionStorage überlebt den Benutzerwechsel im selben Tab, und der
+    // Wizard-Snapshot enthält getippten Inhalt (Prüfungsthema). Auf einem
+    // geteilten Rechner bekäme der nächste Nutzer sonst den Stand seines
+    // Vorgängers zu sehen.
+    writeSessionSnapshot('ragExamWizard', 1, { ragRequest: { topic: 'Vertraulich' } });
+    expect(readSessionSnapshot('ragExamWizard', 1)).not.toBeNull();
+
+    const accessToken = makeToken(900);
+    (mockAuthService.login as jest.Mock).mockResolvedValue({
+      access_token: accessToken,
+      refresh_token: 'rt-1',
+      token_type: 'bearer',
+    });
+    (mockAuthService.getProfile as jest.Mock).mockResolvedValue(mockUser as any);
+
+    let capturedAuth: ReturnType<typeof useAuth> | null = null;
+    render(
+      <AuthProvider>
+        <AuthConsumer onContext={(a) => { capturedAuth = a; }} />
+      </AuthProvider>,
+    );
+
+    await act(async () => {
+      await capturedAuth!.login('user@test.com', 'pw');
+    });
+    await act(async () => {
+      await capturedAuth!.logout();
+    });
+
+    expect(readSessionSnapshot('ragExamWizard', 1)).toBeNull();
+  });
+
   it('sets isAuthenticated to false when refresh token is expired', async () => {
     const accessToken = makeToken(900);
     (mockAuthService.login as jest.Mock).mockResolvedValue({
@@ -209,6 +243,55 @@ describe('AuthContext — token refresh', () => {
       },
       { timeout: 3000 },
     );
+  });
+
+  it('clears wizard snapshots when a stale session is found expired on mount (TF-608)', async () => {
+    // Der interessantere Fall als der explizite Logout-Klick oben: eine
+    // abgelaufene Sitzung liegt bereits im localStorage eines offenen Tabs
+    // (z. B. ein geteilter Rechner), und `loadAuthState`s Mount-Pfad in
+    // AuthContext.tsx — nicht der `tokenRefreshCallback` — stellt das fest.
+    // Genau der Fall, in dem jemand weggegangen ist und sich jemand anderes
+    // an den Rechner setzt (siehe Kommentar an der Aufrufstelle).
+    //
+    // Echte Timer statt der Suite-weiten Fake-Timer: `isAuthenticated` ist
+    // schon im Initial-State `false` — ein `waitFor` darauf würde beim
+    // allerersten (synchronen) Poll grün werden, bevor die mehrstufige
+    // async-Kette (getProfile → refreshToken → clearAllSessionSnapshots)
+    // überhaupt einmal durchgelaufen ist. Ohne echte Timer bleibt unklar, ob
+    // `waitFor`s Polling unter Fake-Timern zuverlässig mehrere
+    // Promise-Hops abwartet.
+    jest.useRealTimers();
+
+    writeSessionSnapshot('ragExamWizard', 1, { ragRequest: { topic: 'Vertraulich' } });
+    expect(readSessionSnapshot('ragExamWizard', 1)).not.toBeNull();
+
+    localStorage.setItem('examcraft_access_token', makeToken(-60));
+    localStorage.setItem('examcraft_refresh_token', 'stale-refresh-token');
+
+    (mockAuthService.getProfile as jest.Mock).mockRejectedValue(new Error('401 Unauthorized'));
+    (mockAuthService.refreshToken as jest.Mock).mockRejectedValue(
+      new Error('Refresh token expired'),
+    );
+
+    let capturedAuth: ReturnType<typeof useAuth> | null = null;
+    render(
+      <AuthProvider>
+        <AuthConsumer onContext={(a) => { capturedAuth = a; }} />
+      </AuthProvider>,
+    );
+
+    // Zielgerichtet auf den eigentlich zu prüfenden Seiteneffekt warten,
+    // nicht auf `isAuthenticated` — das ist schon vor der async-Kette
+    // `false` und würde ein `waitFor` sofort (fälschlich) grün werden
+    // lassen.
+    await waitFor(
+      () => {
+        expect(readSessionSnapshot('ragExamWizard', 1)).toBeNull();
+      },
+      { timeout: 3000 },
+    );
+
+    expect(capturedAuth!.isAuthenticated).toBe(false);
   });
 });
 

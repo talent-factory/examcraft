@@ -2,8 +2,9 @@
 Tests for GET /api/v1/rag/active-tasks endpoint.
 
 Verifies:
-1. Only non-terminal jobs are returned
-2. Jobs older than 2 hours are excluded
+1. Non-terminal jobs are returned; jobs older than 2 hours are excluded
+2. Recently completed jobs are returned too, so a task that finished during a
+   page reload stays reachable in the UI (TF-608)
 3. Progress/message come from Celery AsyncResult when available
 4. Defaults to progress=0, message=None when Celery is unavailable
 """
@@ -269,6 +270,79 @@ class TestGetActiveTasks:
         task = response.json()["tasks"][0]
         assert task["topic"] is None
         assert task["question_count"] is None
+
+
+class TestRecentlyCompletedTasks:
+    """TF-608: kürzlich abgeschlossene Jobs bleiben wiederherstellbar.
+
+    Wird die Seite gewechselt oder neu geladen, während ein Task fertig wird,
+    stirbt der WebSocket — ohne diese Jobs im Recovery-Payload wäre das Ergebnis
+    aus der UI verschwunden (die Fragen liegen zwar in der Prüf-Queue, aber ohne
+    Rückweg in die Generierungsansicht).
+    """
+
+    def _setup_db_query(self, mock_db, jobs: list):
+        query_mock = MagicMock()
+        filter_mock = MagicMock()
+        filter_mock.all.return_value = jobs
+        filter_mock.filter.return_value.all.return_value = jobs
+        query_mock.filter.return_value = filter_mock
+        mock_db.query.return_value = query_mock
+
+    def test_completed_job_is_returned_with_full_progress(self, auth_client, mock_db):
+        """Ein Job mit DB-Status SUCCESS erscheint mit progress=100."""
+        job = _make_job("task-done", status="SUCCESS")
+        self._setup_db_query(mock_db, [job])
+
+        with patch("celery.result.AsyncResult") as mock_ar_cls:
+            response = auth_client.get("/api/v1/rag/active-tasks")
+
+        assert response.status_code == 200
+        task = response.json()["tasks"][0]
+        assert task["task_id"] == "task-done"
+        assert task["status"] == "SUCCESS"
+        assert task["progress"] == 100
+        # Der Status steht in der DB — Celery muss dafür nicht befragt werden.
+        mock_ar_cls.assert_not_called()
+
+    @pytest.mark.parametrize("status", ["FAILURE", "REVOKED"])
+    def test_failed_job_is_returned_without_progress(
+        self, auth_client, mock_db, status
+    ):
+        """FAILURE/REVOKED erscheinen ebenfalls, aber ohne Fortschrittsanspruch."""
+        job = _make_job(f"task-{status.lower()}", status=status)
+        self._setup_db_query(mock_db, [job])
+
+        with patch("celery.result.AsyncResult"):
+            response = auth_client.get("/api/v1/rag/active-tasks")
+
+        assert response.status_code == 200
+        task = response.json()["tasks"][0]
+        assert task["status"] == status
+        assert task["progress"] == 0
+
+    def test_active_and_completed_jobs_are_mixed(self, auth_client, mock_db):
+        """Laufende und abgeschlossene Jobs erscheinen nebeneinander."""
+        jobs = [
+            _make_job("task-running", status="PROGRESS"),
+            _make_job("task-finished", status="SUCCESS"),
+        ]
+        self._setup_db_query(mock_db, jobs)
+
+        with patch("celery.result.AsyncResult") as mock_ar_cls:
+            mock_result = Mock()
+            mock_result.state = "PROGRESS"
+            mock_result.info = {"current": 1, "total": 4, "message": "läuft"}
+            mock_ar_cls.return_value = mock_result
+
+            response = auth_client.get("/api/v1/rag/active-tasks")
+
+        assert response.status_code == 200
+        tasks = {t["task_id"]: t for t in response.json()["tasks"]}
+        assert tasks["task-running"]["progress"] == 25
+        assert tasks["task-finished"]["progress"] == 100
+        # Nur der laufende Job löst eine Celery-Abfrage aus.
+        assert mock_ar_cls.call_count == 1
 
 
 class TestActiveTasksSuperuser:

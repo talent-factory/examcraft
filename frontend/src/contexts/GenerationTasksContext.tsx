@@ -8,6 +8,10 @@ import React, {
 } from 'react';
 import { useAuth } from './AuthContext';
 import i18n from '../i18n';
+import {
+  readSessionSnapshot,
+  writeSessionSnapshot,
+} from '../utils/sessionSnapshot';
 import type {
   GenerationTaskState,
   GenerationTasksContextType,
@@ -21,9 +25,44 @@ const WS_RECONNECT_MAX_RETRIES = 3;
 const WS_RECONNECT_BASE_DELAY_MS = 1000;
 const TERMINAL_STATUSES = new Set(['SUCCESS', 'FAILURE', 'REVOKED']);
 
+// TF-608: Weggeklickte Tasks überleben den Reload. Ohne das würden die
+// kürzlich abgeschlossenen Jobs, die `/active-tasks` seit TF-608 mitliefert,
+// bei jedem Seitenaufruf erneut auftauchen — genau der Hinweis, den der
+// Nutzer eben geschlossen hat.
+const DISMISSED_TASKS_KEY = 'dismissedGenerationTasks';
+const DISMISSED_TASKS_VERSION = 1;
+// Deckelt den Snapshot; abgeschlossene Jobs sind ohnehin nur 30 Minuten lang
+// wiederherstellbar (COMPLETED_TASK_MAX_AGE im Backend).
+const DISMISSED_TASKS_MAX = 50;
+
+const readDismissedTaskIds = (): string[] => {
+  const stored = readSessionSnapshot<string[]>(DISMISSED_TASKS_KEY, DISMISSED_TASKS_VERSION);
+  // `readSessionSnapshot` only version-gates the envelope, not the payload
+  // shape — an entry from an incompatible previous build could pass
+  // `Array.isArray` while containing non-string elements. Filter defensively
+  // so a corrupted entry just fails to un-dismiss a task, instead of silently
+  // producing a `string[]` that isn't one.
+  return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : [];
+};
+
+const rememberDismissedTaskId = (taskId: string): void => {
+  const next = [taskId, ...readDismissedTaskIds().filter((id) => id !== taskId)].slice(
+    0,
+    DISMISSED_TASKS_MAX
+  );
+  writeSessionSnapshot(DISMISSED_TASKS_KEY, DISMISSED_TASKS_VERSION, next);
+};
+
 export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, accessToken } = useAuth();
   const [tasks, setTasks] = useState<Record<string, GenerationTaskState>>({});
+  // TF-608: lets the recovery effect below read the *current* task state
+  // (in particular an already-fetched `result`) without depending on `tasks`
+  // itself — depending on it would re-run the recovery effect on every
+  // state update it causes, i.e. an infinite loop. Kept in sync by the
+  // effect right after this declaration, which always runs before the
+  // recovery effect (source order = commit order for same-phase effects).
+  const tasksRef = useRef<Record<string, GenerationTaskState>>({});
   const progressRef = useRef<Record<string, Partial<GenerationTaskState>>>({});
   // Synchronous record of which task_ids have reached a terminal state. Updated
   // INSIDE `setTasks` updaters (sync) before the React commit phase, so the
@@ -36,6 +75,15 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
   const terminalTaskIdsRef = useRef<Set<string>>(new Set());
   const wsRef = useRef<Record<string, WebSocket>>({});
   const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Keep `tasksRef` mirroring `tasks` after every commit. Unlike
+  // `terminalTaskIdsRef` above, this doesn't need same-turn sync (no
+  // WebSocket-callback race to beat) — an ordinary post-commit effect is
+  // enough, and it must run before the recovery effect further below, which
+  // source order guarantees for same-phase effects.
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   // Flush progress from ref to state periodically
   useEffect(() => {
@@ -157,7 +205,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
     };
   }, []);
 
-  // Recovery: fetch active tasks on mount when authenticated
+  // Recovery: fetch recoverable tasks on mount when authenticated
   useEffect(() => {
     if (!isAuthenticated || !accessToken) return;
 
@@ -168,9 +216,25 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
         if (!RAGService) return;
 
         const response = await RAGService.getActiveTasks();
+        const dismissed = new Set(readDismissedTaskIds());
 
         const recovered: Record<string, GenerationTaskState> = {};
+        // TF-608: Tasks, die während eines Seitenwechsels fertig wurden, kommen
+        // seit TF-608 als terminale Einträge mit. Für sie gibt es keinen
+        // WebSocket mehr (der Task ist durch) — ihr Ergebnis wird per HTTP
+        // nachgeladen, damit die Ergebnisansicht wieder erreichbar ist.
+        const terminalTaskIds: string[] = [];
         for (const task of response.tasks) {
+          if (dismissed.has(task.task_id)) continue;
+
+          // TF-608 Fix: dieser Effekt läuft nicht nur beim Mount, sondern bei
+          // jedem `accessToken`-Wechsel erneut (stiller Token-Refresh, siehe
+          // Dependency-Array unten) — mitten in der Session, nicht nur nach
+          // einem Reload. Ohne `tasksRef` würde ein bereits über WebSocket
+          // oder einen vorherigen Recovery-Durchlauf geladenes `result` hier
+          // mit `null` überschrieben und wäre bis zum (evtl. fehlschlagenden)
+          // Refetch weiter unten unerreichbar.
+          const existingResult = tasksRef.current[task.task_id]?.result ?? null;
           recovered[task.task_id] = {
             taskId: task.task_id,
             status: task.status as GenerationTaskState['status'],
@@ -179,14 +243,57 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
             topic: task.topic,
             questionCount: task.question_count,
             createdAt: task.created_at,
-            result: null,
+            result: existingResult,
           };
-          connectWebSocket(task.task_id, accessToken);
+
+          if (TERMINAL_STATUSES.has(task.status)) {
+            // Sticky-Terminal-Guard vorziehen: ein später eintreffender
+            // PROGRESS-Rest aus einer alten Verbindung darf einen fertigen
+            // Task nicht zurückstufen.
+            terminalTaskIdsRef.current.add(task.task_id);
+            // Nur nachladen, wenn wir das Ergebnis nicht schon haben — spart
+            // einen unnötigen Roundtrip und verhindert, dass ein
+            // fehlschlagender Refetch (Celery-Result inzwischen abgelaufen)
+            // ein bereits sichtbares Ergebnis unerreichbar macht.
+            if (!existingResult) {
+              terminalTaskIds.push(task.task_id);
+            }
+          } else {
+            connectWebSocket(task.task_id, accessToken);
+          }
         }
 
         if (Object.keys(recovered).length > 0) {
           setTasks((prev) => ({ ...prev, ...recovered }));
         }
+
+        // Ergebnisse einzeln nachladen. Fehler pro Task schlucken: ein
+        // abgelaufener Celery-Result-Eintrag darf die übrigen nicht mitreissen —
+        // der Task bleibt dann eben ohne Detailansicht sichtbar.
+        await Promise.all(
+          terminalTaskIds.map(async (taskId) => {
+            try {
+              const detail = await RAGService.getTaskResult(taskId);
+              setTasks((prev) =>
+                prev[taskId]
+                  ? {
+                      ...prev,
+                      [taskId]: {
+                        ...prev[taskId],
+                        result: detail.result ?? null,
+                        message: detail.error ?? prev[taskId].message,
+                      },
+                    }
+                  : prev
+              );
+            } catch (err) {
+              console.warn(
+                `[GenerationTasks] Failed to recover result for task ${taskId}:`,
+                err
+              );
+            }
+          })
+        );
       } catch (err) {
         console.error('[GenerationTasks] Failed to recover active tasks:', err);
       }
@@ -266,6 +373,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
   }, [accessToken, connectWebSocket]);
 
   const dismissTask = useCallback((taskId: string) => {
+    rememberDismissedTaskId(taskId);
     setTasks((prev) => {
       const next = { ...prev };
       delete next[taskId];

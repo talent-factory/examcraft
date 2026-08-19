@@ -17,13 +17,18 @@ from database import get_db
 import services.rag_service as rag_service_module
 from services.rag_service import RAGExamRequest
 from services.document_service import document_service
+from services.rag_errors import GENERIC_TASK_ERROR, user_facing_task_error
 from models.auth import User
 from models.competency import CompetencyFramework
 from models.document import Document, DocumentStatus
 from models.question_generation_job import QuestionGenerationJob
 from tasks.question_tasks import generate_questions_task
 from schemas.task import GenerateExamTaskResponse
-from schemas.active_tasks import ActiveTaskInfo, ActiveTasksResponse
+from schemas.active_tasks import (
+    ActiveTaskInfo,
+    ActiveTasksResponse,
+    TaskResultResponse,
+)
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import (
     get_current_active_user,
@@ -859,6 +864,12 @@ async def rag_service_health():
 
 TERMINAL_STATUSES = {"SUCCESS", "FAILURE", "REVOKED"}
 ACTIVE_TASK_MAX_AGE = timedelta(hours=2)
+# TF-608: Fenster für bereits abgeschlossene Jobs. Ein Task, der während eines
+# Seitenwechsels/Reloads fertig geworden ist, war weder in `active-tasks` noch
+# über den (mit der Seite gestorbenen) WebSocket erreichbar — sein Ergebnis war
+# aus der UI verschwunden. Deutlich kürzer als ACTIVE_TASK_MAX_AGE, damit nicht
+# bei jedem Seitenaufruf stundenalte Generierungen wieder aufpoppen.
+COMPLETED_TASK_MAX_AGE = timedelta(minutes=30)
 
 
 @router.get("/active-tasks", response_model=ActiveTasksResponse)
@@ -867,7 +878,12 @@ async def get_active_tasks(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Return all active (non-terminal) generation tasks.
+    """Return all recoverable generation tasks.
+
+    That is: active (non-terminal) jobs from the last ``ACTIVE_TASK_MAX_AGE``,
+    plus jobs that already reached a terminal state within the last
+    ``COMPLETED_TASK_MAX_AGE`` (TF-608). The latter carry no result payload —
+    the frontend pulls it from ``GET /tasks/{task_id}/result``.
 
     Normal users see only their own jobs. Superusers see jobs of all users;
     the broadening is audit-logged via AuditService.log_superuser_bypass
@@ -879,22 +895,29 @@ async def get_active_tasks(
     DB row is synced idempotently via ``_try_update_job_status`` (single attempt
     only — the watchdog from TF-329 reconciles persistent failures, so the HTTP
     handler never blocks on the multi-attempt retry loop in ``_update_job_status``).
+    The synced job reappears as a completed task on the next call.
     """
     from celery.result import AsyncResult
+    from sqlalchemy import and_, or_
 
     from tasks.question_tasks import _try_update_job_status
 
-    # created_at is timezone-aware (UTC) — use aware cutoff
-    cutoff = datetime.now(timezone.utc) - ACTIVE_TASK_MAX_AGE
+    # created_at is timezone-aware (UTC) — use aware cutoffs
+    now = datetime.now(timezone.utc)
+    cutoff = now - ACTIVE_TASK_MAX_AGE
+    completed_cutoff = now - COMPLETED_TASK_MAX_AGE
+    recoverable = or_(
+        and_(
+            QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
+            QuestionGenerationJob.created_at > cutoff,
+        ),
+        and_(
+            QuestionGenerationJob.status.in_(TERMINAL_STATUSES),
+            QuestionGenerationJob.created_at > completed_cutoff,
+        ),
+    )
     if current_user.is_superuser:
-        jobs = (
-            db.query(QuestionGenerationJob)
-            .filter(
-                QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
-                QuestionGenerationJob.created_at > cutoff,
-            )
-            .all()
-        )
+        jobs = db.query(QuestionGenerationJob).filter(recoverable).all()
         # Audit only when the bypass actually surfaced a foreign-owned job.
         # The frontend GenerationTasksContext polls this endpoint on a multi-
         # second interval; emitting an audit row every poll cycle (most of
@@ -920,14 +943,29 @@ async def get_active_tasks(
             db.query(QuestionGenerationJob)
             .filter(
                 QuestionGenerationJob.user_id == current_user.id,
-                QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
-                QuestionGenerationJob.created_at > cutoff,
+                recoverable,
             )
             .all()
         )
 
     tasks = []
     for job in jobs:
+        # TF-608: bereits abgeschlossene Jobs brauchen keine Celery-Abfrage —
+        # ihr Status steht in der DB, das Ergebnis holt das Frontend separat.
+        if job.status in TERMINAL_STATUSES:
+            tasks.append(
+                ActiveTaskInfo(
+                    task_id=job.task_id,
+                    status=job.status,
+                    progress=100 if job.status == "SUCCESS" else 0,
+                    message=None,
+                    created_at=job.created_at,
+                    topic=job.topic,
+                    question_count=job.question_count,
+                )
+            )
+            continue
+
         progress = 0
         message = None
         celery_state: Optional[str] = None
@@ -987,3 +1025,88 @@ async def get_active_tasks(
         )
 
     return ActiveTasksResponse(tasks=tasks)
+
+
+@router.get("/tasks/{task_id}/result", response_model=TaskResultResponse)
+async def get_task_result(
+    task_id: str,
+    http_request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Ergebnis eines abgeschlossenen Generierungs-Tasks nachladen (TF-608).
+
+    Der WebSocket liefert das Ergebnis nur an eine lebende Verbindung. Wird die
+    Seite gewechselt oder neu geladen, während der Task fertig wird, gibt es
+    ohne diesen Pull-Weg keinen Rückweg zur Ergebnisansicht. Ownership-Check mit
+    Superuser-Bypass + Audit-Log analog `retry-generation`.
+
+    Der Status kommt aus Celery, solange dort ein terminaler State steht; sonst
+    aus der DB. Das verhindert, dass ein abgelaufener Result-Eintrag
+    (``result_expires``) einen fertigen Job in der UI wieder auf PENDING
+    zurückstuft.
+    """
+    locale = get_request_locale(http_request, current_user)
+    job = (
+        db.query(QuestionGenerationJob)
+        .filter(QuestionGenerationJob.task_id == task_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(
+            status_code=404, detail=t("rag_task_not_found", locale=locale)
+        )
+
+    from utils.auth_utils import enforce_resource_access
+
+    enforce_resource_access(
+        obj=job,
+        user=current_user,
+        action="read_result",
+        db=db,
+        resource_type="question_generation_job",
+        request=http_request,
+    )
+
+    from celery.result import AsyncResult
+
+    celery_state: Optional[str] = None
+    payload: Any = None
+    error: Optional[str] = None
+    try:
+        async_result = AsyncResult(job.task_id)
+        celery_state = async_result.state
+        if celery_state == "SUCCESS":
+            payload = async_result.result
+        elif celery_state in ("FAILURE", "REVOKED"):
+            raw_info = async_result.result
+            error = user_facing_task_error(raw_info)
+            # Echten Fehler server-seitig vollständig loggen (mit Traceback,
+            # falls vorhanden); dem User nur die sichere, handlungsleitende
+            # Meldung senden — keine rohen Interna/PII (TF-358). Selber Mapper
+            # + Logging-Pattern wie im WebSocket-Pfad (api/v1/websocket.py),
+            # damit ein Task unabhängig vom Recovery-Weg dieselbe Meldung zeigt
+            # und Fehler auch auf diesem Pfad alertbar bleiben.
+            unmapped = error == GENERIC_TASK_ERROR
+            logger.error(
+                "Task %s failed (%s): %r",
+                job.task_id,
+                "unmapped error class" if unmapped else "mapped error",
+                raw_info,
+                exc_info=raw_info if isinstance(raw_info, BaseException) else None,
+            )
+    except Exception as celery_err:
+        # Broker/Result-Backend nicht erreichbar: der DB-Status bleibt die
+        # Wahrheit, das Ergebnis fehlt eben. Kein 5xx — die Bar soll den Task
+        # weiterhin anzeigen können.
+        logger.warning(
+            "Failed to fetch Celery result for task %s: %s", job.task_id, celery_err
+        )
+
+    status = celery_state if celery_state in TERMINAL_STATUSES else job.status
+    return TaskResultResponse(
+        task_id=job.task_id,
+        status=status,
+        result=payload,
+        error=error,
+    )

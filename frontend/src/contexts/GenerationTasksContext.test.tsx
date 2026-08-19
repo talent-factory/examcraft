@@ -13,10 +13,18 @@ jest.mock('../i18n', () => ({
   default: { t: (key: string) => key },
 }));
 
-// Mock the dynamic loader so startGeneration / retryTask never reach the network
+// Mock the dynamic loader so startGeneration / retryTask never reach the network.
+// The recovery-facing methods are jest.fn()s so individual tests can re-programme
+// them (see the TF-608 block below).
+const mockGetActiveTasks = jest.fn(() => Promise.resolve({ tasks: [] as any[] }));
+const mockGetTaskResult = jest.fn((_taskId: string) =>
+  Promise.resolve({ task_id: _taskId, status: 'SUCCESS', result: null, error: null }),
+);
+
 jest.mock('../utils/componentLoader', () => ({
   loadRAGService: () => Promise.resolve({
-    getActiveTasks: () => Promise.resolve({ tasks: [] }),
+    getActiveTasks: () => mockGetActiveTasks(),
+    getTaskResult: (taskId: string) => mockGetTaskResult(taskId),
     triggerGeneration: () => Promise.resolve({ task_id: 'task-1' }),
     retryGeneration: () => Promise.resolve({ task_id: 'task-2' }),
   }),
@@ -62,6 +70,13 @@ class MockWebSocket {
 beforeEach(() => {
   MockWebSocket.instances = [];
   (global as any).WebSocket = MockWebSocket;
+  window.sessionStorage.clear();
+  mockGetActiveTasks.mockReset();
+  mockGetActiveTasks.mockResolvedValue({ tasks: [] });
+  mockGetTaskResult.mockReset();
+  mockGetTaskResult.mockImplementation((taskId: string) =>
+    Promise.resolve({ task_id: taskId, status: 'SUCCESS', result: null, error: null }),
+  );
 });
 
 // Helper component exposes context to tests
@@ -177,5 +192,113 @@ describe('GenerationTasksProvider — sticky terminal state (TF-328)', () => {
       () => expect(MockWebSocket.instances.length).toBe(2),
       { timeout: 3000 },
     );
+  });
+});
+
+describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () => {
+  const EXAM_RESULT = { exam_id: 'exam-9', questions: [{ question_text: 'Q?' }] };
+
+  const completedTask = (taskId: string, status = 'SUCCESS') => ({
+    task_id: taskId,
+    status,
+    progress: status === 'SUCCESS' ? 100 : 0,
+    message: null,
+    created_at: new Date().toISOString(),
+    topic: 'Heapsort',
+    question_count: 5,
+  });
+
+  it('pulls the result for a task that finished while the page was away', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-done')] });
+    mockGetTaskResult.mockResolvedValue({
+      task_id: 'task-done',
+      status: 'SUCCESS',
+      result: EXAM_RESULT,
+      error: null,
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(captured!.getTask('task-done')?.result).toEqual(EXAM_RESULT));
+    expect(captured!.completedTasks).toHaveLength(1);
+    expect(mockGetTaskResult).toHaveBeenCalledWith('task-done');
+  });
+
+  it('opens no WebSocket for an already-terminal task', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-done')] });
+
+    renderProvider();
+
+    await waitFor(() => expect(captured!.getTask('task-done')).toBeDefined());
+    // Der Task ist durch — eine Verbindung dafür wäre nur Ballast, und ein
+    // abgelaufener Redis-Eintrag könnte ihn über PENDING sogar zurückstufen.
+    expect(MockWebSocket.instances).toHaveLength(0);
+  });
+
+  it('still connects a WebSocket for a task that is still running', async () => {
+    mockGetActiveTasks.mockResolvedValue({
+      tasks: [{ ...completedTask('task-running'), status: 'PROGRESS', progress: 40 }],
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    expect(mockGetTaskResult).not.toHaveBeenCalled();
+  });
+
+  it('keeps a task visible when its result can no longer be fetched', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-expired')] });
+    mockGetTaskResult.mockRejectedValue(new Error('HTTP 404'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    renderProvider();
+
+    await waitFor(() => expect(captured!.getTask('task-expired')?.status).toBe('SUCCESS'));
+    expect(captured!.getTask('task-expired')?.result).toBeNull();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('surfaces the error message of a recovered FAILURE task', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-failed', 'FAILURE')] });
+    mockGetTaskResult.mockResolvedValue({
+      task_id: 'task-failed',
+      status: 'FAILURE',
+      result: null,
+      error: 'Claude timeout',
+    });
+
+    renderProvider();
+
+    await waitFor(() =>
+      expect(captured!.getTask('task-failed')?.message).toBe('Claude timeout'),
+    );
+  });
+
+  it('does not resurrect a task the user dismissed before the reload', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-done')] });
+    mockGetTaskResult.mockResolvedValue({
+      task_id: 'task-done',
+      status: 'SUCCESS',
+      result: EXAM_RESULT,
+      error: null,
+    });
+
+    const first = renderProvider();
+    await waitFor(() => expect(captured!.getTask('task-done')?.result).toEqual(EXAM_RESULT));
+
+    act(() => {
+      captured!.dismissTask('task-done');
+    });
+    expect(captured!.getTask('task-done')).toBeUndefined();
+
+    // Reload simulieren: neuer Provider, gleicher sessionStorage.
+    first.unmount();
+    mockGetTaskResult.mockClear();
+    renderProvider();
+
+    await waitFor(() => expect(mockGetActiveTasks).toHaveBeenCalledTimes(2));
+    expect(captured!.getTask('task-done')).toBeUndefined();
+    expect(mockGetTaskResult).not.toHaveBeenCalled();
   });
 });

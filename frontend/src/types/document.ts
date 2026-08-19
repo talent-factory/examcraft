@@ -294,7 +294,14 @@ export interface GenerationTaskState {
   result: RAGExamResponse | null;
 }
 
-/** Response from GET /api/v1/rag/active-tasks */
+/**
+ * Response from GET /api/v1/rag/active-tasks.
+ *
+ * Enthält seit TF-608 nicht nur laufende, sondern auch kürzlich abgeschlossene
+ * Tasks (terminaler `status`), damit eine während eines Seitenwechsels fertig
+ * gewordene Generierung erreichbar bleibt. Das Ergebnis reist nicht mit — es
+ * wird per `GET /api/v1/rag/tasks/{task_id}/result` nachgeladen.
+ */
 export interface ActiveTaskInfo {
   task_id: string;
   status: string;
@@ -307,6 +314,19 @@ export interface ActiveTaskInfo {
 
 export interface ActiveTasksResponse {
   tasks: ActiveTaskInfo[];
+}
+
+/**
+ * Response from GET /api/v1/rag/tasks/{task_id}/result (TF-608).
+ *
+ * `result` ist `null`, wenn das Celery-Result-Backend den Eintrag bereits
+ * verworfen hat — der Task bleibt dann sichtbar, nur ohne Detailansicht.
+ */
+export interface TaskResultResponse {
+  task_id: string;
+  status: string;
+  result: RAGExamResponse | null;
+  error: string | null;
 }
 
 /** Context value exposed by GenerationTasksContext */

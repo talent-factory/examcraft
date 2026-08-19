@@ -28,6 +28,7 @@ import {
   REFRESH_LEAD_MS,
   ACCESS_TOKEN_KEY,
 } from '../api/tokenRefreshLock';
+import { clearAllSessionSnapshots } from '../utils/sessionSnapshot';
 
 // ============================================================================
 // Context Creation
@@ -116,6 +117,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // stuck at true while every subsequent request silently fails.
       console.error('[AuthContext] Failed to clear stored session:', error);
     } finally {
+      // TF-608: sessionStorage überlebt einen Benutzerwechsel im selben Tab;
+      // Rationale (geteilter Rechner) in sessionSnapshot.ts. Zentral hier statt
+      // an jedem Call-Site: deckt explizites Logout, fehlgeschlagenen Refresh
+      // UND das cross-tab Logout-Following (TF-607, storage-Listener weiter
+      // unten) gleichermassen ab — nie vergessbar, wenn ein weiterer Trigger
+      // für "Sitzung lokal beendet" hinzukommt.
+      clearAllSessionSnapshots();
       setState({
         user: null,
         accessToken: null,
@@ -299,6 +307,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 localStorage.removeItem(ACCESS_TOKEN_KEY);
                 localStorage.removeItem(REFRESH_TOKEN_KEY);
                 localStorage.removeItem(USER_KEY);
+                // TF-608: wie beim expliziten Logout (siehe clearLocalSession).
+                // Eine abgelaufene Sitzung im offenen Tab ist genau der Fall,
+                // in dem jemand weggegangen ist und sich jemand anderes
+                // hinsetzt. Bewusst innerhalb des obigen Guards: gehört das
+                // Token-Paar noch einem anderen, weiterhin eingeloggten Tab,
+                // ist dessen Sitzung nicht zu Ende — dessen Snapshots sollen
+                // dann auch nicht verschwinden.
+                clearAllSessionSnapshots();
               }
 
               setState({

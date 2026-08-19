@@ -26,8 +26,13 @@ os.environ["CLAUDE_SKIP_MODEL_VALIDATION"] = "true"
 # graph past the previous 3000 cap, so the full-suite build now needs more
 # headroom. There is no reference cycle (FrameworkOut → List[CompetencyOut] is
 # one-directional); the depth is bounded, so a larger fixed cap is sufficient.
-if sys.getrecursionlimit() < 5000:
-    sys.setrecursionlimit(5000)
+# TF-608: the TF-638..651 resource-visibility epic (org units, exam/question/
+# competency/prompt visibility routers + schemas) grew the graph past 5000 —
+# a fresh `TestClient(app)` entry in tests/test_task_result.py (new in this
+# PR, alphabetically early enough to be first to trip it) hit RecursionError
+# in CI. Same cause as before, same fix: more headroom, no code change.
+if sys.getrecursionlimit() < 8000:
+    sys.setrecursionlimit(8000)
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
