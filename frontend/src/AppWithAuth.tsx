@@ -41,7 +41,7 @@ import QuestionReviewDetail from './components/QuestionReviewDetail';
 import GenerationTasksBar from './components/GenerationTasksBar';
 import TagSettingsPage from './pages/TagSettingsPage';
 import CompetencyFrameworkSettingsPage from './pages/CompetencyFrameworkSettingsPage';
-import HelpWidget from './components/help/HelpWidget';
+import HelpWidgetGate from './components/help/HelpWidgetGate';
 import { loadPromptLibraryWithUpload, loadDocumentChat } from './utils/componentLoader';
 
 // Load Premium PromptLibrary with Upload (falls back to Core version)
@@ -69,7 +69,7 @@ export const AppWithAuth: React.FC = () => {
           <GenerationTasksProvider>
           <BrowserRouter>
             <GenerationTasksBar />
-            <HelpWidget />
+            <HelpWidgetGate />
             <Routes>
               {/* Public Routes - Only accessible when NOT authenticated */}
               <Route

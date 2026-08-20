@@ -178,3 +178,71 @@ test.describe('Password Reset', () => {
     await expect(forgotButton).toBeVisible({ timeout: 10000 });
   });
 });
+
+// TF-657: Das Hilfe-Widget hängt ausserhalb von <Routes> und war deshalb auch
+// unangemeldet sichtbar. HelpWidgetGate gated am Auth-Status.
+//
+// Selektiert wird über data-testid, NICHT über aria-label: das Label kommt aus
+// i18n und ist sprachabhängig ("Hilfe" auf de, "Help" auf en). Playwright-
+// Chromium läuft mit en-US, eine Negativ-Assertion auf [aria-label="Hilfe"]
+// wäre hier also immer grün — auch gegen den ungefixten Code. Genau das ist
+// beim ersten Lauf passiert.
+test.describe('Help Widget — Public Routes', () => {
+
+  const HELP_FAB = '[data-testid="help-fab"]';
+
+  const PUBLIC_ROUTES = [
+    '/login',
+    '/register',
+    '/auth/callback',
+    '/auth/reset-password',
+    '/auth/reset-password/confirm',
+    '/verify-email',
+    '/registration-success',
+  ];
+
+  test.beforeEach(async () => {
+    clearAuthState();
+  });
+
+  for (const route of PUBLIC_ROUTES) {
+    test(`should not render the help FAB on ${route}`, async ({ page }) => {
+      await page.goto(route);
+      await page.waitForLoadState('networkidle');
+
+      await expect(page.locator(HELP_FAB)).toHaveCount(0);
+    });
+  }
+
+  test('should not fire help API requests on the login page', async ({ page }) => {
+    const helpRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/api/v1/help/')) {
+        helpRequests.push(request.url());
+      }
+    });
+
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+
+    expect(helpRequests).toEqual([]);
+  });
+
+  test('should not open the help panel via Ctrl+/ on the login page', async ({ page }) => {
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+
+    await page.keyboard.press('Control+/');
+    await page.keyboard.press('Meta+/');
+
+    await expect(page.locator(HELP_FAB)).toHaveCount(0);
+    await expect(page.locator('[aria-label="close"]')).toHaveCount(0);
+  });
+
+  test('should render the help FAB again after login', async ({ page }) => {
+    await loginUser(page, E2E_TEST_USER.email, E2E_TEST_USER.password);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator(HELP_FAB)).toBeVisible({ timeout: 15000 });
+  });
+});

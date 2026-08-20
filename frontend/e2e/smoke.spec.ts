@@ -35,6 +35,28 @@ test.describe('Smoke Tests - Frontend', () => {
     await expect(page.locator('input[type="password"], input[name="password"]')).toBeVisible();
   });
 
+  // TF-657: Das Hilfe-Widget hängt in AppWithAuth ausserhalb von <Routes> und
+  // war deshalb auch ausgeloggt sichtbar. HelpWidgetGate gated am Auth-Status.
+  //
+  // Der Test steht hier und nicht nur in auth.spec.ts, weil CI ausschliesslich
+  // smoke.spec.ts fährt (ci.yml). Er ist die einzige CI-Absicherung dafür, dass
+  // das Gate in AppWithAuth verdrahtet ist und der echte AuthContext für einen
+  // ausgeloggten Besucher greift — die Unit-Tests rendern AppWithAuth nicht und
+  // mocken useAuth weg.
+  //
+  // Selektiert wird über data-testid: das aria-label des FAB kommt aus i18n und
+  // ist sprachabhängig ("Hilfe"/"Help"), ein Selektor darauf wäre hier immer
+  // grün. Braucht keinen Login und keine E2E-Testdaten.
+  test('should not render the help FAB when logged out', async ({ page }) => {
+    await page.goto('/login');
+
+    // Positiver Anker zuerst: beweist, dass die App überhaupt gerendert hat.
+    // Ohne ihn wäre die Assertion darunter auch bei totem Frontend grün.
+    await expect(page.locator('#email')).toBeVisible({ timeout: 10000 });
+
+    await expect(page.locator('[data-testid="help-fab"]')).toHaveCount(0);
+  });
+
   test('should display register page', async ({ page }) => {
     await page.goto('/register');
 

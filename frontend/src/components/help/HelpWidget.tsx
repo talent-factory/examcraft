@@ -194,6 +194,11 @@ const HelpWidget: React.FC = () => {
         <IconButton
           onClick={toggle}
           aria-label={t('help.title', 'Hilfe')}
+          // TF-657: sprachunabhängiger Hook für E2E. Das aria-label kommt aus
+          // i18n ("Hilfe"/"Help"/…) und taugt nicht als Testselektor — eine
+          // Negativ-Assertion darauf wäre in einem englischen Browser immer
+          // grün, egal ob das Widget gegated ist.
+          data-testid="help-fab"
           sx={{
             width: 56,
             height: 56,
