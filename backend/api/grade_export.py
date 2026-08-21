@@ -14,7 +14,6 @@ Multi-Tenancy via Exam-Institution-Check; RBAC: ``submissions:read``.
 
 import logging
 from typing import Literal
-from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
@@ -36,6 +35,7 @@ from services.grading_scheme_resolver import (
 )
 from services.translation_service import get_request_locale, t
 from utils.auth_utils import require_permission
+from utils.download_filename import content_disposition, filename_stem
 
 logger = logging.getLogger(__name__)
 
@@ -49,27 +49,9 @@ GradeExportFormat = Literal["csv", "moodle_csv", "pdf"]
 _FormatLiteral = GradeExportFormat
 
 
-def _content_disposition(filename_ascii: str, filename_full: str) -> str:
-    """RFC 6266 Content-Disposition with both ASCII fallback and UTF-8.
-
-    Older browsers (and some download tools) don't parse ``filename*``;
-    they use ``filename`` verbatim. Modern browsers prefer the
-    percent-encoded ``filename*`` form, so titles with German umlauts
-    survive round-trip without mojibake.
-    """
-    return (
-        f'attachment; filename="{filename_ascii}"; '
-        f"filename*=UTF-8''{quote(filename_full)}"
-    )
-
-
-def _safe_titles(title: str, prefix: str, ext: str) -> tuple[str, str]:
-    """Return (ascii-fallback, full) filename pair for Content-Disposition."""
-    full = "".join(c if c.isalnum() else "_" for c in title)[:60] or "exam"
-    ascii_only = (
-        "".join(c if c.isascii() and c.isalnum() else "_" for c in title)[:60] or "exam"
-    )
-    return f"{prefix}-{ascii_only}.{ext}", f"{prefix}-{full}.{ext}"
+def _download_filename(title: str, prefix: str, ext: str) -> str:
+    """Build the download name for a grade export: ``<prefix>-<Titel>.<ext>``."""
+    return f"{prefix}-{filename_stem(title)}.{ext}"
 
 
 # ---------------------------------------------------------------------------
@@ -209,11 +191,9 @@ async def export_grades(
             detail=t("submissions_grade_export_internal_error", locale=locale),
         )
 
-    filename_ascii, filename_full = _safe_titles(exam.title, prefix, ext)
+    filename = _download_filename(exam.title, prefix, ext)
     return Response(
         content=body,
         media_type=media_type,
-        headers={
-            "Content-Disposition": _content_disposition(filename_ascii, filename_full)
-        },
+        headers={"Content-Disposition": content_disposition(filename)},
     )

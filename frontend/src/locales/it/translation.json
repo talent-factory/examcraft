@@ -1382,6 +1382,7 @@
       "title": "Esporta esame",
       "formatLabel": "Formato",
       "formatMd": "Markdown (.md)",
+      "formatPdf": "PDF (pronto per la stampa)",
       "formatJson": "JSON (.json)",
       "formatMoodle": "Moodle XML (.xml)",
       "includeSolutions": "Includi soluzioni",

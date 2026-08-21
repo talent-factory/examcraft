@@ -1824,6 +1824,7 @@
       "title": "Export Exam",
       "formatLabel": "Format",
       "formatMd": "Markdown (.md)",
+      "formatPdf": "PDF (print-ready)",
       "formatJson": "JSON (.json)",
       "formatMoodle": "Moodle XML (.xml)",
       "includeSolutions": "Include solutions",

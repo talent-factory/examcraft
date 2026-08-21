@@ -74,13 +74,28 @@ Click on **Export** and choose the desired format:
 | Format | Description |
 |--------|-------------|
 | Markdown (.md) | Text-based format, ideal for further editing or publishing. Optionally include answer solutions. |
+| PDF (print-ready) | Fully laid-out exam sheet ready for printing. Optionally include answer solutions. |
 | JSON (.json) | Machine-readable format for further processing, integration with external systems, or data analysis |
 | Moodle XML (.xml) | Directly importable format for the Moodle learning management system |
 
 !!! tip "Include Solutions"
-    When exporting in Markdown format, you can optionally include the solutions. Enable the **Include solutions** checkbox in the export dialog — useful for creating answer sheets or internal review.
+    When exporting in Markdown or PDF format, you can optionally include the solutions. Enable the **Include solutions** checkbox in the export dialog — useful for creating answer sheets or internal review.
 
 The Markdown format is suitable for further editing or integration into documentation systems. The JSON format is ideal for technical integration — for example, when importing exam data into a custom system or performing automated evaluations. The Moodle XML format enables direct import into Moodle without manual post-processing.
+
+### PDF Export for Paper-Based Exams
+
+The PDF format produces a print-ready exam sheet — no post-processing in a word processor required:
+
+- **Header** with title, course, date, time limit, allowed aids, total points and the pass mark (as a percentage and in points). Fields that are not set are omitted.
+- **Fill-in lines** for name and class directly below the header.
+- **Tick boxes** for single-choice, multiple-choice and true/false questions.
+- **Answer lines** for open questions — three lines per point, but never fewer than three.
+- **Footer** with the exam title and "Page X of Y" on every page.
+
+The sheet is rendered in the **exam's language**, not in your display language — it is the candidates who receive it. Only the labels are translated (course, question, points, sample solution …); question texts and answers stay exactly as they were written. The same applies to the filename: depending on the exam language the answer key is called `…_Lösungen.pdf`, `…_solutions.pdf`, `…_corrigé.pdf` or `…_soluzioni.pdf`.
+
+A question is kept together with its answer area as long as that area fits on one page: if the whole block no longer fits on the current page, it starts on the next one. Only an unusually large answer area — e.g. a high-point open-ended question — can itself run past a single page. With **Include solutions** enabled, each question is followed by a set-off box containing the sample solution and explanation — suitable as a marking guide.
 
 ## Manage Existing Exams
 

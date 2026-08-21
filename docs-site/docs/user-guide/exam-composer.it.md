@@ -74,13 +74,28 @@ Fate clic su **Esporta** e scegliete il formato desiderato:
 | Formato | Descrizione |
 |---------|-------------|
 | Markdown (.md) | Formato testuale, ideale per ulteriori modifiche o pubblicazione. Le soluzioni possono essere incluse facoltativamente. |
+| PDF (pronto per la stampa) | Foglio d'esame completamente impaginato, pronto per la stampa. Le soluzioni possono essere incluse facoltativamente. |
 | JSON (.json) | Formato leggibile da macchina per ulteriore elaborazione, integrazione con sistemi esterni o analisi dati |
 | Moodle XML (.xml) | Formato direttamente importabile nel sistema di gestione dell'apprendimento Moodle |
 
 !!! tip "Includere le soluzioni"
-    Nell'esportazione in formato Markdown, è possibile includere facoltativamente le soluzioni. Attivate la casella **Includi soluzioni** nella finestra di dialogo di esportazione — pratico per creare fogli di risposta o per la revisione interna.
+    Nell'esportazione in formato Markdown e in formato PDF, è possibile includere facoltativamente le soluzioni. Attivate la casella **Includi soluzioni** nella finestra di dialogo di esportazione — pratico per creare fogli di risposta o per la revisione interna.
 
 Il formato Markdown è adatto per ulteriori modifiche o l'integrazione in sistemi di documentazione. Il formato JSON è ideale per l'integrazione tecnica — ad esempio se desiderate importare dati d'esame in un sistema personalizzato o eseguire valutazioni automatizzate. Il formato Moodle XML consente l'importazione diretta in Moodle senza elaborazione manuale successiva.
+
+### Esportazione PDF per esami su carta
+
+Il formato PDF produce un foglio d'esame pronto per la stampa, senza rielaborazione in un programma di videoscrittura:
+
+- **Intestazione** con titolo, corso, data, limite di tempo, strumenti ausiliari ammessi, punteggio totale e soglia di superamento (in percentuale e in punti). I campi non compilati vengono omessi.
+- **Righe da compilare** per nome e classe, direttamente sotto l'intestazione.
+- **Caselle da barrare** per le domande a scelta singola, a scelta multipla e vero/falso.
+- **Righe di risposta** per le domande aperte — tre righe per punto, comunque mai meno di tre.
+- **Piè di pagina** con il titolo dell'esame e «Pagina X di Y» su ogni pagina.
+
+Il foglio viene generato nella **lingua dell'esame**, non nella vostra lingua di visualizzazione — sono i candidati a riceverlo. Vengono tradotte solo le diciture (corso, domanda, punti, soluzione …); i testi delle domande e le risposte restano come sono stati redatti. Lo stesso vale per il nome del file: a seconda della lingua dell'esame la griglia di correzione si chiama `…_Lösungen.pdf`, `…_solutions.pdf`, `…_corrigé.pdf` o `…_soluzioni.pdf`.
+
+Una domanda resta unita alla sua area di risposta finché quest'area entra in una pagina: se l'intero blocco non entra più nella pagina corrente, inizia su quella successiva. Solo un'area di risposta eccezionalmente ampia — ad esempio una domanda aperta con moltissimi punti — può a sua volta superare una pagina. Con **Includi soluzioni** attivo, ogni domanda è seguita da un riquadro con la soluzione tipo e la spiegazione — utile come griglia di correzione.
 
 ## Gestione esami esistenti
 

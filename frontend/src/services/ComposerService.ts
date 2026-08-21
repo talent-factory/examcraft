@@ -14,6 +14,46 @@ import type {
 import { apiClient } from '../api/apiClient';
 
 /**
+ * Read the filename a download should be saved under from Content-Disposition.
+ *
+ * The backend sends two parameters (RFC 6266): an ASCII-transliterated
+ * `filename` for old clients, and `filename*` carrying the real name
+ * UTF-8 percent-encoded. Preferring `filename*` is what keeps characters
+ * the ASCII fallback can't represent — an em dash is dropped there, and
+ * umlauts are transliterated to their base letter (`ü` → `u`) — intact.
+ *
+ * Path separators are stripped so a crafted header cannot suggest a name
+ * that escapes the download directory.
+ */
+export function parseContentDispositionFilename(
+  contentDisposition: string | undefined,
+  fallback: string
+): string {
+  const sanitize = (name: string): string =>
+    name.replace(/[/\\]/g, '_').trim();
+
+  if (contentDisposition) {
+    const encoded = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (encoded) {
+      try {
+        const decoded = sanitize(decodeURIComponent(encoded[1]));
+        if (decoded) return decoded;
+      } catch {
+        // Malformed percent-encoding — fall through to the plain filename.
+      }
+    }
+
+    const plain = contentDisposition.match(/filename="(.+)"/);
+    if (plain) {
+      const name = sanitize(plain[1]);
+      if (name) return name;
+    }
+  }
+
+  return fallback;
+}
+
+/**
  * Extracts a human-readable error message from an Axios error response.
  * Falls back to the provided fallback string if no detail is available.
  */
@@ -186,7 +226,10 @@ export class ComposerService {
       { params, responseType: 'blob' }
     );
     const contentDisposition = response.headers['content-disposition'];
-    const filename = contentDisposition?.match(/filename="(.+)"/)?.[1] || `exam_export.${format}`;
+    const filename = parseContentDispositionFilename(
+      contentDisposition,
+      `exam_export.${format}`
+    );
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;

@@ -23,7 +23,12 @@ interface ExportDialogProps {
   hasQuestions: boolean;
 }
 
-type ExportFormat = 'md' | 'json' | 'moodle';
+type ExportFormat = 'md' | 'json' | 'moodle' | 'pdf';
+
+// Formats that render the exam for humans and can therefore carry a
+// sample-solution variant. JSON and Moodle XML always ship the solution
+// data as part of their payload, so the toggle is meaningless there.
+const SOLUTION_CAPABLE_FORMATS: ExportFormat[] = ['md', 'pdf'];
 
 const ExportDialog: React.FC<ExportDialogProps> = ({
   open,
@@ -32,7 +37,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   examTitle,
   hasQuestions,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [format, setFormat] = useState<ExportFormat>('md');
   const [includeSolutions, setIncludeSolutions] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -40,9 +45,20 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
 
   const FORMAT_LABELS: Record<ExportFormat, string> = {
     md: t('composer.exportDialog.formatMd'),
+    pdf: t('composer.exportDialog.formatPdf'),
     json: t('composer.exportDialog.formatJson'),
     moodle: t('composer.exportDialog.formatMoodle'),
   };
+
+  const supportsSolutions = SOLUTION_CAPABLE_FORMATS.includes(format);
+
+  // Sorted by what the user actually reads, not by key order — an
+  // alphabetical list is quicker to scan than an editorial one. Sorting on
+  // the translated label (rather than a fixed order) keeps it alphabetical
+  // in every locale, using that locale's collation rules.
+  const orderedFormats = (Object.keys(FORMAT_LABELS) as ExportFormat[]).sort(
+    (a, b) => FORMAT_LABELS[a].localeCompare(FORMAT_LABELS[b], i18n.language)
+  );
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -51,7 +67,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
       await ComposerService.downloadExport(
         examId,
         format,
-        format === 'md' ? includeSolutions : false
+        supportsSolutions ? includeSolutions : false
       );
       onClose();
     } catch (err) {
@@ -104,7 +120,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
             value={format}
             onChange={(e) => setFormat(e.target.value as ExportFormat)}
           >
-            {(Object.keys(FORMAT_LABELS) as ExportFormat[]).map((f) => (
+            {orderedFormats.map((f) => (
               <FormControlLabel
                 key={f}
                 value={f}
@@ -115,7 +131,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
           </RadioGroup>
         </FormControl>
 
-        {format === 'md' && (
+        {supportsSolutions && (
           <div className="mt-3">
             <FormControlLabel
               control={

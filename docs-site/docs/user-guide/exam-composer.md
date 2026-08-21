@@ -73,13 +73,28 @@ Klicken Sie auf **Exportieren** und wählen Sie das gewünschte Format:
 | Format | Beschreibung |
 |--------|-------------|
 | Markdown (.md) | Textbasiertes Format, ideal für die weitere Bearbeitung oder Veröffentlichung. Optional können die Lösungen eingeschlossen werden. |
+| PDF (druckfertig) | Fertig gesetzter Prüfungsbogen zum Ausdrucken. Optional können die Lösungen eingeschlossen werden. |
 | JSON (.json) | Maschinenlesbares Format für die weitere Verarbeitung, Integration mit externen Systemen oder Datenanalyse |
 | Moodle XML (.xml) | Direkt importierbares Format für das Lernmanagementsystem Moodle |
 
 !!! tip "Lösungen einschliessen"
-    Beim Export im Markdown-Format können Sie optional die Lösungen einschliessen. Aktivieren Sie dazu die Checkbox **Lösungen einschliessen** im Export-Dialog — praktisch für die Erstellung von Lösungsblättern oder zur internen Überprüfung.
+    Beim Export im Markdown- und im PDF-Format können Sie optional die Lösungen einschliessen. Aktivieren Sie dazu die Checkbox **Lösungen einschliessen** im Export-Dialog — praktisch für die Erstellung von Lösungsblättern oder zur internen Überprüfung.
 
 Das Markdown-Format eignet sich für die weitere Bearbeitung oder Integration in Dokumentationssysteme. Das JSON-Format ist ideal für technische Integration — etwa wenn Sie Prüfungsdaten in ein eigenes System importieren oder automatisierte Auswertungen durchführen möchten. Das Moodle-XML-Format ermöglicht den direkten Import in Moodle, ohne manuelle Nachbearbeitung.
+
+### PDF-Export für die Durchführung auf Papier
+
+Das PDF-Format liefert einen druckfertigen Prüfungsbogen — ohne Nachbearbeitung in einem Textprogramm:
+
+- **Kopfbereich** mit Titel, Kurs, Datum, Zeitlimit, erlaubten Hilfsmitteln, Gesamtpunktzahl und Bestehensgrenze (in Prozent und in Punkten). Nicht gesetzte Felder werden weggelassen.
+- **Ausfüllzeilen** für Name und Klasse direkt unter dem Kopfbereich.
+- **Ankreuzkästchen** bei Einfach- und Mehrfachauswahl sowie bei Wahr/Falsch-Fragen.
+- **Antwortlinien** bei offenen Fragen — drei Linien pro Punkt, mindestens jedoch drei.
+- **Fusszeile** mit Prüfungstitel und „Seite X von Y" auf jeder Seite.
+
+Der Bogen erscheint in der **Sprache der Prüfung**, nicht in Ihrer Anzeigesprache — er geht schliesslich an die Prüflinge. Übersetzt werden dabei nur die Beschriftungen (Kurs, Frage, Punkte, Musterlösung …); Fragetexte und Antworten bleiben unverändert, so wie sie verfasst wurden. Das gilt auch für den Dateinamen: das Lösungsblatt heisst je nach Prüfungssprache `…_Lösungen.pdf`, `…_solutions.pdf`, `…_corrigé.pdf` oder `…_soluzioni.pdf`.
+
+Eine Frage bleibt mit ihrem Antwortbereich zusammen, solange dieser auf eine Seite passt: Passt der ganze Block nicht mehr auf die aktuelle Seite, beginnt er auf der nächsten. Nur ein aussergewöhnlich umfangreicher Antwortbereich — etwa bei einer offenen Frage mit sehr vielen Punkten — kann selbst über eine Seite hinausgehen. Wählen Sie **Lösungen einschliessen**, erscheint zu jeder Frage ein abgesetzter Kasten mit Musterlösung und Erklärung — geeignet als Korrekturvorlage.
 
 ## Bestehende Prüfungen verwalten
 

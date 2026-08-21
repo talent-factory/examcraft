@@ -71,13 +71,28 @@ Cliquez sur **Exporter** et sélectionnez le format souhaité:
 | Format | Description |
 |--------|-------------|
 | Markdown (.md) | Format texte, idéal pour une édition ultérieure ou la publication. Les solutions peuvent être incluses en option. |
+| PDF (prêt à imprimer) | Feuille d'examen entièrement mise en page, prête à imprimer. Les solutions peuvent être incluses en option. |
 | JSON (.json) | Format lisible par machine pour un traitement supplémentaire, l'intégration avec des systèmes externes ou l'analyse de données |
 | Moodle XML (.xml) | Format directement importable dans le système de gestion de l'apprentissage Moodle |
 
 !!! tip "Inclure les solutions"
-    Lors de l'export au format Markdown, vous pouvez inclure les solutions en option. Activez la case **Inclure les solutions** dans la boîte de dialogue d'export — pratique pour créer des feuilles de réponses ou pour une révision interne.
+    Lors de l'export au format Markdown et au format PDF, vous pouvez inclure les solutions en option. Activez la case **Inclure les solutions** dans la boîte de dialogue d'export — pratique pour créer des feuilles de réponses ou pour une révision interne.
 
 Le format Markdown convient pour une édition ultérieure ou l'intégration dans des systèmes de documentation. Le format JSON est idéal pour l'intégration technique — par exemple, si vous voulez importer des données d'examen dans un système personnalisé ou effectuer des analyses automatisées. Le format Moodle XML permet l'import direct dans Moodle sans post-traitement manuel.
+
+### Export PDF pour les examens sur papier
+
+Le format PDF produit une feuille d'examen prête à imprimer, sans retouche dans un traitement de texte :
+
+- **En-tête** avec le titre, le cours, la date, la durée, les moyens auxiliaires autorisés, le total des points et le seuil de réussite (en pourcentage et en points). Les champs non renseignés sont omis.
+- **Lignes à remplir** pour le nom et la classe, directement sous l'en-tête.
+- **Cases à cocher** pour les questions à choix unique, à choix multiple et vrai/faux.
+- **Lignes de réponse** pour les questions ouvertes — trois lignes par point, mais jamais moins de trois.
+- **Pied de page** avec le titre de l'examen et « Page X sur Y » sur chaque page.
+
+La feuille est générée dans la **langue de l'examen**, et non dans votre langue d'affichage — ce sont les candidats qui la reçoivent. Seuls les libellés sont traduits (cours, question, points, corrigé …) ; les énoncés et les réponses restent tels qu'ils ont été rédigés. Il en va de même pour le nom du fichier : selon la langue de l'examen, le corrigé s'appelle `…_Lösungen.pdf`, `…_solutions.pdf`, `…_corrigé.pdf` ou `…_soluzioni.pdf`.
+
+Une question reste groupée avec sa zone de réponse tant que celle-ci tient sur une page : si le bloc entier ne tient plus sur la page en cours, il commence sur la suivante. Seule une zone de réponse exceptionnellement grande — par exemple une question ouverte à très haute pondération — peut elle-même dépasser une page. Avec **Inclure les solutions**, chaque question est suivie d'un encadré contenant la solution type et l'explication — utile comme corrigé.
 
 ## Gérer les examens existants
 

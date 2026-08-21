@@ -3,6 +3,8 @@ Tests for Exam Composer Models: Exam, ExamQuestion, ExamStatus
 TDD: These tests are written before the model implementation.
 """
 
+import re
+
 import pytest
 from unittest.mock import Mock
 from fastapi.testclient import TestClient
@@ -1997,16 +1999,389 @@ class TestExamExportApi(
     def test_export_unsupported_format_returns_400(
         self, exam_client, exam_db, exam_institution, exam_user
     ):
-        """GET /export/pdf (unsupported) returns 400."""
+        """An unknown format returns 400 (``pdf`` is supported since TF-656)."""
+        exam_id = self._create_exam_with_question(
+            exam_client, exam_db, exam_institution.id, exam_user.id
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/docx")
+        assert response.status_code == 400
+        detail = response.json()["detail"].lower()
+        assert "nicht unterstützt" in detail or "unsupported" in detail
+
+    def test_export_pdf_format(self, exam_client, exam_db, exam_institution, exam_user):
+        """GET /export/pdf returns a real PDF with an attachment filename."""
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="PDF Export Exam",
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 200
+        assert "application/pdf" in response.headers["content-type"]
+        disposition = response.headers["content-disposition"]
+        assert disposition.startswith("attachment;")
+        assert "PDF Export Exam" in disposition
+        # Both the quoted filename and the RFC 5987 filename* carry .pdf
+        assert '.pdf"' in disposition
+        assert disposition.endswith(".pdf")
+        assert response.content.startswith(b"%PDF-")
+
+    def test_export_pdf_exporter_failure_returns_translated_500(
+        self, exam_client, exam_db, exam_institution, exam_user, monkeypatch
+    ):
+        """A ReportLab/exporter exception must not propagate as a bare,
+        unlocalized FastAPI 500 — it should be caught, logged, and turned
+        into a translated error (mirroring grade_export.py's pattern)."""
+        import api.exams as exams_api
+
+        def _boom(*args, **kwargs):
+            raise ValueError("simulated exporter failure")
+
+        monkeypatch.setattr(exams_api.PdfExporter, "export", staticmethod(_boom))
+
         exam_id = self._create_exam_with_question(
             exam_client, exam_db, exam_institution.id, exam_user.id
         )
         response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 500
+        detail = response.json()["detail"]
+        assert "simulated exporter failure" not in detail
+        assert detail.strip() != ""
+
+    def test_export_pdf_with_solutions_uses_solutions_suffix(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="PDF Solutions Exam",
+        )
+        response = exam_client.get(
+            f"/api/v1/exams/{exam_id}/export/pdf?include_solutions=true"
+        )
+        assert response.status_code == 200
+        # German exam → German suffix (the suffix follows the exam language)
+        assert "_L%C3%B6sungen.pdf" in response.headers["content-disposition"]
+        assert response.content.startswith(b"%PDF-")
+
+    @pytest.mark.parametrize(
+        "language,suffix",
+        [
+            ("de", "_Lösungen"),
+            ("en", "_solutions"),
+            ("fr", "_corrigé"),
+            ("it", "_soluzioni"),
+        ],
+    )
+    def test_solutions_suffix_follows_the_exam_language(
+        self, exam_client, exam_db, exam_institution, exam_user, language, suffix
+    ):
+        """The suffix labels the document, so it speaks the document's
+        language — not the exporting user's UI locale."""
+        from models.exam import Exam
+
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="Sprachtest",
+        )
+        exam = exam_db.query(Exam).filter_by(id=exam_id).first()
+        exam.language = language
+        exam_db.commit()
+
+        response = exam_client.get(
+            f"/api/v1/exams/{exam_id}/export/pdf?include_solutions=true"
+        )
+        assert response.status_code == 200
+
+        _ascii, real_name = self._disposition_names(
+            response.headers["content-disposition"]
+        )
+        assert real_name == f"Sprachtest{suffix}.pdf"
+
+    def test_export_pdf_draft_exam_returns_400(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "PDF Draft"})
+        exam_id = create_resp.json()["id"]
+        q = self._create_approved_question(exam_db, exam_institution.id, exam_user.id)
+        exam_client.post(
+            f"/api/v1/exams/{exam_id}/questions", json={"question_ids": [q.id]}
+        )
+
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
         assert response.status_code == 400
         detail = response.json()["detail"].lower()
-        assert (
-            "nicht unterstützt" in detail or "pdf" in detail or "unsupported" in detail
+        assert "export" in detail or "finalisiert" in detail
+
+    def test_export_pdf_without_questions_returns_400(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """The empty-exam guard also covers PDF."""
+        from models.exam import Exam
+
+        create_resp = exam_client.post("/api/v1/exams/", json={"title": "PDF Empty"})
+        exam_id = create_resp.json()["id"]
+        # Bypass finalize (which requires questions) to reach the empty guard.
+        exam = exam_db.query(Exam).filter_by(id=exam_id).first()
+        exam.status = "finalized"
+        exam_db.commit()
+
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 400
+
+    def test_export_pdf_sets_status_to_exported(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="PDF Status Export",
         )
+        assert exam_client.get(f"/api/v1/exams/{exam_id}").json()["status"] == (
+            "finalized"
+        )
+
+        assert exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf").status_code == 200
+
+        detail = exam_client.get(f"/api/v1/exams/{exam_id}").json()
+        assert detail["status"] == "exported"
+
+    @staticmethod
+    def _disposition_names(disposition: str) -> tuple[str, str]:
+        """Return ``(ascii_filename, decoded_filename_star)`` from the header."""
+        from urllib.parse import unquote
+
+        ascii_name = re.search(r'filename="([^"]*)"', disposition).group(1)
+        encoded = re.search(r"filename\*=UTF-8''(\S+)", disposition).group(1)
+        return ascii_name, unquote(encoded)
+
+    def test_export_filename_keeps_spaces_capitals_and_ampersand(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """A download should look like the exam, not like a slug."""
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="Algorithmen & Datenstrukturen FS 2026",
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 200
+
+        ascii_name, real_name = self._disposition_names(
+            response.headers["content-disposition"]
+        )
+        assert real_name == "Algorithmen & Datenstrukturen FS 2026.pdf"
+        # The ASCII fallback keeps spaces, capitals and & too — only
+        # non-ASCII gets transliterated.
+        assert ascii_name == "Algorithmen & Datenstrukturen FS 2026.pdf"
+
+    def test_export_filename_carries_no_export_timestamp(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """The server runs in UTC while users sit in CET/CEST, so an export
+        timestamp reads two hours off. The exam's own date is in the document;
+        the filename stays clean (and matches the grade export's convention).
+        """
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="Zeitlose Prüfung",
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 200
+
+        ascii_name, real_name = self._disposition_names(
+            response.headers["content-disposition"]
+        )
+        assert real_name == "Zeitlose Prüfung.pdf"
+        assert not re.search(r"\d{6,}", ascii_name)
+
+    def test_export_solutions_variant_stays_distinguishable(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """Without a timestamp the two PDF variants must still differ by name."""
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="Doppelte Prüfung",
+        )
+        plain = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        solutions = exam_client.get(
+            f"/api/v1/exams/{exam_id}/export/pdf?include_solutions=true"
+        )
+        assert self._disposition_names(plain.headers["content-disposition"])[1] == (
+            "Doppelte Prüfung.pdf"
+        )
+        assert self._disposition_names(solutions.headers["content-disposition"])[1] == (
+            "Doppelte Prüfung_Lösungen.pdf"
+        )
+
+    @pytest.mark.parametrize("reserved", ["CON", "nul", "Com1"])
+    def test_export_filename_avoids_windows_reserved_device_names(
+        self, exam_client, exam_db, exam_institution, exam_user, reserved
+    ):
+        """CON, NUL, COM1 … are device names on Windows and cannot be saved,
+        extension or not. Without a timestamp the stem is the bare title, so
+        this is reachable again."""
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title=reserved,
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 200
+
+        for name in self._disposition_names(response.headers["content-disposition"]):
+            stem = name.rsplit(".", 1)[0]
+            assert stem.upper() != reserved.upper()
+            assert reserved.lower() in name.lower()
+
+    def test_export_filename_drops_characters_windows_forbids(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        r"""``\ / : * ? " < > |`` are illegal in Windows filenames; leaving
+        them in would hand the user a file they cannot save."""
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="Prüfung: Kapitel 3? <A/B> 100%|ok*",
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 200
+
+        ascii_name, real_name = self._disposition_names(
+            response.headers["content-disposition"]
+        )
+        for name in (ascii_name, real_name):
+            assert not set(name) & set('\\/:*?"<>|')
+        # The readable parts survive.
+        assert "Kapitel 3" in real_name
+        assert "100%" in real_name
+
+    def test_export_filename_has_no_leading_or_trailing_space_or_dot(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """Windows silently rejects names that begin or end with a space or dot."""
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="  .Randfall.  ",
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 200
+
+        for name in self._disposition_names(response.headers["content-disposition"]):
+            assert name == name.strip()
+            assert not name.startswith(".")
+            assert "Randfall" in name
+
+    @pytest.mark.parametrize("export_format", ["md", "pdf", "json", "moodle"])
+    def test_export_title_with_non_latin1_characters(
+        self, exam_client, exam_db, exam_institution, exam_user, export_format
+    ):
+        """A title with an em dash must not break the download.
+
+        HTTP headers are latin-1; "—" (U+2014) is not in latin-1, so naively
+        interpolating the title into Content-Disposition raises
+        UnicodeEncodeError and the export 500s for every format.
+        """
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="Algorithmen — Semesterprüfung FS 2026",
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/{export_format}")
+        assert response.status_code == 200
+
+        disposition = response.headers["content-disposition"]
+        # The whole header must survive the latin-1 round trip.
+        disposition.encode("latin-1")
+        # Plain filename stays ASCII for old clients, filename* carries UTF-8.
+        assert 'filename="' in disposition
+        assert "filename*=UTF-8''" in disposition
+        # The umlaut survives verbatim in filename* as UTF-8 percent-encoding…
+        assert "Semesterpr%C3%BCfung" in disposition
+        # …while the ASCII fallback transliterates it instead of dropping it.
+        assert "Semesterprufung" in disposition
+
+    def test_export_title_without_any_ascii_still_yields_a_filename(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="試験",
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 200
+
+        disposition = response.headers["content-disposition"]
+        disposition.encode("latin-1")
+        ascii_name, real_name = self._disposition_names(disposition)
+        # Transliteration leaves nothing, so the fallback must still name a
+        # usable .pdf rather than a bare extension.
+        assert ascii_name == "export.pdf"
+        assert real_name == "試験.pdf"
+
+    def test_export_title_cannot_inject_response_headers(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """Quotes and CRLF in a title must never reach the header verbatim."""
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title='ev"il\r\nX-Injected: yes',
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 200
+        assert "x-injected" not in {k.lower() for k in response.headers}
+
+        disposition = response.headers["content-disposition"]
+        quoted = disposition.split('filename="', 1)[1].split('"', 1)[0]
+        assert '"' not in quoted
+        assert "\r" not in disposition and "\n" not in disposition
+
+    def test_export_pdf_without_create_exams_permission_returns_403(
+        self, exam_client, exam_db, exam_institution, exam_user, mock_user
+    ):
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="PDF Forbidden",
+        )
+        mock_user.has_permission = lambda permission: permission != "create_exams"
+
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/pdf")
+        assert response.status_code == 403
 
     def test_export_markdown_format(
         self, exam_client, exam_db, exam_institution, exam_user
@@ -2040,7 +2415,7 @@ class TestExamExportApi(
             f"/api/v1/exams/{exam_id}/export/md?include_solutions=true"
         )
         assert response.status_code == 200
-        assert "_solutions.md" in response.headers["content-disposition"]
+        assert "_L%C3%B6sungen.md" in response.headers["content-disposition"]
         # Markdown exporter uses "Musterlösung" heading for solutions
         assert "Musterlösung" in response.text
 

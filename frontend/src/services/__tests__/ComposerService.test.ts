@@ -442,6 +442,84 @@ describe('ComposerService', () => {
       expect(mockRevokeObjectURL).toHaveBeenCalled();
     });
 
+    it('prefers the RFC 5987 filename* so special characters survive', async () => {
+      // The ASCII `filename` transliterates for old clients; filename* keeps
+      // the real title (&, em dash, umlaut). We save under the real one.
+      const link = { href: '', download: '', click: mockClick, remove: jest.fn() };
+      fakeClient.get.mockResolvedValueOnce({
+        data: new Blob(['content']),
+        headers: {
+          'content-disposition':
+            'attachment; filename="algorithmen___datenstrukturen__semesterprufung.pdf"; ' +
+            "filename*=UTF-8''algorithmen_%26_datenstrukturen_%E2%80%94_semesterpr%C3%BCfung.pdf",
+        },
+      });
+      jest.spyOn(document, 'createElement').mockReturnValue(
+        link as unknown as HTMLAnchorElement
+      );
+
+      await ComposerService.downloadExport(1, 'pdf', false);
+
+      expect(link.download).toBe(
+        'algorithmen_&_datenstrukturen_—_semesterprüfung.pdf'
+      );
+    });
+
+    it('falls back to the plain filename when filename* is absent', async () => {
+      const link = { href: '', download: '', click: mockClick, remove: jest.fn() };
+      fakeClient.get.mockResolvedValueOnce({
+        data: new Blob(['content']),
+        headers: { 'content-disposition': 'attachment; filename="exam_1.pdf"' },
+      });
+      jest.spyOn(document, 'createElement').mockReturnValue(
+        link as unknown as HTMLAnchorElement
+      );
+
+      await ComposerService.downloadExport(1, 'pdf', false);
+
+      expect(link.download).toBe('exam_1.pdf');
+    });
+
+    it('strips path separators out of the suggested filename', async () => {
+      const link = { href: '', download: '', click: mockClick, remove: jest.fn() };
+      fakeClient.get.mockResolvedValueOnce({
+        data: new Blob(['content']),
+        headers: {
+          'content-disposition':
+            "attachment; filename=\"safe.pdf\"; filename*=UTF-8''%2Fetc%2Fpasswd.pdf",
+        },
+      });
+      jest.spyOn(document, 'createElement').mockReturnValue(
+        link as unknown as HTMLAnchorElement
+      );
+
+      await ComposerService.downloadExport(1, 'pdf', false);
+
+      expect(link.download).not.toContain('/');
+      expect(link.download).toContain('passwd.pdf');
+    });
+
+    it('falls back to the plain filename when filename* has malformed percent-encoding', async () => {
+      const link = { href: '', download: '', click: mockClick, remove: jest.fn() };
+      fakeClient.get.mockResolvedValueOnce({
+        data: new Blob(['content']),
+        headers: {
+          // A lone "%" is not valid percent-encoding — decodeURIComponent
+          // throws, and parseContentDispositionFilename must fall through
+          // to the plain `filename` parameter rather than propagating.
+          'content-disposition':
+            "attachment; filename=\"exam_1.pdf\"; filename*=UTF-8''broken%.pdf",
+        },
+      });
+      jest.spyOn(document, 'createElement').mockReturnValue(
+        link as unknown as HTMLAnchorElement
+      );
+
+      await ComposerService.downloadExport(1, 'pdf', false);
+
+      expect(link.download).toBe('exam_1.pdf');
+    });
+
     it('sets include_solutions=true when format is markdown and flag is true', async () => {
       fakeClient.get.mockResolvedValueOnce({ data: new Blob(['content']), headers: {} });
       jest.spyOn(document, 'createElement').mockReturnValue(

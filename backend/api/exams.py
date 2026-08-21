@@ -22,6 +22,7 @@ from api.question_review import _serialize_competency
 from utils.question_options import normalize_options
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import require_permission
+from utils.download_filename import content_disposition, filename_stem
 from utils.tenant_utils import TenantFilter, get_tenant_context
 from utils.document_visibility import filter_documents_for_user
 from utils.question_visibility import (
@@ -35,6 +36,7 @@ from services.exam_export_service import (
     MarkdownExporter,
     JsonExporter,
     MoodleXmlExporter,
+    PdfExporter,
 )
 import logging
 
@@ -2091,7 +2093,7 @@ async def export_exam(
     current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
-    """Export exam in specified format (md, json, moodle)."""
+    """Export exam in specified format (md, pdf, json, moodle)."""
     locale = get_request_locale(request, current_user)
     exam = _get_exam_or_404(
         exam_id, db, current_user, locale, allow_read_all_bypass=False
@@ -2113,28 +2115,47 @@ async def export_exam(
     if exam_data.get("exam_date"):
         exam_data["exam_date"] = str(exam_data["exam_date"])
 
-    safe_title = exam.title.lower().replace(" ", "_")[:50]
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_title = filename_stem(exam.title)
+    # The suffix labels the document, so it follows the exam's language
+    # rather than the exporting user's UI locale (TF-656).
+    solutions_suffix = (
+        "_" + t("export_solutions_suffix", locale=exam_data.get("language") or locale)
+        if include_solutions
+        else ""
+    )
 
-    if format == "md":
-        content = MarkdownExporter.export(
-            exam_data, include_solutions=include_solutions
-        )
-        suffix = "_solutions" if include_solutions else ""
-        media_type = "text/markdown"
-        filename = f"{safe_title}_{timestamp}{suffix}.md"
-    elif format == "json":
-        content = JsonExporter.export(exam_data)
-        media_type = "application/json"
-        filename = f"{safe_title}_{timestamp}.json"
-    elif format == "moodle":
-        content = MoodleXmlExporter.export(exam_data)
-        media_type = "application/xml"
-        filename = f"{safe_title}_{timestamp}_moodle.xml"
-    else:
+    try:
+        if format == "md":
+            content = MarkdownExporter.export(
+                exam_data, include_solutions=include_solutions
+            )
+            media_type = "text/markdown"
+            filename = f"{safe_title}{solutions_suffix}.md"
+        elif format == "pdf":
+            content = PdfExporter.export(exam_data, include_solutions=include_solutions)
+            media_type = "application/pdf"
+            filename = f"{safe_title}{solutions_suffix}.pdf"
+        elif format == "json":
+            content = JsonExporter.export(exam_data)
+            media_type = "application/json"
+            filename = f"{safe_title}.json"
+        elif format == "moodle":
+            content = MoodleXmlExporter.export(exam_data)
+            media_type = "application/xml"
+            filename = f"{safe_title}_moodle.xml"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=t("exams_unsupported_format", locale=locale),
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        # Unhandled exporter exceptions are otherwise logless 500s.
+        logger.exception("Exam export failed: format=%s exam_id=%d", format, exam_id)
         raise HTTPException(
-            status_code=400,
-            detail=t("exams_unsupported_format", locale=locale),
+            status_code=500,
+            detail=t("exams_export_internal_error", locale=locale),
         )
 
     # Update status to exported if currently finalized
@@ -2145,5 +2166,5 @@ async def export_exam(
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(filename)},
     )

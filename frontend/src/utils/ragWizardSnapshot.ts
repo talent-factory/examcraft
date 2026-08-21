@@ -7,7 +7,10 @@
  * abgedeckt wird.
  */
 
-import type { PromptSelection, RAGExamRequest, TagValue } from '../types';
+import type { PromptSelection, RAGExamRequest } from '../types';
+// TagValue lives with the tags API, not in ../types (it is re-exported from
+// lib.ts for tier packages).
+import type { TagValue } from '../api/tagsApi';
 
 /** Schlüssel des Snapshots im sessionStorage (siehe `sessionSnapshot.ts`). */
 export const RAG_WIZARD_SNAPSHOT_KEY = 'ragExamWizard';

@@ -246,10 +246,13 @@ def test_export_filename_is_ascii_safe_for_umlaut_titles(test_db: Session) -> No
     response = client.get(f"/api/v1/exams/{exam.id}/grades/export/csv")
     assert response.status_code == 200, response.text
     disposition = response.headers["content-disposition"]
-    # ASCII fallback: the umlaut must be replaced by ``_``.
-    assert 'filename="noten-Pr_fung_Fr_hjahr.csv"' in disposition
-    # Percent-encoded full form for modern browsers.
-    assert "filename*=UTF-8''" in disposition
+    # The header must survive the latin-1 round trip HTTP requires.
+    disposition.encode("latin-1")
+    # ASCII fallback: umlauts are transliterated, spaces are kept
+    # (shared with the exam export via utils.download_filename).
+    assert 'filename="noten-Prufung Fruhjahr.csv"' in disposition
+    # Percent-encoded full form for modern browsers keeps the umlauts.
+    assert "noten-Pr%C3%BCfung%20Fr%C3%BChjahr.csv" in disposition
 
 
 # ---------------------------------------------------------------------------

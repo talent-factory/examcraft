@@ -49,11 +49,22 @@ describe('ExportDialog', () => {
       expect(screen.getByText('Informatik Prüfung')).toBeInTheDocument();
     });
 
-    it('renders all three format options', () => {
+    it('renders all four format options', () => {
       render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
       expect(screen.getByLabelText('Markdown (.md)')).toBeInTheDocument();
+      expect(screen.getByLabelText('PDF (druckfertig)')).toBeInTheDocument();
       expect(screen.getByLabelText('JSON (.json)')).toBeInTheDocument();
       expect(screen.getByLabelText('Moodle XML (.xml)')).toBeInTheDocument();
+    });
+
+    it('lists the formats alphabetically by their visible label', () => {
+      render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
+
+      const order = screen
+        .getAllByRole('radio')
+        .map((radio) => (radio as HTMLInputElement).value);
+
+      expect(order).toEqual(['json', 'md', 'moodle', 'pdf']);
     });
 
     it('has Markdown selected by default', () => {
@@ -102,6 +113,16 @@ describe('ExportDialog', () => {
 
       await waitFor(() => {
         expect(screen.queryByLabelText(/Lösungen einschliessen/)).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows solutions checkbox when PDF is selected', async () => {
+      render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByLabelText('PDF (druckfertig)'));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Lösungen einschliessen/)).toBeInTheDocument();
       });
     });
 
@@ -192,6 +213,33 @@ describe('ExportDialog', () => {
 
       await waitFor(() => {
         expect(mockComposerService.downloadExport).toHaveBeenCalledWith(1, 'json', false);
+      });
+    });
+
+    it('calls downloadExport with pdf when PDF is selected', async () => {
+      mockComposerService.downloadExport.mockResolvedValue(undefined);
+
+      render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByLabelText('PDF (druckfertig)'));
+      fireEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
+
+      await waitFor(() => {
+        expect(mockComposerService.downloadExport).toHaveBeenCalledWith(1, 'pdf', false);
+      });
+    });
+
+    it('passes includeSolutions=true for pdf when the checkbox is checked', async () => {
+      mockComposerService.downloadExport.mockResolvedValue(undefined);
+
+      render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByLabelText('PDF (druckfertig)'));
+      fireEvent.click(screen.getByLabelText(/Lösungen einschliessen/));
+      fireEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
+
+      await waitFor(() => {
+        expect(mockComposerService.downloadExport).toHaveBeenCalledWith(1, 'pdf', true);
       });
     });
 

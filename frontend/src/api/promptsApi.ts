@@ -67,6 +67,9 @@ export interface PromptWritePayload {
   // TF-410 visibility tiers (permission-checked server-side).
   visibility?: string;
   is_institution_default?: boolean;
+  // TF-641: target Org-Unit for the "team" tier. Only meaningful together
+  // with visibility='team'; the editor has sent it since TF-651.
+  org_unit_id?: number | null;
 }
 
 class PromptsApiService {

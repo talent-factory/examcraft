@@ -1824,6 +1824,7 @@
       "title": "Prüfung exportieren",
       "formatLabel": "Format",
       "formatMd": "Markdown (.md)",
+      "formatPdf": "PDF (druckfertig)",
       "formatJson": "JSON (.json)",
       "formatMoodle": "Moodle XML (.xml)",
       "includeSolutions": "Lösungen einschliessen",
