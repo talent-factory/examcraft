@@ -632,6 +632,8 @@
       
         
       
+        
+      
     
     
     
@@ -723,6 +725,34 @@
     
   
     Dokumente hochladen und verwalten
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kompetenzrahmen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kompetenzrahmen
   
 
     
@@ -958,6 +988,17 @@
     <span class="md-ellipsis">
       
         Schritt 5: Prüfung exportieren
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pdf-export-fur-die-durchfuhrung-auf-papier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PDF-Export für die Durchführung auf Papier
       
     </span>
   </a>
@@ -1954,6 +1995,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pdf-export-fur-die-durchfuhrung-auf-papier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PDF-Export für die Durchführung auf Papier
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2073,7 +2125,9 @@
 <p>Wählen Sie Fragen aus der Liste der genehmigten Fragen:</p>
 <ul>
 <li>Klicken Sie auf <strong>+ Hinzufügen</strong> neben jeder gewünschten Frage</li>
-<li>Nutzen Sie die Filter um gezielt Fragen nach <strong>Fragetyp</strong>, <strong>Schwierigkeit</strong> oder <strong>Quelldokument</strong> zu finden</li>
+<li>Nutzen Sie die Filter um gezielt Fragen nach <strong>Fragetyp</strong>, <strong>Schwierigkeit</strong>, <strong>Quelldokument</strong> oder —
+  sofern Fragen einem <a href="../kompetenzrahmen/">Kompetenzrahmen</a> zugeordnet sind — nach <strong>Handlungskompetenz</strong>
+  und <strong>LN-Stufe</strong> zu finden</li>
 <li>Die Gesamtanzahl der ausgewählten Fragen wird oben angezeigt</li>
 </ul>
 <div class="admonition tip">
@@ -2100,6 +2154,10 @@
 <td>Textbasiertes Format, ideal für die weitere Bearbeitung oder Veröffentlichung. Optional können die Lösungen eingeschlossen werden.</td>
 </tr>
 <tr>
+<td>PDF (druckfertig)</td>
+<td>Fertig gesetzter Prüfungsbogen zum Ausdrucken. Optional können die Lösungen eingeschlossen werden.</td>
+</tr>
+<tr>
 <td>JSON (.json)</td>
 <td>Maschinenlesbares Format für die weitere Verarbeitung, Integration mit externen Systemen oder Datenanalyse</td>
 </tr>
@@ -2111,9 +2169,20 @@
 </table>
 <div class="admonition tip">
 <p class="admonition-title">Lösungen einschliessen</p>
-<p>Beim Export im Markdown-Format können Sie optional die Lösungen einschliessen. Aktivieren Sie dazu die Checkbox <strong>Lösungen einschliessen</strong> im Export-Dialog — praktisch für die Erstellung von Lösungsblättern oder zur internen Überprüfung.</p>
+<p>Beim Export im Markdown- und im PDF-Format können Sie optional die Lösungen einschliessen. Aktivieren Sie dazu die Checkbox <strong>Lösungen einschliessen</strong> im Export-Dialog — praktisch für die Erstellung von Lösungsblättern oder zur internen Überprüfung.</p>
 </div>
 <p>Das Markdown-Format eignet sich für die weitere Bearbeitung oder Integration in Dokumentationssysteme. Das JSON-Format ist ideal für technische Integration — etwa wenn Sie Prüfungsdaten in ein eigenes System importieren oder automatisierte Auswertungen durchführen möchten. Das Moodle-XML-Format ermöglicht den direkten Import in Moodle, ohne manuelle Nachbearbeitung.</p>
+<h3 id="pdf-export-fur-die-durchfuhrung-auf-papier">PDF-Export für die Durchführung auf Papier</h3>
+<p>Das PDF-Format liefert einen druckfertigen Prüfungsbogen — ohne Nachbearbeitung in einem Textprogramm:</p>
+<ul>
+<li><strong>Kopfbereich</strong> mit Titel, Kurs, Datum, Zeitlimit, erlaubten Hilfsmitteln, Gesamtpunktzahl und Bestehensgrenze (in Prozent und in Punkten). Nicht gesetzte Felder werden weggelassen.</li>
+<li><strong>Ausfüllzeilen</strong> für Name und Klasse direkt unter dem Kopfbereich.</li>
+<li><strong>Ankreuzkästchen</strong> bei Einfach- und Mehrfachauswahl sowie bei Wahr/Falsch-Fragen.</li>
+<li><strong>Antwortlinien</strong> bei offenen Fragen — drei Linien pro Punkt, mindestens jedoch drei.</li>
+<li><strong>Fusszeile</strong> mit Prüfungstitel und „Seite X von Y" auf jeder Seite.</li>
+</ul>
+<p>Der Bogen erscheint in der <strong>Sprache der Prüfung</strong>, nicht in Ihrer Anzeigesprache — er geht schliesslich an die Prüflinge. Übersetzt werden dabei nur die Beschriftungen (Kurs, Frage, Punkte, Musterlösung …); Fragetexte und Antworten bleiben unverändert, so wie sie verfasst wurden. Das gilt auch für den Dateinamen: das Lösungsblatt heisst je nach Prüfungssprache <code>…_Lösungen.pdf</code>, <code>…_solutions.pdf</code>, <code>…_corrigé.pdf</code> oder <code>…_soluzioni.pdf</code>.</p>
+<p>Eine Frage bleibt mit ihrem Antwortbereich zusammen, solange dieser auf eine Seite passt: Passt der ganze Block nicht mehr auf die aktuelle Seite, beginnt er auf der nächsten. Nur ein aussergewöhnlich umfangreicher Antwortbereich — etwa bei einer offenen Frage mit sehr vielen Punkten — kann selbst über eine Seite hinausgehen. Wählen Sie <strong>Lösungen einschliessen</strong>, erscheint zu jeder Frage ein abgesetzter Kasten mit Musterlösung und Erklärung — geeignet als Korrekturvorlage.</p>
 <h2 id="bestehende-prufungen-verwalten">Bestehende Prüfungen verwalten</h2>
 <p><img alt="Prüfungskomponist — Prüfungsübersicht" src="../../screenshots/exam-composer/exam-composer-builder.png" /></p>
 <p>Alle erstellten Prüfungen erscheinen in der Übersichtsliste. Dort können Sie:</p>

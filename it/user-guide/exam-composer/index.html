@@ -632,6 +632,8 @@
       
         
       
+        
+      
     
     
     
@@ -723,6 +725,34 @@
     
   
     Caricamento e gestione documenti
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kompetenzrahmen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kompetenzrahmen
   
 
     
@@ -958,6 +988,17 @@
     <span class="md-ellipsis">
       
         Passaggio 5: Esportazione esame
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#esportazione-pdf-per-esami-su-carta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Esportazione PDF per esami su carta
       
     </span>
   </a>
@@ -1954,6 +1995,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#esportazione-pdf-per-esami-su-carta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Esportazione PDF per esami su carta
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2104,6 +2156,10 @@
 <td>Formato testuale, ideale per ulteriori modifiche o pubblicazione. Le soluzioni possono essere incluse facoltativamente.</td>
 </tr>
 <tr>
+<td>PDF (pronto per la stampa)</td>
+<td>Foglio d'esame completamente impaginato, pronto per la stampa. Le soluzioni possono essere incluse facoltativamente.</td>
+</tr>
+<tr>
 <td>JSON (.json)</td>
 <td>Formato leggibile da macchina per ulteriore elaborazione, integrazione con sistemi esterni o analisi dati</td>
 </tr>
@@ -2115,9 +2171,20 @@
 </table>
 <div class="admonition tip">
 <p class="admonition-title">Includere le soluzioni</p>
-<p>Nell'esportazione in formato Markdown, è possibile includere facoltativamente le soluzioni. Attivate la casella <strong>Includi soluzioni</strong> nella finestra di dialogo di esportazione — pratico per creare fogli di risposta o per la revisione interna.</p>
+<p>Nell'esportazione in formato Markdown e in formato PDF, è possibile includere facoltativamente le soluzioni. Attivate la casella <strong>Includi soluzioni</strong> nella finestra di dialogo di esportazione — pratico per creare fogli di risposta o per la revisione interna.</p>
 </div>
 <p>Il formato Markdown è adatto per ulteriori modifiche o l'integrazione in sistemi di documentazione. Il formato JSON è ideale per l'integrazione tecnica — ad esempio se desiderate importare dati d'esame in un sistema personalizzato o eseguire valutazioni automatizzate. Il formato Moodle XML consente l'importazione diretta in Moodle senza elaborazione manuale successiva.</p>
+<h3 id="esportazione-pdf-per-esami-su-carta">Esportazione PDF per esami su carta</h3>
+<p>Il formato PDF produce un foglio d'esame pronto per la stampa, senza rielaborazione in un programma di videoscrittura:</p>
+<ul>
+<li><strong>Intestazione</strong> con titolo, corso, data, limite di tempo, strumenti ausiliari ammessi, punteggio totale e soglia di superamento (in percentuale e in punti). I campi non compilati vengono omessi.</li>
+<li><strong>Righe da compilare</strong> per nome e classe, direttamente sotto l'intestazione.</li>
+<li><strong>Caselle da barrare</strong> per le domande a scelta singola, a scelta multipla e vero/falso.</li>
+<li><strong>Righe di risposta</strong> per le domande aperte — tre righe per punto, comunque mai meno di tre.</li>
+<li><strong>Piè di pagina</strong> con il titolo dell'esame e «Pagina X di Y» su ogni pagina.</li>
+</ul>
+<p>Il foglio viene generato nella <strong>lingua dell'esame</strong>, non nella vostra lingua di visualizzazione — sono i candidati a riceverlo. Vengono tradotte solo le diciture (corso, domanda, punti, soluzione …); i testi delle domande e le risposte restano come sono stati redatti. Lo stesso vale per il nome del file: a seconda della lingua dell'esame la griglia di correzione si chiama <code>…_Lösungen.pdf</code>, <code>…_solutions.pdf</code>, <code>…_corrigé.pdf</code> o <code>…_soluzioni.pdf</code>.</p>
+<p>Una domanda resta unita alla sua area di risposta finché quest'area entra in una pagina: se l'intero blocco non entra più nella pagina corrente, inizia su quella successiva. Solo un'area di risposta eccezionalmente ampia — ad esempio una domanda aperta con moltissimi punti — può a sua volta superare una pagina. Con <strong>Includi soluzioni</strong> attivo, ogni domanda è seguita da un riquadro con la soluzione tipo e la spiegazione — utile come griglia di correzione.</p>
 <h2 id="gestione-esami-esistenti">Gestione esami esistenti</h2>
 <p><img alt="Exam Composer — Panoramica esami" src="../../../screenshots/exam-composer/exam-composer-builder.png" /></p>
 <p>Tutti gli esami creati appaiono nell'elenco di panoramica. Lì potete:</p>

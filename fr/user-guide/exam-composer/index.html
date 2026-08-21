@@ -632,6 +632,8 @@
       
         
       
+        
+      
     
     
     
@@ -723,6 +725,34 @@
     
   
     Télécharger et gérer les documents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kompetenzrahmen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kompetenzrahmen
   
 
     
@@ -958,6 +988,17 @@
     <span class="md-ellipsis">
       
         Étape 5: Exporter l'examen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#export-pdf-pour-les-examens-sur-papier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export PDF pour les examens sur papier
       
     </span>
   </a>
@@ -1954,6 +1995,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#export-pdf-pour-les-examens-sur-papier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export PDF pour les examens sur papier
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2100,6 +2152,10 @@
 <td>Format texte, idéal pour une édition ultérieure ou la publication. Les solutions peuvent être incluses en option.</td>
 </tr>
 <tr>
+<td>PDF (prêt à imprimer)</td>
+<td>Feuille d'examen entièrement mise en page, prête à imprimer. Les solutions peuvent être incluses en option.</td>
+</tr>
+<tr>
 <td>JSON (.json)</td>
 <td>Format lisible par machine pour un traitement supplémentaire, l'intégration avec des systèmes externes ou l'analyse de données</td>
 </tr>
@@ -2111,9 +2167,20 @@
 </table>
 <div class="admonition tip">
 <p class="admonition-title">Inclure les solutions</p>
-<p>Lors de l'export au format Markdown, vous pouvez inclure les solutions en option. Activez la case <strong>Inclure les solutions</strong> dans la boîte de dialogue d'export — pratique pour créer des feuilles de réponses ou pour une révision interne.</p>
+<p>Lors de l'export au format Markdown et au format PDF, vous pouvez inclure les solutions en option. Activez la case <strong>Inclure les solutions</strong> dans la boîte de dialogue d'export — pratique pour créer des feuilles de réponses ou pour une révision interne.</p>
 </div>
 <p>Le format Markdown convient pour une édition ultérieure ou l'intégration dans des systèmes de documentation. Le format JSON est idéal pour l'intégration technique — par exemple, si vous voulez importer des données d'examen dans un système personnalisé ou effectuer des analyses automatisées. Le format Moodle XML permet l'import direct dans Moodle sans post-traitement manuel.</p>
+<h3 id="export-pdf-pour-les-examens-sur-papier">Export PDF pour les examens sur papier</h3>
+<p>Le format PDF produit une feuille d'examen prête à imprimer, sans retouche dans un traitement de texte :</p>
+<ul>
+<li><strong>En-tête</strong> avec le titre, le cours, la date, la durée, les moyens auxiliaires autorisés, le total des points et le seuil de réussite (en pourcentage et en points). Les champs non renseignés sont omis.</li>
+<li><strong>Lignes à remplir</strong> pour le nom et la classe, directement sous l'en-tête.</li>
+<li><strong>Cases à cocher</strong> pour les questions à choix unique, à choix multiple et vrai/faux.</li>
+<li><strong>Lignes de réponse</strong> pour les questions ouvertes — trois lignes par point, mais jamais moins de trois.</li>
+<li><strong>Pied de page</strong> avec le titre de l'examen et « Page X sur Y » sur chaque page.</li>
+</ul>
+<p>La feuille est générée dans la <strong>langue de l'examen</strong>, et non dans votre langue d'affichage — ce sont les candidats qui la reçoivent. Seuls les libellés sont traduits (cours, question, points, corrigé …) ; les énoncés et les réponses restent tels qu'ils ont été rédigés. Il en va de même pour le nom du fichier : selon la langue de l'examen, le corrigé s'appelle <code>…_Lösungen.pdf</code>, <code>…_solutions.pdf</code>, <code>…_corrigé.pdf</code> ou <code>…_soluzioni.pdf</code>.</p>
+<p>Une question reste groupée avec sa zone de réponse tant que celle-ci tient sur une page : si le bloc entier ne tient plus sur la page en cours, il commence sur la suivante. Seule une zone de réponse exceptionnellement grande — par exemple une question ouverte à très haute pondération — peut elle-même dépasser une page. Avec <strong>Inclure les solutions</strong>, chaque question est suivie d'un encadré contenant la solution type et l'explication — utile comme corrigé.</p>
 <h2 id="gerer-les-examens-existants">Gérer les examens existants</h2>
 <p><img alt="Exam Composer — Vue d'ensemble des examens" src="../../../screenshots/exam-composer/exam-composer-builder.png" /></p>
 <p>Tous les examens créés apparaissent dans une liste de présentation. Vous pouvez:</p>
