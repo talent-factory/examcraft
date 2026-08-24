@@ -1,14 +1,14 @@
-"""Tests für die ``submission.grade_status``-Aggregation in Phase 2.
+"""Tests for the ``submission.grade_status`` aggregation in phase 2.
 
 Spec 6.5:
 
-* keine open_ended-Antwort  → ``fully_reviewed``
-* alle proposed (open_ended) → ``pending_review``
-* mind. ein proposed + mind. ein approved/manual_override → ``partially``
-* alle approved/manual_override → ``fully_reviewed``
+* no open_ended answer  → ``fully_reviewed``
+* all proposed (open_ended) → ``pending_review``
+* at least one proposed + at least one approved/manual_override → ``partially``
+* all approved/manual_override → ``fully_reviewed``
 
-MC/W-F-Antworten haben ``is_correct`` ∈ {True, False} und gelten als
-review-äquivalent (gating funktioniert nur über is_correct=None).
+MC/true-false answers have ``is_correct`` ∈ {True, False} and count as
+review-equivalent (gating only works via is_correct=None).
 """
 
 from __future__ import annotations
@@ -166,9 +166,9 @@ def test_all_reviewed_becomes_fully_reviewed(test_db: Session) -> None:
 
 
 def test_only_mc_answers_are_fully_reviewed_immediately(test_db: Session) -> None:
-    """MC + W-F mit is_correct ∈ {True, False} sollten ohne Review
-    direkt als ``fully_reviewed`` gelten — das ist der Default-Fall, der
-    nach einem Phase-1-Import (rein deterministisch) erwartet wird."""
+    """MC + true-false answers with is_correct ∈ {True, False} should count
+    as ``fully_reviewed`` without review — this is the default case expected
+    after a phase-1 import (purely deterministic)."""
     inst = Institution(
         name="MC",
         slug="mc-only",
@@ -233,7 +233,7 @@ def test_only_mc_answers_are_fully_reviewed_immediately(test_db: Session) -> Non
     )
     test_db.commit()
 
-    # GradingService.grade_submission setzt grade_status; wir testen
-    # hier nur das Aggregations-Resultat über den Internal-Refresh-Pfad.
+    # GradingService.grade_submission sets grade_status; here we only test
+    # the aggregation result via the internal refresh path.
     sub = _refresh_aggregate(test_db, sub.id)
     assert sub.grade_status == SubmissionGradeStatus.FULLY_REVIEWED.value

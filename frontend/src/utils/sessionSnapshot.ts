@@ -1,16 +1,16 @@
 /**
- * Versionierte sessionStorage-Snapshots (TF-608).
+ * Versioned sessionStorage snapshots (TF-608).
  *
- * Gedacht für flüchtigen UI-Zustand, der einen Seitenwechsel überleben soll,
- * aber nicht dauerhaft gehört: der Konfigurationsstand eines Wizards, die Liste
- * weggeklickter Hinweise. sessionStorage (nicht localStorage) ist bewusst
- * gewählt — der Zustand gehört zum Tab, nicht zum Gerät, und verschwindet
- * spätestens beim Schliessen.
+ * Meant for transient UI state that should survive a page change but
+ * doesn't belong long-term: a wizard's configuration state, the list of
+ * dismissed hints. sessionStorage (not localStorage) is deliberately
+ * chosen — the state belongs to the tab, not the device, and disappears
+ * at the latest when it's closed.
  *
- * Alle Zugriffe sind fehlertolerant: sessionStorage kann in Safari im privaten
- * Modus, unter strengen Cookie-Policies oder bei vollem Kontingent werfen. Ein
- * kaputter Snapshot darf nie die Seite mitreissen — im Zweifel gilt "kein
- * Snapshot vorhanden".
+ * All access is fault-tolerant: sessionStorage can throw in Safari private
+ * mode, under strict cookie policies, or when the quota is full. A broken
+ * snapshot must never take the page down with it — when in doubt, "no
+ * snapshot present" applies.
  */
 
 const KEY_PREFIX = 'examcraft.snapshot.';
@@ -27,16 +27,15 @@ const getStorage = (): Storage | null => {
   try {
     return window.sessionStorage;
   } catch {
-    // Zugriff auf sessionStorage kann selbst schon werfen (Cookie-Policy).
+    // Accessing sessionStorage itself can already throw (cookie policy).
     return null;
   }
 };
 
 /**
- * Liest einen Snapshot. Gibt `null` zurück, wenn keiner existiert, die Version
- * nicht passt oder der Eintrag beschädigt ist — in den letzten beiden Fällen
- * wird der Eintrag gleich entfernt, damit er nicht bei jedem Mount erneut
- * geparst wird.
+ * Reads a snapshot. Returns `null` when none exists, the version doesn't
+ * match, or the entry is corrupt — in the latter two cases the entry is
+ * removed right away, so it isn't re-parsed on every mount.
  */
 export function readSessionSnapshot<T>(key: string, version: number): T | null {
   const storage = getStorage();
@@ -59,9 +58,9 @@ export function readSessionSnapshot<T>(key: string, version: number): T | null {
     }
     return envelope.data;
   } catch (err) {
-    // Beschädigter/inkompatibler Eintrag (kaputtes JSON, o.ä.) — wie beim
-    // Write-Pfad geloggt, damit ein solcher Fund eine Debugging-Spur
-    // hinterlässt statt komplett spurlos zu verschwinden.
+    // Corrupt/incompatible entry (broken JSON, etc.) — logged like the
+    // write path, so a find like this leaves a debugging trail instead of
+    // disappearing completely without a trace.
     console.warn(`[sessionSnapshot] Snapshot "${key}" ist beschädigt und wird verworfen:`, err);
     clearSessionSnapshot(key);
     return null;
@@ -69,8 +68,8 @@ export function readSessionSnapshot<T>(key: string, version: number): T | null {
 }
 
 /**
- * Schreibt einen Snapshot. Schlägt das fehl (Kontingent, privater Modus), geht
- * nur die Wiederherstellbarkeit verloren — nie der laufende Arbeitsschritt.
+ * Writes a snapshot. If this fails (quota, private mode), only the
+ * restorability is lost — never the current work step.
  */
 export function writeSessionSnapshot<T>(key: string, version: number, data: T): void {
   const storage = getStorage();
@@ -90,16 +89,16 @@ export function writeSessionSnapshot<T>(key: string, version: number, data: T): 
 }
 
 /**
- * Entfernt ALLE Snapshots dieser Anwendung.
+ * Removes ALL snapshots of this application.
  *
- * Beim Logout aufzurufen: sessionStorage überlebt einen Benutzerwechsel im
- * selben Tab, und die Snapshots enthalten getippten Inhalt (z. B. das
- * Prüfungsthema). Auf einem geteilten Rechner — Schulungsraum, Klassenzimmer —
- * bekäme der nächste Nutzer sonst den Stand seines Vorgängers zu sehen.
+ * Call this on logout: sessionStorage survives a user switch in the same
+ * tab, and the snapshots contain typed content (e.g. the exam topic). On
+ * a shared machine — training room, classroom — the next user would
+ * otherwise see their predecessor's state.
  *
- * Bewusst über das Präfix statt über eine Liste bekannter Schlüssel: ein später
- * hinzugefügter Snapshot ist damit automatisch mit abgedeckt und kann nicht
- * vergessen werden.
+ * Deliberately keyed off the prefix rather than a list of known keys: a
+ * snapshot added later is thus automatically covered and can't be
+ * forgotten.
  */
 export function clearAllSessionSnapshots(): void {
   const storage = getStorage();
@@ -112,20 +111,20 @@ export function clearAllSessionSnapshots(): void {
       const key = storage.key(index);
       if (key && key.startsWith(KEY_PREFIX)) keys.push(key);
     }
-    // Erst sammeln, dann löschen — Entfernen während der Iteration verschiebt
-    // die Indizes und überspringt Einträge.
+    // Collect first, then delete — removing during iteration shifts the
+    // indices and skips entries.
   } catch (err) {
     console.warn('[sessionSnapshot] Snapshots konnten nicht aufgelistet werden:', err);
     return;
   }
 
-  // TF-608 Fix: jeder removeItem einzeln behandelt statt in einem
-  // gemeinsamen try/catch um die ganze Schleife — sonst bricht EIN
-  // fehlschlagender Key (z. B. SecurityError im Private-Modus) die
-  // Schleife komplett ab und lässt alle nachfolgenden Snapshots ungelöscht
-  // liegen. Das untergräbt genau den Privacy-Zweck dieser Funktion (siehe
-  // Docstring oben): der nächste Nutzer auf dem geteilten Rechner sähe
-  // trotz "Logout" weiterhin den Stand seines Vorgängers.
+  // TF-608 fix: each removeItem handled individually instead of in one
+  // shared try/catch around the whole loop — otherwise ONE failing key
+  // (e.g. SecurityError in private mode) would abort the loop entirely and
+  // leave all subsequent snapshots undeleted. That would undermine exactly
+  // the privacy purpose of this function (see the docstring above): the
+  // next user on the shared machine would still see their predecessor's
+  // state despite "logging out".
   let failures = 0;
   for (const key of keys) {
     try {
@@ -142,13 +141,13 @@ export function clearAllSessionSnapshots(): void {
   }
 }
 
-/** Entfernt einen Snapshot. Fehler werden geschluckt. */
+/** Removes a snapshot. Errors are swallowed. */
 export function clearSessionSnapshot(key: string): void {
   const storage = getStorage();
   if (!storage) return;
   try {
     storage.removeItem(storageKey(key));
   } catch {
-    // Nichts zu tun — der Snapshot bleibt eben liegen.
+    // Nothing to do — the snapshot just stays behind.
   }
 }

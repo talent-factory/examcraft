@@ -1,9 +1,9 @@
 /**
  * /admin/integrations/moodle (TF-336 Subarea C).
  *
- * Wrapper-Page um den ``MoodleConnectionForm``. Eigene Page (statt Tab
- * im Admin) entspricht dem `/admin/integrations/<system>`-Schema, das
- * weitere Integrationen (ILIAS, Generic-CSV, …) später aufnehmen kann.
+ * Wrapper page around ``MoodleConnectionForm``. A dedicated page (instead
+ * of a tab in Admin) matches the `/admin/integrations/<system>` scheme,
+ * which can later accommodate further integrations (ILIAS, generic CSV, …).
  */
 
 import React from 'react';

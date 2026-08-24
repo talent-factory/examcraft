@@ -1,6 +1,6 @@
 """
-Document Model für ExamCraft AI
-Speichert Metadaten hochgeladener Dokumente
+Document model for ExamCraft AI
+Stores metadata for uploaded documents
 """
 
 import logging
@@ -208,13 +208,13 @@ class Document(Base):
     # Extracted metadata from document processing
     doc_metadata = Column(JSON, nullable=True)
 
-    # Text content (für Fallback-Suche)
+    # Text content (for fallback search)
     content_preview = Column(Text, nullable=True)
 
     # Vector DB collection name
     vector_collection = Column(String(100), nullable=True)
 
-    # Flag ob Vektoren erstellt wurden
+    # Flag indicating whether vectors have been created
     has_vectors = Column(Boolean, default=False, nullable=True)
 
     # Celery Task Tracking
@@ -296,12 +296,12 @@ class Document(Base):
             "processed_at": self.processed_at.isoformat()
             if self.processed_at
             else None,
-            # Qualitäts-Eskalation (TF-360/TF-365): kuratierte Felder aus
-            # processing_info. ``escalation`` wird seit TF-365 exponiert, damit das
-            # UI laufende (``queued``), erschöpfte (``exhausted``), nicht verfügbare
-            # (``unavailable``) oder fehlgeschlagene (``failed``) OCR-Nachbearbeitung
-            # darstellen kann. Rein interne Marker (ocr_attempted, processor_chain)
-            # bleiben intern.
+            # Quality escalation (TF-360/TF-365): curated fields from
+            # processing_info. ``escalation`` has been exposed since TF-365 so the
+            # UI can display in-progress (``queued``), exhausted (``exhausted``),
+            # unavailable (``unavailable``), or failed (``failed``) OCR
+            # post-processing. Purely internal markers (ocr_attempted,
+            # processor_chain) stay internal.
             "quality": (self.processing_info or {}).get("quality"),
             "processed_with_ocr": (self.processing_info or {}).get(
                 "processed_with_ocr", False

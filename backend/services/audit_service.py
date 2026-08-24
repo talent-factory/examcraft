@@ -1,6 +1,6 @@
 """
-Audit Logging Service für ExamCraft AI
-Implementiert Security & GDPR Compliance Logging
+Audit Logging Service for ExamCraft AI
+Implements security & GDPR compliance logging
 """
 
 import logging
@@ -599,9 +599,10 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             AuditService.ACTION_CREATE_RESULT_IMPORT,
             AuditService.ACTION_DELETE_RESULT_IMPORT,
             # Grading-scheme lifecycle (api/grading_schemes.py, TF-502).
-            # "business": academic-content action (Notenschema ist fachliche
-            # Konfiguration, keine Nutzer-/RBAC-Verwaltung) — nicht wegen
-            # Institution-Admin-Sichtbarkeit, die deckt ohnehin business+admin ab.
+            # "business": academic-content action (a grading scheme is
+            # subject-matter configuration, not user/RBAC administration) —
+            # not because of Institution-Admin visibility, which covers
+            # business+admin anyway.
             AuditService.ACTION_CREATE_GRADING_SCHEME,
             AuditService.ACTION_UPDATE_GRADING_SCHEME,
             AuditService.ACTION_DELETE_GRADING_SCHEME,
@@ -619,16 +620,17 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             AuditService.ACTION_DELETE_USER,
             AuditService.ACTION_ASSIGN_ROLE,
             AuditService.ACTION_REMOVE_ROLE,
-            # Prompt-Mutationen — jede Sichtbarkeitsstufe (auch private), da
-            # dieselbe Aktion auch institutions-/systemweite Prompts betrifft.
+            # Prompt mutations — every visibility level (including private),
+            # since the same action can also affect institution-/system-wide
+            # prompts.
             AuditService.ACTION_CREATE_PROMPT,
             AuditService.ACTION_UPDATE_PROMPT,
             AuditService.ACTION_DELETE_PROMPT,
-            # Custom-Rollen (api/v1/rbac.py, TF-502)
+            # Custom roles (api/v1/rbac.py, TF-502)
             AuditService.ACTION_CREATE_ROLE,
             AuditService.ACTION_UPDATE_ROLE,
             AuditService.ACTION_DELETE_ROLE,
-            # Institutions-Verwaltung (api/admin.py, TF-502)
+            # Institution management (api/admin.py, TF-502)
             AuditService.ACTION_CREATE_INSTITUTION,
             AuditService.ACTION_UPDATE_INSTITUTION,
             # Granted Role via OrgUnit (api/org_units.py, TF-637) -- same

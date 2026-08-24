@@ -1,5 +1,5 @@
 """
-Pytest Configuration und Fixtures für ExamCraft AI Tests
+Pytest configuration and fixtures for ExamCraft AI tests
 """
 
 import pytest
@@ -68,7 +68,7 @@ collect_ignore_glob = [
 # CI sets DATABASE_URL with localhost; Docker uses 'postgres' as host
 POSTGRES_HOST = os.getenv(
     "POSTGRES_HOST", "localhost"
-)  # Docker: postgres, CI/Lokal: localhost
+)  # Docker: postgres, CI/local: localhost
 POSTGRES_PASSWORD = os.getenv(
     "POSTGRES_PASSWORD", "examcraft_dev"
 )  # Match docker-compose.yml
@@ -89,21 +89,21 @@ TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", _test_db_url)
 @pytest.fixture(scope="session")
 def test_engine():
     """
-    Erstelle Test-Database Engine mit PostgreSQL
+    Create test database engine with PostgreSQL
 
-    Verwendet eine separate Test-Datenbank um Produktionsdaten zu schützen.
-    Die Datenbank wird vor jedem Test-Run neu erstellt.
+    Uses a separate test database to protect production data.
+    The database is recreated before every test run.
     """
-    # Erstelle Engine für postgres Database (um Test-DB zu erstellen/löschen)
+    # Create engine for the postgres database (to create/drop the test DB)
     admin_url = TEST_DATABASE_URL.rsplit("/", 1)[0] + "/postgres"
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
 
-    # Extrahiere Test-DB Namen
+    # Extract test DB name
     test_db_name = TEST_DATABASE_URL.split("/")[-1]
 
-    # Lösche Test-DB falls vorhanden und erstelle neu
+    # Drop test DB if present and recreate it
     with admin_engine.connect() as conn:
-        # Beende alle Verbindungen zur Test-DB
+        # Terminate all connections to the test DB
         conn.execute(
             text(f"""
             SELECT pg_terminate_backend(pg_stat_activity.pid)
@@ -113,23 +113,23 @@ def test_engine():
         """)
         )
 
-        # Lösche Test-DB
+        # Drop test DB
         conn.execute(text(f"DROP DATABASE IF EXISTS {test_db_name}"))
 
-        # Erstelle Test-DB
+        # Create test DB
         conn.execute(text(f"CREATE DATABASE {test_db_name}"))
 
     admin_engine.dispose()
 
-    # Erstelle Engine für Test-DB
+    # Create engine for the test DB
     engine = create_engine(TEST_DATABASE_URL)
 
-    # Erstelle alle Tabellen
+    # Create all tables
     Base.metadata.create_all(bind=engine)
 
     yield engine
 
-    # Cleanup: Lösche Test-DB nach allen Tests
+    # Cleanup: drop test DB after all tests
     engine.dispose()
 
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
@@ -149,27 +149,25 @@ def test_engine():
 @pytest.fixture(scope="function")
 def test_db(test_engine):
     """
-    Erstelle Test-Database Session mit Savepoint-Isolation.
+    Create test database session with savepoint isolation.
 
-    Jeder Test läuft in einer äusseren Transaction, die nach dem Test
-    zurückgerollt wird. Damit Produktionscode wie
-    ``audit_service.log_action``, der intern ``session.commit()``
-    aufruft, nicht zwischen Tests leakt, wird das offizielle
-    SQLAlchemy "Joined Session for External Transaction"-Pattern
-    verwendet (siehe
+    Each test runs inside an outer transaction that is rolled back after the
+    test. So that production code such as ``audit_service.log_action``,
+    which internally calls ``session.commit()``, doesn't leak between
+    tests, this uses the official SQLAlchemy "Joined Session for External
+    Transaction" pattern (see
     https://docs.sqlalchemy.org/en/20/orm/session_transaction.html
     #joining-a-session-into-an-external-transaction-such-as-for-test-suites):
 
-    - Die Session wird mit ``join_transaction_mode="create_savepoint"``
-      angelegt — jeder Commit innerhalb des Tests wirkt nur auf das
-      Savepoint, nicht auf die äussere Transaction.
-    - Am Test-Ende rollt die äussere Transaction zurück und verwirft
-      alles, was im Test geschrieben wurde.
+    - The session is created with ``join_transaction_mode="create_savepoint"``
+      — every commit within the test only affects the savepoint, not the
+      outer transaction.
+    - At the end of the test, the outer transaction rolls back and discards
+      everything written during the test.
 
-    Effekt: ``session.commit()`` im Produktivcode wirkt innerhalb des
-    Tests sichtbar, leakt aber nicht über die Test-Grenze hinaus. Die
-    vorherige SAWarning "transaction already deassociated from
-    connection" verschwindet.
+    Effect: ``session.commit()`` in production code is visible within the
+    test but doesn't leak across the test boundary. The previous SAWarning
+    "transaction already deassociated from connection" disappears.
     """
     connection = test_engine.connect()
     transaction = connection.begin()
@@ -218,14 +216,14 @@ def client():
 
 @pytest.fixture(scope="function")
 def temp_upload_dir():
-    """Temporäres Upload-Verzeichnis für Tests"""
+    """Temporary upload directory for tests"""
     with tempfile.TemporaryDirectory() as temp_dir:
         yield temp_dir
 
 
 @pytest.fixture(scope="function")
 def sample_text_file():
-    """Erstelle temporäre Test-Textdatei"""
+    """Create a temporary test text file"""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
         f.write("Dies ist ein Test-Dokument für Unit Tests.\n")
         f.write("Es enthält mehrere Zeilen Text.\n")
@@ -241,13 +239,13 @@ def sample_text_file():
 
 @pytest.fixture(scope="function")
 def sample_pdf_content():
-    """Mock PDF-Inhalt für Tests"""
+    """Mock PDF content for tests"""
     return b"%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n"
 
 
 @pytest.fixture(scope="function")
 def mock_upload_file():
-    """Mock UploadFile für Tests"""
+    """Mock UploadFile for tests"""
     from io import BytesIO
     from fastapi import UploadFile
 
@@ -263,7 +261,7 @@ def mock_upload_file():
 
 @pytest.fixture(scope="function")
 def test_institution(test_db):
-    """Erstelle Test-Institution für Subscription Limit Tests"""
+    """Create test institution for subscription limit tests"""
     from models.auth import Institution
 
     institution = Institution(
@@ -307,10 +305,10 @@ def _make_mock_user(is_admin: bool = False):
 def help_db(test_engine):
     """DB session for help tests with seeded Institution + User for FK constraints.
 
-    Cleanup beim Teardown: löscht User(id=999) und Institution(id=998), damit
-    diese Rows nicht später von ``Institution.first()``-Fixtures in anderen
-    Test-Files (test_quota_enforcement_integration, test_profile_permissions_
-    and_institution u.a.) als "frische" Institution interpretiert werden.
+    Cleanup on teardown: deletes User(id=999) and Institution(id=998) so
+    these rows aren't later picked up by ``Institution.first()`` fixtures in
+    other test files (test_quota_enforcement_integration, test_profile_permissions_
+    and_institution, among others) as a "fresh" institution.
     """
     from sqlalchemy.orm import sessionmaker
     from models.auth import Institution, User

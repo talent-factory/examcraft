@@ -1,15 +1,15 @@
 /**
- * Notenexport-Panel — TF-335 Spec 9.
+ * Notenexport panel — TF-335 Spec 9.
  *
- * Drei Formate (CSV / Moodle-CSV / PDF) per Radio. Download-Button
- * deaktiviert solange noch Submissions im Status `pending_review` oder
- * `partially_reviewed` sind — der Backend-Endpoint blockiert mit 409
- * (i18n key `submissions_grade_export_blocked_pending_review`), aber
- * wir spiegeln die Sperre auch im UI, damit der Button nicht
- * scheinbar nichts tut.
+ * Three formats (CSV / Moodle-CSV / PDF) via radio buttons. The download
+ * button is disabled while submissions are still in `pending_review` or
+ * `partially_reviewed` status — the backend endpoint blocks with 409
+ * (i18n key `submissions_grade_export_blocked_pending_review`), but
+ * we mirror the block in the UI too, so the button doesn't
+ * appear to do nothing.
  *
- * Ein Hinweis-Banner mit Link zur Review-Queue zeigt sich, wenn der
- * Export aktuell blockiert ist.
+ * A hint banner with a link to the review queue is shown when the
+ * export is currently blocked.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -214,11 +214,11 @@ const NotenexportPanel: React.FC<NotenexportPanelProps> = ({
       URL.revokeObjectURL(objectUrl);
     } catch (err) {
       if (err instanceof ApiError) {
-        // Branch on err.kind so the lehrperson sees an actionable
+        // Branch on err.kind so the teacher sees an actionable
         // message instead of "Export failed (500)". Conflict (409)
         // surfaces the backend's translated detail directly because
         // it carries the specific reason (pending review vs. draft
-        // status vs. "etwas anderes").
+        // status vs. "something else").
         switch (err.kind) {
           case 'auth':
             setError(t('auswertungen.export.errorAuth'));

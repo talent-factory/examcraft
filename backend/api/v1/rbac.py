@@ -1,6 +1,6 @@
 """
-RBAC API Endpoints für ExamCraft AI
-REST API für RBAC Management (Roles, Features, Permissions, Quotas)
+RBAC API Endpoints for ExamCraft AI
+REST API for RBAC Management (Roles, Features, Permissions, Quotas)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -113,8 +113,8 @@ async def list_features(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Listet alle verfügbaren Features auf.
-    Optional filterbar nach Kategorie.
+    Lists all available features.
+    Optionally filterable by category.
     """
     query = db.query(Feature)
 
@@ -136,7 +136,7 @@ async def get_feature(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Gibt Details zu einem spezifischen Feature zurück.
+    Returns details for a specific feature.
     """
     locale = get_request_locale(request, current_user)
     feature = db.query(Feature).filter(Feature.id == feature_id).first()
@@ -160,14 +160,14 @@ async def list_roles(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Listet alle Rollen auf.
+    Lists all roles.
     """
     rbac_service = RBACService(db)
     roles = rbac_service.list_roles(
         include_system_roles=include_system_roles, include_inactive=include_inactive
     )
 
-    # Features für jede Rolle laden
+    # Load features for each role
     result = []
     for role in roles:
         features = rbac_service.get_role_features(role.id)
@@ -186,7 +186,7 @@ async def get_role(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Gibt Details zu einer spezifischen Rolle zurück.
+    Returns details for a specific role.
     """
     locale = get_request_locale(request, current_user)
     role = db.query(RBACRole).filter(RBACRole.id == role_id).first()
@@ -213,8 +213,8 @@ async def list_subscription_tiers(
     active_only: bool = True, db: Session = Depends(get_db)
 ):
     """
-    Listet alle Subscription Tiers auf.
-    Öffentlicher Endpoint (kein Auth erforderlich).
+    Lists all subscription tiers.
+    Public endpoint (no auth required).
     """
     query = db.query(SubscriptionTier)
 
@@ -228,9 +228,9 @@ async def list_subscription_tiers(
 @router.get("/tiers/current", response_model=SubscriptionTierResponse)
 async def get_current_tier(request: Request, db: Session = Depends(get_db)):
     """
-    Gibt den aktuellen/Standard Subscription Tier zurück.
-    Basiert auf der DEFAULT_SUBSCRIPTION_TIER Environment Variable.
-    Öffentlicher Endpoint (kein Auth erforderlich).
+    Returns the current/default subscription tier.
+    Based on the DEFAULT_SUBSCRIPTION_TIER environment variable.
+    Public endpoint (no auth required).
 
     **DEPRECATED**: Use /tiers/my instead to get the authenticated user's institution tier.
     """
@@ -267,7 +267,7 @@ async def get_my_tier(
     db: Session = Depends(get_db),
 ):
     """
-    Gibt den Subscription Tier der Institution des eingeloggten Users zurück.
+    Returns the subscription tier of the logged-in user's institution.
     Requires Authentication.
 
     Returns:
@@ -314,8 +314,8 @@ async def get_my_tier(
 @router.get("/tiers/{tier_id}/quotas", response_model=List[TierQuotaResponse])
 async def get_tier_quotas(tier_id: str, db: Session = Depends(get_db)):
     """
-    Gibt alle Quotas für einen Subscription Tier zurück.
-    Öffentlicher Endpoint (kein Auth erforderlich).
+    Returns all quotas for a subscription tier.
+    Public endpoint (no auth required).
     """
     quotas = db.query(TierQuota).filter(TierQuota.tier_id == tier_id).all()
     return quotas
@@ -333,7 +333,7 @@ async def check_feature_permission(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Prüft ob der aktuelle User Zugriff auf ein Feature hat.
+    Checks whether the current user has access to a feature.
     """
     rbac_service = RBACService(db)
     has_access = rbac_service.user_has_feature_access(
@@ -352,7 +352,7 @@ async def check_resource_quota(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Prüft ob die Institution des Users noch Quota verfügbar hat.
+    Checks whether the user's institution still has quota available.
     """
     locale = get_request_locale(request, current_user)
     if not current_user.institution_id:

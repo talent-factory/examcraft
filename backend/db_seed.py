@@ -1,27 +1,27 @@
-"""Idempotenter System-Seed für plattformweite Referenzdaten.
+"""Idempotent system seed for platform-wide reference data.
 
-Single Source of Truth für die System-Notenschemata (``grading_schemes`` mit
-``institution_id IS NULL``). Wird von **beiden** Pfaden aufgerufen:
+Single source of truth for the system grading schemes (``grading_schemes``
+with ``institution_id IS NULL``). Called from **both** paths:
 
-* der Alembic-Migration ``tf333`` (regulärer Prod-/Migrationspfad), und
-* dem ``create_all``-Bootstrap (``database.py`` Fresh-DB-Zweig sowie
-  ``just repro-reset``), der Migrationskörper *überspringt* und die Schemata
-  sonst nie erhielte (TF-433).
+* the Alembic migration ``tf333`` (regular prod/migration path), and
+* the ``create_all`` bootstrap (``database.py`` fresh-DB branch as well as
+  ``just repro-reset``), which *skips* migration bodies and would otherwise
+  never receive the schemes (TF-433).
 
-Der Seed ist **idempotent per Name**: mehrfacher Aufruf fügt nichts doppelt ein,
-sodass er gefahrlos bei jedem Bootstrap laufen kann und bestehende DBs heilt.
+The seed is **idempotent per name**: calling it repeatedly never inserts
+duplicates, so it can safely run on every bootstrap and heal existing DBs.
 
-Bewusst nur ``sqlalchemy`` als Abhängigkeit (kein ORM-Modell-Import), damit die
-Migration ihn importieren kann, ohne an driftende Modell-Definitionen zu koppeln.
+Deliberately only depends on ``sqlalchemy`` (no ORM model import) so the
+migration can import it without coupling to drifting model definitions.
 """
 
 from __future__ import annotations
 
 import sqlalchemy as sa
 
-# Plattformweite System-Notenschemata (institution_id = NULL). In einer komplett
-# leeren Tabelle bekommt der erste Eintrag id=1; auf den exakten Wert verlässt sich
-# aber nichts — die Repro-Recipes sammeln Schemata per tatsächlicher ID, nicht per id=1.
+# Platform-wide system grading schemes (institution_id = NULL). In a completely
+# empty table the first entry gets id=1; but nothing relies on that exact value —
+# the repro recipes collect schemes by their actual ID, not by id=1.
 SYSTEM_GRADING_SCHEMES: list[dict] = [
     {
         "name": "Swiss 1.0–6.0",
@@ -131,7 +131,7 @@ SYSTEM_GRADING_SCHEMES: list[dict] = [
     },
 ]
 
-# Leichtgewichtige Core-Table-Projektion (kein ORM-Modell-Import — siehe Docstring).
+# Lightweight core Table projection (no ORM model import — see docstring).
 _grading_schemes = sa.table(
     "grading_schemes",
     sa.column("institution_id", sa.Integer),
@@ -143,12 +143,12 @@ _grading_schemes = sa.table(
 
 
 def seed_system_grading_schemes(conn: sa.engine.Connection) -> int:
-    """Fügt fehlende System-Notenschemata (``institution_id IS NULL``) ein.
+    """Inserts missing system grading schemes (``institution_id IS NULL``).
 
-    Idempotent per ``name``: bereits vorhandene Schemata werden übersprungen.
-    Erwartet eine aktive ``Connection`` (z.B. ``op.get_bind()`` in der Migration
-    oder ``engine.begin()`` im Bootstrap). Gibt die Anzahl eingefügter Zeilen
-    zurück.
+    Idempotent per ``name``: schemes that already exist are skipped.
+    Expects an active ``Connection`` (e.g. ``op.get_bind()`` in the migration
+    or ``engine.begin()`` in the bootstrap). Returns the number of rows
+    inserted.
     """
     existing = set(
         conn.execute(

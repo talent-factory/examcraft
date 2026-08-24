@@ -335,7 +335,7 @@ def test_class_history_excludes_removed_member(
     student_class = two_exams_setup["class"]
     bruno = two_exams_setup["bruno"]
 
-    # Bruno aus der Klasse entfernen.
+    # Remove Bruno from the class.
     test_db.query(StudentClassMembership).filter(
         StudentClassMembership.class_id == student_class.id,
         StudentClassMembership.student_id == bruno.id,
@@ -372,7 +372,7 @@ def test_student_history_chronological_with_bloom_and_topics(
     topics = {t.topic for t in stats.topic_heatmap}
     assert topics == {"Geo", "History"}
 
-    # Anna ist Mitglied von INF-23a.
+    # Anna is a member of INF-23a.
     assert {c.class_name for c in stats.classes} == {"INF-23a"}
 
 
@@ -468,7 +468,7 @@ def test_class_history_with_no_members(test_db: Session) -> None:
     """A class with no members must return zero-shaped stats, not 500.
 
     The dashboard renders this as an "empty" state; if the service
-    crashed, the whole Klassen-page would 500."""
+    crashed, the whole class page would 500."""
     inst = _make_institution(test_db, slug="tf336-stats-empty-cls")
     student_class = StudentClass(institution_id=inst.id, name="Leere-Klasse")
     test_db.add(student_class)

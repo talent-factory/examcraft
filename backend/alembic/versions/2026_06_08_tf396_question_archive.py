@@ -1,9 +1,9 @@
-"""tf396: Archiv-Achse (archived_at/by/reason) auf question_reviews
+"""tf396: archive axis (archived_at/by/reason) on question_reviews
 
-Orthogonal zum review_status. archived_at IS NULL => aktiv; gesetzt =>
-archiviert (aus Bank/Listen ausgeblendet, in Prüfungen aber erhalten).
-Additive, nullable Spalten + partieller Index — nicht-destruktiv, unbedenklich
-unter AUTO_MIGRATE=true. Altbestand bleibt NULL ("aktiv"). (TF-396)
+Orthogonal to review_status. archived_at IS NULL => active; set =>
+archived (hidden from bank/lists, but retained in exams). Additive,
+nullable columns + partial index — non-destructive, safe under
+AUTO_MIGRATE=true. Existing rows stay NULL ("active"). (TF-396)
 
 Revision ID: tf396_question_archive
 Revises: tf383_question_gen_metadata
@@ -41,14 +41,14 @@ def upgrade() -> None:
         ["id"],
         ondelete="SET NULL",
     )
-    # Partieller Index NUR auf archivierte Zeilen (archived_at IS NOT NULL):
-    # beschleunigt die Archiv-/Admin-Aufräumansicht (archived_only). Der
-    # Default-Filter (archived_at IS NULL) profitiert NICHT von diesem Index —
-    # Postgres nutzt einen partiellen Index nur, wenn das Query-Prädikat das
-    # Index-Prädikat impliziert; IS NULL schliesst alle indizierten Zeilen aus.
-    # Bewusst so: die archivierte Menge ist klein und selektiv, die aktive
-    # (IS NULL) gross und unselektiv. Plain CREATE INDEX (kein CONCURRENTLY —
-    # würde In-Transaction-Migrationstests brechen).
+    # Partial index ONLY on archived rows (archived_at IS NOT NULL):
+    # speeds up the archive/admin cleanup view (archived_only). The
+    # default filter (archived_at IS NULL) does NOT benefit from this index —
+    # Postgres only uses a partial index when the query predicate implies
+    # the index predicate; IS NULL excludes all indexed rows. Deliberate:
+    # the archived set is small and selective, the active (IS NULL) set is
+    # large and unselective. Plain CREATE INDEX (no CONCURRENTLY — would
+    # break in-transaction migration tests).
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_question_reviews_archived_at "
         "ON question_reviews (archived_at) WHERE archived_at IS NOT NULL"

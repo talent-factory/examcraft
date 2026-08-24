@@ -1,4 +1,4 @@
-"""API-Tests für Kompetenzrahmen-CRUD (TF-400)."""
+"""API tests for competency framework CRUD (TF-400)."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -266,14 +266,14 @@ _RENDERED_WITH_HK = (
 
 
 def test_create_derives_competencies_from_rendered_text(api_client):
-    """TF-400: ohne explizite competencies werden HKs aus rendered_text geparst."""
+    """TF-400: without explicit competencies, HKs are parsed from rendered_text."""
     payload = {
         "name": "Modul B – via rendered_text",
         "module_code": "B",
         "rendered_text": _RENDERED_WITH_HK,
         "language": "de",
         "visibility": "institution",
-        # bewusst KEIN competencies-Feld → Ableitung greift
+        # deliberately NO competencies field → derivation kicks in
     }
     r = api_client.post("/api/v1/competency-frameworks", json=payload)
     assert r.status_code == 201, r.text
@@ -285,7 +285,7 @@ def test_create_derives_competencies_from_rendered_text(api_client):
 
 
 def test_update_rendered_text_syncs_competencies(api_client):
-    """TF-400: ändert sich rendered_text, werden die HKs neu abgeleitet (upsert)."""
+    """TF-400: when rendered_text changes, the HKs are re-derived (upsert)."""
     fw_id = api_client.post(
         "/api/v1/competency-frameworks",
         json={
@@ -296,7 +296,7 @@ def test_update_rendered_text_syncs_competencies(api_client):
             "visibility": "institution",
         },
     ).json()["id"]
-    # Anfangs keine HKs (rendered_text hat keine ### B<n>-Headings)
+    # Initially no HKs (rendered_text has no ### B<n> headings)
     assert (
         api_client.get(f"/api/v1/competency-frameworks/{fw_id}").json()["competencies"]
         == []
@@ -312,7 +312,7 @@ def test_update_rendered_text_syncs_competencies(api_client):
 
 
 def test_framework_out_exposes_created_by(api_client):
-    """FrameworkOut liefert created_by, damit das Frontend Ownership prüfen kann."""
+    """FrameworkOut returns created_by so the frontend can check ownership."""
     created = api_client.post("/api/v1/competency-frameworks", json=_payload()).json()
     assert "created_by" in created
     assert created["created_by"] is not None
@@ -333,9 +333,9 @@ _RENDERED_DUPLICATE_HEADINGS = (
 
 
 def test_create_with_duplicate_headings_dedupes_not_500(api_client):
-    """Doppelte ### B1-Headings im rendered_text dürfen keinen 500
-    (IntegrityError auf ux_competencies_framework_code) erzeugen — der Code wird
-    dedupliziert (erste Fassung gewinnt)."""
+    """Duplicate ### B1 headings in rendered_text must not produce a 500
+    (IntegrityError on ux_competencies_framework_code) — the code is
+    deduplicated (first version wins)."""
     payload = {
         "name": "Modul mit Dublette",
         "rendered_text": _RENDERED_DUPLICATE_HEADINGS,
@@ -348,8 +348,8 @@ def test_create_with_duplicate_headings_dedupes_not_500(api_client):
 
 
 def test_create_with_malformed_competency_code_returns_422(api_client):
-    """CompetencyIn.code muss dem Parser-Format ^[A-Za-z]\\d+$ entsprechen
-    (Tagging-Kontrakt); ein abweichender Code wird mit 422 abgewiesen."""
+    """CompetencyIn.code must match the parser format ^[A-Za-z]\\d+$
+    (tagging contract); a deviating code is rejected with 422."""
     payload = _payload()
     payload["competencies"] = [
         {"code": "nicht ok", "title": "x", "descriptors": [], "position": 1}
@@ -359,8 +359,8 @@ def test_create_with_malformed_competency_code_returns_422(api_client):
 
 
 def test_create_with_explicit_duplicate_codes_returns_400(api_client):
-    """Zwei explizite competencies mit gleichem Code sind ein Client-Fehler →
-    400 mit Code in der Meldung, kein roher 500."""
+    """Two explicit competencies with the same code are a client error →
+    400 with the code in the message, not a bare 500."""
     payload = _payload()
     payload["competencies"] = [
         {"code": "B1", "title": "erste", "descriptors": [], "position": 1},
@@ -372,9 +372,9 @@ def test_create_with_explicit_duplicate_codes_returns_400(api_client):
 
 
 def test_update_retains_removed_competency_code(api_client):
-    """_sync_competencies_from_text behält Codes, die nicht mehr im rendered_text
-    stehen (sonst SET NULL auf question_reviews.competency_id), und aktualisiert
-    weiterhin vorhandene Codes in-place."""
+    """_sync_competencies_from_text keeps codes that are no longer present in
+    rendered_text (otherwise SET NULL on question_reviews.competency_id), and
+    still updates existing codes in-place."""
     fw_id = api_client.post(
         "/api/v1/competency-frameworks",
         json={
@@ -385,20 +385,20 @@ def test_update_retains_removed_competency_code(api_client):
         },
     ).json()["id"]
 
-    # Update: nur noch B1, mit geändertem Titel; B2 fehlt im neuen Text.
+    # Update: only B1 remains, with a changed title; B2 is missing from the new text.
     r = api_client.put(
         f"/api/v1/competency-frameworks/{fw_id}",
         json={"rendered_text": "# HKB\n\n### B1 neuer Titel\n\n- Kriterium. (LN 2)\n"},
     )
     assert r.status_code == 200, r.text
     by_code = {c["code"]: c for c in r.json()["competencies"]}
-    assert set(by_code) == {"B1", "B2"}  # B2 erhalten (FK-schonend)
-    assert by_code["B1"]["title"] == "neuer Titel"  # B1 in-place aktualisiert
+    assert set(by_code) == {"B1", "B2"}  # B2 retained (FK-safe)
+    assert by_code["B1"]["title"] == "neuer Titel"  # B1 updated in-place
 
 
 def test_private_framework_visible_to_creator_only(test_db, seeded_user):
-    """Ein privates Framework ist für den Ersteller sichtbar, aber nicht für
-    andere Nutzer derselben Institution (visibility='private')."""
+    """A private framework is visible to its creator, but not to other users
+    of the same institution (visibility='private')."""
     owner, inst = seeded_user
     owner_client = _make_client(test_db, owner.id, owner.institution_id)
     payload = _payload()

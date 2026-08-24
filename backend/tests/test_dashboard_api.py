@@ -1,5 +1,5 @@
 # core/backend/tests/test_dashboard_api.py
-"""Tests für Dashboard API (TF-319)"""
+"""Tests for the Dashboard API (TF-319)"""
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -141,10 +141,10 @@ def make_exam(
 
 
 def make_dashboard_client(test_db: Session, institution_id: int, user_id: int):
-    """TestClient mit übergebener DB-Session und User-Override.
+    """TestClient with the given DB session and user override.
 
-    Registriert den Dashboard-Router direkt (ohne lifespan), analog zu
-    test_exam_api.py – FastAPI dedupliziert identische Routen.
+    Registers the dashboard router directly (without lifespan), analogous to
+    test_exam_api.py — FastAPI deduplicates identical routes.
     """
     import api.dashboard as dashboard_module
     from models.auth import User as UserModel
@@ -167,7 +167,7 @@ def make_dashboard_client(test_db: Session, institution_id: int, user_id: int):
 
 class TestDashboardStats:
     def test_stats_returns_zeros_for_empty_institution(self, test_db: Session):
-        """Leere Institution → alle Werte 0."""
+        """Empty institution → all values 0."""
         inst = make_institution(test_db, "Empty Inst")
         user = make_user(test_db, inst.id, "empty@test.ch")
         test_db.commit()
@@ -185,7 +185,7 @@ class TestDashboardStats:
             app.dependency_overrides.clear()
 
     def test_stats_counts_own_institution_only(self, test_db: Session):
-        """Counts sind institution-weit, nicht global."""
+        """Counts are institution-wide, not global."""
         inst_a = make_institution(test_db, "Inst A")
         inst_b = make_institution(test_db, "Inst B")
         user_a = make_user(test_db, inst_a.id, "a@test.ch")
@@ -199,7 +199,7 @@ class TestDashboardStats:
         make_question(test_db, inst_a.id, user_a.id, ReviewStatus.PENDING.value)
         make_exam(test_db, inst_a.id, user_a.id)
 
-        # inst_b: 5 docs (sollten für user_a nicht sichtbar sein)
+        # inst_b: 5 docs (should not be visible to user_a)
         for i in range(5):
             make_document(test_db, inst_b.id, user_b.id, f"b{i}.pdf")
 
@@ -218,7 +218,7 @@ class TestDashboardStats:
             app.dependency_overrides.clear()
 
     def test_stats_requires_auth(self):
-        """Unauthentifizierter Request → 401."""
+        """Unauthenticated request → 401."""
         import api.dashboard as dashboard_module
 
         app.dependency_overrides.clear()
@@ -231,7 +231,7 @@ class TestDashboardStats:
 
 class TestDashboardActivity:
     def test_activity_empty(self, test_db: Session):
-        """Keine Daten → leere Liste."""
+        """No data → empty list."""
         inst = make_institution(test_db, "Empty Act")
         user = make_user(test_db, inst.id, "emptyact@test.ch")
         test_db.commit()
@@ -246,10 +246,10 @@ class TestDashboardActivity:
             app.dependency_overrides.clear()
 
     def test_activity_returns_max_25(self, test_db: Session):
-        """Mehr als 25 Datensätze → nur 25 werden zurückgegeben.
+        """More than 25 records → only 25 are returned.
 
-        Limit wurde mit dem TF-319 Follow-up-Commit von 10 auf 25 erhöht;
-        die Aktivitätsliste fasst per Aktivitätstyp jeweils 25 Einträge.
+        Limit was raised from 10 to 25 in the TF-319 follow-up commit;
+        the activity list holds 25 entries per activity type.
         """
         inst = make_institution(test_db, "Many Act")
         user = make_user(test_db, inst.id, "manyact@test.ch")
@@ -268,7 +268,7 @@ class TestDashboardActivity:
             app.dependency_overrides.clear()
 
     def test_activity_types_present(self, test_db: Session):
-        """Alle vier Aktivitätstypen werden korrekt zurückgegeben."""
+        """All four activity types are returned correctly."""
         inst = make_institution(test_db, "Types Act")
         user = make_user(test_db, inst.id, "types@test.ch")
         make_document(test_db, inst.id, user.id, "file.pdf")
@@ -291,7 +291,7 @@ class TestDashboardActivity:
             app.dependency_overrides.clear()
 
     def test_activity_sorted_by_timestamp_desc(self, test_db: Session):
-        """Aktivitäten sind absteigend nach timestamp sortiert."""
+        """Activities are sorted descending by timestamp."""
         inst = make_institution(test_db, "Sort Act")
         user = make_user(test_db, inst.id, "sort@test.ch")
         make_document(test_db, inst.id, user.id, "first.pdf")
@@ -309,7 +309,7 @@ class TestDashboardActivity:
             app.dependency_overrides.clear()
 
     def test_activity_isolates_institution(self, test_db: Session):
-        """Activities einer anderen Institution sind nicht sichtbar."""
+        """Activities from another institution are not visible."""
         inst_a = make_institution(test_db, "ActA")
         inst_b = make_institution(test_db, "ActB")
         user_a = make_user(test_db, inst_a.id, "acta@test.ch")
@@ -327,13 +327,13 @@ class TestDashboardActivity:
             app.dependency_overrides.clear()
 
     def test_activity_isolates_users_in_same_institution(self, test_db: Session):
-        """Lehrperson sieht keine Aktivitäten von Kolleg:innen.
+        """A teacher sees no activities from colleagues.
 
-        Pinnt das per-User-Filtering aller 7 Activity-Quellen
+        Pins the per-user filtering of all 7 activity sources
         (create_document, questions_generated via QuestionReview,
         approve_question, reject_question, create_exam, delete_exam,
-        delete_document). Eine Copy-Paste-Regression auf einer der
-        Quellen würde diesen Test fehlschlagen lassen.
+        delete_document). A copy-paste regression on any of the
+        sources would make this test fail.
         """
         inst = make_institution(test_db, "PrivacyInst")
         user_a = make_user(test_db, inst.id, "a@privacy.ch")
@@ -374,8 +374,8 @@ class TestDashboardActivity:
             resp = client.get("/api/dashboard/activity")
             assert resp.status_code == 200
             data = resp.json()
-            # User A hat keine eigenen Aktivitäten und sieht auch
-            # keine von User B aus irgend einer der 7 Quellen.
+            # User A has no activities of their own and also sees
+            # none of User B's from any of the 7 sources.
             assert data["activities"] == []
         finally:
             app.dependency_overrides.clear()
@@ -432,8 +432,8 @@ class TestDashboardActivity:
     def test_activity_returns_only_own_events_when_both_users_active(
         self, test_db: Session
     ):
-        """User A sieht nur eigene Events, auch wenn beide User
-        Aktivitäten in derselben Institution haben."""
+        """User A sees only their own events, even when both users
+        have activities in the same institution."""
         inst = make_institution(test_db, "MixedInst")
         user_a = make_user(test_db, inst.id, "a@mixed.ch")
         user_b = make_user(test_db, inst.id, "b@mixed.ch")

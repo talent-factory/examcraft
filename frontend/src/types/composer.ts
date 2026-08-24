@@ -1,7 +1,7 @@
 import type { Tag } from '../api/tagsApi';
 export type { Tag };
 
-// TF-406: Sortierung des Fragenpools im Prüfungskomponist.
+// TF-406: sort order of the question pool in the exam composer.
 export type QuestionSort = 'newest' | 'most_used' | 'difficulty';
 
 export enum ExamStatus {
@@ -43,13 +43,13 @@ export interface Exam {
   updated_at: string;
   question_count: number;
   default_document_ids: number[] | null;
-  // TF-335: NULL ⇒ Exam erbt Institution-Default (oder bleibt ohne).
+  // TF-335: NULL ⇒ exam inherits the institution default (or stays without one).
   grading_scheme_id?: number | null;
-  // TF-398: Archiv-Achse — orthogonal zu status. archived_at !== null ⇒ archiviert.
+  // TF-398: archive axis — orthogonal to status. archived_at !== null ⇒ archived.
   archived_at?: string | null;
   archived_by?: number | null;
   archive_reason?: string | null;
-  // Ob die Prüfung Abgaben hat (Guard für den Lösch-Button).
+  // Whether the exam has submissions (guard for the delete button).
   has_submissions?: boolean;
 }
 
@@ -63,7 +63,7 @@ export interface UpdateExamRequest extends Partial<CreateExamRequest> { updated_
 export interface ApprovedQuestion { id: number; question_text: string; question_type: string; difficulty: string; topic: string; bloom_level: number | null; options: string[] | null; usage_count: number; tags?: Tag[]; }
 export interface ApprovedQuestionsResponse { total: number; questions: ApprovedQuestion[]; }
 
-// TF-405: Read-only Detail für das Vorschau-Modal im Prüfungskomponist.
+// TF-405: read-only detail for the preview modal in the exam composer.
 export interface ApprovedQuestionOption { text: string; is_correct: boolean; }
 export interface ApprovedQuestionSourceDocument { id: number; title: string; }
 export interface ApprovedQuestionCompetency { id: number; code: string; title: string; framework_id: number; module_code?: string | null; }

@@ -1,5 +1,5 @@
 """
-Tests für Claude API Endpoints - Health Check und Usage Statistics
+Tests for Claude API endpoints - health check and usage statistics
 
 SKIPPED: These endpoints do not exist in Core package.
 Claude API endpoints were moved to Premium package or removed.
@@ -17,7 +17,7 @@ pytestmark = pytest.mark.skip(
 
 
 class TestClaudeAPIEndpoints:
-    """Test Suite für Claude API Endpoints"""
+    """Test suite for Claude API endpoints"""
 
     @pytest.fixture
     def client(self):
@@ -92,7 +92,7 @@ class TestClaudeAPIEndpoints:
             assert not data["demo_mode"]
 
     def test_claude_usage_endpoint_demo_mode(self, client):
-        """Test Claude Usage Endpoint im Demo Mode"""
+        """Test Claude Usage Endpoint in Demo Mode"""
         mock_service = Mock()
         mock_service.get_usage_stats.return_value = {
             "total_cost": 0.0,
@@ -114,7 +114,7 @@ class TestClaudeAPIEndpoints:
     def test_generate_exam_endpoint_with_claude_success(
         self, client, mock_claude_service
     ):
-        """Test Exam Generation mit erfolgreichem Claude API Call"""
+        """Test Exam Generation with successful Claude API call"""
         # Mock successful question generation
         mock_claude_service.generate_questions.return_value = [
             {
@@ -150,7 +150,7 @@ class TestClaudeAPIEndpoints:
             assert "metadata" in data
 
     def test_generate_exam_endpoint_fallback_to_demo(self, client):
-        """Test Exam Generation mit Fallback zu Demo Mode"""
+        """Test Exam Generation with fallback to Demo Mode"""
         mock_service = Mock()
         mock_service.generate_questions.side_effect = Exception("API Error")
 
@@ -164,24 +164,24 @@ class TestClaudeAPIEndpoints:
             assert response.status_code == 200
 
     def test_generate_exam_endpoint_invalid_request(self, client):
-        """Test Exam Generation mit invaliden Daten"""
+        """Test Exam Generation with invalid data"""
         response = client.post(
             "/api/v1/generate-exam",
             json={
-                "topic": "",  # Leeres Topic
-                "difficulty": "invalid",  # Invalide Schwierigkeit
-                "question_count": -1,  # Negative Anzahl
+                "topic": "",  # Empty topic
+                "difficulty": "invalid",  # Invalid difficulty
+                "question_count": -1,  # Negative count
             },
         )
 
         assert response.status_code == 422  # Validation Error
 
     def test_generate_exam_endpoint_missing_fields(self, client):
-        """Test Exam Generation mit fehlenden Feldern"""
+        """Test Exam Generation with missing fields"""
         response = client.post(
             "/api/v1/generate-exam",
             json={
-                # Fehlendes topic
+                # Missing topic
                 "difficulty": "medium"
             },
         )
@@ -190,7 +190,7 @@ class TestClaudeAPIEndpoints:
 
 
 class TestClaudeServiceEndToEnd:
-    """End-to-End Tests für Claude Service Integration"""
+    """End-to-end tests for Claude Service integration"""
 
     @pytest.fixture
     def client(self):
@@ -198,12 +198,12 @@ class TestClaudeServiceEndToEnd:
 
     @pytest.mark.asyncio
     async def test_full_exam_generation_workflow(self, client):
-        """Test kompletter Exam Generation Workflow"""
+        """Test complete Exam Generation workflow"""
         # Test 1: Health Check
         health_response = client.get("/api/v1/claude/health")
         assert health_response.status_code == 200
 
-        # Test 2: Usage Stats (sollte initial 0 sein)
+        # Test 2: Usage stats (should initially be 0)
         usage_response = client.get("/api/v1/claude/usage")
         assert usage_response.status_code == 200
         usage_response.json()
@@ -228,16 +228,16 @@ class TestClaudeServiceEndToEnd:
         assert "exam_id" in exam_data
         assert "created_at" in exam_data
 
-        # Test 4: Usage Stats nach Exam Generation
+        # Test 4: Usage stats after exam generation
         final_usage_response = client.get("/api/v1/claude/usage")
         assert final_usage_response.status_code == 200
         final_usage_response.json()
 
-        # Im Demo Mode sollten sich die Stats nicht ändern
-        # Im echten API Mode würden sich Token Counts erhöhen
+        # In demo mode the stats should not change
+        # In real API mode, token counts would increase
 
     def test_concurrent_requests_rate_limiting(self, client):
-        """Test Rate Limiting bei gleichzeitigen Requests"""
+        """Test rate limiting under concurrent requests"""
         import concurrent.futures
 
         def make_request():
@@ -250,39 +250,39 @@ class TestClaudeServiceEndToEnd:
                 },
             )
 
-        # Sende mehrere gleichzeitige Requests
+        # Send multiple concurrent requests
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(make_request) for _ in range(5)]
             responses = [future.result() for future in futures]
 
-        # Alle Requests sollten erfolgreich sein (Demo Mode oder Rate Limiting)
+        # All requests should succeed (demo mode or rate limiting)
         for response in responses:
             assert response.status_code in [200, 429]  # 429 = Rate Limited
 
     def test_error_handling_and_recovery(self, client):
-        """Test Error Handling und Recovery"""
-        # Test mit verschiedenen invaliden Inputs
+        """Test error handling and recovery"""
+        # Test with various invalid inputs
         test_cases = [
             {
                 "topic": "A" * 1000,
                 "difficulty": "medium",
                 "question_count": 1,
-            },  # Sehr langes Topic
+            },  # Very long topic
             {
                 "topic": "Test",
                 "difficulty": "medium",
                 "question_count": 100,
-            },  # Zu viele Fragen
+            },  # Too many questions
             {
                 "topic": "Test",
                 "difficulty": "impossible",
                 "question_count": 1,
-            },  # Invalide Schwierigkeit
+            },  # Invalid difficulty
         ]
 
         for test_case in test_cases:
             response = client.post("/api/v1/generate-exam", json=test_case)
-            # Sollte entweder validiert werden (422) oder erfolgreich sein (200)
+            # Should either be validated (422) or succeed (200)
             assert response.status_code in [200, 422]
 
 

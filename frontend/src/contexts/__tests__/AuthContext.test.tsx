@@ -166,10 +166,9 @@ describe('AuthContext — token refresh', () => {
   });
 
   it('clears wizard snapshots on logout (TF-608)', async () => {
-    // sessionStorage überlebt den Benutzerwechsel im selben Tab, und der
-    // Wizard-Snapshot enthält getippten Inhalt (Prüfungsthema). Auf einem
-    // geteilten Rechner bekäme der nächste Nutzer sonst den Stand seines
-    // Vorgängers zu sehen.
+    // sessionStorage survives a user switch within the same tab, and the
+    // wizard snapshot contains typed content (exam topic). On a shared
+    // machine, the next user would otherwise see their predecessor's state.
     writeSessionSnapshot('ragExamWizard', 1, { ragRequest: { topic: 'Vertraulich' } });
     expect(readSessionSnapshot('ragExamWizard', 1)).not.toBeNull();
 
@@ -246,20 +245,19 @@ describe('AuthContext — token refresh', () => {
   });
 
   it('clears wizard snapshots when a stale session is found expired on mount (TF-608)', async () => {
-    // Der interessantere Fall als der explizite Logout-Klick oben: eine
-    // abgelaufene Sitzung liegt bereits im localStorage eines offenen Tabs
-    // (z. B. ein geteilter Rechner), und `loadAuthState`s Mount-Pfad in
-    // AuthContext.tsx — nicht der `tokenRefreshCallback` — stellt das fest.
-    // Genau der Fall, in dem jemand weggegangen ist und sich jemand anderes
-    // an den Rechner setzt (siehe Kommentar an der Aufrufstelle).
+    // The more interesting case than the explicit logout click above: an
+    // expired session already sits in an open tab's localStorage (e.g. a
+    // shared machine), and `loadAuthState`'s mount path in AuthContext.tsx —
+    // not the `tokenRefreshCallback` — is the one that detects it. Exactly
+    // the case where someone walked away and someone else sits down at the
+    // machine (see the comment at the call site).
     //
-    // Echte Timer statt der Suite-weiten Fake-Timer: `isAuthenticated` ist
-    // schon im Initial-State `false` — ein `waitFor` darauf würde beim
-    // allerersten (synchronen) Poll grün werden, bevor die mehrstufige
-    // async-Kette (getProfile → refreshToken → clearAllSessionSnapshots)
-    // überhaupt einmal durchgelaufen ist. Ohne echte Timer bleibt unklar, ob
-    // `waitFor`s Polling unter Fake-Timern zuverlässig mehrere
-    // Promise-Hops abwartet.
+    // Real timers instead of the suite-wide fake timers: `isAuthenticated` is
+    // already `false` in the initial state — a `waitFor` on it would pass on
+    // the very first (synchronous) poll, before the multi-step async chain
+    // (getProfile → refreshToken → clearAllSessionSnapshots) has run even
+    // once. Without real timers it stays unclear whether `waitFor`'s polling
+    // reliably waits out several promise hops under fake timers.
     jest.useRealTimers();
 
     writeSessionSnapshot('ragExamWizard', 1, { ragRequest: { topic: 'Vertraulich' } });
@@ -280,10 +278,9 @@ describe('AuthContext — token refresh', () => {
       </AuthProvider>,
     );
 
-    // Zielgerichtet auf den eigentlich zu prüfenden Seiteneffekt warten,
-    // nicht auf `isAuthenticated` — das ist schon vor der async-Kette
-    // `false` und würde ein `waitFor` sofort (fälschlich) grün werden
-    // lassen.
+    // Wait specifically for the side effect actually under test, not for
+    // `isAuthenticated` — that is already `false` before the async chain
+    // runs and would make a `waitFor` on it pass immediately (falsely).
     await waitFor(
       () => {
         expect(readSessionSnapshot('ragExamWizard', 1)).toBeNull();

@@ -29,7 +29,7 @@ from services.import_service import ImportService, ImportValidationError
 
 
 # ---------------------------------------------------------------------------
-# Test-Fixtures: Institution + Exam mit gemischten Frage-Typen
+# Test fixtures: institution + exam with mixed question types
 # ---------------------------------------------------------------------------
 
 
@@ -51,7 +51,7 @@ def institution(test_db: Session) -> Institution:
 
 @pytest.fixture
 def exam_with_questions(test_db: Session, institution: Institution) -> Exam:
-    """Prüfung mit 1 MC, 1 W/F, 1 offene Frage. Punkte: 4 + 1 + 5 = 10."""
+    """Exam with 1 MC, 1 T/F, 1 open-ended question. Points: 4 + 1 + 5 = 10."""
     mc_q = QuestionReview(
         question_text="Hauptstadt der Schweiz?",
         question_type="single_choice",
@@ -168,9 +168,9 @@ def _json_source(rows: list[dict]) -> bytes:
 
 
 def _json_two_students(*, anna_q1: str = "Bern", anna_q2: str = "wahr") -> bytes:
-    """Zwei Studierende mit je einem Versuch.
+    """Two students, each with one attempt.
 
-    Anna: anpassbare Antworten. Bruno: alles falsch.
+    Anna: customizable answers. Bruno: everything wrong.
     """
     return _json_source(
         [
@@ -189,7 +189,7 @@ def _json_two_students(*, anna_q1: str = "Bern", anna_q2: str = "wahr") -> bytes
 
 
 # ---------------------------------------------------------------------------
-# Preview (kein Persistenz)
+# Preview (no persistence)
 # ---------------------------------------------------------------------------
 
 
@@ -225,7 +225,7 @@ def test_validate_rejects_mismatched_exam_id(
 def test_validate_rejects_question_id_outside_exam(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
-    """AttemptAnswer mit fremder exam_question_id ⇒ Hard-Failure."""
+    """AttemptAnswer with a foreign exam_question_id ⇒ hard failure."""
     from services.import_drivers import (
         AnswerRecord,
         AttemptRecord,
@@ -293,7 +293,7 @@ def test_commit_persists_students_attempts_grades(
     assert test_db.query(Student).count() == 2
     assert test_db.query(Submission).count() == 2
     assert test_db.query(Attempt).count() == 2
-    # 2 Versuche × 3 Antworten = 6 AttemptAnswers + 6 Grades
+    # 2 attempts × 3 answers = 6 AttemptAnswers + 6 Grades
     assert test_db.query(AttemptAnswer).count() == 6
     assert test_db.query(Grade).count() == 6
 
@@ -372,11 +372,11 @@ def test_anna_gets_full_mc_and_tf_points(
         .one()
     )
 
-    # MC (4 P.) + W/F (1 P.) korrekt; offene Frage stub = 0 P.
+    # MC (4 pts) + T/F (1 pt) correct; open question stub = 0 pts
     assert submission.total_points_awarded == 5.0
     assert submission.total_points_max == 10.0
     assert submission.percentage == pytest.approx(50.0)
-    # offene Frage vorhanden ⇒ pending_review (Phase-2-Routing)
+    # open question present ⇒ pending_review (phase-2 routing)
     assert submission.grade_status == "pending_review"
 
 
@@ -413,11 +413,11 @@ def test_grades_have_correct_status_and_correctness(
     )
     grades = test_db.query(Grade).all()
     assert all(g.status == "proposed" for g in grades)
-    # Genau eine richtige MC + eine richtige W/F (Annas Versuch):
+    # Exactly one correct MC + one correct T/F (Anna's attempt):
     correct_count = sum(1 for g in grades if g.is_correct is True)
     open_ended_count = sum(1 for g in grades if g.is_correct is None)
     assert correct_count == 2
-    assert open_ended_count == 2  # offene Frage × 2 Studis
+    assert open_ended_count == 2  # open-ended question × 2 students
 
 
 # ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ def test_re_import_same_csv_creates_no_duplicates(
     )
     assert job1.status == "succeeded"
 
-    # Zweiter Import mit identischer CSV
+    # Second import with identical CSV
     job2 = service.commit(
         exam=exam_with_questions,
         driver_name="moodle_json",
@@ -454,7 +454,7 @@ def test_re_import_same_csv_creates_no_duplicates(
     # test mocks this contract — assert the backend actually emits it.
     assert job2.rows_processed == 0
     assert (job2.source_metadata or {}).get("attempts_skipped_idempotent") == 2
-    # Keine zusätzlichen Versuche / Antworten / Grades:
+    # No additional attempts / answers / grades:
     assert test_db.query(Attempt).count() == 2
     assert test_db.query(AttemptAnswer).count() == 6
     assert test_db.query(Grade).count() == 6
@@ -464,8 +464,8 @@ def test_re_import_same_csv_creates_no_duplicates(
 def test_second_import_with_new_attempt_adds_only_delta(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
-    """Bestehende Versuche idempotent skipped; nur neue Versuche werden
-    persistiert."""
+    """Existing attempts are idempotently skipped; only new attempts are
+    persisted."""
     service = ImportService(test_db)
 
     json_v1 = _json_two_students()
@@ -476,10 +476,10 @@ def test_second_import_with_new_attempt_adds_only_delta(
         triggered_by=None,
     )
 
-    # v2: Anna macht zusätzlich einen zweiten Versuch (anderer
-    # Started-Zeitstempel) — Bruno bleibt gleich. Reihenfolge erhält die
-    # Versuchs-Nummerierung (1 vor 2), sodass der erste Versuch idempotent
-    # übersprungen und nur der zweite ergänzt wird.
+    # v2: Anna additionally makes a second attempt (different started
+    # timestamp) — Bruno stays the same. Ordering preserves the attempt
+    # numbering (1 before 2), so the first attempt is idempotently
+    # skipped and only the second one is added.
     json_v2 = _json_source(
         [
             _attempt_row(email="anna@example.org"),
@@ -516,7 +516,7 @@ def test_second_import_with_new_attempt_adds_only_delta(
         .filter(Submission.student_id == anna.id)
         .all()
     )
-    assert len(anna_attempts) == 2  # erster Versuch + neuer Versuch
+    assert len(anna_attempts) == 2  # first attempt + new attempt
     bruno_attempts = (
         test_db.query(Attempt)
         .join(Submission, Submission.id == Attempt.submission_id)
@@ -530,12 +530,12 @@ def test_second_import_with_new_attempt_adds_only_delta(
 def _make_exam_with_same_questions(
     test_db: Session, institution: Institution, *, title: str
 ) -> Exam:
-    """Zweite Prüfung mit denselben Fragetexten wie ``exam_with_questions``.
+    """Second exam with the same question texts as ``exam_with_questions``.
 
-    Eigene ``QuestionReview``-Zeilen mit identischem Text — der JSON-Driver
-    matcht über Text, nicht über IDs, also mappt dieselbe Quelle auf beide
-    Prüfungen. Spiegelt die Prod-Realität (zwei separate Prüfungen mit
-    identischen Fragen in derselben Institution).
+    Its own ``QuestionReview`` rows with identical text — the JSON driver
+    matches by text, not by ID, so the same source maps onto both exams.
+    Mirrors the prod reality (two separate exams with identical questions
+    in the same institution).
     """
     mc_q = QuestionReview(
         question_text=_Q1,
@@ -594,16 +594,16 @@ def _make_exam_with_same_questions(
 def test_same_source_attempt_imports_into_two_exams_same_institution(
     test_db: Session, exam_with_questions: Exam, institution: Institution
 ) -> None:
-    """TF-500: Derselbe Moodle-Attempt muss in ZWEI verschiedene Prüfungen
-    derselben Institution importiert werden können.
+    """TF-500: the same Moodle attempt must be importable into TWO different
+    exams of the same institution.
 
-    Regression: Der Idempotenz-Check dedupte institutions-weit auf
-    ``(institution_id, source, source_attempt_id)`` — ohne ``exam_id``, und die
-    DB-Unique-Constraint war ebenso institutions-scoped. Ein zweiter Import
-    derselben Moodle-Resultate in eine *andere* Prüfung lief dadurch still leer
-    (``rows_processed=0, status=succeeded``), die Prüfung blieb leer. Der
-    Idempotenz-Schutz darf nur denselben Attempt in dieselbe Prüfung
-    deduplizieren, nicht prüfungsübergreifend.
+    Regression: the idempotency check deduplicated institution-wide on
+    ``(institution_id, source, source_attempt_id)`` — without ``exam_id``, and
+    the DB unique constraint was likewise institution-scoped. A second import
+    of the same Moodle results into a *different* exam therefore ran silently
+    empty (``rows_processed=0, status=succeeded``), leaving the exam empty.
+    The idempotency protection must only deduplicate the same attempt within
+    the same exam, not across exams.
     """
     service = ImportService(test_db)
     source = _json_two_students()
@@ -620,7 +620,7 @@ def test_same_source_attempt_imports_into_two_exams_same_institution(
         test_db, institution, title="Zweite Prüfung gleiche Fragen"
     )
 
-    # Identische Quelle (gleiche source_attempt_ids) in die ZWEITE Prüfung.
+    # Identical source (same source_attempt_ids) into the SECOND exam.
     job_b = service.commit(
         exam=exam_b,
         driver_name="moodle_json",
@@ -628,7 +628,7 @@ def test_same_source_attempt_imports_into_two_exams_same_institution(
         triggered_by=None,
     )
     assert job_b.status == "succeeded"
-    # Vor dem Fix: 0 (alle als institutions-weites Duplikat übersprungen).
+    # Before the fix: 0 (all skipped as an institution-wide duplicate).
     assert job_b.rows_processed == 2
 
     subs_a = (
@@ -649,7 +649,7 @@ def test_same_source_attempt_imports_into_two_exams_same_institution(
 def test_partial_failure_when_some_rows_invalid(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
-    """Eine Zeile ohne E-Mail → row error; Job-Status partial."""
+    """A row without an email → row error; job status partial."""
     service = ImportService(test_db)
     json_with_bad_row = _json_source(
         [
@@ -705,7 +705,7 @@ def test_empty_csv_marks_job_failed(
             source="",
             triggered_by=None,
         )
-    # ImportJob existiert + ist auf failed
+    # ImportJob exists + is set to failed
     job = test_db.query(ImportJob).order_by(ImportJob.id.desc()).first()
     assert job is not None
     assert job.status == "failed"
@@ -723,7 +723,7 @@ def test_unknown_driver_raises(test_db: Session, exam_with_questions: Exam) -> N
 
 
 # ---------------------------------------------------------------------------
-# Scoring-Strategy für Mehrfachversuche
+# Scoring strategy for multiple attempts
 # ---------------------------------------------------------------------------
 
 
@@ -733,9 +733,9 @@ def test_latest_strategy_picks_most_recent_attempt(
     service = ImportService(test_db)
     json_two_attempts = _json_source(
         [
-            # Versuch 1: alles falsch
+            # Attempt 1: all wrong
             _attempt_row(email="anna@example.org", a1="Zürich", a2="falsch", a3=""),
-            # Versuch 2: korrekt
+            # Attempt 2: correct
             _attempt_row(
                 email="anna@example.org",
                 begonnen="2026-05-16 10:00:00",
@@ -758,7 +758,7 @@ def test_latest_strategy_picks_most_recent_attempt(
         .filter(Student.external_id == "anna@example.org")
         .one()
     )
-    # Default 'latest' → der zweite Versuch zählt:
+    # Default 'latest' → the second attempt counts:
     assert submission.total_points_awarded == 5.0  # MC 4 + W/F 1
 
 
@@ -791,24 +791,24 @@ def test_best_strategy_picks_highest_scoring_attempt(
         .filter(Student.external_id == "anna@example.org")
         .one()
     )
-    # Strategy umstellen + erneut grading auslösen:
+    # Switch strategy + trigger grading again:
     submission.scoring_strategy = "best"
     test_db.flush()
     service.grading_service.grade_submission(submission.id)
     test_db.refresh(submission)
-    assert submission.total_points_awarded == 5.0  # erster Versuch wins
+    assert submission.total_points_awarded == 5.0  # first attempt wins
 
 
 # ---------------------------------------------------------------------------
-# Multi-Tenancy: Studierende sind institution-scoped
+# Multi-tenancy: students are institution-scoped
 # ---------------------------------------------------------------------------
 
 
 def test_same_external_id_in_different_institutions_are_separate(
     test_db: Session,
 ) -> None:
-    """Zwei Institutions ⇒ zwei voneinander unabhängige Student-Records
-    auch bei identischer external_id."""
+    """Two institutions ⇒ two independent student records
+    even with an identical external_id."""
     inst_a = Institution(
         name="Inst A",
         slug="inst-a",
@@ -1154,14 +1154,14 @@ def test_attempt_with_null_timestamps_does_not_crash_pick_attempt(
 
 
 # ---------------------------------------------------------------------------
-# Cross-Tenant-Isolation für Idempotenz-Schlüssel
+# Cross-tenant isolation for idempotency keys
 # ---------------------------------------------------------------------------
 
 
 def test_two_institutions_can_have_overlapping_source_attempt_ids(
     test_db: Session, institution: Institution
 ) -> None:
-    """Regression for the Cross-Tenant-Idempotenz-Bug: two institutions
+    """Regression for the cross-tenant idempotency bug: two institutions
     with the *same* (driver_name, source_attempt_id) tuple must not
     collide. Before scoping the unique constraint by institution_id,
     tenant B's import would either raise IntegrityError or be silently
@@ -1375,7 +1375,7 @@ def test_extract_constraint_name_prefers_diag_attribute() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Surface stiller Fehler im _persist_attempts: student is None branch
+# Surface silent errors in _persist_attempts: student is None branch
 # ---------------------------------------------------------------------------
 
 
@@ -1475,10 +1475,10 @@ def test_queued_job_is_reused_by_commit_without_duplicate(
 
 
 # ---------------------------------------------------------------------------
-# Audit-Trail (TF-501): das Anlegen eines Imports erzeugt Studierenden-PII
-# und muss — symmetrisch zum fail-closed ``delete_result_import`` — eine
-# Audit-Spur hinterlassen. Hier best-effort: ein fehlschlagender Audit-Write
-# darf den bereits committeten Import nicht zurückrollen.
+# Audit trail (TF-501): creating an import generates student PII and must
+# — symmetrically to the fail-closed ``delete_result_import`` — leave an
+# audit trail. Here, best-effort: a failing audit write must not roll
+# back an already-committed import.
 # ---------------------------------------------------------------------------
 
 
@@ -1515,7 +1515,7 @@ def test_commit_writes_create_result_import_audit_log(
 def test_commit_audit_log_records_triggering_user(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
-    """TF-501: der Audit-Eintrag hält fest, WER die PII angelegt hat."""
+    """TF-501: the audit entry records WHO created the PII."""
     from models.auth import AuditLog, User, UserStatus
 
     user = User(
@@ -1548,8 +1548,8 @@ def test_commit_audit_log_records_triggering_user(
 def test_commit_succeeds_even_if_audit_write_fails(
     test_db: Session, exam_with_questions: Exam, monkeypatch
 ) -> None:
-    """TF-501: Audit ist best-effort. Ein fehlschlagender Audit-Write darf den
-    bereits durabel committeten Import weder scheitern lassen noch zurückrollen."""
+    """TF-501: audit is best-effort. A failing audit write must neither fail
+    nor roll back an already durably committed import."""
     from services.audit_service import AuditService
 
     def _boom(*args, **kwargs):

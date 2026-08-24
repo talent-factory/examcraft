@@ -306,13 +306,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
 
   return (
     <aside
-      // Höhe = Viewport minus 64px Navbar. Ursprünglich war 'screen-minus-nav'
-      // unter theme.extend.minHeight konfiguriert — falscher Theme-Key für eine
-      // h-*-Utility (die zieht theme.height, nicht minHeight), daher hat
-      // 'h-screen-minus-nav' nie CSS erzeugt und die Sidebar hatte gar keine
-      // Höhe. Fix als Arbitrary-Value statt Korrektur des Theme-Keys, weil
-      // tailwind.config.js im Dev-Container nicht gemountet ist (nur src/) —
-      // Config-Änderungen bräuchten sonst einen Image-Rebuild (TF-506).
+      // Height = viewport minus 64px navbar. Originally configured as
+      // 'screen-minus-nav' under theme.extend.minHeight — the wrong theme key
+      // for an h-*-utility (that one pulls from theme.height, not minHeight),
+      // so 'h-screen-minus-nav' never generated any CSS and the sidebar had
+      // no height at all. Fixed as an arbitrary value instead of correcting
+      // the theme key, because tailwind.config.js isn't mounted in the dev
+      // container (only src/ is) — config changes would otherwise require an
+      // image rebuild (TF-506).
       className={`fixed left-0 top-16 h-[calc(100vh_-_64px)] bg-white border-r border-gray-200 transition-all duration-250 z-40 ${
         isOpen ? 'w-sidebar' : 'w-sidebar-collapsed'
       }`}
@@ -352,8 +353,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
         {/* Version Footer */}
         {isOpen && (() => {
           const version = process.env.REACT_APP_VERSION;
-          // Bei fehlendem Version-Build-Arg → Liste-View als Fallback;
-          // sonst direkt auf das spezifische Release-Tag verlinken.
+          // If the version build arg is missing → fall back to the list view;
+          // otherwise link directly to the specific release tag.
           const releasesBase = 'https://github.com/talent-factory/examcraft/releases';
           const href = version ? `${releasesBase}/tag/v${version}` : releasesBase;
           return (

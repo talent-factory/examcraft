@@ -1,7 +1,7 @@
-"""Kompetenzrahmen-API (HKB/Modul + HK) für ExamCraft AI (TF-400).
+"""Competency framework API (HKB/module + HK) for ExamCraft AI (TF-400).
 
-Sichtbarkeit (private/team/institution) + ``competencies:read_all``-Bypass
-seit TF-644 — siehe ``models.competency.CompetencyFrameworkVisibility`` und
+Visibility (private/team/institution) + ``competencies:read_all`` bypass
+since TF-644 — see ``models.competency.CompetencyFrameworkVisibility`` and
 ``utils.competency_visibility``.
 """
 
@@ -44,9 +44,9 @@ class DescriptorIn(BaseModel):
 
 
 class CompetencyIn(BaseModel):
-    # Code-Format wie vom Parser erzeugt (ein Buchstabe + Ziffern, z. B. "B3").
-    # Das Tagging (competency_code → competency_id) verlässt sich darauf; beide
-    # Schreibpfade (explizite API-Eingabe + rendered_text) müssen es teilen.
+    # Code format as produced by the parser (one letter + digits, e.g. "B3").
+    # Tagging (competency_code → competency_id) relies on this; both write
+    # paths (explicit API input + rendered_text) must share it.
     code: str = Field(..., min_length=1, max_length=10, pattern=r"^[A-Za-z]\d+$")
     title: str = Field(..., min_length=1)
     descriptors: Optional[List[DescriptorIn]] = None
@@ -162,21 +162,22 @@ async def list_frameworks(
 
 
 def _sync_competencies_from_text(fw: CompetencyFramework) -> int:
-    """TF-400: leitet HKs aus fw.rendered_text ab und upsertet sie per Code.
+    """TF-400: derives HKs from fw.rendered_text and upserts them by code.
 
-    FK-schonend: bestehende Codes werden aktualisiert, neue ergänzt; nicht mehr
-    im Text vorhandene Codes bleiben erhalten (sonst würde
-    question_reviews.competency_id über SET NULL verloren gehen). Gibt die
-    Anzahl der im Text gefundenen HKs zurück.
+    FK-preserving: existing codes are updated, new ones added; codes no
+    longer present in the text are kept (otherwise
+    question_reviews.competency_id would be lost via SET NULL). Returns
+    the number of HKs found in the text.
     """
     parsed = parse_competencies(fw.rendered_text)
     existing = {c.code: c for c in fw.competencies}
     seen: set[str] = set()
     for p in parsed:
         code = p["code"]
-        # Freitext kann denselben ### Code mehrfach enthalten — nur das erste
-        # Vorkommen zählt. Ohne Dedup gäbe es zwei Competency-Zeilen mit gleichem
-        # Code und damit eine UniqueViolation (ux_competencies_framework_code).
+        # Free text can contain the same ### code multiple times — only the
+        # first occurrence counts. Without dedup there would be two competency
+        # rows with the same code, causing a UniqueViolation
+        # (ux_competencies_framework_code).
         if code in seen:
             logger.info(
                 "Kompetenzrahmen id=%s: doppeltes HK-Heading %r im rendered_text "
@@ -204,9 +205,9 @@ def _sync_competencies_from_text(fw: CompetencyFramework) -> int:
 
 
 def _commit_or_conflict(db: Session, user_id: int) -> None:
-    """Commit; eine IntegrityError (z. B. doppelter Kompetenz-Code aus
-    Race/Parallel-Edit) wird als sauberer 400 statt als roher 500 gemeldet und
-    die Session zurückgerollt."""
+    """Commit; an IntegrityError (e.g. a duplicate competency code from a
+    race/parallel edit) is reported as a clean 400 instead of a raw 500,
+    and the session is rolled back."""
     try:
         db.commit()
     except IntegrityError:
@@ -300,7 +301,7 @@ async def create_framework(
         created_by=current_user.id,
     )
     if body.competencies:
-        # Doppelte Codes sind ein Client-Fehler → klarer 400 statt UniqueViolation.
+        # Duplicate codes are a client error → clear 400 instead of UniqueViolation.
         seen: set[str] = set()
         for c in body.competencies:
             if c.code in seen:
@@ -321,8 +322,8 @@ async def create_framework(
                 )
             )
     else:
-        # TF-400: keine HKs explizit übergeben → aus rendered_text ableiten,
-        # damit auch via GUI erfasste Frameworks strukturiertes Tagging erhalten.
+        # TF-400: no HKs explicitly given → derive from rendered_text, so
+        # frameworks captured via the GUI also get structured tagging.
         _sync_competencies_from_text(fw)
     db.add(fw)
     _commit_or_conflict(db, current_user.id)
@@ -457,8 +458,8 @@ async def update_framework(
         fw.org_unit_id = visibility_update["org_unit_id"]
     for field, value in fields.items():
         setattr(fw, field, value)
-    # TF-400: bei geändertem rendered_text die strukturierten HKs neu ableiten
-    # (upsert per Code), damit das Tagging zur Quelle konsistent bleibt.
+    # TF-400: re-derive the structured HKs when rendered_text changed
+    # (upsert by code), so the tagging stays consistent with the source.
     if "rendered_text" in fields:
         _sync_competencies_from_text(fw)
     _commit_or_conflict(db, current_user.id)

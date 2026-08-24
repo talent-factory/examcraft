@@ -1,16 +1,16 @@
 """
-Tests für .txt- und .md-Extraktion im PyMuPDFProcessor.
+Tests for .txt and .md extraction in PyMuPDFProcessor.
 
-Hintergrund: Die DOCX-Vektorisierungs-Bugfix-Story (TF-331) deckte die Frage auf,
-ob die anderen unterstützten Textformate (.txt und .md) ebenfalls vollständig
-durch die Pipeline laufen. Konkret:
+Background: the DOCX vectorization bugfix story (TF-331) raised the question
+of whether the other supported text formats (.txt and .md) also make it
+fully through the pipeline. Specifically:
 
-* `.md` wird von `libmagic` als `text/plain` klassifiziert — wir müssen die
-  Datei-Endung priorisieren, damit der Markdown-spezifische Code-Pfad
-  (Heading-Extraktion, Syntax-Stripping) erreicht wird.
-* `_process_markdown` muss — analog zu `_process_text` — einen Latin-1-Fallback
-  bieten, um nicht-UTF-8-Markdown-Dateien nicht hart fallen zu lassen.
-* End-to-End: Beide Formate müssen non-leere Chunks plus Metadaten produzieren.
+* `.md` is classified by `libmagic` as `text/plain` — we must prioritize the
+  file extension so the markdown-specific code path (heading extraction,
+  syntax stripping) is reached.
+* `_process_markdown` must — analogous to `_process_text` — offer a Latin-1
+  fallback so non-UTF-8 markdown files don't fail hard.
+* End-to-end: both formats must produce non-empty chunks plus metadata.
 """
 
 import fitz
@@ -271,7 +271,7 @@ def test_pymupdf_processor_ocr_flag_enabled():
 def test_is_ocr_available_requires_env_binary_and_traineddata(monkeypatch):
     from services.document_processors import processor_factory
 
-    # Voll verfügbar: Env gesetzt + Binary im PATH + Sprachpaket vorhanden.
+    # Fully available: env set + binary on PATH + language pack present.
     monkeypatch.setenv("TESSDATA_PREFIX", "/fake/tessdata")
     monkeypatch.setattr(
         processor_factory.shutil, "which", lambda _: "/usr/bin/tesseract"
@@ -279,16 +279,16 @@ def test_is_ocr_available_requires_env_binary_and_traineddata(monkeypatch):
     monkeypatch.setattr(processor_factory.os.path, "isfile", lambda _: True)
     assert processor_factory.is_ocr_available() is True
 
-    # Env fehlt -> nicht verfügbar.
+    # Env missing -> unavailable.
     monkeypatch.delenv("TESSDATA_PREFIX", raising=False)
     assert processor_factory.is_ocr_available() is False
 
-    # Env gesetzt, aber Tesseract-Binary fehlt -> nicht verfügbar.
+    # Env set, but Tesseract binary missing -> unavailable.
     monkeypatch.setenv("TESSDATA_PREFIX", "/fake/tessdata")
     monkeypatch.setattr(processor_factory.shutil, "which", lambda _: None)
     assert processor_factory.is_ocr_available() is False
 
-    # Binary da, aber traineddata fehlt -> nicht verfügbar.
+    # Binary present, but traineddata missing -> unavailable.
     monkeypatch.setattr(
         processor_factory.shutil, "which", lambda _: "/usr/bin/tesseract"
     )
@@ -306,7 +306,7 @@ def test_create_ocr_processor_enables_ocr():
 
 
 def _make_pdf(tmp_path, n_pages: int = 2, name: str = "scan.pdf") -> str:
-    """Erzeuge ein mehrseitiges PDF (Inhalt egal — OCR-Aufruf wird gemockt)."""
+    """Generate a multi-page PDF (content irrelevant — OCR call is mocked)."""
     doc = fitz.open()
     for _ in range(n_pages):
         doc.new_page()
@@ -318,7 +318,7 @@ def _make_pdf(tmp_path, n_pages: int = 2, name: str = "scan.pdf") -> str:
 
 @pytest.mark.asyncio
 async def test_pdf_ocr_page_failure_counted_not_fatal(tmp_path, monkeypatch):
-    """Nicht-RuntimeError-Abbruch auf einer OCR-Seite: zählen, nicht fatal."""
+    """A non-RuntimeError abort on one OCR page: counted, not fatal."""
     processor = PyMuPDFProcessor(enable_ocr=True)
     path = _make_pdf(tmp_path, n_pages=2)
 
@@ -334,14 +334,14 @@ async def test_pdf_ocr_page_failure_counted_not_fatal(tmp_path, monkeypatch):
     )
 
     full_text = " ".join(c.content for c in result.chunks)
-    assert "SEITENTEXT 0" in full_text  # überlebende Seite erhalten
+    assert "SEITENTEXT 0" in full_text  # surviving page is retained
     assert result.metadata["ocr_pages_attempted"] == 2
     assert result.metadata["ocr_pages_discarded"] == 1
 
 
 @pytest.mark.asyncio
 async def test_pdf_ocr_engine_failure_still_fatal(tmp_path, monkeypatch):
-    """RuntimeError-Pfad bleibt fatal: DocumentProcessingError(OCR_ENGINE_FAILURE)."""
+    """RuntimeError path remains fatal: DocumentProcessingError(OCR_ENGINE_FAILURE)."""
     processor = PyMuPDFProcessor(enable_ocr=True)
     path = _make_pdf(tmp_path, n_pages=2)
 
@@ -364,7 +364,7 @@ async def test_pdf_ocr_engine_failure_still_fatal(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ocr_pdf_page_converts_runtimeerror_to_engine_failure():
-    """Der Helper wandelt RuntimeError aus get_textpage_ocr in OCR_ENGINE_FAILURE."""
+    """The helper converts a RuntimeError from get_textpage_ocr into OCR_ENGINE_FAILURE."""
     processor = PyMuPDFProcessor(enable_ocr=True)
 
     class _FakePage:
@@ -378,7 +378,7 @@ async def test_ocr_pdf_page_converts_runtimeerror_to_engine_failure():
 
 @pytest.mark.asyncio
 async def test_ocr_pdf_page_returns_text_on_success():
-    """Erfolgsfall: Helper liefert den OCR-Text der Textpage zurück."""
+    """Success case: the helper returns the OCR text of the textpage."""
     processor = PyMuPDFProcessor(enable_ocr=True)
 
     sentinel_tp = object()
@@ -396,7 +396,7 @@ async def test_ocr_pdf_page_returns_text_on_success():
 
 @pytest.mark.asyncio
 async def test_pdf_no_discard_metadata_when_ocr_disabled(tmp_path):
-    """Erstlauf ohne OCR setzt keine Discard-Metadaten."""
+    """First run without OCR does not set any discard metadata."""
     processor = PyMuPDFProcessor(enable_ocr=False)
     path = _make_pdf(tmp_path, n_pages=1)
     result = await processor.process_document(

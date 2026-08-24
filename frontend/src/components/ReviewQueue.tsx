@@ -93,11 +93,11 @@ const ReviewQueue: React.FC = () => {
   const [actionQuestionId, setActionQuestionId] = useState<number | null>(null);
   const [actionReason, setActionReason] = useState('');
 
-  // TF-396: Permission-Gating + Hard-Delete-Bestätigung
+  // TF-396: Permission gating + hard-delete confirmation
   const { hasPermission } = useAuth();
   const canDelete = hasPermission('delete_questions');
   const [deleteQuestionId, setDeleteQuestionId] = useState<number | null>(null);
-  // TF-408: Lösch-Fehler inline im Dialog anzeigen (statt Banner oben, ausserhalb des Viewports)
+  // TF-408: Show delete error inline in the dialog (instead of a banner above, outside the viewport)
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Load questions
@@ -198,7 +198,7 @@ const ReviewQueue: React.FC = () => {
     }
   };
 
-  // TF-396: Archivieren / Wiederherstellen / Hard-Delete
+  // TF-396: Archive / restore / hard-delete
   const handleArchive = async (questionId: number) => {
     setLoading(true);
     try {
@@ -228,7 +228,7 @@ const ReviewQueue: React.FC = () => {
     setDeleteQuestionId(questionId);
   };
 
-  // TF-408: Dialog schliessen und Lösch-Fehler zurücksetzen
+  // TF-408: Close dialog and reset delete error
   const closeDeleteDialog = () => {
     setDeleteQuestionId(null);
     setDeleteError(null);
@@ -243,9 +243,9 @@ const ReviewQueue: React.FC = () => {
       closeDeleteDialog();
       await loadQuestions();
     } catch (err) {
-      // TF-408: Fehler inline im offenen Dialog zeigen — der Dialog bleibt
-      // offen (deleteQuestionId unverändert), damit die Meldung immer im
-      // Fokus des Benutzers liegt, statt als Banner oben ausserhalb des Viewports.
+      // TF-408: Show the error inline in the open dialog — the dialog stays
+      // open (deleteQuestionId unchanged) so the message always stays in the
+      // user's focus, instead of as a banner above, outside the viewport.
       setDeleteError(err instanceof Error ? err.message : t('components.reviewQueue.errorDelete'));
     } finally {
       setLoading(false);
@@ -256,8 +256,8 @@ const ReviewQueue: React.FC = () => {
     setLoading(true);
     try {
       await ReviewService.editQuestion(questionId, updates);
-      // Modal-Schliessen und Datenneuladung erfolgen einmalig in onClose,
-      // nachdem auch die Tags gespeichert wurden.
+      // Closing the modal and reloading data happen once in onClose,
+      // after the tags have also been saved.
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save changes');
       throw err;
@@ -533,7 +533,7 @@ const ReviewQueue: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* TF-396: Hard-Delete Bestätigung */}
+      {/* TF-396: Hard-delete confirmation */}
       <Dialog
         open={deleteQuestionId !== null}
         onClose={closeDeleteDialog}
@@ -543,7 +543,7 @@ const ReviewQueue: React.FC = () => {
         <DialogTitle>{t('components.reviewQueue.deleteTitle')}</DialogTitle>
         <DialogContent>
           <Typography>{t('components.reviewQueue.deleteConfirm')}</Typography>
-          {/* TF-408: Lösch-Fehler inline im Dialog — immer im Viewport, dort wo der Benutzer interagiert */}
+          {/* TF-408: Delete error inline in the dialog — always in the viewport, right where the user is interacting */}
           {deleteError && (
             <Alert severity="error" sx={{ mt: 2 }}>
               {deleteError}

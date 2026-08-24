@@ -1,14 +1,14 @@
-"""TF-333: Auswertungen — Datenmodell für Resultate-Import + Bewertung
+"""TF-333: Results — data model for results import + grading
 
 Spec: docs/superpowers/specs/2026-04-30-exam-results-import-grading-design.md
 
-Additive Migration (kein Datenverlust): legt 11 neue Tabellen + drei
-Spalten-Erweiterungen an, alle Indexes aus Spec Abschnitt 4.3, den Partial
-Unique Index auf grading_schemes(institution_id) für Default-Schemes pro
-Institution, sowie den Seed der 8 System-Grading-Schemes (Spec 4.6).
+Additive migration (no data loss): creates 11 new tables + three column
+extensions, all indexes from spec section 4.3, the partial unique index
+on grading_schemes(institution_id) for default schemes per institution,
+plus the seed of the 8 system grading schemes (spec 4.6).
 
-`AUTO_MIGRATE=true` ist in Prod aktiv → die Migration läuft beim
-Deployment automatisch. Da rein additiv, kein Downtime-Risiko.
+`AUTO_MIGRATE=true` is active in prod → the migration runs automatically
+on deployment. Purely additive, so no downtime risk.
 
 Revision ID: tf333_phase1
 Revises: tf331_display_name
@@ -28,15 +28,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 # ---------------------------------------------------------------------------
-# System-Grading-Schemes (Spec 4.6) leben jetzt in
-# db_seed.SYSTEM_GRADING_SCHEMES (TF-433): Single Source of Truth, geteilt mit
-# dem create_all-Bootstrap (database.py / just repro-reset), der diesen
-# Migrationskörper überspringt. Eingespielt via seed_system_grading_schemes().
+# System grading schemes (spec 4.6) now live in
+# db_seed.SYSTEM_GRADING_SCHEMES (TF-433): single source of truth, shared with
+# the create_all bootstrap (database.py / just repro-reset), which skips this
+# migration body. Applied via seed_system_grading_schemes().
 
 
 def upgrade() -> None:
     # ------------------------------------------------------------------
-    # 1) grading_schemes (institution_id NULL = System-Scheme)
+    # 1) grading_schemes (institution_id NULL = system scheme)
     # ------------------------------------------------------------------
     op.create_table(
         "grading_schemes",
@@ -83,7 +83,7 @@ def upgrade() -> None:
         ["institution_id"],
         unique=False,
     )
-    # Partial Unique Index: höchstens ein Default pro Institution
+    # Partial unique index: at most one default per institution
     op.create_index(
         "uq_grading_schemes_default_per_institution",
         "grading_schemes",
@@ -93,12 +93,12 @@ def upgrade() -> None:
             "is_default_for_institution = true AND institution_id IS NOT NULL"
         ),
     )
-    # System-Schemes (institution_id IS NULL) müssen eindeutig sein.
-    # Postgres behandelt NULL in Unique-Constraints standardmässig als
-    # "distinct", was beim Re-Run einer fehlgeschlagenen Migration zu
-    # stillem Duplizieren der 8 Default-Schemes führen würde. Dieser
-    # partielle Unique-Index lässt Duplikat-Inserts laut crashen statt
-    # Operator-unsichtbar einen zweiten "Swiss 1.0–6.0" anzulegen.
+    # System schemes (institution_id IS NULL) must be unique.
+    # Postgres treats NULL in unique constraints as "distinct" by default,
+    # which would silently duplicate the 8 default schemes on a re-run of
+    # a failed migration. This partial unique index makes duplicate
+    # inserts crash loudly instead of silently creating a second
+    # "Swiss 1.0–6.0" invisible to the operator.
     op.create_index(
         "uq_grading_schemes_system_name",
         "grading_schemes",
@@ -108,16 +108,16 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # 2) Seed System-Grading-Schemes
+    # 2) Seed system grading schemes
     # ------------------------------------------------------------------
-    # Single Source: db_seed.SYSTEM_GRADING_SCHEMES, geteilt mit dem create_all-
-    # Bootstrap, der diesen Migrationskörper überspringt (TF-433). Idempotent.
+    # Single source: db_seed.SYSTEM_GRADING_SCHEMES, shared with the create_all
+    # bootstrap, which skips this migration body (TF-433). Idempotent.
     from db_seed import seed_system_grading_schemes
 
     seed_system_grading_schemes(op.get_bind())
 
     # ------------------------------------------------------------------
-    # 3) Studierenden-Stammdaten
+    # 3) Student master data
     # ------------------------------------------------------------------
     op.create_table(
         "students",
@@ -229,9 +229,9 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # 4) Submissions / Attempts / Answers / Grades
     # ------------------------------------------------------------------
-    # submissions referenziert attempts (graded_attempt_id) — zirkulärer
-    # FK; deshalb erst submissions ohne diesen FK, dann attempts, dann FK
-    # nachträglich per ALTER hinzufügen.
+    # submissions references attempts (graded_attempt_id) — circular FK;
+    # so create submissions without that FK first, then attempts, then
+    # add the FK afterwards via ALTER.
     op.create_table(
         "submissions",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -384,7 +384,7 @@ def upgrade() -> None:
         unique=False,
     )
 
-    # Zirkulärer FK: submissions.graded_attempt_id → attempts.id
+    # Circular FK: submissions.graded_attempt_id → attempts.id
     op.create_foreign_key(
         "fk_submissions_graded_attempt",
         "submissions",
@@ -520,7 +520,7 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # 5) Import-Jobs + Moodle-Connection
+    # 5) Import jobs + Moodle connection
     # ------------------------------------------------------------------
     op.create_table(
         "import_jobs",
@@ -628,7 +628,7 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # 6) Erweiterungen bestehender Tabellen
+    # 6) Extensions to existing tables
     # ------------------------------------------------------------------
     op.add_column(
         "exams",
@@ -663,25 +663,24 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Rollback Phase-1-Datenmodell.
+    """Roll back the phase-1 data model.
 
-    Reversibel, aber DESTRUKTIV: alle Submissions, Attempts, Grades und
-    History-Einträge gehen verloren. System-Grading-Schemes ebenfalls.
+    Reversible, but DESTRUCTIVE: all submissions, attempts, grades and
+    history entries are lost. System grading schemes as well.
 
-    Mit ``AUTO_MIGRATE=true`` in Prod hat der Operator beim Container-
-    Start keine Möglichkeit, vorher ein Backup zu ziehen. Deshalb sind
-    zwei Env-Variablen Pflicht für genau diesen Downgrade:
+    With ``AUTO_MIGRATE=true`` in prod, the operator has no chance to
+    pull a backup before the container starts. So two env vars are
+    mandatory for this specific downgrade:
 
-    * ``ALEMBIC_ALLOW_DESTRUCTIVE_DOWNGRADE=1`` — explizite Bestätigung
-      durch den Operator.
-    * ``ALEMBIC_BACKUP_TIMESTAMP`` — der Operator klebt den Dateinamen
-      des ``pg_dump``-Backups hier rein. Wird unverändert in den
-      Server-Log geschrieben, damit man später nachvollziehen kann,
-      welches Backup zu welchem Downgrade gehört.
+    * ``ALEMBIC_ALLOW_DESTRUCTIVE_DOWNGRADE=1`` — explicit confirmation
+      by the operator.
+    * ``ALEMBIC_BACKUP_TIMESTAMP`` — the operator pastes the filename
+      of the ``pg_dump`` backup here. Written unchanged to the server
+      log so it can later be traced which backup belongs to which
+      downgrade.
 
-    Der Standard-Auto-Migrate-Pfad führt nur Upgrades aus, nicht
-    Downgrades — beide Variablen sind also nur in einer manuellen
-    Rollback-Session nötig.
+    The standard auto-migrate path only runs upgrades, not downgrades —
+    so both variables are only needed in a manual rollback session.
     """
     import logging
     import os
@@ -710,8 +709,8 @@ def downgrade() -> None:
         backup_ref,
     )
 
-    # Erst FK-Spalten in bestehenden Tabellen droppen, damit die Targets
-    # frei werden.
+    # Drop FK columns on existing tables first so the targets are
+    # freed up.
     op.drop_constraint(
         "fk_institutions_default_grading_scheme",
         "institutions",
@@ -724,7 +723,7 @@ def downgrade() -> None:
     op.drop_constraint("fk_exams_grading_scheme", "exams", type_="foreignkey")
     op.drop_column("exams", "grading_scheme_id")
 
-    # Moodle-Connection / Import-Jobs
+    # Moodle connection / import jobs
     op.drop_index(op.f("ix_moodle_connections_id"), table_name="moodle_connections")
     op.drop_table("moodle_connections")
 
@@ -734,7 +733,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_import_jobs_id"), table_name="import_jobs")
     op.drop_table("import_jobs")
 
-    # Grade-Historie + Grades + AttemptAnswers
+    # Grade history + grades + attempt answers
     op.drop_index(op.f("ix_grade_history_grade_id"), table_name="grade_history")
     op.drop_index(op.f("ix_grade_history_id"), table_name="grade_history")
     op.drop_table("grade_history")
@@ -750,7 +749,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_attempt_answers_id"), table_name="attempt_answers")
     op.drop_table("attempt_answers")
 
-    # Zirkulärer FK lösen, dann attempts, dann submissions
+    # Resolve the circular FK first, then attempts, then submissions
     op.drop_constraint(
         "fk_submissions_graded_attempt", "submissions", type_="foreignkey"
     )
@@ -767,7 +766,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_submissions_id"), table_name="submissions")
     op.drop_table("submissions")
 
-    # Studierenden-Stammdaten
+    # Student master data
     op.drop_index(
         op.f("ix_student_class_memberships_class_id"),
         table_name="student_class_memberships",
@@ -792,7 +791,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_students_id"), table_name="students")
     op.drop_table("students")
 
-    # Zuletzt grading_schemes
+    # grading_schemes last
     op.drop_index("uq_grading_schemes_system_name", table_name="grading_schemes")
     op.drop_index(
         "uq_grading_schemes_default_per_institution", table_name="grading_schemes"

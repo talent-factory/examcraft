@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import i18n from '../../../i18n'; // echte i18n-Instanz laden
+import i18n from '../../../i18n'; // load the real i18n instance
 import { ProfileView } from '../ProfileView';
 
 // setupTests.ts installs a global mock for 'react-i18next' that resolves keys
@@ -12,7 +12,7 @@ import { ProfileView } from '../ProfileView';
 // (which transitively require 'react-i18next') are resolved.
 jest.unmock('react-i18next');
 
-// AuthContext mocken, damit useAuth() einen User mit Rollen liefert
+// Mock AuthContext so useAuth() returns a user with roles
 jest.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: {
@@ -34,7 +34,7 @@ jest.mock('../../../contexts/AuthContext', () => ({
   }),
 }));
 
-// AuthService wird von ProfileView importiert (Sprachwechsel) — mocken
+// AuthService is imported by ProfileView (language switching) — mock it
 jest.mock('../../../services/AuthService', () => ({
   __esModule: true,
   default: { updateProfile: jest.fn() },

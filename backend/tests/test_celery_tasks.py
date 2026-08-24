@@ -62,13 +62,14 @@ class TestDocumentProcessingTask:
             assert result["has_vectors"] is True
 
     def test_process_document_vectorization_failure_reports_failure(self):
-        """TF-364: Bei Vektorisierungs-Fehler liefert process_document_with_vectors
-        ein dict (kein None) mit vector_embeddings.error und ohne quality-Key.
+        """TF-364: on a vectorization error, process_document_with_vectors
+        returns a dict (not None) with vector_embeddings.error and no quality key.
 
-        Der None-Guard greift nicht; früher fiel die Ausführung in den
-        Eskalations-Zweig und gab ``success: True`` bei ``status: "error"`` zurück.
-        Das Envelope-``success`` und das eingebettete ``status`` müssen konsistent
-        sein: bei einem ERROR-Dokument ``success=False`` mit error_code.
+        The None guard doesn't trigger; previously execution fell into the
+        escalation branch and returned ``success: True`` alongside
+        ``status: "error"``. The envelope ``success`` and the embedded
+        ``status`` must be consistent: for an ERROR document, ``success=False``
+        with error_code.
         """
         with (
             patch("tasks.document_tasks.SessionLocal") as mock_session_local,
@@ -83,8 +84,8 @@ class TestDocumentProcessingTask:
             mock_document.id = 1
             mock_document.original_filename = "broken.pdf"
             mock_document.file_path = "/path/to/broken.pdf"
-            # Vektorisierung hat das Dokument bereits als ERROR markiert
-            # (process_document_with_vectors, except-Zweig).
+            # Vectorization has already marked the document as ERROR
+            # (process_document_with_vectors, except branch).
             mock_document.status = DocumentStatus.ERROR
             mock_document.has_vectors = False
             mock_document.error_message = "Qdrant unreachable"
@@ -98,7 +99,7 @@ class TestDocumentProcessingTask:
                 mock_document
             )
 
-            # dict OHNE quality-Key, MIT vector_embeddings.error
+            # dict WITHOUT a quality key, WITH vector_embeddings.error
             mock_run_async.return_value = {
                 "document_id": 1,
                 "extraction": {"total_chunks": 3},
@@ -110,18 +111,18 @@ class TestDocumentProcessingTask:
                     document_id="1", user_id="test-user-id"
                 )
 
-            # Envelope-success und eingebettetes status sind konsistent
+            # Envelope success and embedded status are consistent
             assert result["success"] is False
             assert result["status"] == DocumentStatus.ERROR.value
             assert result["error_code"] == "vectorization_failed"
-            # Der spezifische Vektor-Fehler wird durchgereicht, nicht verschluckt.
+            # The specific vector error is passed through, not swallowed.
             assert result["error"] == "Qdrant unreachable"
 
     def test_process_document_failure_reads_metadata_fallbacks(self):
-        """TF-364 (Review): error_code wird aus doc_metadata gelesen (nicht hart
-        defaultet), und die Fehlermeldung fällt auf die in doc_metadata
-        persistierte Ursache zurück, wenn weder Result noch error_message eine
-        liefern — das Envelope ist nie ohne Fehlermeldung."""
+        """TF-364 (review): error_code is read from doc_metadata (not hard-
+        defaulted), and the error message falls back to the cause persisted
+        in doc_metadata when neither result nor error_message provide one —
+        the envelope is never left without an error message."""
         with (
             patch("tasks.document_tasks.SessionLocal") as mock_session_local,
             patch("tasks.document_tasks.document_service"),
@@ -148,7 +149,7 @@ class TestDocumentProcessingTask:
                 mock_document
             )
 
-            # Branch feuert über status==ERROR; vector_embeddings ohne 'error'.
+            # Branch triggers via status==ERROR; vector_embeddings without 'error'.
             mock_run_async.return_value = {
                 "document_id": 1,
                 "extraction": {"error": "processing_failed_before_vectorization"},
@@ -161,9 +162,9 @@ class TestDocumentProcessingTask:
                 )
 
             assert result["success"] is False
-            # error_code stammt aus doc_metadata, nicht aus dem Default.
+            # error_code comes from doc_metadata, not from the default.
             assert result["error_code"] == "empty_document"
-            # Fehlermeldung fällt auf die persistierte Ursache zurück (nicht None).
+            # Error message falls back to the persisted cause (not None).
             assert result["error"] == "no chunks extracted"
 
     def test_process_document_task_not_found(self):

@@ -1,8 +1,8 @@
-"""Tests für das GenerationMetadata-Envelope (TF-383).
+"""Tests for the GenerationMetadata envelope (TF-383).
 
-Sichert die drei ehrlichen Zustände (default/custom/fallback), die immer
-präsente fallback_to_default-Flag, den offenen variables-Payload und die
-bewusst nachsichtige Read-Validierung (kein 500 bei Teil-/Altdaten).
+Covers the three honest states (default/custom/fallback), the always-present
+fallback_to_default flag, the open variables payload, and the deliberately
+lenient read validation (no 500 on partial/legacy data).
 """
 
 import pytest
@@ -20,7 +20,7 @@ def test_default_state_flag_present_and_false():
     dumped = gm.model_dump()
     assert dumped["is_default_template"] is True
     assert dumped["prompt_id"] is None
-    # fallback_to_default ist IMMER serialisiert (kein "False vs. fehlt"-Raten).
+    # fallback_to_default is ALWAYS serialized (no "False vs. missing" guessing).
     assert "fallback_to_default" in dumped
     assert dumped["fallback_to_default"] is False
 
@@ -69,10 +69,10 @@ def test_stored_dict_roundtrips_unchanged():
 
 
 def test_partial_dict_fills_defaults_without_raising():
-    """Read-Robustheit: ein Teil-Dict (z. B. Altbestand) fällt auf Defaults
-    zurück statt ein 500 zu werfen. Der Konsistenz-Validator verbietet nur
-    *widersprüchliche* Zustände, nicht das Auffüllen fehlender Felder — dieses
-    Teil-Dict ist ein gültiger custom-Zustand (prompt_id vorhanden)."""
+    """Read robustness: a partial dict (e.g. legacy data) falls back to
+    defaults instead of raising a 500. The consistency validator only
+    forbids *contradictory* states, not filling in missing fields — this
+    partial dict is a valid custom state (prompt_id present)."""
     gm = GenerationMetadata.model_validate(
         {"prompt_id": "u1", "is_default_template": False}
     )
@@ -83,14 +83,14 @@ def test_partial_dict_fills_defaults_without_raising():
 
 
 def test_custom_without_prompt_id_rejected():
-    """Widersprüchlicher Zustand: custom (is_default_template=False) ohne
-    prompt_id ist nicht konstruierbar (TF-383-Review-Härtung)."""
+    """Contradictory state: custom (is_default_template=False) without
+    prompt_id cannot be constructed (TF-383 review hardening)."""
     with pytest.raises(ValidationError):
         GenerationMetadata(is_default_template=False)
 
 
 def test_fallback_without_default_flag_rejected():
-    """fallback_to_default impliziert is_default_template=True."""
+    """fallback_to_default implies is_default_template=True."""
     with pytest.raises(ValidationError):
         GenerationMetadata(
             prompt_id="u1", is_default_template=False, fallback_to_default=True
@@ -98,13 +98,13 @@ def test_fallback_without_default_flag_rejected():
 
 
 def test_negative_prompt_version_rejected():
-    """Versionen sind positiv (ge=1)."""
+    """Versions must be positive (ge=1)."""
     with pytest.raises(ValidationError):
         GenerationMetadata(prompt_id="u1", is_default_template=False, prompt_version=0)
 
 
 def test_snapshot_is_frozen():
-    """Snapshot ist nach Konstruktion unveränderlich (eingefroren)."""
+    """Snapshot is immutable after construction (frozen)."""
     gm = GenerationMetadata(prompt_id="u1", is_default_template=False)
     with pytest.raises(ValidationError):
         gm.prompt_id = "u2"

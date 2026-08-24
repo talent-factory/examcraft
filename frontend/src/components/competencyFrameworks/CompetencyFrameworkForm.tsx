@@ -21,7 +21,7 @@ export interface FrameworkFormValues {
   rendered_text: string;
   language: string;
   visibility: FrameworkVisibility;
-  // TF-644: nur bei visibility='team' relevant/gesetzt.
+  // TF-644: only relevant/set when visibility='team'.
   org_unit_id: number | null;
 }
 
@@ -52,8 +52,8 @@ const CompetencyFrameworkForm: React.FC<Props> = ({
 }) => {
   const { t } = useTranslation();
   const [values, setValues] = useState<FrameworkFormValues>({ ...EMPTY, ...initial });
-  // TF-644: team-Sichtbarkeit erfordert eine der eigenen Org-Unit-
-  // Mitgliedschaften — einmalig beim Mount geladen, mirrors DocumentUpload.
+  // TF-644: team visibility requires one of the user's own org-unit
+  // memberships — loaded once on mount, mirrors DocumentUpload.
   const [myOrgUnits, setMyOrgUnits] = useState<OrgUnitOut[]>([]);
   const [orgUnitsLoadError, setOrgUnitsLoadError] = useState(false);
 

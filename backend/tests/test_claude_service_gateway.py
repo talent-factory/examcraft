@@ -1,10 +1,11 @@
 # core/backend/tests/test_claude_service_gateway.py
-"""Wiring-Tests für die Gateway-Delegation in ClaudeService (TF-439).
+"""Wiring tests for the gateway delegation in ClaudeService (TF-439).
 
-Die Leaf-Funktionen in ``gateway_generator`` sind separat getestet; hier wird
-der Produktiv-*Schalter* geprüft: dass ClaudeService bei aktivem Gateway
-tatsächlich in den Gateway-Zweig verzweigt (statt Legacy-httpx) und dass die
-Fehler-Klassifizierung (permanent vs. transient) korrekt durchgereicht wird.
+The leaf functions in ``gateway_generator`` are tested separately; here the
+production *switch* is checked: that ClaudeService actually branches into
+the gateway path (instead of legacy httpx) when the gateway is active, and
+that error classification (permanent vs. transient) is passed through
+correctly.
 """
 
 import pytest
@@ -22,12 +23,12 @@ def _enable_gateway(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# C1: demo_mode darf den Gateway-Pfad nicht blockieren
+# C1: demo_mode must not block the gateway path
 # ---------------------------------------------------------------------------
 
 
 def test_demo_mode_false_when_gateway_enabled_without_key(monkeypatch):
-    """Gateway an + kein ANTHROPIC_API_KEY ⇒ NICHT Demo-Modus (sonst raist Generierung)."""
+    """Gateway on + no ANTHROPIC_API_KEY ⇒ NOT demo mode (otherwise generation raises)."""
     _enable_gateway(monkeypatch)
     assert ClaudeService().demo_mode is False
 
@@ -40,7 +41,7 @@ def test_demo_mode_true_when_no_key_and_no_gateway(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# generate_questions: Delegation an den Gateway
+# generate_questions: delegation to the gateway
 # ---------------------------------------------------------------------------
 
 
@@ -57,16 +58,16 @@ async def test_generate_questions_delegates_to_gateway(monkeypatch):
 
     service = ClaudeService()
 
-    # TF-440: Legacy-httpx-Pfad existiert nicht mehr — es gibt nur noch den
-    # Gateway-Zweig, keine Assertion mehr nötig, dass er "nicht aufgerufen wird".
+    # TF-440: the legacy httpx path no longer exists — there is only the
+    # gateway branch now, no assertion needed anymore that it is "not called".
     out = await service.generate_questions(topic="Loops", question_count=1)
 
     assert out == [{"id": "q1", "type": "single_choice"}]
-    assert "Loops" in seen["prompt"]  # der gebaute Prompt wird weitergereicht
+    assert "Loops" in seen["prompt"]  # the built prompt is passed through
 
 
 # ---------------------------------------------------------------------------
-# generate_exam_async (custom_prompt): typed → raw Fallback + Fehler-Reraise
+# generate_exam_async (custom_prompt): typed → raw fallback + error reraise
 # ---------------------------------------------------------------------------
 
 
@@ -113,7 +114,7 @@ async def test_custom_prompt_typed_failure_falls_back_to_raw(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_custom_prompt_model_unavailable_is_reraised(monkeypatch):
-    """Permanent (4xx) ⇒ ModelUnavailableError fail-fast, KEIN raw-Fallback."""
+    """Permanent (4xx) ⇒ ModelUnavailableError fail-fast, NO raw fallback."""
     _enable_gateway(monkeypatch)
 
     async def typed_permanent(prompt):
@@ -131,7 +132,7 @@ async def test_custom_prompt_model_unavailable_is_reraised(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_custom_prompt_transient_http_error_is_reraised(monkeypatch):
-    """I3: transienter 5xx (ModelHTTPError) wird durchgereicht, NICHT in raw maskiert."""
+    """I3: a transient 5xx (ModelHTTPError) is passed through, NOT masked into raw."""
     from pydantic_ai.exceptions import ModelHTTPError
 
     _enable_gateway(monkeypatch)
@@ -152,14 +153,14 @@ async def test_custom_prompt_transient_http_error_is_reraised(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# validate_claude_model_on_startup: Skip bei aktivem Gateway
+# validate_claude_model_on_startup: skip when gateway is active
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_startup_validation_skipped_when_gateway_enabled(monkeypatch):
     _enable_gateway(monkeypatch)
-    # Den vorgelagerten Skip-Schalter abschalten, damit der Gateway-Zweig greift.
+    # Disable the upstream skip switch so the gateway branch takes effect.
     monkeypatch.delenv("CLAUDE_SKIP_MODEL_VALIDATION", raising=False)
 
     def boom():
@@ -167,5 +168,5 @@ async def test_startup_validation_skipped_when_gateway_enabled(monkeypatch):
 
     monkeypatch.setattr(cs, "get_claude_service", boom)
 
-    # Kein Raise, kein Netzwerk-Call.
+    # No raise, no network call.
     await cs.validate_claude_model_on_startup()

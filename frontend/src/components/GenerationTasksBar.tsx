@@ -112,8 +112,8 @@ const GenerationTasksBar: React.FC = () => {
       sx={{
         position: 'fixed',
         bottom: 16,
-        // 88 = HelpWidget-FAB (right: 24 + 56px Breite, help/HelpWidget.tsx) + 8px Abstand,
-        // damit dieses Panel nicht unter dem FAB verschwindet (TF-506).
+        // 88 = HelpWidget FAB (right: 24 + 56px width, help/HelpWidget.tsx) + 8px gap,
+        // so this panel doesn't disappear under the FAB (TF-506).
         right: 88,
         zIndex: 1300,
         width: 320,
@@ -244,9 +244,9 @@ const GenerationTasksBar: React.FC = () => {
                         {t('components.generationTasks.clickToView')}
                       </Typography>
                     </Box>
-                    {/* TF-358: Hinweis, wenn die Fragenanzahl ans verfügbare
-                        Dokumenten-Material gekoppelt wurde (weniger Fragen als
-                        angefordert). Text kommt vom Backend. */}
+                    {/* TF-358: Notice shown when the question count was coupled to
+                        the available document material (fewer questions than
+                        requested). Text comes from the backend. */}
                     {task.result?.quality_metrics?.context_limited_notice && (
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mt: 0.5 }}>
                         <WarningIcon fontSize="small" color="warning" sx={{ mt: '2px' }} />

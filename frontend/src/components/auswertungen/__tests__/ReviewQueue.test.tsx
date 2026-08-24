@@ -1,9 +1,9 @@
 /**
  * Tests for ReviewQueue (TF-334).
  *
- * Wir mocken den GradesService — die Component-Logik (Filter,
- * Selection, Approve, Override, Bulk-Approve) ist hier das
- * Test-Subject.
+ * We mock the GradesService — the component logic (filter,
+ * selection, approve, override, bulk-approve) is the
+ * test subject here.
  */
 
 import React from 'react';
@@ -98,7 +98,7 @@ describe('ReviewQueue', () => {
     });
     expect(screen.getByTestId('review-card-12')).toBeInTheDocument();
     expect(onTotalChange).toHaveBeenCalledWith(2);
-    // matched / missing aspects sind sichtbar
+    // matched / missing aspects are visible
     expect(screen.getAllByText('Daten').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Verhalten').length).toBeGreaterThan(0);
   });
@@ -122,10 +122,11 @@ describe('ReviewQueue', () => {
       expect(screen.getByTestId('review-card-11')).toBeInTheDocument();
     });
 
-    // Der react-markdown-Mock rendert children verbatim unter
-    // [data-testid="react-markdown"]. Erscheint der rohe Markdown-Text dort,
-    // ist bewiesen, dass das Feld durch MarkdownRenderer läuft (statt nacktem
-    // <Typography>, das `**` literal anzeigt und Zeilenumbrüche verschluckt).
+    // The react-markdown mock renders children verbatim under
+    // [data-testid="react-markdown"]. If the raw markdown text shows up
+    // there, it proves the field goes through MarkdownRenderer (instead of
+    // a bare <Typography>, which shows `**` literally and swallows line
+    // breaks).
     const rendered = screen
       .getAllByTestId('react-markdown')
       .map((el) => el.textContent ?? '');
@@ -155,7 +156,7 @@ describe('ReviewQueue', () => {
     await waitFor(() => {
       expect(mockGradesService.approve).toHaveBeenCalledWith(11);
     });
-    // Re-fetch nach Approve (initial + nach erfolgreichem Approve).
+    // Re-fetch after approve (initial + after a successful approve).
     await waitFor(() => {
       expect(mockGradesService.getReviewQueue).toHaveBeenCalledTimes(2);
     });
@@ -242,7 +243,7 @@ describe('ReviewQueue', () => {
     mockGradesService.getReviewQueue.mockResolvedValue({ items: [], total: 0 });
     renderQueue();
     await waitFor(() => {
-      // Empty hint key landet als success-Alert
+      // Empty hint key lands as a success alert
       const alert = screen.getByRole('alert');
       expect(within(alert).getByText(/keine offenen|no open/i)).toBeInTheDocument();
     });

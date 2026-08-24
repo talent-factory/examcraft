@@ -1,6 +1,6 @@
 """
-RAG-basierte Prüfungserstellung API Endpoints für ExamCraft AI
-Implementiert dokumentenbasierte Fragenerstellung mit Retrieval-Augmented Generation
+RAG-based exam creation API endpoints for ExamCraft AI
+Implements document-based question generation with retrieval-augmented generation
 """
 
 import uuid
@@ -49,51 +49,51 @@ router = APIRouter(prefix="/api/v1/rag", tags=["RAG Exams"])
 
 # Pydantic Models
 class PromptConfig(BaseModel):
-    """Konfiguration für einen Prompt"""
+    """Configuration for a prompt"""
 
     prompt_id: str = Field(..., description="Prompt UUID")
     variables: Optional[Dict[str, Any]] = Field(
-        None, description="Template-Variablen für den Prompt"
+        None, description="Template variables for the prompt"
     )
 
 
 class RAGExamRequestModel(BaseModel):
-    """Request Model für RAG-basierte Prüfungserstellung"""
+    """Request model for RAG-based exam creation"""
 
     topic: str = Field(
-        ..., description="Thema der Prüfung", min_length=3, max_length=200
+        ..., description="Topic of the exam", min_length=3, max_length=200
     )
     document_ids: Optional[List[int]] = Field(
-        None, description="Spezifische Dokument-IDs (optional)"
+        None, description="Specific document IDs (optional)"
     )
-    question_count: int = Field(5, description="Anzahl Fragen", ge=1, le=20)
+    question_count: int = Field(5, description="Number of questions", ge=1, le=20)
     question_types: Optional[List[str]] = Field(
-        ["single_choice", "open_ended"], description="Fragetypen"
+        ["single_choice", "open_ended"], description="Question types"
     )
     difficulty: Literal["easy", "medium", "hard"] = Field(
-        "medium", description="Schwierigkeitsgrad"
+        "medium", description="Difficulty level"
     )
-    language: str = Field("de", description="Sprache")
+    language: str = Field("de", description="Language")
     context_chunks_per_question: int = Field(
-        3, description="Context Chunks pro Frage", ge=1, le=10
+        3, description="Context chunks per question", ge=1, le=10
     )
 
     prompt_config: Optional[Dict[str, PromptConfig]] = Field(
         None,
-        description="Prompt-Konfiguration pro Fragetyp (z.B. {'single_choice': {...}, 'open_ended': {...}})",
+        description="Prompt configuration per question type (e.g. {'single_choice': {...}, 'open_ended': {...}})",
     )
     tag_ids: List[int] = Field(
         default_factory=list,
-        description="Tag-IDs, die allen generierten Fragen zugewiesen werden",
+        description="Tag IDs assigned to all generated questions",
     )
     framework_id: Optional[int] = Field(
         None,
-        description="Handlungskompetenz-Framework-ID (optional)",
+        description="Competency framework ID (optional)",
     )
     competencies_override: Optional[str] = Field(
         None,
         max_length=20000,
-        description="Freitext-Überschreibung der {{ competencies }}-Variable (gewinnt über Framework)",
+        description="Free-text override of the {{ competencies }} variable (takes precedence over framework)",
     )
 
 
@@ -139,20 +139,21 @@ def resolve_framework_for_user(db, framework_id, user):
 
 def resolve_competencies_text(db, framework_id, override, user):
     """Resolve the {{ competencies }} value: free-text override wins; else the
-    selected framework's rendered_text (institution-scoped, nicht archiviert,
-    für ``user`` sichtbar); else None.
+    selected framework's rendered_text (institution-scoped, not archived,
+    visible to ``user``); else None.
 
-    Ein explizit gewähltes, aber nicht auflösbares ``framework_id`` (gelöscht,
-    archiviert, fremde Institution oder — seit TF-644 — für ``user`` nicht
-    sichtbar) wird geloggt — sonst generiert die Prüfung still ohne
-    Kompetenz-Bezug, obwohl der Nutzer ein Framework gewählt hat.
+    An explicitly chosen but unresolvable ``framework_id`` (deleted,
+    archived, foreign institution, or — since TF-644 — not visible to
+    ``user``) is logged — otherwise the exam would generate silently
+    without a competency reference, even though the user selected a
+    framework.
 
-    TF-644: vor dieser Änderung ignorierte die Framework-Auswahl visibility
-    komplett — jedes institutionsweite Framework war per direkt gesetztem
-    ``framework_id`` wählbar, auch ein privates/team-gescoptes Framework
-    eines anderen Users (das Frontend-Dropdown ist ``list_frameworks``-
-    gefiltert, aber die API selbst prüfte nichts). Mirrors wie TF-643 die
-    analoge Moodle-Endpunkt-Lücke bei Exams geschlossen hat.
+    TF-644: before this change, the framework selection ignored visibility
+    entirely — any institution-wide framework was selectable via a directly
+    set ``framework_id``, including a private/team-scoped framework
+    belonging to another user (the frontend dropdown is filtered via
+    ``list_frameworks``, but the API itself checked nothing). Mirrors how
+    TF-643 closed the analogous Moodle-endpoint gap for exams.
     """
     if override and override.strip():
         return override
@@ -174,7 +175,7 @@ def resolve_competencies_text(db, framework_id, override, user):
 
 
 class RAGContextResponse(BaseModel):
-    """Response Model für RAG-Kontext"""
+    """Response model for RAG context"""
 
     query: str
     total_chunks: int
@@ -184,16 +185,14 @@ class RAGContextResponse(BaseModel):
 
 
 class ContextRetrievalRequest(BaseModel):
-    """Request Model für Context Retrieval"""
+    """Request model for context retrieval"""
 
-    query: str = Field(..., description="Suchanfrage", min_length=3, max_length=500)
-    document_ids: Optional[List[int]] = Field(
-        None, description="Spezifische Dokument-IDs"
-    )
-    max_chunks: int = Field(5, description="Maximale Anzahl Chunks", ge=1, le=20)
+    query: str = Field(..., description="Search query", min_length=3, max_length=500)
+    document_ids: Optional[List[int]] = Field(None, description="Specific document IDs")
+    max_chunks: int = Field(5, description="Maximum number of chunks", ge=1, le=20)
     min_similarity: Optional[float] = Field(
         0.01,
-        description="Mindest-Similarity Score (niedrig fuer maximalen Recall)",
+        description="Minimum similarity score (low for maximum recall)",
         ge=0.0,
         le=1.0,
     )
@@ -208,22 +207,22 @@ async def generate_rag_exam(
     db: Session = Depends(get_db),
 ):
     """
-    Startet asynchrone Fragengenerierung via Celery Task.
-    Gibt sofort task_id zurück — Fortschritt via WebSocket /ws/tasks/{task_id}.
+    Starts asynchronous question generation via a Celery task.
+    Returns task_id immediately — progress via WebSocket /ws/tasks/{task_id}.
 
     **Required Permission:** `create_questions` (Dozent, Assistant, Admin)
 
-    - **topic**: Thema der Prüfung (3-200 Zeichen)
-    - **document_ids**: Optional spezifische Dokumente
-    - **question_count**: Anzahl Fragen (1-20, default: 5)
-    - **question_types**: Fragetypen (single_choice, open_ended, true_false)
-    - **difficulty**: Schwierigkeitsgrad (easy, medium, hard)
-    - **language**: Sprache (de, en)
-    - **context_chunks_per_question**: Context Chunks pro Frage (1-10)
+    - **topic**: topic of the exam (3-200 characters)
+    - **document_ids**: optional specific documents
+    - **question_count**: number of questions (1-20, default: 5)
+    - **question_types**: question types (single_choice, open_ended, true_false)
+    - **difficulty**: difficulty level (easy, medium, hard)
+    - **language**: language (de, en)
+    - **context_chunks_per_question**: context chunks per question (1-10)
     """
     locale = get_request_locale(http_request, current_user)
     try:
-        # Validiere Document IDs falls angegeben
+        # Validate document IDs if provided
         if request.document_ids:
             # Computed once per request, not once per document (TF-620 perf
             # fix) — is_document_visible_for's team-visibility branch would
@@ -232,8 +231,8 @@ async def generate_rag_exam(
             accessible_org_unit_ids = get_accessible_org_unit_ids_for(current_user, db)
             for doc_id in request.document_ids:
                 document = document_service.get_document_by_id(doc_id, db)
-                # Visibility-Check (TF-354): 404 statt 403 — ein fremdes
-                # privates Dokument darf nicht über den RAG-Pfad leaken.
+                # Visibility check (TF-354): 404 instead of 403 — a foreign
+                # private document must not leak via the RAG path.
                 if not document or not is_document_visible_for(
                     current_user,
                     document,
@@ -245,14 +244,14 @@ async def generate_rag_exam(
                         detail=t("rag_document_not_found", locale=locale),
                     )
 
-                # Prüfe ob Dokument verarbeitet ist
+                # Check whether the document is processed
                 if document.status != DocumentStatus.PROCESSED:
                     raise HTTPException(
                         status_code=400,
                         detail=t("rag_document_not_processed", locale=locale),
                     )
 
-        # Validiere Question Types
+        # Validate question types
         valid_types = ["single_choice", "multiple_choice", "open_ended", "true_false"]
         if request.question_types:
             for qtype in request.question_types:
@@ -286,7 +285,7 @@ async def generate_rag_exam(
                         detail=f"Tag '{tag.name}' ist archiviert.",
                     )
 
-        # Request serialisieren
+        # Serialize the request
         prompt_config_dict = None
         if request.prompt_config:
             prompt_config_dict = {}
@@ -296,7 +295,7 @@ async def generate_rag_exam(
                     "variables": config.variables,
                 }
 
-        # Quota-Check vor Generierung (verhindert unnötige Claude-API-Kosten)
+        # Quota check before generation (avoids unnecessary Claude API costs)
         from utils.tenant_utils import SubscriptionLimits
 
         if not current_user.institution:
@@ -343,8 +342,8 @@ async def generate_rag_exam(
         )
         request_data = rag_request.model_dump(mode="json")
 
-        # UUID vorab generieren — wird sowohl als DB-Record-Key als auch als
-        # Celery task_id verwendet.
+        # Generate the UUID up front — used both as the DB record key and
+        # as the Celery task_id.
         task_id = str(uuid.uuid4())
         job = QuestionGenerationJob(
             task_id=task_id,
@@ -356,7 +355,7 @@ async def generate_rag_exam(
         db.add(job)
         db.commit()
 
-        # Celery Task dispatchen — bei Fehler Job bereinigen
+        # Dispatch the Celery task — clean up the job on failure
         try:
             generate_questions_task.apply_async(
                 args=[request_data, str(current_user.id), current_user.institution_id],
@@ -434,7 +433,7 @@ async def retry_generation(
                 status_code=404, detail=t("rag_task_not_found", locale=locale)
             )
 
-        # Owner-Check (Superuser-Bypass mit Audit-Log)
+        # Owner check (superuser bypass with audit log)
         from utils.auth_utils import enforce_resource_access
 
         enforce_resource_access(
@@ -599,26 +598,26 @@ async def retrieve_context(
     db: Session = Depends(get_db),
 ):
     """
-    Hole relevanten Kontext aus Vector Database
+    Fetch relevant context from the vector database
 
     **Required:** Authenticated user
 
-    - **query**: Suchanfrage für Kontext
-    - **document_ids**: Optional spezifische Dokumente
-    - **max_chunks**: Maximale Anzahl Chunks (1-20)
-    - **min_similarity**: Mindest-Similarity Score (0.0-1.0)
+    - **query**: search query for context
+    - **document_ids**: optional specific documents
+    - **max_chunks**: maximum number of chunks (1-20)
+    - **min_similarity**: minimum similarity score (0.0-1.0)
     """
     locale = get_request_locale(http_request, current_user)
     try:
-        # Validiere Document IDs falls angegeben
+        # Validate document IDs if provided
         if request.document_ids:
             # Computed once per request, not once per document (TF-620 perf
             # fix) — see generate_exam_from_documents for the same pattern.
             accessible_org_unit_ids = get_accessible_org_unit_ids_for(current_user, db)
             for doc_id in request.document_ids:
                 document = document_service.get_document_by_id(doc_id, db)
-                # Visibility-Check (TF-354): 404 statt 403 — ein fremdes
-                # privates Dokument darf nicht über den RAG-Pfad leaken.
+                # Visibility check (TF-354): 404 instead of 403 — a foreign
+                # private document must not leak via the RAG path.
                 if not document or not is_document_visible_for(
                     current_user,
                     document,
@@ -663,17 +662,17 @@ async def retrieve_context(
 
 @router.get("/available-documents")
 async def get_available_documents(
-    processed_only: bool = Query(True, description="Nur verarbeitete Dokumente"),
+    processed_only: bool = Query(True, description="Only processed documents"),
     request: Request = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """
-    Hole verfügbare Dokumente für RAG-Prüfungserstellung
+    Fetch available documents for RAG exam creation
 
     **Required:** Authenticated user
 
-    - **processed_only**: Nur verarbeitete Dokumente anzeigen (empfohlen)
+    - **processed_only**: only show processed documents (recommended)
     """
     locale = get_request_locale(request, current_user)
     try:
@@ -683,8 +682,8 @@ async def get_available_documents(
                 detail=t("rag_no_institution", locale=locale),
             )
 
-        # Visibility-aware (TF-354): konsistent mit list_documents — eigene
-        # Docs + institution-geteilte Docs der eigenen Institution.
+        # Visibility-aware (TF-354): consistent with list_documents — own
+        # docs + institution-shared docs of the caller's own institution.
         query = db.query(Document)
         query = filter_documents_for_user(query, current_user, db)
 
@@ -693,20 +692,20 @@ async def get_available_documents(
 
         documents = query.order_by(Document.created_at.desc()).all()
 
-        # Konvertiere zu Response Format
+        # Convert to response format
         available_docs = []
         for doc in documents:
             doc_info = {
                 "id": doc.id,
                 "filename": doc.original_filename,
-                # TF-605: Die Dokumentauswahl der Fragengenerierung soll den in
-                # der Bibliothek vergebenen Namen zeigen, nicht den Upload-
-                # Dateinamen. `title` löst die Fallback-Kette display_name →
-                # doc_metadata['title'] → original_filename (ohne Endung) auf
-                # und ist damit praktisch nie leer (nur bei verletztem
-                # Schema-Invariant — dann warnt die Property und liefert "");
-                # `display_name` bleibt als rohes Override daneben stehen
-                # (analog Document.to_dict()).
+                # TF-605: the document picker in question generation should
+                # show the name assigned in the library, not the upload
+                # filename. `title` resolves the fallback chain display_name →
+                # doc_metadata['title'] → original_filename (without
+                # extension) and is therefore practically never empty (only
+                # on a violated schema invariant — the property then warns
+                # and returns ""); `display_name` remains alongside as the
+                # raw override (mirrors Document.to_dict()).
                 "title": doc.title,
                 "display_name": doc.display_name,
                 "mime_type": doc.mime_type,
@@ -719,7 +718,7 @@ async def get_available_documents(
                 "has_vectors": bool(doc.vector_collection),
             }
 
-            # Füge Metadaten hinzu falls verfügbar
+            # Add metadata if available
             if doc.doc_metadata:
                 doc_info["metadata"] = {
                     "total_chunks": doc.doc_metadata.get("total_chunks"),
@@ -752,7 +751,7 @@ async def get_available_documents(
 @router.get("/question-types")
 async def get_supported_question_types():
     """
-    Hole unterstützte Fragetypen für RAG-Prüfungen
+    Fetch supported question types for RAG exams
     """
     return {
         "supported_types": [
@@ -802,24 +801,24 @@ async def get_supported_question_types():
 @router.get("/health")
 async def rag_service_health():
     """
-    Health Check für RAG Service
+    Health check for the RAG service
 
-    Prüft:
-    - RAG Service Status
-    - Vector Service Verfügbarkeit
-    - Claude API Status
+    Checks:
+    - RAG service status
+    - Vector service availability
+    - Claude API status
     """
     try:
-        # Teste Vector Service
+        # Test the vector service
         from services.vector_service_factory import vector_service
 
         vector_stats = vector_service.get_collection_stats()
 
-        # Teste Claude Service (vereinfacht)
+        # Test the Claude service (simplified)
         claude_available = True
         try:
             claude_service = rag_service_module.rag_service.claude_service
-            # Einfacher Test ob Service initialisiert ist
+            # Simple check whether the service is initialized
             claude_available = claude_service is not None
         except Exception as e:
             logger.warning(
@@ -864,11 +863,11 @@ async def rag_service_health():
 
 TERMINAL_STATUSES = {"SUCCESS", "FAILURE", "REVOKED"}
 ACTIVE_TASK_MAX_AGE = timedelta(hours=2)
-# TF-608: Fenster für bereits abgeschlossene Jobs. Ein Task, der während eines
-# Seitenwechsels/Reloads fertig geworden ist, war weder in `active-tasks` noch
-# über den (mit der Seite gestorbenen) WebSocket erreichbar — sein Ergebnis war
-# aus der UI verschwunden. Deutlich kürzer als ACTIVE_TASK_MAX_AGE, damit nicht
-# bei jedem Seitenaufruf stundenalte Generierungen wieder aufpoppen.
+# TF-608: window for already-completed jobs. A task that finished during a
+# page navigation/reload was reachable neither via `active-tasks` nor via
+# the WebSocket (which died with the page) — its result had vanished from
+# the UI. Deliberately much shorter than ACTIVE_TASK_MAX_AGE, so hour-old
+# generations don't pop back up on every page load.
 COMPLETED_TASK_MAX_AGE = timedelta(minutes=30)
 
 
@@ -950,8 +949,8 @@ async def get_active_tasks(
 
     tasks = []
     for job in jobs:
-        # TF-608: bereits abgeschlossene Jobs brauchen keine Celery-Abfrage —
-        # ihr Status steht in der DB, das Ergebnis holt das Frontend separat.
+        # TF-608: already-completed jobs need no Celery lookup — their
+        # status lives in the DB, the frontend fetches the result separately.
         if job.status in TERMINAL_STATUSES:
             tasks.append(
                 ActiveTaskInfo(
@@ -1034,17 +1033,17 @@ async def get_task_result(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Ergebnis eines abgeschlossenen Generierungs-Tasks nachladen (TF-608).
+    """Fetch the result of a completed generation task on demand (TF-608).
 
-    Der WebSocket liefert das Ergebnis nur an eine lebende Verbindung. Wird die
-    Seite gewechselt oder neu geladen, während der Task fertig wird, gibt es
-    ohne diesen Pull-Weg keinen Rückweg zur Ergebnisansicht. Ownership-Check mit
-    Superuser-Bypass + Audit-Log analog `retry-generation`.
+    The WebSocket only delivers the result to a live connection. If the
+    page is navigated away from or reloaded while the task finishes, there
+    is no way back to the result view without this pull path. Ownership
+    check with superuser bypass + audit log, analogous to `retry-generation`.
 
-    Der Status kommt aus Celery, solange dort ein terminaler State steht; sonst
-    aus der DB. Das verhindert, dass ein abgelaufener Result-Eintrag
-    (``result_expires``) einen fertigen Job in der UI wieder auf PENDING
-    zurückstuft.
+    The status comes from Celery as long as a terminal state is stored
+    there; otherwise from the DB. This prevents an expired result entry
+    (``result_expires``) from reverting a finished job back to PENDING
+    in the UI.
     """
     locale = get_request_locale(http_request, current_user)
     job = (
@@ -1081,12 +1080,12 @@ async def get_task_result(
         elif celery_state in ("FAILURE", "REVOKED"):
             raw_info = async_result.result
             error = user_facing_task_error(raw_info)
-            # Echten Fehler server-seitig vollständig loggen (mit Traceback,
-            # falls vorhanden); dem User nur die sichere, handlungsleitende
-            # Meldung senden — keine rohen Interna/PII (TF-358). Selber Mapper
-            # + Logging-Pattern wie im WebSocket-Pfad (api/v1/websocket.py),
-            # damit ein Task unabhängig vom Recovery-Weg dieselbe Meldung zeigt
-            # und Fehler auch auf diesem Pfad alertbar bleiben.
+            # Log the real error fully server-side (with traceback if
+            # available); send the user only the safe, actionable message —
+            # no raw internals/PII (TF-358). Same mapper + logging pattern as
+            # the WebSocket path (api/v1/websocket.py), so a task shows the
+            # same message regardless of recovery path, and errors stay
+            # alertable on this path too.
             unmapped = error == GENERIC_TASK_ERROR
             logger.error(
                 "Task %s failed (%s): %r",
@@ -1096,9 +1095,9 @@ async def get_task_result(
                 exc_info=raw_info if isinstance(raw_info, BaseException) else None,
             )
     except Exception as celery_err:
-        # Broker/Result-Backend nicht erreichbar: der DB-Status bleibt die
-        # Wahrheit, das Ergebnis fehlt eben. Kein 5xx — die Bar soll den Task
-        # weiterhin anzeigen können.
+        # Broker/result backend unreachable: the DB status remains the
+        # source of truth, the result is just missing. No 5xx — the bar
+        # should still be able to display the task.
         logger.warning(
             "Failed to fetch Celery result for task %s: %s", job.task_id, celery_err
         )

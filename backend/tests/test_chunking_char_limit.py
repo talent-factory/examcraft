@@ -1,10 +1,10 @@
-"""Tests für die geteilte Chunking-Logik mit Zeichen-Obergrenze (TF-445).
+"""Tests for the split chunking logic with a character upper limit (TF-445).
 
-Stellt sicher, dass über-lange Inhalte beim Chunking inhaltserhaltend in
-mehrere vollständige Chunks gesplittet werden — statt am Embedding-Boundary
-getrunct zu werden (TF-442) —, dass die ``chunk_index``-Nummerierung
-fortlaufend/eindeutig bleibt (Qdrant-Point-ID-Sicherheit) und dass beide
-Prozessoren (Default + Legacy) die Obergrenze durchsetzen.
+Ensures that oversized content is split during chunking, content-preserving,
+into multiple complete chunks — instead of being truncated at the embedding
+boundary (TF-442) —, that the ``chunk_index`` numbering stays
+sequential/unique (Qdrant point ID safety), and that both processors
+(default + legacy) enforce the upper limit.
 """
 
 import pytest
@@ -19,10 +19,11 @@ from services.document_processors.pymupdf_processor import PyMuPDFProcessor
 
 
 def _strip_ws(text: str) -> str:
-    """Inhalt ohne Whitespace — robuste „kein Inhaltsverlust"-Invariante.
+    """Content without whitespace — a robust "no content loss" invariant.
 
-    Der Wort-Fenster-/Split-Pfad normalisiert Whitespace zwischen Wörtern zu
-    einfachen Leerzeichen; verglichen wird daher der whitespace-freie Inhalt.
+    The word-window/split path normalizes whitespace between words to
+    single spaces; the whitespace-free content is therefore what gets
+    compared.
     """
     return "".join(text.split())
 
@@ -32,21 +33,21 @@ class TestSplitToCharLimit:
         assert _split_to_char_limit("hello world", 100) == ["hello world"]
 
     def test_single_oversized_word_hard_split_by_chars(self):
-        # Ein Block ohne Whitespace (Base64-Blob / minifizierter Code) ist EIN
-        # „Wort" und muss hart per Zeichen gesplittet werden.
+        # A block without whitespace (Base64 blob / minified code) is ONE
+        # "word" and must be hard-split by character.
         word = "A" * 250
         pieces = _split_to_char_limit(word, 100)
 
         assert [len(p) for p in pieces] == [100, 100, 50]
         assert all(len(p) <= 100 for p in pieces)
-        assert "".join(pieces) == word  # keinerlei Inhaltsverlust
+        assert "".join(pieces) == word  # no content loss whatsoever
 
     def test_word_boundaries_preferred_over_hard_split(self):
-        text = " ".join(["word"] * 50)  # 50*4 + 49 Spaces = 249 Zeichen
+        text = " ".join(["word"] * 50)  # 50*4 + 49 spaces = 249 characters
         pieces = _split_to_char_limit(text, 100)
 
         assert all(len(p) <= 100 for p in pieces)
-        # Kein Wort wird mitten zerschnitten.
+        # No word is cut in the middle.
         for piece in pieces:
             assert all(token == "word" for token in piece.split())
         assert _strip_ws("".join(pieces)) == _strip_ws(text)
@@ -60,8 +61,8 @@ class TestSplitToCharLimit:
         assert _strip_ws("".join(pieces)) == _strip_ws(text)
 
     def test_word_exactly_at_limit_is_not_hard_split(self):
-        # Guard ist `len(word) > max_chars`, also bleibt ein Wort der Länge
-        # genau max_chars ungeteilt.
+        # Guard is `len(word) > max_chars`, so a word of length exactly
+        # max_chars stays undivided.
         word = "C" * 100
         assert _split_to_char_limit(word, 100) == [word]
 
@@ -80,13 +81,13 @@ class TestCreateChunksCharLimit:
 
         assert len(chunks) == 5
         assert all(len(c.content) <= 1000 for c in chunks)
-        # Kein Inhaltsverlust — anders als bei der Embedding-Truncation.
+        # No content loss — unlike embedding truncation.
         assert "".join(c.content for c in chunks) == blob
 
     def test_chunk_index_sequential_and_unique(self):
-        # Eindeutige, fortlaufende chunk_index ist Pflicht: generate_point_id
-        # leitet daraus eine deterministische UUID ab — Kollisionen würden
-        # Chunks in Qdrant gegenseitig überschreiben.
+        # A unique, sequential chunk_index is mandatory: generate_point_id
+        # derives a deterministic UUID from it — collisions would cause
+        # chunks in Qdrant to overwrite each other.
         blob = "Z" * 5000
         chunks = create_chunks(blob, 1000, 200, max_chars=1000)
 
@@ -95,8 +96,8 @@ class TestCreateChunksCharLimit:
         assert len(indices) == len(set(indices))
 
     def test_early_return_path_is_also_capped(self):
-        # words <= chunk_size (ein einziges Mega-Wort) lief früher ungeprüft in
-        # einen einzigen Riesen-Chunk.
+        # words <= chunk_size (a single mega-word) previously flowed unchecked
+        # into a single giant chunk.
         blob = "x" * 3000
         chunks = create_chunks(blob, chunk_size=1000, chunk_overlap=200, max_chars=1000)
 
@@ -110,7 +111,7 @@ class TestCreateChunksCharLimit:
         assert len(chunks) == 1
         assert chunks[0].content == text
         assert chunks[0].chunk_index == 0
-        # Kein Split → keine Split-Marker in den Metadaten.
+        # No split → no split markers in the metadata.
         assert "char_split_part" not in chunks[0].metadata
 
     def test_split_metadata_marks_parts(self):
@@ -126,8 +127,8 @@ class TestCreateChunksCharLimit:
         assert create_chunks("   \n\t ", 1000, 200) == []
 
     def test_multiword_document_with_embedded_oversized_word(self):
-        # > chunk_size Wörter (Overlap-Pfad) UND ein Mega-Wort mittendrin:
-        # alle Chunks müssen unter dem Cap bleiben und die Indizes lückenlos.
+        # > chunk_size words (overlap path) AND a mega-word in the middle:
+        # all chunks must stay under the cap and the indices must be gapless.
         words = ["alpha"] * 1500
         words[700] = "M" * 3000
         text = " ".join(words)
@@ -139,9 +140,9 @@ class TestCreateChunksCharLimit:
         assert indices == list(range(len(chunks)))
 
     def test_multiwindow_no_overlap_preserves_all_content(self):
-        # Mehrere Wort-Fenster (Overlap=0, also keine Duplizierung) MIT einem
-        # Mega-Wort: der Multi-Window-Pfad darf weder am Fenster-Übergang noch
-        # beim Zeichen-Split Inhalt verlieren.
+        # Multiple word windows (overlap=0, i.e. no duplication) WITH a
+        # mega-word: the multi-window path must not lose content, either at
+        # the window boundary or during the character split.
         words = ["alpha"] * 1500
         words[700] = "M" * 3000
         text = " ".join(words)
@@ -153,8 +154,8 @@ class TestCreateChunksCharLimit:
         assert _strip_ws("".join(c.content for c in chunks)) == _strip_ws(text)
 
     def test_word_count_invariant_holds_after_windowing(self):
-        # Bestehende Zusage: word_count <= chunk_size pro Chunk. Multi-Wort-Doku
-        # über der Fenstergrösse, unter dem Zeichen-Cap (kein Char-Split).
+        # Existing guarantee: word_count <= chunk_size per chunk. Multi-word
+        # document above the window size, below the character cap (no char split).
         text = " ".join(["lorem"] * 2500)
         chunks = create_chunks(
             text, chunk_size=1000, chunk_overlap=200, max_chars=12000

@@ -26,7 +26,7 @@ jest.mock('../../contexts/AuthContext', () => ({
   }),
 }));
 
-// Form als Stub — der Seiten-Test prüft Liste/Filter/Aktionen, nicht das Formular.
+// Form as a stub — the page test checks list/filter/actions, not the form.
 jest.mock('../../components/competencyFrameworks/CompetencyFrameworkForm', () => () => (
   <div data-testid="framework-form" />
 ));
@@ -73,7 +73,7 @@ it('listet Frameworks inkl. Competency-Codes', async () => {
 it('zeigt Aktionen nur für eigene Frameworks (created_by === user.id)', async () => {
   renderPage();
   await screen.findByText(/Modul A/);
-  // Modul A gehört user 1 → Archivieren-Button vorhanden; Modul B (created_by 99) → nicht.
+  // Modul A belongs to user 1 → archive button present; Modul B (created_by 99) → not.
   const archiveButtons = screen.getAllByRole('button', { name: /Archivieren/i });
   expect(archiveButtons).toHaveLength(1);
 });

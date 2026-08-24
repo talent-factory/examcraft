@@ -1,4 +1,4 @@
-"""Tests für WebSocket Task Progress Endpoint"""
+"""Tests for the WebSocket task progress endpoint"""
 
 import pytest
 from unittest.mock import patch, MagicMock
@@ -11,14 +11,14 @@ import os
 
 @pytest.fixture
 def ws_app():
-    """Minimale FastAPI-App mit WebSocket-Router für Tests"""
+    """Minimal FastAPI app with the WebSocket router for tests"""
     import sys
 
     app = FastAPI()
     ws_path = os.path.join(os.path.dirname(__file__), "..", "api", "v1", "websocket.py")
     spec = importlib.util.spec_from_file_location("ws_module", ws_path)
     ws_module = importlib.util.module_from_spec(spec)
-    # Registriere unter dem kanonischen Namen, damit patch("api.v1.websocket.*") greift
+    # Register under the canonical name so patch("api.v1.websocket.*") takes effect
     sys.modules["api.v1.websocket"] = ws_module
     spec.loader.exec_module(ws_module)
     app.include_router(ws_module.router)
@@ -52,7 +52,7 @@ class TestWebSocketConnection:
     def test_websocket_connection_valid_token(
         self, ws_app, valid_token_payload, mock_user, mock_document
     ):
-        """Verbindung mit gültigem Token-Handshake wird akzeptiert"""
+        """Connection with a valid token handshake is accepted"""
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
@@ -81,7 +81,7 @@ class TestWebSocketConnection:
                 assert data["status"] == "SUCCESS"
 
     def test_websocket_invalid_token(self, ws_app):
-        """Ungültiger Token → WebSocket wird geschlossen"""
+        """Invalid token → WebSocket is closed"""
         with patch("api.v1.websocket.AuthService") as mock_auth:
             mock_auth.decode_token.return_value = None
 
@@ -92,7 +92,7 @@ class TestWebSocketConnection:
                     ws.receive_json()
 
     def test_websocket_revoked_token(self, ws_app, valid_token_payload, mock_user):
-        """Revozierter Token → WebSocket wird geschlossen"""
+        """Revoked token → WebSocket is closed"""
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
@@ -110,7 +110,7 @@ class TestWebSocketConnection:
                     ws.receive_json()
 
     def test_websocket_wrong_ownership(self, ws_app, valid_token_payload, mock_user):
-        """Task gehört einem anderen User → WebSocket wird geschlossen"""
+        """Task belongs to a different user → WebSocket is closed"""
         wrong_doc = MagicMock()
         wrong_doc.user_id = 999
 
@@ -139,7 +139,7 @@ class TestWebSocketProgressUpdates:
     def test_task_progress_updates(
         self, ws_app, valid_token_payload, mock_user, mock_document
     ):
-        """PROGRESS-Messages werden korrekt übertragen"""
+        """PROGRESS messages are transmitted correctly"""
         call_count = 0
 
         def make_result(*args, **kwargs):
@@ -186,7 +186,7 @@ class TestWebSocketProgressUpdates:
     def test_connection_closed_on_success(
         self, ws_app, valid_token_payload, mock_user, mock_document
     ):
-        """Connection wird nach SUCCESS geschlossen"""
+        """Connection is closed after SUCCESS"""
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
@@ -219,7 +219,7 @@ class TestWebSocketProgressUpdates:
     def test_connection_closed_on_failure(
         self, ws_app, valid_token_payload, mock_user, mock_document
     ):
-        """Connection wird nach FAILURE geschlossen"""
+        """Connection is closed after FAILURE"""
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
@@ -251,12 +251,13 @@ class TestWebSocketProgressUpdates:
     def test_connection_closed_on_revoked(
         self, ws_app, valid_token_payload, mock_user, mock_document
     ):
-        """REVOKED ist genauso terminal wie FAILURE — der Client darf nach
-        einer REVOKED-Nachricht keine weiteren Updates erhalten. Ohne diesen
-        Test würde eine Regression, die REVOKED aus dem Terminal-Tuple
-        entfernt (z. B. eine "Vereinheitlichung" mit FAILURE), unbemerkt
-        bleiben — der Frontend-Sticky-Terminal-Schutz (TF-328) wäre dann
-        wirkungslos, weil das Backend gar keinen REVOKED-Frame mehr sendet.
+        """REVOKED is just as terminal as FAILURE — the client must not
+        receive any further updates after a REVOKED message. Without this
+        test, a regression that removes REVOKED from the terminal tuple
+        (e.g. a "unification" with FAILURE) would go unnoticed — the
+        frontend's sticky-terminal protection (TF-328) would then be
+        ineffective, because the backend would no longer send a REVOKED
+        frame at all.
         """
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
@@ -286,8 +287,8 @@ class TestWebSocketProgressUpdates:
                 assert data["status"] == "REVOKED"
                 assert data["error"] is not None
                 with pytest.raises(Exception):
-                    # Server muss nach REVOKED schliessen — kein weiterer
-                    # Frame (analog zum SUCCESS- und FAILURE-Verhalten).
+                    # Server must close after REVOKED — no further
+                    # frame (analogous to SUCCESS/FAILURE behavior).
                     ws.receive_json()
 
 
@@ -326,8 +327,8 @@ class TestWebSocketDisconnect:
 
 @pytest.fixture
 def ws_module():
-    """Lädt das websocket-Modul (wie ws_app) und gibt es zurück, damit reine
-    Hilfsfunktionen wie user_facing_task_error direkt getestet werden können."""
+    """Loads the websocket module (like ws_app) and returns it, so pure
+    helper functions like user_facing_task_error can be tested directly."""
     import sys
 
     ws_path = os.path.join(os.path.dirname(__file__), "..", "api", "v1", "websocket.py")
@@ -339,12 +340,12 @@ def ws_module():
 
 
 class TestUserFacingError:
-    """TF-358: Der echte Task-Fehler wird geloggt, dem User aber eine sichere,
-    handlungsleitende Meldung gezeigt — bekannte Fehlerklassen konkret,
-    Unbekanntes generisch (kein Info-Leak)."""
+    """TF-358: The real task error is logged, but the user is shown a safe,
+    actionable message — known error classes get a specific message,
+    unknowns get a generic one (no info leak)."""
 
     def test_no_context_maps_to_actionable_message(self, ws_module):
-        # Genau der Prod-Fehler aus TF-358.
+        # The exact production error from TF-358.
         msg = ws_module.user_facing_task_error(
             ValueError("No context available for question generation")
         )
@@ -363,7 +364,7 @@ class TestUserFacingError:
         assert msg != ws_module.GENERIC_TASK_ERROR
 
     def test_unknown_error_falls_back_to_generic_no_leak(self, ws_module):
-        # Interna (Tabellennamen, Stacktrace-Fragmente) dürfen NICHT durchsickern.
+        # Internals (table names, stack trace fragments) must NOT leak through.
         leaky = ValueError(
             "IntegrityError: duplicate key value violates unique constraint "
             '"question_source_doc_pkey" DETAIL: Key (id)=(42) at /app/secret.py'
@@ -377,9 +378,9 @@ class TestUserFacingError:
         assert ws_module.user_facing_task_error(None) == ws_module.GENERIC_TASK_ERROR
 
     def test_maps_via_stable_code_independent_of_message(self, ws_module):
-        # TF-358: Mapping muss über den stabilen .code greifen, auch wenn die
-        # Roh-Message den englischen Substring NICHT enthält (Robustheit gegen
-        # Umformulierung/Lokalisierung). Die typisierten Fehler leben in core.
+        # TF-358: Mapping must work via the stable .code, even if the raw
+        # message does NOT contain the English substring (robustness against
+        # rewording/localization). The typed errors live in core.
         from services.rag_errors import NoContextError, UnknownQuestionTypeError
 
         no_ctx = ws_module.user_facing_task_error(
@@ -394,8 +395,8 @@ class TestUserFacingError:
 
 
 class TestFailureMessageMapping:
-    """Integrationstest: der FAILURE-Frame trägt die handlungsleitende Meldung
-    statt der pauschalen — der Test schlägt ohne den TF-358-Fix fehl."""
+    """Integration test: the FAILURE frame carries the actionable message
+    instead of the generic one — this test fails without the TF-358 fix."""
 
     def test_no_context_failure_sends_actionable_error(
         self, ws_app, valid_token_payload, mock_user, mock_document

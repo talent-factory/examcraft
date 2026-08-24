@@ -1,6 +1,6 @@
 """
 Document Processor Factory
-Dynamische Auswahl zwischen PyMuPDF und Legacy Processor
+Dynamic selection between PyMuPDF and legacy processor
 """
 
 import os
@@ -28,29 +28,29 @@ class UnknownProcessorTypeError(ValueError):
 
 class DocumentProcessorFactory:
     """
-    Factory für dynamische Processor-Auswahl
+    Factory for dynamic processor selection
 
     Environment Variables:
     - DOCUMENT_PROCESSOR_TYPE: "pymupdf" (default), "legacy", or "auto"
 
     Default: PyMuPDF (fast and efficient)
-    - PyMuPDF: Schnelle PDF-Verarbeitung mit fitz
+    - PyMuPDF: fast PDF processing with fitz
     - Legacy: pypdf + python-docx (deprecated)
     """
 
     @staticmethod
     def create_processor() -> Union["PyMuPDFProcessor", "LegacyProcessor"]:
         """
-        Erstelle Document Processor basierend auf Konfiguration
+        Create a document processor based on configuration
 
         Returns:
-            PyMuPDFProcessor (default) oder LegacyProcessor
+            PyMuPDFProcessor (default) or LegacyProcessor
         """
         processor_type = os.getenv("DOCUMENT_PROCESSOR_TYPE", "pymupdf").lower().strip()
 
         logger.info(f"Creating document processor (type: {processor_type})")
 
-        # PyMuPDF (Standard - schnell und effizient)
+        # PyMuPDF (default - fast and efficient)
         if processor_type == "pymupdf":
             try:
                 from .pymupdf_processor import PyMuPDFProcessor
@@ -67,7 +67,7 @@ class DocumentProcessorFactory:
                     "Install with: pip install PyMuPDF"
                 ) from e
 
-        # Explizit Legacy angefordert (deprecated)
+        # Legacy explicitly requested (deprecated)
         if processor_type == "legacy":
             logger.warning(
                 "Legacy processor is deprecated. Consider using PyMuPDF instead."
@@ -77,9 +77,9 @@ class DocumentProcessorFactory:
             logger.info("Using LegacyProcessor (explicitly requested, deprecated)")
             return LegacyProcessor()
 
-        # Auto-Detection (versucht PyMuPDF, dann Legacy)
+        # Auto-detection (tries PyMuPDF, then legacy)
         if processor_type == "auto":
-            # Versuche PyMuPDF zuerst
+            # Try PyMuPDF first
             try:
                 from .pymupdf_processor import PyMuPDFProcessor
 
@@ -97,7 +97,7 @@ class DocumentProcessorFactory:
 
             return LegacyProcessor()
 
-        # Unbekannter Typ
+        # Unknown type
         raise UnknownProcessorTypeError(
             f"Unknown processor type: {processor_type}. "
             "Valid options: 'pymupdf' (default), 'legacy', 'auto'"
@@ -105,17 +105,18 @@ class DocumentProcessorFactory:
 
 
 def is_ocr_available() -> bool:
-    """True, wenn PyMuPDF-OCR tatsächlich nutzbar ist.
+    """True if PyMuPDF OCR is actually usable.
 
-    Prüft drei Bedingungen, statt nur die Env-Var — sonst meldete OCR sich
-    als verfügbar (``TESSDATA_PREFIX`` wird im Image unbedingt gesetzt),
-    obwohl Tesseract gar nicht installiert ist, und ``get_textpage_ocr``
-    würde erst zur Laufzeit krachen statt sauber auf ``unavailable`` zu fallen:
+    Checks three conditions instead of just the env var — otherwise OCR
+    would report itself as available (``TESSDATA_PREFIX`` is unconditionally
+    set in the image) even though Tesseract isn't installed at all, and
+    ``get_textpage_ocr`` would only blow up at runtime instead of falling
+    back cleanly to ``unavailable``:
 
-    1. ``TESSDATA_PREFIX`` ist gesetzt (PyMuPDF verlangt das),
-    2. das ``tesseract``-Binary ist im PATH,
-    3. mindestens ein konfiguriertes Sprachpaket (``<lang>.traineddata``) liegt
-       im tessdata-Verzeichnis.
+    1. ``TESSDATA_PREFIX`` is set (PyMuPDF requires this),
+    2. the ``tesseract`` binary is on PATH,
+    3. at least one configured language pack (``<lang>.traineddata``) exists
+       in the tessdata directory.
     """
     prefix = os.environ.get("TESSDATA_PREFIX")
     if not prefix:
@@ -127,30 +128,30 @@ def is_ocr_available() -> bool:
 
 
 def create_ocr_processor() -> "PyMuPDFProcessor":
-    """Erzeuge einen PyMuPDF-Prozessor mit aktiviertem Tesseract-OCR (TF-360)."""
+    """Create a PyMuPDF processor with Tesseract OCR enabled (TF-360)."""
     from .pymupdf_processor import PyMuPDFProcessor
 
     return PyMuPDFProcessor(enable_ocr=True)
 
 
 def _init_document_processor() -> Union["PyMuPDFProcessor", "LegacyProcessor"]:
-    """Erzeuge die globale Processor-Instanz beim Import (TF-368).
+    """Create the global processor instance at import time (TF-368).
 
-    Verhalten bei Fehlern:
+    Behavior on error:
 
-    * **Fehlkonfiguration** (``UnknownProcessorTypeError`` aus
-      ``create_processor`` — ein ungültiges ``DOCUMENT_PROCESSOR_TYPE``):
-      fail-fast. Wir degradieren *nicht* still auf einen deprecateten
-      Processor, sondern lassen den Boot mit dem Original-Fehler abbrechen,
-      damit die Fehlkonfiguration operator-sichtbar und debuggbar ist statt
-      unbemerkt. Andere ``ValueError`` (z. B. ein kaputtes numerisches
-      ``OCR_DPI``) zählen *nicht* als Typ-Fehlkonfiguration und laufen in den
-      Resilienz-Fallback.
-    * **Laufzeit-/Import-Fehler** (z. B. PyMuPDF nicht installiert): Resilienz
-      bleibt akzeptabel — wir fallen auf PyMuPDF, dann Legacy zurück. Anders
-      als bisher (``logger.warning``) wird der Downgrade aber auf ``ERROR``
-      *mit dem Original-Exception-Typ* geloggt, sodass ein degradierter
-      Worker nicht in einer einzelnen Warnzeile untergeht.
+    * **Misconfiguration** (``UnknownProcessorTypeError`` from
+      ``create_processor`` — an invalid ``DOCUMENT_PROCESSOR_TYPE``):
+      fail-fast. We do *not* silently degrade to a deprecated processor;
+      instead we let boot abort with the original error, so the
+      misconfiguration is operator-visible and debuggable instead of
+      going unnoticed. Other ``ValueError``s (e.g. a malformed numeric
+      ``OCR_DPI``) do *not* count as a type misconfiguration and fall
+      into the resilience fallback.
+    * **Runtime/import errors** (e.g. PyMuPDF not installed): resilience
+      remains acceptable — we fall back to PyMuPDF, then legacy. Unlike
+      before (``logger.warning``), the downgrade is now logged at
+      ``ERROR`` *with the original exception type*, so a degraded worker
+      doesn't get lost in a single warning line.
     """
     try:
         processor = DocumentProcessorFactory.create_processor()
@@ -203,5 +204,5 @@ def _init_document_processor() -> Union["PyMuPDFProcessor", "LegacyProcessor"]:
 
 
 # Global Processor Instance
-# Wird beim ersten Import erstellt
+# Created on first import
 document_processor = _init_document_processor()

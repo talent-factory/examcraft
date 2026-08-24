@@ -253,7 +253,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           : f
       ));
 
-      // Start processing (asynchron im Backend) - NICHT WARTEN!
+      // Start processing (async in the backend) - DO NOT WAIT!
       await DocumentService.processDocument(uploadResult.document_id, true);
 
       // Check if cancelled
@@ -261,8 +261,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         throw new Error('Processing cancelled');
       }
 
-      // SOFORT als "completed" markieren - Processing läuft im Hintergrund!
-      // User kann sofort weiterarbeiten, während das Dokument verarbeitet wird
+      // Mark as "completed" IMMEDIATELY - processing runs in the background!
+      // User can continue working right away while the document is being processed
       setUploadFiles(prev => prev.map(f =>
         f.id === fileId
           ? {
@@ -438,10 +438,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         </RadioGroup>
         {visibility === DocumentVisibility.TEAM && (
           <FormControl size="small" sx={{ mt: 1, ml: 4, minWidth: 220 }}>
-            {/* TF-626: Generic explizit setzen. Ohne ihn leitet MUI den
-                Value-Typ als `number` ab, und `value === ''` unten galt als
-                unmoeglicher Vergleich (TS2367) — obwohl '' der reale
-                Platzhalter-Zustand ist. */}
+            {/* TF-626: Explicitly set the generic. Without it, MUI infers the
+                value type as `number`, and `value === ''` below was flagged
+                as an impossible comparison (TS2367) — even though '' is the
+                actual placeholder state. */}
             <Select<number | ''>
               displayEmpty
               value={orgUnitId}

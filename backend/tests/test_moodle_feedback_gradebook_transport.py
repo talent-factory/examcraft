@@ -57,7 +57,7 @@ def test_gradebook_resolves_cm_then_pushes_grade_and_feedback():
     assert params["activityid"] == 555
     assert params["grades"][0]["studentid"] == 7
     assert params["grades"][0]["grade"] == 3.0
-    # Feedback enthält den (escapten) Kommentar und ist HTML
+    # Feedback contains the (escaped) comment and is HTML
     assert "gut &lt;b&gt;" in params["grades"][0]["str_feedback"]
     assert results["a@x.com"].status == "ok"
 

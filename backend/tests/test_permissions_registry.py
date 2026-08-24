@@ -11,13 +11,13 @@ def test_known_permissions_has_manage_org_units():
 
 
 def test_known_permissions_covers_all_seeded_strings():
-    # Liest die Permission-Union direkt aus utils/seed_roles.py, statt sie hier
-    # ein drittes Mal hart zu kodieren (test_permission_consistency.py und
-    # seed_roles.py selbst sind die anderen beiden Stellen) — verhindert genau
-    # das Drift-Muster, das test_permission_consistency.py laut eigenem
-    # Docstring verhindern soll. Wird dieser Test rot, weil seed_roles.py einen
-    # neuen String einführt: KNOWN_PERMISSIONS entsprechend ergänzen, nicht den
-    # Test lockern.
+    # Reads the permission union directly from utils/seed_roles.py instead of
+    # hard-coding it here a third time (test_permission_consistency.py and
+    # seed_roles.py itself are the other two places) — this prevents exactly
+    # the drift pattern that test_permission_consistency.py's own docstring
+    # says it should prevent. If this test goes red because seed_roles.py
+    # introduces a new string: extend KNOWN_PERMISSIONS accordingly, don't
+    # loosen the test.
     seeded_permissions = _get_all_seed_permission_names()
     assert seeded_permissions == set(KNOWN_PERMISSIONS.keys())
 
@@ -29,10 +29,10 @@ def test_known_permissions_entries_have_label_and_category():
 
 
 def test_known_permissions_has_institution_admin_read_all_bypass_permissions():
-    # TF-639: Institutions-Admin-Immer-Lesezugriff pro Ressourcentyp.
-    # "prompt:read_all" ist bewusst Singular (matcht prompt:read/update/
-    # delete/create), die anderen vier Plural (matchen documents:read /
-    # ihre jeweilige Ressourcen-Kategorie).
+    # TF-639: institution-admin always-read-access bypass per resource type.
+    # "prompt:read_all" is deliberately singular (matches prompt:read/update/
+    # delete/create), the other four are plural (match documents:read /
+    # their respective resource category).
     expected_category_by_permission = {
         "documents:read_all": "Dokumente",
         "prompt:read_all": "Prompts",

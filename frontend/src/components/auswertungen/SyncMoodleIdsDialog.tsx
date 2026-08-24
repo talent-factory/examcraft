@@ -1,10 +1,10 @@
 /**
  * SyncMoodleIdsDialog (TF-336 Subarea D).
  *
- * Lehrperson trägt die Moodle-Quiz-ID ein (optional inkl. der
- * Question-IDs in Slot-Reihenfolge). Wir POSTen an
- * `/api/v1/exams/{id}/sync-moodle-question-ids`; Backend verifiziert
- * via Web-Service-Call und schreibt `external_refs` zurück.
+ * The teacher enters the Moodle quiz ID (optionally including the
+ * question IDs in slot order). We POST to
+ * `/api/v1/exams/{id}/sync-moodle-question-ids`; the backend verifies
+ * via a web-service call and writes `external_refs` back.
  */
 
 import React, { useState } from 'react';

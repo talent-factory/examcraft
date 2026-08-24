@@ -1,11 +1,11 @@
 /**
- * Studi-Detail mit Cross-Exam-Verlauf (TF-336 G3 / Subarea B).
+ * Student detail with cross-exam history (TF-336 G3 / Subarea B).
  *
  * Layout:
- *  - Header: external_id + display_name + Klassenzugehörigkeit
- *  - Submissions chronologisch (LineChart % über Zeit + Tabelle)
- *  - Bloom-Mix (BarChart)
- *  - Topic-Heatmap (BarChart)
+ *  - Header: external_id + display_name + class membership
+ *  - Submissions chronologically (LineChart % over time + table)
+ *  - Bloom mix (BarChart)
+ *  - Topic heatmap (BarChart)
  */
 
 import React, { useEffect, useState } from 'react';

@@ -510,9 +510,9 @@ const AuswertungenExam: React.FC = () => {
         pointsMax={overrideAnswer?.grade?.points_max ?? 0}
         onClose={() => setOverrideAnswer(null)}
         onSuccess={async () => {
-          // Drawer-State zum Aufruf-Zeitpunkt einfangen — der Drawer
-          // kann während des Requests geschlossen werden, dann brauchen
-          // wir keinen Re-Fetch.
+          // Capture the drawer state at call time — the drawer
+          // may get closed during the request, in which case we
+          // don't need a re-fetch.
           const submissionId = drawer?.id;
           if (submissionId !== undefined) {
             const updated = await SubmissionsService.getDetail(submissionId);

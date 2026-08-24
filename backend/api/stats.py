@@ -1,13 +1,13 @@
-"""Statistik-API für /api/v1/exams/{exam_id}/stats/* + /submissions/{id}/stats.
+"""Statistics API for /api/v1/exams/{exam_id}/stats/* + /submissions/{id}/stats.
 
-Wraps ``StatisticsService`` (read-only, on-the-fly) — Spec 8.
+Wraps ``StatisticsService`` (read-only, on-the-fly) — spec 8.
 
-Multi-Tenancy: jede Route verifiziert ``Exam.institution_id`` (resp.
-``Submission`` über das Exam) gegen ``current_user.institution_id``.
-RBAC: ``submissions:read`` reicht — Statistik ist read-side Auswertung.
+Multi-tenancy: every route verifies ``Exam.institution_id`` (respectively
+``Submission`` via the exam) against ``current_user.institution_id``.
+RBAC: ``submissions:read`` suffices — statistics is read-side analysis.
 
-Kein ``from __future__ import annotations``: FastAPI/Pydantic v2
-braucht Runtime-Typen für die OpenAPI-Generierung.
+No ``from __future__ import annotations``: FastAPI/Pydantic v2
+needs runtime types for OpenAPI generation.
 """
 
 import logging
@@ -139,7 +139,7 @@ def _ensure_exam_for_user(db: Session, user: User, exam_id: int) -> Exam:
         .one_or_none()
     )
     if exam is None:
-        # 404 (statt 403) verhindert die Cross-Tenant-Existenz-Leak.
+        # 404 (instead of 403) prevents the cross-tenant existence leak.
         raise HTTPException(status_code=404, detail="Prüfung nicht gefunden")
     return exam
 
@@ -155,9 +155,9 @@ def _ensure_submission_for_user(
     )
     if submission is None:
         raise HTTPException(status_code=404, detail="Submission nicht gefunden")
-    # Cross-Check via Exam-Institution; ein Submission kann aus
-    # mehreren Attempts in mehreren Tenants nicht existieren, aber das
-    # Exam ist die kanonische Multi-Tenancy-Grenze.
+    # Cross-check via the exam's institution; a submission cannot exist
+    # across multiple tenants via multiple attempts, but the exam is the
+    # canonical multi-tenancy boundary.
     exam = (
         db.query(Exam)
         .filter(

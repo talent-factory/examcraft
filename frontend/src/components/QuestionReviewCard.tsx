@@ -146,10 +146,10 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
     ).join(' ');
   };
 
-  // TF-383: Provenance-Chip — zeigt, mit welcher Vorlage die Frage erstellt
-  // wurde. Snapshot zum Generierungszeitpunkt. Altbestand (null) → "nicht
-  // erfasst"; Default-/Fallback-Template → Standard-Badge; Custom-Prompt →
-  // Name + Version mit Variablen im Tooltip.
+  // TF-383: Provenance chip — shows which template was used to create the
+  // question. Snapshot at generation time. Legacy data (null) → "not
+  // recorded"; default/fallback template → standard badge; custom prompt →
+  // name + version with variables in the tooltip.
   const renderTemplateChip = () => {
     const gm = question.generation_metadata;
     const provenance = t('components.questionCard.templateProvenance');
@@ -316,7 +316,7 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             </Tooltip>
           )}
 
-          {/* TF-400: geprüfte Handlungskompetenz (HK) + LN-Stufe */}
+          {/* TF-400: reviewed competency (HK) + LN level */}
           {question.competency && (
             <Tooltip
               title={t('components.questionCard.competencyTooltip', {

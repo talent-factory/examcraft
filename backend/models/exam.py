@@ -146,10 +146,10 @@ class Exam(Base):
         nullable=False,
     )
 
-    # Archiv-Achse (TF-398): orthogonal zu ``status``. archived_at IS NULL =>
-    # aktiv; gesetzt => archiviert. Spiegelt das TF-396-Muster
-    # (question_reviews). Archivieren ist in jedem Status erlaubt und lässt
-    # ``status`` unangetastet.
+    # Archive axis (TF-398): orthogonal to ``status``. archived_at IS NULL =>
+    # active; set => archived. Mirrors the TF-396 pattern
+    # (question_reviews). Archiving is allowed in any status and leaves
+    # ``status`` untouched.
     archived_at = Column(DateTime(), nullable=True)
     archived_by = Column(
         Integer,

@@ -1,22 +1,21 @@
-"""Moodle-Connections API (TF-336 Subarea C).
+"""Moodle Connections API (TF-336 Subarea C).
 
-Endpoints (alle unter ``moodle:configure``):
+Endpoints (all under ``moodle:configure``):
 
-* ``GET    /api/v1/admin/moodle-connections``      — Liste (max. 1 pro Inst.)
-* ``POST   /api/v1/admin/moodle-connections``      — anlegen
-* ``GET    /api/v1/admin/moodle-connections/{id}`` — Detail (Token maskiert)
-* ``PATCH  /api/v1/admin/moodle-connections/{id}`` — base_url/token ändern
-* ``DELETE /api/v1/admin/moodle-connections/{id}`` — entfernen
-* ``POST   /api/v1/admin/moodle-connections/{id}/test`` — Token validieren
+* ``GET    /api/v1/admin/moodle-connections``      — list (max. 1 per institution)
+* ``POST   /api/v1/admin/moodle-connections``      — create
+* ``GET    /api/v1/admin/moodle-connections/{id}`` — detail (token masked)
+* ``PATCH  /api/v1/admin/moodle-connections/{id}`` — change base_url/token
+* ``DELETE /api/v1/admin/moodle-connections/{id}`` — remove
+* ``POST   /api/v1/admin/moodle-connections/{id}/test`` — validate token
 
-Multi-Tenancy: jede Connection ist 1:1 an die Institution gekoppelt
-(``moodle_connections.institution_id`` UNIQUE). Lesen/Schreiben filtert
-auf ``current_user.institution_id``.
+Multi-tenancy: each connection is coupled 1:1 to the institution
+(``moodle_connections.institution_id`` UNIQUE). Reads/writes filter on
+``current_user.institution_id``.
 
-Token-Verschlüsselung: Plaintext-Token wird via Fernet
-(``utils.secret_encryption``) verschlüsselt persistiert. Der Token wird
-**nie** roh ausgespielt; das Detail-Schema liefert ``token_masked`` als
-``****<letzte 4 Zeichen>``.
+Token encryption: the plaintext token is persisted encrypted via Fernet
+(``utils.secret_encryption``). The token is **never** exposed raw; the
+detail schema returns ``token_masked`` as ``****<last 4 characters>``.
 """
 
 import logging
@@ -171,7 +170,7 @@ async def list_connections(
     current_user: User = Depends(require_permission("moodle:configure")),
     db: Session = Depends(get_db),
 ) -> MoodleConnectionListOut:
-    """Liefert die (höchstens eine) Connection der Institution."""
+    """Returns the (at most one) connection of the institution."""
     rows = (
         db.query(MoodleConnection)
         .filter(MoodleConnection.institution_id == current_user.institution_id)
@@ -192,7 +191,7 @@ async def create_connection(
     current_user: User = Depends(require_permission("moodle:configure")),
     db: Session = Depends(get_db),
 ) -> MoodleConnectionOut:
-    """Connection anlegen. 409, falls bereits eine existiert."""
+    """Create a connection. 409 if one already exists."""
     encrypted = encrypt_secret(body.token)
     connection = MoodleConnection(
         institution_id=current_user.institution_id,
@@ -230,7 +229,7 @@ async def update_connection(
     current_user: User = Depends(require_permission("moodle:configure")),
     db: Session = Depends(get_db),
 ) -> MoodleConnectionOut:
-    """Token / Base-URL ändern. Mindestens ein Feld muss gesetzt sein."""
+    """Change the token / base URL. At least one field must be set."""
     if body.base_url is None and body.token is None:
         raise HTTPException(
             status_code=400,
@@ -261,7 +260,7 @@ async def delete_connection(
 
 
 # ---------------------------------------------------------------------------
-# Verbindungstest
+# Connection test
 # ---------------------------------------------------------------------------
 
 
@@ -271,11 +270,11 @@ async def test_connection(
     current_user: User = Depends(require_permission("moodle:configure")),
     db: Session = Depends(get_db),
 ) -> MoodleConnectionTestOut:
-    """Ruft ``core_webservice_get_site_info`` auf.
+    """Calls ``core_webservice_get_site_info``.
 
-    Antwortet mit 200 + ``ok: false`` bei Auth-/Netzwerkfehlern, damit
-    das Frontend die Fehlermeldung im Form-State anzeigen kann (statt
-    einer 4xx, die als generischer Toast auftauchen würde).
+    Responds with 200 + ``ok: false`` on auth/network errors, so the
+    frontend can display the error message in the form state (instead
+    of a 4xx, which would show up as a generic toast).
     """
     connection = _load_for_user(db=db, user=current_user, connection_id=connection_id)
     # Decryption failure indicates server-side encryption corruption
@@ -308,9 +307,9 @@ async def test_connection(
         )
     if 400 <= response.status_code < 500:
         # Surface the real status so the operator can tell apart
-        # "Token verboten" (401/403) from "Endpoint falsch" (404) and
-        # "Rate-limit" (429) — without this branch all three render as
-        # an opaque "Antwort war kein JSON".
+        # "token forbidden" (401/403) from "wrong endpoint" (404) and
+        # "rate limit" (429) — without this branch all three render as
+        # an opaque "response was not JSON".
         return MoodleConnectionTestOut(
             ok=False,
             error=(
@@ -329,7 +328,7 @@ async def test_connection(
             error=data.get("message") or "unbekannter Fehler",
         )
 
-    # Erfolg: Connection als getestet markieren.
+    # Success: mark the connection as tested.
     connection.last_used_at = datetime.now(timezone.utc)
     db.commit()
 

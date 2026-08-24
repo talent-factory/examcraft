@@ -1,16 +1,16 @@
 /**
- * Review-Queue (Spec 6.4 / TF-334).
+ * Review queue (Spec 6.4 / TF-334).
  *
- * Listet alle ``status='proposed'``-Grades für ``open_ended``-Antworten
- * der ausgewählten Prüfung auf. Sortierung nach Konfidenz (NULL +
- * niedrig zuerst — dort braucht es Lehrperson-Aufmerksamkeit). Filter:
- * Konfidenz-Range, Frage, Studi. Aktionen pro Eintrag: Übernehmen,
- * Anpassen (öffnet Inline-Editor), "Im Kontext" (Hand-off an die
- * Submissions-Detailansicht).
+ * Lists all ``status='proposed'`` grades for ``open_ended`` answers
+ * of the selected exam. Sorted by confidence (NULL + low first —
+ * that's where the teacher's attention is needed). Filters:
+ * confidence range, question, student. Actions per entry: approve,
+ * override (opens inline editor), "in context" (hand-off to the
+ * submissions detail view).
  *
- * Bulk-Aktion: explizit getriggert (kein Auto-Approve, Spec 6.4
- * Abgrenzung). Schwelle als Konfidenz-Slider, plus Auswahl-basierter
- * Pfad für Lehrperson, die einzelne Items "abhaken" will.
+ * Bulk action: explicitly triggered (no auto-approve, per Spec 6.4
+ * scope). Threshold as a confidence slider, plus a selection-based
+ * path for teachers who want to "check off" individual items.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -48,9 +48,9 @@ import OverrideGradeDialog from './OverrideGradeDialog';
 import MarkdownRenderer from '../MarkdownRenderer';
 import { reflowMoodleAnswer } from '../../utils/moodleAnswerReflow';
 
-// Untere Grenze für die Bulk-Konfidenz-Schwelle: 0% würde alle
-// proposed-Grades inklusive der Fail-Soft-Stubs (confidence=0.0)
-// einsammeln — Lehrperson soll das nicht versehentlich auslösen.
+// Lower bound for the bulk confidence threshold: 0% would collect
+// all proposed grades, including the fail-soft stubs (confidence=0.0)
+// — the teacher shouldn't be able to trigger that accidentally.
 const MIN_BULK_THRESHOLD = 50;
 const SNACKBAR_AUTOHIDE_MS = 5000;
 
@@ -98,7 +98,7 @@ const ReviewQueue: React.FC<Props> = ({
       setItems(result.items);
       setTotal(result.total);
       onTotalChange?.(result.total);
-      // Selection ausmisten — verschwundene IDs nicht mehr auswählbar.
+      // Prune selection — vanished IDs are no longer selectable.
       setSelected((prev) => {
         const next = new Set<number>();
         for (const it of result.items) {
@@ -115,7 +115,7 @@ const ReviewQueue: React.FC<Props> = ({
     } finally {
       setLoading(false);
     }
-    // ``t`` aus den Deps gelassen (siehe AuswertungenExam.tsx Begründung).
+    // ``t`` left out of the deps (see AuswertungenExam.tsx for rationale).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examId, confidenceMin, confidenceMax, questionFilter, studentFilter]);
 
@@ -123,9 +123,9 @@ const ReviewQueue: React.FC<Props> = ({
     reload();
   }, [reload]);
 
-  // Distinct question + student facets aus aktueller Item-Liste —
-  // einfach genug ohne separaten Endpoint, solange die Queue
-  // begrenzt ist (Default 200, Hard-Cap 1000).
+  // Distinct question + student facets derived from the current item
+  // list — simple enough without a separate endpoint, as long as the
+  // queue stays bounded (default 200, hard cap 1000).
   const questionOptions = useMemo(() => {
     const map = new Map<number, string>();
     for (const it of items) {
@@ -187,9 +187,9 @@ const ReviewQueue: React.FC<Props> = ({
     const eligible = items.filter(
       (it) => (it.confidence ?? -1) >= threshold,
     );
-    // Confirm-Dialog ist bewusst nur ein window.confirm — kein neuer
-    // Modal-Flow für das hier; die Queue ist sichtbar, der Schwellwert
-    // ist sichtbar, und der Snackbar-Toast meldet den Erfolg.
+    // The confirm dialog is deliberately just a window.confirm — no new
+    // modal flow for this; the queue is visible, the threshold is
+    // visible, and the snackbar toast reports the outcome.
     if (
       !window.confirm(
         t('auswertungen.exam.review.bulk.confirmThreshold', {
@@ -342,7 +342,7 @@ const ReviewQueue: React.FC<Props> = ({
         </CardContent>
       </Card>
 
-      {/* Bulk-Bar */}
+      {/* Bulk bar */}
       <Card variant="outlined" sx={{ mb: 2 }}>
         <CardContent>
           <Stack

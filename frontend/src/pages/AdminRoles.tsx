@@ -1,10 +1,10 @@
 /**
- * AdminRoles — Listenseite für den "Rollen"-Tab (TF-603).
+ * AdminRoles — list page for the "Roles" tab (TF-603).
  *
- * Ersetzt die bisherige RoleManagementPage (System A / RBACRole, siehe
- * Design-Doc). Zeigt models.auth.Role (System B) — das, was Role.permissions
- * tatsächlich enforced. Nur für Superuser sichtbar (Admin.tsx: visible: isSuperuser),
- * konsistent mit dem Backend-Guard get_current_superuser.
+ * Replaces the previous RoleManagementPage (System A / RBACRole, see
+ * design doc). Shows models.auth.Role (System B) — what Role.permissions
+ * actually enforces. Visible to superusers only (Admin.tsx: visible: isSuperuser),
+ * consistent with the backend guard get_current_superuser.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -104,10 +104,10 @@ const AdminRoles: React.FC = () => {
       setDeleteTarget(null);
       load();
     } catch (e) {
-      // Backend liefert bei 409 (Systemrolle / noch zugewiesene Benutzer)
-      // eine aussagekräftige detail-Message — die zeigen wir statt des
-      // generischen Fallbacks. Netzwerkfehler (kein `.detail`) fallen
-      // weiterhin auf den generischen i18n-String zurück (TF-603 Finding 4).
+      // On 409 (system role / users still assigned) the backend returns a
+      // meaningful detail message — we show that instead of the generic
+      // fallback. Network errors (no `.detail`) still fall back to the
+      // generic i18n string (TF-603 Finding 4).
       if (e instanceof ApiError && typeof e.detail === 'string' && e.detail) {
         setDeleteError(e.detail);
       } else {

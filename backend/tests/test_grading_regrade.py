@@ -1,13 +1,13 @@
 """Tests for ``GradingService.regrade_after_correct_answer_update``
 (Spec 6.6).
 
-Drei Garantien werden hier abgesichert:
+Three guarantees are covered here:
 
-1. ``manual_override`` bleibt unangetastet — die Lehrperson hat dort
-   schon explizit entschieden.
-2. ``proposed`` und ``approved`` werden zurückgesetzt auf ``proposed``
-   und neu gegradet.
-3. Jede Status-Transition landet als ``grade_history``-Zeile mit
+1. ``manual_override`` remains untouched — the instructor has already
+   made an explicit decision there.
+2. ``proposed`` and ``approved`` are reset to ``proposed`` and
+   re-graded.
+3. Every status transition lands as a ``grade_history`` row with
    ``change_reason='regrade_after_correct_answer_update'``.
 """
 
@@ -40,8 +40,8 @@ from services.grading_service import (
 def _seed_three_open_ended_grades(
     test_db: Session,
 ) -> tuple[ExamQuestion, list[Grade], User, Institution]:
-    """Bereite drei Submissions auf eine open_ended-Frage vor:
-    eine ``proposed``, eine ``approved``, eine ``manual_override``."""
+    """Prepare three submissions for an open_ended question:
+    one ``proposed``, one ``approved``, one ``manual_override``."""
     inst = Institution(
         name="Regrade",
         slug="regrade",
@@ -158,24 +158,24 @@ def test_regrade_keeps_manual_override_untouched(test_db: Session) -> None:
     ).regrade_after_correct_answer_update(exam_question_id=eq.id, triggered_by=user.id)
     test_db.commit()
 
-    # Zwei wurden re-gradet (proposed, approved); manual_override blieb.
+    # Two were re-graded (proposed, approved); manual_override stayed.
     assert count == 2
 
     test_db.refresh(proposed_g)
     test_db.refresh(approved_g)
     test_db.refresh(override_g)
 
-    # proposed bleibt proposed, hat aber neue Punkte
+    # proposed stays proposed, but has new points
     assert proposed_g.status == GradeStatus.PROPOSED.value
     assert proposed_g.points_awarded == 3.5
 
-    # approved wurde zurück auf proposed gesetzt + neu bewertet
+    # approved was reset to proposed + re-graded
     assert approved_g.status == GradeStatus.PROPOSED.value
     assert approved_g.points_awarded == 3.5
     assert approved_g.reviewer_id is None
     assert approved_g.reviewed_at is None
 
-    # manual_override unverändert in Punktzahl + Status
+    # manual_override unchanged in points + status
     assert override_g.status == GradeStatus.MANUAL_OVERRIDE.value
     assert override_g.points_awarded == 1.5
 
@@ -204,18 +204,18 @@ def test_regrade_writes_history_entries(test_db: Session) -> None:
         .all()
     )
     grade_ids = {r.grade_id for r in rows}
-    # Genau zwei history-Einträge — proposed + approved
+    # Exactly two history entries — proposed + approved
     assert grade_ids == {proposed_g.id, approved_g.id}
     assert override_g.id not in grade_ids
-    # changed_by gesetzt
+    # changed_by set
     for r in rows:
         assert r.changed_by == user.id
 
 
 def test_regrade_returns_zero_on_unknown_question(test_db: Session) -> None:
-    """Defense-in-depth: unbekannte exam_question_id wirft nicht, sondern
-    liefert 0 zurück. Endpoint-Schicht meldet 404 davor — aber Service
-    bleibt robust für Background-Jobs."""
+    """Defense-in-depth: an unknown exam_question_id does not raise, but
+    returns 0. The endpoint layer reports 404 before that point — but the
+    service stays robust for background jobs."""
     count = GradingService(test_db).regrade_after_correct_answer_update(
         exam_question_id=99999999, triggered_by=None
     )

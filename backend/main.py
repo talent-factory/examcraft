@@ -1,6 +1,6 @@
 """
 ExamCraft AI - FastAPI Backend
-KI-gestützte Plattform zur automatischen Generierung von Prüfungsaufgaben
+AI-powered platform for automatically generating exam questions
 """
 
 import asyncio
@@ -295,7 +295,7 @@ async def lifespan(app: FastAPI):
     submissions_api = importlib.util.module_from_spec(spec_submissions)
     spec_submissions.loader.exec_module(submissions_api)
 
-    # TF-336: Klassen-CRUD + Mitglieder.
+    # TF-336: class CRUD + members.
     spec_student_classes = importlib.util.spec_from_file_location(
         "core_api_student_classes",
         os.path.join(core_api_path, "student_classes.py"),
@@ -303,7 +303,7 @@ async def lifespan(app: FastAPI):
     student_classes_api = importlib.util.module_from_spec(spec_student_classes)
     spec_student_classes.loader.exec_module(student_classes_api)
 
-    # Org-Unit-Hierarchie (Abteilung/Team) — Stufe 0 Fundament.
+    # Org-Unit hierarchy (department/team) — Level 0 foundation.
     spec_org_units = importlib.util.spec_from_file_location(
         "core_api_org_units",
         os.path.join(core_api_path, "org_units.py"),
@@ -311,7 +311,7 @@ async def lifespan(app: FastAPI):
     org_units_api = importlib.util.module_from_spec(spec_org_units)
     spec_org_units.loader.exec_module(org_units_api)
 
-    # TF-336: Studi-Verlauf-Endpoints.
+    # TF-336: student history endpoints.
     spec_students = importlib.util.spec_from_file_location(
         "core_api_students",
         os.path.join(core_api_path, "students.py"),
@@ -319,7 +319,7 @@ async def lifespan(app: FastAPI):
     students_api = importlib.util.module_from_spec(spec_students)
     spec_students.loader.exec_module(students_api)
 
-    # TF-336: Moodle-Connections (Token-verschlüsselt).
+    # TF-336: Moodle connections (token-encrypted).
     spec_moodle_connections = importlib.util.spec_from_file_location(
         "core_api_moodle_connections",
         os.path.join(core_api_path, "moodle_connections.py"),
@@ -348,7 +348,7 @@ async def lifespan(app: FastAPI):
     grading_schemes_api = importlib.util.module_from_spec(spec_grading_schemes)
     spec_grading_schemes.loader.exec_module(grading_schemes_api)
 
-    # TF-400: Kompetenzrahmen-CRUD. Registered as "api.competency_frameworks"
+    # TF-400: competency framework CRUD. Registered as "api.competency_frameworks"
     # so that a later Premium import `from api.competency_frameworks import FrameworkOut`
     # resolves — mirroring the api.tags pattern.
     spec_competency = importlib.util.spec_from_file_location(
@@ -743,9 +743,9 @@ from middleware.i18n_middleware import I18nMiddleware  # noqa: E402
 
 app.add_middleware(I18nMiddleware)
 
-# GZip-Kompression für grössere Responses (Auswertungen, Dokumentlisten).
-# Vor CORS hinzugefügt, damit CORS die äusserste Schicht bleibt (siehe unten).
-# minimum_size=1000: kleine Responses bleiben unkomprimiert (kein Overhead).
+# GZip compression for larger responses (evaluations, document lists).
+# Added before CORS so CORS stays the outermost layer (see below).
+# minimum_size=1000: small responses stay uncompressed (no overhead).
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS middleware - must be added LAST so it becomes the outermost layer.
@@ -757,8 +757,8 @@ cors_origins_str = os.getenv(
 )
 cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
-# Wenn "*" in den Origins ist, setze allow_credentials auf False
-# (CORS-Konflikt: allow_credentials=True und allow_origins="*" sind nicht kompatibel)
+# If "*" is among the origins, set allow_credentials to False
+# (CORS conflict: allow_credentials=True and allow_origins="*" are not compatible)
 allow_credentials = "*" not in cors_origins
 
 app.add_middleware(
@@ -778,7 +778,7 @@ class ExamRequest(BaseModel):
     question_count: int = 5
     question_types: List[str] = ["single_choice", "open_ended"]
     language: str = "de"
-    tag_ids: Optional[List[int]] = None  # TF-320 Iter2: Tags für generierte Fragen
+    tag_ids: Optional[List[int]] = None  # TF-320 Iter2: tags for generated questions
 
 
 class Question(BaseModel):
@@ -894,7 +894,7 @@ async def api_health_check():
 
     # Check Vector Database
     try:
-        # get_collection_stats() ist nicht async, gibt dict zurück
+        # get_collection_stats() is not async, returns a dict
         stats = vector_service.get_collection_stats()
         if stats and isinstance(stats, dict):
             health_status["services"]["vector_db"] = "connected"
@@ -908,7 +908,7 @@ async def api_health_check():
         health_status["services"]["vector_db"] = "error"
         health_status["status"] = "degraded"
 
-    # Check Claude API (TF-440: Gateway ist die einzige Quelle für Modell-Routing)
+    # Check Claude API (TF-440: the gateway is the sole source of model routing)
     from services import llm_gateway
 
     health_status["services"]["claude_api"] = (
@@ -958,8 +958,8 @@ async def get_claude_health():
         "status": "healthy" if not stats["demo_mode"] else "demo_mode",
         "service": "Claude API",
         "demo_mode": stats["demo_mode"],
-        # TF-440: kein direkter Provider-Key mehr in der App — der Gateway
-        # hält die Credentials, hier zählt nur, ob er konfiguriert ist.
+        # TF-440: no direct provider key in the app anymore — the gateway
+        # holds the credentials; here only whether it's configured matters.
         "gateway_configured": llm_gateway.gateway_enabled(),
         "model": claude_service.model,
         "usage": stats,
@@ -1037,7 +1037,7 @@ async def generate_questions_endpoint(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Fragen generieren und optional Tags zuweisen (TF-320 Iter2)."""
+    """Generate questions and optionally assign tags (TF-320 Iter2)."""
     from models.question_review import QuestionReview, ReviewStatus
     from models.tag import Tag, QuestionTag as _QuestionTag
 

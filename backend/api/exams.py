@@ -107,8 +107,8 @@ class ExamGradingSchemeUpdate(BaseModel):
     grading_scheme_id: Optional[int] = Field(
         None,
         description=(
-            "None entfernt die Zuordnung; Exam fällt zurück auf "
-            "Institution-Default beim Notenexport."
+            "None removes the assignment; the exam falls back to the "
+            "institution default at grade export time."
         ),
     )
     updated_at: datetime = Field(..., description="For optimistic locking")
@@ -151,15 +151,15 @@ class ExamOut(BaseModel):
     question_count: int = 0
     default_document_ids: Optional[List[int]] = None
     grading_scheme_id: Optional[int] = None
-    # TF-643: Sichtbarkeit — siehe ExamVisibility-Docstring.
+    # TF-643: visibility — see the ExamVisibility docstring.
     visibility: str = "institution"
     org_unit_id: Optional[int] = None
-    # Archiv-Achse (TF-398) — orthogonal zu ``status``.
+    # Archive axis (TF-398) — orthogonal to ``status``.
     archived_at: Optional[datetime] = None
     archived_by: Optional[int] = None
     archive_reason: Optional[str] = None
-    # Ob die Prüfung Abgaben hat — vom Frontend für die ``canDelete``-Logik
-    # (disabled-Zustand des Lösch-Buttons) benötigt.
+    # Whether the exam has submissions — needed by the frontend for the
+    # ``canDelete`` logic (disabled state of the delete button).
     has_submissions: bool = False
 
     class Config:
@@ -176,7 +176,7 @@ class ExamListOut(BaseModel):
 
 
 class ExamArchiveRequest(BaseModel):
-    """Optionaler Grund beim Archivieren (TF-398)."""
+    """Optional reason when archiving (TF-398)."""
 
     reason: Optional[str] = Field(None, max_length=500)
 
@@ -244,9 +244,9 @@ def _require_draft(exam: Exam, locale: str = "de"):
 
 
 def _exam_to_out(exam: Exam, has_submissions: Optional[bool] = None) -> dict:
-    # ``has_submissions`` kann vom Aufrufer vorberechnet werden (Liste:
-    # Bulk-Query gegen N+1); fällt es weg, wird die Relationship lazy geladen
-    # (Einzel-Exam-Pfade — ein zusätzlicher Query, unkritisch).
+    # ``has_submissions`` can be precomputed by the caller (list endpoint:
+    # bulk query against N+1); if omitted, the relationship is lazy-loaded
+    # (single-exam paths — one extra query, non-critical).
     if has_submissions is None:
         has_submissions = bool(exam.submissions)
     return {
@@ -277,7 +277,7 @@ def _exam_to_out(exam: Exam, has_submissions: Optional[bool] = None) -> dict:
 
 
 def _exam_has_submissions(db: Session, exam_id: int) -> bool:
-    """Ob die Prüfung mindestens eine Abgabe hat (Guard fürs Hard-Delete)."""
+    """Whether the exam has at least one submission (guard for hard delete)."""
     from models.submission import Submission
 
     return (
@@ -287,11 +287,11 @@ def _exam_has_submissions(db: Session, exam_id: int) -> bool:
 
 
 def _exam_delete_block_reason(db: Session, exam: Exam, locale: str) -> Optional[str]:
-    """i18n-Grund, warum die Prüfung NICHT hart gelöscht werden darf — oder
-    ``None``, wenn alle vier Guards erfüllt sind (TF-398).
+    """i18n reason why the exam may NOT be hard-deleted — or
+    ``None`` if all four guards are satisfied (TF-398).
 
-    Reihenfolge: zuerst archiviert, dann nicht exportiert, dann keine Abgaben.
-    Die Permission (``delete_exams``) wird vom Endpoint-Dependency geprüft.
+    Order: first archived, then not exported, then no submissions.
+    The permission (``delete_exams``) is checked by the endpoint dependency.
     """
     if exam.archived_at is None:
         return t("delete_exam_requires_archive", locale=locale)
@@ -494,10 +494,10 @@ async def list_exams(
     status: Optional[str] = Query(None, pattern="^(draft|finalized|exported)$"),
     search: Optional[str] = Query(None, max_length=200),
     include_archived: bool = Query(
-        False, description="Auch archivierte Prüfungen einschliessen (TF-398)."
+        False, description="Also include archived exams (TF-398)."
     ),
     archived_only: bool = Query(
-        False, description="Nur archivierte Prüfungen zeigen (TF-398)."
+        False, description="Show only archived exams (TF-398)."
     ),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -506,9 +506,9 @@ async def list_exams(
 ):
     """List exams visible to the current user (TF-643).
 
-    Default blendet archivierte Prüfungen aus (``archived_at IS NULL``).
-    ``archived_only`` zeigt ausschliesslich archivierte; ``include_archived``
-    zeigt aktive + archivierte. ``archived_only`` hat Vorrang (TF-398).
+    By default, archived exams are hidden (``archived_at IS NULL``).
+    ``archived_only`` shows only archived ones; ``include_archived``
+    shows active + archived. ``archived_only`` takes precedence (TF-398).
     """
     query = db.query(Exam)
     query = filter_exams_for_user(query, current_user, db)
@@ -526,8 +526,8 @@ async def list_exams(
     total = query.count()
     exams = query.order_by(Exam.updated_at.desc()).limit(limit).offset(offset).all()
 
-    # has_submissions per Bulk-Query (vermeidet N+1 beim Lazy-Load der
-    # submissions-Relationship pro Prüfung).
+    # has_submissions via bulk query (avoids an N+1 from lazy-loading the
+    # submissions relationship per exam).
     exams_with_subs: set[int] = set()
     exam_ids = [e.id for e in exams]
     if exam_ids:
@@ -572,7 +572,7 @@ class ApprovedQuestionsListOut(BaseModel):
 
 
 class ApprovedQuestionOptionOut(BaseModel):
-    """TF-405: Eine Antwortoption mit Markierung der korrekten Lösung."""
+    """TF-405: an answer option flagged with whether it's the correct one."""
 
     text: str
     is_correct: bool
@@ -592,12 +592,12 @@ class ApprovedQuestionCompetencyOut(BaseModel):
 
 
 class ApprovedQuestionDetailOut(BaseModel):
-    """TF-405: Vollständiges, rein lesendes Detail für das Vorschau-Modal im
-    Prüfungskomponist.
+    """TF-405: full, read-only detail for the preview modal in the
+    exam composer.
 
-    Bewusst getrennt vom schlanken ``ApprovedQuestionOut`` der 50er-Liste: dieses
-    Detail wird beim Öffnen der Vorschau gezielt für *eine* Frage nachgeladen, damit
-    die Listen-API leichtgewichtig bleibt.
+    Deliberately separate from the lean ``ApprovedQuestionOut`` used by the
+    50-item list: this detail is fetched on demand for *one* question when
+    the preview opens, so the list API stays lightweight.
     """
 
     id: int
@@ -609,9 +609,10 @@ class ApprovedQuestionDetailOut(BaseModel):
     bloom_level: Optional[int] = None
     ln_level: Optional[int] = None
     estimated_time_minutes: Optional[int] = None
-    # options[].is_correct markiert die richtige Wahl bei MC/TF (abgeleitet aus
-    # correct_answer). correct_answer bleibt zusätzlich gesetzt und ist die einzige
-    # Lösungsquelle bei offenen Fragen (Musterlösung, options ist dann leer).
+    # options[].is_correct flags the right choice for MC/TF (derived from
+    # correct_answer). correct_answer is also still set and is the sole
+    # source of the answer for open-ended questions (sample solution,
+    # options is then empty).
     options: List[ApprovedQuestionOptionOut] = []
     correct_answer: Optional[str] = None
     explanation: Optional[str] = None
@@ -643,7 +644,7 @@ async def list_documents_with_questions(
                     (
                         and_(
                             QuestionReview.review_status == ReviewStatus.APPROVED.value,
-                            # TF-396: archivierte Fragen nicht mitzählen
+                            # TF-396: don't count archived questions
                             QuestionReview.archived_at.is_(None),
                         ),
                         QuestionReview.id,
@@ -683,18 +684,16 @@ async def list_approved_questions(
     question_type: Optional[str] = Query(
         None, pattern="^(single_choice|multiple_choice|open_ended|true_false)$"
     ),
-    # TF-406: Fachfilter-Facetten (Anforderungsniveau, Handlungskompetenz,
-    # Qualitätsstufe) und "noch nie verwendet". Felder liegen am Modell
-    # QuestionReview; UND-Verknüpfung zwischen den Facetten.
+    # TF-406: subject filter facets (competency level, competency,
+    # quality tier) and "never used". Fields live on the QuestionReview
+    # model; facets are AND-combined.
     ln_level: Optional[int] = Query(
-        None, ge=1, le=4, description="TF-400 Anforderungsniveau (1–4)"
+        None, ge=1, le=4, description="TF-400 competency level (1-4)"
     ),
-    competency_id: Optional[int] = Query(
-        None, ge=1, description="Handlungskompetenz-ID"
-    ),
+    competency_id: Optional[int] = Query(None, ge=1, description="Competency ID"),
     quality_tier: Optional[str] = Query(None, pattern="^(A|B|C)$"),
     unused: bool = Query(
-        False, description="Nur Fragen ohne Prüfungs-Verwendung (usage_count=0)"
+        False, description="Only questions with no exam usage (usage_count=0)"
     ),
     search: Optional[str] = Query(None, max_length=500),
     tag_ids: Optional[str] = Query(None, description="Comma-separated tag IDs"),
@@ -704,7 +703,7 @@ async def list_approved_questions(
     sort: str = Query(
         "newest",
         pattern="^(most_used|newest|difficulty)$",
-        description="Sortierung der Resultate",
+        description="Sort order for the results",
     ),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -714,11 +713,11 @@ async def list_approved_questions(
     """Browse approved questions for exam composition."""
     query = db.query(QuestionReview).filter(
         QuestionReview.review_status == ReviewStatus.APPROVED.value,
-        # TF-396: archivierte Fragen nicht zur Wiederverwendung anbieten
+        # TF-396: don't offer archived questions for reuse
         QuestionReview.archived_at.is_(None),
     )
-    # TF-642: visibility-aware Fragenpool (private/team/institution +
-    # questions:read_all-Bypass), ersetzt die reine Institution-Schranke.
+    # TF-642: visibility-aware question pool (private/team/institution +
+    # questions:read_all bypass), replaces the plain institution boundary.
     query = filter_questions_for_user(query, current_user, db)
 
     if topic:
@@ -762,8 +761,8 @@ async def list_approved_questions(
             query = query.filter(QuestionReview.id.in_(linked_ids_select))
 
     if unused:
-        # "noch nie verwendet" — kein einziger ExamQuestion-Eintrag verweist
-        # auf die Frage (usage_count=0). Korrelierte NOT EXISTS-Subquery.
+        # "never used" — no ExamQuestion row references the question at
+        # all (usage_count=0). Correlated NOT EXISTS subquery.
         query = query.filter(
             ~db.query(ExamQuestion.id)
             .filter(ExamQuestion.question_id == QuestionReview.id)
@@ -772,7 +771,7 @@ async def list_approved_questions(
 
     total = query.count()
 
-    # TF-406: Sortierung. "newest" (Default) = bisheriges Verhalten.
+    # TF-406: sorting. "newest" (default) = previous behavior.
     if sort == "most_used":
         usage_sort_sq = (
             db.query(
@@ -860,19 +859,19 @@ async def get_approved_question(
     current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
-    """TF-405: Rein lesendes Detail einer Frage für die Vorschau im Komponist.
+    """TF-405: read-only detail of a question for the preview in the composer.
 
-    Liefert vollen Fragetext, Optionen mit markierter korrekter Lösung, Erklärung,
-    Quelldokument(e) und Kompetenz/Bloom/LN.
+    Returns the full question text, options with the correct one flagged,
+    explanation, source document(s), and competency/Bloom/LN.
 
-    Bewusst NUR tenant-skopiert (keine ``review_status``-/``archived_at``-Filter):
-    Die Vorschau wird sowohl aus dem Fragenpool (nur freigegebene Fragen) als auch
-    aus den bereits zusammengestellten Prüfungsfragen geöffnet. Eine Frage, die schon
-    in der Prüfung liegt, muss vorschaubar bleiben, auch wenn sie inzwischen
-    nachbearbeitet (``edited``) oder archiviert wurde — die Freigabe-Gating ist eine
-    Belang der Listen-API (was hinzugefügt werden darf), nicht der Detail-Ansicht.
-    Eine Frage einer fremden Institution ist nicht von einer nicht-existenten zu
-    unterscheiden (404, kein 403) — kein Existenz-Leak.
+    Deliberately ONLY tenant-scoped (no ``review_status``/``archived_at``
+    filter): the preview is opened both from the question pool (approved
+    questions only) and from questions already assembled into an exam. A
+    question already on an exam must stay previewable even if it has since
+    been edited (``edited``) or archived — approval gating is a concern of
+    the list API (what may be added), not of the detail view. A question
+    belonging to a foreign institution must be indistinguishable from a
+    non-existent one (404, not 403) — no existence leak.
     """
     locale = get_request_locale(request, current_user)
     tenant_context = get_tenant_context(current_user)
@@ -890,9 +889,9 @@ async def get_approved_question(
             detail=t("approved_question_not_found", locale=locale),
         )
 
-    # usage_count zählt — wie der Listen-Endpoint — institutionsübergreifend, wie
-    # oft die Frage in Prüfungen genutzt wird (globale Wiederverwendung, kein Leak,
-    # da keine fremden Prüfungsdaten exponiert werden).
+    # usage_count counts — like the list endpoint — cross-institution how
+    # often the question is used in exams (global reuse, no leak, since no
+    # foreign exam data is exposed).
     usage_count = (
         db.query(sa_func.count(ExamQuestion.id))
         .filter(ExamQuestion.question_id == question.id)
@@ -909,8 +908,8 @@ async def get_approved_question(
     source_documents: list[dict] = []
     doc_ids = [link.document_id for link in question.source_document_links]
     if doc_ids:
-        # Defense-in-depth: Quelldokumente zusätzlich tenant-filtern, damit auch bei
-        # einem fehlerhaften Cross-Institution-Link kein fremder Titel durchsickert.
+        # Defense-in-depth: also tenant-filter source documents, so that even
+        # a faulty cross-institution link can't leak a foreign title.
         docs = (
             db.query(Document)
             .filter(
@@ -920,8 +919,8 @@ async def get_approved_question(
             .all()
         )
         if len(docs) < len(doc_ids):
-            # Ein gefiltertes Dokument deutet auf einen Cross-Institution-Link hin
-            # (Datenintegritätsproblem) — sichtbar machen statt stillschweigend droppen.
+            # A filtered-out document indicates a cross-institution link
+            # (data-integrity issue) — surface it instead of silently dropping it.
             logger.warning(
                 "approved_question_detail: %d/%d Quelldokument(e) für Frage %s "
                 "tenant-gefiltert (institution_id=%s) — möglicher Cross-Institution-Link",
@@ -1138,8 +1137,8 @@ async def update_exam_grading_scheme(
 ):
     """Reassign or clear the grading scheme on any exam (incl. finalized).
 
-    Bypasses ``_require_draft`` because reassigning the noten-skala is
-    metadata-only and the lehrperson must be able to fix a wrong
+    Bypasses ``_require_draft`` because reassigning the grading scheme is
+    metadata-only and the instructor must be able to fix a wrong
     institution-default after finalisation. ``None`` clears the field
     so the export falls back to the institution default at render time.
     """
@@ -1180,7 +1179,7 @@ async def update_exam_grading_scheme(
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
 
     # Audit trail mirrors create/finalize/delete on this resource. The
-    # noten-skala is the load-bearing input for export, so any change
+    # grading scheme is the load-bearing input for export, so any change
     # to it on a finalized exam must be reconstructable.
     from services.audit_service import AuditService
 
@@ -1209,15 +1208,15 @@ async def delete_exam(
     current_user: User = Depends(require_permission("delete_exams")),
     db: Session = Depends(get_db),
 ):
-    """Hard-delete an exam — abgesichert (TF-398).
+    """Hard-delete an exam — guarded (TF-398).
 
-    Der frühere One-Click-Draft-Delete entfällt; jede Löschung läuft über
-    "erst archivieren, dann löschen". Nur erlaubt, wenn ALLE vier Guards
-    erfüllt sind: zuvor archiviert ∧ keine Abgaben ∧ nicht exportiert ∧
-    Aufrufer hat ``delete_exams`` (Admin oder Dozent — beide Rollen sind
-    dafür geseedet). Sonst HTTP 409. Vor dem Löschen
-    wird ein ``audit_logs``-Snapshot geschrieben; FK-Cascade räumt
-    ``exam_questions`` ab.
+    The former one-click draft delete is gone; every deletion now goes
+    through "archive first, then delete". Only allowed when ALL four
+    guards are satisfied: previously archived ∧ no submissions ∧ not
+    exported ∧ caller has ``delete_exams`` (Admin or Dozent — both roles
+    are seeded for it). Otherwise HTTP 409. Before deletion an
+    ``audit_logs`` snapshot is written; FK cascade cleans up
+    ``exam_questions``.
     """
     locale = get_request_locale(request, current_user)
     exam = _get_exam_or_404(
@@ -1228,7 +1227,7 @@ async def delete_exam(
     if block is not None:
         raise HTTPException(status_code=409, detail=block)
 
-    # Snapshot VOR der Löschung (forensische Wiederherstellbarkeit im Audit).
+    # Snapshot BEFORE deletion (forensic recoverability in the audit log).
     snapshot = {
         "title": exam.title,
         "course": exam.course,
@@ -1257,8 +1256,8 @@ async def delete_exam(
         logger.error("Database error in delete_exam for exam %s: %s", exam_id, exc)
         raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
 
-    # log_action committet Delete + Audit atomar; bei Audit-Fehler rollt es
-    # auch den gestageten Delete zurück und liefert None (fail loud).
+    # log_action commits the delete + audit atomically; on an audit failure
+    # it also rolls back the staged delete and returns None (fail loud).
     audit = AuditService.log_action(
         db,
         action="delete_exam",
@@ -1284,11 +1283,11 @@ async def archive_exam(
     current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
-    """Prüfung archivieren — in jedem Status erlaubt (draft / finalized /
-    exported). Zweck ist Aufräumen: setzt nur ``archived_at/by/reason`` und
-    blendet die Prüfung aus der aktiven Übersicht aus. ``status``, Export und
-    Abgaben bleiben unangetastet. 409 falls bereits archiviert (idempotenz-
-    sicher). **Required Permission:** ``create_exams`` (Komponist). (TF-398)
+    """Archive an exam — allowed in any status (draft / finalized /
+    exported). Purpose is cleanup: only sets ``archived_at/by/reason`` and
+    hides the exam from the active overview. ``status``, export, and
+    submissions stay untouched. 409 if already archived (idempotency-safe).
+    **Required Permission:** ``create_exams`` (composer). (TF-398)
     """
     locale = get_request_locale(http_request, current_user)
     exam = _get_exam_or_404(
@@ -1332,9 +1331,9 @@ async def restore_exam(
     current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
-    """Archivierte Prüfung wiederherstellen — setzt ``archived_at = NULL``
-    und lässt den ursprünglichen ``status`` unangetastet. 409 falls nicht
-    archiviert. **Required Permission:** ``create_exams``. (TF-398)
+    """Restore an archived exam — sets ``archived_at = NULL`` and leaves
+    the original ``status`` untouched. 409 if not archived.
+    **Required Permission:** ``create_exams``. (TF-398)
     """
     locale = get_request_locale(http_request, current_user)
     exam = _get_exam_or_404(
@@ -1790,11 +1789,11 @@ def _build_candidate_query(
     """Build filtered query for approved question candidates."""
     query = db.query(QuestionReview).filter(
         QuestionReview.review_status == ReviewStatus.APPROVED.value,
-        # TF-396: archivierte Fragen nicht zur Wiederverwendung anbieten
+        # TF-396: don't offer archived questions for reuse
         QuestionReview.archived_at.is_(None),
     )
-    # TF-642: gleicher Fragenpool wie list_approved_questions — Auto-Compose
-    # darf keine Fragen vorschlagen, die die manuelle Suche verbirgt.
+    # TF-642: same question pool as list_approved_questions — auto-compose
+    # must not propose questions that manual search hides.
     query = filter_questions_for_user(query, current_user, db)
 
     # Exclude already-added and user-excluded questions

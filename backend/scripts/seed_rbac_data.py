@@ -1,6 +1,6 @@
 """
-Seed Script für RBAC System-Daten
-Erstellt System-Rollen, Features, Subscription Tiers und Default-Mappings
+Seed script for RBAC system data
+Creates system roles, features, subscription tiers and default mappings
 """
 
 import sys
@@ -21,7 +21,7 @@ from models.rbac import (
 
 
 def seed_features(db):
-    """Erstellt alle Feature-Definitionen"""
+    """Creates all feature definitions"""
     features = [
         # Generation Features
         (
@@ -135,7 +135,7 @@ def seed_features(db):
 
 
 def seed_rbac_roles(db):
-    """Erstellt System-Rollen"""
+    """Creates system roles"""
     roles = [
         (
             "role_admin",
@@ -185,8 +185,8 @@ def seed_rbac_roles(db):
 
 
 def seed_role_features(db):
-    """Erstellt Role-Feature Mappings"""
-    # Admin: Alle Features
+    """Creates role-feature mappings"""
+    # Admin: all features
     admin_features = db.query(Feature).all()
     for feature in admin_features:
         existing = (
@@ -222,7 +222,7 @@ def seed_role_features(db):
         if not existing:
             db.add(RoleFeature(role_id="role_dozent", feature_id=feat_id))
 
-    # Assistant: Limitierte Features
+    # Assistant: limited features
     assistant_features = ["feat_doc_library", "feat_review", "feat_analytics"]
     for feat_id in assistant_features:
         existing = (
@@ -236,7 +236,7 @@ def seed_role_features(db):
         if not existing:
             db.add(RoleFeature(role_id="role_assistant", feature_id=feat_id))
 
-    # Viewer: Nur Lesezugriff
+    # Viewer: read-only access
     viewer_features = ["feat_doc_library", "feat_analytics"]
     for feat_id in viewer_features:
         existing = (
@@ -254,7 +254,7 @@ def seed_role_features(db):
 
 
 def seed_subscription_tiers(db):
-    """Erstellt Subscription Tiers"""
+    """Creates subscription tiers"""
     tiers = [
         ("tier_free", "free", "Free", "Kostenloser Basis-Zugang", 0.00, 0.00, 1),
         (
@@ -323,7 +323,7 @@ def seed_subscription_tiers(db):
 
 
 def seed_tier_quotas(db):
-    """Erstellt Tier-Quotas"""
+    """Creates tier quotas"""
     quotas = [
         # Free Tier
         ("tier_free", "documents", 5),
@@ -368,8 +368,8 @@ def seed_tier_quotas(db):
 
 
 def seed_tier_features(db):
-    """Erstellt Tier-Feature Mappings"""
-    # Free: Basis Features (inkl. RAG — Quotas limitieren die Nutzung)
+    """Creates tier-feature mappings"""
+    # Free: basic features (incl. RAG — quotas limit usage)
     free_features = [
         "feat_question_gen_ai",
         "feat_doc_upload",
@@ -418,7 +418,7 @@ def seed_tier_features(db):
         if not existing:
             db.add(TierFeature(tier_id="tier_professional", feature_id=feat_id))
 
-    # Enterprise: Alle Features
+    # Enterprise: all features
     enterprise_features = db.query(Feature).all()
     for feature in enterprise_features:
         existing = (
@@ -437,7 +437,7 @@ def seed_tier_features(db):
 
 
 def main():
-    """Hauptfunktion zum Seeden aller RBAC-Daten"""
+    """Main function for seeding all RBAC data"""
     print("🌱 Starte RBAC Seed-Prozess...")
 
     db = SessionLocal()

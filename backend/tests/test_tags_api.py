@@ -1,4 +1,4 @@
-"""Tests für die Tags API."""
+"""Tests for the Tags API."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -189,14 +189,14 @@ class TestCreateTag:
         data = resp.json()
         assert (
             data["name"] == "Neuer Tag"
-        )  # Original-Schreibweise erhalten (case-preserving)
+        )  # Original casing preserved (case-preserving)
         assert data["institution_id"] == inst.id
         assert "id" in data
 
     def test_create_tag_duplicate_returns_existing_tag(
         self, tags_db: Session, tags_client: TestClient
     ) -> None:
-        """create_tag ist idempotent — Duplikat gibt bestehenden Tag zurück (200)."""
+        """create_tag is idempotent — a duplicate returns the existing tag (200)."""
         inst = make_institution(tags_db, "dup")
         user_db = make_user(tags_db, inst.id, "dup")
         existing = make_tag(tags_db, inst.id, "duplikat")
@@ -230,7 +230,7 @@ class TestCreateTag:
     def test_create_tag_strips_name(
         self, tags_db: Session, tags_client: TestClient
     ) -> None:
-        """Leerzeichen werden entfernt, Schreibweise wird erhalten (case-preserving)."""
+        """Whitespace is stripped, casing is preserved (case-preserving)."""
         inst = make_institution(tags_db, "strip")
         user_db = make_user(tags_db, inst.id, "strip")
 
@@ -242,7 +242,7 @@ class TestCreateTag:
         resp = tags_client.post("/api/v1/tags", json={"name": "  Python  "})
 
         assert resp.status_code == 200
-        assert resp.json()["name"] == "Python"  # Strip OK, Schreibweise erhalten
+        assert resp.json()["name"] == "Python"  # Strip OK, casing preserved
 
     def test_create_tag_without_permission_returns_403(
         self, tags_db: Session, tags_client: TestClient
@@ -263,7 +263,7 @@ class TestCreateTag:
 
 
 # ---------------------------------------------------------------------------
-# Question-Tag Endpunkte
+# Question-Tag Endpoints
 # ---------------------------------------------------------------------------
 
 
@@ -297,7 +297,7 @@ class TestQuestionTagEndpoints:
         tag2 = make_tag(tags_db, inst.id, "oop")
         tags_db.commit()
 
-        # Override auth mit User der edit_questions hat
+        # Override auth with a user who has edit_questions
         from utils.auth_utils import get_current_user
 
         user.has_permission = Mock(return_value=True)
@@ -396,7 +396,7 @@ class TestQuestionTagEndpoints:
 
         resp = tags_client.post(
             f"/api/v1/questions/{question.id}/tags",
-            json={"tag_ids": [99999]},  # ID existiert nicht
+            json={"tag_ids": [99999]},  # ID does not exist
         )
         assert resp.status_code == 422
 

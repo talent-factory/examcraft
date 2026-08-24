@@ -25,14 +25,13 @@ const WS_RECONNECT_MAX_RETRIES = 3;
 const WS_RECONNECT_BASE_DELAY_MS = 1000;
 const TERMINAL_STATUSES = new Set(['SUCCESS', 'FAILURE', 'REVOKED']);
 
-// TF-608: Weggeklickte Tasks überleben den Reload. Ohne das würden die
-// kürzlich abgeschlossenen Jobs, die `/active-tasks` seit TF-608 mitliefert,
-// bei jedem Seitenaufruf erneut auftauchen — genau der Hinweis, den der
-// Nutzer eben geschlossen hat.
+// TF-608: dismissed tasks survive the reload. Without this, the recently
+// completed jobs that `/active-tasks` has included since TF-608 would
+// reappear on every page load — exactly the notice the user just closed.
 const DISMISSED_TASKS_KEY = 'dismissedGenerationTasks';
 const DISMISSED_TASKS_VERSION = 1;
-// Deckelt den Snapshot; abgeschlossene Jobs sind ohnehin nur 30 Minuten lang
-// wiederherstellbar (COMPLETED_TASK_MAX_AGE im Backend).
+// Caps the snapshot; completed jobs are only recoverable for 30 minutes
+// anyway (COMPLETED_TASK_MAX_AGE in the backend).
 const DISMISSED_TASKS_MAX = 50;
 
 const readDismissedTaskIds = (): string[] => {
@@ -219,21 +218,21 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
         const dismissed = new Set(readDismissedTaskIds());
 
         const recovered: Record<string, GenerationTaskState> = {};
-        // TF-608: Tasks, die während eines Seitenwechsels fertig wurden, kommen
-        // seit TF-608 als terminale Einträge mit. Für sie gibt es keinen
-        // WebSocket mehr (der Task ist durch) — ihr Ergebnis wird per HTTP
-        // nachgeladen, damit die Ergebnisansicht wieder erreichbar ist.
+        // TF-608: tasks that finished during a page navigation are now
+        // included as terminal entries since TF-608. There's no WebSocket
+        // left for them (the task is done) — their result is fetched via
+        // HTTP so the result view stays reachable.
         const terminalTaskIds: string[] = [];
         for (const task of response.tasks) {
           if (dismissed.has(task.task_id)) continue;
 
-          // TF-608 Fix: dieser Effekt läuft nicht nur beim Mount, sondern bei
-          // jedem `accessToken`-Wechsel erneut (stiller Token-Refresh, siehe
-          // Dependency-Array unten) — mitten in der Session, nicht nur nach
-          // einem Reload. Ohne `tasksRef` würde ein bereits über WebSocket
-          // oder einen vorherigen Recovery-Durchlauf geladenes `result` hier
-          // mit `null` überschrieben und wäre bis zum (evtl. fehlschlagenden)
-          // Refetch weiter unten unerreichbar.
+          // TF-608 fix: this effect runs not only on mount but again on
+          // every `accessToken` change (silent token refresh, see the
+          // dependency array below) — mid-session, not only after a reload.
+          // Without `tasksRef`, a `result` already loaded via WebSocket or a
+          // previous recovery pass would get overwritten here with `null`
+          // and would stay unreachable until the (possibly failing) refetch
+          // further below.
           const existingResult = tasksRef.current[task.task_id]?.result ?? null;
           recovered[task.task_id] = {
             taskId: task.task_id,
@@ -247,14 +246,14 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
           };
 
           if (TERMINAL_STATUSES.has(task.status)) {
-            // Sticky-Terminal-Guard vorziehen: ein später eintreffender
-            // PROGRESS-Rest aus einer alten Verbindung darf einen fertigen
-            // Task nicht zurückstufen.
+            // Set the sticky-terminal guard up front: a straggling PROGRESS
+            // message arriving later from an old connection must not demote
+            // an already-finished task.
             terminalTaskIdsRef.current.add(task.task_id);
-            // Nur nachladen, wenn wir das Ergebnis nicht schon haben — spart
-            // einen unnötigen Roundtrip und verhindert, dass ein
-            // fehlschlagender Refetch (Celery-Result inzwischen abgelaufen)
-            // ein bereits sichtbares Ergebnis unerreichbar macht.
+            // Only refetch if we don't already have the result — saves an
+            // unnecessary roundtrip and prevents a failing refetch (Celery
+            // result meanwhile expired) from making an already-visible
+            // result unreachable.
             if (!existingResult) {
               terminalTaskIds.push(task.task_id);
             }
@@ -267,9 +266,9 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
           setTasks((prev) => ({ ...prev, ...recovered }));
         }
 
-        // Ergebnisse einzeln nachladen. Fehler pro Task schlucken: ein
-        // abgelaufener Celery-Result-Eintrag darf die übrigen nicht mitreissen —
-        // der Task bleibt dann eben ohne Detailansicht sichtbar.
+        // Refetch results one by one. Swallow errors per task: an expired
+        // Celery result entry must not drag down the others — the task then
+        // simply stays visible without a detail view.
         await Promise.all(
           terminalTaskIds.map(async (taskId) => {
             try {

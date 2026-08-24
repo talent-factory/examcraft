@@ -83,7 +83,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
         setArchivedWarning(newTag.name);
         return;
       }
-      queryClient.invalidateQueries({ queryKey: ['tags'] }); // trifft auch ['tags', 'with-archived']
+      queryClient.invalidateQueries({ queryKey: ['tags'] }); // also matches ['tags', 'with-archived']
       onChange([...valueRef.current, newTag]);
       setTimeout(() => inputElRef.current?.focus(), 0);
     },
@@ -114,7 +114,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
     if (!trimmed) return;
     if (value.some((v) => v.name.toLowerCase() === trimmed.toLowerCase())) return;
 
-    // Archiviert-Check: sofortiges Feedback ohne API-Call
+    // Archived check: immediate feedback without an API call
     const archivedMatch = allTagsWithArchived.find(
       (t) => t.is_archived && t.name.toLowerCase() === trimmed.toLowerCase()
     );
@@ -330,7 +330,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
         }}
       />
 
-      {/* Archiviert-Warnung */}
+      {/* Archived warning */}
       {archivedWarning && (
         <Box
           sx={{
@@ -348,7 +348,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
         </Box>
       )}
 
-      {/* Erstellungs-Fehler */}
+      {/* Creation error */}
       {createError && (
         <Box sx={{ mt: 1, p: 1.5, bgcolor: 'error.50', border: '1px solid', borderColor: 'error.200', borderRadius: 1 }}>
           <Typography variant="body2" color="error.dark">

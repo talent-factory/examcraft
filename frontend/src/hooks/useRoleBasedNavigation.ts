@@ -85,8 +85,8 @@ export const useRoleBasedNavigation = (): RoleBasedNavigation => {
             requiredPermissions: ['create_questions'],
           },
           {
-            // TF-506: umgekehrte Richtung zu den H1-Fixes in Documents.tsx etc. —
-            // hier folgt das Sidebar-Label dem Seitentitel-Key, nicht umgekehrt
+            // TF-506: reverse direction of the H1 fixes in Documents.tsx etc. —
+            // here the sidebar label follows the page title key, not the other way around
             label: t('pages.review.title'),
             path: '/questions/review',
             icon: '✅',
@@ -148,8 +148,8 @@ export const useRoleBasedNavigation = (): RoleBasedNavigation => {
         label: t('nav.groups.administration'),
         items: [
           {
-            // TF-506: umgekehrte Richtung zu den H1-Fixes in Documents.tsx etc. —
-            // hier folgt das Sidebar-Label dem Seitentitel-Key, nicht umgekehrt
+            // TF-506: reverse direction of the H1 fixes in Documents.tsx etc. —
+            // here the sidebar label follows the page title key, not the other way around
             label: t('pages.admin.title'),
             path: '/admin',
             icon: '⚙️',
@@ -168,9 +168,9 @@ export const useRoleBasedNavigation = (): RoleBasedNavigation => {
             label: t('nav.sidebar.competencyFrameworks'),
             path: '/settings/competency-frameworks',
             icon: '🎯',
-            // Nur Dozent: ASSISTANT hat keine 'create_questions'-Permission und
-            // würde ohnehin herausgefiltert — der Eintrag bliebe sonst toter
-            // Config-Ballast. Admin/Superuser bedienen das Admin-Panel-Tab.
+            // Dozent only: ASSISTANT has no 'create_questions' permission and
+            // would be filtered out anyway — the entry would otherwise be dead
+            // config clutter. Admin/superuser use the admin panel tab.
             requiredRoles: [UserRole.DOZENT],
             excludedRoles: [UserRole.ADMIN],
             excludeSuperuser: true,

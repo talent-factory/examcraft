@@ -1,49 +1,49 @@
 """
-Strukturierte RAG-Generierungs-Fehler mit stabilen Codes (TF-358).
+Structured RAG generation errors with stable codes (TF-358).
 
-Analog zu :mod:`services.document_errors`: statt rohe englische Fehlertexte
-per Substring zu interpretieren, tragen die Exceptions einen stabilen,
-maschinenlesbaren ``code``. Der WebSocket-Endpoint (`api/v1/websocket.py`)
-mappt diesen Code auf eine sichere, handlungsleitende deutsche User-Meldung —
-robust gegen Lokalisierung oder Umformulierung der Roh-Meldung.
+Analogous to :mod:`services.document_errors`: instead of interpreting raw
+English error texts by substring, the exceptions carry a stable,
+machine-readable ``code``. The WebSocket endpoint (`api/v1/websocket.py`)
+maps this code to a safe, actionable German user message — robust
+against localization or rewording of the raw message.
 
-Wichtig zur Cross-Tier-Architektur: Diese Datei lebt in ``core/`` (nicht
-``premium/``), damit BEIDE Prozesse sie importieren können — der Celery-Worker
-(`premium/.../rag_service.py` wirft die Exception) UND der API-Prozess
-(`core/.../websocket.py` liest sie aus dem Celery-Result). Celery kann den
-Exception-Typ nur dann originalgetreu rekonstruieren, wenn die Klasse in beiden
-Prozessen importierbar ist; sonst degradiert sie zu einer generischen Exception
-(nur die Message überlebt). Der WebSocket-Mapper hält deshalb zusätzlich einen
-Substring-Fallback vor.
+Important cross-tier architecture note: this file lives in ``core/``
+(not ``premium/``), so BOTH processes can import it — the Celery worker
+(`premium/.../rag_service.py` raises the exception) AND the API process
+(`core/.../websocket.py` reads it from the Celery result). Celery can
+only faithfully reconstruct the exception type if the class is
+importable in both processes; otherwise it degrades to a generic
+exception (only the message survives). The WebSocket mapper therefore
+also keeps a substring fallback.
 
-Codes sind stabile snake_case-Identifier — niemals lokalisieren, niemals
-stillschweigend umdeuten. Neue Codes additiv ergänzen.
+Codes are stable snake_case identifiers — never localize them, never
+silently reinterpret them. Extend with new codes additively.
 """
 
 from typing import Any, Dict
 
 # ---------------------------------------------------------------------------
-# Stabile, maschinenlesbare Fehlercodes. Additiv erweitern; nie umdeuten.
+# Stable, machine-readable error codes. Extend additively; never reinterpret.
 # ---------------------------------------------------------------------------
 
 NO_CONTEXT = "no_context"
-"""RAG-Retrieval lieferte keinen verwertbaren Kontext für (mind.) eine Frage
-oder das gesamte Thema — die ausgewählten Dokumente sind zu kurz / nicht
-indexiert."""
+"""RAG retrieval returned no usable context for (at least) one question
+or the whole topic — the selected documents are too short / not
+indexed."""
 
 UNKNOWN_QUESTION_TYPE = "unknown_question_type"
-"""Angeforderter Fragetyp hat kein Template / wird nicht unterstützt."""
+"""Requested question type has no template / is not supported."""
 
 
 class RAGGenerationError(ValueError):
-    """ValueError-Subklasse mit stabilem ``code`` (+ optionalen ``details``).
+    """ValueError subclass carrying a stable ``code`` (+ optional ``details``).
 
-    Erbt von ``ValueError``, damit bestehende ``except ValueError`` / Tests
-    (`pytest.raises(ValueError, ...)`) unverändert greifen.
+    Inherits from ``ValueError`` so existing ``except ValueError`` / tests
+    (`pytest.raises(ValueError, ...)`) still work unchanged.
 
     Args:
-        message: Menschenlesbare (englische) Meldung — geht in Logs/Result.
-        **details: Optionale strukturierte Diagnostik (z.B. ``question_type=...``).
+        message: Human-readable (English) message — goes into logs/result.
+        **details: Optional structured diagnostics (e.g. ``question_type=...``).
     """
 
     code: str = "rag_generation_error"
@@ -54,47 +54,47 @@ class RAGGenerationError(ValueError):
 
 
 class NoContextError(RAGGenerationError):
-    """Kein verwertbarer RAG-Kontext für die Fragengenerierung."""
+    """No usable RAG context for question generation."""
 
     code = NO_CONTEXT
 
 
 class UnknownQuestionTypeError(RAGGenerationError):
-    """Nicht unterstützter Fragetyp."""
+    """Unsupported question type."""
 
     code = UNKNOWN_QUESTION_TYPE
 
 
 # ---------------------------------------------------------------------------
-# TF-608: gemeinsamer Mapper Task-Exception → sichere User-Meldung.
+# TF-608: shared mapper task exception → safe user message.
 #
-# Lebt hier (statt lokal in einem einzelnen Endpoint), damit sowohl der
-# WebSocket-Stream (`api/v1/websocket.py`) als auch der REST-Recovery-
-# Endpoint (`GET /rag/tasks/{id}/result`, `api/rag_exams.py`) exakt dieselbe
-# TF-358-Sanitisierung verwenden. Eine der beiden Stellen hat vorher
-# ``str(exception)`` roh an den Client zurückgegeben — genau der Leak, den
-# dieser Mapper verhindern soll.
+# Lives here (instead of locally in a single endpoint) so both the
+# WebSocket stream (`api/v1/websocket.py`) and the REST recovery
+# endpoint (`GET /rag/tasks/{id}/result`, `api/rag_exams.py`) use the
+# exact same TF-358 sanitization. One of the two spots previously
+# returned ``str(exception)`` raw to the client — exactly the leak this
+# mapper is meant to prevent.
 # ---------------------------------------------------------------------------
 
 GENERIC_TASK_ERROR = "Verarbeitung fehlgeschlagen. Bitte erneut versuchen."
-"""Generische Fallback-Meldung für unbekannte Task-Fehler. Bewusst nichts-
-sagend gegenüber dem User, um keine internen Details/PII zu leaken."""
+"""Generic fallback message for unknown task errors. Deliberately
+uninformative to the user, to avoid leaking internal details/PII."""
 
 
 def user_facing_task_error(raw_info: Any) -> str:
-    """Mappe eine (technische) Task-Exception auf eine sichere, handlungs-
-    leitende deutsche User-Meldung (TF-358).
+    """Map a (technical) task exception to a safe, actionable German
+    user message (TF-358).
 
-    Der echte Fehler muss vom Aufrufer serverseitig geloggt werden — hier wird
-    er NICHT an den User durchgereicht. Nur explizit bekannte Fehlerklassen
-    erhalten eine konkrete Meldung; alles andere fällt auf eine generische
-    Meldung zurück, damit keine internen Details oder personenbezogenen Daten
-    zum Client gelangen.
+    The real error must be logged server-side by the caller — it is
+    NOT passed through to the user here. Only explicitly known error
+    classes get a concrete message; everything else falls back to a
+    generic message, so no internal details or personal data reach the
+    client.
 
-    Matching primär über den stabilen ``code`` der RAG-Fehler oben — robust
-    gegen Umformulierung/Lokalisierung. Der Substring-Fallback greift, falls
-    Celery den Exception-Typ bei der Serialisierung verloren hat und nur noch
-    die Roh-Message überlebt.
+    Matching is primarily via the stable ``code`` of the RAG errors
+    above — robust against rewording/localization. The substring
+    fallback kicks in if Celery lost the exception type during
+    serialization and only the raw message survives.
     """
     code = getattr(raw_info, "code", None)
     text = str(raw_info or "").lower()

@@ -45,28 +45,29 @@ export class ApiError extends Error {
 }
 
 /**
- * Kanonisches HTTP-Status → `ApiErrorKind`-Mapping (TF-626-Review).
+ * Canonical HTTP status → `ApiErrorKind` mapping (TF-626-Review).
  *
- * Vorher pflegte praktisch jeder Service (httpClient, activityService,
+ * Previously, practically every service (httpClient, activityService,
  * gradesService, gradingSchemesService, gradeExportService,
- * moodleFeedbackPushService) eine eigene, leicht abweichende Kopie dieser
- * Funktion — u.a. deshalb kannte keine von ihnen `409 → 'conflict'`, obwohl
- * `gradingSchemesService`/`gradeExportService` genau das schon zur Laufzeit
- * auswarfen. Diese Datei ist der natuerliche gemeinsame Ort: `ApiError`
- * selbst ist bereits hier definiert und wird von allen anderen Services
- * importiert (siehe `import { ApiError } from './submissionsService'` dort).
+ * moodleFeedbackPushService) maintained its own, slightly divergent copy
+ * of this function — among other things, none of them knew about
+ * `409 → 'conflict'`, even though `gradingSchemesService`/
+ * `gradeExportService` already threw exactly that at runtime. This file
+ * is the natural shared place for it: `ApiError` itself is already
+ * defined here and imported by every other service (see
+ * `import { ApiError } from './submissionsService'` there).
  *
- * Exportiert, damit andere Services sie statt einer eigenen Kopie
- * importieren — siehe httpClient.ts, activityService.ts, gradesService.ts,
+ * Exported so other services import it instead of keeping their own
+ * copy — see httpClient.ts, activityService.ts, gradesService.ts,
  * gradingSchemesService.ts, gradeExportService.ts,
  * moodleFeedbackPushService.ts.
  */
 export function statusToKind(status: number): ApiErrorKind {
   if (status === 401) return 'auth';
   if (status === 403) return 'permission';
-  // 402 faellt semantisch unter "permission" — der Nutzer hat keinen
-  // *bezahlten* Zugriff. QuotaBanner liest `status === 402` direkt; dieses
-  // Label dient nur Telemetrie/Gruppierung (uebernommen aus httpClient.ts).
+  // 402 falls semantically under "permission" — the user simply lacks
+  // *paid* access. QuotaBanner reads `status === 402` directly; this
+  // label only serves telemetry/grouping (carried over from httpClient.ts).
   if (status === 402) return 'permission';
   if (status === 404) return 'not_found';
   if (status === 409) return 'conflict';
@@ -301,9 +302,9 @@ export class SubmissionsService {
   }
 
   /**
-   * TF-336: Moodle-API-Import (Pro+ only). Backend wirft 402 wenn der
-   * Tier den ``moodle_api``-Driver nicht freischaltet — der Caller
-   * unterscheidet das via ``ApiError.status``.
+   * TF-336: Moodle API import (Pro+ only). Backend throws 402 when the
+   * tier doesn't unlock the ``moodle_api`` driver — the caller
+   * distinguishes that via ``ApiError.status``.
    */
   static async apiPreview(params: {
     examId: number;

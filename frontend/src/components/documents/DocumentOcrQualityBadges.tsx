@@ -1,17 +1,17 @@
 /**
- * DocumentOcrQualityBadges — OCR-/Qualitäts-Status-Badges (TF-361).
+ * DocumentOcrQualityBadges — OCR/quality status badges (TF-361).
  *
- * Folge-Ticket zur Backend-OCR-Eskalation (TF-360). Zeigt anhand der vom
- * Backend exponierten Felder `processed_with_ocr` + `quality`:
- *   - „OCR"-Chip, wenn das Dokument per Texterkennung verarbeitet wurde,
- *   - „OCR-Neuverarbeitung"-Chip, während die Eskalation läuft (Dokument auf
- *     PROCESSING mit negativem Erstlauf-Verdict, noch nicht OCR-verarbeitet),
- *   - Warn-Chip „Eingeschränkte Textqualität" bei `quality.ok === false`, mit
- *     Tooltip auf den konkreten `quality.reason`.
+ * Follow-up ticket to the backend OCR escalation (TF-360). Based on the
+ * backend-exposed fields `processed_with_ocr` + `quality`, shows:
+ *   - an "OCR" chip when the document was processed via text recognition,
+ *   - an "OCR reprocessing" chip while the escalation is running (document is
+ *     PROCESSING with a negative first-pass verdict, not yet OCR-processed),
+ *   - a "Limited text quality" warning chip when `quality.ok === false`, with
+ *     a tooltip showing the concrete `quality.reason`.
  *
- * Dateiformat-unabhängig: greift identisch für PDF und gescanntes DOCX, da das
- * Backend für beide dieselben Felder befüllt. Reine Präsentationskomponente —
- * keine Datenbeschaffung, wird in Karten- und Listen-Ansicht wiederverwendet.
+ * File-format independent: behaves identically for PDF and scanned DOCX,
+ * since the backend populates the same fields for both. Pure presentation
+ * component — no data fetching, reused in card and list views.
  */
 import React from 'react';
 import { Chip, Stack, Tooltip } from '@mui/material';
@@ -19,9 +19,9 @@ import { DocumentScanner, WarningAmber, ErrorOutline } from '@mui/icons-material
 import { useTranslation } from 'react-i18next';
 import { Document, DocumentStatus } from '../../types/document';
 
-// Mapping der Backend-`quality.reason`-Werte auf i18n-Tooltip-Keys. Dynamische
-// Keys werden vom i18n-Parity-Test bewusst nicht geprüft — daher ein
-// expliziter Fallback (`reasonUnknown`) für künftige Backend-Reasons.
+// Mapping of the backend `quality.reason` values to i18n tooltip keys. Dynamic
+// keys are deliberately not checked by the i18n parity test — hence an
+// explicit fallback (`reasonUnknown`) for future backend reasons.
 const QUALITY_REASON_KEY: Record<string, string> = {
   scanned_low_text: 'components.documentLibrary.quality.reasonScannedLowText',
   single_chunk_large_file:
@@ -32,7 +32,7 @@ const QUALITY_REASON_KEY: Record<string, string> = {
 
 export interface DocumentOcrQualityBadgesProps {
   document: Document;
-  /** MUI Chip size — `small` (default) passt in Karten- und Tabellenzeilen. */
+  /** MUI Chip size — `small` (default) fits card and table rows. */
   size?: 'small' | 'medium';
 }
 
@@ -46,9 +46,9 @@ const DocumentOcrQualityBadges: React.FC<DocumentOcrQualityBadgesProps> = ({
   const qualityFailed = quality != null && quality.ok === false;
   const escalation = document.escalation;
 
-  // OCR-Nachbearbeitung fehlgeschlagen (TF-365): der Reprocess-Job hat das
-  // Dokument auf ERROR gesetzt. Eigener Hinweis, damit der für den Nutzer sonst
-  // unerklärliche PROCESSED→ERROR-Übergang nachvollziehbar wird.
+  // OCR post-processing failed (TF-365): the reprocess job set the document to
+  // ERROR. Dedicated notice so the otherwise unexplainable PROCESSED→ERROR
+  // transition is comprehensible to the user.
   if (escalation === 'failed') {
     return (
       <Tooltip
@@ -72,11 +72,11 @@ const DocumentOcrQualityBadges: React.FC<DocumentOcrQualityBadgesProps> = ({
     );
   }
 
-  // OCR-Neuverarbeitung läuft (TF-360/TF-365): bevorzugt am exponierten
-  // `escalation`-Marker erkannt. `queued` deckt sowohl das Warten in der Celery-
-  // Queue (Dokument noch PROCESSED — Fenster A, sonst unsichtbar) als auch den
-  // bereits laufenden Reprocess (PROCESSING) ab. Die Status-Heuristik bleibt als
-  // Fallback für Altrows, deren processing_info noch keinen Marker trägt.
+  // OCR reprocessing is running (TF-360/TF-365): preferably detected via the
+  // exposed `escalation` marker. `queued` covers both waiting in the Celery
+  // queue (document still PROCESSED — window A, otherwise invisible) and the
+  // already-running reprocess (PROCESSING). The status heuristic remains as a
+  // fallback for legacy rows whose processing_info doesn't yet carry a marker.
   const ocrReprocessing =
     escalation === 'queued' ||
     (document.status === DocumentStatus.PROCESSING &&
@@ -84,8 +84,8 @@ const DocumentOcrQualityBadges: React.FC<DocumentOcrQualityBadgesProps> = ({
       !document.processed_with_ocr);
 
   if (ocrReprocessing) {
-    // Während der Neuverarbeitung nur diesen Hinweis zeigen — der widersprüchliche
-    // Qualitäts-Warnchip aus dem Erstlauf würde sonst doppelt erscheinen.
+    // Only show this notice during reprocessing — the contradictory quality
+    // warning chip from the first pass would otherwise appear alongside it.
     return (
       <Tooltip
         title={t(

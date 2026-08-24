@@ -79,7 +79,7 @@ const HelpWidget: React.FC = () => {
       .catch((err) => console.warn('Failed to load onboarding steps:', err));
   }, [showOnboarding, hasSkippedSteps, role]);
 
-  // Catch-up: beim Panel-Öffnen prüfen, welche skipped Steps jetzt zugänglich sind
+  // Catch-up: when the panel opens, check which skipped steps are now accessible
   useEffect(() => {
     if (!open || !onboardingStatus?.completed) return;
     const skipped = onboardingStatus.skipped_steps ?? [];
@@ -194,10 +194,10 @@ const HelpWidget: React.FC = () => {
         <IconButton
           onClick={toggle}
           aria-label={t('help.title', 'Hilfe')}
-          // TF-657: sprachunabhängiger Hook für E2E. Das aria-label kommt aus
-          // i18n ("Hilfe"/"Help"/…) und taugt nicht als Testselektor — eine
-          // Negativ-Assertion darauf wäre in einem englischen Browser immer
-          // grün, egal ob das Widget gegated ist.
+          // TF-657: language-independent hook for E2E. The aria-label comes
+          // from i18n ("Hilfe"/"Help"/…) and isn't suitable as a test selector
+          // — a negative assertion on it would always pass in an English
+          // browser, regardless of whether the widget is gated.
           data-testid="help-fab"
           sx={{
             width: 56,
@@ -304,7 +304,7 @@ const HelpWidget: React.FC = () => {
               </Box>
             )}
 
-            {/* Catch-up banner (wenn completed tour, aber neue Seiten zugänglich) */}
+            {/* Catch-up banner (when tour completed, but new pages are now accessible) */}
             {onboardingStatus?.completed && catchUpSteps.length > 0 && !catchUpMode && !tourJustCompleted && (
               <Box sx={{ p: 2, m: 2, bgcolor: 'info.light', borderRadius: 1 }}>
                 <Typography variant="body2" gutterBottom>
@@ -325,9 +325,9 @@ const HelpWidget: React.FC = () => {
               </Box>
             )}
 
-            {/* Tour-Banner — starten (step 0) oder fortsetzen (step > 0).
-                Gate: Banner nur zeigen wenn Modal bereits dismissed oder Tour bereits begonnen,
-                damit Modal und Banner nicht gleichzeitig sichtbar sind. */}
+            {/* Tour banner — start (step 0) or resume (step > 0).
+                Gate: only show the banner once the modal is already dismissed or the tour
+                has already started, so the modal and banner aren't visible at the same time. */}
             {showOnboarding && !tourActive && !tourJustCompleted && onboardingSteps.length > 0 && (modalDismissed || (onboardingStatus?.current_step ?? 0) > 0) && (
               <Box sx={{ p: 2, m: 2, bgcolor: 'info.light', borderRadius: 1 }}>
                 <Typography variant="body2" gutterBottom>

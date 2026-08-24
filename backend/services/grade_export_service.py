@@ -1,25 +1,24 @@
-"""Notenexport — drei Formate (CSV / Moodle-CSV / PDF) per Spec 9.
+"""Grade export — three formats (CSV / Moodle CSV / PDF) per Spec 9.
 
-Pattern wie ``services.exam_export_service``: stateless Exporter-Klassen,
-einer pro Format. Der Service-Module gibt drei Klassen frei:
+Same pattern as ``services.exam_export_service``: stateless exporter
+classes, one per format. This service module exposes three classes:
 
-* ``GradeCsvExporter`` — UTF-8 CSV mit ``;``-Delimiter, deutscher Header
+* ``GradeCsvExporter`` — UTF-8 CSV with ``;`` delimiter, German header
   ("external_id;display_name;Punkte;Maximalpunkte;Prozent;Note;Status").
-* ``MoodleGradeCsvExporter`` — Moodle-Grades-Reimport-Format. Spalten
-  ``"Email address";"State";"Grade/X.0"`` und Punkte-Skala an Moodles
-  ``X.0``-Konvention angepasst, sodass die Datei direkt im Moodle-
-  Gradebook hochgeladen werden kann.
-* ``GradePdfExporter`` — reportlab-PDF mit Header (Institution /
-  Prüfung / Datum), tabellarisch, Footer mit Lehrperson-Signatur-Feld.
+* ``MoodleGradeCsvExporter`` — Moodle grades reimport format. Columns
+  ``"Email address";"State";"Grade/X.0"`` and the points scale adapted
+  to Moodle's ``X.0`` convention, so the file can be uploaded directly
+  into the Moodle gradebook.
+* ``GradePdfExporter`` — reportlab PDF with a header (institution /
+  exam / date), tabular body, footer with a teacher signature field.
 
-Alle Exporter nehmen ein vorbereitetes ``GradeExportData``-DTO entgegen
-— der API-Layer baut das Objekt einmal aus der DB zusammen, jeder
-Exporter rendert es. Vermeidet, dass jedes Format dieselben Joins
-schreiben muss.
+All exporters take a prepared ``GradeExportData`` DTO — the API layer
+builds the object once from the DB, and each exporter renders it. This
+avoids every format having to write the same joins.
 
-Note-Berechnung: ``GradingSchemeEvaluator.percentage_to_grade`` —
-``scheme_config = None`` → fällt auf "—" zurück (statt zu crashen, wenn
-die Lehrperson noch keine Skala zugeordnet hat).
+Grade calculation: ``GradingSchemeEvaluator.percentage_to_grade`` —
+``scheme_config = None`` → falls back to "—" (instead of crashing when
+the teacher hasn't assigned a grading scale yet).
 """
 
 from __future__ import annotations
@@ -73,7 +72,7 @@ def _pdf_safe(value: str | None) -> str:
 
 
 # ---------------------------------------------------------------------------
-# DTOs — der API-Layer baut diese aus DB zusammen, alle Exporter teilen sie
+# DTOs — the API layer builds these from the DB, shared by all exporters
 # ---------------------------------------------------------------------------
 
 
@@ -85,7 +84,7 @@ class GradeRow:
     total_points_max: float
     percentage: float
     grade_status: str
-    moodle_state: str | None = None  # Optional: Moodle "State"-Spalte
+    moodle_state: str | None = None  # Optional: Moodle "State" column
 
 
 @dataclass(frozen=True)
@@ -111,7 +110,7 @@ def _grade_label(
     external_id: str | None = None,
 ) -> str:
     """Run the configured scheme; fall back to "—" when no scheme is
-    set so a missing skala doesn't crash the export.
+    set so a missing scale doesn't crash the export.
     """
     if scheme_config is None:
         return "—"
@@ -136,7 +135,7 @@ def _row_label(row: GradeRow) -> str:
 
 
 class GradeCsvExporter:
-    """Default CSV — Excel-friendly, ``;`` delimiter, BOM für Excel-DE."""
+    """Default CSV — Excel-friendly, ``;`` delimiter, BOM for Excel-DE."""
 
     HEADER = [
         "external_id",
@@ -182,29 +181,29 @@ class GradeCsvExporter:
 
 
 class MoodleGradeCsvExporter:
-    """Moodle-Grades-Reimport Format.
+    """Moodle grades reimport format.
 
-    Moodles "Import: CSV file" feature on Quiz-Grades-Page erwartet:
+    Moodle's "Import: CSV file" feature on the quiz grades page expects:
 
-    * ``"Email address"`` — eindeutiger Identifier (Spec: external_id
-      = E-Mail per Default; falls nicht E-Mail, schreibt der Exporter
-      die external_id als Fallback in dieselbe Spalte und Moodle
-      verweigert dann den Import — bewusste Sicherheits-Abweisung).
-    * ``"State"`` — ``"Finished"`` für submitted attempts (im import_
-      pipeline normalisiert), sonst leer.
-    * ``"Grade/X.0"`` — die Note-Spalte. ``X`` ist die Maximalpunktzahl
-      der Prüfung, mit ``.0``-Suffix (Moodle-Konvention).
+    * ``"Email address"`` — unique identifier (spec: external_id
+      = email by default; if it's not an email, the exporter writes
+      the external_id as a fallback into the same column and Moodle
+      then refuses the import — a deliberate safety rejection).
+    * ``"State"`` — ``"Finished"`` for submitted attempts (normalized
+      in the import pipeline), otherwise empty.
+    * ``"Grade/X.0"`` — the grade column. ``X`` is the maximum points
+      of the exam, with a ``.0`` suffix (Moodle convention).
 
-    Die Skala wird in Punkten exportiert (nicht als Note-Label) — Moodle
-    rechnet selbst. Für stepped-Schemes wo es keine numerischen Punkte
-    gibt fallen wir auf percentage zurück (Moodle akzeptiert Dezimal-
-    werte in dieser Spalte).
+    The scale is exported in points (not as a grade label) — Moodle
+    computes on its own. For stepped schemes that have no numeric
+    points, we fall back to percentage (Moodle accepts decimal values
+    in this column).
     """
 
     @staticmethod
     def export(data: GradeExportData) -> bytes:
         if not data.rows:
-            # Empty-Datei mit Header so Moodle erkennt das Format
+            # Empty file with header so Moodle recognizes the format
             grade_max = 100.0
         else:
             grade_max = max((r.total_points_max for r in data.rows), default=100.0)
@@ -236,7 +235,7 @@ class MoodleGradeCsvExporter:
 
 
 class GradePdfExporter:
-    """PDF Notenliste mit Institution-Header, Tabelle und Signatur-Footer."""
+    """PDF grade list with institution header, table, and signature footer."""
 
     @staticmethod
     def export(data: GradeExportData) -> bytes:
@@ -337,7 +336,7 @@ class GradePdfExporter:
         story.append(table)
         story.append(Spacer(1, 1.5 * cm))
 
-        # --- Footer (Signatur)
+        # --- Footer (signature)
         story.append(
             Paragraph(
                 "Lehrperson: ____________________________&nbsp;&nbsp;"

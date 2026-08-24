@@ -1,43 +1,43 @@
 /**
- * Rekonstruiert lesbare Zeilenstruktur in Moodle-Freitextantworten (TF-430).
+ * Reconstructs readable line structure in Moodle free-text answers (TF-430).
  *
- * Moodle plattet Zeilenumbrüche bereits beim Export — in keiner Quelldatei
- * (JSON oder CSV) sind sie noch vorhanden. Übrig bleibt Residual-Struktur an
- * den alten Bruchstellen: NBSP (U+00A0), Läufe von 3+ Leerzeichen und Tabs.
- * Diese Funktion verwandelt diese Signale zur Render-Zeit in Markdown-taugliche
- * Absatzumbrüche, OHNE den in der DB gespeicherten Originaltext zu verändern.
+ * Moodle already flattens line breaks on export — none of the source files
+ * (JSON or CSV) still have them. What remains is residual structure at the
+ * old break points: NBSP (U+00A0), runs of 3+ spaces, and tabs. This
+ * function turns those signals into Markdown-friendly paragraph breaks at
+ * render time, WITHOUT changing the original text stored in the DB.
  *
- * Bewusst konservativ (Guard gegen Über-Segmentierung):
- * - Ein Tab oder ein Lauf von 3+ Whitespace (Spaces und/oder NBSP) bricht.
- * - Ein einzelnes NBSP (oder 1–2-Zeichen-Lauf) wird zu einem normalen
- *   Leerzeichen — so zerreissen innersatzliche `wort<NBSP>wort`-Fälle (im
- *   Demo-Korpus mehrfach belegt) den Satz nicht.
+ * Deliberately conservative (guard against over-segmentation):
+ * - A tab or a run of 3+ whitespace (spaces and/or NBSP) breaks.
+ * - A single NBSP (or a 1–2-character run) becomes a normal space — so
+ *   mid-sentence `word<NBSP>word` cases (occurring repeatedly in the demo
+ *   corpus) don't tear the sentence apart.
  *
- * Der MarkdownRenderer nutzt nur `remark-gfm` (kein `remark-breaks`); einzelne
- * `\n` kollabieren dort zu Leerzeichen. Brüche werden deshalb als Leerzeilen
- * (`\n\n`) ausgegeben, damit sie im Render sichtbar bleiben.
+ * The MarkdownRenderer only uses `remark-gfm` (no `remark-breaks`); single
+ * `\n` collapse to a space there. Breaks are therefore emitted as blank
+ * lines (`\n\n`) so they stay visible in the render.
  *
- * Gibt `''` für null/undefined/leer/whitespace-only zurück, damit Aufrufer
- * ihren `|| '—'`-Fallback behalten.
+ * Returns `''` for null/undefined/empty/whitespace-only, so callers can
+ * keep their `|| '—'` fallback.
  */
 
-// Interne Bruchmarke: U+0000 kommt in Moodle-Antworten nie vor und dient nur
-// als Sentinel vor split(). Bewusst als Escape (nicht als unsichtbares Byte)
-// notiert — NICHT durch ein Leerzeichen ersetzen.
+// Internal break marker: U+0000 never occurs in Moodle answers and only
+// serves as a sentinel before split(). Deliberately written as an escape
+// (not as an invisible byte) — do NOT replace with a space.
 const BREAK = '\u0000';
 
 export function reflowMoodleAnswer(text: string | null | undefined): string {
   if (!text) return '';
 
   const withBreaks = text
-    // bereits vorhandene Zeilenumbrüche (CR/LF) sind echte Brüche — nie als
-    // nacktes einzelnes \n durchreichen (würde im Render unsichtbar kollabieren)
+    // existing line breaks (CR/LF) are real breaks — never pass through as
+    // a bare single \n (would collapse invisibly in the render)
     .replace(/[\r\n]+/g, BREAK)
-    // Tab = Einrückungs-/Umbruch-Residue → Bruch
+    // tab = indentation/break residue → break
     .replace(/\t/g, BREAK)
-    // Lauf von 3+ Whitespace (Space und/oder NBSP) → Bruch
+    // run of 3+ whitespace (space and/or NBSP) → break
     .replace(/[ \u00a0]{3,}/g, BREAK)
-    // verbleibende NBSP (solo / 1–2er-Lauf) → normales Leerzeichen
+    // remaining NBSP (solo / 1–2-char run) → normal space
     .replace(/\u00a0/g, ' ');
 
   return withBreaks

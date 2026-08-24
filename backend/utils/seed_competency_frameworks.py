@@ -1,9 +1,9 @@
-"""Seed BWZ-Lyss Kompetenzrahmen (Modul A + B) — TF-400.
+"""Seed BWZ-Lyss competency frameworks (Module A + B) — TF-400.
 
-Liest die HKP-Markdown-Quellen aus demo/BWZ/ und legt je ein
-CompetencyFramework mit rendered_text = vollständiger Dateiinhalt an.
-Idempotent über (institution_id, name). Behebt den H1-Titel-Copy-&-Paste-Bug
-in Modul A ("Wirkungsvoll kommunizieren" -> "Mitarbeitende führen").
+Reads the HKP markdown sources from demo/BWZ/ and creates one
+CompetencyFramework each with rendered_text = the full file content.
+Idempotent over (institution_id, name). Fixes the H1-title copy-and-paste
+bug in Module A ("Wirkungsvoll kommunizieren" -> "Mitarbeitende führen").
 """
 
 from pathlib import Path
@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from models.competency import Competency, CompetencyFramework
 from utils.competency_parser import parse_competencies
 
-# Repo-Root: .../core/backend/utils/ -> 3x parent == repo root
+# Repo root: .../core/backend/utils/ -> 3x parent == repo root
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _BWZ = _REPO_ROOT / "demo" / "BWZ"
 
@@ -50,8 +50,8 @@ def seed_bwz_frameworks(db: Session, institution_id: int) -> list[CompetencyFram
                 visibility="institution",
             )
             db.add(fw)
-        # TF-400: strukturierte HKs aus rendered_text ableiten, sofern noch keine
-        # vorhanden (idempotent; backfillt auch zuvor angelegte Frameworks).
+        # TF-400: derive structured HKs from rendered_text if none exist yet
+        # (idempotent; also backfills previously created frameworks).
         if not fw.competencies:
             for p in parse_competencies(fw.rendered_text):
                 fw.competencies.append(

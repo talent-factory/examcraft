@@ -1,46 +1,47 @@
-"""LLM-basierter Grader für offene Fragen (Spec 6.3).
+"""LLM-based grader for open-ended questions (Spec 6.3).
 
-Bewertet ``open_ended`` Antworten über den self-hosted LLM-Gateway und
-liefert ein strukturiertes ``LlmGradeOutcome`` zurück, das die
-``GradingService`` 1:1 in den ``Grade``-Datensatz übernimmt.
+Grades ``open_ended`` answers via the self-hosted LLM Gateway and returns
+a structured ``LlmGradeOutcome`` that ``GradingService`` copies 1:1 into
+the ``Grade`` record.
 
-Architektur-Entscheidungen:
+Architecture decisions:
 
-* **Gateway (OpenAI-Wire) statt Anthropic SDK direkt.** TF-440: der
-  frühere Anthropic-Direktpfad (eigener SDK-Import, Anthropic-natives
-  ``messages.create``) wurde entfernt — der Gateway ist die einzige
-  Quelle für Modell-Routing. Cache-Control auf System- und User-Blöcken
-  bleibt möglich: LiteLLM leitet ``cache_control``-Felder aus dem
-  OpenAI-Wire-Format als Anthropic-Header durch.
-* **Prompt-Caching.** Der pro-Frage statische Block (System-Prompt +
-  Frage + Musterlösung + Erklärung + Bewertungsregeln) trägt
-  ``cache_control: ephemeral``; nur die Studi-Antwort ist variabel.
-  Erwarteter Effekt ab dem 2. Studi pro Prüfung: deutlich reduzierte
-  Token-Kosten (Grading-Spec §6.3 — Zielwert ``cache-hit-rate > 80%``,
-  Prod-Canary-Metrik, noch zu verifizieren; nicht die TF-439-Spec).
-* **Strict Schema.** Die Modell-Antwort wird mit Pydantic validiert.
-  Bei Schema-Verletzung fällt der Grader auf einen 0-Punkte-Stub mit
-  ``confidence=0.0`` zurück, sodass die Lehrperson das Item garantiert
-  in der Review-Queue sieht. Ein Schema-Fail darf nie eine ganze
-  Submission scheitern lassen.
-* **Demo-Mode.** Ohne konfigurierten Gateway (``LLM_GATEWAY_URL``)
-  läuft der Grader im Stub-Modus (Confidence 0.0, Rationale-Hinweis).
-  Das hält Tests und Setups ohne Gateway-Zugang grün, ohne dass die
-  Lehrperson ein leises 0-Resultat bekommt.
+* **Gateway (OpenAI wire) instead of the Anthropic SDK directly.**
+  TF-440: the former direct Anthropic path (own SDK import, Anthropic-
+  native ``messages.create``) was removed — the Gateway is the sole
+  source of truth for model routing. Cache control on system and user
+  blocks remains possible: LiteLLM passes ``cache_control`` fields from
+  the OpenAI wire format through as Anthropic headers.
+* **Prompt caching.** The per-question static block (system prompt +
+  question + model answer + explanation + grading rules) carries
+  ``cache_control: ephemeral``; only the student's answer is variable.
+  Expected effect from the 2nd student per exam onward: significantly
+  reduced token costs (grading spec §6.3 — target ``cache-hit-rate >
+  80%``, a prod canary metric, still to be verified; not the TF-439
+  spec).
+* **Strict schema.** The model's response is validated with Pydantic.
+  On a schema violation, the grader falls back to a 0-point stub with
+  ``confidence=0.0``, so the teacher is guaranteed to see the item in
+  the review queue. A schema failure must never fail an entire
+  submission.
+* **Demo mode.** Without a configured Gateway (``LLM_GATEWAY_URL``),
+  the grader runs in stub mode (confidence 0.0, rationale note). This
+  keeps tests and setups without Gateway access green, without giving
+  the teacher a silent 0 result.
 
 .. note::
-   ``Institution.llm_model_for_grading`` (Enterprise-Tier-Override):
-   die TF-439-Migration ``tf439_grade_logical`` hat alle zum Zeitpunkt
-   ihrer Ausführung bestehenden rohen Modell-IDs bereits auf den
-   logischen Alias ``'examcraft/grading'`` normalisiert (siehe
-   ``alembic/versions/2026_06_19_tf439_grading_model_logical.py``), und
-   es gibt derzeit keinen App-Schreibpfad (kein Admin-Endpoint, kein
-   Pydantic-Schema) für dieses Feld. Ein zukünftiger roher Wert (z. B.
-   via Direkt-DB-Zugriff) würde unverändert an den Gateway durchgereicht
-   und dort scheitern, falls er nicht in der Virtual-Key-Allowlist steht
-   — ``grading_service._resolve_llm_grader`` loggt diesen Fall seit
-   TF-440 laut, statt ihn erst als kryptische Gateway-Ablehnung sichtbar
-   werden zu lassen.
+   ``Institution.llm_model_for_grading`` (enterprise tier override):
+   the TF-439 migration ``tf439_grade_logical`` already normalized all
+   raw model IDs that existed at the time it ran to the logical alias
+   ``'examcraft/grading'`` (see
+   ``alembic/versions/2026_06_19_tf439_grading_model_logical.py``), and
+   there is currently no app write path (no admin endpoint, no Pydantic
+   schema) for this field. A future raw value (e.g. via direct DB
+   access) would be passed through to the Gateway unchanged and would
+   fail there if it isn't on the virtual key allowlist —
+   ``grading_service._resolve_llm_grader`` has logged this case loudly
+   since TF-440, instead of it only surfacing as a cryptic Gateway
+   rejection.
 """
 
 from __future__ import annotations
@@ -68,7 +69,7 @@ _DEFAULT_TIMEOUT_S = float(os.getenv("CLAUDE_GRADING_TIMEOUT", "30.0"))
 
 
 class OpenEndedGrade(BaseModel):
-    """Strukturiertes Output-Schema (Spec 6.3)."""
+    """Structured output schema (Spec 6.3)."""
 
     points_awarded: float = Field(ge=0)
     confidence: float = Field(ge=0, le=1)
@@ -79,11 +80,11 @@ class OpenEndedGrade(BaseModel):
 
 @dataclass(frozen=True)
 class LlmGradeOutcome:
-    """Was der ``GradingService`` zum Persistieren erwartet.
+    """What ``GradingService`` expects for persisting.
 
-    ``is_correct`` bleibt ``None`` für offene Fragen — die Lehrperson
-    übernimmt diese Bewertung in der Review-Queue. Erst die Status-
-    Transition auf ``approved``/``manual_override`` zählt als reviewed.
+    ``is_correct`` stays ``None`` for open-ended questions — the teacher
+    makes that call in the review queue. Only the status transition to
+    ``approved``/``manual_override`` counts as reviewed.
     """
 
     points_awarded: float
@@ -97,20 +98,21 @@ class LlmGradeOutcome:
 
 
 class LlmGrader:
-    """Gateway-basierter Bewerter für offene Fragen (TF-440)."""
+    """Gateway-based grader for open-ended questions (TF-440)."""
 
     PROMPT_ID = GRADING_OPEN_ENDED_PROMPT_ID
 
     def __init__(self, *, client=None, model: str | None = None) -> None:
-        # ``client`` ist ein optionaler injizierter OpenAI-SDK-Client
-        # (Test-Naht — siehe test_grading_service_llm.py::_stub_gateway_client).
+        # ``client`` is an optional injected OpenAI SDK client
+        # (test seam — see test_grading_service_llm.py::_stub_gateway_client).
         self._client = client
         from services import llm_gateway
 
-        # Fix 1: Kein expliziter model-Override → logischen Alias wählen,
-        # damit rohe Modell-IDs nie die Gateway-Allowlist treffen (TF-439).
+        # Fix 1: no explicit model override → pick the logical alias, so raw
+        # model IDs never hit the Gateway allowlist (TF-439).
         self.model = model if model is not None else llm_gateway.ALIAS_GRADING
-        # Demo-Mode nur, wenn weder Client injiziert noch Gateway konfiguriert.
+        # Demo mode only when neither a client is injected nor a Gateway is
+        # configured.
         self.demo_mode = client is None and not llm_gateway.gateway_enabled()
         if self.demo_mode:
             logger.warning(
@@ -133,7 +135,7 @@ class LlmGrader:
         difficulty: str | None = None,
         bloom_level: str | None = None,
     ) -> LlmGradeOutcome:
-        """Bewerte eine offene Antwort. Wirft nie — Fehler → 0-Punkte-Stub."""
+        """Grade an open-ended answer. Never raises — errors → 0-point stub."""
         if self.demo_mode:
             return self._stub(
                 points_max=points_max,
@@ -175,10 +177,10 @@ class LlmGrader:
                 ),
             )
 
-        # Clamp gegen Modell-Halluzinationen — Pydantic prüft ge=0,
-        # nicht "≤ points_max". Ein Modell-Vorschlag von 12/10 wird auf
-        # 10 begrenzt; der Verstoss landet im Log, damit eine Drift in
-        # der Prompt-Qualität sichtbar bleibt.
+        # Clamp against model hallucinations — Pydantic only checks ge=0,
+        # not "≤ points_max". A model suggestion of 12/10 gets capped at
+        # 10; the violation is logged so a drift in prompt quality stays
+        # visible.
         clamped_points = max(0.0, min(grade.points_awarded, points_max))
         if clamped_points != grade.points_awarded:
             logger.warning(
@@ -201,11 +203,12 @@ class LlmGrader:
     # ------------------------------------------------------------------
 
     def _client_or_create(self):
-        """Holt den injizierten Test-Client oder erstellt den OpenAI-SDK-
-        Client gegen den Gateway.
+        """Returns the injected test client or creates the OpenAI SDK
+        client against the Gateway.
 
-        Modulattribut-Zugriff (``llm_gateway.make_openai_client``) statt
-        direktem Funktionsaufruf, damit Tests via monkeypatch greifen.
+        Uses module-attribute access (``llm_gateway.make_openai_client``)
+        instead of a direct function call, so tests can hook in via
+        monkeypatch.
         """
         if self._client is not None:
             return self._client
@@ -214,16 +217,18 @@ class LlmGrader:
         return llm_gateway.make_openai_client()
 
     def _call_gateway(self, question_block: str, student_block: str) -> OpenEndedGrade:
-        """Sendet den Grading-Call über den LiteLLM-Gateway (OpenAI-Wire).
+        """Sends the grading call via the LiteLLM Gateway (OpenAI wire).
 
-        Prompt-Caching wird via ``cache_control``-Felder in den Content-
-        Parts transportiert; LiteLLM leitet sie als Anthropic-Header durch.
-        System- und Fragen-Block sind statisch pro Frage (Cache-Kandidaten);
-        der Studi-Block variiert und trägt deshalb kein ``cache_control``.
+        Prompt caching is carried via ``cache_control`` fields on the
+        content parts; LiteLLM passes them through as Anthropic headers.
+        The system and question blocks are static per question (cache
+        candidates); the student block varies and therefore carries no
+        ``cache_control``.
         """
         client = self._client_or_create()
-        # Fix 2: Grading-Timeout explizit setzen — make_openai_client() setzt
-        # kein Timeout (OpenAI-SDK-Default ~600 s würde Celery-Worker blockieren).
+        # Fix 2: set the grading timeout explicitly — make_openai_client()
+        # sets no timeout (the OpenAI SDK default of ~600s would block the
+        # Celery worker).
         response = client.chat.completions.create(
             model=self.model,
             max_tokens=_DEFAULT_MAX_TOKENS,
@@ -279,22 +284,22 @@ class LlmGrader:
         )
         student_block = build_student_answer_block(given_answer)
 
-        # TF-440: Gateway ist der einzige Pfad — kein Anthropic-Direkt-Zweig mehr.
+        # TF-440: the Gateway is the only path — no more direct Anthropic branch.
         return self._call_gateway(question_block, student_block)
 
     @staticmethod
     def _parse_response(text: str) -> OpenEndedGrade:
-        """Parse JSON; toleriert ``{ ... }``-Blöcke umrahmt von Markdown.
+        """Parse JSON; tolerates ``{ ... }`` blocks wrapped in Markdown.
 
-        Das Modell wird im Prompt explizit angewiesen, *nur* JSON zu
-        liefern. Trotzdem extrahieren wir defensiv den ersten ``{...}``-
-        Block, damit ein gelegentliches ```` ```json ```` -Wrapping nicht
-        gleich den ganzen Grading-Lauf scheitern lässt.
+        The model is explicitly instructed in the prompt to return *only*
+        JSON. Even so, we defensively extract the first ``{...}`` block,
+        so that an occasional ```` ```json ```` wrapping doesn't fail the
+        whole grading run.
         """
         stripped = (text or "").strip()
         if not stripped:
             raise ValueError("Leere Modell-Antwort")
-        # Trim Markdown-Code-Blöcke — strip fence lines, not characters.
+        # Trim Markdown code blocks — strip fence lines, not characters.
         # str.strip("`") removes any backtick from both ends of the string,
         # which corrupts content that legitimately contains backticks (e.g.
         # rationale: "matches `key criterion`"). Instead, drop the opening

@@ -1,6 +1,6 @@
 """
-Authentication Models für ExamCraft AI
-User, Role, Institution Models für Multi-Tenant Authentication
+Authentication Models for ExamCraft AI
+User, Role, Institution models for multi-tenant authentication
 """
 
 from sqlalchemy import (
@@ -31,7 +31,7 @@ SUPPORTED_LANGUAGES = ("de", "en", "fr", "it")
 
 # Enums
 class UserRole(str, enum.Enum):
-    """User Roles für RBAC (Python Enum für Type-Safety)"""
+    """User roles for RBAC (Python Enum for type safety)"""
 
     ADMIN = "admin"
     DOZENT = "dozent"
@@ -48,7 +48,7 @@ class UserStatus(str, enum.Enum):
     PENDING = "pending"
 
 
-# Association Table für Many-to-Many Relationship zwischen User und Role
+# Association table for many-to-many relationship between User and Role
 user_roles = Table(
     "user_roles",
     Base.metadata,
@@ -65,8 +65,8 @@ user_roles = Table(
 
 class Institution(Base):
     """
-    Institution Model für Multi-Tenancy
-    Repräsentiert Bildungseinrichtungen (Hochschulen, Schulen, etc.)
+    Institution model for multi-tenancy
+    Represents educational institutions (universities, schools, etc.)
     """
 
     __tablename__ = "institutions"
@@ -80,7 +80,7 @@ class Institution(Base):
     )  # URL-friendly identifier
     domain = Column(
         String(100), nullable=True, unique=True
-    )  # Email domain für Auto-Assignment
+    )  # Email domain for auto-assignment
 
     # Contact Information
     contact_email = Column(String(255), nullable=True)
@@ -94,7 +94,7 @@ class Institution(Base):
     country = Column(String(100), nullable=True)
 
     # Settings (JSON)
-    settings = Column(Text, nullable=True)  # JSON string für flexible Settings
+    settings = Column(Text, nullable=True)  # JSON string for flexible settings
 
     # Status
     is_active = Column(Boolean, default=True, nullable=False, index=True)
@@ -105,7 +105,7 @@ class Institution(Base):
     # migration. Replaces the old "lowest id" seed convention.
     is_system = Column(Boolean, default=False, nullable=False, index=True)
 
-    # Subscription Info (TF-116 Monetarisierungsstrategie)
+    # Subscription Info (TF-116 monetization strategy)
     subscription_tier = Column(
         String(50), default="free", nullable=False
     )  # free, starter, professional, enterprise
@@ -113,12 +113,12 @@ class Institution(Base):
         ARRAY(String), nullable=True
     )  # Optional: Manual feature overrides
 
-    # Quotas (basierend auf subscription_tier, siehe backend/config/features.py)
+    # Quotas (based on subscription_tier, see backend/config/features.py)
     max_users = Column(Integer, default=1, nullable=False)
     max_documents = Column(Integer, default=5, nullable=False)
     max_questions_per_month = Column(Integer, default=20, nullable=False)
 
-    # Review-Workflow
+    # Review workflow
     require_second_reviewer = Column(Boolean, default=False)
 
     # Institution-wide default grading scheme (FK; per-exam overrides
@@ -135,11 +135,11 @@ class Institution(Base):
         nullable=True,
     )
 
-    # TF-336: Enterprise-Tier kann das Claude-Modell pro Institution
-    # wählen ("claude-sonnet-4-..." oder "claude-opus-4-..."). NULL =
-    # Plattform-Default (Sonnet). Wert-Validierung passiert serviceseitig
-    # (z. B. claude_service.py); die DB hält den String roh, damit ein
-    # Modell-Update keine Schema-Migration erfordert.
+    # TF-336: Enterprise tier can choose the Claude model per institution
+    # ("claude-sonnet-4-..." or "claude-opus-4-..."). NULL =
+    # platform default (Sonnet). Value validation happens service-side
+    # (e.g. claude_service.py); the DB holds the string raw so a
+    # model update never requires a schema migration.
     llm_model_for_grading = Column(String(100), nullable=True)
 
     # Timestamps
@@ -197,8 +197,8 @@ class Institution(Base):
 
 class Role(Base):
     """
-    Role Model für RBAC
-    Definiert Berechtigungen und Zugriffslevel
+    Role model for RBAC
+    Defines permissions and access levels
     """
 
     __tablename__ = "roles"
@@ -212,7 +212,7 @@ class Role(Base):
     display_name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
 
-    # Permissions (JSON string mit Liste von Permissions)
+    # Permissions (JSON string with list of permissions)
     permissions = Column(
         Text, nullable=False
     )  # JSON: ["create_questions", "review_questions", ...]
@@ -221,7 +221,7 @@ class Role(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_system_role = Column(
         Boolean, default=False, nullable=False
-    )  # System Roles können nicht gelöscht werden
+    )  # System roles cannot be deleted
 
     # Timestamps
     created_at = Column(
@@ -243,8 +243,8 @@ class Role(Base):
 
 class User(Base):
     """
-    User Model für Authentication
-    Speichert Benutzerinformationen und Credentials
+    User model for authentication
+    Stores user information and credentials
     """
 
     __tablename__ = "users"
@@ -253,7 +253,7 @@ class User(Base):
 
     # Authentication
     email = Column(String(255), nullable=False, unique=True, index=True)
-    password_hash = Column(String(255), nullable=True)  # Nullable für OAuth-only Users
+    password_hash = Column(String(255), nullable=True)  # Nullable for OAuth-only users
 
     # User Details
     first_name = Column(String(100), nullable=False)
@@ -309,7 +309,7 @@ class User(Base):
     )  # password, google, microsoft
 
     # Preferences (JSON)
-    preferences = Column(Text, nullable=True)  # JSON string für User Preferences
+    preferences = Column(Text, nullable=True)  # JSON string for user preferences
 
     # Language Preference (i18n)
     preferred_language = Column(String(5), nullable=True, default=None)
@@ -416,8 +416,8 @@ class User(Base):
 
 class UserSession(Base):
     """
-    User Session Model für JWT Token Management
-    Speichert aktive Sessions und ermöglicht Token Revocation
+    User Session model for JWT token management
+    Stores active sessions and enables token revocation
     """
 
     __tablename__ = "user_sessions"
@@ -460,8 +460,8 @@ class UserSession(Base):
 
 class AuditLog(Base):
     """
-    Audit Log Model für Security & GDPR Compliance
-    Speichert alle sicherheitsrelevanten Aktionen
+    Audit Log model for security & GDPR compliance
+    Stores all security-relevant actions
     """
 
     __tablename__ = "audit_logs"
@@ -489,7 +489,7 @@ class AuditLog(Base):
     # Additional Data (JSON)
     additional_data = Column(
         Text, nullable=True
-    )  # JSON string mit zusätzlichen Informationen
+    )  # JSON string with additional information
 
     # Status
     status = Column(String(20), nullable=False)  # success, failure, error
@@ -519,8 +519,8 @@ class OAuthProvider(str, enum.Enum):
 
 class OAuthAccount(Base):
     """
-    OAuth Account Model für Social Login
-    Verknüpft User mit OAuth Provider Accounts (Google, Microsoft, etc.)
+    OAuth Account model for social login
+    Links a user to OAuth provider accounts (Google, Microsoft, etc.)
     """
 
     __tablename__ = "oauth_accounts"

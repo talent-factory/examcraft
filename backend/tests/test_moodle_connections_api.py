@@ -1,6 +1,6 @@
 """API tests for /api/v1/admin/moodle-connections/* (TF-336 Subarea C).
 
-Covers CRUD, Token-Verschlüsselung, Test-Endpoint-Mocking, multi-tenancy.
+Covers CRUD, token encryption, test-endpoint mocking, multi-tenancy.
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ def test_create_persists_encrypted_token(test_db: Session) -> None:
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["base_url"] == "https://moodle.example.org"
-    # Token wird maskiert ausgespielt.
+    # Token is returned masked.
     assert body["token_masked"].startswith("****")
     assert body["token_masked"].endswith("1234")
 
@@ -99,7 +99,7 @@ def test_create_persists_encrypted_token(test_db: Session) -> None:
         .filter(MoodleConnection.institution_id == inst.id)
         .one()
     )
-    # In der DB ist der Token verschlüsselt — Rohwert ist nicht enthalten.
+    # The token is encrypted in the DB — the raw value is not stored.
     assert "supersecretmoodletoken1234" not in row.token_encrypted
     assert decrypt_secret(row.token_encrypted) == "supersecretmoodletoken1234"
 
@@ -184,7 +184,7 @@ def test_get_returns_404_for_other_institution(test_db: Session) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Verbindungstest
+# Connection test
 # ---------------------------------------------------------------------------
 
 

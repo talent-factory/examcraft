@@ -1,16 +1,15 @@
-"""Permission-Registry für ExamCraft (TF-603).
+"""Permission registry for ExamCraft (TF-603).
 
-Einzige Quelle der Wahrheit für alle Permission-Strings, die aktuell in
-``Role.permissions`` (System B, siehe ``models/auth.py``) vergeben werden
-können. Vervollständigt am 2026-08-10 gegen die Union aller vier
-Systemrollen-Permission-Listen in ``utils/seed_roles.py``.
+Single source of truth for all permission strings that can currently be
+assigned in ``Role.permissions`` (System B, see ``models/auth.py``).
+Completed on 2026-08-10 against the union of all four system roles'
+permission lists in ``utils/seed_roles.py``.
 
-19 Strings werden aktuell tatsächlich via ``require_permission()``/
-``has_permission()`` geprüft; 11 sind seit jeher vergeben, aber nirgends
-enforced (siehe Design-Doc, Abschnitt "Permission-Registry"). Beide Gruppen
-sind hier bewusst gemeinsam aufgeführt: Ein Bearbeiten einer bestehenden
-Rolle über das neue Admin-GUI darf ihr keine bereits vergebenen Rechte
-unbemerkt entziehen.
+19 strings are actually checked today via ``require_permission()``/
+``has_permission()``; 11 have always been assignable but are enforced
+nowhere (see the design doc, "Permission Registry" section). Both groups
+are deliberately listed together here: editing an existing role via the
+new admin GUI must not silently strip permissions it already held.
 """
 
 import json
@@ -26,7 +25,7 @@ class PermissionMeta(TypedDict):
 
 
 _KNOWN_PERMISSIONS: dict[str, PermissionMeta] = {
-    # Aktiv geprüft (19)
+    # Actively checked (19)
     "manage_org_units": {
         "label": "Organisationseinheiten verwalten",
         "category": "Organisation",
@@ -58,7 +57,7 @@ _KNOWN_PERMISSIONS: dict[str, PermissionMeta] = {
         "category": "Integration",
     },
     "prompt:create": {"label": "Prompts erstellen", "category": "Prompts"},
-    # Seeded, aber aktuell nirgends enforced (11) — bewusst mitgeführt, siehe Docstring
+    # Seeded, but currently enforced nowhere (11) — deliberately kept, see docstring
     "manage_users": {"label": "Benutzer verwalten", "category": "System"},
     "manage_institutions": {"label": "Institutionen verwalten", "category": "System"},
     "manage_roles": {"label": "Rollen verwalten", "category": "System"},
@@ -70,11 +69,11 @@ _KNOWN_PERMISSIONS: dict[str, PermissionMeta] = {
     "prompt:read": {"label": "Prompts einsehen", "category": "Prompts"},
     "prompt:update": {"label": "Prompts bearbeiten", "category": "Prompts"},
     "prompt:delete": {"label": "Prompts löschen", "category": "Prompts"},
-    # TF-639: Institutions-Admin-Immer-Lesezugriff pro Ressourcentyp (nur
-    # Lesen, kein Edit/Delete-Bypass — siehe utils/resource_visibility.py).
-    # "prompt:read_all" ist bewusst Singular, um mit der bestehenden
-    # prompt:*-Familie konsistent zu bleiben; die anderen vier sind Plural,
-    # analog zu "documents:read".
+    # TF-639: institution-admin always-read-access per resource type (read
+    # only, no edit/delete bypass — see utils/resource_visibility.py).
+    # "prompt:read_all" is deliberately singular, to stay consistent with
+    # the existing prompt:* family; the other four are plural, analogous
+    # to "documents:read".
     "documents:read_all": {
         "label": "Alle Dokumente einsehen (Institutions-Admin)",
         "category": "Dokumente",

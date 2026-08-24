@@ -1,11 +1,11 @@
-"""Org-Unit-Hierarchie: org_units + user_org_units (Stufe 0 Fundament)
+"""Org unit hierarchy: org_units + user_org_units (stage 0 foundation)
 
 Spec: docs/superpowers/specs/2026-08-07-org-unit-hierarchie-design.md
 
-Additive Migration (kein Datenverlust): legt zwei neue Tabellen an.
-``org_units`` ist selbstreferenzierend (parent_org_unit_id) fuer eine
-beliebig tiefe Organisationshierarchie unterhalb der Institution;
-``user_org_units`` ist die M:N-Mitgliedschaft zwischen User und OrgUnit.
+Additive migration (no data loss): creates two new tables.
+``org_units`` is self-referencing (parent_org_unit_id) for an arbitrarily
+deep organization hierarchy below the institution;
+``user_org_units`` is the M:N membership between user and org unit.
 
 Revision ID: orgunits_foundation
 Revises: tf500_attempt_idem_exam
@@ -64,13 +64,13 @@ def upgrade() -> None:
         ["parent_org_unit_id"],
         unique=False,
     )
-    # Sibling-Name-Eindeutigkeit DB-seitig erzwingen (Service-Layer-Check in
-    # org_unit_service.py bleibt als freundlicher 409-Vorab-Check, ist aber
-    # SELECT-dann-INSERT und damit race-anfaellig ohne diese Constraint).
-    # Zwei Indizes, weil NULL-Werte in einem Unique-Index nie als gleich
-    # gelten: ein regulaerer Composite-Index deckt Geschwister mit
-    # nicht-null parent_org_unit_id ab, der partielle Index separat die
-    # Wurzel-Ebene (parent_org_unit_id IS NULL).
+    # Enforce sibling name uniqueness at the DB level (the service-layer
+    # check in org_unit_service.py remains a friendly 409 pre-check, but
+    # it's SELECT-then-INSERT and thus race-prone without this constraint).
+    # Two indexes because NULL values in a unique index never compare
+    # equal: a regular composite index covers siblings with a non-null
+    # parent_org_unit_id, the partial index separately covers the root
+    # level (parent_org_unit_id IS NULL).
     op.create_index(
         "ix_org_units_unique_sibling_name",
         "org_units",

@@ -1,6 +1,6 @@
 """
-Question Review API Endpoints für ExamCraft AI
-Implementiert Review-Workflow für generierte Prüfungsfragen
+Question Review API Endpoints for ExamCraft AI
+Implements review workflow for generated exam questions
 """
 
 from typing import List, Optional, Dict, Any
@@ -59,10 +59,10 @@ def _serialize_tag(tag: Tag, usage_count: int) -> dict:
 
 
 def _serialize_competency(question: QuestionReview) -> dict | None:
-    """TF-400: Brief der geprüften Handlungskompetenz (HK) für die Anzeige.
+    """TF-400: brief of the assessed competency (HK) for display.
 
-    None, wenn der Frage keine Kompetenz zugeordnet ist (Altbestand oder Code
-    ohne Treffer). ``module_code`` stammt aus dem zugehörigen Framework.
+    None if the question has no competency assigned (legacy data or a code
+    with no match). ``module_code`` comes from the associated framework.
     """
     competency = question.competency
     if competency is None:
@@ -109,13 +109,13 @@ def _question_to_dict(
         "created_at": question.created_at,
         "updated_at": question.updated_at,
         "tags": [_serialize_tag(t, counts.get(t.id, 0)) for t in question.tags],
-        # TF-400: geprüfte Handlungskompetenz + LN-Stufe (Anzeige in der
-        # Review-Queue/Detail). None für Fragen ohne HK-Zuordnung.
+        # TF-400: assessed competency + LN level (shown in the
+        # review queue/detail). None for questions without a competency link.
         "competency_id": question.competency_id,
         "ln_level": question.ln_level,
         "competency": _serialize_competency(question),
-        # TF-642: Fragenpool-Sichtbarkeit — informativ hier (Review-Queue
-        # filtert nicht danach, siehe utils/question_visibility.py).
+        # TF-642: question pool visibility — informational here (the review
+        # queue does not filter by it, see utils/question_visibility.py).
         "visibility": (
             question.visibility.value if question.visibility is not None else None
         ),
@@ -166,7 +166,7 @@ def _get_scoped_question(
 
 # Pydantic Models
 class QuestionReviewCreate(BaseModel):
-    """Request Model für neue Question Review"""
+    """Request model for a new question review"""
 
     question_text: str = Field(..., min_length=10, max_length=5000)
     question_type: str = Field(
@@ -189,7 +189,7 @@ class QuestionReviewCreate(BaseModel):
 
 
 class QuestionReviewUpdate(BaseModel):
-    """Request Model für Question Update"""
+    """Request model for a question update"""
 
     question_text: Optional[str] = Field(None, min_length=10, max_length=5000)
     options: Optional[List[str]] = None
@@ -198,22 +198,23 @@ class QuestionReviewUpdate(BaseModel):
     difficulty: Optional[str] = Field(None, pattern="^(easy|medium|hard)$")
     bloom_level: Optional[int] = Field(None, ge=1, le=6)
     estimated_time_minutes: Optional[int] = Field(None, ge=1, le=180)
-    # TF-642: Sichtbarkeit im Fragenpool ändern. org_unit_id nur zusammen mit
-    # visibility="team" zulässig (siehe _resolve_question_visibility_update)
-    # — muss eine Org-Unit sein, der der Bearbeitende selbst angehört.
+    # TF-642: change visibility in the question pool. org_unit_id is only
+    # allowed together with visibility="team" (see
+    # _resolve_question_visibility_update) — must be an Org-Unit the editor
+    # themselves belongs to.
     visibility: Optional[str] = Field(None, pattern="^(private|team|institution)$")
     org_unit_id: Optional[int] = None
 
 
 class ReviewActionRequest(BaseModel):
-    """Request Model fuer Review Actions (Approve/Reject)"""
+    """Request model for review actions (approve/reject)"""
 
     comment: Optional[str] = Field(None, max_length=2000)
     reason: Optional[str] = Field(None, max_length=500)
 
 
 class CommentCreate(BaseModel):
-    """Request Model fuer neuen Comment"""
+    """Request model for a new comment"""
 
     comment_text: str = Field(..., min_length=1, max_length=2000)
     comment_type: str = Field(
@@ -233,9 +234,9 @@ class ReviewerInfo(BaseModel):
 
 
 class CompetencyBrief(BaseModel):
-    """TF-400: schlanke Sicht auf die geprüfte Handlungskompetenz für die
+    """TF-400: lean view of the assessed competency for the
 
-    Frage-Anzeige (Code + Titel + Modul), ohne den vollen Deskriptor-Baum.
+    question display (code + title + module), without the full descriptor tree.
     """
 
     id: int
@@ -249,7 +250,7 @@ class CompetencyBrief(BaseModel):
 
 
 class QuestionReviewResponse(BaseModel):
-    """Response Model für Question Review"""
+    """Response model for a question review"""
 
     id: int
     question_text: str
@@ -264,8 +265,8 @@ class QuestionReviewResponse(BaseModel):
     source_documents: Optional[List[str]]
     confidence_score: float
     bloom_level: Optional[int]
-    # TF-400: geprüfte Handlungskompetenz (HK) + LN-Stufe (1-4, distinkt von
-    # bloom_level). ``competency`` ist der schlanke Brief für die Anzeige.
+    # TF-400: assessed competency (HK) + LN level (1-4, distinct from
+    # bloom_level). ``competency`` is the lean brief for display.
     competency_id: Optional[int] = None
     ln_level: Optional[int] = Field(None, ge=1, le=4)
     competency: Optional[CompetencyBrief] = None
@@ -283,8 +284,8 @@ class QuestionReviewResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     tags: List[TagOut] = []
-    # TF-642: Fragenpool-Sichtbarkeit (governs list_approved_questions only —
-    # siehe utils/question_visibility.py). Nicht die Review-Queue-Sichtbarkeit.
+    # TF-642: question pool visibility (governs list_approved_questions only —
+    # see utils/question_visibility.py). Not the review queue visibility.
     visibility: str = "institution"
     org_unit_id: Optional[int] = None
 
@@ -310,7 +311,7 @@ class QuestionReviewResponse(BaseModel):
 
 
 class CommentResponse(BaseModel):
-    """Response Model für Comment"""
+    """Response model for a comment"""
 
     id: int
     question_id: int
@@ -326,7 +327,7 @@ class CommentResponse(BaseModel):
 
 
 class HistoryResponse(BaseModel):
-    """Response Model für History Entry"""
+    """Response model for a history entry"""
 
     id: int
     question_id: int
@@ -343,14 +344,14 @@ class HistoryResponse(BaseModel):
 
 
 class QuestionReviewDetailResponse(QuestionReviewResponse):
-    """Detailed Response mit Comments und History"""
+    """Detailed response with comments and history"""
 
     comments: List[CommentResponse] = []
     history: List[HistoryResponse] = []
 
 
 class ReviewQueueResponse(BaseModel):
-    """Response Model für Review Queue"""
+    """Response model for the review queue"""
 
     total: int
     pending: int
@@ -380,16 +381,16 @@ async def get_review_queue(
     db: Session = Depends(get_db),
 ):
     """
-    Hole Review Queue mit Filtern
+    Fetch the review queue with filters
 
     **Required:** Authenticated user
 
-    - **status**: Filter nach Review-Status
-    - **difficulty**: Filter nach Schwierigkeitsgrad
-    - **question_type**: Filter nach Fragetyp
-    - **exam_id**: Filter nach Exam ID
-    - **limit**: Maximale Anzahl Ergebnisse
-    - **offset**: Offset für Pagination
+    - **status**: filter by review status
+    - **difficulty**: filter by difficulty level
+    - **question_type**: filter by question type
+    - **exam_id**: filter by exam ID
+    - **limit**: maximum number of results
+    - **offset**: offset for pagination
     """
     locale = get_request_locale(request, current_user)
     try:
@@ -408,19 +409,19 @@ async def get_review_queue(
             query = query.filter(QuestionReview.question_type == question_type)
         if exam_id:
             query = query.filter(QuestionReview.exam_id == exam_id)
-        # TF-396: Archiv-Achse. Default: nur aktive Fragen (archived_at IS NULL).
+        # TF-396: archive axis. Default: only active questions (archived_at IS NULL).
         if archived_only:
             query = query.filter(QuestionReview.archived_at.isnot(None))
         elif not include_archived:
             query = query.filter(QuestionReview.archived_at.is_(None))
 
-        # Get Statistics — ebenfalls institution-scoped
+        # Get Statistics — also institution-scoped
         base_stats = TenantFilter.filter_by_tenant(
             db.query(QuestionReview), QuestionReview, tenant_context
         )
-        # TF-396: Stats folgen demselben Archiv-Filter wie die Liste, damit die
-        # Badge-Zähler zur angezeigten Menge passen (sonst über-zählen sie, sobald
-        # Fragen archiviert sind).
+        # TF-396: stats follow the same archive filter as the list, so the
+        # badge counters match the displayed set (otherwise they would
+        # over-count once questions are archived).
         if archived_only:
             base_stats = base_stats.filter(QuestionReview.archived_at.isnot(None))
         elif not include_archived:
@@ -499,7 +500,7 @@ async def get_question_review(
     db: Session = Depends(get_db),
 ):
     """
-    Hole detaillierte Question Review mit Comments und History
+    Fetch a detailed question review with comments and history
 
     **Required:** Authenticated user
     """
@@ -534,7 +535,7 @@ async def create_question_review(
     db: Session = Depends(get_db),
 ):
     """
-    Erstelle neue Question Review
+    Create a new question review
 
     **Required Permission:** `create_questions` (Dozent, Assistant, Admin)
     """
@@ -608,9 +609,9 @@ async def create_question_review(
         return question
 
     except HTTPException:
-        # Audit-Failure-500 aus check_question_limit/log_superuser_bypass nicht
-        # in generisches 500 umverpacken — sonst geht das DSGVO-Signal in den
-        # Logs verloren.
+        # Don't rewrap an audit-failure 500 from check_question_limit/
+        # log_superuser_bypass into a generic 500 — otherwise the GDPR
+        # signal is lost in the logs.
         db.rollback()
         raise
     except Exception as e:
@@ -724,7 +725,7 @@ async def edit_question(
     db: Session = Depends(get_db),
 ):
     """
-    Bearbeite Question (Inline Editing)
+    Edit a question (inline editing)
 
     **Required Permission:** `edit_questions` (Dozent, Assistant, Admin)
     """
@@ -894,9 +895,9 @@ async def start_review(
     db: Session = Depends(get_db),
 ):
     """
-    Markiere Frage als 'In Review'.
+    Mark a question as 'In Review'.
 
-    Signalisiert anderen Reviewern, dass diese Frage gerade bearbeitet wird.
+    Signals to other reviewers that this question is currently being worked on.
 
     **Required Permission:** `approve_questions` (Dozent, Admin)
     """
@@ -963,7 +964,7 @@ async def approve_question(
     db: Session = Depends(get_db),
 ):
     """
-    Genehmige Question
+    Approve a question
 
     **Required Permission:** `approve_questions` (Dozent, Admin)
     """
@@ -976,7 +977,7 @@ async def approve_question(
                 status_code=404, detail=t("review_question_not_found", locale=locale)
             )
 
-        # Vier-Augen-Prinzip Check
+        # Four-eyes principle check
         if question.institution_id:
             from models.auth import Institution
 
@@ -1068,7 +1069,7 @@ async def reject_question(
     db: Session = Depends(get_db),
 ):
     """
-    Lehne Question ab
+    Reject a question
 
     **Required Permission:** `approve_questions` (Dozent, Admin)
     """
@@ -1141,31 +1142,31 @@ async def reject_question(
 
 
 # ---------------------------------------------------------------------------
-# TF-396: Archivieren / Wiederherstellen / Hard-Delete
+# TF-396: archive / restore / hard delete
 # ---------------------------------------------------------------------------
 
 
 class ArchiveRequest(BaseModel):
-    """Request Model für Archivieren."""
+    """Request model for archiving."""
 
     reason: Optional[str] = Field(None, max_length=500)
 
 
 class BulkDeleteRequest(BaseModel):
-    """Request Model für Bulk-Hard-Delete."""
+    """Request model for bulk hard delete."""
 
     ids: list[int] = Field(..., min_length=1, max_length=200)
 
 
 class BlockedDeletion(BaseModel):
-    """Eine im Bulk-Delete abgewiesene Frage mit i18n-Begründung."""
+    """A question rejected in the bulk delete, with an i18n reason."""
 
     id: int
     reason: str
 
 
 class BulkDeleteResult(BaseModel):
-    """Ergebnis eines Bulk-Hard-Delete: gelöschte IDs + abgewiesene Einträge."""
+    """Result of a bulk hard delete: deleted IDs + rejected entries."""
 
     deleted: list[int]
     blocked: list[BlockedDeletion]
@@ -1174,11 +1175,11 @@ class BulkDeleteResult(BaseModel):
 def _question_delete_block_reason(
     db: Session, question: QuestionReview, locale: str
 ) -> str | None:
-    """i18n-Grund, falls die Frage NICHT hart löschbar ist, sonst ``None``.
+    """i18n reason if the question may NOT be hard-deleted, else ``None``.
 
-    Guard (TF-396): nur archivierte Fragen, die in keiner Prüfung verwendet
-    werden, dürfen hart gelöscht werden. "In keiner Prüfung" deckt transitiv
-    auch Schüler-Antworten ab (attempt_answers -> exam_questions).
+    Guard (TF-396): only archived questions that are not used in any exam
+    may be hard-deleted. "Not used in any exam" transitively also covers
+    student answers (attempt_answers -> exam_questions).
     """
     from models.exam import ExamQuestion
 
@@ -1200,9 +1201,9 @@ async def archive_question(
     current_user: User = Depends(require_permission("review_questions")),
     db: Session = Depends(get_db),
 ):
-    """Archiviere eine Frage (orthogonal zum review_status).
+    """Archive a question (orthogonal to review_status).
 
-    Blendet die Frage aus Bank/Listen aus; in Prüfungen bleibt sie erhalten.
+    Hides the question from the bank/lists; it is retained in exams.
 
     **Required Permission:** `review_questions`
     """
@@ -1250,7 +1251,7 @@ async def restore_question(
     current_user: User = Depends(require_permission("review_questions")),
     db: Session = Depends(get_db),
 ):
-    """Stelle eine archivierte Frage wieder her (Status bleibt unverändert).
+    """Restore an archived question (status remains unchanged).
 
     **Required Permission:** `review_questions`
     """
@@ -1298,11 +1299,11 @@ async def delete_question(
     current_user: User = Depends(require_permission("delete_questions")),
     db: Session = Depends(get_db),
 ):
-    """Lösche eine Frage endgültig (Hard-Delete). 3-fach geguarded.
+    """Permanently delete a question (hard delete). Triple-guarded.
 
-    Voraussetzungen: Frage ist archiviert, in keiner Prüfung verwendet, und der
-    Aufrufer hat `delete_questions`. Schreibt einen Audit-Snapshot, bevor die
-    Zeile (per FK-Cascade) verschwindet.
+    Preconditions: the question is archived, is not used in any exam, and
+    the caller has `delete_questions`. Writes an audit snapshot before the
+    row disappears (via FK cascade).
 
     **Required Permission:** `delete_questions`
     """
@@ -1320,12 +1321,13 @@ async def delete_question(
         if block:
             raise HTTPException(status_code=409, detail=block)
 
-        # Snapshot fürs Audit-Log VOR dem Löschen erfassen (review_history stirbt
-        # per Cascade mit). Der Delete wird zuerst gestaged und dann zusammen mit
-        # dem Audit-Insert atomar committet: AuditService.log_action besitzt den
-        # commit; schlägt der Audit-Insert fehl, rollt er auch den Delete zurück
-        # und gibt None zurück -> wir brechen mit 500 ab. So gibt es weder einen
-        # Delete ohne Audit noch ein Orphan-Audit für eine noch existierende Frage.
+        # Capture a snapshot for the audit log BEFORE deletion (review_history
+        # dies along with it via cascade). The delete is staged first and then
+        # committed atomically together with the audit insert:
+        # AuditService.log_action owns the commit; if the audit insert fails
+        # it also rolls back the delete and returns None -> we abort with 500.
+        # This way there's never a delete without an audit, nor an orphan
+        # audit for a question that still exists.
         snapshot = {
             "question_text": question.question_text,
             "review_status": question.review_status,
@@ -1363,13 +1365,14 @@ async def bulk_delete_questions(
     current_user: User = Depends(require_permission("delete_questions")),
     db: Session = Depends(get_db),
 ):
-    """Bulk-Hard-Delete. Jede ID einzeln geguarded und einzeln atomar gelöscht.
+    """Bulk hard delete. Each ID individually guarded and individually
+    committed atomically.
 
-    Pro Frage wird der Delete gestaged und über den (selbst-committenden)
-    Audit-Insert atomar committet; schlägt das Audit fehl, rollt es diesen
-    Delete zurück und die ID landet in ``blocked``. Bereits committete IDs
-    bleiben bei einem unerwarteten Fehler bestehen; die laufende, nicht
-    committete Frage wird zurückgerollt.
+    For each question, the delete is staged and committed atomically via
+    the (self-committing) audit insert; if the audit fails, it rolls back
+    that delete and the ID ends up in ``blocked``. Already-committed IDs
+    remain in place on an unexpected error; the in-flight, uncommitted
+    question is rolled back.
 
     **Required Permission:** `delete_questions`
     """
@@ -1406,8 +1409,8 @@ async def bulk_delete_questions(
                 additional_data=snapshot,
             )
             if audit is None:
-                # Audit fehlgeschlagen -> log_action hat diesen Delete bereits
-                # zurückgerollt; ID als blockiert melden statt still zu löschen.
+                # Audit failed -> log_action has already rolled back this
+                # delete; report the ID as blocked instead of silently deleting.
                 blocked.append({"id": qid, "reason": t("delete_failed", locale=locale)})
                 continue
             deleted.append(qid)
@@ -1427,7 +1430,7 @@ async def get_comments(
     db: Session = Depends(get_db),
 ):
     """
-    Hole alle Comments für eine Question
+    Fetch all comments for a question
 
     **Required:** Authenticated user
     """
@@ -1469,7 +1472,7 @@ async def add_comment(
     db: Session = Depends(get_db),
 ):
     """
-    Füge Comment zu Question hinzu
+    Add a comment to a question
 
     **Required:** Authenticated user
     """
@@ -1519,7 +1522,7 @@ async def get_question_history(
     db: Session = Depends(get_db),
 ):
     """
-    Hole History für Question
+    Fetch the history for a question
 
     **Required:** Authenticated user
     """
@@ -1554,7 +1557,7 @@ async def get_question_history(
         )
 
 
-# --- Tag-Endpunkte ---
+# --- Tag Endpoints ---
 
 
 class _SetTagsRequest(BaseModel):
@@ -1571,11 +1574,11 @@ def _assign_tags_to_question(
     tag_ids: list[int],
     current_user: User,
 ) -> None:
-    """Weist einer Frage Tags zu (ersetzt bestehende vollständig).
+    """Assigns tags to a question (fully replaces existing ones).
 
-    Validiert Institution-Zugehörigkeit und Archiviert-Status. Cross-Tenant-
-    Enumeration wird verhindert: unbekannte und fremde Tag-IDs führen zum
-    gleichen 422-Response, ohne die IDs zu echoen.
+    Validates institution membership and archived status. Cross-tenant
+    enumeration is prevented: unknown and foreign tag IDs produce the same
+    422 response, without echoing the IDs back.
     """
     # Visible to this user: own institution + global
     visible = (
@@ -1611,7 +1614,7 @@ async def set_question_tags(
     current_user: User = Depends(require_permission("edit_questions")),
     db: Session = Depends(get_db),
 ):
-    """Tags einer Frage setzen (ersetzt bestehende Tags vollständig)."""
+    """Set tags on a question (fully replaces existing tags)."""
     question = _get_scoped_question(db, question_id, current_user)
     if not question:
         raise HTTPException(status_code=404, detail="Frage nicht gefunden.")
@@ -1629,7 +1632,7 @@ async def remove_question_tag(
     current_user: User = Depends(require_permission("edit_questions")),
     db: Session = Depends(get_db),
 ):
-    """Einzelnen Tag von einer Frage entfernen."""
+    """Remove a single tag from a question."""
     question = _get_scoped_question(db, question_id, current_user)
     if not question:
         raise HTTPException(status_code=404, detail="Frage nicht gefunden.")

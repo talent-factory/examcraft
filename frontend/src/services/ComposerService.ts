@@ -118,7 +118,7 @@ export class ComposerService {
     await apiClient.delete(`/api/v1/exams/${examId}`);
   }
 
-  // TF-398: Archivieren (in jedem Status erlaubt) / Wiederherstellen.
+  // TF-398: archive (allowed in any status) / restore.
   static async archiveExam(examId: number, reason?: string): Promise<Exam> {
     const response = await apiClient.post(`/api/v1/exams/${examId}/archive`, {
       reason: reason ?? null,

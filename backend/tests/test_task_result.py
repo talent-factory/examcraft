@@ -1,16 +1,16 @@
 """
-Tests für GET /api/v1/rag/tasks/{task_id}/result (TF-608).
+Tests for GET /api/v1/rag/tasks/{task_id}/result (TF-608).
 
-Der WebSocket liefert das Generierungsergebnis nur an eine lebende Verbindung.
-Wird die Seite gewechselt oder neu geladen, während der Task fertig wird, gibt
-es ohne diesen Pull-Endpoint keinen Rückweg zur Ergebnisansicht.
+The WebSocket only delivers the generation result to a live connection. If
+the page is changed or reloaded while the task finishes, there is no way
+back to the result view without this pull endpoint.
 
-Abgedeckt:
-1. Ergebnis wird für den Eigentümer geliefert
-2. Fehlerfälle (FAILURE/REVOKED) liefern die Fehlermeldung statt eines Results
-3. Abgelaufenes Celery-Result stuft einen fertigen Job nicht auf PENDING zurück
-4. Broker-Ausfall führt nicht zu 5xx
-5. Ownership: fremde Jobs werden abgelehnt, Superuser bekommen ein Audit-Log
+Covers:
+1. Result is delivered to the owner
+2. Error cases (FAILURE/REVOKED) return the error message instead of a result
+3. An expired Celery result does not downgrade a finished job back to PENDING
+4. Broker outage does not lead to 5xx
+5. Ownership: foreign jobs are rejected, superusers get an audit log entry
 """
 
 import logging
@@ -23,15 +23,15 @@ from fastapi.testclient import TestClient
 from main import app
 from services.rag_errors import GENERIC_TASK_ERROR, NoContextError
 
-# main.py lädt core-API-Module über importlib.spec_from_file_location unter
-# Sondernamen (Konflikt api ↔ premium.api im Full-Deployment vermeiden;
-# core_api_rag_exams für rag_exams.py, siehe main.py). Ein normales
-# `import api.rag_exams` in DIESER Datei würde eine komplett eigene,
-# unabhängige Modulinstanz erzeugen — mit anderem `logger`-Objekt als das,
-# was die über `from main import app` tatsächlich laufende App verwendet.
-# logging.getLogger(name) ist dagegen ein globales Registry-Lookup: für
-# denselben Namen immer dasselbe Singleton, unabhängig davon, welche
-# Modulinstanz `logging.getLogger(__name__)` aufgerufen hat.
+# main.py loads core API modules via importlib.spec_from_file_location under
+# special names (avoids the api ↔ premium.api conflict in full deployment;
+# core_api_rag_exams for rag_exams.py, see main.py). A plain
+# `import api.rag_exams` in THIS file would create a completely separate,
+# independent module instance — with a different `logger` object than the
+# one actually used by the app running via `from main import app`.
+# logging.getLogger(name), by contrast, is a global registry lookup: for
+# the same name it always returns the same singleton, regardless of which
+# module instance called `logging.getLogger(__name__)`.
 _rag_exams_logger = logging.getLogger("core_api_rag_exams")
 
 
@@ -73,9 +73,9 @@ def _make_job(task_id: str = "task-1", status: str = "SUCCESS", user_id: int = 7
     job.task_id = task_id
     job.status = status
     job.user_id = user_id
-    # QuestionGenerationJob hat keine institution_id-Spalte; ohne das `del`
-    # würde der Mock eine erfinden und enforce_resource_access' Tenant-Check
-    # gegen einen Wert prüfen, den es in Produktion nicht gibt.
+    # QuestionGenerationJob has no institution_id column; without this `del`
+    # the mock would invent one, and enforce_resource_access' tenant check
+    # would test against a value that doesn't exist in production.
     del job.institution_id
     return job
 
@@ -99,7 +99,7 @@ EXAM_RESULT = {
 
 class TestGetTaskResult:
     def test_returns_result_for_successful_task(self, auth_client, mock_db):
-        """Der Eigentümer bekommt das vollständige Generierungsergebnis."""
+        """The owner gets the full generation result."""
         _wire_job(mock_db, _make_job(status="SUCCESS"))
 
         with patch("celery.result.AsyncResult") as mock_ar_cls:
@@ -119,15 +119,15 @@ class TestGetTaskResult:
 
     @pytest.mark.parametrize("state", ["FAILURE", "REVOKED"])
     def test_returns_error_for_failed_task(self, auth_client, mock_db, state):
-        """Fehlgeschlagene Tasks liefern eine sichere, generische Fehlermeldung,
-        kein Result — NICHT die rohe Exception-Message (TF-358). Derselbe Mapper
-        wie beim WebSocket-Recovery-Pfad (api/v1/websocket.py) verhindert, dass
-        interne Details/PII aus der Celery-Exception zum Client durchsickern."""
+        """Failed tasks return a safe, generic error message, no result —
+        NOT the raw exception message (TF-358). The same mapper as the
+        WebSocket recovery path (api/v1/websocket.py) prevents internal
+        details/PII from leaking to the client via the Celery exception."""
         _wire_job(mock_db, _make_job(status=state))
 
-        # Modul-Logger-Methode gepatcht statt caplog/patch("...logger") — in der
-        # Gesamt-Suite unzuverlässig (Propagation-/Modul-Instanz-Eigenheiten,
-        # siehe test_rag_competency_wiring.py für dasselbe Muster).
+        # Module logger method patched instead of caplog/patch("...logger") —
+        # unreliable in the full suite (propagation/module-instance quirks,
+        # see test_rag_competency_wiring.py for the same pattern).
         with (
             patch("celery.result.AsyncResult") as mock_ar_cls,
             patch.object(_rag_exams_logger, "error") as mock_error,
@@ -149,8 +149,8 @@ class TestGetTaskResult:
         assert "Claude timeout" not in data["error"]
         assert "internal-db-host" not in data["error"]
 
-        # Der echte Fehler bleibt serverseitig sichtbar (Alerting), auch wenn
-        # der Client nur die generische Meldung sieht.
+        # The real error stays visible server-side (alerting), even though
+        # the client only sees the generic message.
         mock_error.assert_called_once()
         logged_task_id, logged_kind = mock_error.call_args[0][1:3]
         assert logged_task_id == "task-1"
@@ -160,9 +160,9 @@ class TestGetTaskResult:
     def test_returns_mapped_message_for_known_error_code(
         self, auth_client, mock_db, state
     ):
-        """Ein bekannter RAG-Fehlercode (TF-358, `services.rag_errors`) liefert
-        die spezifische, lokalisierte Meldung statt des generischen Fallbacks —
-        Paritätstest zum selben Mapping im WebSocket-Recovery-Pfad."""
+        """A known RAG error code (TF-358, `services.rag_errors`) returns
+        the specific, localized message instead of the generic fallback —
+        a parity test against the same mapping in the WebSocket recovery path."""
         _wire_job(mock_db, _make_job(status=state))
 
         with patch("celery.result.AsyncResult") as mock_ar_cls:
@@ -179,14 +179,14 @@ class TestGetTaskResult:
         assert "durchsuchbaren" in data["error"]
 
     def test_expired_celery_result_keeps_db_status(self, auth_client, mock_db):
-        """Ein abgelaufenes Result-Backend darf einen fertigen Job nicht auf
-        PENDING zurückstufen — sonst würde die UI einen längst erledigten Task
-        wieder als laufend anzeigen und ewig auf Fortschritt warten."""
+        """An expired result backend must not downgrade a finished job back
+        to PENDING — otherwise the UI would show a long-completed task as
+        running again and wait forever for progress."""
         _wire_job(mock_db, _make_job(status="SUCCESS"))
 
         with patch("celery.result.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
-            mock_result.state = "PENDING"  # Result-Eintrag bereits verworfen
+            mock_result.state = "PENDING"  # Result entry already discarded
             mock_result.result = None
             mock_ar_cls.return_value = mock_result
 
@@ -198,8 +198,8 @@ class TestGetTaskResult:
         assert data["result"] is None
 
     def test_broker_failure_does_not_break_endpoint(self, auth_client, mock_db):
-        """Broker-Ausfall: 200 mit DB-Status statt 5xx, damit die Bar den Task
-        weiterhin anzeigen kann."""
+        """Broker outage: 200 with DB status instead of 5xx, so the progress
+        bar can keep showing the task."""
         _wire_job(mock_db, _make_job(status="SUCCESS"))
 
         with patch(
@@ -213,7 +213,7 @@ class TestGetTaskResult:
         assert data["result"] is None
 
     def test_unknown_task_returns_404(self, auth_client, mock_db):
-        """Unbekannte task_id → 404."""
+        """Unknown task_id → 404."""
         _wire_job(mock_db, None)
 
         response = auth_client.get("/api/v1/rag/tasks/does-not-exist/result")
@@ -221,7 +221,7 @@ class TestGetTaskResult:
         assert response.status_code == 404
 
     def test_foreign_job_is_denied(self, auth_client, mock_db):
-        """Fremde Jobs werden abgelehnt (kein Superuser)."""
+        """Foreign jobs are rejected (not a superuser)."""
         _wire_job(mock_db, _make_job(user_id=42))
 
         with patch("celery.result.AsyncResult"):
@@ -257,7 +257,7 @@ class TestGetTaskResultSuperuser:
         app.dependency_overrides.clear()
 
     def test_superuser_access_to_foreign_job_is_audited(self, super_client, mock_db):
-        """Superuser darf fremde Ergebnisse lesen — mit DSGVO-Audit-Trail."""
+        """A superuser may read foreign results — with a GDPR audit trail."""
         _wire_job(mock_db, _make_job(user_id=42))
 
         with (

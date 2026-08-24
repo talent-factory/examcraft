@@ -1,51 +1,51 @@
-"""Parser: leitet strukturierte Handlungskompetenzen aus rendered_text ab (TF-400).
+"""Parser: derives structured competencies from rendered_text (TF-400).
 
-Der ``rendered_text`` eines CompetencyFramework ist der vollständige HKP-Text
-(BWZ-Format). Daraus werden die einzelnen Handlungskompetenzen (HK) gewonnen,
-damit das strukturierte Tagging (competency_code → competency_id) eine
-Datengrundlage hat — ohne die HKs zusätzlich von Hand erfassen zu müssen.
+The ``rendered_text`` of a CompetencyFramework is the complete HKP text
+(BWZ format). The individual competencies (HK) are extracted from it, so
+structured tagging (competency_code → competency_id) has a data basis —
+without having to capture the HKs by hand separately.
 
-Erwartetes Quellformat (Markdown):
+Expected source format (Markdown):
 
-    ### B1 <Titel der Handlungskompetenz>
+    ### B1 <title of the competency>
 
-    - <Leistungskriterium> (LN 2)
-    - <weiteres Kriterium> (LN 1)
+    - <performance criterion> (LN 2)
+    - <another criterion> (LN 1)
 
-    ### B2 <Titel>
+    ### B2 <title>
     ...
 
-Nur ``###``-Überschriften mit einem Code-Muster (Buchstabe + Ziffern, z. B.
-``B1``, ``A6``) zählen als HK. Codes müssen exakt jenen entsprechen, die das
-Modell als ``competency_code`` zurückgibt (Key-Konsistenz, vgl. TF-384) — beide
-stammen aus demselben rendered_text.
+Only ``###`` headings with a code pattern (letter + digits, e.g.
+``B1``, ``A6``) count as an HK. Codes must exactly match those the model
+returns as ``competency_code`` (key consistency, cf. TF-384) — both come
+from the same rendered_text.
 """
 
 import re
 from typing import TypedDict
 
-# ### B1 Titel  → Code (Buchstabe + Ziffern), Titel
+# ### B1 Title  → code (letter + digits), title
 _HEADING = re.compile(r"^###\s+([A-Za-z]\d+)\s+(.+?)\s*$")
-# - Kriterium (LN 2)  → Text, LN-Stufe
+# - Criterion (LN 2)  → text, LN level
 _BULLET_WITH_LN = re.compile(r"^\s*[-*]\s+(.*?)\s*\(LN\s*(\d+)\)\s*$")
-# - Kriterium ohne LN-Angabe
+# - Criterion without an LN value
 _BULLET = re.compile(r"^\s*[-*]\s+(.+?)\s*$")
 
-# Gültiger LN-Stufen-Bereich (deckungsgleich mit DescriptorIn ge=1/le=4 und
-# QuestionReview.ln_level). rendered_text ist freier Text — Stufen ausserhalb
-# dieses Bereichs sind ungültig und werden verworfen.
+# Valid LN level range (matches DescriptorIn ge=1/le=4 and
+# QuestionReview.ln_level). rendered_text is free text — levels outside
+# this range are invalid and are discarded.
 _LN_MIN, _LN_MAX = 1, 4
 
 
 class ParsedDescriptor(TypedDict):
-    """Ein Leistungskriterium einer HK; ``ln_level`` ist 1–4 oder None."""
+    """A performance criterion of an HK; ``ln_level`` is 1-4 or None."""
 
     text: str
     ln_level: int | None
 
 
 class ParsedCompetency(TypedDict):
-    """Eine aus rendered_text abgeleitete Handlungskompetenz."""
+    """A competency derived from rendered_text."""
 
     code: str
     title: str
@@ -54,10 +54,11 @@ class ParsedCompetency(TypedDict):
 
 
 def _coerce_ln_level(raw: str) -> int | None:
-    """LN-Stufe aus dem Quelltext: nur 1–4 gültig, sonst None.
+    """LN level from the source text: only 1-4 valid, otherwise None.
 
-    Verhindert, dass eine im rendered_text erfundene Stufe (``(LN 9)``,
-    ``(LN 0)``) ungeprüft ins descriptors-JSON und damit ins Tagging gelangt.
+    Prevents a level made up in the rendered_text (``(LN 9)``,
+    ``(LN 0)``) from ending up unchecked in the descriptors JSON and
+    thus in tagging.
     """
     try:
         value = int(raw)
@@ -67,11 +68,11 @@ def _coerce_ln_level(raw: str) -> int | None:
 
 
 def parse_competencies(rendered_text: str | None) -> list[ParsedCompetency]:
-    """Parst rendered_text in eine Liste von HK-Dicts (``ParsedCompetency``).
+    """Parses rendered_text into a list of HK dicts (``ParsedCompetency``).
 
-    Rückgabe je HK: ``{"code", "title", "descriptors": [{"text", "ln_level"}],
-    "position"}`` in Reihenfolge des Auftretens. Leerer/unstrukturierter Text
-    ergibt ``[]``. Ungültige LN-Stufen werden auf None reduziert.
+    Returns per HK: ``{"code", "title", "descriptors": [{"text", "ln_level"}],
+    "position"}`` in order of appearance. Empty/unstructured text
+    yields ``[]``. Invalid LN levels are reduced to None.
     """
     competencies: list[ParsedCompetency] = []
     current: ParsedCompetency | None = None
@@ -88,8 +89,8 @@ def parse_competencies(rendered_text: str | None) -> list[ParsedCompetency]:
             competencies.append(current)
             continue
 
-        # Bullets ausserhalb einer HK-Überschrift ignorieren (z. B. in der
-        # Beschreibung des Handlungskompetenzbereiches).
+        # Ignore bullets outside an HK heading (e.g. in the description
+        # of the competency area).
         if current is None:
             continue
 

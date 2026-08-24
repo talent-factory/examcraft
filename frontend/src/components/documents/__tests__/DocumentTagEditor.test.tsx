@@ -116,11 +116,12 @@ describe('DocumentTagEditor', () => {
     });
   });
 
-  // (b2) Bug-Regression: Der Fix akkumuliert `nextTags` lokal statt pro Iteration
-  //      `(document.tags ?? []).filter(…)` zu berechnen.
-  //      Testfall: MUI Autocomplete "Clear all" (CloseIcon) feuert onChange([]) mit einem
-  //      einzigen Event — das löst removedTags=[tag1,tag2] aus. Mit dem Fix darf onChanged
-  //      nur einmal mit tags:[] aufgerufen werden, nicht zweimal mit inkonsistenten Werten.
+  // (b2) Bug regression: the fix accumulates `nextTags` locally instead of
+  //      recomputing `(document.tags ?? []).filter(…)` on every iteration.
+  //      Test case: the MUI Autocomplete "Clear all" (CloseIcon) fires onChange([])
+  //      as a single event — which triggers removedTags=[tag1,tag2]. With the fix,
+  //      onChanged must be called exactly once with tags:[], not twice with
+  //      inconsistent values.
   it('(b2) Clear-All (CloseIcon) feuert ein onChange([]) → detach für beide, onChanged mit tags:[]', async () => {
     mockDocumentService.detachDocumentTag.mockResolvedValue(undefined);
     const onChanged = jest.fn();
@@ -138,20 +139,20 @@ describe('DocumentTagEditor', () => {
       ),
     );
 
-    // MUI Autocomplete mit multiple=true und value=[tag1,tag2] zeigt einen "CloseIcon"
-    // (Clear-All-Button). Ein Klick darauf feuert onChange([]) — ein einziges Event.
-    // Das entspricht genau dem Szenario, das den Stale-Prop-Bug auslöst.
+    // MUI Autocomplete with multiple=true and value=[tag1,tag2] renders a "CloseIcon"
+    // (clear-all button). Clicking it fires onChange([]) — a single event.
+    // This matches exactly the scenario that triggers the stale-prop bug.
     const clearButton = screen.getByTestId('CloseIcon');
     fireEvent.click(clearButton);
 
-    // Beide Detachs müssen erfolgen
+    // Both detaches must occur
     await waitFor(() => {
       expect(mockDocumentService.detachDocumentTag).toHaveBeenCalledTimes(2);
     });
     expect(mockDocumentService.detachDocumentTag).toHaveBeenCalledWith(42, tag1.id);
     expect(mockDocumentService.detachDocumentTag).toHaveBeenCalledWith(42, tag2.id);
 
-    // onChanged muss mit tags:[] aufgerufen worden sein (nicht tags:[tag2] oder tags:[tag1])
+    // onChanged must have been called with tags:[] (not tags:[tag2] or tags:[tag1])
     await waitFor(() => {
       const lastArg = onChanged.mock.calls[onChanged.mock.calls.length - 1][0];
       expect(lastArg).toMatchObject({ id: 42, tags: [] });

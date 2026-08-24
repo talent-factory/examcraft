@@ -432,7 +432,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
-  const [chunksPageSize] = useState(10); // Chunks pro Seite
+  const [chunksPageSize] = useState(10); // Chunks per page
   const [chunksLoading, setChunksLoading] = useState(false);
   const [chunksError, setChunksError] = useState<string | null>(null);
 
@@ -851,10 +851,10 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       setProcessingDocumentId(document.id);
       handleMenuClose();
 
-      // Start processing (asynchron im Backend) - NICHT WARTEN!
+      // Start processing (async in the backend) - DO NOT WAIT!
       await DocumentService.processDocument(document.id, true);
 
-      // SOFORT Dokumente neu laden - Processing läuft im Hintergrund!
+      // Reload documents IMMEDIATELY - processing runs in the background!
       await loadDocuments();
 
       setError(null);
@@ -869,10 +869,10 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const waitForDocumentProcessing = async (
     documentId: number,
-    maxWaitTime: number = 1800000 // 30 Minuten für große Dokumente
+    maxWaitTime: number = 1800000 // 30 minutes for large documents
   ) => {
     const startTime = Date.now();
-    const pollInterval = 3000; // Poll alle 3 Sekunden
+    const pollInterval = 3000; // Poll every 3 seconds
     let pollCount = 0;
 
     while (Date.now() - startTime < maxWaitTime) {
@@ -886,18 +886,18 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
         }
 
         if (status.status === 'Verarbeitet' || status.status === 'processed') {
-          return; // Verarbeitung abgeschlossen
+          return; // Processing complete
         }
 
         if (status.status === 'Fehler' || status.status === 'error') {
           throw new Error(`Document processing failed: ${status.status}`);
         }
 
-        // Warte vor nächstem Poll
+        // Wait before next poll
         await new Promise(resolve => setTimeout(resolve, pollInterval));
       } catch (error) {
         console.error('Error checking document status:', error);
-        // Weiter versuchen
+        // Keep retrying
         await new Promise(resolve => setTimeout(resolve, pollInterval));
       }
     }
@@ -1467,7 +1467,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                     </Stack>
                   )}
 
-                  {/* Status + OCR-/Qualitäts-Badges (TF-361) */}
+                  {/* Status + OCR/quality badges (TF-361) */}
                   <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
                     {getStatusChip(document.status, document)}
                     <DocumentOcrQualityBadges document={document} />
@@ -1801,7 +1801,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                           {t('components.documentLibrary.processingDetails')}
                         </Typography>
 
-                        {/* Sections mit Hierarchie */}
+                        {/* Sections with hierarchy */}
                         {previewDialog.document.metadata.sections_hierarchy && previewDialog.document.metadata.sections_hierarchy.length > 0 && (
                           <Box sx={{ mb: 3 }}>
                             <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>

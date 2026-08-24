@@ -1,14 +1,14 @@
 import { reflowMoodleAnswer } from '../moodleAnswerReflow';
 
 /**
- * TF-430 — Moodle plattet Zeilenumbrüche in Freitextantworten beim Export.
- * Übrig bleibt Residual-Struktur (NBSP, 3+-Space-Runs, Tabs) an den alten
- * Bruchstellen. reflowMoodleAnswer() rekonstruiert daraus Markdown-taugliche
- * Umbrüche, OHNE den Original-Text in der DB zu verändern (Render-Zeit).
+ * TF-430 — Moodle flattens line breaks in free-text answers on export.
+ * What remains is residual structure (NBSP, 3+-space runs, tabs) at the
+ * old break points. reflowMoodleAnswer() reconstructs Markdown-friendly
+ * breaks from that, WITHOUT changing the original text in the DB (render time).
  *
- * Wichtig: Der MarkdownRenderer nutzt nur remark-gfm (kein remark-breaks) —
- * einzelne \n kollabieren zu Leerzeichen. Brüche MÜSSEN als Leerzeilen
- * (\n\n) erzeugt werden, sonst sind sie im Render unsichtbar.
+ * Important: the MarkdownRenderer only uses remark-gfm (no remark-breaks) —
+ * single \n collapse to a space. Breaks MUST be produced as blank lines
+ * (\n\n), otherwise they're invisible in the render.
  */
 const NBSP = '\u00a0';
 
@@ -29,8 +29,8 @@ describe('reflowMoodleAnswer (TF-430)', () => {
   });
 
   it('bricht NICHT bei einzelnem NBSP mitten im Satz (kein Über-Segmentieren)', () => {
-    // wort<NBSP>wort (innersatzlich, im Demo-Korpus mehrfach belegt) — darf
-    // den Satz nicht zerreissen
+    // word<NBSP>word (mid-sentence, occurs repeatedly in the demo corpus) —
+    // must not tear the sentence apart
     const result = reflowMoodleAnswer(`sehr${NBSP}gut gemacht`);
     expect(result).toBe('sehr gut gemacht');
   });
@@ -38,7 +38,7 @@ describe('reflowMoodleAnswer (TF-430)', () => {
   it('erzeugt Leerzeilen (\\n\\n), niemals nackte einzelne \\n', () => {
     const result = reflowMoodleAnswer('a)   b)   c)');
     expect(result).toContain('\n\n');
-    // keine einsamen \n (jedes \n ist Teil eines \n\n-Paares)
+    // no lone \n (every \n is part of a \n\n pair)
     expect(/[^\n]\n[^\n]/.test(result)).toBe(false);
   });
 
@@ -61,9 +61,9 @@ describe('reflowMoodleAnswer (TF-430)', () => {
   });
 
   it('reflowt einen realen, run-on-Antwortausschnitt in mehrere Segmente', () => {
-    // Signaturen aus dem echten Demo-Korpus (BWZ Modul B, Jennifer Meyer):
-    // NBSP+Spaces vor dem ersten Marker, danach 6-Space-Runs vor weiteren
-    // Markern, Pfeile, run-on-Blob.
+    // Signatures from the real demo corpus (BWZ Modul B, Jennifer Meyer):
+    // NBSP+spaces before the first marker, then 6-space runs before further
+    // markers, arrows, run-on blob.
     const real =
       `a)${NBSP}      1.) Kommunikation mit dem Kunden      ` +
       `-> Die Fachsprache ist zu komplex      2.) Zu wenig Klarheit (Monteur)      ` +
@@ -71,22 +71,23 @@ describe('reflowMoodleAnswer (TF-430)', () => {
     const result = reflowMoodleAnswer(real);
     const segments = result.split('\n\n');
     expect(segments.length).toBeGreaterThanOrEqual(5);
-    // kein Segment trägt noch einen Bruch-Lauf in sich (NBSP / Tab / 3+ Spaces)
+    // no segment still carries a break-run within it (NBSP / Tab / 3+ spaces)
     for (const seg of segments) {
       expect(seg).not.toMatch(/\u00a0|\t| {3,}/);
       expect(seg.trim()).not.toBe('');
     }
-    // Inhalt bleibt vollständig erhalten (nur Whitespace neu gesetzt)
+    // content stays fully intact (only whitespace is re-set)
     expect(result.replace(/\s+/g, ' ').trim()).toBe(
       real.replace(/\s+/g, ' ').trim()
     );
   });
 
   it('normalisiert bereits vorhandene Zeilenumbrüche (\\n, \\r\\n) zu sichtbaren Leerzeilen', () => {
-    // Vertrag: niemals ein nacktes einzelnes \n im Output — der MarkdownRenderer
-    // würde es zu einem Leerzeichen kollabieren und der Bruch wäre unsichtbar.
-    // Schützt die Funktion als alleinigen Hüter der Invariante, falls je eine
-    // Quelle doch Newlines liefert (anderer Export, manuell editierte Antwort).
+    // Contract: never a lone single \n in the output — the MarkdownRenderer
+    // would collapse it to a space and the break would be invisible.
+    // Protects the function as the sole guardian of the invariant, in case
+    // some source ever does deliver newlines (a different export, a manually
+    // edited answer).
     const result = reflowMoodleAnswer('Zeile 1\nZeile 2\r\nZeile 3');
     expect(result).toBe('Zeile 1\n\nZeile 2\n\nZeile 3');
     expect(/[^\n]\n[^\n]/.test(result)).toBe(false);
@@ -103,8 +104,8 @@ describe('reflowMoodleAnswer (TF-430)', () => {
   });
 
   it('Spiegelstrich-/Stern-Marker landen am Zeilenanfang (→ Markdown-Liste, gewollt)', () => {
-    // Charakterisierung: nach dem Reflow rendert der MarkdownRenderer `*`/`-`-
-    // Zeilen als Liste — lesbarer als inline im Blob. Bewusst NICHT escaped.
+    // Characterization: after the reflow, the MarkdownRenderer renders `*`/`-`
+    // lines as a list — more readable than inline in the blob. Deliberately NOT escaped.
     expect(reflowMoodleAnswer('Antwort:\t- erster Punkt')).toBe(
       'Antwort:\n\n- erster Punkt'
     );

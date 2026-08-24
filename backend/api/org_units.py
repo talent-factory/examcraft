@@ -1,4 +1,4 @@
-"""OrgUnit-CRUD-API (Abteilung/Team-Hierarchie) -- Stufe 0 Fundament.
+"""OrgUnit CRUD API (department/team hierarchy) -- stage 0 foundation.
 
 Design: docs/superpowers/specs/2026-08-07-org-unit-hierarchie-design.md
 """
@@ -76,10 +76,10 @@ class OrgUnitCreateIn(BaseModel):
     @field_validator("unit_type")
     @classmethod
     def _unit_type_must_be_known(cls, value: str) -> str:
-        # KNOWN_UNIT_TYPES ist bewusst kein DB-Enum (siehe models/org_unit.py)
-        # -- diese Validierung sitzt nur an der API-Grenze, damit Tippfehler
-        # aus der Admin-UI nicht unbemerkt eine neue "Ebene" erzeugen. Interne
-        # Aufrufer der Service-Funktionen bleiben unrestricted.
+        # KNOWN_UNIT_TYPES is deliberately not a DB enum (see models/org_unit.py)
+        # -- this validation sits only at the API boundary, so a typo from the
+        # admin UI doesn't unnoticedly create a new "level". Internal callers
+        # of the service functions remain unrestricted.
         if value not in KNOWN_UNIT_TYPES:
             raise ValueError(
                 "unit_type muss einer der bekannten Werte sein: "
@@ -339,9 +339,9 @@ async def update_org_unit_endpoint(
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
     elif "parent_org_unit_id" in fields_set and body.parent_org_unit_id is None:
-        # Explizit gesendetes null ohne move_to_root ist mehrdeutig -- statt
-        # still keinen Effekt zu haben, lieber ablehnen (silent no-op statt
-        # Detach waere ein API-Contract-Fussangel).
+        # Explicitly sent null without move_to_root is ambiguous -- rather
+        # than silently having no effect, reject it (a silent no-op instead
+        # of a detach would be an API-contract footgun).
         raise HTTPException(
             status_code=422,
             detail=(
@@ -392,13 +392,13 @@ async def delete_org_unit_endpoint(
     current_user: User = Depends(require_permission("manage_org_units")),
     db: Session = Depends(get_db),
 ) -> Response:
-    """Loescht die OrgUnit inkl. aller Nachfahren (CASCADE).
+    """Deletes the OrgUnit incl. all descendants (CASCADE).
 
-    Die API selbst fuehrt die Kaskade unbedingt aus -- die Bestaetigung
-    ("descendant_count anzeigen, explizite Nutzer-Bestaetigung einholen")
-    ist reine Frontend-Verantwortung (siehe AdminOrgUnits.tsx), keine
-    Server-seitige Garantie. Ein direkter API-Aufruf ohne UI kann also ohne
-    Warnung eine ganze Teilhierarchie loeschen.
+    The API itself unconditionally performs the cascade -- the confirmation
+    ("show descendant_count, obtain explicit user confirmation") is purely
+    a frontend responsibility (see AdminOrgUnits.tsx), not a server-side
+    guarantee. A direct API call without the UI can therefore delete an
+    entire sub-hierarchy without warning.
     """
     org_unit = _load_org_unit_for_user(
         db=db, user=current_user, org_unit_id=org_unit_id

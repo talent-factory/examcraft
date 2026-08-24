@@ -10,9 +10,9 @@ from services.help_service import HelpService
 
 @pytest.mark.asyncio
 async def test_call_claude_uses_gateway(monkeypatch):
-    """_call_claude() geht über den LLM-Gateway (ALIAS_CHAT), nicht über den
-    entfernten Anthropic-Direktpfad (TF-440). Nutzt PydanticAI TestModel als
-    Stub-Modell, damit kein echter Gateway-Call nötig ist."""
+    """_call_claude() goes through the LLM gateway (ALIAS_CHAT), not through
+    the removed direct Anthropic path (TF-440). Uses PydanticAI's TestModel
+    as a stub model, so no real gateway call is needed."""
     from pydantic_ai.models.test import TestModel
 
     import services.llm_gateway as gw
@@ -56,10 +56,10 @@ async def test_call_claude_uses_gateway(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_call_claude_folds_history_into_prompt(monkeypatch):
-    """TF-440: die neue History-Folding-Logik in _call_claude war bisher
-    ungetestet (der einzige Gateway-Test übergibt history=None). Deckt ab:
-    dict- UND objekt-förmige History-Einträge, [-10:]-Trunkierung, korrekte
-    User:/Assistant:-Label-Reihenfolge."""
+    """TF-440: the new history-folding logic in _call_claude was previously
+    untested (the only gateway test passes history=None). Covers: dict- AND
+    object-shaped history entries, [-10:] truncation, correct
+    User:/Assistant: label ordering."""
     import types
 
     from pydantic_ai import Agent
@@ -85,7 +85,7 @@ async def test_call_claude_folds_history_into_prompt(monkeypatch):
     monkeypatch.setattr(Agent, "run", spy_run)
 
     service = HelpService(MagicMock())
-    # 11 Einträge: der älteste ("alte Frage 0") muss durch [-10:] wegfallen.
+    # 11 entries: the oldest ("alte Frage 0") must be dropped by [-10:].
     history = [{"role": "user", "content": f"alte Frage {i}"} for i in range(9)]
     history.append(types.SimpleNamespace(role="assistant", content="objekt-antwort"))
     history.append({"role": "user", "content": "neueste Frage"})
@@ -110,9 +110,9 @@ async def test_call_claude_folds_history_into_prompt(monkeypatch):
 
     prompt = captured["user_prompt"]
     assert "Conversation history:" in prompt
-    assert "alte Frage 0" not in prompt  # durch [-10:] getrimmt
+    assert "alte Frage 0" not in prompt  # trimmed by [-10:]
     assert "alte Frage 1" in prompt
-    assert "Assistant: objekt-antwort" in prompt  # objekt-förmiger Eintrag
+    assert "Assistant: objekt-antwort" in prompt  # object-shaped entry
     assert "User: neueste Frage" in prompt
     assert prompt.index("Assistant: objekt-antwort") < prompt.index(
         "User: neueste Frage"
@@ -123,12 +123,12 @@ async def test_call_claude_folds_history_into_prompt(monkeypatch):
 async def test_low_confidence_does_not_retry():
     """TF-440: answer_question no longer retries on low confidence.
 
-    Vor der Gateway-Migration lief der Retry auf einem stärkeren Modell
-    (haiku -> sonnet). Seit ALIAS_CHAT die einzige Modellquelle ist, würde
-    ein Retry denselben Alias mit demselben Prompt nochmal aufrufen — reine
-    Kostenverdopplung ohne Nutzen. _call_claude wird deshalb bei jeder
-    Confidence nur noch einmal aufgerufen; die Escalate-Markierung
-    (confidence < 0.5) bleibt unverändert bestehen.
+    Before the gateway migration, the retry ran on a stronger model
+    (haiku -> sonnet). Since ALIAS_CHAT is now the only model source, a
+    retry would call the same alias with the same prompt again — pure cost
+    doubling with no benefit. _call_claude is therefore called only once
+    regardless of confidence; the escalate marker (confidence < 0.5)
+    remains unchanged.
     """
     mock_db = MagicMock()
     service = HelpService(mock_db)

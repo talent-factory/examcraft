@@ -1,6 +1,6 @@
 /**
- * Review Service für ExamCraft AI
- * API Client für Question Review System
+ * Review service for ExamCraft AI
+ * API client for the question review system
  */
 
 import {

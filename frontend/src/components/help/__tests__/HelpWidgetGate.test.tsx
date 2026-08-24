@@ -1,8 +1,8 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-// jest.mock-Aufrufe werden von babel-jest über die Imports gehoisted, der Import
-// von HelpWidgetGate sieht die Mocks unten also bereits.
+// jest.mock calls are hoisted above the imports by babel-jest, so the import
+// of HelpWidgetGate below already sees the mocks defined further down.
 import HelpWidgetGate from '../HelpWidgetGate';
 
 const mockUseAuth = jest.fn();
@@ -11,8 +11,8 @@ jest.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-// HelpWidget wird gestubbt: der Gate-Test soll nur prüfen, ob gemountet wird —
-// nicht den ganzen Widget-Baum (inkl. useHelpContext und dessen Requests) ziehen.
+// HelpWidget is stubbed: the gate test should only check whether it mounts —
+// not pull in the whole widget tree (incl. useHelpContext and its requests).
 const mockHelpWidgetRender = jest.fn();
 jest.mock('../HelpWidget', () => ({
   __esModule: true,
@@ -39,8 +39,8 @@ describe('HelpWidgetGate', () => {
   });
 
   it('rendert null während des Token-Bootstraps (isLoading)', () => {
-    // Kein FAB-Aufblitzen vor dem ersten Auth-Ergebnis: isAuthenticated ist hier
-    // noch false, kann aber gleich auf true kippen.
+    // No FAB flash before the first auth result: isAuthenticated is still
+    // false here, but may flip to true right afterwards.
     mockUseAuth.mockReturnValue({ isAuthenticated: false, isLoading: true });
 
     const { container } = render(<HelpWidgetGate />);

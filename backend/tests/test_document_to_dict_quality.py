@@ -1,4 +1,4 @@
-"""Tests für die Qualitäts-/OCR-Felder in Document.to_dict (TF-360)."""
+"""Tests for the quality/OCR fields in Document.to_dict (TF-360)."""
 
 
 def test_to_dict_exposes_quality_and_ocr_flag():
@@ -18,8 +18,9 @@ def test_to_dict_exposes_quality_and_ocr_flag():
         "signals": {},
     }
     assert payload["processed_with_ocr"] is True
-    # TF-365-Nachzügler: das escalation-Feld (das die UI-Badges erst wirksam
-    # macht) muss to_dict ebenfalls durchreichen, nicht nur das Response-Schema.
+    # TF-365 follow-up: the escalation field (which makes the UI badges
+    # effective in the first place) must also be passed through by to_dict,
+    # not just by the response schema.
     assert payload["escalation"] == "completed"
 
 

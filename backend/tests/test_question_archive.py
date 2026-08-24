@@ -1,13 +1,13 @@
-"""TF-396: Tests für Archivieren / Wiederherstellen / Hard-Delete von Fragen.
+"""TF-396: tests for archiving / restoring / hard-deleting questions.
 
-Read-Path-Audit (Stand TF-396): Lese-/Wiederverwendungs-Pfade auf
-question_reviews, die ``archived_at IS NULL`` filtern MÜSSEN:
-  - api/question_review.py::get_review_queue   (Review-Bank-Liste)
-  - api/exams.py::list_approved_questions       (Composer-Pool)
-  - api/exams.py::_build_candidate_query        (Auto-Fill-Kandidaten)
-  - api/exams.py (documents-with-questions Count: nur aktive zählen)
-Bewusst NICHT gefiltert: by-id Detail/Restore (sollen archivierte liefern),
-Statistik-Zähler die bewusst Gesamtbestand zählen.
+Read-path audit (as of TF-396): read/reuse paths on question_reviews that
+MUST filter ``archived_at IS NULL``:
+  - api/question_review.py::get_review_queue   (review bank list)
+  - api/exams.py::list_approved_questions       (composer pool)
+  - api/exams.py::_build_candidate_query        (auto-fill candidates)
+  - api/exams.py (documents-with-questions count: count only active ones)
+Deliberately NOT filtered: by-id detail/restore (should return archived
+ones too), statistics counters that deliberately count the total stock.
 """
 
 import json
@@ -97,10 +97,11 @@ def make_user(db, institution_id, suffix="qa", is_superuser=True):
 
 
 def make_user_with_role(db, institution_id, suffix, perms):
-    """Non-Superuser mit einer Rolle, die genau ``perms`` trägt.
+    """Non-superuser with a role that carries exactly ``perms``.
 
-    Notwendig, um Tenant-Scoping (_get_scoped_question) und require_permission
-    real zu prüfen — Superuser umgehen BEIDE (TenantFilter + has_permission).
+    Necessary to genuinely exercise tenant scoping (_get_scoped_question)
+    and require_permission — superusers bypass BOTH (TenantFilter +
+    has_permission).
     """
     user = make_user(db, institution_id, suffix, is_superuser=False)
     role = Role(
@@ -148,7 +149,7 @@ def make_question(
 
 
 def login(client, user):
-    """Override beide Auth-Dependencies auf denselben User."""
+    """Override both auth dependencies to the same user."""
     client.app.dependency_overrides[get_current_user] = lambda: user
     client.app.dependency_overrides[get_current_active_user] = lambda: user
 
@@ -254,7 +255,7 @@ def test_restore_clears_archive(qa_db, qa_client):
     assert resp.status_code == 200
     qa_db.refresh(q)
     assert q.archived_at is None
-    assert q.review_status == ReviewStatus.APPROVED.value  # Status unverändert
+    assert q.review_status == ReviewStatus.APPROVED.value  # status unchanged
     h = (
         qa_db.query(ReviewHistory)
         .filter_by(question_id=q.id, action="restored")
@@ -272,7 +273,7 @@ def test_restore_clears_archive(qa_db, qa_client):
 def test_delete_blocks_unarchived(qa_db, qa_client):
     inst = make_institution(qa_db, "d1")
     user = make_user(qa_db, inst.id, "d1")
-    q = make_question(qa_db, inst.id)  # nicht archiviert
+    q = make_question(qa_db, inst.id)  # not archived
     qa_db.commit()
     login(qa_client, user)
 
@@ -318,7 +319,7 @@ def test_delete_free_archived_question_writes_audit(qa_db, qa_client):
 
 def test_delete_forbidden_without_permission(qa_db, qa_client):
     inst = make_institution(qa_db, "d4")
-    user = make_user(qa_db, inst.id, "d4", is_superuser=False)  # keine Rolle/Permission
+    user = make_user(qa_db, inst.id, "d4", is_superuser=False)  # no role/permission
     q = make_question(qa_db, inst.id, archived_at=datetime.utcnow())
     qa_db.commit()
     login(qa_client, user)
@@ -344,7 +345,7 @@ def test_bulk_delete_mixed(qa_db, qa_client):
     body = resp.json()
     assert free.id in body["deleted"]
     assert any(b["id"] == not_archived.id for b in body["blocked"])
-    # Audit-Row pro gelöschter Frage, mit bulk-Marker im Snapshot
+    # One audit row per deleted question, with a bulk marker in the snapshot
     log = (
         qa_db.query(AuditLog)
         .filter(
@@ -358,7 +359,7 @@ def test_bulk_delete_mixed(qa_db, qa_client):
 
 
 # ---------------------------------------------------------------------------
-# Tenant-Scoping + RBAC (Non-Superuser — prüft _get_scoped_question + require_permission)
+# Tenant scoping + RBAC (non-superuser — exercises _get_scoped_question + require_permission)
 # ---------------------------------------------------------------------------
 
 
@@ -366,14 +367,14 @@ def test_archive_cross_tenant_returns_404(qa_db, qa_client):
     inst_a = make_institution(qa_db, "t1a")
     inst_b = make_institution(qa_db, "t1b")
     actor = make_user_with_role(qa_db, inst_a.id, "t1", ["review_questions"])
-    foreign = make_question(qa_db, inst_b.id)  # gehört Institution B
+    foreign = make_question(qa_db, inst_b.id)  # belongs to institution B
     qa_db.commit()
     login(qa_client, actor)
 
     resp = qa_client.post(f"/api/v1/questions/{foreign.id}/archive", json={})
     assert resp.status_code == 404
     qa_db.refresh(foreign)
-    assert foreign.archived_at is None  # nicht angetastet
+    assert foreign.archived_at is None  # untouched
 
 
 def test_delete_cross_tenant_returns_404(qa_db, qa_client):
@@ -405,7 +406,7 @@ def test_bulk_delete_skips_cross_tenant(qa_db, qa_client):
     body = resp.json()
     assert own.id in body["deleted"]
     assert any(b["id"] == foreign.id for b in body["blocked"])
-    # Fremde Frage NICHT gelöscht
+    # Foreign question NOT deleted
     assert qa_db.query(QuestionReview).filter_by(id=foreign.id).first() is not None
 
 
@@ -449,8 +450,8 @@ def test_review_queue_include_archived_returns_both(qa_db, qa_client):
 
 
 # ---------------------------------------------------------------------------
-# Exams read path: Dokument-Fragenzähler schliesst archivierte aus
-# (validiert die and_(...)-Bedingung im SQL-case von list_documents_with_questions)
+# Exams read path: document question counter excludes archived ones
+# (validates the and_(...) condition in the SQL case of list_documents_with_questions)
 # ---------------------------------------------------------------------------
 
 
@@ -458,10 +459,10 @@ def test_documents_with_questions_count_excludes_archived(qa_db, qa_client):
     inst = make_institution(qa_db, "dq")
     user = make_user(qa_db, inst.id, "dq")
     doc = make_document(qa_db, inst.id, user.id)
-    q1 = make_question(qa_db, inst.id)  # approved, aktiv
+    q1 = make_question(qa_db, inst.id)  # approved, active
     q2 = make_question(
         qa_db, inst.id, archived_at=datetime.utcnow()
-    )  # approved, archiviert
+    )  # approved, archived
     qa_db.add(QuestionSourceDocument(question_id=q1.id, document_id=doc.id))
     qa_db.add(QuestionSourceDocument(question_id=q2.id, document_id=doc.id))
     qa_db.commit()
@@ -470,4 +471,4 @@ def test_documents_with_questions_count_excludes_archived(qa_db, qa_client):
     resp = qa_client.get("/api/v1/exams/documents-with-questions")
     assert resp.status_code == 200
     entry = next(d for d in resp.json() if d["id"] == doc.id)
-    assert entry["approved_question_count"] == 1  # archivierte Frage nicht mitgezählt
+    assert entry["approved_question_count"] == 1  # archived question not counted

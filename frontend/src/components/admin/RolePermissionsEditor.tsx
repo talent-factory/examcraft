@@ -1,11 +1,11 @@
 /**
- * RolePermissionsEditor — Create/Edit-Dialog für Rollen (TF-603).
+ * RolePermissionsEditor — create/edit dialog for roles (TF-603).
  *
- * Name ist nur im Create-Modus editierbar (role === null); im Edit-Modus
- * gesperrt, auch für Nicht-System-Rollen — die Backend-API akzeptiert
- * ohnehin kein `name`-Feld im Update (siehe api/admin.py: UpdateRoleRequest).
- * Berechtigungen bleiben bei Systemrollen editierbar (das ist der eigentliche
- * Zweck dieses Tickets), nur das Löschen ist für sie gesperrt (siehe AdminRoles.tsx).
+ * Name is only editable in create mode (role === null); locked in edit
+ * mode, even for non-system roles — the backend API doesn't accept a
+ * `name` field on update anyway (see api/admin.py: UpdateRoleRequest).
+ * Permissions remain editable on system roles (that's the actual point
+ * of this ticket) — only deletion is locked for them (see AdminRoles.tsx).
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -57,8 +57,8 @@ const RolePermissionsEditor: React.FC<RolePermissionsEditorProps> = ({
       const list = await RolesService.listPermissions();
       setPermissions(list);
     } catch (e) {
-      // Unbehandelt würde dies den Dialog mit einer leeren Checkbox-Liste
-      // zurücklassen — ununterscheidbar von einer Rolle ohne Berechtigungen.
+      // Left unhandled, this would leave the dialog with an empty checkbox
+      // list — indistinguishable from a role with no permissions.
       // eslint-disable-next-line no-console
       console.error('Failed to load permission list', e);
       setError(t('admin.roles.failedLoadPermissions'));
@@ -114,10 +114,10 @@ const RolePermissionsEditor: React.FC<RolePermissionsEditorProps> = ({
       }
       onSaved();
     } catch (e) {
-      // Backend liefert bei 409 (Duplikat) / 422 (unbekannte Permission)
-      // eine aussagekräftige detail-Message — die zeigen wir statt des
-      // generischen Fallbacks. Netzwerkfehler (kein `.detail`) fallen
-      // weiterhin auf den generischen i18n-String zurück (TF-603 Finding 4).
+      // On 409 (duplicate) / 422 (unknown permission) the backend returns
+      // a meaningful detail message — we show that instead of the generic
+      // fallback. Network errors (no `.detail`) still fall back to the
+      // generic i18n string (TF-603 Finding 4).
       if (e instanceof ApiError && typeof e.detail === 'string' && e.detail) {
         setError(e.detail);
       } else {

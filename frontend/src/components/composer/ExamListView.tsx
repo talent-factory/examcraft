@@ -35,7 +35,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
-  // TF-398: Archiv-Filter + Archivieren-Dialog (mit optionalem Grund).
+  // TF-398: archive filter + archive dialog (with optional reason).
   const [showArchived, setShowArchived] = useState(false);
   const [archiveTargetId, setArchiveTargetId] = useState<number | null>(null);
   const [archiveReason, setArchiveReason] = useState('');
@@ -85,7 +85,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
     },
   });
 
-  // TF-398: Archivieren / Wiederherstellen.
+  // TF-398: archive / restore.
   const archiveMutation = useMutation({
     mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
       ComposerService.archiveExam(id, reason),
@@ -130,7 +130,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          {/* TF-506: H1 nutzt den Sidebar-Key, damit Titel und Navigation synchron bleiben */}
+          {/* TF-506: H1 uses the sidebar key so the title and navigation stay in sync */}
           <h1 className="text-3xl font-bold text-gray-900">{t('nav.sidebar.examComposer')}</h1>
           <p className="text-gray-600 mt-2">{t('composer.examList.subtitle')}</p>
         </div>
@@ -156,7 +156,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
         </div>
       )}
 
-      {/* Search + Archiv-Filter (TF-398) */}
+      {/* Search + archive filter (TF-398) */}
       <div className="flex flex-wrap items-center gap-4">
         <input
           type="text"
@@ -222,7 +222,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
                     )}
                   </span>
                 )}
-                {/* TF-398: Zeilen-Aktionen — Archivieren / Wiederherstellen / Löschen */}
+                {/* TF-398: row actions — archive / restore / delete */}
                 <div
                   className="ml-auto flex items-center gap-1"
                   onClick={(e) => e.stopPropagation()}
@@ -255,7 +255,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
                         </svg>
                       </button>
                       {(() => {
-                        // canDelete = Permission ∧ nicht exportiert ∧ keine Abgaben.
+                        // canDelete = permission ∧ not exported ∧ no submissions.
                         const deleteReason = !canHardDelete
                           ? t('composer.examList.deleteNoPermission')
                           : exam.status === 'exported'
@@ -319,7 +319,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
         </DialogActions>
       </Dialog>
 
-      {/* Archive Dialog (TF-398) — Bestätigung mit optionalem Grund */}
+      {/* Archive dialog (TF-398) — confirmation with optional reason */}
       <Dialog
         open={archiveTargetId !== null}
         onClose={() => {

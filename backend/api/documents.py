@@ -1,6 +1,6 @@
 """
-Document API Endpoints für ExamCraft AI
-Verwaltet Document Upload, Listing und Management
+Document API Endpoints for ExamCraft AI
+Manages document upload, listing, and management
 """
 
 from fastapi import (
@@ -65,7 +65,7 @@ router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 document_service = DocumentService()
 
 
-# Pydantic Models für API Responses
+# Pydantic models for API responses
 class DocumentTagOut(BaseModel):
     id: int
     name: str
@@ -110,16 +110,16 @@ class DocumentResponse(BaseModel):
     updated_at: Optional[str]
     processed_at: Optional[str]
     tags: List[DocumentTagOut] = []
-    # OCR-/Qualitäts-Eskalation (TF-360/TF-361/TF-365). Ohne diese Felder verwirft
-    # Pydantic per Default (``extra`` ist nicht auf ``'allow'`` gesetzt) die von
-    # Document.to_dict() gelieferten Werte still, wodurch die Frontend-Badges nie
-    # Daten erhielten. ``escalation`` macht eine laufende/fehlgeschlagene
-    # OCR-Nachbearbeitung für den Nutzer sichtbar.
+    # OCR/quality escalation (TF-360/TF-361/TF-365). Without these fields,
+    # Pydantic silently drops (by default ``extra`` is not set to ``'allow'``)
+    # the values delivered by Document.to_dict(), so the frontend badges would
+    # never receive any data. ``escalation`` makes an in-progress/failed OCR
+    # post-processing pass visible to the user.
     quality: Optional[dict] = None
     processed_with_ocr: bool = False
-    # ``escalation`` trägt dieselbe geschlossene Wertemenge wie upstream in
-    # quality_assessor.EscalationState — als Literal getypt, statt die Garantie
-    # an der API-Grenze auf ``str`` zu verwässern (TF-365 follow-up).
+    # ``escalation`` carries the same closed value set as upstream in
+    # quality_assessor.EscalationState — typed as a Literal instead of
+    # diluting the guarantee to ``str`` at the API boundary (TF-365 follow-up).
     escalation: Optional[EscalationState] = None
 
 
@@ -222,23 +222,23 @@ async def upload_document(
     db: Session = Depends(get_db),
 ):
     """
-    Upload ein neues Dokument (Asynchrone Verarbeitung mit Celery)
+    Upload a new document (asynchronous processing via Celery)
 
     **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
 
-    - **file**: Dokument zum Upload (PDF, DOC, DOCX, TXT, MD)
-    - **visibility**: `private` (nur ich, Default), `team` (geteilt mit einer
-      eigenen OrgUnit) oder `institution` (geteilt). `institution` ist nur
-      erlaubt, wenn der User einer Institution angehört; `team` erfordert
-      zusätzlich **org_unit_id** (siehe unten).
-    - **org_unit_id**: Ziel-OrgUnit für `visibility=team`. Muss eine OrgUnit
-      sein, der der Uploader selbst angehört (via GET
-      `/api/v1/org-units/mine`) — sonst 400.
+    - **file**: document to upload (PDF, DOC, DOCX, TXT, MD)
+    - **visibility**: `private` (only me, default), `team` (shared with an
+      OrgUnit the caller belongs to) or `institution` (shared). `institution`
+      is only allowed if the user belongs to an institution; `team`
+      additionally requires **org_unit_id** (see below).
+    - **org_unit_id**: target OrgUnit for `visibility=team`. Must be an
+      OrgUnit the uploader themselves belongs to (via GET
+      `/api/v1/org-units/mine`) — otherwise 400.
 
     Returns:
-        UploadResponse mit Document ID und Status
+        UploadResponse with document ID and status
 
-    **Note:** Document wird asynchron verarbeitet. Status kann via GET /documents/{id} abgerufen werden.
+    **Note:** The document is processed asynchronously. Status can be fetched via GET /documents/{id}.
     """
     locale = get_request_locale(http_request, current_user)
 
@@ -541,10 +541,10 @@ async def list_documents(
         )
 
 
-# Health check endpoint (muss vor parametrisierten Routen stehen)
+# Health check endpoint (must come before parameterized routes)
 @router.get("/health")
 async def health_check():
-    """Health check für Document Service"""
+    """Health check for document service"""
     return {
         "status": "healthy",
         "service": "Document Upload Service",
@@ -650,14 +650,14 @@ async def get_document(
     db: Session = Depends(get_db),
 ):
     """
-    Hole spezifisches Dokument nach ID
+    Fetch a specific document by ID
 
     **Required:** Authenticated user
 
-    - **document_id**: ID des gewünschten Dokuments
+    - **document_id**: ID of the requested document
 
     Returns:
-        Document Details mit Metadaten
+        Document details with metadata
     """
     locale = get_request_locale(request, current_user)
     try:
@@ -1540,15 +1540,15 @@ async def get_document_raw(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    """Liefert die Original-Datei mit Content-Disposition: inline.
+    """Returns the original file with Content-Disposition: inline.
 
-    Identisch zu /download, jedoch ohne attachment-Header, sodass das
-    Frontend die Datei einbetten kann (z. B. PDF in einem iframe via
-    Blob-URL) statt sie herunterzuladen.
+    Identical to /download, but without the attachment header, so the
+    frontend can embed the file (e.g. a PDF in an iframe via a blob URL)
+    instead of downloading it.
 
     **Required:** Authenticated user.
 
-    - **document_id**: ID des Dokuments.
+    - **document_id**: ID of the document.
     """
     locale = get_request_locale(request, current_user)
     try:
@@ -1660,14 +1660,14 @@ async def delete_document(
     db: Session = Depends(get_db),
 ):
     """
-    Lösche Dokument und zugehörige Datei
+    Delete document and its associated file
 
     **Required Permission:** `delete_documents` (Dozent, Admin)
 
-    - **document_id**: ID des zu löschenden Dokuments
+    - **document_id**: ID of the document to delete
 
     Returns:
-        Bestätigung der Löschung
+        Confirmation of the deletion
     """
     locale = get_request_locale(http_request, current_user)
     try:
@@ -1692,9 +1692,9 @@ async def delete_document(
             if document.user_id and document.user_id != current_user.id:
                 from services.audit_service import AuditService
 
-                # Fail-loud auf Audit-Persistenz-Fehler (DSGVO): kein cross-owner
-                # DELETE ohne Trail, deshalb log_admin_cross_owner statt
-                # log_action — analog log_superuser_bypass.
+                # Fail loud on audit-persistence errors (GDPR): no cross-owner
+                # DELETE without a trail, hence log_admin_cross_owner instead
+                # of log_action — analogous to log_superuser_bypass.
                 AuditService.log_admin_cross_owner(
                     db=db,
                     admin=current_user,
@@ -1761,32 +1761,32 @@ async def delete_document(
 @router.post("/{document_id}/process")
 async def process_document(
     document_id: int,
-    create_vectors: bool = Query(True, description="Erstelle auch Vector Embeddings"),
+    create_vectors: bool = Query(True, description="Also create vector embeddings"),
     background_tasks: BackgroundTasks = None,
     request: Request = None,
     current_user: User = Depends(require_permission("create_documents")),
     db: Session = Depends(get_db),
 ):
     """
-    Verarbeite hochgeladenes Dokument mit Docling (und optional Vector Embeddings)
+    Process an uploaded document with Docling (and optionally vector embeddings)
 
-    **ASYNCHRON:** Diese Endpoint startet die Verarbeitung im Hintergrund und antwortet sofort.
-    Nutze GET /{document_id}/status um den Verarbeitungsstatus zu prüfen.
+    **ASYNCHRONOUS:** This endpoint starts processing in the background and responds immediately.
+    Use GET /{document_id}/status to check the processing status.
 
     **Required Permission:** `create_documents` (Dozent, Assistant, Admin)
 
-    - **document_id**: ID des zu verarbeitenden Dokuments
-    - **create_vectors**: Ob Vector Embeddings erstellt werden sollen (default: True)
+    - **document_id**: ID of the document to process
+    - **create_vectors**: whether vector embeddings should be created (default: True)
     """
     locale = get_request_locale(request, current_user)
-    # Prüfe ob Dokument existiert
+    # Check whether the document exists
     document = document_service.get_document_by_id(document_id, db)
     if not document:
         raise HTTPException(
             status_code=404, detail=t("documents_not_found", locale=locale)
         )
 
-    # Prüfe User-Berechtigung (Superuser-Bypass mit Audit-Log)
+    # Check user permission (superuser bypass with audit log)
     from utils.auth_utils import enforce_resource_access
 
     enforce_resource_access(
@@ -1799,7 +1799,7 @@ async def process_document(
     )
 
     try:
-        # Starte Verarbeitung im Hintergrund
+        # Start processing in the background
         if background_tasks:
             if create_vectors:
                 background_tasks.add_task(
@@ -1810,7 +1810,7 @@ async def process_document(
                     document_service.process_document_content, document_id, db
                 )
 
-        # Antworte sofort mit Status "processing"
+        # Respond immediately with status "processing"
         return {
             "message": "Document processing started in background",
             "document_id": document_id,
@@ -1836,14 +1836,14 @@ async def get_document_content(
     db: Session = Depends(get_db),
 ):
     """
-    Hole vollständigen Dokumenteninhalt für Vorschau
+    Fetch the full document content for preview
 
     **Required:** Authenticated user
 
-    - **document_id**: ID des Dokuments
+    - **document_id**: ID of the document
 
     Returns:
-        Vollständiger Dokumenteninhalt als Text
+        Full document content as text
     """
     locale = get_request_locale(request, current_user)
     try:
@@ -1857,11 +1857,11 @@ async def get_document_content(
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, db, locale=locale)
 
-        # Hole vollständigen Inhalt vom Document Service
+        # Fetch the full content from the document service
         content = await document_service.get_full_document_content(document_id, db)
 
         if content is None:
-            # Fallback auf content_preview wenn verfügbar
+            # Fall back to content_preview if available
             if document.content_preview:
                 content = document.content_preview
             else:
@@ -1898,14 +1898,14 @@ async def get_document_chunks(
     db: Session = Depends(get_db),
 ):
     """
-    Hole verarbeitete Text-Chunks eines Dokuments
+    Fetch the processed text chunks of a document
 
     **Required:** Authenticated user
 
-    - **document_id**: ID des Dokuments
+    - **document_id**: ID of the document
 
     Returns:
-        Liste der Text-Chunks mit Metadaten
+        List of text chunks with metadata
     """
     locale = get_request_locale(request, current_user)
     try:
@@ -1925,7 +1925,7 @@ async def get_document_chunks(
                 detail=t("documents_not_processed", locale=locale),
             )
 
-        # Hole Chunks
+        # Fetch chunks
         chunks = await document_service.get_document_chunks(document_id, db)
 
         if chunks is None:
@@ -1962,16 +1962,16 @@ async def get_document_chunks_paginated(
     db: Session = Depends(get_db),
 ):
     """
-    Hole verarbeitete Text-Chunks eines Dokuments mit Pagination (für große Dokumente)
+    Fetch the processed text chunks of a document with pagination (for large documents)
 
     **Required:** Authenticated user
 
-    - **document_id**: ID des Dokuments
-    - **page**: Seitennummer (1-indexed, default: 1)
-    - **page_size**: Anzahl Chunks pro Seite (1-100, default: 10)
+    - **document_id**: ID of the document
+    - **page**: page number (1-indexed, default: 1)
+    - **page_size**: number of chunks per page (1-100, default: 10)
 
     Returns:
-        Paginierte Liste der Text-Chunks mit Metadaten
+        Paginated list of text chunks with metadata
     """
     locale = get_request_locale(request, current_user)
     try:
@@ -1991,7 +1991,7 @@ async def get_document_chunks_paginated(
                 detail=t("documents_not_processed", locale=locale),
             )
 
-        # Hole Chunks aus Vector Database (schneller als Neuverarbeitung!)
+        # Fetch chunks from the vector database (faster than reprocessing!)
         search_results = await vector_service.get_document_chunks(document_id)
 
         if not search_results:
@@ -2000,7 +2000,7 @@ async def get_document_chunks_paginated(
                 detail=t("documents_chunks_load_failed", locale=locale),
             )
 
-        # Konvertiere SearchResult zu Dictionary Format
+        # Convert SearchResult to dictionary format
         chunks = []
         for result in search_results:
             chunks.append(
@@ -2014,22 +2014,22 @@ async def get_document_chunks_paginated(
                 }
             )
 
-        # Berechne Pagination
+        # Compute pagination
         total_chunks = len(chunks)
         total_pages = (total_chunks + page_size - 1) // page_size
 
-        # Validiere page
+        # Validate page
         if page > total_pages and total_chunks > 0:
             raise HTTPException(
                 status_code=400,
                 detail=t("documents_page_out_of_range", locale=locale),
             )
 
-        # Berechne Start- und End-Index
+        # Compute start and end index
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size
 
-        # Hole Chunks für diese Seite
+        # Fetch chunks for this page
         paginated_chunks = chunks[start_idx:end_idx]
 
         return {

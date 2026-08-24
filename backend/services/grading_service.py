@@ -1,17 +1,17 @@
 """GradingService: orchestrates grading + aggregation.
 
-* MC / W-F → ``DeterministicGrader`` (pure-functional, kein LLM-Call).
-* offene Fragen → ``LlmGrader`` (Anthropic + Pydantic-Schema, mit
-  Prompt-Caching).
-* Unbekannte ``question_type`` fallen auf den Stub mit
-  ``is_correct=None`` zurück, damit ein einzelner Mis-Konfigurations-
-  Fall nie einen ganzen Import scheitern lässt.
+* MC / true-false → ``DeterministicGrader`` (pure-functional, no LLM call).
+* open-ended → ``LlmGrader`` (Anthropic + Pydantic schema, with
+  prompt caching).
+* Unknown ``question_type`` falls back to the stub with
+  ``is_correct=None``, so a single misconfiguration case never fails
+  an entire import.
 
-Grade-History (Audit-Trail nach Spec 6.5/6.6) wird ausschliesslich für
-*spätere* Status-Transitionen geschrieben:
+Grade history (audit trail per Spec 6.5/6.6) is written exclusively for
+*later* status transitions:
 ``approved_by_reviewer``, ``manual_override_by_reviewer``,
-``regrade_after_correct_answer_update``. Die initiale ``proposed``-
-Erzeugung bleibt history-frei — sie wäre Rauschen.
+``regrade_after_correct_answer_update``. The initial ``proposed``
+creation stays history-free — it would just be noise.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ _FAR_PAST = datetime.min.replace(tzinfo=timezone.utc)
 _FAR_FUTURE = datetime.max.replace(tzinfo=timezone.utc)
 
 
-# change_reason-Konstanten für GradeHistory (Spec 6.5/6.6).
+# change_reason constants for GradeHistory (Spec 6.5/6.6).
 CHANGE_REASON_APPROVED = "approved_by_reviewer"
 CHANGE_REASON_OVERRIDE = "manual_override_by_reviewer"
 CHANGE_REASON_REGRADE = "regrade_after_correct_answer_update"
@@ -76,11 +76,10 @@ def _grading_concurrency() -> int:
 
 @dataclass(frozen=True)
 class _QuestionMeta:
-    """Internes Tupel — alle Felder, die ein Grader für eine Frage
-    braucht.
+    """Internal tuple — all fields a grader needs for one question.
 
-    Ein einzelner Datentyp statt zwei Lookups (deterministisch /
-    LLM) hält die Logik in ``_grade_attempt_answers`` linear.
+    A single data type instead of two lookups (deterministic / LLM)
+    keeps the logic in ``_grade_attempt_answers`` linear.
     """
 
     points: float
@@ -90,8 +89,8 @@ class _QuestionMeta:
     explanation: str | None
     difficulty: str | None
     bloom_level: str | None
-    # TF-403: Antwortoptionen (JSON-Liste) für multiple_choice-Teilpunkte;
-    # None/leer für andere Typen.
+    # TF-403: answer options (JSON list) for multiple_choice partial
+    # credit; None/empty for other types.
     options: list[str] | None = None
 
 
@@ -124,16 +123,15 @@ class GradingService:
     ) -> None:
         self.db = db
         self.grader = deterministic_grader or DeterministicGrader()
-        # LlmGrader-Konstruktion ist günstig (kein API-Call); im Demo-
-        # Mode (kein Gateway konfiguriert, TF-440) liefert sie einen
-        # 0-Punkte-Stub.
+        # Constructing an LlmGrader is cheap (no API call); in demo
+        # mode (no Gateway configured, TF-440) it returns a 0-point
+        # stub.
         self._explicit_llm_grader = llm_grader
         self.llm_grader = llm_grader or LlmGrader()
-        # TF-336: Cache pro Modell-String, damit Enterprise-
-        # Institutionen mit eigenem ``llm_model_for_grading`` kein
-        # Re-Build der Gateway-Client-Konstruktion pro Submission
-        # bezahlen, aber gleichzeitig zwei verschiedene Modelle in
-        # einer Pipeline nicht teilen.
+        # TF-336: cache per model string, so enterprise institutions with
+        # their own ``llm_model_for_grading`` don't pay for rebuilding
+        # the Gateway client construction on every submission, while
+        # still not sharing two different models within one pipeline.
         self._llm_grader_by_model: dict[str | None, LlmGrader] = {None: self.llm_grader}
 
     def _resolve_llm_grader(self, *, submission: Submission) -> LlmGrader:
@@ -159,18 +157,17 @@ class GradingService:
         if model_override:
             cached = self._llm_grader_by_model.get(model_override)
             if cached is None:
-                # TF-440: kein Schreibpfad in der App setzt derzeit einen
-                # rohen Modellnamen (kein Admin-Endpoint/Schema für dieses
-                # Feld) — die TF-439-Migration `tf439_grade_logical` hat
-                # bestehende Werte bereits auf 'examcraft/grading'
-                # normalisiert. Falls dennoch ein roher Wert auftaucht
-                # (Altdaten/Direkt-DB-Zugriff), scheitert er sonst erst am
-                # Gateway mit einer schwer diagnostizierbaren Allowlist-
-                # Ablehnung — UND degradiert damit JEDE Freitext-Bewertung
-                # dieser Institution auf den 0-Punkte-Stub, bis wer es
-                # bemerkt. Deshalb `error`, nicht `warning`, und nur einmal
-                # pro erstmals gesehenem Modellwert (Cache-Miss), nicht pro
-                # Submission.
+                # TF-440: no write path in the app currently sets a raw
+                # model name (no admin endpoint/schema for this field) —
+                # the TF-439 migration `tf439_grade_logical` already
+                # normalized existing values to 'examcraft/grading'. If a
+                # raw value shows up anyway (legacy data/direct DB
+                # access), it would otherwise only fail at the Gateway
+                # with a hard-to-diagnose allowlist rejection — AND
+                # degrade EVERY open-ended grading for this institution
+                # to the 0-point stub until someone notices. Hence
+                # `error`, not `warning`, and only once per first-seen
+                # model value (cache miss), not per submission.
                 if "/" not in model_override:
                     logger.error(
                         "_resolve_llm_grader: Institution %s hat llm_model_for_grading=%r "
@@ -398,7 +395,7 @@ class GradingService:
 
         for answer in attempt.answers:
             existing = answer.grade
-            # manual_override is sacrosanct — Lehrperson hat Vorrang.
+            # manual_override is sacrosanct — the teacher takes priority.
             if existing and existing.status == GradeStatus.MANUAL_OVERRIDE.value:
                 continue
 
@@ -462,8 +459,8 @@ class GradingService:
             # (non-import callers, or an answer added after pre-grading).
             if precomputed is not None and answer.id in precomputed:
                 return precomputed[answer.id]
-            # LlmGrader fängt API/Schema-Fehler intern ab und liefert
-            # einen 0-Punkte-Stub — keine Ausnahme propagiert nach hier.
+            # LlmGrader catches API/schema errors internally and returns
+            # a 0-point stub — no exception propagates up to here.
             return self.llm_grader.grade(**self._open_ended_inputs(qmeta, answer))
         raise UnknownQuestionTypeError(
             f"question_type {qmeta.question_type!r} hat keinen Grading-Pfad"
@@ -474,12 +471,12 @@ class GradingService:
         answer: AttemptAnswer,
         outcome: GradeOutcome | LlmGradeOutcome,
     ) -> None:
-        """Persistiert oder aktualisiert den Grade einer AttemptAnswer.
+        """Persists or updates the Grade for an AttemptAnswer.
 
-        LLM-Felder werden nur bei ``LlmGradeOutcome`` gesetzt — bei
-        deterministischen Outcomes auf NULL zurückgeschrieben, sonst
-        bleiben Reste eines vorherigen LLM-Laufs (z. B. Question-Type-
-        Wechsel im Composer) im DB-Record.
+        LLM fields are only set for ``LlmGradeOutcome`` — for
+        deterministic outcomes they are written back as NULL, otherwise
+        leftovers from a previous LLM run (e.g. a question-type change
+        in the composer) would remain in the DB record.
         """
         is_llm = isinstance(outcome, LlmGradeOutcome)
 
@@ -515,10 +512,10 @@ class GradingService:
     # ------------------------------------------------------------------
 
     def approve_grade(self, *, grade_id: int, reviewer_id: int) -> Grade:
-        """Lehrperson übernimmt LLM-Vorschlag → ``status=approved``.
+        """Teacher accepts the LLM suggestion → ``status=approved``.
 
-        Idempotent: Wiederholtes Approve eines bereits approveten
-        Grades schreibt keine zweite History-Zeile (`old==new`).
+        Idempotent: repeatedly approving an already-approved grade
+        doesn't write a second history row (`old==new`).
         """
         grade = self.db.get(Grade, grade_id)
         if grade is None:
@@ -553,12 +550,12 @@ class GradingService:
         points_awarded: float,
         reviewer_note: str | None = None,
     ) -> Grade:
-        """Lehrperson überschreibt → ``status=manual_override``.
+        """Teacher overrides → ``status=manual_override``.
 
-        Auditierbar: jede Änderung an Status, Punkten oder Reviewer-Note
-        erzeugt eine History-Zeile. Wenn alle drei identisch zum
-        bestehenden Stand sind, ist der Aufruf ein echter No-Op und
-        ``reviewed_at`` bleibt unverändert.
+        Auditable: every change to status, points, or reviewer note
+        creates a history row. If all three are identical to the
+        existing state, the call is a genuine no-op and ``reviewed_at``
+        stays unchanged.
         """
         grade = self.db.get(Grade, grade_id)
         if grade is None:
@@ -607,14 +604,14 @@ class GradingService:
         confidence_min: float | None = None,
         grade_ids: Iterable[int] | None = None,
     ) -> list[Grade]:
-        """Approve mehrere Grades in einem Aufruf.
+        """Approve multiple grades in a single call.
 
-        Lehrperson trigger explizit (Spec 6.4 — kein Auto-Approve).
-        Filter sind exklusiv: entweder ``grade_ids`` (explizite Liste)
-        oder ``confidence_min`` (alle proposed-Grades dieser Prüfung
-        mit konfidenz >= Schwelle). Multi-Tenancy-Check via
-        ``institution_id`` ist Pflicht — sonst kann Tenant A Grades
-        von Tenant B approven.
+        Teacher-triggered explicitly (Spec 6.4 — no auto-approve).
+        Filters are exclusive: either ``grade_ids`` (explicit list)
+        or ``confidence_min`` (all proposed grades for this exam with
+        confidence >= threshold). The multi-tenancy check via
+        ``institution_id`` is mandatory — otherwise tenant A could
+        approve tenant B's grades.
         """
         if (grade_ids is None) == (confidence_min is None):
             raise ValueError(
@@ -659,7 +656,7 @@ class GradingService:
             )
             approved.append(grade)
 
-        # Aggregate je Submission einmal nachziehen statt n-fach pro Grade.
+        # Refresh the aggregate once per submission instead of once per grade.
         submission_ids: set[int] = set()
         for g in approved:
             sid = self._submission_id_for_grade(g)
@@ -680,15 +677,15 @@ class GradingService:
         exam_question_id: int,
         triggered_by: int | None = None,
     ) -> int:
-        """Re-Grading nach ``correct_answer``-Änderung einer Frage.
+        """Re-grade after a question's ``correct_answer`` change.
 
-        Setzt alle ``proposed``/``approved``-Grades dieser ExamQuestion
-        zurück auf ``proposed`` und re-gradet sie. ``manual_override``
-        bleibt unangetastet — die Lehrperson hat dort schon explizit
-        entschieden (Spec 6.6).
+        Resets all ``proposed``/``approved`` grades of this ExamQuestion
+        back to ``proposed`` and re-grades them. ``manual_override``
+        stays untouched — the teacher has already explicitly decided
+        there (Spec 6.6).
 
         Returns:
-            Anzahl der re-gradeten Grades.
+            Number of re-graded grades.
         """
         affected_answers = (
             self.db.query(AttemptAnswer)
@@ -726,8 +723,9 @@ class GradingService:
                     points_max=qmeta.points
                 )
             self._upsert_grade(answer, outcome)
-            # Re-Grading zwingt zurück auf proposed, auch wenn vorher
-            # bereits approved — Lehrperson muss neu reviewen (Spec 6.6).
+            # Re-grading forces it back to proposed, even if it was
+            # already approved before — the teacher must review it again
+            # (Spec 6.6).
             grade.status = GradeStatus.PROPOSED.value
             grade.reviewer_id = None
             grade.reviewed_at = None
@@ -844,22 +842,22 @@ class GradingService:
 
     @staticmethod
     def _compute_grade_status(attempt: Attempt) -> str:
-        """Aggregiere ``submission.grade_status`` aus den open-ended-Grades.
+        """Aggregate ``submission.grade_status`` from the open-ended grades.
 
-        Open-ended-Antworten erkennen wir am ``is_correct=None``-
-        Sentinel (LLM- und Stub-Outcomes). MC/W-F-Antworten haben
-        immer ``True``/``False`` und gelten als review-äquivalent — die
-        Lehrperson kann sie via ``manual_override`` aus der Submissions-
-        Detailansicht heraus jederzeit eingreifen, aber das gated den
-        Notenexport nicht.
+        We recognize open-ended answers by the ``is_correct=None``
+        sentinel (LLM and stub outcomes). MC/true-false answers always
+        have ``True``/``False`` and are considered review-equivalent —
+        the teacher can still intervene on them via ``manual_override``
+        from the submission detail view at any time, but that doesn't
+        gate the grade export.
 
-        Logik (Spec 6.5):
+        Logic (Spec 6.5):
 
-        * keine open-ended-Antwort → ``fully_reviewed``
-        * mind. ein ``proposed`` und mind. ein ``approved``/
+        * no open-ended answer → ``fully_reviewed``
+        * at least one ``proposed`` and at least one ``approved``/
           ``manual_override`` → ``partially_reviewed``
-        * alle ``approved``/``manual_override`` → ``fully_reviewed``
-        * sonst → ``pending_review``
+        * all ``approved``/``manual_override`` → ``fully_reviewed``
+        * otherwise → ``pending_review``
         """
         open_ended_grades = [
             g
@@ -893,7 +891,7 @@ class GradingService:
     def _load_question_lookup(
         self, answers: Iterable[AttemptAnswer]
     ) -> dict[int, _QuestionMeta]:
-        """Fetch question meta (incl. Felder für LLM-Grading) in einem Roundtrip."""
+        """Fetch question meta (incl. fields for LLM grading) in a single roundtrip."""
         ids = {a.exam_question_id for a in answers}
         if not ids:
             return {}

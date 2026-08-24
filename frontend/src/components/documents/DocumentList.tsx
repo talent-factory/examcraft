@@ -1,5 +1,5 @@
 /**
- * DocumentList — Tabellen-Ansicht für die Dokumentbibliothek (TF-355 Phase 3).
+ * DocumentList — table view for the document library (TF-355 Phase 3).
  *
  * Presentational component. All mutations flow through props.
  */
@@ -307,7 +307,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
             <TableCell>
               {t('components.documentLibrary.list.colVisibility', 'Sichtbarkeit')}
             </TableCell>
-            {/* Titel — sortable */}
+            {/* Title — sortable */}
             <TableCell>
               {renderSortLabel('title', t('components.documentLibrary.list.colTitle', 'Titel'))}
             </TableCell>
@@ -319,15 +319,15 @@ const DocumentList: React.FC<DocumentListProps> = ({
             <TableCell>
               {t('components.documentLibrary.list.colStatus', 'Status')}
             </TableCell>
-            {/* Typ */}
+            {/* Type */}
             <TableCell>
               {t('components.documentLibrary.list.colType', 'Typ')}
             </TableCell>
-            {/* Grösse — sortable */}
+            {/* Size — sortable */}
             <TableCell>
               {renderSortLabel('size', t('components.documentLibrary.list.colSize', 'Grösse'))}
             </TableCell>
-            {/* Hochgeladen — sortable */}
+            {/* Uploaded — sortable */}
             <TableCell>
               {renderSortLabel('created_at', t('components.documentLibrary.list.colUploaded', 'Hochgeladen'))}
             </TableCell>
@@ -462,7 +462,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                   ) : null}
                 </TableCell>
 
-                {/* Status + OCR-/Qualitäts-Badges (TF-361) */}
+                {/* Status + OCR/quality badges (TF-361) */}
                 <TableCell>
                   <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
                     {renderStatusChip(doc)}
@@ -470,17 +470,17 @@ const DocumentList: React.FC<DocumentListProps> = ({
                   </Stack>
                 </TableCell>
 
-                {/* Typ */}
+                {/* Type */}
                 <TableCell>
                   {getMimeLabel(doc.mime_type)}
                 </TableCell>
 
-                {/* Grösse */}
+                {/* Size */}
                 <TableCell>
                   {formatFileSize(doc.file_size)}
                 </TableCell>
 
-                {/* Hochgeladen */}
+                {/* Uploaded */}
                 <TableCell>
                   {formatDate(doc.created_at, i18n.language)}
                 </TableCell>

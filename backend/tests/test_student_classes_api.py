@@ -290,7 +290,7 @@ def test_multi_tenancy_member_add_uses_user_institution(
     created = client.post("/api/v1/student-classes", json={"name": "Klasse A"})
     class_id = created.json()["id"]
 
-    # Ein Studi aus Institution B darf nicht in Klasse A eingeordnet werden.
+    # A student from institution B must not be assignable to class A.
     resp = client.post(
         f"/api/v1/student-classes/{class_id}/members",
         json={"student_id": foreign_student.id},

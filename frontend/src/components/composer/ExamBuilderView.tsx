@@ -173,10 +173,10 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
           if (eq) {
             removeMutation.mutate(eq.id);
           } else {
-            // Defensive: the "Entfernen"-Button erscheint nur, wenn isAdded true
-            // ist (gleiche exam.questions-Quelle) — dieser Zweig sollte also nie
-            // erreicht werden. Falls die beiden je auseinanderlaufen, lieber einen
-            // Fehler anzeigen als das Modal kommentarlos schliessen (kein Silent-Fail).
+            // Defensive: the "Remove" button only appears when isAdded is true
+            // (same exam.questions source) — so this branch should never be
+            // reached. If the two ever diverge, it's better to show an error
+            // than to close the modal silently (no silent fail).
             setBuilderError(t('composer.examBuilder.errorRemoveQuestion'));
           }
         }}

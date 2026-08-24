@@ -1,12 +1,12 @@
 """
 Claude API Service for ExamCraft AI
-Generiert Prüfungsfragen über den self-hosted LLM-Gateway.
+Generates exam questions via the self-hosted LLM Gateway.
 
-TF-440 (Phase 2): der Legacy-Direktpfad (rohes ``httpx`` gegen
-``/v1/messages``, ``CLAUDE_MODEL_FALLBACK``-Kette, Models-API-Startup-Check)
-wurde entfernt. Der Gateway (LiteLLM) ist die einzige Quelle für
-Modell-Routing — ein zurückgezogenes Modell wird dort per Config-Edit
-behoben statt hier per App-seitiger Fallback-Kette (TF-437/438).
+TF-440 (Phase 2): the legacy direct path (raw ``httpx`` against
+``/v1/messages``, ``CLAUDE_MODEL_FALLBACK`` chain, Models API startup check)
+was removed. The Gateway (LiteLLM) is the sole source of truth for
+model routing — a retired model is fixed there via a config edit
+instead of an app-side fallback chain here (TF-437/438).
 """
 
 import logging
@@ -20,24 +20,24 @@ logger = logging.getLogger(__name__)
 
 class ModelUnavailableError(Exception):
     """Raised when the Gateway classifies a model as permanently unavailable
-    (4xx ausser 429) — TF-438/TF-440.
+    (4xx except 429) — TF-438/TF-440.
 
-    Ein zurückgezogenes Modell ist eine *permanente* Bedingung, deshalb
-    müssen Caller — insbesondere der Celery Question-Generation-Task — dies
-    als nicht-retrybar behandeln statt endlos zu loopen (TF-437-Klasse).
+    A retired model is a *permanent* condition, so callers — in particular
+    the Celery question-generation task — must treat this as non-retryable
+    instead of looping indefinitely (TF-437 class).
     """
 
 
 class ClaudeService:
-    """Fragengenerierung über den LLM-Gateway (logischer Alias
+    """Question generation via the LLM Gateway (logical alias
     ``examcraft/generation``, TF-439/440)."""
 
     def __init__(self):
         self.demo_mode = (not llm_gateway.gateway_enabled()) or os.getenv(
             "CLAUDE_DEMO_MODE", "false"
         ).lower() == "true"
-        # Logischer Alias statt roher Modell-ID — der Gateway löst das Modell
-        # auf. Nur noch informativ (Dev-Debug-Endpoint main.py:/claude/health).
+        # Logical alias instead of a raw model ID — the Gateway resolves the
+        # model. Informational only now (dev debug endpoint main.py:/claude/health).
         self.model = llm_gateway.ALIAS_GENERATION
 
         if self.demo_mode:
@@ -49,11 +49,11 @@ class ClaudeService:
             logger.info(f"Claude API initialized via Gateway: model={self.model}")
 
     def get_usage_stats(self) -> Dict[str, Any]:
-        """Legacy-Shape für die Dev-only Debug-Endpoints
-        (``/api/v1/claude/usage`` und ``/api/v1/claude/health``).
-        Token-/Kosten-Tracking läuft seit TF-439 zentral am Gateway
-        (LiteLLM); hier bleiben nur Nullen als Platzhalter, damit der
-        bestehende Endpoint-Contract nicht bricht.
+        """Legacy shape for the dev-only debug endpoints
+        (``/api/v1/claude/usage`` and ``/api/v1/claude/health``).
+        Token/cost tracking has run centrally on the Gateway (LiteLLM)
+        since TF-439; only zero placeholders remain here so the
+        existing endpoint contract doesn't break.
         """
         return {
             "total_cost": 0.0,
@@ -145,14 +145,14 @@ class ClaudeService:
 
                 try:
                     questions = await generate_questions_via_gateway(custom_prompt)
-                # Transport-/Modellfehler durchreichen (TF-438-Klassifizierung):
+                # Pass through transport/model errors (TF-438 classification):
                 # ModelUnavailableError = permanent (fail-fast),
-                # ModelHTTPError = transient (retrybar). Nur ein echtes
-                # Typed-Output-/Parsing-Versagen darf auf Roh-Markdown
-                # zurückfallen — sonst maskiert der Fallback eine 5xx-Blip.
+                # ModelHTTPError = transient (retryable). Only a genuine
+                # typed-output/parsing failure may fall back to raw Markdown —
+                # otherwise the fallback masks a 5xx blip.
                 except (ModelUnavailableError, ModelHTTPError):
                     raise
-                except Exception as e:  # typisierter Output fehlgeschlagen
+                except Exception as e:  # typed output failed
                     logger.warning(
                         f"Gateway typed parse failed, returning raw Markdown: {e}"
                     )
@@ -275,14 +275,14 @@ def get_claude_service() -> "ClaudeService":
 
 
 async def validate_claude_model_on_startup() -> None:
-    """Startup hook, eingehängt in FastAPI-Lifespan und Celery-Worker-Boot.
+    """Startup hook, wired into the FastAPI lifespan and Celery worker boot.
 
-    TF-440: die Legacy Models-API-Validierungskette (curated fallback chain,
-    ``GET /v1/models/{id}``) wurde entfernt — der Gateway (LiteLLM) besitzt
-    eigene Health-/Fallback-Mechanik. Ein zurückgezogenes Modell wird dort
-    per 1-Zeilen-Config-Edit behoben statt hier per App-seitiger Kette
-    (TF-437/438). Bleibt als schlanker No-Op-Hook für die bestehenden
-    Call-Sites erhalten und crasht den Start nie.
+    TF-440: the legacy Models API validation chain (curated fallback chain,
+    ``GET /v1/models/{id}``) was removed — the Gateway (LiteLLM) has its
+    own health/fallback mechanics. A retired model is fixed there via a
+    one-line config edit instead of an app-side chain here (TF-437/438).
+    Remains as a lean no-op hook for the existing call sites and never
+    crashes startup.
     """
     if not llm_gateway.gateway_enabled():
         logger.warning(

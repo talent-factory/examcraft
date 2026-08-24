@@ -32,11 +32,11 @@ interface QuestionPreviewModalProps {
 }
 
 /**
- * TF-405: Rein lesendes Detail-Modal für eine Frage. Lädt das Detail erst beim
- * Öffnen nach (lazy via React Query) und markiert die korrekte Lösung.
- * Wird vom Prüfungskomponist sowohl aus dem Fragenpool (links) als auch aus den
- * Prüfungsfragen (rechts) geöffnet; der Aktions-Button schaltet je nach Zustand
- * zwischen „+ Hinzufügen" und „− Entfernen" um.
+ * TF-405: purely read-only detail modal for a question. Loads the detail
+ * only on open (lazy via React Query) and marks the correct answer.
+ * Opened by the exam composer both from the question pool (left) and from
+ * the exam questions (right); the action button toggles between
+ * "+ Add" and "− Remove" depending on state.
  */
 const QuestionPreviewModal: React.FC<QuestionPreviewModalProps> = ({
   questionId,

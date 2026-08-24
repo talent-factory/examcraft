@@ -16,7 +16,7 @@ from database import get_db
 
 
 # ---------------------------------------------------------------------------
-# Fixtures (analog zu test_tags_api.py)
+# Fixtures (analogous to test_tags_api.py)
 # ---------------------------------------------------------------------------
 
 
@@ -113,8 +113,8 @@ def make_question(db: Session, institution_id: int, created_by: int) -> Question
     return q
 
 
-# Fixtures werden aus conftest.py geerbt (tags_db, tags_client)
-# Die tags_client Fixture hat bereits tags_module.router und qr_module.router eingebunden.
+# Fixtures are inherited from conftest.py (tags_db, tags_client)
+# The tags_client fixture already includes tags_module.router and qr_module.router.
 
 
 # ---------------------------------------------------------------------------
@@ -335,7 +335,7 @@ class TestMergeTags:
         )
         assert len(logs) == 2
         assert sum(lg.questions_migrated for lg in logs) == 2
-        # Beide source_tag_ids einzeln im Audit-Trail vorhanden
+        # Both source_tag_ids are present individually in the audit trail
         assert {lg.source_tag_id for lg in logs} == {source1.id, source2.id}
 
     def test_merge_with_target_as_source_returns_422(self, tags_db, tags_client):
@@ -366,7 +366,7 @@ class TestUsageCount:
         tags_client.app.dependency_overrides[get_current_user] = lambda: user
 
         tags_client.post(f"/api/v1/questions/{q.id}/tags", json={"tag_ids": [tag.id]})
-        # usage_count wird live aus QuestionTag berechnet — abgefragt via API
+        # usage_count is computed live from QuestionTag — queried via the API
         resp = tags_client.get("/api/v1/tags")
         found = next(t for t in resp.json() if t["id"] == tag.id)
         assert found["usage_count"] == 1
@@ -557,7 +557,7 @@ class TestDeleteTag:
 
 class TestCaseInsensitivity:
     def test_create_tag_case_insensitive_returns_same_id(self, tags_db, tags_client):
-        """POST 'Python' und danach 'PYTHON' liefern denselben Tag (case-insensitive, case-preserving)."""
+        """POST 'Python' followed by 'PYTHON' returns the same tag (case-insensitive, case-preserving)."""
         inst = make_institution(tags_db, "ci1")
         user = make_user(tags_db, inst.id, "ci1")
         tags_db.commit()
@@ -571,7 +571,7 @@ class TestCaseInsensitivity:
         assert first.status_code == 200
         assert second.status_code == 200
         assert first.json()["id"] == second.json()["id"]
-        # Original-Schreibweise des ERSTEN Eintrags bleibt erhalten
+        # Original casing of the FIRST entry is preserved
         assert first.json()["name"] == "Python"
         assert second.json()["name"] == "Python"
 

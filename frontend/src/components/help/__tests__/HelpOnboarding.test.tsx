@@ -156,8 +156,8 @@ describe('HelpOnboarding — nav_selector already in DOM (fast path)', () => {
   it('highlights synchronously without dispatching a reveal request', () => {
     // navDocumentsEl is already in the DOM from beforeEach -- the opposite
     // fixture from the collapsed-sidebar tests below. This locks in the PR's
-    // own stated goal ("ein bereits gerenderter Link wird weiterhin synchron
-    // gehighlightet — kein zusätzliches Flackern") as a dedicated assertion
+    // own stated goal ("a link that's already rendered is still highlighted
+    // synchronously — no additional flicker") as a dedicated assertion
     // instead of relying on it as an incidental side effect of the unrelated
     // confirmation-dialog tests above (review fix).
     const dispatchSpy = jest.spyOn(window, 'dispatchEvent');

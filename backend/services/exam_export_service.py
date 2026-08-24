@@ -424,7 +424,7 @@ def _add_essay_question(quiz: Element, q: dict):
 
 
 # ---------------------------------------------------------------------------
-# PDF (TF-656) — druckfertiger Prüfungsbogen
+# PDF (TF-656) — print-ready exam sheet
 # ---------------------------------------------------------------------------
 
 
@@ -1037,7 +1037,7 @@ def _pdf_header(exam_data: dict, styles: dict) -> list:
 
 
 def _pdf_fill_in_block(styles: dict, content_width: float, locale: str) -> list:
-    """Name / Klasse fill-in lines directly below the header.
+    """Name / class fill-in lines directly below the header.
 
     Laid out as a table so both rules start at the same x despite the
     labels differing in width. The rules are underscores rather than drawn

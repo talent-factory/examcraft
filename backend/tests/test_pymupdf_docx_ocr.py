@@ -1,19 +1,19 @@
-"""Tests für OCR-Eskalation gescannter DOCX-Dateien im PyMuPDFProcessor (TF-360).
+"""Tests for OCR escalation of scanned DOCX files in PyMuPDFProcessor (TF-360).
 
-Hintergrund: Ein „gescanntes" DOCX speichert seine Seiten als eingebettete
-Rasterbilder mit kaum/keinem ``<w:t>``-Text. Vor TF-360 extrahierte
-``_process_docx`` nur die Textebene (z. B. eine 57-Zeichen-Quellenzeile) und
-setzte zudem kein ``pages`` in den Metadaten — wodurch beide Eskalations-
-Heuristiken des Quality-Gate (``scanned_low_text``, ``single_chunk_large_file``)
-blind blieben. Ein inhaltlich identisches PDF wurde dagegen sauber OCR-eskaliert.
+Background: a "scanned" DOCX stores its pages as embedded raster images with
+little/no ``<w:t>`` text. Before TF-360, ``_process_docx`` only extracted the
+text layer (e.g. a 57-character source line) and also did not set ``pages``
+in the metadata — leaving both escalation heuristics of the quality gate
+(``scanned_low_text``, ``single_chunk_large_file``) blind. An otherwise
+identical PDF, by contrast, was cleanly OCR-escalated.
 
-Diese Tests sichern beide Lücken ab:
-1. ``pages`` wird gesetzt -> Quality-Gate kann gescannte DOCX erkennen.
-2. Bei aktiviertem OCR werden eingebettete Bilder via Tesseract erkannt und in
-   den extrahierten Text aufgenommen (analog zur PDF-Eskalation).
+These tests cover both gaps:
+1. ``pages`` is set -> the quality gate can detect a scanned DOCX.
+2. With OCR enabled, embedded images are recognized via Tesseract and
+   included in the extracted text (analogous to the PDF escalation).
 
-Wie die PDF-OCR-Tests wird die eigentliche Tesseract-Engine gemockt — der echte
-Round-Trip wird (mangels Tesseract-Binary in CI) manuell im Image verifiziert.
+As with the PDF OCR tests, the actual Tesseract engine is mocked — the real
+round trip is verified manually in the image (no Tesseract binary in CI).
 """
 
 import io
@@ -30,11 +30,11 @@ DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 
 
 def _make_png(width: int = 8, height: int = 8, red: int = 255) -> bytes:
-    """Erzeuge ein gültiges PNG ohne Pillow (stdlib zlib/struct).
+    """Generate a valid PNG without Pillow (stdlib zlib/struct).
 
-    Die Farbe variiert über ``red``, damit unterschiedliche Aufrufe
-    byte-verschiedene Bilder liefern — python-docx dedupliziert sonst
-    identische Bytes zu einer einzigen Relationship.
+    The color varies via ``red`` so different calls produce byte-distinct
+    images — otherwise python-docx dedupes identical bytes into a single
+    relationship.
     """
 
     def _chunk(typ: bytes, data: bytes) -> bytes:
@@ -65,7 +65,7 @@ def _save_docx(tmp_path, builder, name="scanned.docx") -> str:
 
 
 def _scanned_docx(tmp_path, n_images: int = 1, text: str = "Quelle: Lehrmittel") -> str:
-    """Baue ein DOCX, das ein gescanntes nachstellt: wenig Text + Bild(er)."""
+    """Build a DOCX that mimics a scanned one: little text + image(s)."""
 
     def build(doc):
         if text:
@@ -78,10 +78,10 @@ def _scanned_docx(tmp_path, n_images: int = 1, text: str = "Quelle: Lehrmittel")
 
 @pytest.mark.asyncio
 async def test_docx_sets_page_count_so_quality_gate_can_fire(tmp_path):
-    """Regression (Ursache 1): _process_docx muss pages setzen.
+    """Regression (cause 1): _process_docx must set pages.
 
-    Ohne page_count waren scanned_low_text und single_chunk_large_file für
-    DOCX wirkungslos und ein gescanntes DOCX rutschte still als 'ok' durch.
+    Without page_count, scanned_low_text and single_chunk_large_file were
+    ineffective for DOCX and a scanned DOCX would silently pass as 'ok'.
     """
     processor = PyMuPDFProcessor()
     path = _scanned_docx(tmp_path, n_images=1)
@@ -96,7 +96,7 @@ async def test_docx_sets_page_count_so_quality_gate_can_fire(tmp_path):
 
 @pytest.mark.asyncio
 async def test_docx_ocr_extracts_image_text_when_enabled(tmp_path, monkeypatch):
-    """Ursache 2: bei enable_ocr=True werden eingebettete Bilder OCR't."""
+    """Cause 2: with enable_ocr=True, embedded images are OCR'd."""
     processor = PyMuPDFProcessor(enable_ocr=True)
     path = _scanned_docx(tmp_path, n_images=1)
 
@@ -117,7 +117,7 @@ async def test_docx_ocr_extracts_image_text_when_enabled(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_docx_ocr_not_run_when_disabled(tmp_path, monkeypatch):
-    """Erstlauf (enable_ocr=False) darf keine Bilder OCR'en."""
+    """First run (enable_ocr=False) must not OCR any images."""
     processor = PyMuPDFProcessor(enable_ocr=False)
     path = _scanned_docx(tmp_path, n_images=1)
 
@@ -140,7 +140,7 @@ async def test_docx_ocr_not_run_when_disabled(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_docx_ocr_preserves_image_order(tmp_path, monkeypatch):
-    """OCR-Text mehrerer Bilder muss in Dokument-Reihenfolge erscheinen."""
+    """OCR text of multiple images must appear in document order."""
     processor = PyMuPDFProcessor(enable_ocr=True)
     path = _scanned_docx(tmp_path, n_images=3, text="")
 
@@ -165,7 +165,7 @@ async def test_docx_ocr_preserves_image_order(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_docx_ocr_engine_failure_propagates(tmp_path, monkeypatch):
-    """Fatale OCR-Engine-Fehler dürfen NICHT als leeres Doc verschluckt werden."""
+    """Fatal OCR engine errors must NOT be swallowed as an empty doc."""
     processor = PyMuPDFProcessor(enable_ocr=True)
     path = _scanned_docx(tmp_path, n_images=1)
 
@@ -185,7 +185,7 @@ async def test_docx_ocr_engine_failure_propagates(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_docx_ocr_skips_unreadable_image_but_keeps_text(tmp_path, monkeypatch):
-    """Ein einzelnes nicht-rasterisierbares Bild ist tolerierbar (kein Fatal)."""
+    """A single non-rasterizable image is tolerable (not fatal)."""
     processor = PyMuPDFProcessor(enable_ocr=True)
     path = _scanned_docx(tmp_path, n_images=1, text="Erhaltener Textinhalt")
 
@@ -204,7 +204,7 @@ async def test_docx_ocr_skips_unreadable_image_but_keeps_text(tmp_path, monkeypa
 
 @pytest.mark.asyncio
 async def test_docx_ocr_discarded_images_counted(tmp_path, monkeypatch):
-    """Nicht-fataler OCR-Abbruch auf einem von zwei Bildern wird gezählt."""
+    """A non-fatal OCR abort on one of two images is counted."""
     processor = PyMuPDFProcessor(enable_ocr=True)
     path = _scanned_docx(tmp_path, n_images=2, text="")
 
@@ -223,6 +223,6 @@ async def test_docx_ocr_discarded_images_counted(tmp_path, monkeypatch):
     )
 
     full_text = " ".join(c.content for c in result.chunks)
-    assert "ZWEITES BILD" in full_text  # überlebendes Bild erhalten
+    assert "ZWEITES BILD" in full_text  # surviving image is retained
     assert result.metadata["ocr_pages_attempted"] == 2
     assert result.metadata["ocr_pages_discarded"] == 1

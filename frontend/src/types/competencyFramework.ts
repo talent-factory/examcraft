@@ -1,8 +1,8 @@
-// TF-400 Handlungskompetenzen — Typen für Kompetenzrahmen (HKB/Modul + HK).
-// Spiegelt FrameworkOut / CompetencyOut aus core/backend/api/competency_frameworks.py.
+// TF-400 competencies — types for competency frameworks (HKB/module + HK).
+// Mirrors FrameworkOut / CompetencyOut from core/backend/api/competency_frameworks.py.
 
-// TF-644: 'team' hinzugefügt (mirrors DocumentVisibility/PromptVisibility/
-// QuestionReviewVisibility/ExamVisibility). Nur zusammen mit org_unit_id sinnvoll.
+// TF-644: added 'team' (mirrors DocumentVisibility/PromptVisibility/
+// QuestionReviewVisibility/ExamVisibility). Only meaningful together with org_unit_id.
 export type FrameworkVisibility = 'private' | 'team' | 'institution';
 
 export interface CompetencyDescriptor {
@@ -26,7 +26,7 @@ export interface CompetencyFramework {
   rendered_text: string;
   language: string;
   institution_id: number | null;
-  // TF-644: gesetzt nur wenn visibility='team'.
+  // TF-644: set only when visibility='team'.
   org_unit_id: number | null;
   created_by: number | null;
   visibility: FrameworkVisibility;
@@ -41,8 +41,8 @@ export interface FrameworkCreatePayload {
   rendered_text: string;
   language?: string;
   visibility?: FrameworkVisibility;
-  // TF-644: nur zusammen mit visibility='team' relevant (backend validiert
-  // Mitgliedschaft in der gewählten Org-Unit).
+  // TF-644: only relevant together with visibility='team' (backend
+  // validates membership in the chosen org unit).
   org_unit_id?: number | null;
 }
 

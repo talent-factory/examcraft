@@ -73,9 +73,9 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
     enabled: editOpen,
   });
 
-  // TF-335: Notenskala-Dropdown im Edit-Dialog. Lazy-Load — nur wenn
-  // der Dialog offen ist, sonst hängt jede ExamMetadataBar-Render am
-  // /api/v1/grading-schemes-Call.
+  // TF-335: grading-scale dropdown in the edit dialog. Lazy-loaded —
+  // only while the dialog is open, otherwise every ExamMetadataBar render
+  // would hang on the /api/v1/grading-schemes call.
   const { data: gradingSchemesResponse } = useQuery({
     queryKey: ['grading-schemes'],
     queryFn: () => GradingSchemesService.list(true),
@@ -138,7 +138,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
     },
   });
 
-  // TF-398: Archivieren / Wiederherstellen (orthogonal zum Lebenszyklus).
+  // TF-398: archive / restore (orthogonal to the lifecycle).
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [archiveReason, setArchiveReason] = useState('');
 
@@ -266,7 +266,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
             >
               {t('composer.examMetadata.export')}
             </button>
-            {/* TF-398: Archivieren (in jedem Status) / Wiederherstellen */}
+            {/* TF-398: archive (in any status) / restore */}
             {exam.archived_at == null ? (
               <button
                 onClick={() => {
@@ -300,7 +300,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
         </div>
       </div>
 
-      {/* TF-398: Archivieren — Bestätigung mit optionalem Grund */}
+      {/* TF-398: archive — confirmation with optional reason */}
       <Dialog
         open={archiveDialogOpen}
         onClose={() => {

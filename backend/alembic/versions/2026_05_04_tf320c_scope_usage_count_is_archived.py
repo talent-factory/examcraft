@@ -1,4 +1,4 @@
-"""tf320c: scope, usage_count, is_archived auf tags
+"""tf320c: scope, usage_count, is_archived on tags
 
 Revision ID: tf320c3e4f5a6
 Revises: tf320b2c3d4e5
@@ -28,7 +28,7 @@ def upgrade() -> None:
         "tags",
         sa.Column("is_archived", sa.Boolean(), nullable=False, server_default="false"),
     )
-    # institution_id darf nun NULL sein (für globale Tags)
+    # institution_id may now be NULL (for global tags)
     op.alter_column("tags", "institution_id", nullable=True)
 
 

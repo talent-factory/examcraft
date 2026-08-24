@@ -1,4 +1,4 @@
-"""Tag Models für ExamCraft AI."""
+"""Tag models for ExamCraft AI."""
 
 from typing import Literal
 
@@ -24,19 +24,19 @@ TAG_KINDS: tuple[str, ...] = ("content", "prompt")
 
 
 class Tag(Base):
-    """Tags für Prüfungsfragen — scope='institution' (eigene Institution sichtbar),
-    scope='global' (institution_id IS NULL, alle Institutionen), oder scope='user'
-    (owner-only, application-validated, Eindeutigkeit case-insensitive per owner via
+    """Tags for exam questions — scope='institution' (visible within own institution),
+    scope='global' (institution_id IS NULL, all institutions), or scope='user'
+    (owner-only, application-validated, uniqueness case-insensitive per owner via
     ux_tags_user_name partial unique index).
-    Eindeutigkeit case-insensitive per scope, durchgesetzt via partielle
-    Unique-Indizes."""
+    Uniqueness is case-insensitive per scope, enforced via partial
+    unique indexes."""
 
     __tablename__ = "tags"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False)
-    # Geschlossene Wertemenge — per DB-CHECK durchgesetzt (s. __table_args__),
-    # nicht bloss per Konvention an den Schreibstellen (TF-372).
+    # Closed value set — enforced via DB CHECK (see __table_args__),
+    # not merely by convention at the write sites (TF-372).
     scope = Column(String(20), default="institution", nullable=False)
     institution_id = Column(
         Integer,
@@ -48,14 +48,14 @@ class Tag(Base):
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    # Deprecated: usage_count wird nicht mehr beschrieben — live aus QuestionTag
-    # berechnet. Spalte bleibt für Backwards-Compat des Schemas (keine Migration).
+    # Deprecated: usage_count is no longer written — computed live from
+    # QuestionTag. Column stays for schema backwards-compat (no migration).
     usage_count = Column(Integer, default=0, nullable=False)
     is_archived = Column(Boolean, default=False, nullable=False)
-    # TF-397: namespace dimension. 'content' tags classify Fragen/Dokumente,
-    # 'prompt' tags classify Prompt-Templates. Kept separate so prompt
+    # TF-397: namespace dimension. 'content' tags classify questions/documents,
+    # 'prompt' tags classify prompt templates. Kept separate so prompt
     # classification tags (e.g. 'single_choice', 'default') never pollute the
-    # Fragen-/Dokument-Tag-Auswahl. Closed value set — enforced by DB CHECK.
+    # question/document tag selection. Closed value set — enforced by DB CHECK.
     kind = Column(String(20), default="content", nullable=False)
 
     __table_args__ = (

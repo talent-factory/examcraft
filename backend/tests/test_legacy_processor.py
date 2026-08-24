@@ -1,6 +1,6 @@
 """
-Unit Tests für LegacyProcessor
-Tests für Fallback Document Processing
+Unit tests for LegacyProcessor
+Tests for fallback document processing
 """
 
 import pytest
@@ -10,15 +10,15 @@ from services.docling_service import ProcessedDocument
 
 @pytest.fixture
 def legacy_processor():
-    """Fixture für LegacyProcessor"""
+    """Fixture for LegacyProcessor"""
     return LegacyProcessor(chunk_size=1000, chunk_overlap=200)
 
 
 @pytest.fixture
 def sample_pdf_path(tmp_path):
-    """Fixture für temporäre PDF-Datei"""
+    """Fixture for a temporary PDF file"""
     pdf_file = tmp_path / "test.pdf"
-    # Minimales PDF mit Text
+    # Minimal PDF with text
     pdf_content = b"""%PDF-1.4
 1 0 obj
 << /Type /Catalog /Pages 2 0 R >>
@@ -57,7 +57,7 @@ startxref
 
 @pytest.fixture
 def sample_text_path(tmp_path):
-    """Fixture für temporäre Text-Datei"""
+    """Fixture for a temporary text file"""
     text_file = tmp_path / "test.txt"
     text_file.write_text(
         "This is a test document.\nWith multiple lines.\nAnd some content."
@@ -67,34 +67,34 @@ def sample_text_path(tmp_path):
 
 @pytest.fixture
 def sample_markdown_path(tmp_path):
-    """Fixture für temporäre Markdown-Datei"""
+    """Fixture for a temporary markdown file"""
     md_file = tmp_path / "test.md"
     md_file.write_text("# Test Document\n\n## Section 1\n\nSome **bold** text.")
     return str(md_file)
 
 
 class TestLegacyProcessorInitialization:
-    """Tests für Processor-Initialisierung"""
+    """Tests for processor initialization"""
 
     def test_processor_initialization(self, legacy_processor):
-        """Test: Processor wird korrekt initialisiert"""
+        """Test: processor is initialized correctly"""
         assert legacy_processor.chunk_size == 1000
         assert legacy_processor.chunk_overlap == 200
         assert len(legacy_processor.supported_types) > 0
 
     def test_supported_mime_types(self, legacy_processor):
-        """Test: Unterstützte MIME-Types"""
+        """Test: supported MIME types"""
         assert "application/pdf" in legacy_processor.supported_types
         assert "text/plain" in legacy_processor.supported_types
         assert "text/markdown" in legacy_processor.supported_types
 
 
 class TestLegacyProcessorPDFProcessing:
-    """Tests für PDF-Verarbeitung"""
+    """Tests for PDF processing"""
 
     @pytest.mark.asyncio
     async def test_process_pdf_success(self, legacy_processor, sample_pdf_path):
-        """Test: Erfolgreiches PDF Processing"""
+        """Test: successful PDF processing"""
         result = await legacy_processor.process_document(
             document_id=1,
             file_path=sample_pdf_path,
@@ -111,7 +111,7 @@ class TestLegacyProcessorPDFProcessing:
 
     @pytest.mark.asyncio
     async def test_pdf_metadata_extraction(self, legacy_processor, sample_pdf_path):
-        """Test: PDF Metadaten-Extraktion"""
+        """Test: PDF metadata extraction"""
         result = await legacy_processor.process_document(
             document_id=1,
             file_path=sample_pdf_path,
@@ -124,11 +124,11 @@ class TestLegacyProcessorPDFProcessing:
 
 
 class TestLegacyProcessorTextProcessing:
-    """Tests für Text-Verarbeitung"""
+    """Tests for text processing"""
 
     @pytest.mark.asyncio
     async def test_process_text_success(self, legacy_processor, sample_text_path):
-        """Test: Erfolgreiches Text Processing"""
+        """Test: successful text processing"""
         result = await legacy_processor.process_document(
             document_id=1,
             file_path=sample_text_path,
@@ -144,7 +144,7 @@ class TestLegacyProcessorTextProcessing:
 
     @pytest.mark.asyncio
     async def test_text_metadata(self, legacy_processor, sample_text_path):
-        """Test: Text Metadaten"""
+        """Test: text metadata"""
         result = await legacy_processor.process_document(
             document_id=1,
             file_path=sample_text_path,
@@ -159,13 +159,13 @@ class TestLegacyProcessorTextProcessing:
 
 
 class TestLegacyProcessorMarkdownProcessing:
-    """Tests für Markdown-Verarbeitung"""
+    """Tests for markdown processing"""
 
     @pytest.mark.asyncio
     async def test_process_markdown_success(
         self, legacy_processor, sample_markdown_path
     ):
-        """Test: Erfolgreiches Markdown Processing"""
+        """Test: successful markdown processing"""
         result = await legacy_processor.process_document(
             document_id=1,
             file_path=sample_markdown_path,
@@ -180,7 +180,7 @@ class TestLegacyProcessorMarkdownProcessing:
 
     @pytest.mark.asyncio
     async def test_markdown_to_plain_text(self, legacy_processor, sample_markdown_path):
-        """Test: Markdown wird zu Plain Text konvertiert"""
+        """Test: markdown is converted to plain text"""
         result = await legacy_processor.process_document(
             document_id=1,
             file_path=sample_markdown_path,
@@ -188,17 +188,17 @@ class TestLegacyProcessorMarkdownProcessing:
             mime_type="text/markdown",
         )
 
-        # Markdown-Formatierung sollte entfernt sein
+        # Markdown formatting should be removed
         content = result.chunks[0].content
         assert "Test Document" in content
         assert "Section 1" in content
 
 
 class TestLegacyProcessorChunking:
-    """Tests für Text-Chunking"""
+    """Tests for text chunking"""
 
     def test_create_chunks_small_text(self, legacy_processor):
-        """Test: Chunking mit kleinem Text"""
+        """Test: chunking with small text"""
         text = "This is a small test document."
         chunks = legacy_processor._create_chunks(text)
 
@@ -206,44 +206,44 @@ class TestLegacyProcessorChunking:
         assert chunks[0].content == text
 
     def test_create_chunks_large_text(self, legacy_processor):
-        """Test: Chunking mit großem Text"""
-        # Erstelle Text mit 2000 Wörtern
+        """Test: chunking with large text"""
+        # Create text with 2000 words
         text = " ".join([f"word{i}" for i in range(2000)])
         chunks = legacy_processor._create_chunks(text)
 
         assert len(chunks) > 1
 
-        # Prüfe Chunk-Größen
+        # Check chunk sizes
         for chunk in chunks:
             word_count = len(chunk.content.split())
             assert word_count <= legacy_processor.chunk_size
 
     def test_chunk_overlap(self, legacy_processor):
-        """Test: Chunk-Überlappung"""
-        # Erstelle Text mit 1500 Wörtern
+        """Test: chunk overlap"""
+        # Create text with 1500 words
         text = " ".join([f"word{i}" for i in range(1500)])
         chunks = legacy_processor._create_chunks(text)
 
         if len(chunks) > 1:
-            # Prüfe ob Überlappung existiert
+            # Check whether overlap exists
             first_chunk_words = chunks[0].content.split()
             second_chunk_words = chunks[1].content.split()
 
-            # Letzte Wörter des ersten Chunks sollten im zweiten Chunk sein
+            # The last words of the first chunk should be in the second chunk
             overlap_words = first_chunk_words[-legacy_processor.chunk_overlap :]
             second_chunk_start = second_chunk_words[: legacy_processor.chunk_overlap]
 
-            # Mindestens einige Wörter sollten überlappen
+            # At least some words should overlap
             assert any(word in second_chunk_start for word in overlap_words)
 
     def test_empty_text_chunking(self, legacy_processor):
-        """Test: Chunking mit leerem Text"""
+        """Test: chunking with empty text"""
         chunks = legacy_processor._create_chunks("")
         assert len(chunks) == 0
 
 
 class TestLegacyProcessorErrorHandling:
-    """Tests für Error Handling"""
+    """Tests for error handling"""
 
     @pytest.mark.asyncio
     async def test_unsupported_mime_type(self, legacy_processor, tmp_path):
@@ -263,7 +263,7 @@ class TestLegacyProcessorErrorHandling:
 
     @pytest.mark.asyncio
     async def test_nonexistent_file(self, legacy_processor):
-        """Test: Nicht-existierende Datei"""
+        """Test: nonexistent file"""
         with pytest.raises(Exception):
             await legacy_processor.process_document(
                 document_id=1,
@@ -274,11 +274,11 @@ class TestLegacyProcessorErrorHandling:
 
 
 class TestLegacyProcessorPerformance:
-    """Tests für Performance"""
+    """Tests for performance"""
 
     @pytest.mark.asyncio
     async def test_processing_time_recorded(self, legacy_processor, sample_text_path):
-        """Test: Processing Time wird aufgezeichnet"""
+        """Test: processing time is recorded"""
         result = await legacy_processor.process_document(
             document_id=1,
             file_path=sample_text_path,
@@ -291,8 +291,8 @@ class TestLegacyProcessorPerformance:
 
     @pytest.mark.asyncio
     async def test_large_document_performance(self, legacy_processor, tmp_path):
-        """Test: Performance mit großem Dokument"""
-        # Erstelle große Text-Datei (10000 Wörter)
+        """Test: performance with a large document"""
+        # Create a large text file (10000 words)
         large_text = " ".join([f"word{i}" for i in range(10000)])
         large_file = tmp_path / "large.txt"
         large_file.write_text(large_text)
@@ -304,16 +304,16 @@ class TestLegacyProcessorPerformance:
             mime_type="text/plain",
         )
 
-        # Sollte mehrere Chunks erstellen
+        # Should create multiple chunks
         assert result.total_chunks > 1
         assert len(result.chunks) > 1
 
-        # Processing sollte schnell sein (< 5 Sekunden)
+        # Processing should be fast (< 5 seconds)
         assert result.processing_time < 5.0
 
 
 class TestLegacyProcessorEncodingFallback:
-    """Tests: Encoding-Fallback für .txt und .md (UTF-8 → Latin-1)."""
+    """Tests: encoding fallback for .txt and .md (UTF-8 -> Latin-1)."""
 
     @pytest.mark.asyncio
     async def test_text_latin1_fallback(self, legacy_processor, tmp_path):

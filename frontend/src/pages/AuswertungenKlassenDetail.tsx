@@ -1,15 +1,15 @@
 /**
- * Klassen-Detail mit Cross-Exam-Verlauf (TF-336 G2 / Subarea B).
+ * Class detail with cross-exam history (TF-336 G2 / Subarea B).
  *
  * Layout:
- *  - Header: Klassenname, Member-Count, "Studi zuweisen"-Action
- *  - Tab "Verlauf": LineChart der Klassen-Durchschnitte pro Prüfung
- *    + BarChart für Topic-Coverage + Tabelle der Member-Performance
- *  - Tab "Mitglieder": Studi-Liste mit Remove-Action
+ *  - Header: class name, member count, "Studi zuweisen" (assign student) action
+ *  - "Verlauf" (history) tab: LineChart of the class averages per exam
+ *    + BarChart for topic coverage + table of member performance
+ *  - "Mitglieder" (members) tab: student list with a remove action
  *
- * Recharts liefert die Charts; Daten kommen aus
- * ``/api/v1/student-classes/{id}/stats`` (Enterprise-only — 402 wird
- * über den QuotaBanner an den Nutzer durchgereicht).
+ * Recharts renders the charts; data comes from
+ * ``/api/v1/student-classes/{id}/stats`` (Enterprise-only — a 402 is
+ * surfaced to the user via the QuotaBanner).
  */
 
 import React, { useEffect, useState } from 'react';
@@ -100,8 +100,8 @@ const AuswertungenKlassenDetail: React.FC = () => {
         if (historyRes.status === 'fulfilled') {
           setHistory(historyRes.value);
         } else if (historyRes.reason instanceof ApiError) {
-          // Tier-Quota auf der Stats-Route ist normal; nur den Banner
-          // anzeigen, ohne den Members-Tab zu blockieren.
+          // A tier quota on the stats route is expected; just show
+          // the banner without blocking the members tab.
           if (historyRes.reason.status === 402) {
             setError(historyRes.reason);
           } else if (detailRes.status === 'fulfilled') {

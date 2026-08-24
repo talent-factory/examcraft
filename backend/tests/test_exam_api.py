@@ -24,14 +24,14 @@ from models.exam import Exam, ExamQuestion, ExamStatus
 def _make_committable_session(test_engine, slug: str, email: str):
     """Yield a committable Session and clean its Institution+User on teardown.
 
-    Endpoints under test call session.commit() — die ``test_db``-Fixture
-    aus conftest.py hat keinen SAVEPOINT-Mode, eine SAVEPOINT-Variante
-    bricht optimistic-locking-Tests (updated_at-Refresh-Verhalten). Daher
-    bleibt es bei einer "echten" Session ohne Outer-Transaction. Damit
-    Pollution für andere Test-Files (test_quota_enforcement_integration,
-    test_profile_permissions_and_institution u.a., die ``Institution.first()``
-    abfragen) nicht entsteht, löschen wir die für diesen Test class-spezifisch
-    angelegten Institution-/User-Rows beim Teardown explizit.
+    Endpoints under test call session.commit() — the ``test_db`` fixture from
+    conftest.py has no SAVEPOINT mode, since a SAVEPOINT variant breaks
+    optimistic-locking tests (updated_at refresh behavior). So we stick with
+    a "real" session without an outer transaction. To avoid pollution for
+    other test files (test_quota_enforcement_integration,
+    test_profile_permissions_and_institution and others, which query
+    ``Institution.first()``), we explicitly delete the Institution/User rows
+    created specifically for this test class on teardown.
     """
     from sqlalchemy.orm import sessionmaker
     from models.auth import Institution, User
@@ -41,7 +41,7 @@ def _make_committable_session(test_engine, slug: str, email: str):
     try:
         yield session
     finally:
-        session.rollback()  # falls letzter Test eine offene Transaktion hatte
+        session.rollback()  # in case the last test had an open transaction
         try:
             session.query(User).filter(User.email == email).delete()
             session.query(Institution).filter(Institution.slug == slug).delete()
@@ -628,17 +628,17 @@ class TestExamCRUDApi:
         assert data["time_limit_minutes"] == 90
 
     def test_delete_draft_exam_requires_archive_first(self, exam_client):
-        """DELETE erfordert vorheriges Archivieren (TF-398): der frühere
-        One-Click-Draft-Delete entfällt. Unarchiviert → 409; nach Archivieren
-        → 204 und die Prüfung ist weg."""
+        """DELETE requires prior archiving (TF-398): the former one-click
+        draft delete is gone. Unarchived → 409; after archiving → 204 and
+        the exam is gone."""
         create_resp = exam_client.post("/api/v1/exams/", json={"title": "To Delete"})
         exam_id = create_resp.json()["id"]
 
-        # Ohne vorheriges Archivieren blockiert (409).
+        # Blocked without prior archiving (409).
         blocked = exam_client.delete(f"/api/v1/exams/{exam_id}")
         assert blocked.status_code == 409
 
-        # Archivieren, dann löschen.
+        # Archive, then delete.
         archive_resp = exam_client.post(f"/api/v1/exams/{exam_id}/archive", json={})
         assert archive_resp.status_code == 200
 
@@ -1295,11 +1295,10 @@ class TestExamCRUDApiExtra(
     def test_delete_finalized_unarchived_exam_returns_409(
         self, exam_client, exam_db, exam_institution, exam_user
     ):
-        """DELETE einer finalisierten, NICHT archivierten Prüfung wird mit 409
-        blockiert (TF-398: erst archivieren, dann löschen). Eine finalisierte
-        Prüfung ist — anders als eine exportierte — nach dem Archivieren
-        grundsätzlich löschbar, sofern keine Abgaben existieren; ohne
-        Archivierung greift jedoch der Guard."""
+        """DELETE of a finalized, NOT archived exam is blocked with 409
+        (TF-398: archive first, then delete). A finalized exam — unlike an
+        exported one — is generally deletable after archiving, as long as
+        no submissions exist; without archiving, however, the guard applies."""
         create_resp = exam_client.post(
             "/api/v1/exams/", json={"title": "Finalized Delete"}
         )
@@ -3615,7 +3614,7 @@ class TestAutoFillDocumentFilter:
 
 
 # ---------------------------------------------------------------------------
-# TF-405: GET /approved-questions/{id} — read-only Detail für die Vorschau
+# TF-405: GET /approved-questions/{id} — read-only detail for the preview
 # ---------------------------------------------------------------------------
 
 
@@ -3730,9 +3729,10 @@ class TestApprovedQuestionDetail(
     def test_detail_previews_non_approved_question(
         self, exam_client, exam_db, exam_institution, exam_user
     ):
-        """A non-approved question in the tenant is previewable — eine Frage, die in
-        einer Prüfung liegt, kann nachträglich auf ``edited``/``pending`` wechseln und
-        muss trotzdem vorschaubar bleiben (Freigabe-Gating gilt nur für die Liste)."""
+        """A non-approved question in the tenant is previewable — a question that
+        is part of an exam can later transition to ``edited``/``pending`` and
+        must still remain previewable (the approval gating only applies to
+        the list)."""
         q = self._make_question(
             exam_db,
             exam_institution.id,

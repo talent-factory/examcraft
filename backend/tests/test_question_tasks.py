@@ -1,6 +1,6 @@
 """
-Tests für den generate_questions_task Celery Task.
-Testet Task-Dispatch, Progress-Steps und Rückgabe-Format.
+Tests for the generate_questions_task Celery task.
+Tests task dispatch, progress steps, and the return format.
 """
 
 import dataclasses
@@ -15,21 +15,21 @@ from unittest.mock import patch
 
 
 def test_generate_questions_task_importable():
-    """Task kann importiert werden"""
+    """Task can be imported"""
     from tasks.question_tasks import generate_questions_task
 
     assert generate_questions_task is not None
 
 
 def test_generate_questions_task_name():
-    """Task hat den korrekten Celery-Namen"""
+    """Task has the correct Celery name"""
     from tasks.question_tasks import generate_questions_task
 
     assert generate_questions_task.name == "tasks.question_tasks.generate_questions"
 
 
 def test_generate_questions_task_uses_progress_task_base():
-    """Task verwendet ProgressTask als Basis"""
+    """Task uses ProgressTask as its base"""
     from tasks.question_tasks import generate_questions_task
     from tasks.document_tasks import ProgressTask
 
@@ -37,14 +37,14 @@ def test_generate_questions_task_uses_progress_task_base():
 
 
 def test_generate_questions_task_registered_in_celery():
-    """Task ist in der Celery-App registriert"""
+    """Task is registered in the Celery app"""
     from celery_app import celery_app
 
     assert "tasks.question_tasks.generate_questions" in celery_app.tasks
 
 
 def test_generate_questions_task_has_correct_queue_route():
-    """Task ist der question_generation Queue zugeordnet"""
+    """Task is routed to the question_generation queue"""
     from celery_app import celery_app
 
     routes = celery_app.conf.task_routes
@@ -54,7 +54,7 @@ def test_generate_questions_task_has_correct_queue_route():
 
 
 def test_generate_questions_task_emits_step_zero():
-    """Task emittiert Step-0-Progress-Update (0%) beim Start"""
+    """Task emits the step-0 progress update (0%) at start"""
     from tasks.question_tasks import generate_questions_task
 
     @dataclasses.dataclass
@@ -105,7 +105,7 @@ def test_generate_questions_task_emits_step_zero():
 
         generate_questions_task.run(request_data, "42")
 
-    # Step 0 muss emittiert werden
+    # Step 0 must be emitted
     assert len(progress_updates) >= 1
     first = progress_updates[0]
     assert first["current"] == 0
@@ -114,8 +114,9 @@ def test_generate_questions_task_emits_step_zero():
 
 
 def test_generate_questions_task_returns_correct_format():
-    """Task gibt dict mit exam_id, topic, questions, context_summary, generation_time,
-    quality_metrics zurück. Verwendet echte Dataclasses um dataclasses.asdict() zu testen.
+    """Task returns a dict with exam_id, topic, questions, context_summary,
+    generation_time, quality_metrics. Uses real dataclasses to test
+    dataclasses.asdict().
     """
     from tasks.question_tasks import generate_questions_task
 
@@ -183,7 +184,7 @@ def test_generate_questions_task_returns_correct_format():
 
 
 def test_generate_questions_task_rejects_when_rag_service_unavailable():
-    """Task wirft Reject wenn RAGService nicht verfügbar (Core-Deployment)."""
+    """Task raises Reject when RAGService is unavailable (Core deployment)."""
     from tasks.question_tasks import generate_questions_task
     from celery.exceptions import Reject
 
@@ -403,9 +404,9 @@ def test_safe_update_job_status_swallows_job_status_update_error_and_logs(mocker
     logs at CRITICAL level with traceback (logger.critical + exc_info=True), and
     does NOT re-raise.
 
-    mocker.patch direkt auf den Modul-Logger statt caplog: pytest 7.4.3
-    (CI-Pin) lässt caplog.records hier leer; der direkte Mock ist
-    versionsunabhängig.
+    mocker.patch directly on the module logger instead of caplog: pytest 7.4.3
+    (the CI-pinned version) leaves caplog.records empty here; the direct mock
+    is version-independent.
     """
     from tasks.question_tasks import JobStatusUpdateError, _safe_update_job_status
 
@@ -823,7 +824,7 @@ def test_persist_questions_preserves_none_options():
 
 
 def _make_open_ended_question(correct_answer):
-    """SimpleNamespace für open_ended-Fragen mit beliebigem correct_answer-Typ."""
+    """SimpleNamespace for open_ended questions with an arbitrary correct_answer type."""
     from types import SimpleNamespace
 
     return SimpleNamespace(
@@ -841,8 +842,8 @@ def _make_open_ended_question(correct_answer):
 
 
 def _capture_persisted_correct_answer(fake_question):
-    """Führt _persist_questions mit einem einzelnen open_ended-Question aus und
-    gibt den correct_answer-Wert zurück, der auf dem QuestionReview-Row landet."""
+    """Runs _persist_questions with a single open_ended question and returns
+    the correct_answer value that ended up on the QuestionReview row."""
     from tasks.question_tasks import _persist_questions
 
     captured: list = []
@@ -982,8 +983,8 @@ def test_persist_questions_preserves_none_correct_answer():
 
 
 def _capture_persisted_explanation(fake_question):
-    """Führt _persist_questions aus und gibt den explanation-Wert zurück,
-    der auf dem QuestionReview-Row landet."""
+    """Runs _persist_questions and returns the explanation value that ended
+    up on the QuestionReview row."""
     from tasks.question_tasks import _persist_questions
 
     captured: list = []
@@ -1284,7 +1285,7 @@ def test_run_async_closes_loop_after_exception():
     assert closed, "Event loop must be closed even when the coroutine raises"
 
 
-# === TF-320: QuestionTag-Zuweisung in _persist_questions ===
+# === TF-320: QuestionTag assignment in _persist_questions ===
 
 
 def _run_persist_with_tags(tag_ids: list):
@@ -1377,7 +1378,7 @@ def _run_persist_with_tags(tag_ids: list):
 
 
 def test_persist_questions_creates_question_tag_rows_for_each_review_and_tag():
-    """Für 1 Frage und 2 Tags → 2 QuestionTag-Rows mit korrekten IDs."""
+    """For 1 question and 2 tags -> 2 QuestionTag rows with correct IDs."""
     added_tags, _ = _run_persist_with_tags([10, 20])
 
     assert len(added_tags) == 2
@@ -1387,14 +1388,14 @@ def test_persist_questions_creates_question_tag_rows_for_each_review_and_tag():
 
 
 def test_persist_questions_does_not_write_denormalised_usage_count():
-    """Regression: usage_count wird nicht mehr per UPDATE geschrieben — live aus QuestionTag."""
+    """Regression: usage_count is no longer written via UPDATE — it's live from QuestionTag."""
     _, execute_calls = _run_persist_with_tags([10, 20])
     update_calls = [c for c in execute_calls if "UPDATE tags" in str(c)]
     assert update_calls == []
 
 
 def test_persist_questions_without_tag_ids_creates_no_question_tags():
-    """Ohne tag_ids → keine QuestionTag-Rows, keine UPDATE tags."""
+    """Without tag_ids -> no QuestionTag rows, no UPDATE tags."""
     added_tags, execute_calls = _run_persist_with_tags([])
     update_calls = [c for c in execute_calls if "UPDATE tags" in str(c)]
 
@@ -1403,7 +1404,7 @@ def test_persist_questions_without_tag_ids_creates_no_question_tags():
 
 
 def test_persist_questions_rejects_invisible_tag_ids():
-    """Tag-IDs die NICHT in der visible-Liste sind → ValueError (keine FK-Verletzung)."""
+    """Tag IDs that are NOT in the visible list -> ValueError (no FK violation)."""
     import pytest
     from types import SimpleNamespace
     from tasks.question_tasks import _persist_questions
@@ -1476,7 +1477,7 @@ def test_persist_questions_rejects_invisible_tag_ids():
 
 
 def test_generate_questions_task_passes_tag_ids_from_request_data():
-    """generate_questions_task extrahiert tag_ids aus request_data und gibt sie weiter."""
+    """generate_questions_task extracts tag_ids from request_data and passes them along."""
     import dataclasses
     from unittest.mock import MagicMock, patch
     from tasks.question_tasks import generate_questions_task
@@ -1535,7 +1536,7 @@ def test_generate_questions_task_passes_tag_ids_from_request_data():
     )
 
 
-# === TF-383: generation_metadata (Prompt-/Template-Herkunft) im Write-Path ===
+# === TF-383: generation_metadata (prompt/template provenance) in the write path ===
 
 
 def _capture_persisted_question(fake_question):
@@ -1591,8 +1592,8 @@ def _capture_persisted_question(fake_question):
 
 
 def test_persist_questions_stores_generation_metadata():
-    """TF-383: Der Provenance-Snapshot der Premium-Frage wird auf der
-    QuestionReview-Zeile persistiert."""
+    """TF-383: the provenance snapshot of the Premium question is persisted
+    on the QuestionReview row."""
     from types import SimpleNamespace
 
     snapshot = {
@@ -1622,11 +1623,11 @@ def test_persist_questions_stores_generation_metadata():
 
 
 def test_persist_questions_generation_metadata_defaults_to_none():
-    """Fragequellen ohne Herkunft (z. B. manuell, kein Premium-Snapshot) dürfen
-    nicht crashen — getattr liefert None."""
+    """Question sources without provenance (e.g. manual, no Premium snapshot)
+    must not crash — getattr returns None."""
     from types import SimpleNamespace
 
-    # Bewusst KEIN generation_metadata-Attribut → testet das getattr(..., None).
+    # Deliberately NO generation_metadata attribute -> tests the getattr(..., None).
     fake_question = SimpleNamespace(
         question_text="Frage ohne Herkunft",
         question_type="open_ended",
@@ -1801,7 +1802,7 @@ def test_persist_questions_falls_back_to_filename_matching_without_source_docume
     from types import SimpleNamespace
     from tasks.question_tasks import _persist_questions
 
-    # Bewusst KEIN source_document_ids-Attribut → testet getattr(..., None).
+    # Deliberately NO source_document_ids attribute -> tests getattr(..., None).
     fake_question = SimpleNamespace(
         question_text="Q?",
         question_type="open_ended",

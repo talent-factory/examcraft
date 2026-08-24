@@ -1,8 +1,8 @@
 /**
- * Tests für DocumentOcrQualityBadges (TF-361).
+ * Tests for DocumentOcrQualityBadges (TF-361).
  *
- * react-i18next ist lokal gemockt (t gibt den Key zurück), damit die Assertions
- * unabhängig von Übersetzungsinhalten auf stabilen data-testid-Markern fussen.
+ * react-i18next is mocked locally (t returns the key) so the assertions rest
+ * on stable data-testid markers regardless of translation content.
  */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
@@ -82,7 +82,7 @@ describe('DocumentOcrQualityBadges', () => {
       ),
     );
     expect(screen.getByTestId('ocr-reprocessing-badge')).toBeInTheDocument();
-    // Kein widersprüchlicher Qualitäts-/OCR-Badge während des Reprocess.
+    // No contradictory quality/OCR badge during reprocessing.
     expect(screen.queryByTestId('quality-warning-badge')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ocr-badge')).not.toBeInTheDocument();
   });
@@ -104,9 +104,9 @@ describe('DocumentOcrQualityBadges', () => {
   });
 
   it('zeigt den Reprocessing-Hinweis bei escalation "queued", auch wenn der Status noch PROCESSED ist (TF-365 Fenster A)', () => {
-    // Zwischen Einreihen der Eskalation und Start des Reprocess-Jobs steht das
-    // Dokument noch auf PROCESSED — ohne escalation würde nur ein grüner Status
-    // ohne Reprocess-Hinweis erscheinen.
+    // Between enqueuing the escalation and starting the reprocess job, the
+    // document is still PROCESSED — without escalation only a green status
+    // would appear, with no reprocess notice.
     render(
       wrap(
         <DocumentOcrQualityBadges
@@ -137,15 +137,15 @@ describe('DocumentOcrQualityBadges', () => {
       ),
     );
     expect(screen.getByTestId('ocr-failed-badge')).toBeInTheDocument();
-    // Early-Return: kein widersprüchlicher Qualitäts-/OCR-Chip neben dem Fehler.
+    // Early return: no contradictory quality/OCR chip alongside the error.
     expect(screen.queryByTestId('quality-warning-badge')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ocr-badge')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ocr-reprocessing-badge')).not.toBeInTheDocument();
   });
 
   it('zeigt bei escalation "exhausted" die bestehenden OCR-+Qualitäts-Badges (kein Reprocessing/Fehler)', () => {
-    // OCR lief, Qualität weiter ungenügend: keine weitere Eskalation, daher kein
-    // Reprocessing-Hinweis und kein Fehler-Chip — nur OCR-Badge + Qualitätswarnung.
+    // OCR ran, quality still insufficient: no further escalation, hence no
+    // reprocessing notice and no error chip — only OCR badge + quality warning.
     render(
       wrap(
         <DocumentOcrQualityBadges

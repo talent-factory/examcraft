@@ -44,7 +44,7 @@ export interface DocumentQuality {
 }
 
 /**
- * OCR-Eskalations-State (TF-360/TF-365). Mirrors backend
+ * OCR escalation state (TF-360/TF-365). Mirrors backend
  * services.quality_assessor.EscalationState. Exposed via
  * `Document.to_dict().escalation` so the UI can surface an in-flight or failed
  * OCR re-processing pass:
@@ -88,12 +88,13 @@ export interface Document {
   vector_collection?: string;
   updated_at?: string;
   tags?: DocumentTag[];
-  // OCR-/Qualitäts-Eskalation (TF-360/TF-361/TF-365). Backend befüllt diese Felder
-  // dateiformat-unabhängig (PDF + gescanntes DOCX) via Document.to_dict.
+  // OCR/quality escalation (TF-360/TF-361/TF-365). Backend populates these
+  // fields file-format-independently (PDF + scanned DOCX) via Document.to_dict.
   processed_with_ocr?: boolean;
   quality?: DocumentQuality | null;
-  // OCR-Eskalations-State (TF-365): macht laufende (`queued`) oder fehlgeschlagene
-  // (`failed`) OCR-Nachbearbeitung im UI sichtbar. `null`/undefined bei Altrows.
+  // OCR escalation state (TF-365): surfaces an in-flight (`queued`) or
+  // failed (`failed`) OCR re-processing pass in the UI. `null`/undefined
+  // for legacy rows.
   escalation?: DocumentEscalation | null;
   metadata?: {
     total_chunks?: number;
@@ -193,9 +194,9 @@ export interface RAGExamRequest {
     true_false?: PromptConfig;
   };
   tag_ids?: number[];
-  /** TF-400: Kompetenzrahmen-ID; Backend lädt rendered_text, wenn kein Override gesetzt ist. */
+  /** TF-400: competency framework ID; backend loads rendered_text when no override is set. */
   framework_id?: number;
-  /** TF-400: Editierter Kompetenzen-Volltext; gewinnt über framework_id (verbatim {{ competencies }}). */
+  /** TF-400: edited competencies full text; takes precedence over framework_id (verbatim {{ competencies }}). */
   competencies_override?: string;
 }
 
@@ -224,8 +225,8 @@ export interface RAGContextSummary {
   source_documents: Array<{
     id: number;
     filename: string;
-    /** TF-605: Anzeigename aus der Dokumentbibliothek — für die Anzeige dem
-     *  `filename` vorziehen. Optional, weil ältere Responses ihn nicht führen. */
+    /** TF-605: display name from the document library — prefer this over
+     *  `filename` for display. Optional, since older responses don't carry it. */
     title?: string;
     chunks_used: number;
   }>;
@@ -248,10 +249,10 @@ export interface RAGExamResponse {
     context_chunks_used: number;
     total_context_length: number;
     average_similarity_score: number;
-    // TF-358: requested_/generated_question_count werden bei jeder
-    // RAG-Generierung gesetzt. context_limited(_notice) nur, wenn die
-    // Fragenanzahl ans verfügbare Chunk-Material gekoppelt wurde (weniger
-    // Fragen erzeugt als angefordert). Alle optional (Backward-Compat).
+    // TF-358: requested_/generated_question_count are set on every RAG
+    // generation. context_limited(_notice) only when the question count
+    // was coupled to the available chunk material (fewer questions
+    // generated than requested). All optional (backward compat).
     requested_question_count?: number;
     generated_question_count?: number;
     context_limited?: boolean;
@@ -272,20 +273,20 @@ export interface DifficultyLevel {
   description: string;
 }
 
-// TF-626: Hiess `SupportedLanguage` und kollidierte damit im Barrel
-// (types/index.ts) mit dem gleichnamigen Union-Typ aus auth.ts
-// ('de' | 'en' | 'fr' | 'it'). TypeScript loeste die Mehrdeutigkeit auf,
-// indem es den Namen aus dem Re-Export ganz herausnahm (TS2308) — beide
-// Typen waren ueber `@examcraft/core/types` also gar nicht erreichbar.
-// Dieser hier ist ein API-DTO (Eintrag in QuestionTypesResponse), nicht die
-// Spracheinstellung des Nutzers.
+// TF-626: was called `SupportedLanguage` and collided in the barrel
+// (types/index.ts) with the identically-named union type from auth.ts
+// ('de' | 'en' | 'fr' | 'it'). TypeScript resolved the ambiguity by
+// dropping the name from the re-export entirely (TS2308) — both types
+// were thus completely unreachable via `@examcraft/core/types`. This
+// one here is an API DTO (entry in QuestionTypesResponse), not the
+// user's language setting.
 //
-// TF-626-Review (Suggestion): `code` war zuvor `string` — der einzige
-// tatsaechliche Erzeuger (core/backend/api/rag_exams.py:supported_languages)
-// gibt aber ausschliesslich Werte aus exakt derselben Menge wie
-// `SupportedLanguage` aus auth.ts ('de' | 'en' | 'fr' | 'it') zurueck. Ohne
-// diese Kopplung wuerde ein Tippfehler im Backend ('deu', 'DE') hier
-// stillschweigend durchgehen.
+// TF-626-Review (suggestion): `code` used to be `string` — but the only
+// actual producer (core/backend/api/rag_exams.py:supported_languages)
+// exclusively returns values from exactly the same set as
+// `SupportedLanguage` from auth.ts ('de' | 'en' | 'fr' | 'it'). Without
+// this coupling, a typo in the backend ('deu', 'DE') would silently
+// slip through here.
 export interface SupportedLanguageOption {
   code: SupportedLanguage;
   name: string;
@@ -312,10 +313,10 @@ export interface GenerationTaskState {
 /**
  * Response from GET /api/v1/rag/active-tasks.
  *
- * Enthält seit TF-608 nicht nur laufende, sondern auch kürzlich abgeschlossene
- * Tasks (terminaler `status`), damit eine während eines Seitenwechsels fertig
- * gewordene Generierung erreichbar bleibt. Das Ergebnis reist nicht mit — es
- * wird per `GET /api/v1/rag/tasks/{task_id}/result` nachgeladen.
+ * Since TF-608 contains not only running but also recently completed
+ * tasks (terminal `status`), so a generation that finished during a
+ * page change stays reachable. The result doesn't travel along — it's
+ * fetched separately via `GET /api/v1/rag/tasks/{task_id}/result`.
  */
 export interface ActiveTaskInfo {
   task_id: string;
@@ -334,8 +335,9 @@ export interface ActiveTasksResponse {
 /**
  * Response from GET /api/v1/rag/tasks/{task_id}/result (TF-608).
  *
- * `result` ist `null`, wenn das Celery-Result-Backend den Eintrag bereits
- * verworfen hat — der Task bleibt dann sichtbar, nur ohne Detailansicht.
+ * `result` is `null` when the Celery result backend has already
+ * discarded the entry — the task stays visible then, just without a
+ * detail view.
  */
 export interface TaskResultResponse {
   task_id: string;

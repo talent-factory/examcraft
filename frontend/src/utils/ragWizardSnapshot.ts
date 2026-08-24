@@ -1,10 +1,10 @@
 /**
- * Persistierter Konfigurationsstand des RAG-Fragengenerierungs-Wizards (TF-608).
+ * Persisted configuration state of the RAG question generation wizard (TF-608).
  *
- * Der Wizard selbst ist eine Premium-Komponente; Form und Absicherung des
- * Snapshots liegen hier, weil der Core ohnehin die RAG-Typen und den
- * GenerationTasksContext hält — und weil die Prüflogik so von der CI-Suite
- * abgedeckt wird.
+ * The wizard itself is a Premium component; the snapshot's shape and
+ * validation live here because core already holds the RAG types and the
+ * GenerationTasksContext — and because that keeps the validation logic
+ * covered by the CI suite.
  */
 
 import type { PromptSelection, RAGExamRequest } from '../types';
@@ -12,27 +12,27 @@ import type { PromptSelection, RAGExamRequest } from '../types';
 // lib.ts for tier packages).
 import type { TagValue } from '../api/tagsApi';
 
-/** Schlüssel des Snapshots im sessionStorage (siehe `sessionSnapshot.ts`). */
+/** Key of the snapshot in sessionStorage (see `sessionSnapshot.ts`). */
 export const RAG_WIZARD_SNAPSHOT_KEY = 'ragExamWizard';
-/** Bei jeder Formänderung erhöhen — alte Snapshots werden dann verworfen
- *  statt halb eingelesen. */
+/** Bump on every form change — older snapshots are then discarded instead
+ *  of being read in half-restored. */
 export const RAG_WIZARD_SNAPSHOT_VERSION = 1;
 /**
- * Letzter `activeStep`-Index (0-basiert), den ein Snapshot wiederherstellen
- * darf. Der letzte Wizard-Schritt (`activeStep === 3`, UI-Label `step4Label`
- * / "Prüfungsfragen generiert") ist die Ergebnisansicht — die hängt an einem
- * generierten Prüfungsobjekt, das nicht im sessionStorage liegt (zu gross,
- * und die Fragen stehen ohnehin in der Prüf-Queue).
+ * Last `activeStep` index (0-based) a snapshot is allowed to restore. The
+ * final wizard step (`activeStep === 3`, UI label `step4Label` /
+ * "Prüfungsfragen generiert") is the results view — it depends on a
+ * generated exam object that isn't in sessionStorage (too large, and the
+ * questions already live in the review queue anyway).
  *
- * (Nicht mit dem 1-basierten "Schritt 3" in `RAGExamCreator.tsx` verwechseln
- * — das bezeichnet dort denselben `activeStep === 2`, die Kontextanalyse.)
+ * (Not to be confused with the 1-based "step 3" in `RAGExamCreator.tsx`
+ * — that refers to the same `activeStep === 2`, the context analysis, there.)
  */
 export const MAX_RESTORABLE_WIZARD_STEP = 2;
 
 /**
- * `contextPreview` fehlt bewusst: Die Vorschau kann veralten und wird bei
- * Rückkehr auf Schritt 3 frisch geladen. Der Kompetenzrahmen reist nur als ID
- * mit und wird aufgelöst, sobald die Rahmenliste geladen ist.
+ * `contextPreview` is deliberately absent: the preview can go stale and is
+ * freshly loaded again when returning to step 3. The competency framework
+ * only travels as an ID and is resolved once the framework list is loaded.
  */
 export interface RAGWizardSnapshot {
   activeStep: number;
@@ -44,24 +44,24 @@ export interface RAGWizardSnapshot {
   frameworkId: number | null;
   competenciesOverride: string;
   /**
-   * Der Stand stammt aus einer bereits gestarteten Generierung, nicht aus einer
-   * unterbrochenen Konfiguration. Der Wizard behält die Einstellungen danach
-   * absichtlich — daran hängt "Schnelle Wiederholung" —, also ist ein
-   * vorbelegter Wizard hier erwartbar und der Wiederherstellungs-Hinweis
-   * überflüssig.
+   * The state stems from a generation that has already been started, not
+   * from an interrupted configuration. The wizard deliberately keeps the
+   * settings afterwards — "quick repeat" depends on that — so a
+   * pre-populated wizard here is expected and the restoration hint is
+   * superfluous.
    */
   generationStarted: boolean;
 }
 
 /**
- * Härtet einen gelesenen Snapshot gegen Formdrift ab. Der sessionStorage kann
- * einen Eintrag aus einer früheren Sitzung enthalten, dessen Struktur nicht mehr
- * passt; ein unvollständiger Snapshot darf den Wizard nicht in einen Zustand
- * bringen, aus dem heraus er abstürzt. Übernommen wird nur, was die erwartete
- * Form hat — für alles andere gilt der Default der Komponente.
+ * Hardens a read snapshot against shape drift. sessionStorage may hold an
+ * entry from an earlier session whose structure no longer fits; an
+ * incomplete snapshot must not put the wizard into a state it can crash
+ * from. Only what has the expected shape is adopted — everything else
+ * falls back to the component's default.
  *
- * Gibt `null` zurück, wenn nichts Verwertbares übrig bleibt; die Komponente
- * unterscheidet daran "nichts wiederhergestellt" von "Stand wiederhergestellt".
+ * Returns `null` when nothing usable is left; the component uses that to
+ * distinguish "nothing restored" from "state restored".
  */
 export function sanitizeWizardSnapshot(
   raw: unknown
@@ -82,14 +82,14 @@ export function sanitizeWizardSnapshot(
     );
   }
   if (snapshot.ragRequest && typeof snapshot.ragRequest === 'object') {
-    // Container-Form allein reicht hier nicht: `RAGExamCreator.tsx` konsumiert
-    // `restored?.ragRequest?.topic?.trim()` direkt — ein `topic` aus einer
-    // inkompatiblen Vorversion, das kein String ist, würde dort mit einer
-    // TypeError crashen statt (wie der Rest dieser Funktion) defensiv leer
-    // zu bleiben. Nur dieses eine konsumierte Feld wird deshalb gehärtet;
-    // die übrigen Felder von `ragRequest` bleiben ungeprüft durchgereicht
-    // (siehe Modul-Docstring: "Formdrift" ist hier bewusst nicht vollständig
-    // abgedeckt).
+    // Container shape alone isn't enough here: `RAGExamCreator.tsx`
+    // consumes `restored?.ragRequest?.topic?.trim()` directly — a `topic`
+    // from an incompatible older version that isn't a string would crash
+    // there with a TypeError instead of (like the rest of this function)
+    // staying defensively empty. Only this one consumed field is
+    // therefore hardened; the remaining fields of `ragRequest` are passed
+    // through unchecked (see the module docstring: "shape drift" is
+    // deliberately not fully covered here).
     const candidate = { ...snapshot.ragRequest } as Partial<RAGExamRequest>;
     if ('topic' in candidate && typeof candidate.topic !== 'string') {
       delete candidate.topic;
@@ -105,10 +105,10 @@ export function sanitizeWizardSnapshot(
   if (Array.isArray(snapshot.selectedTags)) {
     result.selectedTags = snapshot.selectedTags;
   }
-  // `frameworkId` ist im vollen Typ bewusst `number | null` (explizit "kein
-  // Framework gewählt" vs. "Feld fehlt"). Ein gespeichertes `null` hier mit
-  // durchreichen, statt es wie "Feld fehlt" zu behandeln, damit Typ-Kontrakt
-  // und Sanitizer nicht auseinanderlaufen.
+  // `frameworkId` is deliberately `number | null` in the full type
+  // (explicitly "no framework selected" vs. "field missing"). A stored
+  // `null` is passed through here rather than treated as "field missing",
+  // so the type contract and the sanitizer don't drift apart.
   if (typeof snapshot.frameworkId === 'number' || snapshot.frameworkId === null) {
     result.frameworkId = snapshot.frameworkId;
   }

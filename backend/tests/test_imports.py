@@ -1,47 +1,47 @@
 """
-Import Tests für ExamCraft AI Backend
-Stellt sicher, dass alle Module korrekt importiert werden können
+Import tests for ExamCraft AI backend
+Ensures that all modules can be imported correctly
 """
 
 import pytest
 import sys
 from pathlib import Path
 
-# Füge Backend-Verzeichnis zu Python Path hinzu
+# Add backend directory to Python path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
 
 class TestCriticalImports:
-    """Tests für kritische Imports, die häufig Probleme verursachen"""
+    """Tests for critical imports that frequently cause problems"""
 
     def test_numpy_import(self):
-        """Numpy muss immer verfügbar sein"""
+        """Numpy must always be available"""
         import numpy as np
 
         assert np is not None
         assert hasattr(np, "ndarray")
 
     def test_fastapi_import(self):
-        """FastAPI Core muss verfügbar sein"""
+        """FastAPI core must be available"""
         from fastapi import FastAPI
 
         assert FastAPI is not None
 
     def test_pydantic_import(self):
-        """Pydantic muss verfügbar sein"""
+        """Pydantic must be available"""
         from pydantic import BaseModel
 
         assert BaseModel is not None
 
     def test_sqlalchemy_import(self):
-        """SQLAlchemy muss verfügbar sein"""
+        """SQLAlchemy must be available"""
         from sqlalchemy import create_engine
 
         assert create_engine is not None
 
     def test_qdrant_client_import(self):
-        """Qdrant Client muss verfügbar sein"""
+        """Qdrant client must be available"""
         try:
             from qdrant_client import QdrantClient
 
@@ -51,10 +51,10 @@ class TestCriticalImports:
 
 
 class TestServiceImports:
-    """Tests für Service-Module"""
+    """Tests for service modules"""
 
     def test_qdrant_vector_service_import(self):
-        """Qdrant Vector Service module muss importierbar sein"""
+        """Qdrant Vector Service module must be importable"""
         import services.qdrant_vector_service as qdrant_mod
 
         assert qdrant_mod is not None
@@ -62,52 +62,52 @@ class TestServiceImports:
         assert hasattr(qdrant_mod, "SearchResult")
 
     def test_vector_service_factory_import(self):
-        """Vector Service Factory muss importierbar sein"""
+        """Vector Service Factory must be importable"""
         from services.vector_service_factory import get_vector_service
 
         assert get_vector_service is not None
 
     def test_document_service_import(self):
-        """Document Service muss importierbar sein"""
+        """Document Service must be importable"""
         from services.document_service import DocumentService
 
         assert DocumentService is not None
 
     def test_docling_service_import(self):
-        """Docling Service muss importierbar sein"""
+        """Docling Service must be importable"""
         from services.docling_service import DoclingService
 
         assert DoclingService is not None
 
 
 class TestAPIImports:
-    """Tests für API-Module"""
+    """Tests for API modules"""
 
     def test_documents_api_import(self):
-        """Documents API muss importierbar sein"""
+        """Documents API must be importable"""
         from api import documents
 
         assert documents is not None
 
     def test_rag_exams_api_import(self):
-        """RAG Exams API muss importierbar sein"""
+        """RAG Exams API must be importable"""
         from api import rag_exams
 
         assert rag_exams is not None
 
 
 class TestMainAppImport:
-    """Test für Haupt-Application"""
+    """Test for the main application"""
 
     def test_main_app_import(self):
-        """main.py muss importierbar sein"""
+        """main.py must be importable"""
         import main
 
         assert main is not None
         assert hasattr(main, "app")
 
     def test_app_is_fastapi_instance(self):
-        """App muss FastAPI-Instanz sein"""
+        """App must be a FastAPI instance"""
         from fastapi import FastAPI
         import main
 
@@ -115,37 +115,37 @@ class TestMainAppImport:
 
 
 class TestNumpyAvailability:
-    """Spezielle Tests für numpy-Verfügbarkeit in Services"""
+    """Dedicated tests for numpy availability in services"""
 
     def test_numpy_available(self):
-        """Numpy muss verfügbar sein"""
+        """Numpy must be available"""
         import numpy as np
 
         assert np is not None
 
 
 class TestOptionalDependencies:
-    """Tests für optionale Dependencies"""
+    """Tests for optional dependencies"""
 
     def test_sentence_transformers_optional(self):
-        """Sentence Transformers ist optional"""
+        """Sentence Transformers is optional"""
         try:
             from sentence_transformers import SentenceTransformer
 
-            # Wenn verfügbar, sollte es funktionieren
+            # If available, it should work
             assert SentenceTransformer is not None
         except ImportError:
-            # Wenn nicht verfügbar, ist das OK
+            # If not available, that's OK
             pass
 
     def test_qdrant_client_optional(self):
-        """Qdrant Client ist optional (nur in Premium)"""
+        """Qdrant client is optional (Premium only)"""
         try:
             from qdrant_client import QdrantClient
 
             assert QdrantClient is not None
         except ImportError:
-            # Wenn nicht verfügbar, ist das OK (Core Package)
+            # If not available, that's OK (core package)
             pass
 
 

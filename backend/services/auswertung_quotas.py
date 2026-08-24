@@ -1,25 +1,25 @@
-"""Subscription-Tier-Quotas für die Auswertungs-Pipeline (TF-336).
+"""Subscription tier quotas for the evaluation pipeline (TF-336).
 
-Spec 7.7. Vier Tiers, vier Dimensionen (Anzahl auswertbarer Prüfungen
-pro Monat, Submissions pro Prüfung, erlaubte Driver, erlaubte Premium-
-Features wie Klassen-Verlaufsstatistik).
+Spec 7.7. Four tiers, four dimensions (number of gradable exams
+per month, submissions per exam, allowed drivers, allowed premium
+features such as class history statistics).
 
-Zentrale Funktionen sind defensiv:
+The central functions are defensive:
 
-* Bei unbekanntem Tier behandeln wir die Institution wie ``free`` —
-  das ist das sichere Failure-Mode für eine fehlkonfigurierte DB-Row.
-* HTTP 402 (Payment Required) wird konsistent verwendet, damit das
-  Frontend den Tier-Banner korrekt anzeigen kann.
-* Die Fehlermeldungen tragen einen ``error_code``-Feld in ``detail``,
-  das das Frontend für das i18n-Lookup nutzt — der Plain-Text ist
-  Fallback.
+* For an unknown tier we treat the institution like ``free`` —
+  that's the safe failure mode for a misconfigured DB row.
+* HTTP 402 (Payment Required) is used consistently so the
+  frontend can correctly display the tier banner.
+* Error messages carry an ``error_code`` field in ``detail``,
+  which the frontend uses for i18n lookup — the plain text is
+  a fallback.
 
-Counting-Semantik für ``exams_per_month``:
+Counting semantics for ``exams_per_month``:
 
-Wir zählen ``COUNT(DISTINCT import_jobs.exam_id)`` für die Institution
-im laufenden Kalendermonat über alle nicht-fehlgeschlagenen Status. Das
-ist die einzige Metrik, die der Pilot wirklich beobachten kann; wir
-haben keine eigene Buchung für "Auswertung gestartet".
+We count ``COUNT(DISTINCT import_jobs.exam_id)`` for the institution
+in the current calendar month across all non-failed statuses. That's
+the only metric the pilot can actually observe; we have no dedicated
+booking for "evaluation started".
 """
 
 from __future__ import annotations
@@ -53,9 +53,9 @@ def _is_production() -> bool:
 
 @dataclass(frozen=True)
 class TierLimits:
-    """Effektive Limits für einen Tier.
+    """Effective limits for a tier.
 
-    ``-1`` = unbegrenzt (gleicher Code wie der bestehende RBAC).
+    ``-1`` = unlimited (same code as the existing RBAC).
     """
 
     tier: str
@@ -135,10 +135,10 @@ if _missing_quotas:
     )
 
 
-# Status-Werte, bei denen ein ImportJob als "ausgeführt" zählt — d. h.
-# auch ``partial`` zählt zur Auswertungs-Quote, weil der Lehrperson
-# danach echte Daten zur Verfügung stehen. ``failed``/``running``
-# zählen nicht.
+# Status values for which an ImportJob counts as "executed" — i.e.
+# ``partial`` also counts toward the evaluation quota, because the
+# teacher then has real data available. ``failed``/``running``
+# do not count.
 _COUNTING_JOB_STATUSES: tuple[str, ...] = ("succeeded", "partial")
 
 
@@ -151,7 +151,7 @@ class UnknownTierError(RuntimeError):
 
 
 def get_tier_for_institution(institution: Institution | None) -> str:
-    """Tier-String aus der Institution lesen.
+    """Read the tier string from the institution.
 
     In **production** an unknown tier raises ``UnknownTierError`` so the
     misconfiguration becomes a visible 5xx instead of a silent feature
@@ -182,7 +182,7 @@ def get_tier_for_institution(institution: Institution | None) -> str:
 
 
 def get_limits(tier: str) -> TierLimits:
-    """Limits für einen Tier-String. Unbekannt → ``free``."""
+    """Limits for a tier string. Unknown → ``free``."""
     return _TIER_LIMITS.get(tier.lower(), _TIER_LIMITS["free"])
 
 
@@ -191,12 +191,12 @@ def get_limits_for_user(user: User) -> TierLimits:
 
 
 # ---------------------------------------------------------------------------
-# Quota-Checks (raise HTTPException 402)
+# Quota checks (raise HTTPException 402)
 # ---------------------------------------------------------------------------
 
 
 def _http_402(error_code: str, message: str, **details) -> HTTPException:
-    """402 Payment Required mit i18n-freundlichem ``error_code``."""
+    """402 Payment Required with an i18n-friendly ``error_code``."""
     return HTTPException(
         status_code=402,
         detail={
@@ -208,10 +208,10 @@ def _http_402(error_code: str, message: str, **details) -> HTTPException:
 
 
 def assert_driver_allowed(*, user: User, driver_name: str) -> None:
-    """Free/Starter dürfen nur den CSV-Driver nutzen.
+    """Free/Starter may only use the CSV driver.
 
-    Wir prüfen vor der teuren Pipeline, damit das Limit nicht durch
-    bereits verbrannte Web-Service-Calls verraten wird.
+    We check before the expensive pipeline, so the limit isn't revealed
+    only after web-service calls have already been burned.
     """
     limits = get_limits_for_user(user)
     if driver_name not in limits.drivers:
@@ -230,7 +230,7 @@ def assert_driver_allowed(*, user: User, driver_name: str) -> None:
 
 
 def assert_class_history_allowed(user: User) -> None:
-    """Klassen- und Studi-Verlaufsstatistik ist Enterprise-only."""
+    """Class and student history statistics are Enterprise-only."""
     limits = get_limits_for_user(user)
     if not limits.class_history_stats:
         raise _http_402(
@@ -246,7 +246,7 @@ def assert_class_history_allowed(user: User) -> None:
 
 
 def assert_review_bulk_allowed(user: User) -> None:
-    """Bulk-Aktionen in der Review-Queue sind Pro+."""
+    """Bulk actions in the review queue are Pro+."""
     limits = get_limits_for_user(user)
     if not limits.review_bulk:
         raise _http_402(
@@ -262,7 +262,7 @@ def assert_review_bulk_allowed(user: User) -> None:
 
 
 def assert_custom_grading_schemes_allowed(user: User) -> None:
-    """Custom Grading-Schemes sind Enterprise-only."""
+    """Custom grading schemes are Enterprise-only."""
     limits = get_limits_for_user(user)
     if not limits.custom_grading_schemes:
         raise _http_402(
@@ -283,18 +283,18 @@ def assert_custom_grading_schemes_allowed(user: User) -> None:
 
 
 def _start_of_month_utc() -> datetime:
-    """Erster Tag des laufenden Kalendermonats (UTC, 00:00:00).
+    """First day of the current calendar month (UTC, 00:00:00).
 
-    Wir benutzen UTC bewusst — TZ-Drift zwischen Worker und API würde
-    sonst dazu führen, dass ein Import an einem 1. Tag-Wechsel doppelt
-    in zwei Monaten zählt.
+    We deliberately use UTC — TZ drift between worker and API would
+    otherwise cause an import right at a 1st-of-month boundary to be
+    double-counted across two months.
     """
     now = datetime.now(timezone.utc)
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def count_evaluated_exams_this_month(db: Session, *, institution_id: int) -> int:
-    """Distinct exam_ids im laufenden Monat (succeeded/partial)."""
+    """Distinct exam_ids in the current month (succeeded/partial)."""
     return int(
         db.query(sa_func.count(sa_func.distinct(ImportJob.exam_id)))
         .filter(
@@ -317,13 +317,12 @@ def count_submissions_for_exam(db: Session, *, exam_id: int) -> int:
 
 
 def assert_exam_quota_for_import(*, db: Session, user: User, exam_id: int) -> None:
-    """Prüft die ``exams_per_month``-Quota.
+    """Checks the ``exams_per_month`` quota.
 
-    Free hat 3 Prüfungen/Monat (distinct exam_ids mit erfolgreichem
-    Import). Wenn das aktuelle Exam *bereits* in diesem Monat
-    importiert wurde (z. B. erneuter Import zur Nachkorrektur), zählt
-    es nicht zusätzlich. Sonst muss
-    ``count + 1 <= exams_per_month``.
+    Free has 3 exams/month (distinct exam_ids with a successful
+    import). If the current exam has *already* been imported this
+    month (e.g. a repeat import for a re-grade), it doesn't count
+    again. Otherwise ``count + 1 <= exams_per_month`` must hold.
     """
     limits = get_limits_for_user(user)
     if limits.exams_per_month == -1:
@@ -339,9 +338,8 @@ def assert_exam_quota_for_import(*, db: Session, user: User, exam_id: int) -> No
         )
 
     current_count = count_evaluated_exams_this_month(db, institution_id=institution_id)
-    # Wenn der aktuelle Exam-ID schon in diesem Monat einen Job hat,
-    # liegt er bereits in current_count drin — Re-Imports sollen nicht
-    # nochmal zählen.
+    # If the current exam_id already has a job this month, it's already
+    # included in current_count — re-imports shouldn't count again.
     already_in_month = (
         db.query(ImportJob.id)
         .filter(
@@ -354,7 +352,7 @@ def assert_exam_quota_for_import(*, db: Session, user: User, exam_id: int) -> No
         is not None
     )
     if already_in_month:
-        return  # Re-Import des gleichen Exams ist frei.
+        return  # Re-importing the same exam is free.
     if current_count >= limits.exams_per_month:
         raise _http_402(
             error_code="auswertung_exam_monthly_quota_exceeded",
@@ -374,13 +372,12 @@ def assert_exam_quota_for_import(*, db: Session, user: User, exam_id: int) -> No
 def assert_submission_quota_for_exam(
     *, db: Session, user: User, exam_id: int, additional: int = 1
 ) -> None:
-    """Prüft, dass die Anzahl Submissions für die Prüfung das Tier-
-    Limit nicht überschreitet.
+    """Checks that the number of submissions for the exam does not
+    exceed the tier limit.
 
-    ``additional`` ist ein optionaler Hint für Bulk-Imports, der die
-    Vorab-Prüfung präziser macht (z. B. CSV mit 60 Zeilen vs.
-    Limit 50). Für die einfachen Aufrufer ist 1 ein konservativer
-    Default.
+    ``additional`` is an optional hint for bulk imports that makes the
+    pre-check more precise (e.g. a CSV with 60 rows vs. a limit of
+    50). For simple callers, 1 is a conservative default.
     """
     limits = get_limits_for_user(user)
     if limits.submissions_per_exam == -1:

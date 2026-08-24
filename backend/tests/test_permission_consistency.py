@@ -223,7 +223,7 @@ class TestPermissionConsistency:
             "submissions:moodle_feedback_push",
             # TF-335 — Custom Grading-Schemes management permission.
             "grading_schemes:manage",
-            # TF-336 — Klassen-/Studi-Stammdaten und Moodle-Connections.
+            # TF-336 — class/student master data and Moodle connections.
             "students:manage",
             "moodle:configure",
         }

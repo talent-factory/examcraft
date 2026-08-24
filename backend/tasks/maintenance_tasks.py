@@ -1,10 +1,10 @@
 """Periodic maintenance tasks (TF-329 Watchdog).
 
-`reconcile_stuck_jobs` läuft alle 5 Minuten via Celery Beat und gleicht
-QuestionGenerationJob-Zeilen mit dem echten Celery-State aus dem Result-Backend
-ab. Adressiert das Phantom-PENDING-Symptom aus dem Demo-Vorfall am 2026-04-28
-auf einer dritten Verteidigungslinie nach TF-325 (Retry-Loop) und TF-326
-(API-Endpoint-Reconcile).
+`reconcile_stuck_jobs` runs every 5 minutes via Celery Beat and
+reconciles QuestionGenerationJob rows against the real Celery state from
+the result backend. Addresses the phantom-PENDING symptom from the demo
+incident on 2026-04-28 as a third line of defense after TF-325
+(retry loop) and TF-326 (API endpoint reconcile).
 """
 
 import logging
@@ -22,14 +22,15 @@ from tasks.question_tasks import _safe_update_job_status
 logger = logging.getLogger(__name__)
 
 
-# Stuck-Threshold: ein PENDING-Job, der älter ist als das, gilt als reconcile-bedürftig.
-# Worst-case Retry-Chain in question_tasks.generate_questions_task:
+# Stuck threshold: a PENDING job older than this is considered in need
+# of reconciliation.
+# Worst-case retry chain in question_tasks.generate_questions_task:
 #   max_retries=4, retry_backoff=30, retry_backoff_max=300, retry_jitter=True
-# → kumulative Backoff-Summe bis zur letzten Ausführung erreicht ~20 Min.
-# Plus task_soft_time_limit=3300 s greift erst bei langen Generations-Calls.
-# 25 Min Schwelle räumt aktiv-retrygenden Tasks Luft, damit der Watchdog
-# nicht prematur eine FAILURE setzt, die ein nachfolgender Retry mit SUCCESS
-# überschreibt (Status-Flicker im UI).
+# → cumulative backoff sum up to the last execution reaches ~20 min.
+# Plus task_soft_time_limit=3300s only kicks in for long generation calls.
+# A 25 min threshold gives actively retrying tasks room, so the
+# watchdog doesn't prematurely set a FAILURE that a subsequent retry
+# then overwrites with SUCCESS (status flicker in the UI).
 _STUCK_THRESHOLD = timedelta(minutes=25)
 
 # TF-412: ImportJob rows are pre-created in ``queued`` and flipped to
@@ -58,10 +59,10 @@ _MOODLE_PUSH_NON_TERMINAL_STATUSES = (
     MoodleFeedbackPushStatus.PROCESSING.value,
 )
 
-# In-Progress-States, die der Watchdog NICHT anfasst — die Tasks laufen tatsächlich.
+# In-progress states the watchdog does NOT touch — these tasks are actually running.
 _IN_PROGRESS_STATES = frozenset({"PROGRESS", "STARTED", "RETRY"})
 
-# Terminal-States, die der Watchdog 1:1 in die DB nachzieht.
+# Terminal states the watchdog mirrors 1:1 into the DB.
 _TERMINAL_STATES = frozenset({"SUCCESS", "FAILURE", "REVOKED"})
 
 
@@ -101,22 +102,23 @@ def _notify_celery_backend_failure(task_id: str) -> None:
 
 @celery_app.task(name="tasks.maintenance_tasks.reconcile_stuck_jobs")
 def reconcile_stuck_jobs() -> dict:
-    """Reconcile DB-Status für stuck PENDING-Jobs gegen Celerys Result-Backend.
+    """Reconcile the DB status of stuck PENDING jobs against Celery's result backend.
 
     Returns:
-        dict mit Counters:
+        dict with counters:
         ``{reconciled, lost, skipped_in_progress, skipped_unexpected, errors}``.
-        Counter-Semantik:
-          - ``reconciled``: tatsächliche DB-Status-Updates, die persistiert wurden.
-          - ``lost``: Untermenge von ``reconciled`` für broker-verlorene Jobs.
-          - ``skipped_in_progress``: läuft noch, nichts zu tun.
-          - ``skipped_unexpected``: Celery-State ausserhalb des bekannten Vokabulars
-            (Tippfehler in einem custom State, kompatibilitätsbruch beim Upgrade,
-            …) — nicht reconciled, aber sichtbar im Counter, damit Operatoren
-            das Symptom in der Beat-Health-Metrik sehen.
-          - ``errors``: AsyncResult-Read-Fehler ODER persistierungs-Fehler.
-        Gut für Sentry-Metriken und Beat-Health-Checks — gibt operatorisch
-        ehrliches Signal bei DB-Outages, statt grün zu bleiben.
+        Counter semantics:
+          - ``reconciled``: actual DB status updates that were persisted.
+          - ``lost``: subset of ``reconciled`` for broker-lost jobs.
+          - ``skipped_in_progress``: still running, nothing to do.
+          - ``skipped_unexpected``: Celery state outside the known
+            vocabulary (a typo in a custom state, a compatibility break
+            on upgrade, …) — not reconciled, but visible in the counter
+            so operators see the symptom in the Beat health metric.
+          - ``errors``: AsyncResult read errors OR persistence errors.
+        Good for Sentry metrics and Beat health checks — gives an
+        operationally honest signal during DB outages, instead of
+        staying green.
     """
     cutoff = datetime.now(timezone.utc) - _STUCK_THRESHOLD
     counters: dict = {
@@ -161,10 +163,10 @@ def reconcile_stuck_jobs() -> dict:
                 else:
                     counters["errors"] += 1
             elif celery_state == "PENDING":
-                # Task ist im Broker verloren — kein Worker hat ihn jemals gesehen,
-                # oder der Result-Backend-Eintrag ist abgelaufen. Markiere FAILURE
-                # und spiegele den State ins Celery-Backend, damit der WebSocket
-                # nicht 120 s auf den Pending-Timeout wartet.
+                # Task is lost from the broker — no worker ever saw it,
+                # or the result-backend entry expired. Mark FAILURE and
+                # mirror the state into the Celery backend, so the
+                # WebSocket doesn't wait 120s for the pending timeout.
                 logger.warning(
                     "Watchdog: task %s lost from broker (celery=PENDING) — marking FAILURE",
                     job.task_id,
@@ -176,9 +178,9 @@ def reconcile_stuck_jobs() -> dict:
                 else:
                     counters["errors"] += 1
             elif celery_state in _IN_PROGRESS_STATES:
-                # Task läuft tatsächlich noch — nicht anfassen. Wenn der Job
-                # älter als der Threshold ist und immer noch PROGRESS, dann ist
-                # er langsam, aber nicht stuck. Operations-Visibility via Log.
+                # Task is actually still running — leave it alone. If the
+                # job is older than the threshold and still PROGRESS,
+                # it's slow, but not stuck. Operational visibility via log.
                 logger.debug(
                     "Watchdog: task %s still in_progress (celery=%s) — skipping",
                     job.task_id,
@@ -186,11 +188,12 @@ def reconcile_stuck_jobs() -> dict:
                 )
                 counters["skipped_in_progress"] += 1
             else:
-                # Unbekannter State — defensiv loggen, nicht anfassen, aber
-                # zählen. Ohne Counter wäre eine schleichende Drift (z. B.
-                # Celery-Upgrade führt einen neuen State ein, custom State
-                # mit Tippfehler) für Operatoren unsichtbar — der Summary-Log
-                # unten würde nicht feuern und der Watchdog "grün" bleiben.
+                # Unknown state — log defensively, leave it alone, but
+                # count it. Without the counter, a gradual drift (e.g. a
+                # Celery upgrade introduces a new state, a custom state
+                # with a typo) would be invisible to operators — the
+                # summary log below wouldn't fire and the watchdog would
+                # stay "green".
                 logger.warning(
                     "Watchdog: task %s in unexpected celery state %r — skipping",
                     job.task_id,

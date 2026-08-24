@@ -1,6 +1,6 @@
 """
 Legacy Document Processor
-Fallback-Implementation mit PyPDF und python-docx
+Fallback implementation using PyPDF and python-docx
 """
 
 import logging
@@ -24,12 +24,12 @@ logger = logging.getLogger(__name__)
 
 class LegacyProcessor:
     """
-    Legacy Document Processor als Fallback
+    Legacy Document Processor used as fallback
 
-    Verwendet:
-    - PyPDF für PDF-Verarbeitung
-    - python-docx für DOCX-Verarbeitung
-    - markdown für Markdown-Verarbeitung
+    Uses:
+    - PyPDF for PDF processing
+    - python-docx for DOCX processing
+    - markdown for Markdown processing
     """
 
     def __init__(
@@ -42,11 +42,12 @@ class LegacyProcessor:
         Initialize Legacy Processor
 
         Args:
-            chunk_size: Maximale Anzahl Wörter pro Chunk
-            chunk_overlap: Überlappung zwischen Chunks in Wörtern
-            max_chars_per_chunk: Generische Zeichen-Obergrenze pro Chunk
-                (TF-445). Über-lange Inhalte werden inhaltserhaltend in mehrere
-                Chunks gesplittet, statt am Embedding-Boundary getrunct zu werden.
+            chunk_size: Maximum number of words per chunk
+            chunk_overlap: Overlap between chunks in words
+            max_chars_per_chunk: Generic character upper bound per chunk
+                (TF-445). Over-long content is split into multiple chunks
+                while preserving content, instead of being truncated at the
+                embedding boundary.
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -65,13 +66,13 @@ class LegacyProcessor:
         self, document_id: int, file_path: str, filename: str, mime_type: str
     ) -> ProcessedDocument:
         """
-        Verarbeite Dokument mit Legacy-Methoden
+        Process document using legacy methods
 
         Args:
-            document_id: ID des Dokuments in der Datenbank
-            file_path: Pfad zur Datei
-            filename: Originaler Dateiname
-            mime_type: MIME-Type der Datei
+            document_id: ID of the document in the database
+            file_path: Path to the file
+            filename: Original filename
+            mime_type: MIME type of the file
 
         Returns:
             ProcessedDocument
@@ -89,21 +90,21 @@ class LegacyProcessor:
 
             logger.info(f"Processing document with Legacy Processor: {filename}")
 
-            # Verarbeite Dokument basierend auf MIME-Type
+            # Process document based on MIME type
             processor = self.supported_types[mime_type]
             raw_text, doc_metadata = await processor(file_path)
 
-            # Erstelle Text-Chunks
+            # Create text chunks
             chunks = self._create_chunks(raw_text)
 
-            # Berechne Verarbeitungszeit
+            # Calculate processing time
             processing_time = time.time() - start_time
 
-            # Erweitere Metadaten
+            # Extend metadata
             doc_metadata["processing_method"] = "legacy"
             doc_metadata["processor_type"] = "pypdf/python-docx"
 
-            # Erstelle ProcessedDocument
+            # Build ProcessedDocument
             processed_doc = ProcessedDocument(
                 document_id=document_id,
                 filename=filename,
@@ -127,7 +128,7 @@ class LegacyProcessor:
             raise
 
     async def _process_pdf(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite PDF-Datei mit PyPDF"""
+        """Process PDF file using PyPDF"""
         try:
             text_content = []
             metadata = {}
@@ -135,7 +136,7 @@ class LegacyProcessor:
             with open(file_path, "rb") as file:
                 pdf_reader = pypdf.PdfReader(file)
 
-                # Extrahiere Metadaten
+                # Extract metadata
                 if pdf_reader.metadata:
                     metadata.update(
                         {
@@ -148,7 +149,7 @@ class LegacyProcessor:
 
                 metadata["pages"] = len(pdf_reader.pages)
 
-                # Extrahiere Text von allen Seiten
+                # Extract text from all pages
                 for page_num, page in enumerate(pdf_reader.pages, 1):
                     try:
                         page_text = page.extract_text()
@@ -168,7 +169,7 @@ class LegacyProcessor:
             raise
 
     async def _process_docx(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite DOCX-Datei (Body + Tabellen + Header/Footer)."""
+        """Process DOCX file (body + tables + header/footer)."""
         from services.document_processors.pymupdf_processor import (
             _iter_docx_text_blocks,
         )
@@ -207,9 +208,9 @@ class LegacyProcessor:
             raise
 
     async def _process_doc(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite DOC-Datei (Legacy Format)"""
+        """Process DOC file (legacy format)"""
         try:
-            # Versuche als Text zu lesen (sehr basic)
+            # Try reading as text (very basic)
             with open(file_path, "rb") as file:
                 content = file.read()
                 text_content = content.decode("utf-8", errors="ignore")
@@ -226,7 +227,7 @@ class LegacyProcessor:
             raise
 
     async def _process_text(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite Text-Datei mit Encoding-Fallback (UTF-8 → Latin-1)."""
+        """Process text file with encoding fallback (UTF-8 → Latin-1)."""
         try:
             content, encoding = self._read_text_with_fallback(file_path)
         except Exception as e:
@@ -242,11 +243,11 @@ class LegacyProcessor:
         return content, metadata
 
     async def _process_markdown(self, file_path: str) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite Markdown-Datei mit Encoding-Fallback (UTF-8 → Latin-1)."""
+        """Process Markdown file with encoding fallback (UTF-8 → Latin-1)."""
         try:
             md_content, encoding = self._read_text_with_fallback(file_path)
 
-            # Konvertiere Markdown zu HTML und extrahiere Plain Text
+            # Convert Markdown to HTML and extract plain text
             html = markdown.markdown(md_content)
             plain_text = re.sub("<[^<]+?>", "", html)
 
@@ -281,7 +282,7 @@ class LegacyProcessor:
         return PyMuPDFProcessor._read_text_with_fallback(file_path)
 
     def _create_chunks(self, text: str) -> List[DocumentChunk]:
-        """Erstelle Text-Chunks für RAG-Processing"""
+        """Create text chunks for RAG processing"""
         return create_chunks(
             text,
             chunk_size=self.chunk_size,

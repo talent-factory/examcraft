@@ -1,5 +1,5 @@
 """
-Unit Tests für DoclingService und LegacyProcessor
+Unit tests for DoclingService and LegacyProcessor
 """
 
 import pytest
@@ -12,15 +12,15 @@ from services.document_processors.legacy_processor import LegacyProcessor
 
 
 class TestLegacyProcessor:
-    """Test Suite für LegacyProcessor (the actual processing backend)"""
+    """Test suite for LegacyProcessor (the actual processing backend)"""
 
     @pytest.fixture
     def processor(self):
-        """LegacyProcessor Instanz für Tests"""
+        """LegacyProcessor instance for tests"""
         return LegacyProcessor(chunk_size=100, chunk_overlap=20)
 
     def test_init(self):
-        """Test LegacyProcessor Initialisierung"""
+        """Test LegacyProcessor initialization"""
         processor = LegacyProcessor(chunk_size=500, chunk_overlap=50)
 
         assert processor.chunk_size == 500
@@ -30,7 +30,7 @@ class TestLegacyProcessor:
         assert "text/plain" in processor.supported_types
 
     def test_create_chunks_small_text(self, processor):
-        """Test Chunk-Erstellung für kleinen Text"""
+        """Test chunk creation for short text"""
         text = "Dies ist ein kurzer Test-Text mit wenigen Wörtern."
 
         chunks = processor._create_chunks(text)
@@ -38,11 +38,11 @@ class TestLegacyProcessor:
         assert len(chunks) == 1
         assert chunks[0].content == text
         assert chunks[0].chunk_index == 0
-        assert chunks[0].metadata["word_count"] == 8  # Korrekte Wort-Anzahl
+        assert chunks[0].metadata["word_count"] == 8  # Correct word count
 
     def test_create_chunks_large_text(self, processor):
-        """Test Chunk-Erstellung für großen Text"""
-        # Erstelle Text mit mehr als 100 Wörtern
+        """Test chunk creation for large text"""
+        # Create text with more than 100 words
         words = ["Wort"] * 150
         text = " ".join(words)
 
@@ -52,7 +52,7 @@ class TestLegacyProcessor:
         assert chunks[0].chunk_index == 0
         assert chunks[1].chunk_index == 1
 
-        # Prüfe Überlappung
+        # Check overlap
         chunk1_words = chunks[0].content.split()
         chunk2_words = chunks[1].content.split()
 
@@ -60,7 +60,7 @@ class TestLegacyProcessor:
         assert len(chunk2_words) <= 100
 
     def test_create_chunks_empty_text(self, processor):
-        """Test Chunk-Erstellung für leeren Text"""
+        """Test chunk creation for empty text"""
         chunks = processor._create_chunks("")
         assert len(chunks) == 0
 
@@ -69,7 +69,7 @@ class TestLegacyProcessor:
 
     @pytest.mark.asyncio
     async def test_process_text_file(self, processor):
-        """Test Text-Datei Verarbeitung"""
+        """Test text file processing"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Dies ist ein Test-Text.\nMit mehreren Zeilen.\nFür Unit Tests.")
             temp_path = f.name
@@ -89,7 +89,7 @@ class TestLegacyProcessor:
 
     @pytest.mark.asyncio
     async def test_process_markdown_file(self, processor):
-        """Test Markdown-Datei Verarbeitung"""
+        """Test markdown file processing"""
         markdown_content = "# Test Überschrift\n\nDies ist **fetter Text** und *kursiver Text*.\n\n- Liste Item 1\n- Liste Item 2"
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
@@ -111,12 +111,12 @@ class TestLegacyProcessor:
     @pytest.mark.asyncio
     @patch("pypdf.PdfReader")
     async def test_process_pdf_file(self, mock_pdf_reader, processor):
-        """Test PDF-Datei Verarbeitung"""
+        """Test PDF file processing"""
         # Mock PDF Reader
         mock_reader_instance = Mock()
         mock_pdf_reader.return_value = mock_reader_instance
 
-        # Mock Metadaten
+        # Mock metadata
         mock_metadata = {
             "/Title": "Test PDF",
             "/Author": "Test Author",
@@ -124,7 +124,7 @@ class TestLegacyProcessor:
         }
         mock_reader_instance.metadata = mock_metadata
 
-        # Mock Seiten
+        # Mock pages
         mock_page = Mock()
         mock_page.extract_text.return_value = "Dies ist der Text von Seite 1."
         mock_reader_instance.pages = [mock_page]
@@ -148,13 +148,13 @@ class TestLegacyProcessor:
     @pytest.mark.asyncio
     @patch("services.document_processors.legacy_processor.DocxDocument")
     async def test_process_docx_file(self, mock_docx_document, processor):
-        """Test DOCX-Datei Verarbeitung"""
+        """Test DOCX file processing"""
         # Mock DOCX Document
         mock_doc_instance = Mock()
         mock_docx_document.return_value = mock_doc_instance
 
-        # Mock w:t XML-Elemente (TF-331: _iter_docx_text_blocks iteriert XML-Body
-        # statt doc.paragraphs, um auch Tabellen/Header/Footer zu erfassen)
+        # Mock w:t XML elements (TF-331: _iter_docx_text_blocks iterates the XML body
+        # instead of doc.paragraphs, to also capture tables/headers/footers)
         mock_t1 = Mock()
         mock_t1.text = "Dies ist der erste Paragraph."
         mock_t2 = Mock()
@@ -162,16 +162,16 @@ class TestLegacyProcessor:
         mock_body = Mock()
         mock_body.iter.return_value = [mock_t1, mock_t2]
         mock_doc_instance.element.body = mock_body
-        mock_doc_instance.sections = []  # keine Header/Footer in diesem Test
+        mock_doc_instance.sections = []  # no header/footer in this test
 
-        # Mock Paragraphen (weiterhin für metadata["paragraphs"])
+        # Mock paragraphs (still used for metadata["paragraphs"])
         mock_paragraph1 = Mock()
         mock_paragraph1.text = "Dies ist der erste Paragraph."
         mock_paragraph2 = Mock()
         mock_paragraph2.text = "Dies ist der zweite Paragraph."
         mock_doc_instance.paragraphs = [mock_paragraph1, mock_paragraph2]
 
-        # Mock Core Properties - alle als Attribute setzen
+        # Mock core properties - set all as attributes
         mock_core_props = Mock()
         mock_core_props.title = "Test Document"
         mock_core_props.author = "Test Author"
@@ -191,7 +191,7 @@ class TestLegacyProcessor:
             assert metadata["title"] == "Test Document"
             assert metadata["author"] == "Test Author"
             assert metadata["paragraphs"] == 2
-            # Prüfe dass subject vorhanden ist (wird vom LegacyProcessor gesetzt)
+            # Check that subject is present (set by LegacyProcessor)
             assert "subject" in metadata
 
         finally:
@@ -199,7 +199,7 @@ class TestLegacyProcessor:
 
     @pytest.mark.asyncio
     async def test_process_document_success(self, processor):
-        """Test vollständige Dokumentenverarbeitung"""
+        """Test full document processing"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(
                 "Test-Dokument für die vollständige Verarbeitung.\nMit mehreren Zeilen Text."
@@ -222,7 +222,7 @@ class TestLegacyProcessor:
             assert len(processed_doc.chunks) == processed_doc.total_chunks
             assert processed_doc.processing_time > 0
 
-            # Prüfe ersten Chunk
+            # Check first chunk
             first_chunk = processed_doc.chunks[0]
             assert isinstance(first_chunk, DocumentChunk)
             assert "Test-Dokument" in first_chunk.content
@@ -232,7 +232,7 @@ class TestLegacyProcessor:
 
     @pytest.mark.asyncio
     async def test_process_document_unsupported_type(self, processor):
-        """Test Verarbeitung mit nicht unterstütztem MIME-Type"""
+        """Test processing with unsupported MIME type"""
         with tempfile.NamedTemporaryFile(suffix=".xyz", delete=False) as f:
             temp_path = f.name
 
@@ -252,11 +252,11 @@ class TestLegacyProcessor:
 
 
 class TestDoclingServiceFacade:
-    """Test Suite für DoclingService (Facade)"""
+    """Test suite for DoclingService (facade)"""
 
     def test_get_document_summary(self):
-        """Test Dokument-Zusammenfassung"""
-        # Erstelle Mock ProcessedDocument
+        """Test document summary"""
+        # Create mock ProcessedDocument
         chunks = [
             DocumentChunk(content="Erster Chunk mit Text", chunk_index=0),
             DocumentChunk(content="Zweiter Chunk mit mehr Text", chunk_index=1),
@@ -288,10 +288,10 @@ class TestDoclingServiceFacade:
 
 
 class TestDocumentChunk:
-    """Test Suite für DocumentChunk"""
+    """Test suite for DocumentChunk"""
 
     def test_document_chunk_creation(self):
-        """Test DocumentChunk Erstellung"""
+        """Test DocumentChunk creation"""
         chunk = DocumentChunk(
             content="Test content",
             page_number=1,
@@ -305,7 +305,7 @@ class TestDocumentChunk:
         assert chunk.metadata == {"test": "value"}
 
     def test_document_chunk_default_metadata(self):
-        """Test DocumentChunk mit Default-Metadaten"""
+        """Test DocumentChunk with default metadata"""
         chunk = DocumentChunk(content="Test content")
 
         assert chunk.metadata == {}
@@ -314,10 +314,10 @@ class TestDocumentChunk:
 
 
 class TestProcessedDocument:
-    """Test Suite für ProcessedDocument"""
+    """Test suite for ProcessedDocument"""
 
     def test_processed_document_creation(self):
-        """Test ProcessedDocument Erstellung"""
+        """Test ProcessedDocument creation"""
         chunks = [DocumentChunk(content="Test", chunk_index=0)]
 
         doc = ProcessedDocument(

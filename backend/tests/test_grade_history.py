@@ -1,10 +1,9 @@
-"""Audit-Trail-Tests für ``GradingService`` Status-Transitionen.
+"""Audit trail tests for ``GradingService`` status transitions.
 
-Spec 6.5 verlangt, dass jede Status-Transition eine
-``grade_history``-Zeile erzeugt mit aussagekräftigem
-``change_reason``. Re-Grading-Eintrag ist bereits in
-``test_grading_regrade.py`` getestet — hier konzentrieren wir uns auf
-die Reviewer-getriebenen Pfade ``approve`` und ``override``.
+Spec 6.5 requires that every status transition produce a
+``grade_history`` row with a meaningful ``change_reason``. The
+re-grading entry is already covered by ``test_grading_regrade.py`` —
+here we focus on the reviewer-driven paths ``approve`` and ``override``.
 """
 
 from __future__ import annotations
@@ -138,7 +137,7 @@ def test_repeated_approve_is_idempotent(test_db: Session) -> None:
     history = (
         test_db.query(GradeHistory).filter(GradeHistory.grade_id == grade.id).all()
     )
-    # Genau ein Eintrag: das zweite Approve ist no-op.
+    # Exactly one entry: the second approve is a no-op.
     assert len(history) == 1
 
 
@@ -187,8 +186,8 @@ def test_override_rejects_points_outside_bounds(test_db: Session) -> None:
 def test_override_idempotent_when_status_points_and_note_unchanged(
     test_db: Session,
 ) -> None:
-    """Ein zweiter override-Aufruf mit identischen Werten ist No-Op:
-    keine zweite History-Zeile, reviewed_at bleibt stabil."""
+    """A second override call with identical values is a no-op:
+    no second history row, reviewed_at stays stable."""
     grade, user, _ = _seed_proposed_grade(test_db)
     service = GradingService(test_db)
     service.override_grade(
@@ -220,8 +219,8 @@ def test_override_idempotent_when_status_points_and_note_unchanged(
 def test_override_writes_history_when_only_note_changes(
     test_db: Session,
 ) -> None:
-    """Note-Änderung allein ist eine Audit-Transition — Spec 6.5
-    verlangt einen lückenlosen Trail."""
+    """A grade change alone is an audit transition — Spec 6.5 requires
+    an unbroken trail."""
     grade, user, _ = _seed_proposed_grade(test_db)
     service = GradingService(test_db)
     service.override_grade(

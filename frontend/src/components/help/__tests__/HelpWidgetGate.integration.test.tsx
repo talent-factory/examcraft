@@ -1,14 +1,14 @@
 /**
- * HelpWidgetGate — Integration mit dem echten HelpWidget (TF-657).
+ * HelpWidgetGate — integration with the real HelpWidget (TF-657).
  *
- * Ergänzung zu HelpWidgetGate.test.tsx, wo `HelpWidget` gestubbt ist: dort wird
- * nur die Verzweigung des Gates geprüft. Alle übrigen Tests zu TF-657 sind
- * Negativ-Assertions („kein FAB auf /login") — die wären auch dann grün, wenn
- * das Widget versehentlich ganz aus dem Baum fiele.
+ * Complement to HelpWidgetGate.test.tsx, where `HelpWidget` is stubbed: that
+ * test only checks the gate's branching. All other TF-657 tests are negative
+ * assertions ("no FAB on /login") — those would still pass even if the widget
+ * accidentally dropped out of the tree entirely.
  *
- * Dieser Test ist die Gegenprobe: das *echte* HelpWidget muss durch das Gate
- * hindurch seinen FAB rendern. Gemockt wird nur `useHelpContext` (wie in
- * HelpWidget.test.tsx), damit keine Help-Requests nötig sind.
+ * This test is the counter-check: the *real* HelpWidget must render its FAB
+ * through the gate. Only `useHelpContext` is mocked (as in HelpWidget.test.tsx)
+ * so no help requests are needed.
  */
 
 import React from 'react';

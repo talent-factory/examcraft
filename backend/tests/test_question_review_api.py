@@ -1,5 +1,5 @@
 """
-API Integration Tests für Question Review Endpoints
+API integration tests for Question Review endpoints
 """
 
 import pytest
@@ -12,7 +12,7 @@ from models.question_review import QuestionReviewVisibility, ReviewStatus
 
 
 class TestQuestionReviewAPI:
-    """Test Suite für Question Review API Endpoints"""
+    """Test suite for Question Review API endpoints"""
 
     @pytest.fixture(autouse=True)
     def ensure_question_review_router(self):
@@ -88,8 +88,8 @@ class TestQuestionReviewAPI:
         mock.bloom_level = 3
         mock.estimated_time_minutes = 5
         mock.quality_tier = "A"
-        # TF-383: Provenance-Snapshot — muss gesetzt sein, sonst liefert der Mock
-        # ein Mock-Attribut, das Pydantic nicht als Optional[Dict] validieren kann.
+        # TF-383: provenance snapshot — must be set, otherwise the mock returns
+        # a Mock attribute that Pydantic cannot validate as Optional[Dict].
         mock.generation_metadata = {
             "prompt_id": "uuid-1",
             "prompt_name": "custom_mcq",
@@ -101,20 +101,20 @@ class TestQuestionReviewAPI:
         mock.reviewed_by = None
         mock.reviewed_at = None
         mock.exam_id = "exam_123"
-        mock.archived_at = None  # TF-396: Archiv-Achse
+        mock.archived_at = None  # TF-396: archive axis
         mock.archived_by = None
         mock.archive_reason = None
         mock.created_at = datetime.now()
         mock.updated_at = datetime.now()
         mock.tags = []  # TF-320: route iterates q.tags — must be a real iterable
-        # TF-400: HK-Felder explizit None — sonst liefert der Mock Auto-Attribute,
-        # die Pydantic (Optional[int] / CompetencyBrief) nicht validieren kann.
+        # TF-400: HK fields explicitly None — otherwise the mock returns
+        # auto-attributes that Pydantic (Optional[int] / CompetencyBrief) cannot validate.
         mock.competency_id = None
         mock.ln_level = None
         mock.competency = None
-        # TF-642: Fragenpool-Sichtbarkeit explizit setzen — sonst liefert der
-        # Mock ein Mock-Attribut, das Pydantic (str / Optional[int]) nicht
-        # validieren kann (gleiches Muster wie TF-383/TF-400 oben).
+        # TF-642: explicitly set question-pool visibility — otherwise the
+        # mock returns a Mock attribute that Pydantic (str / Optional[int])
+        # cannot validate (same pattern as TF-383/TF-400 above).
         mock.visibility = QuestionReviewVisibility.INSTITUTION
         mock.org_unit_id = None
         return mock
@@ -122,7 +122,7 @@ class TestQuestionReviewAPI:
     # ==================== GET /api/v1/questions/review ====================
 
     def test_get_review_queue_success(self, auth_client, mock_question_review):
-        """Test erfolgreiche Review Queue Abfrage"""
+        """Test successful review queue query"""
         client, mock_db = auth_client
 
         # Mock Query Chain for main query
@@ -148,7 +148,7 @@ class TestQuestionReviewAPI:
         assert response.status_code == 401
 
     def test_get_review_queue_invalid_status(self):
-        """Test Review Queue mit ungültigem Status"""
+        """Test review queue with an invalid status"""
         client = TestClient(app)
         response = client.get(
             "/api/v1/questions/review", params={"status": "invalid_status"}
@@ -159,7 +159,7 @@ class TestQuestionReviewAPI:
     # ==================== GET /api/v1/questions/{id}/review ====================
 
     def test_get_question_review_success(self, auth_client, mock_question_review):
-        """Test erfolgreiche Question Review Details Abfrage"""
+        """Test successful question review details query"""
         client, mock_db = auth_client
 
         mock_question_review.comments = []
@@ -173,13 +173,13 @@ class TestQuestionReviewAPI:
         response = client.get("/api/v1/questions/1/review")
 
         assert response.status_code == 200
-        # TF-383: Provenance-Snapshot wird durch die API-Serialisierung gereicht.
+        # TF-383: provenance snapshot is passed through by the API serialization.
         body = response.json()
         assert body["generation_metadata"]["prompt_name"] == "custom_mcq"
         assert body["generation_metadata"]["prompt_version"] == 2
         assert body["generation_metadata"]["is_default_template"] is False
-        # TF-400: Frage ohne HK-Zuordnung serialisiert competency/ln_level als
-        # None — Altbestand bricht nicht.
+        # TF-400: a question without an HK assignment serializes competency/
+        # ln_level as None — legacy rows don't break.
         assert body["competency"] is None
         assert body["competency_id"] is None
         assert body["ln_level"] is None
@@ -187,8 +187,8 @@ class TestQuestionReviewAPI:
     def test_get_question_review_includes_competency(
         self, auth_client, mock_question_review
     ):
-        """TF-400: ist der Frage eine Handlungskompetenz zugeordnet, liefert die
-        Detail-Response den verschachtelten competency-Brief + LN-Stufe."""
+        """TF-400: if the question has a competency assigned, the detail
+        response returns the nested competency brief + LN level."""
         client, mock_db = auth_client
 
         mock_question_review.comments = []
@@ -225,7 +225,7 @@ class TestQuestionReviewAPI:
     def test_review_queue_serializes_competency(
         self, auth_client, mock_question_review
     ):
-        """TF-400: auch die Queue-Liste reicht den competency-Brief durch."""
+        """TF-400: the queue list also passes through the competency brief."""
         client, mock_db = auth_client
 
         framework = Mock()
@@ -257,7 +257,7 @@ class TestQuestionReviewAPI:
         assert item["ln_level"] == 4
 
     def test_get_question_review_not_found(self, auth_client):
-        """Test Question Review nicht gefunden"""
+        """Test question review not found"""
         client, mock_db = auth_client
 
         mock_query = MagicMock()
@@ -367,7 +367,7 @@ class TestQuestionReviewAPI:
     # ==================== GET /api/v1/questions/{id}/history ====================
 
     def test_get_review_history_success(self, auth_client):
-        """Test erfolgreiche Review History Abfrage - history endpoint has no auth"""
+        """Test successful review history query - history endpoint has no auth"""
         client, mock_db = auth_client
 
         mock_question = MagicMock()

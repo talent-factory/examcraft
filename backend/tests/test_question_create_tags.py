@@ -1,4 +1,4 @@
-"""Tests für tag_ids in create_question_review."""
+"""Tests for tag_ids in create_question_review."""
 
 import pytest
 from unittest.mock import Mock
@@ -172,7 +172,7 @@ class TestCreateQuestionWithTags:
         assert resp.status_code == 422
 
     def test_create_with_archived_tag_rolls_back_question(self, qct_db, qct_client):
-        """Regressionsschutz: invalide Tag-Validierung darf KEINE Frage persistieren."""
+        """Regression guard: invalid tag validation must NOT persist a question."""
         inst = make_institution(qct_db, "c4r")
         user = make_user(qct_db, inst.id, "c4r")
         tag = make_tag(qct_db, inst.id, "archiviert-rollback", archived=True)
@@ -191,7 +191,7 @@ class TestCreateQuestionWithTags:
         assert qct_db.query(QuestionReview).count() == before
 
     def test_create_with_foreign_institution_tag_returns_422(self, qct_db, qct_client):
-        """Cross-Tenant-Enumeration: fremde Tag-IDs liefern dasselbe 422 wie unbekannte."""
+        """Cross-tenant enumeration: foreign tag IDs return the same 422 as unknown ones."""
         inst_a = make_institution(qct_db, "c5a")
         inst_b = make_institution(qct_db, "c5b")
         user_a = make_user(qct_db, inst_a.id, "c5a")
@@ -206,7 +206,7 @@ class TestCreateQuestionWithTags:
             json={**QUESTION_PAYLOAD, "tag_ids": [foreign_tag.id]},
         )
         assert resp.status_code == 422
-        # Antwort darf die fremde ID nicht zurückspiegeln
+        # Response must not reflect back the foreign ID
         assert str(foreign_tag.id) not in resp.text
 
     def test_create_with_foreign_tag_rolls_back_question(self, qct_db, qct_client):

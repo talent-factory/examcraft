@@ -1,6 +1,6 @@
 """
-OAuth Service für ExamCraft AI
-Google und Microsoft OAuth2 Integration
+OAuth Service for ExamCraft AI
+Google and Microsoft OAuth2 integration
 """
 
 from authlib.integrations.starlette_client import OAuth
@@ -45,7 +45,7 @@ oauth.register(
 
 
 class OAuthService:
-    """OAuth Service für Social Login"""
+    """OAuth Service for social login"""
 
     def __init__(self, db: Session):
         self.db = db
@@ -406,9 +406,10 @@ class OAuthService:
         self.db.commit()
         self.db.refresh(new_user)
 
-        # TF-503: OAuth-User-Erstellung ist PII-erzeugend (analog create_user).
-        # Best-effort (log_action fängt eigene Fehler ab); der User ist bereits
-        # committet und darf durch ein Audit-Problem nicht verloren gehen.
+        # TF-503: OAuth user creation is PII-generating (analogous to
+        # create_user). Best-effort (log_action catches its own errors);
+        # the user is already committed and must not be lost due to an
+        # audit problem.
         AuditService.log_action(
             db=self.db,
             action=AuditService.ACTION_CREATE_USER,

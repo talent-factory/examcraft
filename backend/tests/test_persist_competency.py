@@ -20,10 +20,10 @@ def _setup(test_db):
     )
     test_db.add(inst)
     test_db.flush()
-    # QuestionReview.created_by ist eine FK auf users.id — ohne realen User
-    # scheitert der INSERT an question_reviews_created_by_fkey (unabhängig von
-    # der Kompetenz-Logik). Wir legen daher einen User an und reichen dessen id
-    # als user_id durch.
+    # QuestionReview.created_by is an FK to users.id — without a real user
+    # the INSERT fails on question_reviews_created_by_fkey (independent of
+    # the competency logic). We therefore create a user and pass its id
+    # through as user_id.
     user = User(
         email="persist@example.com",
         first_name="P",
@@ -109,8 +109,8 @@ def test_unknown_code_nulls_competency_but_keeps_ln(test_db):
 
 
 def test_out_of_range_ln_level_clamped_to_none(test_db):
-    """Modell-Output mit LN-Stufe ausserhalb 1–4 wird beim Persistieren auf None
-    reduziert (defensive Tier-Grenze; der DB-CHECK ist der Backstop)."""
+    """Model output with an LN level outside 1-4 is reduced to None on
+    persist (defensive app-tier guard; the DB CHECK is the backstop)."""
     inst, fw, user = _setup(test_db)
     _persist_questions(
         [_q(competency_code="B3", ln_level=9)],
@@ -129,15 +129,16 @@ def test_out_of_range_ln_level_clamped_to_none(test_db):
 
 
 def _logged(warn_mock) -> str:
-    """Alle Argumente aller logger.warning(...)-Aufrufe zu einem String."""
+    """All arguments of all logger.warning(...) calls joined into one string."""
     return " ".join(str(a) for call in warn_mock.call_args_list for a in call.args)
 
 
 def test_unmatched_competency_code_logs_warning(test_db):
-    """Ein nicht-leerer competency_code ohne Treffer in der Framework-Map wird
-    geloggt — sonst bliebe ein totaler Tagging-Ausfall (z. B. abweichendes
-    Heading-Format) unbemerkbar. Der Modul-Logger wird gepatcht statt caplog zu
-    nutzen, das in der Gesamt-Suite je nach Logging-Konfiguration nichts fängt."""
+    """A non-empty competency_code with no match in the framework map is
+    logged — otherwise a total tagging failure (e.g. a mismatched heading
+    format) would go unnoticed. The module logger is patched instead of
+    using caplog, which catches nothing in the full suite depending on the
+    logging configuration."""
     from unittest.mock import patch
 
     import tasks.question_tasks as qt
@@ -161,8 +162,8 @@ def test_unmatched_competency_code_logs_warning(test_db):
 
 
 def test_empty_competency_code_does_not_warn(test_db):
-    """Ein leerer/fehlender Code ist der legitime „kein Tagging gewünscht“-Fall
-    und darf kein competency_code_unmatched-Warning erzeugen."""
+    """An empty/missing code is the legitimate "no tagging desired" case
+    and must not produce a competency_code_unmatched warning."""
     from unittest.mock import patch
 
     import tasks.question_tasks as qt
@@ -184,9 +185,9 @@ def test_empty_competency_code_does_not_warn(test_db):
 
 
 def test_ln_level_check_constraint_rejects_out_of_range(test_db):
-    """DB-CHECK check_ln_level_range ist der Backstop: ein Direkt-UPDATE auf eine
-    LN-Stufe ausserhalb 1–4 muss scheitern (App klemmt bereits, aber die DB darf
-    sich nicht darauf verlassen)."""
+    """DB CHECK check_ln_level_range is the backstop: a direct UPDATE to an
+    LN level outside 1-4 must fail (the app already clamps, but the DB must
+    not rely on that)."""
     import pytest
     from sqlalchemy import text
     from sqlalchemy.exc import IntegrityError

@@ -1,20 +1,20 @@
 /**
  * HelpWidgetGate
  *
- * Auth-Gate für das Hilfe-Widget (TF-657).
+ * Auth gate for the help widget (TF-657).
  *
- * Das Widget hängt in `AppWithAuth` ausserhalb von `<Routes>` und würde damit
- * auch auf den öffentlichen Routen (/login, /register, /auth/*, /verify-email,
- * /registration-success) rendern. Gegated wird bewusst am Auth-Status statt an
- * einer Allowlist öffentlicher Routen — sonst reisst jede neue Public-Route den
- * Fix wieder auf.
+ * The widget is mounted in `AppWithAuth` outside of `<Routes>` and would
+ * therefore also render on the public routes (/login, /register, /auth/*,
+ * /verify-email, /registration-success). Gating is deliberately done on auth
+ * status rather than an allowlist of public routes — otherwise every new
+ * public route would reopen the fix.
  *
- * Der Guard muss eine Ebene über `HelpWidget` sitzen: React-Hooks lassen sich
- * nicht bedingt aufrufen, ein Early-Return innerhalb von `HelpWidget` würde
- * `useHelpContext` (und dessen Help-Requests) weiterhin feuern lassen.
+ * The guard must sit one level above `HelpWidget`: React hooks can't be
+ * called conditionally, so an early return inside `HelpWidget` would still
+ * let `useHelpContext` (and its help requests) fire.
  *
- * `isLoading` gehört mit ins Gate: ohne das blitzt der FAB während des
- * Token-Bootstraps nach einem Reload kurz auf, bevor `isAuthenticated` steht.
+ * `isLoading` belongs in the gate too: without it, the FAB briefly flashes
+ * during the token bootstrap after a reload, before `isAuthenticated` settles.
  */
 
 import React from 'react';

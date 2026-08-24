@@ -1,8 +1,8 @@
-"""Organisationseinheiten unterhalb der Institution (z.B. Abteilung, Team).
+"""Organizational units below the institution (e.g. department, team).
 
-Selbstreferenzierende, beliebig tiefe Hierarchie via ``parent_org_unit_id``.
-``unit_type`` ist ein freier String statt Enum, damit neue Ebenen (z.B.
-"team" unterhalb von "abteilung") ohne Schema-Aenderung moeglich sind.
+Self-referencing, arbitrarily deep hierarchy via ``parent_org_unit_id``.
+``unit_type`` is a free string instead of an enum, so a new level (e.g.
+"team" below "abteilung") is possible without a schema change.
 
 Design: docs/superpowers/specs/2026-08-07-org-unit-hierarchie-design.md
 """
@@ -19,17 +19,17 @@ from sqlalchemy.sql import func
 
 from database import Base
 
-# Fuer Stufe 0 unterstuetzte unit_type-Werte. Bewusst kein DB-Enum/Constraint
-# (siehe Modul-Docstring) -- eine neue Ebene hinzuzufuegen bleibt eine
-# Ein-Zeilen-Aenderung hier, keine Migration. Validiert wird dieser Katalog
-# an der API-Grenze (api/org_units.py::OrgUnitCreateIn), nicht hier im Modell
-# oder im Service -- interne/zukuenftige Aufrufer (z.B. Stufe-1-Piloten) duerfen
-# weiterhin beliebige Werte direkt setzen.
+# unit_type values supported for level 0. Deliberately no DB enum/constraint
+# (see module docstring) -- adding a new level stays a one-line change here,
+# no migration needed. This catalog is validated at the API boundary
+# (api/org_units.py::OrgUnitCreateIn), not here in the model or the service --
+# internal/future callers (e.g. level-1 pilots) may still set arbitrary
+# values directly.
 KNOWN_UNIT_TYPES = ("abteilung", "team")
 
 
 class OrgUnit(Base):
-    """Ein Knoten in der Organisationshierarchie (Abteilung, Team, ...)."""
+    """A node in the organizational hierarchy (department, team, ...)."""
 
     __tablename__ = "org_units"
 
@@ -87,7 +87,7 @@ class OrgUnit(Base):
 
 
 class UserOrgUnit(Base):
-    """M:N-Mitgliedschaft: eine Person kann mehreren OrgUnits angehoeren."""
+    """M:N membership: a person can belong to multiple OrgUnits."""
 
     __tablename__ = "user_org_units"
 

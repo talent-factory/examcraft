@@ -1,17 +1,17 @@
 """
-Test-Daten Seed Script — TF-341 / Dokumentations-Screenshots
+Test data seed script — TF-341 / documentation screenshots
 
-Erstellt realistische Testdaten für lokale Entwicklung und Dokumentation:
-  - 8 genehmigte Prüfungsfragen (5 MC + 3 offen)
-  - 1 Exam im Entwurfsstatus (wird im Screenshot-Lauf via UI finalisiert)
-  - 2 Klassen (INF-24a, WI-24b)
-  - 12 Studierende, aufgeteilt auf die Klassen
-  - 12 Submissions mit Attempts, Antworten und Noten
-    (Mix aus fully_reviewed / partially_reviewed / pending_review)
+Creates realistic test data for local development and documentation:
+  - 8 approved exam questions (5 MC + 3 open)
+  - 1 exam in draft status (finalized via the UI during the screenshot run)
+  - 2 classes (INF-24a, WI-24b)
+  - 12 students, split across the classes
+  - 12 submissions with attempts, answers and grades
+    (mix of fully_reviewed / partially_reviewed / pending_review)
 
-Voraussetzung: just seed (Institution + Admin müssen existieren)
+Prerequisite: just seed (institution + admin must already exist)
 
-Ausführung via: just seed-test-data
+Run via: just seed-test-data
 """
 
 import sys
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 EXAM_TITLE = "Algorithmen & Datenstrukturen — Semesterprüfung FS 2026"
 
-# 5 MC-Fragen: (text, options, correct_answer, topic)
+# 5 MC questions: (text, options, correct_answer, topic)
 MC_QUESTIONS = [
     (
         "Was ist die durchschnittliche Zeitkomplexität von Quicksort?",
@@ -67,7 +67,7 @@ MC_QUESTIONS = [
     ),
 ]
 
-# 3 offene Fragen: (text, model_answer, topic)
+# 3 open questions: (text, model_answer, topic)
 OPEN_QUESTIONS = [
     (
         "Erklären Sie den Unterschied zwischen Stack und Queue. Nennen Sie je ein Anwendungsbeispiel.",
@@ -93,7 +93,7 @@ OPEN_QUESTIONS = [
     ),
 ]
 
-# 12 Studierende: (external_id, display_name, class_name)
+# 12 students: (external_id, display_name, class_name)
 STUDENTS = [
     ("moodle_u101", "Müller A.", "INF-24a"),
     ("moodle_u102", "Huber M.", "INF-24a"),
@@ -109,10 +109,10 @@ STUDENTS = [
     ("moodle_u112", "Baumann F.", "WI-24b"),
 ]
 
-# Pro Student: mc_correct (Liste bool, 5 MC-Fragen) + open_pts (Liste float, 3 offene Fragen)
+# Per student: mc_correct (list of bool, 5 MC questions) + open_pts (list of float, 3 open questions)
 # grade_status: 'fully_reviewed' | 'partially_reviewed' | 'pending_review'
 STUDENT_SCORES = {
-    #                        MC                      Open (max 3pt je)      grade_status
+    #                        MC                      Open (max 3pt each)    grade_status
     "moodle_u101": {
         "mc": [1, 1, 1, 1, 1],
         "open": [3.0, 3.0, 2.0],
@@ -175,7 +175,7 @@ STUDENT_SCORES = {
     },
 }
 
-# Beispielantworten der Studierenden (offene Fragen)
+# Example student answers (open questions)
 STUDENT_OPEN_ANSWERS = {
     "moodle_u101": [
         "Stack arbeitet nach LIFO (Last In First Out) — das zuletzt eingefügte Element wird zuerst entnommen. Beispiel: Browser-Verlauf (Zurück-Schaltfläche). Queue arbeitet nach FIFO (First In First Out) — das zuerst eingefügte Element kommt zuerst heraus. Beispiel: Druckerwarteschlange.",
@@ -420,8 +420,8 @@ def seed_submissions(db, institution, exam, students):
         .all()
     )
 
-    # Nach Fragetyp filtern statt per Index slicen — robust gegen abweichende
-    # Reihenfolge/Anzahl. mc_correct hat 5, open_pts hat 3 Einträge pro Student.
+    # Filter by question type instead of slicing by index — robust against
+    # deviating order/count. mc_correct has 5, open_pts has 3 entries per student.
     mc_questions = [
         eq for eq in exam_questions if eq.question.question_type == "single_choice"
     ]
@@ -456,7 +456,7 @@ def seed_submissions(db, institution, exam, students):
             logger.info(f"   ✅ Submission für {display_name} bereits vorhanden")
             continue
 
-        # Calculate totals (mc_questions / open_questions wurden oben validiert)
+        # Calculate totals (mc_questions / open_questions were validated above)
         mc_total = sum(mc_correct)
         open_total = sum(open_pts_awarded)
         total_awarded = float(mc_total) + open_total

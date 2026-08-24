@@ -1,9 +1,9 @@
-"""Tests for ``LlmGrader`` + ``GradingService`` open_ended-Routing
+"""Tests for ``LlmGrader`` + ``GradingService`` open_ended routing
 (TF-334, TF-440).
 
-Pure-functional Stubs für den Gateway-Client (OpenAI-Wire) — der echte
-SDK-Call ist nie Teil eines Tests. Wir mocken auf Client-Ebene, weil das
-genau die Naht ist, an der ``LlmGrader`` injizierbar gebaut wurde.
+Pure-functional stubs for the gateway client (OpenAI wire) — the real
+SDK call is never part of a test. We mock at the client level, because
+that is exactly the seam ``LlmGrader`` was built to be injectable at.
 """
 
 from __future__ import annotations
@@ -159,8 +159,8 @@ def test_llm_grader_falls_back_on_invalid_json() -> None:
 
 
 def test_llm_grader_falls_back_on_empty_content_blocks() -> None:
-    """Der Gateway kann eine leere ``choices``-Liste zurückgeben (z. B. bei
-    einem Content-Filter-Abbruch). ``_call_gateway`` wirft → fail-soft."""
+    """The gateway can return an empty ``choices`` list (e.g. on a
+    content-filter abort). ``_call_gateway`` raises → fail-soft."""
     client = MagicMock()
     client.chat.completions.create.return_value = SimpleNamespace(choices=[])
     grader = LlmGrader(client=client)
@@ -175,9 +175,9 @@ def test_llm_grader_falls_back_on_empty_content_blocks() -> None:
 
 
 def test_llm_grader_demo_mode_without_gateway(monkeypatch) -> None:
-    """Ohne LLM_GATEWAY_URL und ohne injizierten Client läuft der
-    Grader im Stub-Modus. Wichtig für lokale Dev-Setups und CI ohne
-    Gateway-Provisionierung (TF-440)."""
+    """Without LLM_GATEWAY_URL and without an injected client, the grader
+    runs in stub mode. Important for local dev setups and CI without
+    gateway provisioning (TF-440)."""
     monkeypatch.delenv("LLM_GATEWAY_URL", raising=False)
     grader = LlmGrader()
     assert grader.demo_mode is True
@@ -193,8 +193,9 @@ def test_llm_grader_demo_mode_without_gateway(monkeypatch) -> None:
 
 
 def test_llm_grader_strips_markdown_code_block() -> None:
-    """Manche Modell-Antworten kommen in ``` json ``` Wrappern — die müssen
-    weg, sonst wird jede Bewertung zur Stub-Antwort."""
+    """Some model responses come wrapped in ``` json ``` fences — those
+    must be stripped, otherwise every grading falls back to the stub
+    answer."""
     fenced = (
         "```json\n"
         '{"points_awarded": 1.0, "confidence": 0.5, '
@@ -262,8 +263,8 @@ def test_llm_grader_fence_preserves_backticks_in_rationale() -> None:
 
 
 def test_llm_grader_returns_stub_when_correct_answer_missing() -> None:
-    """Ohne Musterlösung lohnt sich ein API-Call gar nicht; stattdessen
-    klar markieren, dass die Lehrperson manuell ranmuss."""
+    """Without a model solution, an API call isn't worth it; instead,
+    clearly flag that the instructor needs to grade manually."""
     grader = LlmGrader(client=_stub_gateway_client({}))
     outcome = grader.grade(
         question_text="X",
@@ -276,8 +277,8 @@ def test_llm_grader_returns_stub_when_correct_answer_missing() -> None:
 
 
 def test_llm_grader_uses_prompt_caching_on_static_blocks() -> None:
-    """Spec 6.3: Frage + Musterlösung als statischer Cache-Anteil pro
-    Prüfung. System-Prompt ebenfalls gecached. Studi-Antwort variabel.
+    """Spec 6.3: question + model solution as a static cache portion per
+    exam. System prompt is cached as well. Student answer is variable.
     """
     client = _stub_gateway_client(
         {
@@ -299,11 +300,11 @@ def test_llm_grader_uses_prompt_caching_on_static_blocks() -> None:
     call_kwargs = client.chat.completions.create.call_args.kwargs
     messages = call_kwargs["messages"]
 
-    # System-Prompt cached (TF-440: OpenAI-Wire-Nachricht statt top-level `system`)
+    # System prompt cached (TF-440: OpenAI-wire message instead of top-level `system`)
     assert messages[0]["role"] == "system"
     assert messages[0]["content"][0]["cache_control"] == {"type": "ephemeral"}
 
-    # User-Block: erster (statischer Fragenblock) cached, zweiter (Studi-Antwort) nicht
+    # User block: first (static question block) cached, second (student answer) not
     assert messages[1]["role"] == "user"
     contents = messages[1]["content"]
     assert contents[0]["cache_control"] == {"type": "ephemeral"}
@@ -311,7 +312,7 @@ def test_llm_grader_uses_prompt_caching_on_static_blocks() -> None:
 
 
 # ---------------------------------------------------------------------------
-# GradingService open_ended-Routing — End-to-End mit DB
+# GradingService open_ended routing — end-to-end with DB
 # ---------------------------------------------------------------------------
 
 
@@ -411,16 +412,16 @@ def test_grading_service_routes_open_ended_to_llm(test_db: Session) -> None:
     assert answer.grade.llm_matched_aspects == ["Kapselung"]
     assert answer.grade.llm_missing_aspects == ["Vererbung"]
     assert answer.grade.is_correct is None
-    # is_correct=None gates pending_review (kein approved/manual_override).
+    # is_correct=None gates pending_review (no approved/manual_override).
     test_db.refresh(submission)
     assert submission.grade_status == "pending_review"
 
 
 def test_grading_service_passes_question_context_to_llm(test_db: Session) -> None:
-    """Spec 6.3 verlangt Fragetext + Musterlösung + Erklärung +
-    Schwierigkeit + Bloom an den LLM. Ohne diesen Test würde ein
-    Refactor still die Cache-Effizienz killen, weil ein leerer Text-
-    Block auch ein gültiger Anthropic-Call ist.
+    """Spec 6.3 requires question text + model solution + explanation +
+    difficulty + Bloom level to be sent to the LLM. Without this test, a
+    refactor could silently kill the cache efficiency, because an empty
+    text block is also a valid Anthropic call.
     """
     submission, _ = _seed_open_ended_submission(test_db)
 
@@ -580,7 +581,7 @@ def test_enterprise_model_override_is_used_and_cached(
 
         service.grade_submission(submission.id)
         assert service._llm_grader_by_model["claude-opus-enterprise"] is custom_grader
-        # Zweiter grade_submission-Call trifft den Cache — kein weiterer Log.
+        # Second grade_submission call hits the cache — no further log.
         mock_log.error.assert_called_once()
 
 

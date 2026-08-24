@@ -1,7 +1,7 @@
 """
-Celery Task für asynchrone Fragengenerierung mit Progress-Tracking.
-Sendet per-Frage Progress-Updates via ProgressTask.update_progress().
-Persistiert generierte Fragen automatisch in question_reviews (Status: pending).
+Celery task for asynchronous question generation with progress tracking.
+Sends per-question progress updates via ProgressTask.update_progress().
+Automatically persists generated questions to question_reviews (status: pending).
 """
 
 import dataclasses
@@ -99,8 +99,8 @@ TIME_ESTIMATES = {
     ("open_ended", "hard"): 8,
 }
 
-# Premium-Package ist im Worker unter /app/premium verfügbar.
-# In lokalen Tests wird RAGService via patch("tasks.question_tasks.RAGService") gemockt.
+# Premium package is available in the worker under /app/premium.
+# In local tests, RAGService is mocked via patch("tasks.question_tasks.RAGService").
 try:
     from premium.services.rag_service import RAGService
 except ImportError as _import_err:
@@ -219,11 +219,11 @@ def _safe_update_job_status(task_id: str, status: str) -> bool:
 
 
 def _coerce_ln_level(value) -> Optional[int]:
-    """LN-Stufe defensiv auf 1–4 begrenzen, sonst None (TF-400).
+    """Defensively clamp the LN level to 1-4, else None (TF-400).
 
-    Quelle ist Modell-Output (Premium klemmt bereits, aber die Core-Persistenz
-    darf sich nicht darauf verlassen — Tier-Grenze). Der DB-CHECK auf
-    question_reviews.ln_level ist der Backstop.
+    Source is model output (Premium already clamps, but Core persistence
+    can't rely on that — tier boundary). The DB CHECK on
+    question_reviews.ln_level is the backstop.
     """
     try:
         level = int(value)
@@ -244,21 +244,21 @@ def _persist_questions(
     db: Optional["Session"] = None,
 ) -> List[int]:
     """
-    Persistiert generierte Fragen in question_reviews mit Status 'pending'.
-    Erstellt ReviewHistory-Einträge für den Audit-Trail.
+    Persists generated questions to question_reviews with status 'pending'.
+    Creates ReviewHistory entries for the audit trail.
 
     Args:
-        framework_id: Kompetenzrahmen (TF-400). Dessen Kompetenzen werden EINMAL
-            als {code: id}-Map vorgeladen, um pro Frage competency_code →
-            competency_id aufzulösen (kein N+1). None → keine Auflösung.
-        db: Optionale injizierte Session (nur für Tests). Wenn None, öffnet die
-            Funktion ihre eigene Session via SessionLocal und schliesst sie im
-            finally. Eine injizierte Session wird NICHT geschlossen — ihr
-            Lifecycle gehört dem Aufrufer. Produktionsverhalten bleibt
-            unverändert (db wird nur in Tests gesetzt).
+        framework_id: Competency framework (TF-400). Its competencies are
+            preloaded ONCE as a {code: id} map to resolve competency_code →
+            competency_id per question (no N+1). None → no resolution.
+        db: Optional injected session (for tests only). If None, the function
+            opens its own session via SessionLocal and closes it in the
+            finally block. An injected session is NOT closed — its lifecycle
+            belongs to the caller. Production behavior remains unchanged
+            (db is only set in tests).
 
     Returns:
-        Liste der generierten QuestionReview-IDs
+        List of generated QuestionReview IDs
     """
     from database import SessionLocal
     from models.competency import Competency
@@ -275,7 +275,7 @@ def _persist_questions(
     if owns_session:
         db = SessionLocal()
     try:
-        # Kompetenz-Code → ID EINMAL vorladen (kein N+1 in der Fragen-Schleife).
+        # Preload competency code → id ONCE (no N+1 in the question loop).
         code_to_id: Dict[str, int] = {}
         if framework_id:
             code_to_id = {
@@ -353,12 +353,12 @@ def _persist_questions(
             else:
                 correct_answer_text = None
 
-            # TF-400: Kompetenz-Zuordnung. competency_code gegen die vorgeladene
-            # Framework-Map auflösen (getattr hält die Tier-Grenze zur
-            # Premium-Datenklasse sauber). Ein nicht-leerer Code ohne Treffer
-            # (halluziniert oder abweichendes rendered_text-Heading-Format) wird
-            # geloggt — analog source_document_unmatched —, damit ein totaler
-            # Tagging-Ausfall nicht still bleibt. ln_level defensiv auf 1–4.
+            # TF-400: competency assignment. Resolve competency_code against
+            # the preloaded framework map (getattr keeps the tier boundary to
+            # the Premium data class clean). A non-empty code with no match
+            # (hallucinated or a differing rendered_text heading format) is
+            # logged — analogous to source_document_unmatched — so a total
+            # tagging failure doesn't stay silent. ln_level clamped to 1-4.
             raw_competency_code = getattr(question, "competency_code", None)
             competency_id = (
                 code_to_id.get(raw_competency_code) if raw_competency_code else None
@@ -392,19 +392,19 @@ def _persist_questions(
                 created_by=user_id,
                 institution_id=institution_id,
                 bloom_level=getattr(question, "bloom_level", None),
-                # TF-400: Kompetenz-Zuordnung. competency_code wird gegen die
-                # vorgeladene Framework-Map aufgelöst; ein halluzinierter/
-                # competency_id/ln_level oben aufgelöst (Warning bei Code-Miss,
-                # ln_level auf 1–4 begrenzt).
+                # TF-400: competency assignment. competency_code is resolved
+                # against the preloaded framework map;
+                # competency_id/ln_level resolved above (warning on code miss,
+                # ln_level clamped to 1-4).
                 competency_id=competency_id,
                 ln_level=ln_level,
                 estimated_time_minutes=TIME_ESTIMATES.get(
                     (question.question_type, question.difficulty), 3
                 ),
-                # TF-383: Provenance-Snapshot der verwendeten Vorlage. getattr,
-                # damit die Core-Persistenz nicht von einer Premium-Datenklasse
-                # abhängt (Tier-Grenze bleibt sauber); None für Frage-Quellen
-                # ohne Herkunft.
+                # TF-383: provenance snapshot of the template used. getattr so
+                # Core persistence doesn't depend on a Premium data class
+                # (keeps the tier boundary clean); None for question sources
+                # without provenance.
                 generation_metadata=getattr(question, "generation_metadata", None),
             )
             db.add(question_review)
@@ -547,15 +547,15 @@ def _persist_questions(
         db.commit()
         return review_ids
     except Exception:
-        # Nur eine selbst eröffnete Session zurückrollen — eine injizierte
-        # Session gehört dem Aufrufer; ein rollback() würde dessen Transaktion
-        # überraschend mitreissen. In Produktion gilt owns_session=True, also
-        # bleibt das Rollback-Verhalten bei Fehlern unverändert.
+        # Only roll back a session we opened ourselves — an injected session
+        # belongs to the caller; a rollback() would unexpectedly drag its
+        # transaction along. In production owns_session=True always holds, so
+        # rollback behavior on errors stays unchanged.
         if owns_session:
             db.rollback()
         raise
     finally:
-        # Eine injizierte Test-Session gehört dem Aufrufer — nicht schliessen.
+        # An injected test session belongs to the caller — do not close it.
         if owns_session:
             db.close()
 
@@ -568,13 +568,13 @@ def _persist_questions(
     dont_autoretry_for=(
         Ignore,
         Reject,
-        ValidationError,  # Ungültige Eingabedaten — Retry ändert nichts
-        TypeError,  # Programmierfehler — Retry ändert nichts
-        ImportError,  # Deployment-Problem — Retry ändert nichts
-        ProgrammingError,  # psycopg2-Adapter-/DDL-Fehler — Retry ändert nichts
-        IntegrityError,  # FK-Verletzung (z. B. Tag-ID) — Retry ändert nichts
-        ValueError,  # Domänenvalidierung (z. B. Tag-Scope) — Retry ändert nichts
-        ModelUnavailableError,  # TF-438: ganze Modell-Kette 404 — permanent
+        ValidationError,  # Invalid input data — retry won't help
+        TypeError,  # Programming error — retry won't help
+        ImportError,  # Deployment issue — retry won't help
+        ProgrammingError,  # psycopg2 adapter/DDL error — retry won't help
+        IntegrityError,  # FK violation (e.g. tag ID) — retry won't help
+        ValueError,  # Domain validation (e.g. tag scope) — retry won't help
+        ModelUnavailableError,  # TF-438: entire model chain 404 — permanent
     ),
     retry_kwargs={"max_retries": 4},
     retry_backoff=30,
@@ -588,15 +588,15 @@ def generate_questions_task(
     institution_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
-    Asynchrone Fragengenerierung mit per-Frage Progress-Updates.
+    Asynchronous question generation with per-question progress updates.
 
     Args:
-        request_data: Serialisierter RAGExamRequest als dict (via model_dump(mode='json'))
-        user_id: ID des Users (für Logging und Persistierung)
-        institution_id: Institution-ID für Multi-Tenancy (optional)
+        request_data: Serialized RAGExamRequest as dict (via model_dump(mode='json'))
+        user_id: ID of the user (for logging and persistence)
+        institution_id: Institution ID for multi-tenancy (optional)
 
     Returns:
-        Dict mit exam_id, topic, questions, generation_time, quality_metrics, review_question_ids
+        Dict with exam_id, topic, questions, generation_time, quality_metrics, review_question_ids
     """
     # TF-359: tag the Sentry scope so a generation failure lands in Sentry with
     # the task context the on-call needs to triage. CeleryIntegration already
@@ -625,19 +625,19 @@ def generate_questions_task(
     # Re-raised "No context available" ValueError from TF-358 is raised later in
     # the service call below; topic is known now, so tag it here.
     sentry_sdk.set_tag("topic", rag_request.topic)
-    # Fortschritt in N+2 Schritten:
-    #   Step 0:      Task-Start (emittiert vom Task)
-    #   Step 1:      Context geladen (emittiert via Callback)
-    #   Steps 2..N+1: Fragen 1..N (emittiert via Callback)
-    # WICHTIG (TF-358): Der Service koppelt die Fragenanzahl ggf. ans verfügbare
-    # Chunk-Material und emittiert dann gegen die EFFEKTIVE Anzahl. Der Callback
-    # reicht das `total` des Service deshalb durch, statt es auf die ursprünglich
-    # angeforderte Anzahl zu fixieren — sonst bliebe der Balken beim Capping
-    # hängen. Der initiale total ist nur eine Schätzung; der SUCCESS-State im
-    # WebSocket setzt am Ende ohnehin 100%.
+    # Progress in N+2 steps:
+    #   Step 0:      task start (emitted by the task)
+    #   Step 1:      context loaded (emitted via callback)
+    #   Steps 2..N+1: questions 1..N (emitted via callback)
+    # IMPORTANT (TF-358): the service may cap the question count to the
+    # available chunk material and then emits against the EFFECTIVE count.
+    # The callback therefore passes through the service's `total` instead of
+    # pinning it to the originally requested count — otherwise the bar would
+    # get stuck when capping occurs. The initial total is only an estimate;
+    # the SUCCESS state in the WebSocket sets 100% at the end regardless.
     initial_total_steps = question_count + 2
 
-    # Step 0: Emittiert vom Task selbst (nicht vom Callback)
+    # Step 0: emitted by the task itself (not by the callback)
     self.update_progress(0, initial_total_steps, "Starte Fragengenerierung...")
 
     def progress_callback(current: int, total: int, message: str) -> None:
@@ -661,15 +661,14 @@ def generate_questions_task(
             f"({question_count} Fragen in {result.generation_time:.1f}s)"
         )
 
-        # Persistiere Fragen in question_reviews (Status: pending). Falls die
-        # Persistierung scheitert, behandeln wir den Task als FAILURE statt
-        # SUCCESS-mit-Warnung: aus User-Sicht ist eine "erfolgreiche"
-        # Generierung ohne abrufbare Review-Queue indistinct von einem
-        # Pipeline-Fehler. Außerdem würde der Watchdog den Job nicht mehr
-        # einsammeln (terminal SUCCESS), so dass die Inkonsistenz dauerhaft
-        # bliebe. Re-Raise lässt Celery den Task — wenn noch Retry-Budget da
-        # ist — erneut versuchen, andernfalls geht der Task FAILURE durch das
-        # generische except weiter unten.
+        # Persist questions to question_reviews (status: pending). If
+        # persistence fails, we treat the task as FAILURE instead of
+        # SUCCESS-with-warning: from the user's perspective, a "successful"
+        # generation with no retrievable review queue is indistinguishable
+        # from a pipeline failure. Also, the watchdog would no longer pick up
+        # the job (terminal SUCCESS), so the inconsistency would persist.
+        # Re-raising lets Celery retry the task — if retry budget remains —
+        # otherwise the task goes FAILURE through the generic except below.
         review_question_ids: List[int] = _persist_questions(
             questions=result.questions,
             exam_id=result.exam_id,
@@ -686,7 +685,7 @@ def generate_questions_task(
 
         _safe_update_job_status(self.request.id, "SUCCESS")
 
-        # Premium RAGQuestion/RAGContext sind @dataclass — bei Wechsel zu Pydantic .model_dump() verwenden
+        # Premium RAGQuestion/RAGContext are @dataclass — use .model_dump() if switching to Pydantic
         return {
             "exam_id": result.exam_id,
             "topic": result.topic,
@@ -706,7 +705,7 @@ def generate_questions_task(
         ProgrammingError,
         IntegrityError,
         ValueError,
-        ModelUnavailableError,  # TF-438: fail fast, kein Endlos-Retry wie TF-437
+        ModelUnavailableError,  # TF-438: fail fast, no endless retry like TF-437
     ):
         _safe_update_job_status(self.request.id, "FAILURE")
         raise

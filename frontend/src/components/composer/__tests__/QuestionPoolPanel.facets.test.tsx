@@ -29,7 +29,7 @@ jest.mock('../../../api/tagsApi', () => ({
   tagsApi: { listTags: jest.fn().mockResolvedValue([]) },
 }));
 
-// TF-406: Kompetenz-Facette speist sich aus den Frameworks der Institution.
+// TF-406: competency facet is populated from the institution's frameworks.
 jest.mock('../../../api/competencyFrameworksApi', () => ({
   competencyFrameworksApi: {
     listFrameworks: jest.fn().mockResolvedValue([

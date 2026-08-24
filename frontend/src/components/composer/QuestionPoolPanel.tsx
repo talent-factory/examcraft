@@ -37,7 +37,7 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   hard: 'bg-red-100 text-red-700',
 };
 
-// TF-406: gemeinsame Optik der Facetten-/Sortier-Dropdowns.
+// TF-406: shared styling for the facet/sort dropdowns.
 const FACET_SELECT_CLS =
   'text-xs px-2 py-1.5 border border-gray-300 rounded-lg bg-white text-gray-700 ' +
   'focus:ring-2 focus:ring-primary-500 focus:border-transparent ' +
@@ -121,7 +121,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<number[]>([]);
   const [docFilterOpen, setDocFilterOpen] = useState(false);
   const docFilterRef = useRef<HTMLDivElement>(null);
-  // TF-406: Fachfilter-Facetten + Sortierung. Leerstring = Facette inaktiv.
+  // TF-406: subject-filter facets + sorting. Empty string = facet inactive.
   const [filterBloom, setFilterBloom] = useState<number | ''>('');
   const [filterLnLevel, setFilterLnLevel] = useState<number | ''>('');
   const [filterCompetencyId, setFilterCompetencyId] = useState<number | ''>('');
@@ -168,8 +168,8 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
   const activeTags = allTagsRaw.filter((t) => !t.is_archived);
   const archivedTagsWithQuestions = allTagsRaw.filter((t) => t.is_archived && t.usage_count > 0);
 
-  // TF-406: Handlungskompetenzen für die Kompetenz-Facette (über alle aktiven
-  // Frameworks der Institution geflacht).
+  // TF-406: competencies for the competency facet (flattened across all
+  // active frameworks of the institution).
   const { data: frameworks = [] } = useQuery({
     queryKey: ['competency-frameworks', 'active'],
     queryFn: () => competencyFrameworksApi.listFrameworks(false),
@@ -391,8 +391,8 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
     return doc ? `${doc.title} (${doc.approved_question_count})` : `Doc ${id}`;
   };
 
-  // TF-406: Auto-Komposition (constraint-basiert) als 1-Klick-Einstieg sichtbar
-  // machen — öffnet den Dialog direkt im Kompositions-Modus.
+  // TF-406: make auto-composition (constraint-based) visible as a 1-click
+  // entry point — opens the dialog directly in composition mode.
   const openAutoFill = (composition: boolean) => {
     setCompositionMode(composition);
     setPreview(null);
@@ -419,8 +419,8 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
     return c ? c.code : `#${id}`;
   };
 
-  // TF-406: aktive Fachfilter-Facetten als Chips. Bestehende Filter (Suche,
-  // Typ, Difficulty, Tags, Dokument) behalten ihre eigene Inline-Darstellung.
+  // TF-406: active subject-filter facets as chips. Existing filters (search,
+  // type, difficulty, tags, document) keep their own inline rendering.
   const facetChips: { key: string; label: string; onClear: () => void }[] = [];
   if (filterLnLevel !== '') {
     facetChips.push({
@@ -641,7 +641,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
 
           {tagFilterOpen && (
             <div className="absolute z-10 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg w-[280px]">
-              {/* Suchfeld */}
+              {/* Search field */}
               <div className="p-2 border-b border-gray-100">
                 <input
                   ref={tagSearchRef}
@@ -653,7 +653,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
                 />
               </div>
 
-              {/* Tag-Chips — aktive und archivierte Sektionen */}
+              {/* Tag chips — active and archived sections */}
               {(() => {
                 const q = tagSearch.toLowerCase();
                 const filteredActive = activeTags
@@ -773,7 +773,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
           )}
         </div>
 
-        {/* Aktive Tag-Chips unter dem Button */}
+        {/* Active tag chips below the button */}
         {selectedTagIds.map((id) => {
           const tag = allTagsRaw.find((tag) => tag.id === id);
           if (!tag) return null;
@@ -801,7 +801,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
         })}
       </div>
 
-      {/* TF-406: Fachfilter-Facetten, Sortierung & aktive-Filter-Chips */}
+      {/* TF-406: subject-filter facets, sorting & active-filter chips */}
       {!disabled && (
         <div className="mb-3 space-y-2">
           <div className="grid grid-cols-2 gap-2">
@@ -1251,10 +1251,10 @@ const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({ question, isAdded, 
         </button>
       </div>
 
-      {/* Zwei-Spalten: links (Badges + Tags), rechts (Button) */}
+      {/* Two columns: left (badges + tags), right (button) */}
       <div className="flex gap-2 items-start">
 
-        {/* Linke Spalte — begrenzt auf Breite vor dem Button */}
+        {/* Left column — width capped before the button */}
         <div className="flex-1 min-w-0">
           {/* Badges */}
           <div className="flex flex-wrap gap-1.5">
@@ -1271,7 +1271,7 @@ const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({ question, isAdded, 
             )}
           </div>
 
-          {/* Tags — unterhalb Badges, gleiche Breite wie linke Spalte */}
+          {/* Tags — below badges, same width as the left column */}
           {sortedTags.length > 0 && (
             <div className="mt-1.5">
               <div className="flex flex-wrap gap-1">
@@ -1309,7 +1309,7 @@ const PoolQuestionCard: React.FC<PoolQuestionCardProps> = ({ question, isAdded, 
           )}
         </div>
 
-        {/* Rechte Spalte — Button, immer fixiert rechts */}
+        {/* Right column — button, always fixed right */}
         <div className="flex-shrink-0 pt-0.5">
           {isAdded ? (
             <span className="text-[13px] text-green-600 font-medium">

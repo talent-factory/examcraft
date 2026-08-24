@@ -1,6 +1,6 @@
 """
-RBAC Service für ExamCraft AI
-Implementiert Permission Checks, Quota Management, Role Management und Audit Logging
+RBAC Service for ExamCraft AI
+Implements permission checks, quota management, role management, and audit logging
 """
 
 from typing import List, Dict, Any
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class RBACService:
     """
-    Service für Role-Based Access Control, Feature-Permissions und Ressourcen-Quotas.
+    Service for role-based access control, feature permissions, and resource quotas.
     """
 
     def __init__(self, db: Session):
@@ -39,22 +39,22 @@ class RBACService:
         self, user_id: int, feature_name: str, log_access: bool = True
     ) -> bool:
         """
-        Prüft ob ein User Zugriff auf ein Feature hat.
-        Berücksichtigt sowohl Rolle als auch Subscription Tier.
+        Check whether a user has access to a feature.
+        Considers both role and subscription tier.
 
         Args:
             user_id: User ID
-            feature_name: Feature-Name (z.B. 'question_generation_ai')
-            log_access: Ob Zugriff geloggt werden soll
+            feature_name: Feature name (e.g. 'question_generation_ai')
+            log_access: Whether access should be logged
 
         Returns:
-            True wenn User Zugriff hat, sonst False
+            True if the user has access, False otherwise
         """
         user = self.db.query(User).filter(User.id == user_id).first()
         if not user:
             return False
 
-        # Feature holen
+        # Look up feature
         feature = (
             self.db.query(Feature)
             .filter(Feature.name == feature_name, Feature.is_active)
@@ -65,11 +65,11 @@ class RBACService:
             logger.warning(f"Feature '{feature_name}' not found or inactive")
             return False
 
-        # 1. Check: Hat die Rolle des Users Zugriff auf das Feature?
-        # Prüfe gegen bestehende 'roles' Tabelle (user.roles Relationship)
+        # 1. Check: does the user's role have access to the feature?
+        # Check against the existing 'roles' table (user.roles relationship)
         role_has_feature = False
         for role in user.roles:
-            # Mappe alte Rolle auf neue RBAC-Rolle
+            # Map old role to new RBAC role
             rbac_role_id = f"role_{role.name}"
             role_feature = (
                 self.db.query(RoleFeature)
@@ -92,12 +92,12 @@ class RBACService:
                 )
             return False
 
-        # 2. Check: Hat das Subscription Tier Zugriff auf das Feature?
-        # Prüfe gegen Institution (die bereits subscription_tier hat)
+        # 2. Check: does the subscription tier have access to the feature?
+        # Check against institution (which already has subscription_tier)
         if user.institution_id:
             institution = user.institution
             if institution and institution.subscription_tier:
-                # Mappe Institution.subscription_tier auf SubscriptionTier
+                # Map Institution.subscription_tier to SubscriptionTier
                 tier_id = f"tier_{institution.subscription_tier}"
                 tier_has_feature = (
                     self.db.query(TierFeature)
@@ -118,7 +118,7 @@ class RBACService:
                         )
                     return False
 
-        # 3. Alles OK - Zugriff erlauben
+        # 3. All OK - allow access
         if log_access:
             self._log_access_granted(user_id, "feature", feature_name)
 
@@ -128,15 +128,15 @@ class RBACService:
         self, institution_id: int, resource_type: str, requested_amount: int = 1
     ) -> Dict[str, Any]:
         """
-        Prüft ob eine Institution noch Ressourcen-Quota verfügbar hat.
+        Check whether an institution still has resource quota available.
 
         Args:
-            institution_id: Institution ID (entspricht Organization)
-            resource_type: z.B. 'documents', 'questions_per_month'
-            requested_amount: Anzahl der angefragten Ressourcen
+            institution_id: Institution ID (corresponds to organization)
+            resource_type: e.g. 'documents', 'questions_per_month'
+            requested_amount: Number of requested resources
 
         Returns:
-            Dict mit 'allowed': bool, 'current_usage': int, 'quota_limit': int, 'remaining': int
+            Dict with 'allowed': bool, 'current_usage': int, 'quota_limit': int, 'remaining': int
         """
         from models.auth import Institution
 
@@ -146,7 +146,7 @@ class RBACService:
         if not institution:
             return {"allowed": False, "reason": "institution_not_found"}
 
-        # Quota Limit für diesen Tier holen
+        # Get the quota limit for this tier
         tier_id = f"tier_{institution.subscription_tier}"
         tier_quota = (
             self.db.query(TierQuota)
@@ -163,7 +163,7 @@ class RBACService:
             return {
                 "allowed": True,
                 "reason": "no_quota_defined",
-            }  # Kein Limit = erlaubt
+            }  # No limit = allowed
 
         quota_limit = tier_quota.quota_limit
         if quota_limit == -1:
@@ -174,7 +174,7 @@ class RBACService:
                 "remaining": -1,
             }  # Unlimited
 
-        # Aktuelle Nutzung ermitteln
+        # Determine current usage
         current_period_start = datetime.now().replace(
             day=1, hour=0, minute=0, second=0, microsecond=0
         )
@@ -210,7 +210,7 @@ class RBACService:
         self, institution_id: int, resource_type: str, amount: int = 1
     ) -> ResourceUsage:
         """
-        Erhöht die Ressourcen-Nutzung für eine Institution.
+        Increases resource usage for an institution.
         """
         current_period_start = datetime.now().replace(
             day=1, hour=0, minute=0, second=0, microsecond=0
@@ -256,7 +256,7 @@ class RBACService:
         self, include_system_roles: bool = True, include_inactive: bool = False
     ) -> List[RBACRole]:
         """
-        Listet alle Rollen auf.
+        Lists all roles.
         """
         query = self.db.query(RBACRole)
 
@@ -270,7 +270,7 @@ class RBACService:
 
     def get_role_features(self, role_id: str) -> List[Feature]:
         """
-        Gibt alle Features einer Rolle zurück.
+        Returns all features of a role.
         """
         return (
             self.db.query(Feature)

@@ -1,11 +1,11 @@
-"""TF-397: Tests für die `kind`-Dimension der Tags-API.
+"""TF-397: Tests for the `kind` dimension of the Tags API.
 
-Deckt ab:
-- `kind`-Filter auf GET /api/v1/tags (Default 'content' blendet Prompt-Tags aus).
-- Eindeutigkeit pro (scope, kind, lower(name)) — ein 'content'-Tag und ein
-  'prompt'-Tag mit gleichem Namen koexistieren.
-- Gelockerte RBAC: 'prompt'-Tags brauchen 'prompt:create' statt superuser; das
-  bestehende superuser-Erfordernis für globale 'content'-Tags bleibt bestehen.
+Covers:
+- `kind` filter on GET /api/v1/tags (default 'content' excludes prompt tags).
+- Uniqueness per (scope, kind, lower(name)) — a 'content' tag and a
+  'prompt' tag with the same name can coexist.
+- Relaxed RBAC: 'prompt' tags need 'prompt:create' instead of superuser; the
+  existing superuser requirement for global 'content' tags remains in place.
 """
 
 import pytest
@@ -32,7 +32,7 @@ def _make_mock_user(
     is_superuser: bool = False,
     permissions: tuple = (),
 ) -> Mock:
-    """Mock-User mit explizit kontrolliertem is_superuser und Permission-Set."""
+    """Mock user with explicitly controlled is_superuser and permission set."""
     user = Mock()
     user.id = user_id
     user.institution_id = institution_id
@@ -184,7 +184,7 @@ class TestKindFilter:
             inst.id, user_db.id
         )
 
-        # Default → nur content
+        # Default → content only
         resp = tags_client.get("/api/v1/tags")
         assert resp.status_code == 200
         names = [t["name"] for t in resp.json()]
@@ -209,8 +209,8 @@ class TestKindFilter:
         assert resp.status_code == 200
         payload = resp.json()
         names = [t["name"] for t in payload]
-        # nur prompt-kind sichtbar; andere Tests legen weitere prompt-Tags an,
-        # daher gezielt prüfen statt Gleichheit der ganzen Liste.
+        # only prompt-kind visible; other tests create additional prompt tags,
+        # so check specifically rather than comparing the whole list for equality.
         assert "prompt-kf2" in names
         assert "content-kf2" not in names
         assert all(t["kind"] == "prompt" for t in payload)
@@ -223,8 +223,8 @@ class TestKindFilter:
 
 class TestKindUniqueness:
     def test_content_and_prompt_same_name_coexist(self, tags_db: Session) -> None:
-        """Ein globales 'content'-`default` und ein globales 'prompt'-`default`
-        dürfen nebeneinander existieren (Namespace-Trennung über kind)."""
+        """A global 'content' `default` and a global 'prompt' `default`
+        may coexist (namespace separation via kind)."""
         make_tag(tags_db, "coexist-default", scope="global", kind="content")
         make_tag(tags_db, "coexist-default", scope="global", kind="prompt")
 
@@ -246,7 +246,7 @@ class TestPromptTagRBAC:
     def test_prompt_tag_create_allowed_with_prompt_create_permission(
         self, tags_db: Session, tags_client: TestClient
     ) -> None:
-        """Nicht-superuser mit 'prompt:create' darf globalen Prompt-Tag anlegen."""
+        """A non-superuser with 'prompt:create' may create a global prompt tag."""
         inst = make_institution(tags_db, "rbac1")
         user_db = make_user(tags_db, inst.id, "rbac1")
 
@@ -273,7 +273,7 @@ class TestPromptTagRBAC:
 
         from utils.auth_utils import get_current_user
 
-        # User hat create_questions, aber NICHT prompt:create.
+        # User has create_questions, but NOT prompt:create.
         app.dependency_overrides[get_current_user] = lambda: _make_mock_user(
             inst.id, user_db.id, is_superuser=False, permissions=("create_questions",)
         )
@@ -287,7 +287,7 @@ class TestPromptTagRBAC:
     def test_content_global_tag_still_requires_superuser(
         self, tags_db: Session, tags_client: TestClient
     ) -> None:
-        """Bestehende Regel unverändert: globale content-Tags nur superuser."""
+        """Existing rule unchanged: global content tags require superuser only."""
         inst = make_institution(tags_db, "rbac3")
         user_db = make_user(tags_db, inst.id, "rbac3")
 

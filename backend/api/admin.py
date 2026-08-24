@@ -139,7 +139,7 @@ class PermissionResponse(BaseModel):
 
 
 class CreateRoleRequest(BaseModel):
-    """Request-Body zum Erstellen einer neuen Rolle (TF-603)."""
+    """Request body for creating a new role (TF-603)."""
 
     name: str = Field(..., min_length=1, max_length=50, pattern="^[a-z0-9_-]+$")
     display_name: str = Field(..., min_length=1, max_length=100)
@@ -148,7 +148,7 @@ class CreateRoleRequest(BaseModel):
 
 
 class UpdateRoleRequest(BaseModel):
-    """Request-Body zum Bearbeiten einer Rolle (TF-603)."""
+    """Request body for editing a role (TF-603)."""
 
     display_name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = None
@@ -904,7 +904,7 @@ async def create_role(
     current_user: User = Depends(get_current_superuser),
     db: Session = Depends(get_db),
 ):
-    """Erstellt eine neue Rolle (Superuser only). Siehe TF-603 Design-Doc."""
+    """Creates a new role (superuser only). See TF-603 design doc."""
     locale = get_request_locale(request, current_user)
     _validate_known_permissions(role_data.permissions, locale)
 
@@ -957,7 +957,7 @@ async def update_role(
     current_user: User = Depends(get_current_superuser),
     db: Session = Depends(get_db),
 ):
-    """Bearbeitet eine existierende Rolle (Superuser only). Siehe TF-603 Design-Doc."""
+    """Edits an existing role (superuser only). See TF-603 design doc."""
     locale = get_request_locale(request, current_user)
     role = db.query(Role).filter(Role.id == role_id).first()
 
@@ -992,9 +992,9 @@ async def update_role(
         additional_data={
             "role_id": role.id,
             "name": role.name,
-            # Vollständige Permission-Liste NACH dem Update, nicht nur die
-            # Tatsache einer Änderung — sicherheitsrelevant, da eine globale
-            # Rolle wie "admin" plattformweit wirkt (TF-603 Review Finding 2).
+            # Full permission list AFTER the update, not just the fact that a
+            # change occurred — security-relevant, since a global role like
+            # "admin" affects the entire platform (TF-603 review finding 2).
             "permissions": permissions,
         },
     )
@@ -1017,8 +1017,8 @@ async def delete_role(
     current_user: User = Depends(get_current_superuser),
     db: Session = Depends(get_db),
 ):
-    """Löscht eine Rolle (Superuser only). 409 bei Systemrolle oder falls noch
-    mindestens ein Benutzer zugewiesen ist."""
+    """Deletes a role (superuser only). 409 if it is a system role or if at
+    least one user is still assigned to it."""
     locale = get_request_locale(request, current_user)
     role = db.query(Role).filter(Role.id == role_id).first()
     if not role:
@@ -1035,9 +1035,9 @@ async def delete_role(
             detail=t("admin_role_has_users", locale=locale, count=len(role.users)),
         )
 
-    # Attribute vor dem Delete/Commit einfangen: SQLAlchemy expired die
-    # Instanz standardmässig nach dem Commit, ein Zugriff auf role.name
-    # danach würde einen Refresh der bereits gelöschten Zeile auslösen.
+    # Capture attributes before delete/commit: SQLAlchemy expires the
+    # instance by default after the commit, and accessing role.name
+    # afterwards would trigger a refresh of the already-deleted row.
     role_name = role.name
     was_system_role = role.is_system_role
 

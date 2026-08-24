@@ -1,6 +1,6 @@
 """
-Tests für enforce_resource_access-Helper.
-Deckt Owner / Superuser-Bypass / Forbidden / 404 / Audit-Logging ab.
+Tests for the enforce_resource_access helper.
+Covers owner / superuser bypass / forbidden / 404 / audit logging.
 """
 
 from types import SimpleNamespace
@@ -128,8 +128,9 @@ def test_enforce_superuser_bypass_logs_audit(super_user, test_db):
 
 def test_enforce_orphan_resource_returns_with_warning(owner_user, test_db, mocker):
     """obj.user_id is None (orphan) → access allowed, warning logged, no audit."""
-    # Patch direkt das logger-Attribut im Modul; das umgeht caplog/Handler-
-    # Propagation-Edge-Cases zwischen pytest 7.4.3 (CI) und 9.0.3 (lokal).
+    # Patch the logger attribute in the module directly; this sidesteps
+    # caplog/handler propagation edge cases between pytest 7.4.3 (CI) and
+    # 9.0.3 (local).
     mock_logger = mocker.patch("utils.auth_utils.logger")
 
     obj = _make_resource(owner_id=None)
@@ -239,10 +240,10 @@ def test_enforce_skips_institution_check_when_obj_lacks_institution_id(
 def test_enforce_superuser_bypass_aborts_when_audit_persistence_fails(
     super_user, test_db, mocker
 ):
-    """DSGVO-Vertrag: Wenn log_action None liefert (DB-Fehler), MUSS
-    log_superuser_bypass HTTPException 500 raisen — der Bypass darf nicht
-    durchgehen ohne Audit-Trail."""
-    # log_action() retourniert None → Persistenz-Fehler simuliert.
+    """GDPR contract: if log_action returns None (DB error),
+    log_superuser_bypass MUST raise HTTPException 500 — the bypass must not
+    go through without an audit trail."""
+    # log_action() returns None → simulates a persistence failure.
     mocker.patch("services.audit_service.AuditService.log_action", return_value=None)
 
     obj = _make_resource(owner_id=1, resource_id=42)

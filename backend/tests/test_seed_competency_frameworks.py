@@ -1,4 +1,4 @@
-"""Seed-Test für BWZ-Kompetenzrahmen (TF-400)."""
+"""Seed test for the BWZ competency framework (TF-400)."""
 
 from models.competency import Competency, CompetencyFramework
 from utils.seed_competency_frameworks import seed_bwz_frameworks
@@ -29,11 +29,11 @@ def test_seed_creates_two_frameworks_idempotently(test_db):
     fws = test_db.query(CompetencyFramework).filter_by(institution_id=inst.id).all()
     names = sorted(f.name for f in fws)
     assert len(fws) == 2
-    assert "Mitarbeitende führen" in names[0]  # Modul A — korrekter Titel
+    assert "Mitarbeitende führen" in names[0]  # Module A — correct title
     assert all(f.rendered_text for f in fws)
 
-    # TF-400: strukturierte HKs werden aus rendered_text abgeleitet und sind
-    # nach zweimaligem Seed nicht dupliziert (Code eindeutig je Framework).
+    # TF-400: structured HKs are derived from rendered_text and are not
+    # duplicated after seeding twice (code is unique per framework).
     modul_b = next(f for f in fws if f.module_code == "B")
     codes = sorted(c.code for c in modul_b.competencies)
     assert codes == ["B1", "B2", "B3"]
@@ -42,4 +42,4 @@ def test_seed_creates_two_frameworks_idempotently(test_db):
         .filter(Competency.framework_id.in_([f.id for f in fws]))
         .count()
     )
-    assert total == 6  # Modul A: A1/A2/A6 + Modul B: B1/B2/B3
+    assert total == 6  # Module A: A1/A2/A6 + Module B: B1/B2/B3

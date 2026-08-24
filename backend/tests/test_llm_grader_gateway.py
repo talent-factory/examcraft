@@ -42,7 +42,7 @@ def test_gateway_grading_sends_cache_control(monkeypatch):
 
     import services.llm_gateway as gw
 
-    # Fix 3: gateway_enabled vor Konstruktion patchen, damit self._gateway korrekt gesetzt wird.
+    # Fix 3: patch gateway_enabled before construction so self._gateway is set correctly.
     monkeypatch.setattr(gw, "gateway_enabled", lambda: True)
     monkeypatch.setattr(gw, "make_openai_client", lambda: _FakeOpenAI(captured))
 
@@ -66,7 +66,7 @@ def test_gateway_grading_sends_cache_control(monkeypatch):
 
 
 def test_gateway_default_model_is_grading_alias(monkeypatch):
-    """Fix 1: Kein model-Arg → Gateway-Default ist logischer Grading-Alias, nicht rohe Modell-ID."""
+    """Fix 1: no model arg -> gateway default is the logical grading alias, not a raw model ID."""
     monkeypatch.setenv("LLM_GATEWAY_URL", "http://gw:4000")
     monkeypatch.setenv("LLM_GATEWAY_API_KEY", "sk-x")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
@@ -77,7 +77,7 @@ def test_gateway_default_model_is_grading_alias(monkeypatch):
     monkeypatch.setattr(gw, "gateway_enabled", lambda: True)
     monkeypatch.setattr(gw, "make_openai_client", lambda: _FakeOpenAI(captured))
 
-    # Kein model= Argument — das ist der Produktiv-Default (Institution.llm_model_for_grading = NULL)
+    # No model= argument — this is the production default (Institution.llm_model_for_grading = NULL)
     grader = LlmGrader()
     outcome = grader.grade(
         question_text="Was ist `y`?",
@@ -86,7 +86,7 @@ def test_gateway_default_model_is_grading_alias(monkeypatch):
         points_max=5,
     )
 
-    assert outcome.points_awarded == 5  # Fake gibt 8, wird auf points_max=5 geclampt
+    assert outcome.points_awarded == 5  # Fake returns 8, clamped to points_max=5
     assert captured["model"] == "examcraft/grading"
-    # Timeout muss gesetzt sein (Fix 2)
+    # Timeout must be set (Fix 2)
     assert captured.get("timeout") is not None

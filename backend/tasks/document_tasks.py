@@ -27,18 +27,18 @@ logger = logging.getLogger(__name__)
 
 
 class ProgressTask(Task):
-    """Base Task mit Progress-Tracking via Celery update_state"""
+    """Base task with progress tracking via Celery update_state"""
 
     abstract = True
 
     def update_progress(self, current: int, total: int, message: str = "") -> None:
         """
-        Sendet Progress-Update an Redis Result Backend.
+        Sends a progress update to the Redis result backend.
 
         Args:
-            current: Aktueller Schritt (0-based)
-            total: Gesamtanzahl Schritte (muss > 0 sein)
-            message: Deutsche Fortschrittsmessage
+            current: Current step (0-based)
+            total: Total number of steps (must be > 0)
+            message: Progress message (German)
         """
         if total <= 0:
             logger.error(
@@ -58,14 +58,13 @@ class ProgressTask(Task):
 
 
 def run_async(coro):
-    """Führt eine async Coroutine im synchronen Celery Worker aus.
+    """Runs an async coroutine inside the synchronous Celery worker.
 
-    Erstellt für jeden Aufruf einen frischen Event-Loop und schliesst ihn
-    im finally-Block. Celery prefork-Worker sind langlebige Prozesse, in
-    denen ein wiederverwendeter Loop nach einer geworfenen Coroutine in
-    einem halb-geschlossenen Zustand zurückbleiben und Folge-Tasks
-    silently hängen lassen kann (TF-351-Symptom). Frische Loops eliminieren
-    diesen geteilten Zustand zwischen Tasks und Retries.
+    Creates a fresh event loop for every call and closes it in the
+    finally block. Celery prefork workers are long-lived processes in
+    which a reused loop can be left in a half-closed state after a
+    raised coroutine and silently hang follow-up tasks (TF-351 symptom).
+    Fresh loops eliminate this shared state between tasks and retries.
     """
     loop = asyncio.new_event_loop()
     try:
@@ -77,18 +76,19 @@ def run_async(coro):
 
 
 def _detect_vector_failure(document, document_id, result):
-    """Erkennt eine fehlgeschlagene Vektorisierung im Result-Envelope.
+    """Detects a failed vectorization in the result envelope.
 
-    ``process_document_with_vectors`` markiert das Dokument bei Vektor-Fehlern
-    als ERROR und liefert ein dict (kein None) mit ``vector_embeddings.error`` —
-    der ``result is None``-Guard der Tasks greift dann NICHT. Ohne diese
-    gemeinsame Prüfung fiele der Code durch den Quality-/Eskalations-Zweig und
-    meldete ``success=True`` trotz ``status="error"`` (TF-364). Als Helper
-    geführt, damit ``process_document`` und ``reprocess_document_ocr`` dieselbe
-    Erkennung nutzen und nicht auseinanderdriften.
+    ``process_document_with_vectors`` marks the document as ERROR on
+    vector failures and returns a dict (not None) with
+    ``vector_embeddings.error`` — the tasks' ``result is None`` guard
+    then does NOT catch it. Without this shared check, the code would
+    fall through the quality/escalation branch and report
+    ``success=True`` despite ``status="error"`` (TF-364). Kept as a
+    helper so ``process_document`` and ``reprocess_document_ocr`` use
+    the same detection and don't drift apart.
 
     Returns:
-        ``(error_code, error_message)`` bei Vektor-Fehler, sonst ``None``.
+        ``(error_code, error_message)`` on vector failure, else ``None``.
     """
     vector_error = (
         result.get("vector_embeddings", {}).get("error")
@@ -101,18 +101,18 @@ def _detect_vector_failure(document, document_id, result):
     metadata = document.doc_metadata or {}
     error_code = metadata.get("error_code")
     if error_code is None:
-        # process_document_with_vectors persistiert sonst immer einen
-        # klassifizierten Code; fehlt er, stammt die ERROR-Markierung aus einer
-        # anderen Quelle -> sichtbar machen statt still als vectorization_failed
-        # zu defaulten.
+        # process_document_with_vectors otherwise always persists a
+        # classified code; if it's missing, the ERROR marking came from
+        # a different source -> surface that instead of silently
+        # defaulting to vectorization_failed.
         error_code = "vectorization_failed"
         logger.warning(
             f"Kein error_code in doc_metadata für {document_id}; "
             f"Default '{error_code}'."
         )
-    # Fehlermeldung möglichst spezifisch: Vektor-Fehler aus dem Result, sonst
-    # error_message, sonst die in doc_metadata persistierte Ursache — nie ein
-    # leeres (None) Fehler-Envelope.
+    # Error message as specific as possible: vector error from the
+    # result, else error_message, else the cause persisted in
+    # doc_metadata — never an empty (None) error envelope.
     error_message = (
         vector_error
         or document.error_message
@@ -131,11 +131,11 @@ def _detect_vector_failure(document, document_id, result):
     dont_autoretry_for=(
         Ignore,
         Reject,
-        ValueError,  # z. B. "Dokument X nicht gefunden" — Retry findet es auch nicht
-        TypeError,  # Programmierfehler
-        ImportError,  # Deployment-Problem
-        ProgrammingError,  # psycopg2-Adapter-/DDL-Fehler
-        IntegrityError,  # FK-Verletzung
+        ValueError,  # e.g. "Document X not found" — a retry won't find it either
+        TypeError,  # programming error
+        ImportError,  # deployment problem
+        ProgrammingError,  # psycopg2 adapter/DDL error
+        IntegrityError,  # FK violation
     ),
     retry_kwargs={"max_retries": 3, "countdown": 60},
     retry_backoff=True,
@@ -143,15 +143,15 @@ def _detect_vector_failure(document, document_id, result):
 )
 def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
     """
-    Asynchrone Dokumentverarbeitung mit Docling und Vector Embedding.
-    Sendet granulare Progress-Updates (0-100%) an Redis.
+    Asynchronous document processing with Docling and vector embedding.
+    Sends granular progress updates (0-100%) to Redis.
 
     Args:
-        document_id: ID des Dokuments
-        user_id: ID des Users
+        document_id: ID of the document
+        user_id: ID of the user
 
     Returns:
-        Dict mit Verarbeitungsstatus und Metadaten
+        Dict with processing status and metadata
     """
     db = SessionLocal()
     document = None
@@ -159,7 +159,7 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
     try:
         self.update_progress(0, 10, "Starte Verarbeitung...")
 
-        # 1. Dokument aus DB laden
+        # 1. Load document from DB
         self.update_progress(1, 10, "Dokument wird geladen...")
         document = db.query(Document).filter(Document.id == int(document_id)).first()
         if not document:
@@ -173,7 +173,7 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
         self.update_progress(2, 10, "Text wird extrahiert...")
         self.update_progress(3, 10, "Docling-Verarbeitung läuft...")
 
-        # 2. Dokument verarbeiten (Docling + Vektoren)
+        # 2. Process document (Docling + vectors)
         self.update_progress(4, 10, "Vektoren werden erstellt...")
         result = run_async(
             document_service.process_document_with_vectors(int(document_id), db)
@@ -184,14 +184,15 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
 
         self.update_progress(8, 10, "Vektoren werden erstellt...")
 
-        # 3. Dokument aus DB neu laden
+        # 3. Reload document from DB
         db.refresh(document)
 
-        # TF-364: Vektorisierung fehlgeschlagen -> process_document_with_vectors
-        # hat das Dokument als ERROR markiert und ein dict (kein None) mit
-        # vector_embeddings.error zurückgegeben. Der None-Guard oben griff daher
-        # nicht. Konsistentes Fehler-Envelope zurückgeben statt durch den
-        # Eskalations-Zweig zu fallen (sonst success=True bei status="error").
+        # TF-364: vectorization failed -> process_document_with_vectors
+        # marked the document as ERROR and returned a dict (not None)
+        # with vector_embeddings.error. The None guard above therefore
+        # didn't catch it. Return a consistent error envelope instead of
+        # falling through the escalation branch (otherwise
+        # success=True despite status="error").
         vector_failure = _detect_vector_failure(document, document_id, result)
         if vector_failure is not None:
             error_code, error_message = vector_failure
@@ -210,15 +211,16 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
                 "vector_embeddings": result.get("vector_embeddings", {}),
             }
 
-        # Qualitäts-Eskalation (TF-360): bei negativem Verdict ggf. einen
-        # separaten OCR-Reprocess-Job einreihen. reprocess_document_ocr selbst
-        # eskaliert nie weiter -> struktureller Loop-Schutz.
+        # Quality escalation (TF-360): on a negative verdict, possibly
+        # enqueue a separate OCR reprocess job. reprocess_document_ocr
+        # itself never escalates further -> structural loop protection.
         info = dict(document.processing_info or {})
         has_verdict = isinstance(result, dict) and "quality" in result
         quality = result.get("quality", {}) if isinstance(result, dict) else {}
         if not has_verdict:
-            # Kein Qualitäts-Verdict (z. B. Vektorisierung fehlgeschlagen) ->
-            # keine Eskalation, klare Markierung statt stillem 'not_needed'.
+            # No quality verdict (e.g. vectorization failed) -> no
+            # escalation, clear marking instead of silently defaulting
+            # to 'not_needed'.
             info["escalation"] = "no_verdict"
             logger.warning(
                 f"Kein Qualitäts-Verdict für {document_id}; Eskalation übersprungen."
@@ -237,9 +239,9 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
                     f"OCR-Eskalation nötig, aber OCR nicht verfügbar für {document_id}"
                 )
             else:
-                # OCR bereits versucht, Qualität weiterhin ungenügend — keine
-                # weitere Eskalation (Loop-Schutz). Bestehenden Zustand
-                # (z. B. 'exhausted'/'failed') bewahren.
+                # OCR already attempted, quality still insufficient — no
+                # further escalation (loop protection). Preserve the
+                # existing state (e.g. 'exhausted'/'failed').
                 info.setdefault("escalation", "exhausted")
                 logger.warning(
                     f"Qualität weiterhin ungenügend nach OCR für {document_id} "
@@ -250,7 +252,7 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
         document.processing_info = info
         flag_modified(document, "processing_info")
 
-        # 4. In Datenbank speichern
+        # 4. Persist to database
         self.update_progress(9, 10, "In Datenbank speichern...")
         db.commit()
 
@@ -288,23 +290,24 @@ def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
                         f"DB-Rollback fehlgeschlagen für {document_id}: {rb_err}"
                     )
 
-        raise  # autoretry_for=(Exception,) auf dem Decorator übernimmt die Retry-Logik
+        raise  # autoretry_for=(Exception,) on the decorator handles the retry logic
 
     finally:
         db.close()
 
 
-# Exceptions, die der OCR-Reprocess NICHT auto-retried (terminal beim ersten
-# Auftreten). Als Konstante geführt, weil der except-Block dieselbe Menge braucht,
-# um zu entscheiden, ob ein Fehler endgültig ist und als escalation='failed'/ERROR
-# persistiert werden darf — sonst driften Decorator und Handler auseinander.
+# Exceptions the OCR reprocess does NOT auto-retry (terminal on first
+# occurrence). Kept as a constant because the except block needs the
+# same set to decide whether an error is final and may be persisted as
+# escalation='failed'/ERROR — otherwise the decorator and handler would
+# drift apart.
 _REPROCESS_NON_RETRYABLE = (
     Ignore,
     Reject,
     ValueError,
     TypeError,
     ImportError,
-    NotImplementedError,  # Core-Tier-Placeholder-Vektorservice
+    NotImplementedError,  # core-tier placeholder vector service
     ProgrammingError,
     IntegrityError,
 )
@@ -323,12 +326,12 @@ REPROCESS_MAX_RETRIES = 2
     retry_jitter=True,
 )
 def reprocess_document_ocr(self, document_id: str, user_id: str) -> Dict[str, Any]:
-    """Neuverarbeitung mit PyMuPDF + Tesseract-OCR nach negativem Qualitäts-Verdict.
+    """Reprocessing with PyMuPDF + Tesseract OCR after a negative quality verdict.
 
-    Eingereiht durch ``process_document``, wenn die Erst-Extraktion ungenügend
-    war und OCR verfügbar ist. Löscht alte Vektoren idempotent, verarbeitet mit
-    OCR neu und setzt Loop-Schutz-Flags. Eskaliert selbst NICHT weiter (genau ein
-    Versuch).
+    Enqueued by ``process_document`` when the initial extraction was
+    insufficient and OCR is available. Deletes old vectors idempotently,
+    reprocesses with OCR, and sets loop-protection flags. Does NOT
+    escalate any further itself (exactly one attempt).
     """
     db = SessionLocal()
     document = None
@@ -339,15 +342,15 @@ def reprocess_document_ocr(self, document_id: str, user_id: str) -> Dict[str, An
         if not document:
             raise ValueError(f"Dokument {document_id} nicht gefunden")
 
-        # 1. Alte Vektoren entfernen (idempotent) — sonst bleiben stale Points
-        #    mit höheren chunk_index-Werten in Qdrant zurück.
+        # 1. Remove old vectors (idempotent) — otherwise stale points with
+        #    higher chunk_index values are left behind in Qdrant.
         self.update_progress(2, 10, "Alte Vektoren werden gelöscht...")
         vector_service = get_vector_service()
         try:
             run_async(vector_service.delete_document_chunks(int(document_id)))
         except Exception as delete_err:
-            # Distinkter Kontext, damit ein Vektor-Lösch-Fehler (z. B. Qdrant
-            # nicht erreichbar) im Log nicht wie ein OCR-Fehler aussieht.
+            # Distinct context so a vector-deletion error (e.g. Qdrant
+            # unreachable) doesn't look like an OCR error in the log.
             logger.error(
                 f"Alte Vektoren konnten nicht gelöscht werden für {document_id}: "
                 f"{delete_err}. OCR-Neuverarbeitung wird abgebrochen.",
@@ -355,7 +358,7 @@ def reprocess_document_ocr(self, document_id: str, user_id: str) -> Dict[str, An
             )
             raise
 
-        # 2. Mit OCR neu verarbeiten
+        # 2. Reprocess with OCR
         self.update_progress(3, 10, "OCR-Verarbeitung läuft...")
         ocr_processor = create_ocr_processor()
         result = run_async(
@@ -366,19 +369,20 @@ def reprocess_document_ocr(self, document_id: str, user_id: str) -> Dict[str, An
         if result is None:
             raise ValueError(f"OCR-Neuverarbeitung fehlgeschlagen für {document_id}")
 
-        # 3. Loop-Schutz- und Status-Flags setzen
+        # 3. Set loop-protection and status flags
         db.refresh(document)
 
-        # TF-364 (Review): Identische Vektor-Fehler-Prüfung wie in
-        # process_document. process_document_with_vectors liefert bei
-        # Vektorisierungs-Fehlern ein dict (kein None) mit vector_embeddings.error
-        # und markiert das Dokument als ERROR — der None-Guard oben greift dann
-        # nicht. Ohne diese Prüfung fiele der OCR-Reprocess in den
-        # 'exhausted'-Quality-Zweig und meldete success=True trotz status="error"
-        # (derselbe Bug, den TF-364 in process_document behoben hat). Terminaler
-        # Fehler: kein weiterer Reprocess (ocr_attempted) und im UI als 'failed'
-        # sichtbar. Wie in process_document wird der Vektor-Fehler NICHT erneut
-        # versucht (process_document_with_vectors hat ihn bereits klassifiziert).
+        # TF-364 (review): identical vector-error check as in
+        # process_document. process_document_with_vectors returns a dict
+        # (not None) with vector_embeddings.error on vectorization
+        # failures and marks the document as ERROR — the None guard
+        # above then doesn't catch it. Without this check, the OCR
+        # reprocess would fall into the 'exhausted' quality branch and
+        # report success=True despite status="error" (the same bug
+        # TF-364 fixed in process_document). Terminal error: no further
+        # reprocess (ocr_attempted) and visible in the UI as 'failed'.
+        # As in process_document, the vector error is NOT retried again
+        # (process_document_with_vectors has already classified it).
         vector_failure = _detect_vector_failure(document, document_id, result)
         if vector_failure is not None:
             error_code, error_message = vector_failure
@@ -428,12 +432,13 @@ def reprocess_document_ocr(self, document_id: str, user_id: str) -> Dict[str, An
         logger.error(
             f"Fehler bei OCR-Neuverarbeitung {document_id}: {str(e)}", exc_info=True
         )
-        # TF-365 (Review): Nur bei terminalem Fehler (kein weiterer Retry folgt) als
-        # escalation='failed'/ERROR persistieren. Sonst sähe der Nutzer im
-        # Retry-Fenster (~120 s) den roten 'failed'-Chip, obwohl der Retry noch
-        # erfolgreich werden kann. Terminal = nicht auto-retried ODER Retries
-        # erschöpft. Bei transientem Fehler bleibt der queued/PROCESSING-Zustand
-        # bestehen und der Reprocessing-Hinweis weiter sichtbar.
+        # TF-365 (review): only persist as escalation='failed'/ERROR on a
+        # terminal error (no further retry follows). Otherwise the user
+        # would see the red 'failed' chip during the retry window
+        # (~120s) even though the retry could still succeed. Terminal =
+        # not auto-retried OR retries exhausted. On a transient error,
+        # the queued/PROCESSING state remains and the reprocessing
+        # indicator stays visible.
         terminal = isinstance(e, _REPROCESS_NON_RETRYABLE) or (
             self.request.retries >= REPROCESS_MAX_RETRIES
         )

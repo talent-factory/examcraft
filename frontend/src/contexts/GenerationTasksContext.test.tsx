@@ -230,8 +230,8 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
     renderProvider();
 
     await waitFor(() => expect(captured!.getTask('task-done')).toBeDefined());
-    // Der Task ist durch — eine Verbindung dafür wäre nur Ballast, und ein
-    // abgelaufener Redis-Eintrag könnte ihn über PENDING sogar zurückstufen.
+    // The task is done — a connection for it would just be dead weight, and
+    // an expired Redis entry could even demote it back to PENDING.
     expect(MockWebSocket.instances).toHaveLength(0);
   });
 
@@ -292,7 +292,7 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
     });
     expect(captured!.getTask('task-done')).toBeUndefined();
 
-    // Reload simulieren: neuer Provider, gleicher sessionStorage.
+    // Simulate a reload: new provider, same sessionStorage.
     first.unmount();
     mockGetTaskResult.mockClear();
     renderProvider();

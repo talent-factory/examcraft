@@ -1,17 +1,17 @@
-"""TF-398: Tests für Archivieren / Wiederherstellen / Hard-Delete von Prüfungen.
+"""TF-398: Tests for archiving / restoring / hard-deleting exams.
 
-Spiegelt das TF-396-Muster (``test_question_archive.py``), angepasst an die
-Prüfungs-Semantik.
+Mirrors the TF-396 pattern (``test_question_archive.py``), adapted to
+exam semantics.
 
-Read-Path-Audit (Stand TF-398): Lese-/Übersichts-Pfad auf ``exams``, der
-``archived_at IS NULL`` filtern MUSS:
-- ``api/exams.py::list_exams`` (Komponist-Übersicht)
+Read-path audit (as of TF-398): read/overview paths on ``exams`` that
+MUST filter ``archived_at IS NULL``:
+- ``api/exams.py::list_exams`` (composer overview)
 
-Bewusst NICHT gefiltert: by-id Detail / Archive / Restore / Delete,
-Grading/Export-by-id (``grades.py``, ``grade_export.py``,
-``moodle_roundtrip.py``), Statistik-Zähler (``dashboard.py``, ``stats.py``).
-Begründung: eine archivierte (aber nicht gelöschte) Prüfung bleibt für die
-Benotung/Export ihrer bestehenden Abgaben erreichbar.
+Deliberately NOT filtered: by-id detail / archive / restore / delete,
+grading/export-by-id (``grades.py``, ``grade_export.py``,
+``moodle_roundtrip.py``), statistics counters (``dashboard.py``, ``stats.py``).
+Rationale: an archived (but not deleted) exam remains reachable for
+grading/exporting its existing submissions.
 """
 
 import json
@@ -37,15 +37,15 @@ from database import get_db
 
 @pytest.fixture()
 def ea_db(test_engine):
-    # Savepoint-Isolation wie ``conftest.test_db``: jeder Test läuft in einer
-    # äusseren Transaction, die am Test-Ende zurückgerollt wird. Ohne das
-    # leakten die hier committeten Zeilen (u. a. Student/Submission via
-    # ``make_submission``) in die session-scoped Test-DB und brachen die
-    # globalen Count-Assertions in ``test_import_service.py`` (``query(Student)
-    # .count() == 0``). ``join_transaction_mode="create_savepoint"`` sorgt
-    # dafür, dass ``commit()`` im Endpoint/``audit_service.log_action``
-    # innerhalb des Tests sichtbar bleibt, aber nicht über die Test-Grenze
-    # hinaus persistiert.
+    # Savepoint isolation like ``conftest.test_db``: each test runs inside an
+    # outer transaction that is rolled back at the end of the test. Without
+    # this, the rows committed here (among them Student/Submission via
+    # ``make_submission``) leaked into the session-scoped test DB and broke
+    # the global count assertions in ``test_import_service.py`` (``query(Student)
+    # .count() == 0``). ``join_transaction_mode="create_savepoint"`` ensures
+    # that ``commit()`` inside the endpoint/``audit_service.log_action``
+    # stays visible within the test, but is not persisted beyond the test
+    # boundary.
     connection = test_engine.connect()
     transaction = connection.begin()
     Session_ = sessionmaker(
@@ -112,10 +112,10 @@ def make_user(db, institution_id, suffix="ea", is_superuser=True):
 
 
 def make_user_with_role(db, institution_id, suffix, perms):
-    """Non-Superuser mit einer Rolle, die genau ``perms`` trägt.
+    """Non-superuser with a role that carries exactly ``perms``.
 
-    Notwendig, um Tenant-Scoping (``_get_exam_or_404`` + ``TenantFilter``) und
-    ``require_permission`` real zu prüfen — Superuser umgehen BEIDE.
+    Needed to actually exercise tenant scoping (``_get_exam_or_404`` +
+    ``TenantFilter``) and ``require_permission`` — superusers bypass BOTH.
     """
     user = make_user(db, institution_id, suffix, is_superuser=False)
     role = Role(
@@ -168,13 +168,13 @@ def make_submission(db, exam_id, institution_id, suffix="s"):
 
 
 def login(client, user):
-    """Override beide Auth-Dependencies auf denselben User."""
+    """Override both auth dependencies to the same user."""
     client.app.dependency_overrides[get_current_user] = lambda: user
     client.app.dependency_overrides[get_current_active_user] = lambda: user
 
 
 # ---------------------------------------------------------------------------
-# Phase B — Lese-Pfade (Übersicht filtert archivierte)
+# Phase B — read paths (overview filters archived)
 # ---------------------------------------------------------------------------
 
 
@@ -297,7 +297,7 @@ def test_restore_clears_archive_keeps_status(ea_db, ea_client):
     ea_db.refresh(exam)
     assert exam.archived_at is None
     assert exam.archived_by is None
-    # Restore lässt den ursprünglichen Status unangetastet.
+    # Restore leaves the original status untouched.
     assert exam.status == "finalized"
 
 
@@ -313,8 +313,8 @@ def test_restore_not_archived_returns_409(ea_db, ea_client):
 
 
 def test_archive_leaves_export_and_submissions_untouched(ea_db, ea_client):
-    """Archivieren einer exportierten Prüfung mit Abgaben ändert weder Status
-    noch Abgaben (TF-398: Archiv ist orthogonal zum Lebenszyklus)."""
+    """Archiving an exported exam with submissions changes neither status
+    nor submissions (TF-398: archiving is orthogonal to the lifecycle)."""
     inst = make_institution(ea_db, "c5")
     user = make_user(ea_db, inst.id, "c5")
     exam = make_exam(ea_db, inst.id, user.id, status="exported")
@@ -332,14 +332,14 @@ def test_archive_leaves_export_and_submissions_untouched(ea_db, ea_client):
 
 
 # ---------------------------------------------------------------------------
-# Phase D — Hard-Delete-Guards (sonst 409)
+# Phase D — hard-delete guards (otherwise 409)
 # ---------------------------------------------------------------------------
 
 
 def test_delete_requires_archive_first(ea_db, ea_client):
     inst = make_institution(ea_db, "d1")
     user = make_user(ea_db, inst.id, "d1")
-    exam = make_exam(ea_db, inst.id, user.id)  # nicht archiviert
+    exam = make_exam(ea_db, inst.id, user.id)  # not archived
     ea_db.commit()
     login(ea_client, user)
 
@@ -401,10 +401,10 @@ def test_delete_archived_free_exam_succeeds_with_audit_snapshot(ea_db, ea_client
 
 
 def test_delete_audit_failure_returns_500_and_keeps_exam(ea_db, ea_client, monkeypatch):
-    """Schlägt das Audit-Logging beim Hard-Delete fehl (``log_action`` →
-    ``None``), bricht der Endpoint mit HTTP 500 ab und der gestagte Delete
-    wird zurückgerollt — die Prüfung bleibt erhalten (fail-loud, kein stiller
-    Datenverlust). Deckt den ``if audit is None``-Zweig in ``delete_exam`` ab.
+    """If audit logging fails during the hard delete (``log_action`` →
+    ``None``), the endpoint aborts with HTTP 500 and the staged delete is
+    rolled back — the exam is preserved (fail-loud, no silent data loss).
+    Covers the ``if audit is None`` branch in ``delete_exam``.
     """
     inst = make_institution(ea_db, "d5")
     user = make_user(ea_db, inst.id, "d5")
@@ -415,8 +415,8 @@ def test_delete_audit_failure_returns_500_and_keeps_exam(ea_db, ea_client, monke
     ea_db.commit()
     login(ea_client, user)
 
-    # log_action-Ausfall simulieren: rollt — wie der echte Service-Vertrag —
-    # den gestagten Delete zurück und liefert None.
+    # Simulate a log_action failure: like the real service contract, this
+    # rolls back the staged delete and returns None.
     import services.audit_service as audit_module
 
     def _failing_log_action(db, *args, **kwargs):
@@ -431,7 +431,7 @@ def test_delete_audit_failure_returns_500_and_keeps_exam(ea_db, ea_client, monke
 
     resp = ea_client.request("DELETE", f"/api/v1/exams/{exam_id}")
     assert resp.status_code == 500
-    # Rollback: Prüfung wurde NICHT gelöscht.
+    # Rollback: the exam was NOT deleted.
     assert ea_db.query(Exam).filter_by(id=exam_id).first() is not None
 
 
@@ -452,8 +452,8 @@ def test_archive_forbidden_without_create_exams(ea_db, ea_client):
 
 
 def test_delete_forbidden_with_only_create_exams(ea_db, ea_client):
-    """``create_exams`` darf archivieren, aber NICHT hart löschen — Delete
-    verlangt ``delete_exams`` (Admin-Stufe)."""
+    """``create_exams`` may archive, but NOT hard-delete — delete requires
+    ``delete_exams`` (admin level)."""
     inst = make_institution(ea_db, "e2")
     actor = make_user_with_role(ea_db, inst.id, "e2", ["create_exams"])
     exam = make_exam(ea_db, inst.id, actor.id, archived_at=datetime.utcnow())
@@ -466,14 +466,14 @@ def test_delete_forbidden_with_only_create_exams(ea_db, ea_client):
 
 
 def test_archive_foreign_tenant_denied(ea_db, ea_client):
-    """Fremder Tenant: ``_get_exam_or_404`` → ``assert_exam_visible_for``
-    verweigert mit 404, nicht 403 (TF-643 — vorher ``TenantFilter
-    .verify_tenant_access``, das 403 warf; seit TF-643 läuft der komplette
-    Exam-Zugriff, inkl. Mutation, durch dieselbe Sichtbarkeitsprüfung wie
-    Documents/Questions, die bewusst 404 statt 403 liefert, um die Existenz
-    einer fremden Ressource nicht zu leaken — siehe
-    ``assert_exam_visible_for``'s eigenes Docstring in
-    utils/exam_visibility.py, wo diese Begründung tatsächlich steht)."""
+    """Foreign tenant: ``_get_exam_or_404`` → ``assert_exam_visible_for``
+    denies with 404, not 403 (TF-643 — previously ``TenantFilter
+    .verify_tenant_access`` threw 403; since TF-643, all exam access,
+    including mutation, goes through the same visibility check as
+    Documents/Questions, which deliberately returns 404 instead of 403 to
+    avoid leaking the existence of a foreign resource — see
+    ``assert_exam_visible_for``'s own docstring in
+    utils/exam_visibility.py, where this rationale is actually stated)."""
     inst_a = make_institution(ea_db, "e3a")
     inst_b = make_institution(ea_db, "e3b")
     actor = make_user_with_role(ea_db, inst_a.id, "e3", ["create_exams"])

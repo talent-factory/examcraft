@@ -1,6 +1,6 @@
 """
 PyMuPDF Document Processor
-Schnelle und effiziente PDF-Verarbeitung mit PyMuPDF (fitz)
+Fast and efficient PDF processing using PyMuPDF (fitz)
 """
 
 import logging
@@ -128,14 +128,14 @@ def _read_docx_page_count(doc) -> Optional[int]:
 
 class PyMuPDFProcessor:
     """
-    Modern Document Processor basierend auf PyMuPDF
+    Modern document processor based on PyMuPDF
 
     Features:
-    - Schnelle PDF-Verarbeitung mit PyMuPDF (fitz)
-    - Text-Extraktion mit Layout-Awareness
-    - Metadaten-Extraktion (Autor, Titel, Creation Date)
-    - Multi-Format-Support (PDF, DOCX, TXT, Markdown)
-    - Optimiert für Performance und Geschwindigkeit
+    - Fast PDF processing using PyMuPDF (fitz)
+    - Text extraction with layout awareness
+    - Metadata extraction (author, title, creation date)
+    - Multi-format support (PDF, DOCX, TXT, Markdown)
+    - Optimized for performance and speed
     """
 
     def __init__(
@@ -149,19 +149,20 @@ class PyMuPDFProcessor:
         Initialize PyMuPDF Processor
 
         Args:
-            chunk_size: Maximale Anzahl Wörter pro Chunk
-            chunk_overlap: Überlappung zwischen Chunks in Wörtern
-            enable_ocr: Wenn True, wird für gescannte Seiten Tesseract-OCR
-                aktiviert (erfordert ein installiertes Tesseract + TESSDATA_PREFIX).
-            max_chars_per_chunk: Generische Zeichen-Obergrenze pro Chunk
-                (TF-445). Über-lange Inhalte werden inhaltserhaltend in mehrere
-                Chunks gesplittet, statt am Embedding-Boundary getrunct zu werden.
+            chunk_size: Maximum number of words per chunk
+            chunk_overlap: Overlap between chunks in words
+            enable_ocr: If True, enables Tesseract OCR for scanned pages
+                (requires an installed Tesseract + TESSDATA_PREFIX).
+            max_chars_per_chunk: Generic character upper bound per chunk
+                (TF-445). Over-long content is split into multiple chunks
+                while preserving content, instead of being truncated at the
+                embedding boundary.
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.max_chars_per_chunk = max_chars_per_chunk
-        # OCR-Eskalation (TF-360): wenn aktiviert, extrahiert _process_pdf den
-        # Text gescannter Seiten via Tesseract (PyMuPDF get_textpage_ocr).
+        # OCR escalation (TF-360): when enabled, _process_pdf extracts the
+        # text of scanned pages via Tesseract (PyMuPDF get_textpage_ocr).
         self.enable_ocr = enable_ocr
         self.ocr_language = os.getenv("OCR_LANGUAGE", "deu+eng")
         self.ocr_dpi = int(os.getenv("OCR_DPI", "200"))
@@ -179,16 +180,16 @@ class PyMuPDFProcessor:
         self, document_id: int, file_path: str, filename: str, mime_type: str
     ) -> ProcessedDocument:
         """
-        Verarbeite Dokument mit PyMuPDF
+        Process document using PyMuPDF
 
         Args:
-            document_id: ID des Dokuments in der Datenbank
-            file_path: Pfad zur Datei
-            filename: Originaler Dateiname
-            mime_type: MIME-Type der Datei
+            document_id: ID of the document in the database
+            file_path: Path to the file
+            filename: Original filename
+            mime_type: MIME type of the file
 
         Returns:
-            ProcessedDocument mit erweiterten Metadaten
+            ProcessedDocument with extended metadata
         """
         start_time = time.time()
 
@@ -204,22 +205,22 @@ class PyMuPDFProcessor:
             ocr_state = "OCR enabled" if self.enable_ocr else "no OCR"
             logger.info(f"Processing document with PyMuPDF ({ocr_state}): {filename}")
 
-            # Verarbeite Dokument basierend auf MIME-Type
+            # Process document based on MIME type
             processor = self.supported_types[mime_type]
             raw_text, doc_metadata = await processor(file_path, filename)
 
-            # Erstelle Text-Chunks
+            # Create text chunks
             chunks = self._create_chunks(raw_text)
 
-            # Berechne Verarbeitungszeit
+            # Calculate processing time
             processing_time = time.time() - start_time
 
-            # Erweitere Metadaten
+            # Extend metadata
             doc_metadata["processing_method"] = "pymupdf"
             doc_metadata["processor_type"] = "PyMuPDF"
             doc_metadata["ocr_enabled"] = self.enable_ocr
 
-            # Erstelle ProcessedDocument
+            # Build ProcessedDocument
             processed_doc = ProcessedDocument(
                 document_id=document_id,
                 filename=filename,
@@ -246,11 +247,11 @@ class PyMuPDFProcessor:
         self, file_path: str, filename: str
     ) -> Tuple[str, Dict[str, Any]]:
         """
-        Verarbeite PDF-Datei mit PyMuPDF (sehr schnell)
+        Process PDF file using PyMuPDF (very fast)
 
         Args:
-            file_path: Pfad zur PDF-Datei
-            filename: Originaler Dateiname für Fallback-Titel
+            file_path: Path to the PDF file
+            filename: Original filename used as a fallback title
 
         Returns:
             Tuple (full_text, metadata)
@@ -259,19 +260,19 @@ class PyMuPDFProcessor:
             text_content = []
             metadata = {}
 
-            # Öffne PDF mit PyMuPDF
+            # Open PDF using PyMuPDF
             doc = fitz.open(file_path)
 
-            # Extrahiere Metadaten
+            # Extract metadata
             pdf_metadata = doc.metadata
             if pdf_metadata:
-                # Titel (mit Fallback auf Filename)
+                # Title (with fallback to filename)
                 title = pdf_metadata.get("title", "").strip()
                 if not title:
                     title = filename.rsplit(".", 1)[0] if "." in filename else filename
                 metadata["title"] = title
 
-                # Autor
+                # Author
                 author = pdf_metadata.get("author", "").strip()
                 metadata["author"] = author
 
@@ -288,11 +289,11 @@ class PyMuPDFProcessor:
                 # Creation Date
                 creation_date = pdf_metadata.get("creationDate", "").strip()
                 if creation_date:
-                    # PyMuPDF Format: D:20240101120000+01'00'
+                    # PyMuPDF format: D:20240101120000+01'00'
                     try:
-                        # Entferne 'D:' Präfix
+                        # Strip the 'D:' prefix
                         date_str = creation_date.replace("D:", "")
-                        # Extrahiere YYYYMMDD
+                        # Extract YYYYMMDD
                         if len(date_str) >= 8:
                             year = date_str[0:4]
                             month = date_str[4:6]
@@ -301,29 +302,29 @@ class PyMuPDFProcessor:
                     except Exception as e:
                         logger.debug(f"Failed to parse PDF creation date: {e}")
 
-            # Anzahl Seiten
+            # Page count
             metadata["pages"] = doc.page_count
 
-            # Extrahiere Text von allen Seiten
+            # Extract text from all pages
             ocr_pages_attempted = 0
             ocr_pages_discarded = 0
             for page_num in range(doc.page_count):
                 try:
                     page = doc[page_num]
                     if self.enable_ocr:
-                        # full=False -> Tesseract läuft nur auf Seiten ohne
-                        # Textebene (gescannte Seiten); vorhandener Text bleibt.
+                        # full=False -> Tesseract only runs on pages without
+                        # a text layer (scanned pages); existing text is kept.
                         ocr_pages_attempted += 1
                         try:
                             page_text = self._ocr_pdf_page(page, page_num, filename)
                         except DocumentProcessingError:
-                            # Fatale Engine-Fehler laut propagieren.
+                            # Propagate fatal engine errors loudly.
                             raise
                         except Exception as ocr_page_err:
-                            # Nicht-fataler Per-Seite-OCR-Abbruch (OOM-gekillter
-                            # Subprozess, malformed Textpage). Zählen, damit das
-                            # Quality-Gate die Lücke sieht (TF-367), Seite aber
-                            # überspringen statt das ganze Doc zu verlieren.
+                            # Non-fatal per-page OCR failure (OOM-killed
+                            # subprocess, malformed textpage). Count it so the
+                            # quality gate sees the gap (TF-367), but skip the
+                            # page instead of losing the whole document.
                             ocr_pages_discarded += 1
                             logger.warning(
                                 f"OCR auf Seite {page_num + 1} verworfen "
@@ -336,31 +337,31 @@ class PyMuPDFProcessor:
                     if page_text.strip():
                         text_content.append(f"[Seite {page_num + 1}]\n{page_text}")
                 except DocumentProcessingError:
-                    # Fatale OCR-Fehler propagieren (loud), nicht überspringen.
+                    # Propagate fatal OCR errors loudly, don't skip them.
                     raise
                 except Exception as e:
-                    # Seiten-lokale Decode-Fehler (PDF-Korruption) sind tolerierbar.
+                    # Page-local decode errors (PDF corruption) are tolerable.
                     logger.warning(
                         f"Could not extract text from page {page_num + 1}: {str(e)}"
                     )
                     continue
 
-            # Schließe PDF
+            # Close PDF
             doc.close()
 
-            # OCR-Verwurf-Zähler für das Quality-Gate sichtbar machen (TF-367).
+            # Surface the OCR discard counters for the quality gate (TF-367).
             if self.enable_ocr:
                 metadata["ocr_pages_attempted"] = ocr_pages_attempted
                 metadata["ocr_pages_discarded"] = ocr_pages_discarded
 
-            # Extrahiere Headings aus Text (einfache Heuristik)
+            # Extract headings from text (simple heuristic)
             full_text = "\n\n".join(text_content)
             sections = self._extract_headings_from_text(full_text)
             if sections:
-                metadata["sections"] = sections[:30]  # Max 30 Headings
+                metadata["sections"] = sections[:30]  # Max 30 headings
                 metadata["section_count"] = len(sections[:30])
 
-            # Defaults falls Metadaten fehlen
+            # Defaults if metadata is missing
             if "title" not in metadata or not metadata["title"]:
                 metadata["title"] = (
                     filename.rsplit(".", 1)[0] if "." in filename else filename
@@ -376,19 +377,19 @@ class PyMuPDFProcessor:
 
     def _extract_headings_from_text(self, text: str) -> List[str]:
         """
-        Extrahiere potentielle Überschriften aus Text
+        Extract potential headings from text
 
-        Heuristik:
-        - Zeilen mit <= 100 Zeichen
-        - Endet nicht mit Punkt
-        - Beginnt mit Großbuchstabe oder Nummer
-        - Hat mindestens 3 Wörter
+        Heuristic:
+        - Lines with <= 100 characters
+        - Doesn't end with a period
+        - Starts with an uppercase letter or a digit
+        - Has at least 3 words
 
         Args:
-            text: Vollständiger Text
+            text: Full text
 
         Returns:
-            Liste von Überschriften
+            List of headings
         """
         headings = []
         lines = text.split("\n")
@@ -396,24 +397,24 @@ class PyMuPDFProcessor:
         for line in lines:
             line = line.strip()
 
-            # Filtere zu lange Zeilen
+            # Filter out lines that are too long
             if len(line) > 100 or len(line) < 10:
                 continue
 
-            # Filtere Zeilen die mit Punkt enden (normale Sätze)
+            # Filter out lines that end with a period (normal sentences)
             if line.endswith("."):
                 continue
 
-            # Muss mit Großbuchstabe oder Nummer beginnen
+            # Must start with an uppercase letter or a digit
             if not (line[0].isupper() or line[0].isdigit()):
                 continue
 
-            # Muss mindestens 3 Wörter haben
+            # Must have at least 3 words
             words = line.split()
             if len(words) < 3:
                 continue
 
-            # Filtere Zeilen mit vielen Sonderzeichen
+            # Filter out lines with lots of special characters
             special_char_count = sum(1 for c in line if c in "()[]{}|\\/@#$%^&*+=~`")
             if special_char_count > 3:
                 continue
@@ -423,11 +424,11 @@ class PyMuPDFProcessor:
         return headings
 
     def _ocr_image_bytes(self, image_bytes: bytes, ext: str, page_label: str) -> str:
-        """OCR ein einzelnes eingebettetes Rasterbild via PyMuPDF + Tesseract.
+        """OCR a single embedded raster image via PyMuPDF + Tesseract.
 
-        Öffnet das Bild als einseitiges PyMuPDF-Dokument und OCR't die ganze
-        Seite (``full=True`` — ein eingebettetes Bild hat keine Textebene, die
-        man erhalten müsste). Engine-Fehler werden als fatal markiert.
+        Opens the image as a single-page PyMuPDF document and OCRs the whole
+        page (``full=True`` — an embedded image has no text layer that needs
+        to be preserved). Engine errors are marked as fatal.
         """
         image_doc = fitz.open(stream=image_bytes, filetype=ext)
         try:
@@ -437,9 +438,10 @@ class PyMuPDFProcessor:
                     language=self.ocr_language, dpi=self.ocr_dpi, full=True
                 )
             except RuntimeError as ocr_err:
-                # Engine-Fehler (Tesseract fehlt/falsch konfiguriert,
-                # Sprachpaket fehlt) ist fürs ganze Dokument fatal — laut
-                # propagieren, nicht still als leeres Doc verschlucken (TF-360).
+                # An engine error (Tesseract missing/misconfigured, language
+                # pack missing) is fatal for the whole document — propagate it
+                # loudly instead of silently swallowing it as an empty doc
+                # (TF-360).
                 raise DocumentProcessingError(
                     OCR_ENGINE_FAILURE,
                     f"Tesseract-OCR fehlgeschlagen für {page_label}: {ocr_err}",
@@ -450,14 +452,14 @@ class PyMuPDFProcessor:
             image_doc.close()
 
     def _ocr_pdf_page(self, page, page_num: int, filename: str) -> str:
-        """OCR eine einzelne PDF-Seite via PyMuPDF/Tesseract.
+        """OCR a single PDF page via PyMuPDF/Tesseract.
 
-        Engine-Fehler (``RuntimeError``: Tesseract fehlt/fehlkonfiguriert,
-        Sprachpaket fehlt) sind fürs ganze Dokument fatal und werden als
-        ``DocumentProcessingError(OCR_ENGINE_FAILURE)`` gemeldet. Alle anderen
-        Ausnahmen (OOM-gekillter Subprozess, malformed Textpage) propagieren
-        roh — die aufrufende Schleife zählt sie als verworfene Seite (TF-367)
-        und überspringt sie, statt das ganze Dokument scheitern zu lassen.
+        Engine errors (``RuntimeError``: Tesseract missing/misconfigured,
+        language pack missing) are fatal for the whole document and are
+        reported as ``DocumentProcessingError(OCR_ENGINE_FAILURE)``. All
+        other exceptions (OOM-killed subprocess, malformed textpage)
+        propagate raw — the calling loop counts them as a discarded page
+        (TF-367) and skips it, instead of failing the whole document.
         """
         try:
             ocr_tp = page.get_textpage_ocr(
@@ -474,23 +476,23 @@ class PyMuPDFProcessor:
     async def _process_docx(
         self, file_path: str, filename: str
     ) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite DOCX-Datei (Body + Tabellen + Header/Footer + OCR).
+        """Process DOCX file (body + tables + header/footer + OCR).
 
-        Bei aktiviertem OCR (Eskalation, TF-360) werden zusätzlich eingebettete
-        Bilder via Tesseract erkannt — so wird ein „gescanntes" DOCX (Seiten als
-        Bilder, kaum ``<w:t>``-Text) nutzbar, analog zur PDF-Eskalation. Der
-        Erstlauf (``enable_ocr=False``) extrahiert nur die Textebene; der
-        Quality-Gate flaggt das dünne Ergebnis (siehe ``pages`` unten) und der
-        Reprocess kommt mit ``enable_ocr=True`` hierher zurück.
+        When OCR is enabled (escalation, TF-360), embedded images are also
+        recognized via Tesseract — this makes a "scanned" DOCX (pages as
+        images, barely any ``<w:t>`` text) usable, analogous to the PDF
+        escalation. The first pass (``enable_ocr=False``) only extracts the
+        text layer; the quality gate flags the thin result (see ``pages``
+        below) and the reprocess comes back here with ``enable_ocr=True``.
         """
         try:
             doc = DocxDocument(file_path)
 
             text_content = list(_iter_docx_text_blocks(doc))
 
-            # Eingebettete Bilder erfassen (Reihenfolge, dedupliziert). Immer
-            # zählen — die Anzahl dient als Seiten-Fallback für den
-            # Quality-Gate; OCR läuft aber nur bei aktivierter Eskalation.
+            # Collect embedded images (order preserved, deduplicated). Always
+            # count them — the count serves as a page fallback for the
+            # quality gate; OCR only runs when escalation is enabled.
             image_blobs = list(_iter_docx_image_blobs(doc))
 
             ocr_pages_attempted = 0
@@ -502,12 +504,12 @@ class PyMuPDFProcessor:
                     try:
                         ocr_text = self._ocr_image_bytes(blob, ext, label)
                     except DocumentProcessingError:
-                        # Fatale OCR-Engine-Fehler laut propagieren.
+                        # Propagate fatal OCR engine errors loudly.
                         raise
                     except Exception as img_err:
-                        # Nicht-fataler Per-Bild-OCR-Abbruch (nicht
-                        # rasterisierbares Bild, OOM, malformed Textpage):
-                        # zählen (TF-367) und überspringen.
+                        # Non-fatal per-image OCR failure (non-rasterizable
+                        # image, OOM, malformed textpage): count it (TF-367)
+                        # and skip it.
                         ocr_pages_discarded += 1
                         logger.warning(f"OCR übersprungen für {label}: {img_err}")
                         continue
@@ -518,10 +520,10 @@ class PyMuPDFProcessor:
             if not title:
                 title = filename.rsplit(".", 1)[0] if "." in filename else filename
 
-            # Seitenzahl für den Quality-Gate: echte gerenderte Seitenzahl aus
-            # app.xml, sonst Anzahl eingebetteter Bilder (Scan-Proxy: ~1/Seite).
-            # Ohne page_count blieben scanned_low_text UND
-            # single_chunk_large_file für DOCX wirkungslos (TF-360).
+            # Page count for the quality gate: real rendered page count from
+            # app.xml, else the number of embedded images (scan proxy:
+            # ~1/page). Without page_count, both scanned_low_text and
+            # single_chunk_large_file would be ineffective for DOCX (TF-360).
             page_count = _read_docx_page_count(doc)
             if not page_count and image_blobs:
                 page_count = len(image_blobs)
@@ -543,7 +545,7 @@ class PyMuPDFProcessor:
             if page_count:
                 metadata["pages"] = page_count
 
-            # OCR-Verwurf-Zähler fürs Quality-Gate sichtbar machen (TF-367).
+            # Surface the OCR discard counters for the quality gate (TF-367).
             if self.enable_ocr:
                 metadata["ocr_pages_attempted"] = ocr_pages_attempted
                 metadata["ocr_pages_discarded"] = ocr_pages_discarded
@@ -569,7 +571,7 @@ class PyMuPDFProcessor:
     async def _process_doc(
         self, file_path: str, filename: str
     ) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite DOC-Datei (Legacy CFB/OLE2 Format).
+        """Process DOC file (legacy CFB/OLE2 format).
 
         `.doc` is a binary OLE2 compound file. Without `antiword`,
         `libreoffice --headless` or a CFB parser, we cannot reliably extract
@@ -615,7 +617,7 @@ class PyMuPDFProcessor:
     async def _process_text(
         self, file_path: str, filename: str
     ) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite Text-Datei mit Encoding-Fallback (UTF-8 → Latin-1)."""
+        """Process text file with encoding fallback (UTF-8 → Latin-1)."""
         try:
             content, encoding = self._read_text_with_fallback(file_path)
         except Exception as e:
@@ -634,22 +636,22 @@ class PyMuPDFProcessor:
     async def _process_markdown(
         self, file_path: str, filename: str
     ) -> Tuple[str, Dict[str, Any]]:
-        """Verarbeite Markdown-Datei mit Encoding-Fallback (UTF-8 → Latin-1)."""
+        """Process Markdown file with encoding fallback (UTF-8 → Latin-1)."""
         try:
             md_content, encoding = self._read_text_with_fallback(file_path)
 
-            # Konvertiere Markdown zu HTML und extrahiere Plain Text
+            # Convert Markdown to HTML and extract plain text
             html = markdown.markdown(md_content)
             plain_text = re.sub("<[^<]+?>", "", html)
 
-            # Extrahiere Headings aus Markdown
+            # Extract headings from Markdown
             sections = []
             heading_pattern = r"^(#+)\s+(.+)$"
             matches = re.finditer(heading_pattern, md_content, re.MULTILINE)
 
             for match in matches:
                 title = match.group(2).strip()
-                if len(title) > 200:  # Filtere zu lange Headings
+                if len(title) > 200:  # Filter out headings that are too long
                     continue
                 sections.append(title)
 
@@ -704,7 +706,7 @@ class PyMuPDFProcessor:
         return content, "latin-1"
 
     def _create_chunks(self, text: str) -> List[DocumentChunk]:
-        """Erstelle Text-Chunks für RAG-Processing"""
+        """Create text chunks for RAG processing"""
         return create_chunks(
             text,
             chunk_size=self.chunk_size,

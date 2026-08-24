@@ -1,15 +1,15 @@
 """
-Unit Tests für Document Model
+Unit tests for Document model
 """
 
 from models.document import Document, DocumentStatus
 
 
 class TestDocumentModel:
-    """Test Suite für Document Model"""
+    """Test suite for Document model"""
 
     def test_document_title_property_from_metadata(self, test_db):
-        """Test dass title Property aus doc_metadata gelesen wird (TF-111 Fix)"""
+        """Test that the title property is read from doc_metadata (TF-111 fix)"""
         doc = Document(
             filename="test.md",
             original_filename="test.md",
@@ -23,15 +23,15 @@ class TestDocumentModel:
         test_db.add(doc)
         test_db.commit()
 
-        # title Property sollte aus doc_metadata lesen
+        # title property should read from doc_metadata
         assert doc.title == "Custom Title"
 
     def test_document_title_property_fallback_to_filename(self, test_db):
-        """Test dass title Property auf original_filename (ohne Extension) zurückfällt.
+        """Test that the title property falls back to original_filename (without extension).
 
-        TF-331: der Resolver liefert den Filename-Stem ohne Extension, weil
-        ".pdf"/".docx" am Ende der Anzeige weder Information liefern noch
-        die Findbarkeit verbessern.
+        TF-331: the resolver returns the filename stem without extension,
+        because ".pdf"/".docx" at the end of the display neither adds
+        information nor improves findability.
         """
         doc = Document(
             filename="abc123.pdf",
@@ -40,7 +40,7 @@ class TestDocumentModel:
             file_size=100,
             mime_type="application/pdf",
             status=DocumentStatus.PROCESSED,
-            doc_metadata={},  # Kein title in metadata
+            doc_metadata={},  # No title in metadata
         )
 
         test_db.add(doc)
@@ -49,7 +49,7 @@ class TestDocumentModel:
         assert doc.title == "My Document"
 
     def test_document_title_property_no_metadata(self, test_db):
-        """Test dass title Property funktioniert wenn doc_metadata None ist."""
+        """Test that the title property works when doc_metadata is None."""
         doc = Document(
             filename="test.pdf",
             original_filename="Test Document.pdf",
@@ -66,7 +66,7 @@ class TestDocumentModel:
         assert doc.title == "Test Document"
 
     def test_document_to_dict_uses_title_property(self, test_db):
-        """Test dass to_dict() die title Property verwendet"""
+        """Test that to_dict() uses the title property"""
         doc = Document(
             filename="test.md",
             original_filename="test.md",
@@ -87,12 +87,12 @@ class TestDocumentModel:
         assert doc_dict["original_filename"] == "test.md"
 
     def test_chat_export_document_structure(self, test_db):
-        """Test dass Chat-Export Dokumente korrekte Struktur haben.
+        """Test that chat export documents have the correct structure.
 
-        Bewusst ohne ``user_id`` — der ``test_db``-Transaction-Scope hat
-        keine seeded Users, eine FK zu ``users.id`` würde scheitern. Der
-        Test verifiziert die Chat-Export-spezifische Struktur (source,
-        full_content, has_vectors=False), nicht die User-Beziehung.
+        Deliberately without ``user_id`` — the ``test_db`` transaction scope
+        has no seeded users, so an FK to ``users.id`` would fail. This test
+        verifies the chat-export-specific structure (source, full_content,
+        has_vectors=False), not the user relationship.
         """
         doc = Document(
             filename="chat_export_20251009_120000.md",
@@ -114,7 +114,7 @@ class TestDocumentModel:
         test_db.add(doc)
         test_db.commit()
 
-        # Prüfe alle wichtigen Felder
+        # Check all important fields
         assert doc.title == "Chat: Test Session"
         assert doc.mime_type == "text/markdown"
         assert doc.status == DocumentStatus.PROCESSED
@@ -123,12 +123,13 @@ class TestDocumentModel:
         assert doc.has_vectors is False
 
     def test_to_dict_exposes_escalation_state(self, test_db):
-        """TF-365: Der escalation-State muss über to_dict() exponiert werden.
+        """TF-365: the escalation state must be exposed via to_dict().
 
-        TF-361 hielt ``escalation`` bewusst intern; dadurch war eine laufende
-        (``queued``) oder fehlgeschlagene (``failed``) OCR-Nachbearbeitung für den
-        Nutzer unsichtbar (PROCESSED-Dokument, das später unerklärt auf ERROR
-        kippt). Der State muss serialisiert werden, damit das UI ihn darstellen kann.
+        TF-361 deliberately kept ``escalation`` internal; as a result, an
+        in-progress (``queued``) or failed (``failed``) OCR post-processing
+        step was invisible to the user (a PROCESSED document that later
+        flips to ERROR with no explanation). The state must be serialized
+        so the UI can display it.
         """
         doc = Document(
             filename="scan.pdf",
@@ -150,7 +151,7 @@ class TestDocumentModel:
         assert result["escalation"] == "queued"
 
     def test_to_dict_escalation_none_without_processing_info(self, test_db):
-        """to_dict() liefert escalation=None, wenn kein processing_info vorliegt."""
+        """to_dict() returns escalation=None when no processing_info is present."""
         doc = Document(
             filename="plain.pdf",
             original_filename="plain.pdf",

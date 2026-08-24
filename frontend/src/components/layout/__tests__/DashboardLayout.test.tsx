@@ -17,7 +17,7 @@ jest.mock('../../../api/apiClient', () => ({
   apiClient: { interceptors: { request: { use: jest.fn() }, response: { use: jest.fn() } } },
 }));
 
-// NavigationBar bewusst nicht gemockt: der echte <nav> muss rendern, damit der fixed/top-0-Test greift
+// NavigationBar deliberately not mocked: the real <nav> must render so the fixed/top-0 test can check it
 // Mock Sidebar
 jest.mock('../Sidebar', () => ({
   Sidebar: () => <div data-testid="sidebar">Sidebar</div>,

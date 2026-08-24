@@ -86,7 +86,7 @@ describe('QuestionEditor — Pending Tags beim Speichern', () => {
   it('ruft setQuestionTags beim Speichern auf (ohne pending Tags)', async () => {
     renderEditor();
 
-    // Änderung vornehmen um den Speichern-Button zu aktivieren
+    // Make a change to activate the Save button
     const textField = screen.getByRole('textbox', { name: /components\.questionEditor\.questionText/i });
     fireEvent.change(textField, { target: { value: 'Was ist 1+1? (aktualisiert)' } });
 
@@ -112,7 +112,7 @@ describe('QuestionEditor — Pending Tags beim Speichern', () => {
       </QueryClientProvider>
     );
 
-    // Änderung vornehmen damit der Speichern-Button aktiv wird
+    // Make a change so the Save button becomes active
     const textField = screen.getByRole('textbox', { name: /components\.questionEditor\.questionText/i });
     fireEvent.change(textField, { target: { value: 'Was ist 1+1? (aktualisiert)' } });
 

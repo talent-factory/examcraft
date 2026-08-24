@@ -28,7 +28,7 @@ DEFAULT_HINTS = [
     },
     {
         "route_pattern": "/prompts",
-        "role": None,  # Sichtbar für alle Rollen (teacher + admin)
+        "role": None,  # Visible for all roles (teacher + admin)
         "hint_text_de": "Die Live-Vorschau zeigt dir, wie der Prompt mit echten Variablen aussieht.",
         "hint_text_en": "The live preview shows you how the prompt looks with real variables.",
         "priority": 10,

@@ -1,4 +1,4 @@
-"""Tests für die OCR-Eskalation: Placeholder-Vektorservice + Tasks (TF-360)."""
+"""Tests for OCR escalation: placeholder vector service + tasks (TF-360)."""
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -62,9 +62,9 @@ def test_reprocess_document_ocr_deletes_old_vectors_and_sets_flags():
 
 
 def _run_reprocess_failure(monkeypatch_retries, side_effect):
-    """Hilfsfunktion: ruft reprocess_document_ocr.__wrapped__ (umgeht den
-    Autoretry-Wrapper) mit kontrolliertem self.request.retries auf und lässt die
-    OCR-Verarbeitung mit ``side_effect`` scheitern. Gibt das Mock-Document zurück.
+    """Helper: calls reprocess_document_ocr.__wrapped__ (bypassing the
+    autoretry wrapper) with a controlled self.request.retries, and makes the
+    OCR processing fail with ``side_effect``. Returns the mock document.
     """
     from tasks import document_tasks
 
@@ -115,10 +115,10 @@ def _run_reprocess_failure(monkeypatch_retries, side_effect):
 
 
 def test_reprocess_transient_failure_does_not_mark_failed():
-    """TF-365 (Review-Finding 4): Ein transienter Fehler mit verbleibenden Retries
-    darf NICHT als escalation='failed'/ERROR persistiert werden — sonst sähe der
-    Nutzer im Retry-Fenster einen endgültigen Fehler, obwohl der Retry noch
-    erfolgreich sein kann. Status/Eskalation bleiben unverändert."""
+    """TF-365 (review finding 4): a transient error with retries remaining
+    must NOT be persisted as escalation='failed'/ERROR — otherwise the user
+    would see a final error during the retry window even though the retry
+    might still succeed. Status/escalation stay unchanged."""
     from models.document import DocumentStatus
 
     document = _run_reprocess_failure(
@@ -131,8 +131,8 @@ def test_reprocess_transient_failure_does_not_mark_failed():
 
 
 def test_reprocess_non_retryable_failure_marks_failed_immediately():
-    """Ein nicht auto-retried Fehler (z. B. ValueError) ist sofort terminal —
-    auch ohne erschöpfte Retries: escalation='failed' + ERROR."""
+    """A non-auto-retried error (e.g. ValueError) is immediately terminal —
+    even without exhausted retries: escalation='failed' + ERROR."""
     from models.document import DocumentStatus
 
     document = _run_reprocess_failure(
@@ -261,7 +261,7 @@ def test_reprocess_document_ocr_exhausted_when_quality_still_poor():
     vector_service = MagicMock()
     vector_service.delete_document_chunks = AsyncMock(return_value=2)
 
-    # OCR-Lauf bringt immer noch schlechte Qualität -> "exhausted".
+    # OCR run still produces poor quality -> "exhausted".
     result = {"document_id": 11, "quality": {"ok": False, "reason": "scanned_low_text"}}
 
     with (
@@ -284,10 +284,10 @@ def test_reprocess_document_ocr_exhausted_when_quality_still_poor():
 
 
 def test_reprocess_document_ocr_error_path_sets_failed():
-    """Terminaler OCR-Fehler (Retries erschöpft) -> ocr_attempted + failed + ERROR.
+    """Terminal OCR error (retries exhausted) -> ocr_attempted + failed + ERROR.
 
-    Nach TF-365-Review wird 'failed' nur noch terminal persistiert; dieser Test
-    deckt den erschöpften Retry-Fall ab.
+    After the TF-365 review, 'failed' is only ever persisted as terminal;
+    this test covers the exhausted-retry case.
     """
     from tasks import document_tasks
     from models.document import DocumentStatus
@@ -338,12 +338,12 @@ def test_process_document_loop_guard_skips_when_already_attempted():
 
 
 def test_process_document_reports_failure_when_vectorization_failed():
-    """TF-364: Vektorisierung fehlgeschlagen (Result-Dict mit vector_embeddings.error,
-    ohne quality) -> konsistentes Fehler-Envelope (success=False), KEINE Eskalation,
-    kein OCR-Reprocess.
+    """TF-364: vectorization failed (result dict with vector_embeddings.error,
+    no quality) -> consistent error envelope (success=False), NO escalation,
+    no OCR reprocess.
 
-    Früher fiel dieser Pfad in den no_verdict-Zweig und meldete fälschlich
-    escalation='no_verdict' bei success=True (status='error').
+    Previously this path fell into the no_verdict branch and incorrectly
+    reported escalation='no_verdict' with success=True (status='error').
     """
     from tasks import document_tasks
     from models.document import DocumentStatus
@@ -360,7 +360,7 @@ def test_process_document_reports_failure_when_vectorization_failed():
     db = MagicMock()
     db.query.return_value.filter.return_value.first.return_value = document
 
-    # Vektorisierung fehlgeschlagen: Result-Dict ohne 'quality'.
+    # Vectorization failed: result dict without 'quality'.
     result = {"document_id": 14, "vector_embeddings": {"error": "qdrant down"}}
 
     with (
@@ -382,14 +382,14 @@ def test_process_document_reports_failure_when_vectorization_failed():
     assert envelope["success"] is False
     assert envelope["status"] == DocumentStatus.ERROR.value
     assert envelope["error_code"] == "vectorization_failed"
-    # Kein Eskalations-Marker auf dem Fehlerpfad.
+    # No escalation marker on the error path.
     assert "escalation" not in document.processing_info
 
 
 def test_process_document_marks_no_verdict_without_error():
-    """Defensiver no_verdict-Pfad: Result ohne 'quality', aber OHNE Fehler und Status
-    nicht ERROR -> escalation='no_verdict', kein OCR-Reprocess (kein Verdict zum
-    Eskalieren)."""
+    """Defensive no_verdict path: result without 'quality', but WITHOUT an error and
+    status not ERROR -> escalation='no_verdict', no OCR reprocess (no verdict to
+    escalate)."""
     from tasks import document_tasks
     from models.document import DocumentStatus
 
@@ -403,7 +403,7 @@ def test_process_document_marks_no_verdict_without_error():
     db = MagicMock()
     db.query.return_value.filter.return_value.first.return_value = document
 
-    # Kein Verdict (keine 'quality'), aber auch kein Fehler.
+    # No verdict (no 'quality'), but also no error.
     result = {
         "document_id": 15,
         "extraction": {"total_chunks": 1},

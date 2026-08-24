@@ -17,13 +17,13 @@ import {
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-// TF-626-Review: `statusToKind` war hier frueher als lokale Kopie
-// dokumentiert ("trivial and stable enough to copy") — genau diese Kopie
-// kannte `409 → 'conflict'` deshalb nicht, obwohl `gradingSchemesService`
-// es bereits zur Laufzeit auswarf. `ApiError` wird ohnehin schon aus
-// `submissionsService` importiert (siehe oben), der Cross-Import existiert
-// also bereits; `statusToKind` folgt jetzt demselben Pfad statt eigener
-// Kopie.
+// TF-626-Review: `statusToKind` used to be documented here as a local
+// copy ("trivial and stable enough to copy") — that exact copy therefore
+// didn't know about `409 → 'conflict'`, even though `gradingSchemesService`
+// already threw it at runtime. `ApiError` is already imported from
+// `submissionsService` anyway (see above), so the cross-import already
+// exists; `statusToKind` now follows that same path instead of keeping
+// its own copy.
 
 async function readErrorBody(response: Response): Promise<{ message: string }> {
   try {

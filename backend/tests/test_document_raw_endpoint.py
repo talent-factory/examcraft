@@ -52,7 +52,7 @@ def _call_download(*, document_id, current_user, db):
 
 @pytest.fixture
 def stage_data(test_db):
-    """Owner + Foreign-User in unterschiedlichen Institutionen + zwei Docs."""
+    """Owner + foreign user in different institutions + two docs."""
     inst_a = Institution(
         id=400,
         name="Inst A",
@@ -97,7 +97,7 @@ def stage_data(test_db):
     test_db.add_all([owner, foreign])
     test_db.flush()
 
-    # Lokale Datei für PDF-Test anlegen
+    # Create local file for the PDF test
     tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False, mode="wb")
     tmp.write(b"%PDF-1.4 minimal")
     tmp.close()
@@ -141,14 +141,14 @@ def stage_data(test_db):
         status=DocumentStatus.PROCESSED,
         institution_id=400,
         user_id=400,
-        doc_metadata={"source": "chat_export"},  # full_content fehlt
+        doc_metadata={"source": "chat_export"},  # full_content missing
     )
 
     s3_doc = Document(
         id=704,
         filename="s3-paper.pdf",
         original_filename="S3 Paper.pdf",
-        # uploads/-Prefix triggert den S3-Pfad in _build_document_file_response
+        # uploads/ prefix triggers the S3 path in _build_document_file_response
         file_path="uploads/inst-400/s3-paper.pdf",
         file_size=128,
         mime_type="application/pdf",
@@ -194,7 +194,7 @@ def stage_data(test_db):
 
 
 def test_raw_chat_export_returns_inline_markdown(stage_data):
-    """Chat-Export liefert full_content als Response mit inline-Disposition."""
+    """Chat export returns full_content as a response with inline disposition."""
     response = _call_raw(
         document_id=stage_data.chat.id,
         current_user=stage_data.owner,
@@ -216,7 +216,7 @@ def test_raw_chat_export_returns_inline_markdown(stage_data):
 
 
 def test_raw_local_file_returns_inline_fileresponse(stage_data):
-    """Lokale PDF-Datei wird als FileResponse mit inline-Disposition geliefert."""
+    """Local PDF file is returned as a FileResponse with inline disposition."""
     response = _call_raw(
         document_id=stage_data.pdf.id,
         current_user=stage_data.owner,
@@ -224,16 +224,16 @@ def test_raw_local_file_returns_inline_fileresponse(stage_data):
     )
     assert isinstance(response, FileResponse)
     assert response.media_type == "application/pdf"
-    # FastAPI setzt Content-Disposition aus content_disposition_type+filename
-    # erst bei Ausgabe, daher prüfen wir das Attribut direkt
+    # FastAPI only sets Content-Disposition from content_disposition_type+filename
+    # at output time, so we check the attribute directly
     assert response.headers["content-disposition"].startswith("inline;")
 
 
 class _FakeStorageService:
     """Minimal storage-service double for the S3 branch in
     _build_document_file_response. ``is_configured`` is a class attribute
-    (statt Property), damit monkeypatch.setattr nicht am realen Singleton
-    hängenbleibt."""
+    (rather than a property) so that monkeypatch.setattr doesn't get stuck
+    on the real singleton."""
 
     is_configured = True
 
@@ -245,18 +245,18 @@ class _FakeStorageService:
 
 
 def test_raw_s3_backed_file_returns_plain_response_inline(stage_data, monkeypatch):
-    """TF-596: S3-Pfad muss eine *plain* ``Response`` liefern, nicht mehr
+    """TF-596: the S3 path must return a *plain* ``Response``, no longer
     ``StreamingResponse(io.BytesIO(...))``.
 
-    ``file_data`` liegt an dieser Stelle bereits vollständig im Speicher
-    (TF-595 lädt es komplett via run_in_threadpool). ``StreamingResponse``
-    mit einem nicht-async Iterable (``io.BytesIO``) fällt in Starlette auf
-    ``iterate_in_threadpool`` zurück, das PRO CHUNK einen eigenen
-    Thread-Dispatch macht — und Iteration über ``BytesIO`` ist zeilenbasiert
-    (bricht bei jedem ``\\n``-Byte), was bei binären PDF-Daten ~1 Chunk pro
-    ~240 Bytes ergibt. Für ein 11.86 MB PDF sind das ~49k Chunks/Dispatches.
-    ``Response(content=file_data, ...)`` sendet die Bytes als einzelnen
-    Body-Write ohne Iteration.
+    At this point ``file_data`` is already fully in memory (TF-595 loads it
+    completely via run_in_threadpool). ``StreamingResponse`` with a non-async
+    iterable (``io.BytesIO``) falls back in Starlette to
+    ``iterate_in_threadpool``, which does a separate thread dispatch PER
+    CHUNK — and iteration over ``BytesIO`` is line-based (breaks on every
+    ``\\n`` byte), which for binary PDF data yields roughly 1 chunk per
+    ~240 bytes. For an 11.86 MB PDF that's about 49k chunks/dispatches.
+    ``Response(content=file_data, ...)`` sends the bytes as a single body
+    write without iteration.
     """
     from api import documents as documents_api
     from fastapi.responses import StreamingResponse
@@ -285,12 +285,12 @@ def test_raw_s3_backed_file_returns_plain_response_inline(stage_data, monkeypatc
 def test_raw_s3_pdf_sets_identity_content_encoding_to_skip_gzip(
     stage_data, monkeypatch
 ):
-    """TF-596: PDF-Bytes sind bereits komprimiert (FlateDecode-Streams) —
-    GZipMiddleware (main.py, minimum_size=1000, kein Content-Type-Ausschluss)
-    würde sie sonst zusätzlich CPU-teuer und ergebnislos re-komprimieren.
-    ``Content-Encoding: identity`` signalisiert Starlettes GZipMiddleware,
-    dass die Response bereits "encoded" ist, und sie überspringt die
-    Kompression (siehe ``IdentityResponder.content_encoding_set``-Check)."""
+    """TF-596: PDF bytes are already compressed (FlateDecode streams) —
+    GZipMiddleware (main.py, minimum_size=1000, no Content-Type exclusion)
+    would otherwise re-compress them again, expensively and pointlessly.
+    ``Content-Encoding: identity`` signals to Starlette's GZipMiddleware
+    that the response is already "encoded", and it skips compression
+    (see the ``IdentityResponder.content_encoding_set`` check)."""
     from api import documents as documents_api
 
     fake_pdf_bytes = b"%PDF-1.4 fake S3 payload"
@@ -307,10 +307,9 @@ def test_raw_s3_pdf_sets_identity_content_encoding_to_skip_gzip(
 
 
 def test_raw_s3_text_document_keeps_gzip_eligible(stage_data, monkeypatch):
-    """Gegenprobe: nicht-binäre/komprimierbare Formate (z. B. text/plain)
-    dürfen weiterhin von GZipMiddleware komprimiert werden — kein
-    Content-Encoding-Header wird gesetzt, damit die Middleware frei
-    entscheiden kann."""
+    """Counter-check: non-binary/compressible formats (e.g. text/plain)
+    must still be compressible by GZipMiddleware — no Content-Encoding
+    header is set, so the middleware remains free to decide."""
     from api import documents as documents_api
 
     db = _db_from_stage(stage_data)
@@ -396,7 +395,7 @@ def test_raw_s3_download_does_not_block_event_loop(stage_data, monkeypatch):
 
 
 def test_raw_s3_file_not_found_returns_404(stage_data, monkeypatch):
-    """S3-Pfad: download_file wirft FileNotFoundError → 404."""
+    """S3 path: download_file raises FileNotFoundError → 404."""
     from api import documents as documents_api
 
     def _raise_not_found(_):
@@ -450,10 +449,11 @@ def test_raw_404_local_file_missing_on_disk(stage_data):
 
 
 def test_raw_404_foreign_tenant(stage_data):
-    """User aus anderer Institution darf nicht zugreifen (kein Superuser).
+    """User from a different institution must not have access (not a superuser).
 
-    TF-354: Das Dokument ist ``private`` (Default). Der visibility-Gate liefert
-    404 statt 403, damit die Existenz des fremden Dokuments nicht leakt.
+    TF-354: the document is ``private`` (default). The visibility gate
+    returns 404 instead of 403, so the existence of the foreign document
+    doesn't leak.
     """
     with pytest.raises(HTTPException) as exc:
         _call_raw(
@@ -465,13 +465,13 @@ def test_raw_404_foreign_tenant(stage_data):
 
 
 # ---------------------------------------------------------------------------
-# Regression: /download bleibt nach Refactor weiterhin attachment
+# Regression: /download still remains attachment after the refactor
 # ---------------------------------------------------------------------------
 
 
 def test_download_still_uses_attachment_disposition(stage_data):
-    """Sicherstellen, dass das Refactoring /download nicht versehentlich auf
-    inline umgestellt hat (Backwards-Compat-Garantie)."""
+    """Ensure that the refactor didn't accidentally switch /download to
+    inline (backwards-compat guarantee)."""
     response = _call_download(
         document_id=stage_data.pdf.id,
         current_user=stage_data.owner,
@@ -717,9 +717,9 @@ def test_raw_filename_with_crlf_is_safely_quoted(stage_data):
 
 
 def _db_from_stage(stage_data):
-    """Greife auf die test_db-Session zurück, die das stage_data-Fixture befüllt
-    hat. Da die Models bereits committed sind, kann jede Session sie lesen —
-    wir nehmen die Session, an die das pdf-Doc gebunden ist."""
+    """Fall back to the test_db session that populated the stage_data fixture.
+    Since the models are already committed, any session can read them —
+    we take the session the pdf doc is bound to."""
     from sqlalchemy.orm import object_session
 
     return object_session(stage_data.pdf)

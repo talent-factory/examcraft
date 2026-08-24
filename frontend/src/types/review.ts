@@ -1,5 +1,5 @@
 /**
- * TypeScript Types für Question Review System
+ * TypeScript types for the Question Review System
  * ExamCraft AI - TF-60
  */
 
@@ -28,7 +28,7 @@ export enum CommentType {
 
 /**
  * Reviewer Info Interface
- * Enthält Informationen über den Reviewer
+ * Contains information about the reviewer
  */
 export interface ReviewerInfo {
   id: number;
@@ -39,12 +39,13 @@ export interface ReviewerInfo {
 
 /**
  * Generation Metadata (TF-383)
- * Snapshot der Vorlage/des Prompts, mit dem eine Frage generiert wurde.
- * Spiegelt das Backend-Envelope (core `schemas/generation_metadata.py`): die
- * Hüllen-Felder sind immer gesetzt (`null` wo nicht anwendbar), nur `variables`
- * ist offen. Der GANZE Wert ist `null`/`undefined` bei Altbestand (nicht erfasst).
- * Drei Zustände: default (is_default_template), custom, und fallback
- * (`fallback_to_default` = fehlgeschlagener Custom-Render → Standard-Template).
+ * Snapshot of the template/prompt used to generate a question.
+ * Mirrors the backend envelope (core `schemas/generation_metadata.py`): the
+ * envelope fields are always set (`null` where not applicable), only
+ * `variables` is open-ended. The WHOLE value is `null`/`undefined` for
+ * legacy data (not captured). Three states: default (is_default_template),
+ * custom, and fallback (`fallback_to_default` = failed custom render →
+ * default template).
  */
 export interface GenerationMetadata {
   prompt_id: string | null;
@@ -57,8 +58,8 @@ export interface GenerationMetadata {
 
 /**
  * Competency Brief (TF-400)
- * Schlanke Sicht auf die geprüfte Handlungskompetenz (HK) für die Frage-Anzeige:
- * Kürzel, Titel und Modul — ohne den vollen Deskriptor-Baum.
+ * Slim view of the assessed competency (HK) for the question display:
+ * code, title and module — without the full descriptor tree.
  */
 export interface CompetencyBrief {
   id: number;
@@ -70,7 +71,7 @@ export interface CompetencyBrief {
 
 /**
  * Question Review Interface
- * Erweitert RAGQuestion mit Review-spezifischen Feldern
+ * Extends RAGQuestion with review-specific fields
  */
 export interface QuestionReview {
   id: number;
@@ -86,8 +87,8 @@ export interface QuestionReview {
   source_documents?: string[];
   confidence_score: number;
   bloom_level?: number;
-  // TF-400: geprüfte Handlungskompetenz (HK) + LN-Stufe (1-4). `competency`
-  // ist der schlanke Brief für die Anzeige; null/undefined ohne HK-Zuordnung.
+  // TF-400: assessed competency (HK) + LN level (1-4). `competency` is
+  // the slim brief for the display; null/undefined when no HK is assigned.
   competency_id?: number | null;
   ln_level?: number | null;
   competency?: CompetencyBrief | null;
@@ -99,7 +100,7 @@ export interface QuestionReview {
   reviewer_info?: ReviewerInfo;
   reviewed_at?: string;
   exam_id?: string;
-  // TF-396: Archiv-Achse (orthogonal zu review_status).
+  // TF-396: archive axis (orthogonal to review_status).
   archived_at?: string | null;
   archived_by?: number | null;
   archive_reason?: string | null;
@@ -142,7 +143,7 @@ export interface ReviewHistory {
 
 /**
  * Question Review Detail Interface
- * Erweitert QuestionReview mit Comments und History
+ * Extends QuestionReview with comments and history
  */
 export interface QuestionReviewDetail extends QuestionReview {
   comments: ReviewComment[];
@@ -169,7 +170,7 @@ export interface ReviewFilters {
   difficulty?: string;
   question_type?: string;
   exam_id?: string;
-  // TF-396: Archiv-Filter. Default (beide false) = nur aktive Fragen.
+  // TF-396: archive filter. Default (both false) = active questions only.
   include_archived?: boolean;
   archived_only?: boolean;
   limit?: number;

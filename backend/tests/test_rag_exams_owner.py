@@ -1,9 +1,9 @@
 """
-Owner-Check Tests für rag_exams.retry_generation.
+Owner-check tests for rag_exams.retry_generation.
 
-Verifiziert: enforce_resource_access wird korrekt aufgerufen, sodass ein
-fremder QuestionGenerationJob für Non-Superuser 403 ergibt und für
-Superuser durchgewunken wird (mit Audit-Log).
+Verifies: enforce_resource_access is called correctly, so that a
+QuestionGenerationJob owned by another user returns 403 for a non-superuser
+and is waved through for a superuser (with an audit log entry).
 """
 
 import asyncio
@@ -19,10 +19,10 @@ from models.question_generation_job import QuestionGenerationJob
 
 @pytest.fixture
 def stage(test_db):
-    # Keine hartcodierten PK-IDs: die geteilte CI-Test-DB akkumuliert Zeilen
-    # aus nicht-isolierten Fixtures anderer Module; ein fixes ``id=320`` kollidiert
-    # dann mit einer geleakten Institution (UniqueViolation institutions_pkey).
-    # Autoincrement + Referenz über ``.id`` ist kollisionsfrei.
+    # No hardcoded PK IDs: the shared CI test DB accumulates rows from
+    # non-isolated fixtures of other modules; a fixed ``id=320`` would then
+    # collide with a leaked institution (UniqueViolation institutions_pkey).
+    # Autoincrement + referencing via ``.id`` avoids collisions.
     inst = Institution(
         name="RagOwner",
         slug="ragowner",
@@ -108,12 +108,12 @@ def test_retry_unknown_task_returns_404(stage, test_db):
 
 
 def test_retry_own_failed_job_as_owner_succeeds(stage, test_db, mocker):
-    """Owner darf eigenen FAILURE-Job retryen → 200 + neuer task_id, kein
-    Bypass-Audit (Owner ist nicht Superuser)."""
+    """Owner may retry their own FAILURE job → 200 + new task_id, no
+    bypass audit entry (owner is not a superuser)."""
     from models.auth import AuditLog
 
     s = stage
-    # Celery-Broker mocken — Test prüft die Endpoint-Logik, nicht den Worker.
+    # Mock the Celery broker — the test checks endpoint logic, not the worker.
     mocker.patch("api.rag_exams.generate_questions_task")
 
     response = _run(
@@ -124,16 +124,16 @@ def test_retry_own_failed_job_as_owner_succeeds(stage, test_db, mocker):
             db=test_db,
         )
     )
-    assert response.task_id != s.job.task_id  # Neuer Task wurde erzeugt.
+    assert response.task_id != s.job.task_id  # A new task was created.
     bypass_logs = (
         test_db.query(AuditLog).filter(AuditLog.action == "superuser_bypass").all()
     )
-    assert bypass_logs == []  # Owner ist kein Superuser → kein Bypass.
+    assert bypass_logs == []  # Owner is not a superuser → no bypass.
 
 
 def test_retry_foreign_failed_job_as_superuser_logs_bypass(stage, test_db, mocker):
-    """Superuser darf fremden FAILURE-Job retryen + ein Bypass-Audit-Eintrag
-    mit resource_type=question_generation_job, action=retry, owner=320."""
+    """Superuser may retry another user's FAILURE job + a bypass audit entry
+    is created with resource_type=question_generation_job, action=retry, owner=320."""
     import json
     from models.auth import AuditLog
 
@@ -166,8 +166,8 @@ def test_retry_foreign_failed_job_as_superuser_logs_bypass(stage, test_db, mocke
 
 
 def test_retry_foreign_job_as_superuser_aborts_when_audit_fails(stage, test_db, mocker):
-    """DSGVO: Wenn der Bypass-Audit-Log nicht persistiert werden kann, MUSS
-    HTTPException 500 raisen — kein Retry ohne Trail."""
+    """GDPR: If the bypass audit log cannot be persisted, an HTTPException 500
+    MUST be raised — no retry without an audit trail."""
     s = stage
     mocker.patch("api.rag_exams.generate_questions_task")
     mocker.patch("services.audit_service.AuditService.log_action", return_value=None)

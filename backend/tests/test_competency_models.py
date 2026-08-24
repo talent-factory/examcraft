@@ -1,4 +1,4 @@
-"""Modell-Tests für Kompetenzrahmen (TF-400)."""
+"""Model tests for competency frameworks (TF-400)."""
 
 from models.competency import (
     CompetencyFramework,
@@ -50,8 +50,8 @@ def test_create_framework_with_competencies(test_db):
 
     loaded = test_db.query(CompetencyFramework).filter_by(id=fw.id).one()
     assert loaded.module_code == "B"
-    # TF-644: visibility ist ein CompetencyFrameworkVisibility-Enum-Member,
-    # kein reiner String mehr (native PG-Enum statt String(20)+CHECK).
+    # TF-644: visibility is a CompetencyFrameworkVisibility enum member,
+    # no longer a plain string (native PG enum instead of String(20)+CHECK).
     assert loaded.visibility == CompetencyFrameworkVisibility.INSTITUTION
     assert loaded.is_archived is False
     assert loaded.competencies[0].code == "B1"
@@ -59,10 +59,11 @@ def test_create_framework_with_competencies(test_db):
 
 
 def test_visibility_rejects_bad_value(test_db):
-    """TF-644: visibility ist seit der Promotion auf ein natives PG-Enum
-    (``competencyframeworkvisibility``) kein reiner String+CHECK mehr — ein
-    unbekannter Wert scheitert als ``DataError`` (invalid enum label) statt
-    als ``IntegrityError`` (CHECK-Constraint-Verletzung, TF-400-Status quo).
+    """TF-644: since the promotion to a native PG enum
+    (``competencyframeworkvisibility``), visibility is no longer a plain
+    String+CHECK — an unknown value fails as a ``DataError`` (invalid enum
+    label) instead of an ``IntegrityError`` (CHECK constraint violation,
+    the TF-400 status quo).
     """
     import pytest
     from sqlalchemy.exc import DataError
@@ -110,10 +111,10 @@ def test_deleting_framework_cascades_competencies(test_db):
 
 
 def test_deleting_competency_sets_question_review_competency_id_null(test_db):
-    """FK ondelete=SET NULL: löscht man eine Competency, überlebt die
-    referenzierende QuestionReview mit competency_id=NULL und unverändertem
-    ln_level. Das ist der Vertrag, um den _sync_competencies_from_text bewusst
-    nie löscht (sonst gingen Frage-Taggings verloren)."""
+    """FK ondelete=SET NULL: deleting a Competency leaves the referencing
+    QuestionReview alive with competency_id=NULL and an unchanged ln_level.
+    This is the contract that _sync_competencies_from_text deliberately
+    never deletes for (otherwise question taggings would be lost)."""
     from models.question_review import QuestionReview
 
     inst = _institution(test_db)
@@ -143,14 +144,14 @@ def test_deleting_competency_sets_question_review_competency_id_null(test_db):
     test_db.expire_all()
 
     survived = test_db.query(QuestionReview).filter_by(id=qid).one()
-    assert survived.competency_id is None  # SET NULL, Frage überlebt
-    assert survived.ln_level == 3  # unverändert
+    assert survived.competency_id is None  # SET NULL, question survives
+    assert survived.ln_level == 3  # unchanged
 
 
 def test_db_level_cascade_deletes_competencies_on_framework_delete(test_db):
-    """ON DELETE CASCADE auf competencies.framework_id greift auch bei einem
-    DELETE, das die ORM-Beziehung umgeht (z. B. Bulk-Delete) — die
-    Relationship-Cascade allein würde das nicht abdecken."""
+    """ON DELETE CASCADE on competencies.framework_id also applies to a
+    DELETE that bypasses the ORM relationship (e.g. bulk delete) — the
+    relationship cascade alone wouldn't cover that."""
     from sqlalchemy import text
 
     inst = _institution(test_db)
@@ -196,4 +197,4 @@ def test_question_review_links_competency(test_db):
     loaded = test_db.query(QuestionReview).filter_by(id=q.id).one()
     assert loaded.competency_id == comp.id
     assert loaded.ln_level == 3
-    assert loaded.bloom_level is None  # distinkt
+    assert loaded.bloom_level is None  # distinct

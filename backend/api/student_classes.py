@@ -1,26 +1,26 @@
-"""Student-Classes API — CRUD + Mitglieder-Verwaltung (TF-336).
+"""Student-Classes API — CRUD + member management (TF-336).
 
 Endpoints:
 
-* ``GET    /api/v1/student-classes`` — Liste mit Member-Count
-* ``POST   /api/v1/student-classes`` — Klasse anlegen
-* ``GET    /api/v1/student-classes/{id}`` — Detail inkl. Mitglieder
-* ``GET    /api/v1/student-classes/{id}/stats`` — Cross-Exam-Verlauf
-* ``PATCH  /api/v1/student-classes/{id}`` — umbenennen
-* ``DELETE /api/v1/student-classes/{id}`` — löschen
-* ``POST   /api/v1/student-classes/{id}/members`` — Mitglied hinzufügen
-* ``DELETE /api/v1/student-classes/{id}/members/{student_id}`` — entfernen
+* ``GET    /api/v1/student-classes`` — list with member count
+* ``POST   /api/v1/student-classes`` — create a class
+* ``GET    /api/v1/student-classes/{id}`` — detail incl. members
+* ``GET    /api/v1/student-classes/{id}/stats`` — cross-exam history
+* ``PATCH  /api/v1/student-classes/{id}`` — rename
+* ``DELETE /api/v1/student-classes/{id}`` — delete
+* ``POST   /api/v1/student-classes/{id}/members`` — add a member
+* ``DELETE /api/v1/student-classes/{id}/members/{student_id}`` — remove
 
-Multi-Tenancy: jeder Endpoint filtert auf
-``current_user.institution_id``. Cross-Institution-Lookups liefern 404
-(nicht 403), um die Existenz fremder Klassen nicht zu leaken.
+Multi-tenancy: every endpoint filters on
+``current_user.institution_id``. Cross-institution lookups return 404
+(not 403), so as not to leak the existence of foreign classes.
 
-RBAC: ``students:manage`` für alle Endpoints — gemäss Spec ist die
-Verwaltung von Studierenden- und Klassenstammdaten Admin-Aufgabe.
+RBAC: ``students:manage`` for all endpoints — per spec, managing student
+and class master data is an admin task.
 
-Note: dieses Modul lässt ``from __future__ import annotations`` bewusst
-weg — Pydantic v2 + FastAPI brauchen reale Typen zur Laufzeit für
-OpenAPI-Schema und Body-Parsing.
+Note: this module deliberately omits ``from __future__ import
+annotations`` — Pydantic v2 + FastAPI need real runtime types for
+OpenAPI schema generation and body parsing.
 """
 
 import logging
@@ -168,10 +168,10 @@ async def list_student_classes(
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> StudentClassListOut:
-    """Liste aller Klassen der Institution mit Mitglieder-Anzahl.
+    """List all classes of the institution with member count.
 
-    Default 200 / Max 1000 verhindert OOM bei Institutionen mit vielen
-    Klassen; das Frontend paginiert ab dort.
+    Default 200 / max 1000 prevents OOM for institutions with many
+    classes; the frontend paginates from there.
     """
     base = db.query(StudentClass).filter(
         StudentClass.institution_id == current_user.institution_id
@@ -205,7 +205,7 @@ async def create_student_class(
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> StudentClassOut:
-    """Klasse anlegen. 409 bei Namens-Konflikt in derselben Institution."""
+    """Create a class. 409 on a name conflict within the same institution."""
     student_class = StudentClass(
         institution_id=current_user.institution_id,
         name=body.name,
@@ -229,7 +229,7 @@ async def get_student_class(
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> StudentClassDetailOut:
-    """Klassen-Detail mit Mitglieder-Liste."""
+    """Class detail with the member list."""
     student_class = (
         db.query(StudentClass)
         .options(
@@ -275,7 +275,7 @@ async def update_student_class(
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> StudentClassOut:
-    """Klasse umbenennen. 409 bei Namens-Kollision."""
+    """Rename a class. 409 on a name collision."""
     student_class = _load_class_for_user(db=db, user=current_user, class_id=class_id)
     student_class.name = body.name
     try:
@@ -302,10 +302,10 @@ async def delete_student_class(
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> Response:
-    """Klasse löschen — Mitgliedschaften werden via CASCADE entfernt.
+    """Delete a class — memberships are removed via CASCADE.
 
-    Studierende selbst bleiben erhalten (sie können in andere Klassen
-    eingeordnet sein und referenzieren auch Submissions).
+    Students themselves are retained (they may be enrolled in other
+    classes and also reference submissions).
     """
     student_class = _load_class_for_user(db=db, user=current_user, class_id=class_id)
     db.delete(student_class)
@@ -329,11 +329,11 @@ async def add_member(
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> StudentRefOut:
-    """Studi der Klasse zuordnen.
+    """Assign a student to the class.
 
-    Idempotent: ist der Studi schon Mitglied, liefert der Endpoint 200
-    statt 201 wäre das technisch sauberer — wir reagieren stattdessen
-    mit 409, damit das Frontend den Konflikt explizit anzeigen kann.
+    Idempotent would technically be cleaner: if the student is already a
+    member, return 200 instead of 201 — we instead respond with 409, so
+    the frontend can explicitly surface the conflict.
     """
     student_class = _load_class_for_user(db=db, user=current_user, class_id=class_id)
     student = _load_student_for_user(
@@ -369,7 +369,7 @@ async def remove_member(
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> Response:
-    """Mitgliedschaft entfernen. 404, wenn nicht vorhanden."""
+    """Remove a membership. 404 if not present."""
     student_class = _load_class_for_user(db=db, user=current_user, class_id=class_id)
     membership = (
         db.query(StudentClassMembership)
@@ -387,7 +387,7 @@ async def remove_member(
 
 
 # ---------------------------------------------------------------------------
-# Cross-Exam-Verlauf (TF-336 Subarea B)
+# Cross-exam history (TF-336 Subarea B)
 # ---------------------------------------------------------------------------
 
 
@@ -450,18 +450,17 @@ async def get_class_history(
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> ClassHistoryStatsOut:
-    """Cross-Exam-Verlauf einer Klasse — Spec 7.5 / 8.
+    """Cross-exam history of a class — spec 7.5 / 8.
 
-    Aggregate werden on-the-fly aus ``submissions`` + ``grades``
-    gerechnet. Die Mitgliedschaft ist eine As-of-Now-Sicht — Studis,
-    die zwischenzeitlich aus der Klasse entfernt wurden, fliessen
-    nicht in die Aggregate ein.
+    Aggregates are computed on-the-fly from ``submissions`` + ``grades``.
+    Membership is an as-of-now view — students who have since been
+    removed from the class are not included in the aggregates.
 
-    Tier-Gate: nur Enterprise. 402 mit ``error_code`` für i18n-Banner.
+    Tier gate: Enterprise only. 402 with ``error_code`` for the i18n banner.
     """
     assert_class_history_allowed(current_user)
-    # 404 bevor wir den Service bemühen — auch hier kein 403, um
-    # Cross-Tenant-Existenz nicht zu leaken.
+    # 404 before we bother the service — again no 403, so as not to
+    # leak cross-tenant existence.
     _load_class_for_user(db=db, user=current_user, class_id=class_id)
 
     stats = StatisticsService(db).class_history(

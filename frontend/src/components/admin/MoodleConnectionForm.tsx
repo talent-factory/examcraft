@@ -1,15 +1,15 @@
 /**
- * MoodleConnectionForm — Admin-UI für `moodle_connections`
+ * MoodleConnectionForm — admin UI for `moodle_connections`
  * (TF-336 Subarea C).
  *
- * Dual-Mode:
- *  - keine Connection: Form zum Anlegen (base_url + token)
- *  - Connection vorhanden: maskierter Token-Status, Buttons "Test",
- *    "Token rotieren", "Entfernen"
+ * Dual mode:
+ *  - no connection: form to create one (base_url + token)
+ *  - connection exists: masked token status, "Test",
+ *    "Rotate token", "Remove" buttons
  *
- * Token-Token-Maskierung: ``****<last 4>`` — der Backend liefert nie
- * den Klartext. Beim Rotieren tippt der Admin den neuen Token in ein
- * separates Feld; das alte Feld bleibt leer (= keine Änderung).
+ * Token masking: ``****<last 4>`` — the backend never returns the
+ * plaintext. When rotating, the admin types the new token into a
+ * separate field; the old field stays empty (= no change).
  */
 
 import React, { useEffect, useState } from 'react';
@@ -80,8 +80,8 @@ const MoodleConnectionForm: React.FC = () => {
     return () => {
       cancelled = true;
     };
-    // ``t`` ist in Tests instabil; wir haben kein dynamisches i18n-
-    // Switching auf dieser Page, der String oben reicht als Fallback.
+    // ``t`` is unstable in tests; we have no dynamic i18n switching
+    // on this page, the string above is sufficient as a fallback.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey]);
 

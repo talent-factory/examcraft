@@ -3,11 +3,11 @@
  *
  * Two source paths:
  *   - ``moodle_json``: file upload (default).
- *   - ``moodle_api``: nur sichtbar, wenn die Institution eine
- *     ``moodle_connections``-Eintragung hat. Statt Datei-Upload wird
- *     die Moodle-Quiz-ID erfasst; Preview/Commit gehen an
- *     `/import/api-preview` resp. `/import/api-commit`. Tier-Quota
- *     402 propagiert via `ApiError.message`.
+ *   - ``moodle_api``: only visible when the institution has a
+ *     ``moodle_connections`` entry. Instead of a file upload, the
+ *     Moodle quiz ID is captured; preview/commit go to
+ *     `/import/api-preview` resp. `/import/api-commit`. Tier-quota
+ *     402 propagates via `ApiError.message`.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -160,13 +160,12 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     };
   }, []);
 
-  // TF-336: Beim Öffnen prüfen, ob die Institution eine Moodle-API-
-  // Connection hat — nur dann ist das ``moodle_api``-Radio aktiv.
-  // 403/permission-Fehler ist normal (Lehrperson hat
-  // ``moodle:configure`` nicht) und wird als "keine Connection"
-  // gerendert. Andere Fehler (Netzwerk, 500, Parse) müssen sichtbar
-  // werden, sonst sieht die Lehrperson nur ein deaktiviertes Radio
-  // ohne zu wissen, warum.
+  // TF-336: On open, check whether the institution has a Moodle API
+  // connection — only then is the ``moodle_api`` radio active.
+  // A 403/permission error is expected (the teacher lacks
+  // ``moodle:configure``) and is rendered as "no connection".
+  // Other errors (network, 500, parse) must be surfaced, otherwise
+  // the teacher just sees a disabled radio without knowing why.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;

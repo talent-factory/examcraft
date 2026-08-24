@@ -65,10 +65,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
       ? detail
       : `Request failed (${response.status})`;
   throw new ApiError({
-    // TF-626-Review: vorher eine inline-Ternary, die nur einen Teil der
-    // Codes kannte und alles Unbekannte auf 'server' abbildete (statt
-    // 'unknown' wie ueberall sonst) — jetzt dasselbe kanonische Mapping wie
-    // jeder andere Service, siehe submissionsService.ts.
+    // TF-626-Review: previously an inline ternary that only knew a subset
+    // of the codes and mapped everything unknown to 'server' (instead of
+    // 'unknown' like everywhere else) — now the same canonical mapping as
+    // every other service, see submissionsService.ts.
     kind: statusToKind(response.status),
     status: response.status,
     message,

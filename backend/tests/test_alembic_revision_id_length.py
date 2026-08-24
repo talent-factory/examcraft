@@ -1,20 +1,20 @@
-"""Regressions-Guard: Alembic-Revision-IDs müssen in alembic_version passen.
+"""Regression guard: Alembic revision IDs must fit in alembic_version.
 
-Alembic legt die Tabelle `alembic_version` standardmässig mit
-`version_num VARCHAR(32)` an. Eine Revision-ID > 32 Zeichen lässt sich
-weder per `upgrade` noch per `stamp` schreiben — Postgres bricht mit
-`StringDataRightTruncation` ab. Genau das war der Release-Blocker in TF-388
-(`tf383_question_generation_metadata`, 34 Zeichen).
+Alembic creates the `alembic_version` table by default with
+`version_num VARCHAR(32)`. A revision ID > 32 characters can be written
+neither via `upgrade` nor via `stamp` — Postgres aborts with
+`StringDataRightTruncation`. That was exactly the release blocker in TF-388
+(`tf383_question_generation_metadata`, 34 characters).
 
-Dieser Test scannt die Migrationsdateien direkt (ohne DB/Alembic-Import) und
-schlägt fehl, sobald eine `revision`-ID die Grenze überschreitet — fängt den
-Fehler also vor dem Merge ab, ohne den vollen Migrationspfad fahren zu müssen.
+This test scans the migration files directly (without a DB/Alembic import)
+and fails as soon as a `revision` ID exceeds the limit — catching the
+error before the merge, without having to run the full migration path.
 """
 
 import re
 from pathlib import Path
 
-# Default-Breite der Spalte alembic_version.version_num
+# Default width of the alembic_version.version_num column
 ALEMBIC_VERSION_NUM_MAX = 32
 
 _VERSIONS_DIR = Path(__file__).resolve().parent.parent / "alembic" / "versions"
@@ -22,7 +22,7 @@ _REVISION_RE = re.compile(r'^revision(?:\s*:\s*\w+)?\s*=\s*["\']([^"\']+)["\']',
 
 
 def _iter_revisions():
-    """Liefert (Dateiname, revision_id) für jede Migrationsdatei mit revision."""
+    """Yields (filename, revision_id) for every migration file that has a revision."""
     for path in sorted(_VERSIONS_DIR.glob("*.py")):
         if path.name == "__init__.py":
             continue

@@ -1,11 +1,10 @@
 """
-Tests für Claude Service (TF-440: Gateway-only, Legacy-Direktpfad entfernt).
+Tests for Claude Service (TF-440: gateway-only, legacy direct path removed).
 
-Wire-Format-/Retry-/Fallback-spezifische Tests leben jetzt ausschliesslich
-in test_claude_service_gateway.py (der Gateway-Pfad selbst) bzw.
-gateway_generator.py's eigener Suite. Diese Datei deckt nur noch das, was
-ClaudeService selbst noch tut: demo_mode-Gating, Prompt-Building,
-Usage-Stats-Shape.
+Wire-format/retry/fallback-specific tests now live exclusively in
+test_claude_service_gateway.py (the gateway path itself) and
+gateway_generator.py's own suite. This file only covers what ClaudeService
+itself still does: demo_mode gating, prompt building, usage stats shape.
 """
 
 import os
@@ -17,11 +16,11 @@ from services.claude_service import ClaudeService
 
 
 class TestClaudeService:
-    """Test Suite für Claude Service"""
+    """Test suite for Claude Service"""
 
     @pytest.fixture
     def claude_service(self):
-        """Claude Service Fixture mit aktivem Gateway (nicht im Demo-Mode)."""
+        """Claude Service fixture with an active gateway (not in demo mode)."""
         with patch.dict(
             os.environ,
             {"LLM_GATEWAY_URL": "http://gw:4000", "CLAUDE_DEMO_MODE": "false"},
@@ -30,28 +29,28 @@ class TestClaudeService:
 
     @pytest.fixture
     def demo_claude_service(self):
-        """Claude Service Fixture im Demo Mode (kein Gateway konfiguriert)."""
+        """Claude Service fixture in demo mode (no gateway configured)."""
         with patch.dict(
             os.environ, {"LLM_GATEWAY_URL": "", "CLAUDE_DEMO_MODE": "true"}
         ):
             return ClaudeService()
 
     def test_initialization_with_gateway(self, claude_service):
-        """Test korrekte Initialisierung mit aktivem Gateway"""
+        """Test correct initialization with an active gateway"""
         from services import llm_gateway
 
         assert claude_service.model == llm_gateway.ALIAS_GENERATION
         assert not claude_service.demo_mode
 
     def test_initialization_demo_mode(self, demo_claude_service):
-        """Test Initialisierung im Demo Mode (kein LLM_GATEWAY_URL)"""
+        """Test initialization in demo mode (no LLM_GATEWAY_URL)"""
         assert demo_claude_service.demo_mode
 
     def test_usage_stats(self, claude_service):
-        """Usage-Stats-Shape bleibt für den Dev-Debug-Endpoint stabil.
+        """Usage stats shape stays stable for the dev debug endpoint.
 
-        Token-/Kosten-Tracking läuft seit TF-439 zentral am Gateway
-        (LiteLLM) — ClaudeService selbst zählt nichts mehr mit.
+        Token/cost tracking has run centrally at the gateway (LiteLLM) since
+        TF-439 — ClaudeService itself no longer counts anything.
         """
         stats = claude_service.get_usage_stats()
         assert stats == {
@@ -64,10 +63,10 @@ class TestClaudeService:
 
     @pytest.mark.asyncio
     async def test_generate_questions_demo_mode_rejects(self, demo_claude_service):
-        """Demo Mode lehnt Question-Generation hart ab — see claude_service.py.
+        """Demo mode hard-rejects question generation — see claude_service.py.
 
-        Historisch produzierte Demo Mode Mock-Fragen; das wurde entfernt, um
-        versehentliche Prod-Nutzung ohne konfigurierten Gateway zu verhindern.
+        Historically demo mode produced mock questions; that was removed to
+        prevent accidental production use without a configured gateway.
         """
         with pytest.raises(RuntimeError, match="Claude generation is not configured"):
             await demo_claude_service.generate_questions(
@@ -78,9 +77,9 @@ class TestClaudeService:
     async def test_generate_questions_propagates_gateway_errors(
         self, claude_service, monkeypatch
     ):
-        """API-/Modell-Fehler aus dem Gateway propagieren, statt in einen
-        stillen Demo-Fallback zu laufen (TF-440: ersetzt den alten
-        _make_api_request_with_retry-Propagations-Test)."""
+        """API/model errors from the gateway propagate instead of falling
+        into a silent demo fallback (TF-440: replaces the old
+        _make_api_request_with_retry propagation test)."""
         import services.gateway_generator as gg
 
         async def boom(_prompt):
@@ -92,7 +91,7 @@ class TestClaudeService:
             await claude_service.generate_questions("Python", "medium", 1)
 
     def test_build_prompt_german(self, claude_service):
-        """Test Prompt Building für deutsche Sprache"""
+        """Test prompt building for German language"""
         prompt = claude_service._build_prompt(
             topic="Python",
             difficulty="medium",
@@ -107,7 +106,7 @@ class TestClaudeService:
         assert "3" in prompt
 
     def test_build_prompt_english(self, claude_service):
-        """Test Prompt Building für englische Sprache"""
+        """Test prompt building for English language"""
         prompt = claude_service._build_prompt(
             topic="Python",
             difficulty="medium",
@@ -123,17 +122,17 @@ class TestClaudeService:
 
 
 class TestClaudeServiceIntegration:
-    """Integration Tests für Claude Service"""
+    """Integration tests for Claude Service"""
 
     @pytest.mark.asyncio
     async def test_full_workflow_demo_mode_rejects_generation(self):
-        """Demo Mode Workflow: Stats sind abrufbar, aber Generation wird abgelehnt."""
+        """Demo mode workflow: stats are retrievable, but generation is rejected."""
         with patch.dict(
             os.environ, {"LLM_GATEWAY_URL": "", "CLAUDE_DEMO_MODE": "true"}
         ):
             service = ClaudeService()
 
-            # Question-Generation wird hart abgelehnt
+            # Question generation is hard-rejected
             with pytest.raises(
                 RuntimeError, match="Claude generation is not configured"
             ):
@@ -141,7 +140,7 @@ class TestClaudeServiceIntegration:
                     topic="Machine Learning", difficulty="hard", question_count=3
                 )
 
-            # Stats bleiben abrufbar und markieren den Demo-Mode korrekt
+            # Stats remain retrievable and correctly mark demo mode
             stats = service.get_usage_stats()
             assert stats["demo_mode"]
             assert stats["total_cost"] == 0.0

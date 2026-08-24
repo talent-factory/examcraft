@@ -1,4 +1,4 @@
-"""Tags API für ExamCraft AI."""
+"""Tags API for ExamCraft AI."""
 
 import logging
 from typing import List, Literal, Optional
@@ -18,10 +18,10 @@ from utils.auth_utils import get_current_active_user, require_permission
 logger = logging.getLogger(__name__)
 
 TagScope = Literal["global", "institution"]
-# TF-397: tag namespace. 'content' tags classify Fragen/Dokumente, 'prompt' tags
-# classify Prompt-Templates. Default stays 'content' everywhere so existing
-# Fragen-/Dokument-Tagging is unaffected. ``TagKind`` is imported from
-# models.tag (single source of truth) so the literal isn't redeclared here.
+# TF-397: tag namespace. 'content' tags classify questions/documents, 'prompt'
+# tags classify prompt templates. Default stays 'content' everywhere so
+# existing question/document tagging is unaffected. ``TagKind`` is imported
+# from models.tag (single source of truth) so the literal isn't redeclared here.
 
 router = APIRouter(prefix="/api/v1/tags", tags=["Tags"])
 
@@ -64,14 +64,14 @@ class MergeRequest(BaseModel):
 
 
 def _visible_tags_query(db: Session, current_user: User):
-    """Gibt die Query für sichtbare Tags zurück (eigene Institution + global)."""
+    """Returns the query for visible tags (own institution + global)."""
     return db.query(Tag).filter(
         (Tag.institution_id == current_user.institution_id) | (Tag.scope == "global")
     )
 
 
 def _get_tag_for_write(tag_id: int, current_user: User, db: Session) -> Tag:
-    """Gibt Tag zurück wenn er zur Institution des Users gehört (oder global + superuser)."""
+    """Returns the tag if it belongs to the user's institution (or global + superuser)."""
     tag = db.query(Tag).filter(Tag.id == tag_id).first()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag nicht gefunden.")
@@ -79,8 +79,8 @@ def _get_tag_for_write(tag_id: int, current_user: User, db: Session) -> Tag:
         raise HTTPException(status_code=403, detail="Zugriff verweigert.")
     if tag.scope == "global" and not current_user.is_superuser:
         # TF-397: a prompt-kind global tag may be managed by its creator,
-        # mirroring the relaxed create rule (Prompt-Editor:innen brauchen keinen
-        # superuser für ihre eigenen Prompt-Tags). Content global tags unchanged.
+        # mirroring the relaxed create rule (prompt editors don't need
+        # superuser for their own prompt tags). Content global tags unchanged.
         if not (tag.kind == "prompt" and tag.created_by == current_user.id):
             raise HTTPException(
                 status_code=403, detail="Nur superuser darf globale Tags bearbeiten."
@@ -100,18 +100,18 @@ async def list_tags(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> List[TagOut]:
-    """Alle sichtbaren Tags (eigene Institution + global), alphabetisch sortiert.
+    """All visible tags (own institution + global), sorted alphabetically.
 
-    TF-397: per Default werden nur 'content'-Tags zurückgegeben, sodass das
-    Fragen-/Dokument-Tagging und die Tag-Verwaltung-Liste unverändert bleiben.
-    `kind=prompt` liefert die Prompt-Template-Tags für den Prompt-Editor.
+    TF-397: by default only 'content' tags are returned, so question/document
+    tagging and the tag management list stay unchanged. `kind=prompt` returns
+    the prompt template tags for the prompt editor.
     """
     q = _visible_tags_query(db, current_user).filter(Tag.kind == kind)
     if not include_archived:
         q = q.filter(Tag.is_archived == False)  # noqa: E712
     tags = q.order_by(func.lower(Tag.name)).all()
 
-    # usage_count live aus QuestionTag berechnen (verlässlicher als denormalisierter Zähler)
+    # Compute usage_count live from QuestionTag (more reliable than a denormalized counter)
     counts: dict[int, int] = {}
     if tags:
         counts = dict(
@@ -142,15 +142,15 @@ async def create_tag(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> Tag:
-    """Tag erstellen oder vorhandenen zurückgeben (case-insensitiv, case-preserving).
+    """Create a tag or return an existing one (case-insensitive, case-preserving).
 
     RBAC (TF-397):
-    - kind='content': benötigt 'create_questions'; globale content-Tags nur superuser
-      (unverändert gegenüber TF-372).
-    - kind='prompt': benötigt 'prompt:create' (Prompt-Verwaltung). Damit ist die
-      Inline-Anlage globaler Prompt-Tags auch ohne superuser möglich — Prompts sind
-      faktisch global (kein institution_id), daher wäre die superuser-Regel sonst
-      ein Blocker für normale Prompt-Editor:innen.
+    - kind='content': requires 'create_questions'; global content tags require
+      superuser (unchanged from TF-372).
+    - kind='prompt': requires 'prompt:create' (prompt management). This makes
+      inline creation of global prompt tags possible without superuser —
+      prompts are effectively global (no institution_id), so the superuser
+      rule would otherwise be a blocker for regular prompt editors.
     """
     if body.kind == "prompt":
         if not current_user.has_permission("prompt:create"):
@@ -217,7 +217,7 @@ async def rename_tag(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> Tag:
-    """Tag umbenennen. Admin darf alle Tags umbenennen; andere nur eigene."""
+    """Rename a tag. Admin may rename all tags; others only their own."""
     tag = _get_tag_for_write(tag_id, current_user, db)
 
     is_admin = current_user.has_permission("manage_settings")
@@ -264,7 +264,7 @@ async def archive_tag(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> Tag:
-    """Tag archivieren. Admin darf alle Tags archivieren; andere nur eigene."""
+    """Archive a tag. Admin may archive all tags; others only their own."""
     tag = _get_tag_for_write(tag_id, current_user, db)
 
     is_admin = current_user.has_permission("manage_settings")
@@ -284,7 +284,7 @@ async def unarchive_tag(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> Tag:
-    """Archivierten Tag wiederherstellen. Admin darf alle Tags wiederherstellen; andere nur eigene."""
+    """Restore an archived tag. Admin may restore all tags; others only their own."""
     tag = _get_tag_for_write(tag_id, current_user, db)
 
     is_admin = current_user.has_permission("manage_settings")
@@ -304,8 +304,8 @@ async def delete_tag(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> None:
-    """Tag permanent löschen. Nur archivierte Tags mit usage_count == 0.
-    Admin darf alle solche Tags löschen; andere nur eigene.
+    """Permanently delete a tag. Only archived tags with usage_count == 0.
+    Admin may delete all such tags; others only their own.
     """
     tag = _get_tag_for_write(tag_id, current_user, db)
 
@@ -350,11 +350,11 @@ async def merge_tags(
     current_user: User = Depends(require_permission("manage_settings")),
     db: Session = Depends(get_db),
 ) -> List[Tag]:
-    """Mehrere Quell-Tags in einen Ziel-Tag zusammenführen.
+    """Merge multiple source tags into one target tag.
 
-    - Quell-Tags werden archiviert
-    - Alle Fragen-Zuweisungen werden auf den Ziel-Tag migriert
-    - Pro Quell-Tag wird ein TagMergeLog-Eintrag erstellt
+    - Source tags are archived
+    - All question assignments are migrated to the target tag
+    - A TagMergeLog entry is created per source tag
     """
     if body.target_id in body.source_ids:
         raise HTTPException(

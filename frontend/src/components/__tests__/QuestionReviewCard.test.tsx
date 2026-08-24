@@ -321,7 +321,7 @@ describe('QuestionReviewCard', () => {
     });
   });
 
-  // TF-383: Template-/Prompt-Herkunft (Provenance-Snapshot)
+  // TF-383: Template/prompt provenance (provenance snapshot)
   describe('Template provenance', () => {
     it('shows custom template name and version', () => {
       const q: QuestionReview = {
@@ -409,7 +409,7 @@ describe('QuestionReviewCard', () => {
     });
   });
 
-  // TF-400: Handlungskompetenz (HK) + LN-Stufe an der Frage
+  // TF-400: Competency (HK) + LN level on the question
   describe('Competency display', () => {
     const withCompetency: QuestionReview = {
       ...mockQuestion,

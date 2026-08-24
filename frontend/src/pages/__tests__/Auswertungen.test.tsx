@@ -12,8 +12,8 @@ import Auswertungen from '../Auswertungen';
 import { ComposerService } from '../../services/ComposerService';
 import { Exam, ExamStatus } from '../../types/composer';
 
-// Explizite Factory verhindert das Laden des echten Moduls (axios-ESM-
-// Import bricht in Jest's CJS-Transform).
+// Explicit factory prevents loading the real module (axios ESM
+// import breaks in Jest's CJS transform).
 jest.mock('../../services/ComposerService', () => ({
   ComposerService: {
     listExams: jest.fn(),

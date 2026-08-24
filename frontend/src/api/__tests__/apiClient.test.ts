@@ -1,18 +1,18 @@
 /**
  * apiClient.test.ts
  *
- * Unit-Tests für core/frontend/src/api/apiClient.ts
+ * Unit tests for core/frontend/src/api/apiClient.ts
  *
- * Strategie:
- *  - axios wird vollständig gemockt (jest.mock wird gehoisted, muss vor Imports stehen)
- *  - Die Fake-Instance ist per Closure zugänglich
- *  - Die Instance ist selbst callable (wegen `apiClient(originalRequest)` im Retry-Pfad)
- *  - Request- und Response-Interceptor-Handler werden direkt aufgerufen
- *  - Das module-level `refreshPromise` wird durch jest.resetModules() zwischen Tests isoliert
+ * Strategy:
+ *  - axios is fully mocked (jest.mock is hoisted, must come before imports)
+ *  - The fake instance is accessible via closure
+ *  - The instance is itself callable (because of `apiClient(originalRequest)` in the retry path)
+ *  - Request and response interceptor handlers are invoked directly
+ *  - The module-level `refreshPromise` is isolated between tests via jest.resetModules()
  */
 
-// ─── Axios-Mock ──────────────────────────────────────────────────────────────
-// MUSS vor allen Imports stehen – jest.mock() wird gehoisted
+// ─── Axios Mock ──────────────────────────────────────────────────────────────
+// MUST come before all imports – jest.mock() is hoisted
 jest.mock('axios', () => {
   const requestHandlers: Array<(config: any) => any> = [];
   const responseHandlers: Array<[(res: any) => any, (err: any) => any]> = [];

@@ -48,9 +48,9 @@ beforeEach(() => {
 
 describe('Titel', () => {
   it('rendert den Titel über den Sidebar-i18n-Key (TF-506)', async () => {
-    // Regression: der Titel war zuvor hartcodiertes Deutsch ("Tag-Verwaltung"
-    // direkt im JSX), dadurch für en/fr/it nie übersetzbar. Jetzt via
-    // nav.sidebar.tagSettings, damit er wie der Rest der App übersetzt wird.
+    // Regression: the title used to be hardcoded German ("Tag-Verwaltung"
+    // directly in the JSX), which made it never translatable for en/fr/it. Now via
+    // nav.sidebar.tagSettings, so it gets translated like the rest of the app.
     renderPage();
     await screen.findByText('#EigenTag');
     expect(screen.getByText('Tag-Verwaltung')).toBeInTheDocument();
@@ -108,10 +108,10 @@ describe('Superuser', () => {
 
   it('zeigt globale Tags als editierbar (readonly: false)', async () => {
     renderPage();
-    // Globaler Tag und eigener Tag sind beide sichtbar
+    // Global tag and own tag are both visible
     await screen.findByText('#EigenTag');
     await screen.findByText('#GlobalTag');
-    // Edit-Buttons: EigenTag + KollegeTag (institution, alle editierbar für Admin) + GlobalTag (editierbar für Superuser)
+    // Edit buttons: EigenTag + KollegeTag (institution, all editable for admin) + GlobalTag (editable for superuser)
     const editButtons = screen.getAllByRole('button', { name: 'Umbenennen' });
     expect(editButtons).toHaveLength(3);
   });

@@ -73,7 +73,7 @@ def exam_with_reviewed_submission(test_db, test_institution):
         question_id=_qr(test_db),
         position=3,
         points=2.0,
-        external_refs={},  # kein slot
+        external_refs={},  # no slot
     )
     test_db.add_all([q1, q2, q3])
     test_db.flush()
@@ -132,7 +132,7 @@ def exam_with_reviewed_submission(test_db, test_institution):
 def test_payload_prefers_reviewer_note_then_llm_rationale(
     test_db, exam_with_reviewed_submission
 ):
-    """reviewer_note gewinnt; sonst llm_rationale; Slot aus external_refs."""
+    """reviewer_note wins; otherwise llm_rationale; slot comes from external_refs."""
     payload = build_feedback_payload(test_db, exam_with_reviewed_submission)
 
     assert payload.quiz_id == 4242
@@ -142,8 +142,8 @@ def test_payload_prefers_reviewer_note_then_llm_rationale(
     by_slot = {q.slot: q for q in student.questions}
     assert by_slot[1].comment == "Gut begründet."  # reviewer_note
     assert by_slot[1].mark == 3.0
-    assert by_slot[2].comment == "Teilweise korrekt (KI)."  # llm_rationale-Fallback
-    # Frage ohne moodle_slot (q3) taucht als Warnung auf, nicht in questions
+    assert by_slot[2].comment == "Teilweise korrekt (KI)."  # llm_rationale fallback
+    # Question without moodle_slot (q3) shows up as a warning, not in questions
     assert 3 not in {q.slot for q in student.questions}
     assert any("kein moodle_slot" in w.lower() for w in payload.warnings)
 

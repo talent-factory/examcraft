@@ -37,8 +37,8 @@ describe('sessionSnapshot', () => {
     writeSessionSnapshot(KEY, 1, { topic: 'alt' });
 
     expect(readSessionSnapshot(KEY, 2)).toBeNull();
-    // Der veraltete Eintrag wird gleich entsorgt, damit er nicht bei jedem
-    // Mount erneut geparst wird.
+    // The stale entry is discarded right away, so it isn't re-parsed on
+    // every mount.
     expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
@@ -83,9 +83,9 @@ describe('sessionSnapshot', () => {
     });
 
     it('removes all entries even though removal shifts indices', () => {
-      // Beim Löschen während der Iteration würde jeder zweite Eintrag
-      // übersprungen — genau das darf nicht passieren, sonst überlebt der
-      // Stand des Vorgängers den Logout.
+      // Deleting during iteration would skip every other entry — exactly
+      // that must not happen, or the predecessor's state would survive
+      // the logout.
       for (let i = 0; i < 6; i++) {
         writeSessionSnapshot(`wizard${i}`, 1, { i });
       }

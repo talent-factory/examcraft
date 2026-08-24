@@ -1,8 +1,8 @@
 /**
- * Studi-Liste (TF-336 G3).
+ * Student list (TF-336 G3).
  *
- * Sucht institutionsweit alle Studierenden, optional gefiltert nach
- * Klasse oder Suchtext. Klick → Studi-Detail.
+ * Searches all students institution-wide, optionally filtered by
+ * class or search text. Click → student detail.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -53,7 +53,7 @@ const AuswertungenStudierende: React.FC = () => {
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState<number | ''>('');
 
-  // Klassen einmal laden für den Filter-Dropdown.
+  // Load classes once for the filter dropdown.
   useEffect(() => {
     let cancelled = false;
     StudentClassesService.list({ limit: 200 })

@@ -1,9 +1,8 @@
-"""Tests für die GZip-Response-Kompression (TF-378).
+"""Tests for GZip response compression (TF-378).
 
-Verifiziert, dass `GZipMiddleware` in der App registriert ist und mit einem
-`minimum_size` konfiguriert wurde, damit kleine Responses unkomprimiert
-bleiben (kein Overhead). Reiner Wiring-Check ohne DB/Lifespan — schnell und
-CI-sicher.
+Verifies that `GZipMiddleware` is registered in the app and configured with
+a `minimum_size`, so small responses stay uncompressed (no overhead). A pure
+wiring check without DB/lifespan — fast and CI-safe.
 """
 
 from fastapi.middleware.gzip import GZipMiddleware
@@ -21,17 +20,17 @@ def test_gzip_middleware_is_registered():
 
 def test_gzip_minimum_size_configured():
     mw = _gzip_entries()[0]
-    # Starlette legt die Middleware-Argumente je nach Version in .kwargs oder
-    # .options ab — beide Pfade abdecken.
+    # Depending on version, Starlette stores middleware arguments in .kwargs
+    # or .options — cover both paths.
     kwargs = getattr(mw, "kwargs", None) or getattr(mw, "options", {})
     assert kwargs.get("minimum_size") == 1000
 
 
 def test_gzip_added_inside_cors():
-    """CORS muss äusserste Schicht bleiben (Header auf allen Responses).
+    """CORS must remain the outermost layer (header on all responses).
 
-    In Starlette wird zuletzt hinzugefügte Middleware zur äussersten Schicht,
-    d.h. CORS muss in der Liste vor GZip stehen.
+    In Starlette, the last middleware added becomes the outermost layer,
+    i.e. CORS must come before GZip in the list.
     """
     from fastapi.middleware.cors import CORSMiddleware
 

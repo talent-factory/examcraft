@@ -1,5 +1,5 @@
 """
-API Integration Tests für Vector Search Endpoints
+API integration tests for Vector Search endpoints
 
 SKIPPED: These endpoints do not exist in Core package.
 Vector Search API endpoints are available in Premium package only.
@@ -19,7 +19,7 @@ pytestmark = pytest.mark.skip(
 
 
 class TestVectorSearchAPI:
-    """Test Suite für Vector Search API Endpoints"""
+    """Test suite for Vector Search API endpoints"""
 
     @pytest.fixture
     def client(self):
@@ -28,12 +28,12 @@ class TestVectorSearchAPI:
 
     @pytest.fixture
     def mock_vector_service(self):
-        """Mock Vector Service für Tests"""
+        """Mock Vector Service for tests"""
         return Mock()
 
     @pytest.fixture
     def sample_search_results(self):
-        """Sample Search Results für Tests"""
+        """Sample Search Results for tests"""
         return [
             SearchResult(
                 chunk_id="doc_1_chunk_0",
@@ -117,7 +117,7 @@ class TestVectorSearchAPI:
     def test_similarity_search_success(
         self, mock_doc_service, mock_vector_service, client, sample_search_results
     ):
-        """Test erfolgreiche Similarity Search"""
+        """Test successful Similarity Search"""
         # Mock Vector Service
         mock_vector_service.similarity_search = AsyncMock(
             return_value=sample_search_results
@@ -141,7 +141,7 @@ class TestVectorSearchAPI:
         assert len(data["results"]) == 2
         assert "search_time_ms" in data
 
-        # Prüfe ersten Result
+        # Check first result
         first_result = data["results"][0]
         assert first_result["chunk_id"] == "doc_1_chunk_0"
         assert first_result["document_id"] == 1
@@ -160,7 +160,7 @@ class TestVectorSearchAPI:
     def test_similarity_search_with_document_filter(
         self, mock_doc_service, mock_vector_service, client
     ):
-        """Test Similarity Search mit Document Filter"""
+        """Test Similarity Search with Document Filter"""
         mock_vector_service.similarity_search = AsyncMock(return_value=[])
 
         search_data = {"query": "test query", "n_results": 5, "document_ids": [1, 2, 3]}
@@ -174,17 +174,17 @@ class TestVectorSearchAPI:
         )
 
     def test_similarity_search_invalid_query(self, client):
-        """Test Similarity Search mit ungültiger Query"""
-        # Leere Query
+        """Test Similarity Search with invalid Query"""
+        # Empty query
         response = client.post("/api/v1/search/similarity", json={"query": ""})
         assert response.status_code == 422  # Validation Error
 
-        # Zu lange Query
+        # Query too long
         long_query = "x" * 1001
         response = client.post("/api/v1/search/similarity", json={"query": long_query})
         assert response.status_code == 422
 
-        # Ungültige n_results
+        # Invalid n_results
         response = client.post(
             "/api/v1/search/similarity", json={"query": "test", "n_results": 0}
         )
@@ -214,7 +214,7 @@ class TestVectorSearchAPI:
     def test_get_document_vector_chunks_success(
         self, mock_doc_service, mock_vector_service, client, sample_search_results
     ):
-        """Test erfolgreiche Document Vector Chunks Abfrage"""
+        """Test successful Document Vector Chunks lookup"""
         # Mock Document Service
         mock_document = Mock()
         mock_document.original_filename = "test_document.txt"
@@ -238,7 +238,7 @@ class TestVectorSearchAPI:
 
     @patch("api.vector_search.document_service")
     def test_get_document_vector_chunks_not_found(self, mock_doc_service, client):
-        """Test Document Vector Chunks - Document nicht gefunden"""
+        """Test Document Vector Chunks - Document not found"""
         mock_doc_service.get_document_by_id.return_value = None
 
         response = client.get("/api/v1/search/document/999/chunks")
@@ -267,7 +267,7 @@ class TestVectorSearchAPI:
 
     @patch("api.vector_search.vector_service")
     def test_get_vector_database_stats_success(self, mock_vector_service, client):
-        """Test erfolgreiche Vector Database Stats"""
+        """Test successful Vector Database Stats"""
         mock_stats = {
             "collection_name": "examcraft_documents",
             "total_chunks": 25,
@@ -308,7 +308,7 @@ class TestVectorSearchAPI:
     def test_delete_document_vectors_success(
         self, mock_doc_service, mock_vector_service, client
     ):
-        """Test erfolgreiche Vector Löschung"""
+        """Test successful vector deletion"""
         # Mock Document Service
         mock_document = Mock()
         mock_document.doc_metadata = {"embedding_model": "test", "total_chunks": 5}
@@ -339,7 +339,7 @@ class TestVectorSearchAPI:
 
     @patch("api.vector_search.document_service")
     def test_delete_document_vectors_not_found(self, mock_doc_service, client):
-        """Test Vector Löschung - Document nicht gefunden"""
+        """Test vector deletion - Document not found"""
         mock_doc_service.get_document_by_id.return_value = None
 
         response = client.delete("/api/v1/search/document/999/vectors")
@@ -353,7 +353,7 @@ class TestVectorSearchAPI:
     def test_reindex_document_vectors_success(
         self, mock_doc_service, mock_vector_service, client
     ):
-        """Test erfolgreiche Document Reindexing"""
+        """Test successful Document Reindexing"""
         # Mock Document Service
         mock_document = Mock()
         mock_document.user_id = "demo_user"
@@ -388,7 +388,7 @@ class TestVectorSearchAPI:
 
     @patch("api.vector_search.document_service")
     def test_reindex_document_not_found(self, mock_doc_service, client):
-        """Test Reindexing - Document nicht gefunden"""
+        """Test Reindexing - Document not found"""
         mock_doc_service.get_document_by_id.return_value = None
 
         response = client.post("/api/v1/search/reindex/999")
@@ -399,7 +399,7 @@ class TestVectorSearchAPI:
 
     @patch("api.vector_search.document_service")
     def test_reindex_document_not_processed(self, mock_doc_service, client):
-        """Test Reindexing - Document nicht verarbeitet"""
+        """Test Reindexing - Document not processed"""
         mock_document = Mock()
         from models.document import DocumentStatus
 
@@ -420,7 +420,7 @@ class TestVectorSearchAPI:
     def test_reindex_document_processing_failed(
         self, mock_doc_service, mock_vector_service, client
     ):
-        """Test Reindexing - Processing fehlgeschlagen"""
+        """Test Reindexing - Processing failed"""
         mock_document = Mock()
         mock_document.user_id = "demo_user"
         from models.document import DocumentStatus
@@ -500,19 +500,19 @@ class TestVectorSearchAPI:
 
 
 class TestVectorSearchModels:
-    """Test Suite für Vector Search Pydantic Models"""
+    """Test suite for Vector Search Pydantic models"""
 
     def test_search_query_model_valid(self):
         """Test SearchQuery Model Validation (Valid)"""
         from api.vector_search import SearchQuery
 
-        # Minimale gültige Query
+        # Minimal valid query
         query = SearchQuery(query="test")
         assert query.query == "test"
         assert query.n_results == 5  # Default
         assert query.document_ids is None  # Default
 
-        # Vollständige Query
+        # Complete query
         query = SearchQuery(
             query="ExamCraft AI system", n_results=10, document_ids=[1, 2, 3]
         )
@@ -525,15 +525,15 @@ class TestVectorSearchModels:
         from api.vector_search import SearchQuery
         from pydantic import ValidationError
 
-        # Leere Query
+        # Empty query
         with pytest.raises(ValidationError):
             SearchQuery(query="")
 
-        # Zu lange Query
+        # Query too long
         with pytest.raises(ValidationError):
             SearchQuery(query="x" * 1001)
 
-        # Ungültige n_results
+        # Invalid n_results
         with pytest.raises(ValidationError):
             SearchQuery(query="test", n_results=0)
 

@@ -1,6 +1,6 @@
 """
-RBAC (Role-Based Access Control) Models für ExamCraft AI
-Erweiterte Models für dynamisches Permission-System, Feature-Gating und Ressourcen-Quotas
+RBAC (Role-Based Access Control) Models for ExamCraft AI
+Extended models for a dynamic permission system, feature gating, and resource quotas
 """
 
 from sqlalchemy import (
@@ -33,8 +33,8 @@ from database import Base
 
 class Feature(Base):
     """
-    Feature Model für granulare Permission-Kontrolle
-    Definiert einzelne Features/Funktionen der Applikation
+    Feature model for granular permission control
+    Defines individual features/functions of the application
     """
 
     __tablename__ = "features"
@@ -72,8 +72,8 @@ class Feature(Base):
 
 class RoleFeature(Base):
     """
-    Many-to-Many Mapping zwischen Roles und Features
-    Definiert welche Features eine Rolle nutzen darf
+    Many-to-many mapping between roles and features
+    Defines which features a role is allowed to use
     """
 
     __tablename__ = "role_features"
@@ -111,14 +111,14 @@ class RoleFeature(Base):
 
 
 # ============================================
-# DYNAMIC ROLES (erweitert bestehende Role-Tabelle)
+# DYNAMIC ROLES (extends the existing Role table)
 # ============================================
 
 
 class RBACRole(Base):
     """
-    Erweiterte Role-Tabelle für dynamisches RBAC
-    Separate Tabelle um bestehende 'roles' nicht zu brechen
+    Extended role table for dynamic RBAC
+    Separate table so the existing 'roles' table isn't broken
     """
 
     __tablename__ = "rbac_roles"
@@ -133,7 +133,7 @@ class RBACRole(Base):
     description = Column(Text, nullable=True)
     is_system_role = Column(
         Boolean, default=False, nullable=False
-    )  # System-Rollen können nicht gelöscht werden
+    )  # System roles cannot be deleted
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -144,7 +144,7 @@ class RBACRole(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    created_by = Column(String(255), nullable=True)  # User ID des Erstellers
+    created_by = Column(String(255), nullable=True)  # User ID of the creator
 
     # Relationships
     role_features = relationship(
@@ -167,8 +167,8 @@ class RBACRole(Base):
 
 class SubscriptionTier(Base):
     """
-    Subscription Tier Model für Monetarisierung
-    Definiert verschiedene Pricing-Tiers (Free, Starter, Professional, Enterprise)
+    Subscription tier model for monetization
+    Defines the various pricing tiers (Free, Starter, Professional, Enterprise)
     """
 
     __tablename__ = "subscription_tiers"
@@ -188,7 +188,7 @@ class SubscriptionTier(Base):
         DECIMAL(10, 2), nullable=True
     )  # 0.00, 190.00, 490.00, 1490.00
     is_active = Column(Boolean, default=True, nullable=False, index=True)
-    sort_order = Column(Integer, default=0, nullable=False)  # Für Sortierung in UI
+    sort_order = Column(Integer, default=0, nullable=False)  # For sorting in the UI
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -213,8 +213,8 @@ class SubscriptionTier(Base):
 
 class TierQuota(Base):
     """
-    Ressourcen-Quotas pro Subscription Tier
-    Definiert Limits für Dokumente, Fragen, User, Storage, etc.
+    Resource quotas per subscription tier
+    Defines limits for documents, questions, users, storage, etc.
     """
 
     __tablename__ = "tier_quotas"
@@ -248,8 +248,8 @@ class TierQuota(Base):
 
 class TierFeature(Base):
     """
-    Many-to-Many Mapping zwischen Subscription Tiers und Features
-    Definiert welche Features in welchem Tier verfügbar sind
+    Many-to-many mapping between subscription tiers and features
+    Defines which features are available in which tier
     """
 
     __tablename__ = "tier_features"
@@ -288,8 +288,8 @@ class TierFeature(Base):
 
 class ResourceUsage(Base):
     """
-    Ressourcen-Nutzungs-Tracking pro Institution
-    Trackt monatliche Nutzung von Dokumenten, Fragen, etc.
+    Resource usage tracking per institution
+    Tracks monthly usage of documents, questions, etc.
     """
 
     __tablename__ = "resource_usage"
@@ -342,8 +342,8 @@ class ResourceUsage(Base):
 
 class PermissionAuditLog(Base):
     """
-    Audit Log für Permission-Checks und RBAC-Aktionen
-    Compliance-konform (GDPR, SOC2)
+    Audit log for permission checks and RBAC actions
+    Compliance-conform (GDPR, SOC2)
     """
 
     __tablename__ = "permission_audit_log"
@@ -357,14 +357,14 @@ class PermissionAuditLog(Base):
         String(100), nullable=True, index=True
     )  # feature, role, organization
     resource_id = Column(String(255), nullable=True)
-    details = Column(JSONB, nullable=True)  # Zusätzliche Details als JSON
+    details = Column(JSONB, nullable=True)  # Additional details as JSON
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(Text, nullable=True)
     timestamp = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
-    # Indexes für Performance
+    # Indexes for performance
     __table_args__ = (
         Index("idx_audit_user_action", "user_id", "action"),
         Index("idx_audit_timestamp", "timestamp"),

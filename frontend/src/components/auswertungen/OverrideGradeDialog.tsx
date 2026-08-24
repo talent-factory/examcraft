@@ -1,10 +1,10 @@
 /**
- * OverrideGradeDialog — gemeinsamer Dialog für Manual-Override (TF-334).
+ * OverrideGradeDialog — shared dialog for manual override (TF-334).
  *
- * Wird sowohl aus der Review-Queue (vorgeschlagener LLM-Grade) als auch
- * aus der Submissions-Detailansicht (MC/W-F „Manuell überstimmen") aufgerufen.
- * Validiert clientseitig (NaN, Range), zeigt Fehler aus dem Backend
- * unverändert an und ruft ``onSuccess`` nach erfolgreichem Speichern.
+ * Called both from the review queue (proposed LLM grade) and from
+ * the submissions detail view (MC/T-F "manually override"). Validates
+ * client-side (NaN, range), displays backend errors unchanged, and
+ * calls ``onSuccess`` after a successful save.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -29,8 +29,8 @@ interface Props {
   initialPoints: number;
   pointsMax: number;
   onClose: () => void;
-  /** Wird nach erfolgreichem Override aufgerufen — Caller kann
-   *  reload-Logik anstossen. */
+  /** Called after a successful override — caller can trigger
+   *  reload logic. */
   onSuccess: () => void | Promise<void>;
 }
 
@@ -48,8 +48,8 @@ const OverrideGradeDialog: React.FC<Props> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Beim Öffnen Felder zurücksetzen — sonst trägt der Dialog Werte
-  // vom letzten Aufruf in den nächsten.
+  // Reset fields on open — otherwise the dialog carries values
+  // over from the previous invocation.
   useEffect(() => {
     if (open) {
       setPoints(initialPoints.toString());

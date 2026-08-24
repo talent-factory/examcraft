@@ -1,6 +1,6 @@
 """
-WebSocket Endpoint für Echtzeit Task-Fortschritt
-Streamt Celery Task Progress via WebSocket (Pull-based via AsyncResult)
+WebSocket endpoint for real-time task progress
+Streams Celery task progress via WebSocket (pull-based via AsyncResult)
 """
 
 import asyncio
@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["websocket"])
 
 
-# Modul-Level-Singleton — nur für Single-Instance-Deployment.
-# Bei horizontaler Skalierung muss ConnectionManager durch Redis Pub/Sub ersetzt werden.
+# Module-level singleton — only for single-instance deployment.
+# For horizontal scaling, ConnectionManager must be replaced with Redis Pub/Sub.
 class ConnectionManager:
     def __init__(self) -> None:
         self.active_connections: Dict[str, WebSocket] = {}
@@ -51,26 +51,26 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# 120s ist eine Kompromiss-Schwelle für beide Task-Typen, die der Endpoint
-# bedient:
-#   - process_document: countdown=60 s (immer < 120 s, Retry beginnt
-#     rechtzeitig).
+# 120s is a compromise threshold for both task types this endpoint
+# serves:
+#   - process_document: countdown=60 s (always < 120 s, retry starts
+#     in time).
 #   - generate_questions_task: retry_backoff=30, retry_backoff_max=300
-#     mit retry_jitter=True. Erster Retry typischerweise bei ~30-60 s,
-#     im Worst Case bis 150 s. Über 120 s übergeben wir an den TF-329-
-#     Watchdog, der den DB-Status setzt; der Client muss neu verbinden.
+#     with retry_jitter=True. First retry typically at ~30-60 s,
+#     up to 150 s in the worst case. Past 120 s we hand off to the
+#     TF-329 watchdog, which sets the DB status; the client must reconnect.
 PENDING_TIMEOUT_SECONDS = 120
-# 1s balanciert Responsivität mit Redis-Last; Progress-Updates sind schritt-basiert.
+# 1s balances responsiveness against Redis load; progress updates are step-based.
 POLL_INTERVAL_SECONDS = 1
 
 
 async def _authenticate_websocket(websocket: WebSocket, token: str) -> User | None:
     """
-    Authentifiziert einen WebSocket-Client via JWT Token.
-    Repliziert die Logik von get_current_user() ohne FastAPI Depends.
+    Authenticates a WebSocket client via JWT token.
+    Replicates the logic of get_current_user() without FastAPI Depends.
 
     Returns:
-        User-Objekt bei Erfolg, None bei Fehler (WebSocket bereits geschlossen)
+        User object on success, None on failure (WebSocket already closed)
     """
     payload = AuthService.decode_token(token)
     if not payload:
@@ -125,9 +125,9 @@ async def _authenticate_websocket(websocket: WebSocket, token: str) -> User | No
 
 async def _check_task_ownership(websocket: WebSocket, task_id: str, user: User) -> bool:
     """
-    Prüft ob der authentifizierte User der Owner des Tasks ist.
-    Prüft Document.task_id (Dokument-Tasks) und QuestionGenerationJob.task_id
-    (Fragen-Tasks). Unbekannte task_ids werden abgelehnt.
+    Checks whether the authenticated user is the owner of the task.
+    Checks Document.task_id (document tasks) and QuestionGenerationJob.task_id
+    (question tasks). Unknown task_ids are rejected.
     """
     from models.question_generation_job import QuestionGenerationJob
 
@@ -181,7 +181,7 @@ async def _check_task_ownership(websocket: WebSocket, task_id: str, user: User) 
                 )
                 return "denied"
 
-            # Unbekannte task_id — ablehnen (kein legitimer Fall, da Job vor apply_async erstellt wird)
+            # Unknown task_id — reject (not a legitimate case, since the job is created before apply_async)
             logger.warning(
                 f"Unbekannte task_id {task_id!r} von User {user.id} abgelehnt"
             )
@@ -207,12 +207,12 @@ async def _check_task_ownership(websocket: WebSocket, task_id: str, user: User) 
 
 def _get_task_result(task_id: str) -> dict:
     """
-    Blockierender Redis-Aufruf — muss via run_in_executor aufgerufen werden.
-    Liest state, info und result in einem einzigen Executor-Aufruf,
-    damit kein blocking I/O auf dem Event-Loop stattfindet.
+    Blocking Redis call — must be invoked via run_in_executor.
+    Reads state, info and result in a single executor call so that
+    no blocking I/O happens on the event loop.
 
-    Bei Redis-Verbindungsfehlern wird ein PENDING-äquivalenter State zurückgegeben,
-    damit der Polling-Loop weiterlaufen kann (transiente Redis-Ausfälle).
+    On Redis connection errors, a PENDING-equivalent state is returned
+    so the polling loop can keep running (transient Redis outages).
     """
     try:
         result = AsyncResult(task_id, app=celery_app)
@@ -232,14 +232,14 @@ def _get_task_result(task_id: str) -> dict:
 @router.websocket("/ws/tasks/{task_id}")
 async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
     """
-    WebSocket Endpoint für Echtzeit Task-Fortschritt.
+    WebSocket endpoint for real-time task progress.
 
-    Protokoll:
-    1. Client verbindet sich
-    2. Client sendet als erste Message: {"token": "<jwt>"}
-    3. Server validiert Token + Ownership
-    4. Server streamt TaskStatusMessage JSON bis zum terminalen State
-    5. Server schliesst Connection nach SUCCESS/FAILURE/REVOKED
+    Protocol:
+    1. Client connects
+    2. Client sends as first message: {"token": "<jwt>"}
+    3. Server validates token + ownership
+    4. Server streams TaskStatusMessage JSON until the terminal state
+    5. Server closes the connection after SUCCESS/FAILURE/REVOKED
     """
     await manager.connect(task_id, websocket)
     try:
@@ -305,9 +305,9 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
                 pending_seconds = 0
 
             elif state == TaskStatus.SUCCESS:
-                # Eine optionale User-Notiz (z.B. "nur X von Y Fragen erstellt",
-                # TF-358) reist im result.quality_metrics mit und wird vom
-                # Frontend von dort gelesen — kein separater Message-Kanal nötig.
+                # An optional user note (e.g. "only X of Y questions created",
+                # TF-358) travels along in result.quality_metrics and is read
+                # from there by the frontend — no separate message channel needed.
                 msg = TaskStatusMessage(
                     task_id=task_id,
                     status=TaskStatus.SUCCESS,
@@ -321,11 +321,11 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
             elif state in (TaskStatus.FAILURE, TaskStatus.REVOKED):
                 raw_info = task_data["info"]
                 user_message = user_facing_task_error(raw_info)
-                # Echten Fehler server-seitig vollständig loggen (mit Traceback,
-                # falls vorhanden); dem User nur die sichere, handlungsleitende
-                # Meldung senden — keine rohen Interna/PII (TF-358). Unbekannte
-                # Fehlerklassen (generischer Fallback) explizit markieren, damit
-                # auf neue, ungemappte Fehler alertbar ist.
+                # Log the real error fully server-side (with traceback, if
+                # available); send the user only the safe, actionable
+                # message — no raw internals/PII (TF-358). Explicitly flag
+                # unknown error classes (generic fallback) so alerting is
+                # possible for new, unmapped errors.
                 unmapped = user_message == GENERIC_TASK_ERROR
                 logger.error(
                     "Task %s failed (%s): %r",

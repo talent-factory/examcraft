@@ -486,8 +486,8 @@ async def import_preview(
     ``/import/commit`` run.
     """
     exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
-    # Tier-Gate vor dem teuren Parsing — Free/Starter dürfen keinen
-    # API-Driver, sonst würde der Preview den Token verbrennen.
+    # Tier gate before the expensive parsing — Free/Starter may not use
+    # an API driver, otherwise the preview would burn the token.
     assert_driver_allowed(user=current_user, driver_name=driver_name)
     contents = await _read_upload(file)
 
@@ -536,8 +536,8 @@ async def import_commit(
     """
     exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
     assert_driver_allowed(user=current_user, driver_name=driver_name)
-    # Monatslimit greift nur bei neuem Exam, nicht beim Re-Import des
-    # gleichen — die Helper-Logik kümmert sich darum.
+    # The monthly limit only applies to a new exam, not to re-importing
+    # the same one — the helper logic takes care of that.
     assert_exam_quota_for_import(db=db, user=current_user, exam_id=exam.id)
     contents = await _read_upload(file)
 
@@ -605,17 +605,17 @@ async def get_import_job(
 
 @router.get("/import-jobs", response_model=ImportJobListOut)
 async def list_import_jobs(
-    exam_id: int = Query(..., description="Prüfung, deren Import-Jobs gelistet werden"),
+    exam_id: int = Query(..., description="Exam whose import jobs are being listed"),
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(require_permission("submissions:read")),
     db: Session = Depends(get_db),
 ) -> ImportJobListOut:
-    """Jüngste Import-Jobs einer Prüfung (institutions-scoped, neueste zuerst).
+    """Most recent import jobs of an exam (institution-scoped, newest first).
 
-    Speist das Auswertungen-Status-Surface (TF-428): Die Seite pollt diesen
-    Endpoint, um laufende/abgeschlossene Importe mit Live-Fortschritt (n/total)
-    anzuzeigen — der Import muss dafür kein Modal mehr offen halten.
+    Feeds the Auswertungen status surface (TF-428): the page polls this
+    endpoint to show running/finished imports with live progress (n/total)
+    — the import no longer needs a modal held open for this.
     """
     base = db.query(ImportJob).filter(
         ImportJob.exam_id == exam_id,
@@ -863,7 +863,7 @@ async def get_submission(
 
 
 # ---------------------------------------------------------------------------
-# API-Driver Import (TF-336)
+# API driver import (TF-336)
 # ---------------------------------------------------------------------------
 
 
@@ -871,7 +871,7 @@ class ApiImportIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     exam_id: int = Field(gt=0)
-    quiz_id: int = Field(gt=0, description="Moodle-Quiz-ID")
+    quiz_id: int = Field(gt=0, description="Moodle quiz ID")
 
 
 @router.post("/import/api-preview", response_model=ImportPreviewOut)
@@ -880,17 +880,17 @@ async def import_api_preview(
     current_user: User = Depends(require_permission("submissions:import")),
     db: Session = Depends(get_db),
 ) -> ImportPreviewOut:
-    """Preview-Variante für den ``moodle_api``-Driver.
+    """Preview variant for the ``moodle_api`` driver.
 
-    Macht die Web-Service-Calls ohne Persistenz, damit das Frontend
-    die erkannten Studis und Antworten anzeigen kann, bevor die
-    Lehrperson auf "Importieren" klickt.
+    Makes the web-service calls without persistence, so the frontend
+    can display the detected students and answers before the teacher
+    clicks "Import".
     """
     import json as _json
 
     exam = _load_exam_for_user(db=db, user=current_user, exam_id=body.exam_id)
-    # Tier-Gate vor allen Web-Service-Calls — Free/Starter dürfen API
-    # gar nicht erst nutzen.
+    # Tier gate before any web-service calls — Free/Starter may not use
+    # the API at all.
     assert_driver_allowed(user=current_user, driver_name=DriverName.MOODLE_API.value)
     source = _json.dumps({"quiz_id": body.quiz_id}).encode("utf-8")
     try:
@@ -927,13 +927,13 @@ async def import_api_commit(
     current_user: User = Depends(require_permission("submissions:import")),
     db: Session = Depends(get_db),
 ) -> ImportJobOut:
-    """Moodle-API-Import — validiert synchron, gradet asynchron (TF-412).
+    """Moodle API import — validates synchronously, grades asynchronously (TF-412).
 
-    Wie der CSV-Pfad: Web-Service-Calls + Validierung laufen inline (frühes
-    400/422 bei falscher Quiz-ID / Auth), die langsame persist+grade-Pipeline
-    übernimmt ein Celery-Worker. Antwort ist 202 mit einem ``queued``-Job, den
-    der Client über ``GET /import-jobs/{id}`` pollt. Idempotent über
-    ``source_attempt_id`` (= Moodle-Attempt-ID).
+    Like the CSV path: web-service calls + validation run inline (early
+    400/422 for a bad quiz ID / auth failure), the slow persist+grade
+    pipeline is handed to a Celery worker. Response is 202 with a
+    ``queued`` job that the client polls via ``GET /import-jobs/{id}``.
+    Idempotent via ``source_attempt_id`` (= Moodle attempt ID).
     """
     import json as _json
 

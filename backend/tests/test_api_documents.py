@@ -1,5 +1,5 @@
 """
-API Integration Tests für Document Endpoints
+API integration tests for Document endpoints
 
 SKIPPED: These tests require complex mocking of database operations,
 file uploads, and service dependencies. They need to be rewritten
@@ -21,7 +21,7 @@ pytestmark = pytest.mark.skip(
 
 
 class TestDocumentAPI:
-    """Test Suite für Document API Endpoints"""
+    """Test suite for Document API endpoints"""
 
     @pytest.fixture
     def mock_user(self):
@@ -93,7 +93,7 @@ class TestDocumentAPI:
 
     @patch("api.documents.document_service.upload_document")
     def test_upload_document_success(self, mock_upload, client):
-        """Test erfolgreicher Document Upload"""
+        """Test successful Document Upload"""
         # Mock Document Response
         mock_document = Mock()
         mock_document.id = 123
@@ -101,7 +101,7 @@ class TestDocumentAPI:
         mock_document.status = DocumentStatus.UPLOADED
         mock_upload.return_value = mock_document
 
-        # Erstelle Test-Datei
+        # Create test file
         test_content = b"Test document content for API testing"
         files = {"file": ("test.txt", BytesIO(test_content), "text/plain")}
 
@@ -122,7 +122,7 @@ class TestDocumentAPI:
 
     @patch("api.documents.document_service.upload_document")
     def test_upload_document_failure(self, mock_upload, client):
-        """Test fehlgeschlagener Document Upload"""
+        """Test failed Document Upload"""
         from fastapi import HTTPException
 
         mock_upload.side_effect = HTTPException(
@@ -140,7 +140,7 @@ class TestDocumentAPI:
 
     @patch("api.documents.document_service.get_documents_by_user")
     def test_list_documents_success(self, mock_get_docs, client):
-        """Test erfolgreiche Dokument-Auflistung"""
+        """Test successful document listing"""
         # Mock Documents
         mock_doc1 = Mock()
         mock_doc1.to_dict.return_value = {
@@ -190,7 +190,7 @@ class TestDocumentAPI:
 
     @patch("api.documents.document_service.get_documents_by_user")
     def test_list_documents_with_status_filter(self, mock_get_docs, client):
-        """Test Dokument-Auflistung mit Status-Filter"""
+        """Test document listing with status filter"""
         mock_get_docs.return_value = []
 
         response = client.get("/api/v1/documents/?status=processed")
@@ -198,12 +198,12 @@ class TestDocumentAPI:
         assert response.status_code == 200
         mock_get_docs.assert_called_once()
 
-        # Prüfe dass Status-Filter korrekt übergeben wurde
+        # Verify status filter was passed correctly
         call_args = mock_get_docs.call_args
         assert call_args[1]["status"] == DocumentStatus.PROCESSED
 
     def test_list_documents_invalid_status(self, client):
-        """Test Dokument-Auflistung mit ungültigem Status"""
+        """Test document listing with invalid status"""
         response = client.get("/api/v1/documents/?status=invalid_status")
 
         assert response.status_code == 400
@@ -212,7 +212,7 @@ class TestDocumentAPI:
 
     @patch("api.documents.document_service.get_document_by_id")
     def test_get_document_success(self, mock_get_doc, client):
-        """Test erfolgreiche Dokument-Abfrage"""
+        """Test successful document lookup"""
         mock_document = Mock()
         mock_document.user_id = "demo_user"
         mock_document.to_dict.return_value = {
@@ -241,7 +241,7 @@ class TestDocumentAPI:
 
     @patch("api.documents.document_service.get_document_by_id")
     def test_get_document_not_found(self, mock_get_doc, client):
-        """Test Dokument nicht gefunden"""
+        """Test document not found"""
         mock_get_doc.return_value = None
 
         response = client.get("/api/v1/documents/999")
@@ -253,7 +253,7 @@ class TestDocumentAPI:
     @patch("api.documents.document_service.delete_document")
     @patch("api.documents.document_service.get_document_by_id")
     def test_delete_document_success(self, mock_get_doc, mock_delete, client):
-        """Test erfolgreiche Dokument-Löschung"""
+        """Test successful document deletion"""
         mock_document = Mock()
         mock_document.user_id = "demo_user"
         mock_get_doc.return_value = mock_document
@@ -269,7 +269,7 @@ class TestDocumentAPI:
     @patch("api.documents.document_service.delete_document")
     @patch("api.documents.document_service.get_document_by_id")
     def test_delete_document_failure(self, mock_get_doc, mock_delete, client):
-        """Test fehlgeschlagene Dokument-Löschung"""
+        """Test failed document deletion"""
         mock_document = Mock()
         mock_document.user_id = "demo_user"
         mock_get_doc.return_value = mock_document
@@ -284,7 +284,7 @@ class TestDocumentAPI:
     @patch("api.documents.document_service.process_document_content")
     @patch("api.documents.document_service.get_document_by_id")
     def test_process_document_success(self, mock_get_doc, mock_process, client):
-        """Test erfolgreiche Dokument-Verarbeitung"""
+        """Test successful document processing"""
         mock_document = Mock()
         mock_document.user_id = "demo_user"
         mock_get_doc.return_value = mock_document
@@ -311,7 +311,7 @@ class TestDocumentAPI:
     @patch("api.documents.document_service.process_document_content")
     @patch("api.documents.document_service.get_document_by_id")
     def test_process_document_failure(self, mock_get_doc, mock_process, client):
-        """Test fehlgeschlagene Dokument-Verarbeitung"""
+        """Test failed document processing"""
         mock_document = Mock()
         mock_document.user_id = "demo_user"
         mock_get_doc.return_value = mock_document
@@ -326,7 +326,7 @@ class TestDocumentAPI:
     @patch("api.documents.document_service.get_document_chunks")
     @patch("api.documents.document_service.get_document_by_id")
     def test_get_document_chunks_success(self, mock_get_doc, mock_get_chunks, client):
-        """Test erfolgreiche Chunk-Abfrage"""
+        """Test successful chunk lookup"""
         mock_document = Mock()
         mock_document.user_id = "demo_user"
         mock_document.status = DocumentStatus.PROCESSED
@@ -349,7 +349,7 @@ class TestDocumentAPI:
 
     @patch("api.documents.document_service.get_document_by_id")
     def test_get_document_chunks_not_processed(self, mock_get_doc, client):
-        """Test Chunk-Abfrage für nicht verarbeitetes Dokument"""
+        """Test chunk lookup for a document that has not been processed"""
         mock_document = Mock()
         mock_document.user_id = "demo_user"
         mock_document.status = DocumentStatus.UPLOADED
@@ -363,7 +363,7 @@ class TestDocumentAPI:
 
     @patch("api.documents.document_service.get_document_by_id")
     def test_get_document_status(self, mock_get_doc, client):
-        """Test Dokument-Status Abfrage"""
+        """Test document status lookup"""
         mock_document = Mock()
         mock_document.user_id = "demo_user"
         mock_document.status = DocumentStatus.PROCESSED

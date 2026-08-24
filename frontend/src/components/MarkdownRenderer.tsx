@@ -11,13 +11,13 @@ interface MarkdownRendererProps {
 }
 
 /**
- * Wiederverwendbare Markdown-Rendering-Komponente mit Syntax-Highlighting
+ * Reusable markdown rendering component with syntax highlighting
  *
  * Features:
  * - GitHub Flavored Markdown (GFM)
- * - Syntax-Highlighting für Code-Blöcke
- * - Responsive Design
- * - Konsistentes Styling
+ * - Syntax highlighting for code blocks
+ * - Responsive design
+ * - Consistent styling
  */
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
@@ -108,7 +108,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           fontSize: '0.875rem',
           fontFamily: 'monospace'
         },
-        // Code Blocks (werden von SyntaxHighlighter überschrieben)
+        // Code Blocks (overridden by SyntaxHighlighter)
         '& pre': {
           my: 2,
           borderRadius: 1,

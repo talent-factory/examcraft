@@ -116,9 +116,9 @@ describe('GenerationTasksBar', () => {
     expect(screen.getByText('Klicken zum Anzeigen')).toBeInTheDocument();
   });
 
-  // TF-358: Wenn die Fragenanzahl ans verfügbare Dokumenten-Material gekoppelt
-  // wurde, trägt das Result eine context_limited_notice, die im Erfolgs-Eintrag
-  // angezeigt werden muss (zusätzlich zum Klick-Hinweis).
+  // TF-358: When the question count was coupled to the available document
+  // material, the result carries a context_limited_notice that must be
+  // shown in the success entry (in addition to the click hint).
   test('shows context-limited notice on SUCCESS when result carries one', () => {
     const notice =
       'Es konnten nur 3 von 5 angeforderten Fragen erstellt werden, weil die ausgewählten Dokumente zu wenig durchsuchbaren Inhalt enthalten.';

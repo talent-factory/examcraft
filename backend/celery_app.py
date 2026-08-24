@@ -96,27 +96,27 @@ celery_app.conf.update(
     worker_disable_rate_limits=False,
 )
 
-# Beat-Schedule für periodische Wartung (TF-329 Watchdog).
-# Voraussetzung: ein laufender `celery -A celery_app beat`-Process. In der
-# Fly.io-Deployment läuft Beat als Sidecar-Process in `fly.celery.toml`
-# (oder als `--beat`-Flag auf dem Worker für Single-Instance-Setup). Siehe
-# docs/superpowers/plans/2026-04-28-tf329-watchdog-pending-jobs.md für die
-# Deployment-Rezeptur.
+# Beat schedule for periodic maintenance (TF-329 watchdog).
+# Prerequisite: a running `celery -A celery_app beat` process. In the
+# Fly.io deployment, Beat runs as a sidecar process in `fly.celery.toml`
+# (or as a `--beat` flag on the worker for single-instance setups). See
+# docs/superpowers/plans/2026-04-28-tf329-watchdog-pending-jobs.md for the
+# deployment recipe.
 celery_app.conf.beat_schedule = {
     "reconcile-stuck-jobs-every-5-minutes": {
         "task": "tasks.maintenance_tasks.reconcile_stuck_jobs",
-        "schedule": 300.0,  # 5 Minuten
+        "schedule": 300.0,  # 5 minutes
     },
     # TF-412: age-fail ImportJob rows stuck in queued/running so the
     # polling client always converges on a terminal status.
     "reap-stuck-import-jobs-every-5-minutes": {
         "task": "tasks.maintenance_tasks.reap_stuck_import_jobs",
-        "schedule": 300.0,  # 5 Minuten
+        "schedule": 300.0,  # 5 minutes
     },
     # TF-435: same watchdog for outbound MoodleFeedbackPushJob rows.
     "reap-stuck-moodle-feedback-jobs-every-5-minutes": {
         "task": "tasks.maintenance_tasks.reap_stuck_moodle_feedback_jobs",
-        "schedule": 300.0,  # 5 Minuten
+        "schedule": 300.0,  # 5 minutes
     },
 }
 

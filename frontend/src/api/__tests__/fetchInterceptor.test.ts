@@ -1,15 +1,15 @@
 /**
  * fetchInterceptor.test.ts
  *
- * Unit-Tests für setupFetchInterceptor + executeTokenRefresh aus apiClient.ts.
+ * Unit tests for setupFetchInterceptor + executeTokenRefresh from apiClient.ts.
  *
- * Strategie:
- *  - jest.resetModules() vor jedem Test isoliert die module-level State
+ * Strategy:
+ *  - jest.resetModules() before every test isolates the module-level state
  *    (fetchInterceptorInstalled, refreshPromise, callbacks).
- *  - Jeder Test importiert die Funktionen frisch via require() und patcht
- *    window.fetch mit einem jest.fn() bevor setupFetchInterceptor() läuft.
- *  - Axios wird nicht benötigt; trotzdem stub-mocken, damit der
- *    apiClient.ts-Top-Level-`axios.create()`-Call nicht crasht.
+ *  - Each test freshly imports the functions via require() and patches
+ *    window.fetch with a jest.fn() before setupFetchInterceptor() runs.
+ *  - Axios is not needed; stub-mock it anyway so the
+ *    apiClient.ts top-level `axios.create()` call doesn't crash.
  */
 
 jest.mock('axios', () => {

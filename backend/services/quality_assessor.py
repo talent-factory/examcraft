@@ -1,10 +1,10 @@
-"""Deterministische Qualitäts-Bewertung der Dokumenten-Extraktion (TF-360).
+"""Deterministic quality assessment of document extraction (TF-360).
 
-Reine Funktionen ohne I/O: nehmen Extraktions-Statistiken entgegen und
-liefern ein Verdict, ob die PyMuPDF-Extraktion ausreicht oder eine
-OCR-Neuverarbeitung mit PyMuPDF/Tesseract nötig ist. Schwellwerte sind via
-Env-Vars tunebar (bei jedem Aufruf gelesen, damit Konfig-Änderungen ohne
-Modul-Reload greifen).
+Pure functions with no I/O: take extraction statistics and return a
+verdict on whether the PyMuPDF extraction is sufficient or an OCR
+reprocessing with PyMuPDF/Tesseract is needed. Thresholds are tunable
+via env vars (read on every call, so config changes take effect without
+a module reload).
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ from typing import Any, Dict, Literal
 
 from services.docling_service import ProcessedDocument
 
-# Geschlossene Wertemengen als Literal getypt — damit Tippfehler an den
-# Aufrufstellen statisch auffallen und die Werte selbstdokumentierend sind.
+# Closed value sets typed as Literal — so typos at the call sites are
+# caught statically and the values are self-documenting.
 QualityReason = Literal[
     "ok",
     "scanned_low_text",
@@ -34,7 +34,7 @@ EscalationState = Literal[
     "no_verdict",
 ]
 
-# Default-Schwellwerte (Design-Spec). Via Env-Vars überschreibbar.
+# Default thresholds (design spec). Overridable via env vars.
 _DEFAULT_MIN_CHARS_PER_PAGE = 100
 _DEFAULT_LOW_CHUNK_FILE_SIZE = 200 * 1024
 _DEFAULT_LOW_CHUNK_MIN_PAGES = 2
@@ -44,12 +44,12 @@ _DEFAULT_MAX_OCR_DISCARD_RATIO = 0.20
 
 @dataclass(frozen=True)
 class DocumentQualityStats:
-    """Eingangs-Statistiken für die Bewertung."""
+    """Input statistics for the assessment."""
 
     page_count: int
     total_chars: int
     chunk_count: int
-    garbage_char_ratio: float  # muss in [0.0, 1.0] liegen
+    garbage_char_ratio: float  # must be in [0.0, 1.0]
     file_size: int
     ocr_pages_attempted: int = 0
     ocr_pages_discarded: int = 0
@@ -75,7 +75,7 @@ class DocumentQualityStats:
 
 @dataclass(frozen=True)
 class QualityVerdict:
-    """Bewertungs-Ergebnis."""
+    """Assessment result."""
 
     ok: bool
     reason: QualityReason
@@ -85,7 +85,7 @@ class QualityVerdict:
 def compute_quality_stats(
     processed_doc: ProcessedDocument, file_size: int
 ) -> DocumentQualityStats:
-    """Leite Statistiken aus einem ProcessedDocument + Dateigrösse ab."""
+    """Derive statistics from a ProcessedDocument + file size."""
     text = "".join(chunk.content for chunk in processed_doc.chunks)
     total_chars = len(text)
     if total_chars:
@@ -107,7 +107,7 @@ def compute_quality_stats(
 
 
 def assess_quality(stats: DocumentQualityStats) -> QualityVerdict:
-    """Bewerte die Extraktions-Qualität mit kombinierten Signalen."""
+    """Assess extraction quality using combined signals."""
     min_chars_per_page = int(
         os.getenv("QUALITY_MIN_CHARS_PER_PAGE", str(_DEFAULT_MIN_CHARS_PER_PAGE))
     )
@@ -149,11 +149,11 @@ def assess_quality(stats: DocumentQualityStats) -> QualityVerdict:
     if stats.ocr_pages_discarded >= 1 and discard_ratio > max_ocr_discard_ratio:
         return QualityVerdict(False, "ocr_pages_discarded", signals)
 
-    # Zero usable extraction must never pass as "ok", auch wenn page_count
-    # unbekannt (0) ist — z. B. ein gescanntes DOCX ohne <Pages>-Metadaten und
-    # ohne Body-Bilder. Ohne diese Prüfung überspränge das ``page_count >= 1``-
-    # Gate unten die Low-Text-Heuristik und liesse ein leeres Dokument still als
-    # "Verarbeitet" durch (TF-367-Nachzügler).
+    # Zero usable extraction must never pass as "ok", even when page_count
+    # is unknown (0) — e.g. a scanned DOCX with no <Pages> metadata and no
+    # body images. Without this check, the ``page_count >= 1`` gate below
+    # would skip the low-text heuristic and silently let an empty
+    # document through as "processed" (TF-367 follow-up).
     if stats.total_chars == 0 or stats.chunk_count == 0:
         return QualityVerdict(False, "scanned_low_text", signals)
 

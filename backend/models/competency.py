@@ -1,10 +1,10 @@
-"""Kompetenzrahmen-Modelle für ExamCraft AI (TF-400).
+"""Competency framework models for ExamCraft AI (TF-400).
 
-CompetencyFramework = Handlungskompetenzbereich (HKB / Modul), institutions-
-skopiert wie Document/Tag. `rendered_text` hält den vollständigen HKB-Text für
-die spätere verbatim-Injektion in die Prompt-Variable {{ competencies }}.
-Competency = einzelne Handlungskompetenz (HK, z. B. "B3") mit Deskriptoren als
-JSON (jeweils inkl. LN-Stufe).
+CompetencyFramework = competency area (HKB / module), institution-
+scoped like Document/Tag. `rendered_text` holds the full HKB text for
+the later verbatim injection into the prompt variable {{ competencies }}.
+Competency = a single competency (HK, e.g. "B3") with descriptors as
+JSON (each including an LN level).
 """
 
 import enum
@@ -29,34 +29,34 @@ from database import Base
 
 
 class CompetencyFrameworkVisibility(enum.Enum):
-    """Wer ein Kompetenz-Framework ausserhalb des Erstellers browsen/für die
-    Fragengenerierung wählen darf (TF-644).
+    """Who may browse/select a competency framework outside its creator, for
+    question generation (TF-644).
 
-    Gilt für ``api.competency_frameworks.list_frameworks``/``get_framework``
-    (Browsing) UND gatet zusätzlich die Erreichbarkeit JEDER Mutation
-    (update/archive/unarchive) via ``_get_for_write`` — visibility wird dort
-    VOR dem ``created_by``/``manage_settings``-Check geprüft (siehe
-    ``_get_for_write``'s Docstring: "visibility is checked first, the
+    Applies to ``api.competency_frameworks.list_frameworks``/``get_framework``
+    (browsing) AND additionally gates the reachability of EVERY mutation
+    (update/archive/unarchive) via ``_get_for_write`` — visibility is checked
+    there BEFORE the ``created_by``/``manage_settings`` check (see
+    ``_get_for_write``'s docstring: "visibility is checked first, the
     owner-or-admin write gate only decides what an already-visible framework
-    may do"). Nur der ``competencies:read_all``-Bypass selbst bleibt für
-    Mutationen deaktiviert (``allow_read_all_bypass=False``, ADR-0004) — die
-    private/team/institution-Regeln selbst gelten für Lesen UND Schreiben.
-    Gilt ausserdem für ``api.rag_exams.resolve_competencies_text``
-    (Fragengenerierung — TF-644 schliesst hier eine vorbestehende Lücke: die
-    Framework-Auswahl war bislang rein institutionsflach, ignorierte
-    visibility komplett). Mirrors ``DocumentVisibility`` (TF-354/TF-620),
+    may do"). Only the ``competencies:read_all`` bypass itself stays
+    disabled for mutations (``allow_read_all_bypass=False``, ADR-0004) — the
+    private/team/institution rules themselves apply to both reading AND
+    writing. Also applies to ``api.rag_exams.resolve_competencies_text``
+    (question generation — TF-644 closes a pre-existing gap here: framework
+    selection used to be purely institution-flat, ignoring visibility
+    entirely). Mirrors ``DocumentVisibility`` (TF-354/TF-620),
     ``PromptVisibility`` (TF-410/TF-641), ``QuestionReviewVisibility``
-    (TF-642) und ``ExamVisibility`` (TF-643).
+    (TF-642) and ``ExamVisibility`` (TF-643).
 
-    ``PRIVATE``: nur der Ersteller sieht/nutzt das Framework.
-    ``TEAM``: Mitglieder der zugeordneten Org-Unit sehen/nutzen es,
-    hierarchisch (``services.org_unit_service.get_user_accessible_org_unit_ids``).
-    ``INSTITUTION``: jedes Mitglied der Institution sieht/nutzt es (Default,
-    Status quo vor TF-644).
+    ``PRIVATE``: only the creator sees/uses the framework.
+    ``TEAM``: members of the assigned Org-Unit see/use it,
+    hierarchically (``services.org_unit_service.get_user_accessible_org_unit_ids``).
+    ``INSTITUTION``: every member of the institution sees/uses it (default,
+    status quo before TF-644).
 
-    Ein User mit ``competencies:read_all`` (Institutions-Admin-Bypass,
-    TF-639/``utils/resource_visibility.py``) sieht jedes Framework der
-    eigenen Institution unabhängig von visibility — analog zu Document/
+    A user with ``competencies:read_all`` (institution-admin bypass,
+    TF-639/``utils/resource_visibility.py``) sees every framework in
+    their own institution regardless of visibility — analogous to Document/
     Prompt/Question/Exam.
     """
 
@@ -66,8 +66,8 @@ class CompetencyFrameworkVisibility(enum.Enum):
 
 
 class CompetencyFramework(Base):
-    """Handlungskompetenzbereich / Modul. visibility steuert Browsing/Reuse
-    (siehe ``CompetencyFrameworkVisibility``), nicht Editierrechte."""
+    """Competency area / module. visibility governs browsing/reuse
+    (see ``CompetencyFrameworkVisibility``), not edit rights."""
 
     __tablename__ = "competency_frameworks"
 
@@ -75,7 +75,7 @@ class CompetencyFramework(Base):
     name = Column(String(200), nullable=False)
     module_code = Column(String(20), nullable=True)
     description = Column(Text, nullable=True)
-    # Vollständiger HKB-Text für die {{ competencies }}-Injektion (verbatim).
+    # Full HKB text for the {{ competencies }} injection (verbatim).
     rendered_text = Column(Text, nullable=False)
     language = Column(String(10), default="de", nullable=False)
 
@@ -85,9 +85,9 @@ class CompetencyFramework(Base):
         nullable=True,
         index=True,
     )
-    # TF-644: Team-Sichtbarkeit. Kein ON DELETE CASCADE/SET NULL — löschen
-    # einer noch referenzierten Org-Unit wird DB-seitig abgelehnt, mirrors
-    # Document/TF-620, Prompt/TF-641, Question/TF-642, Exam/TF-643 (siehe
+    # TF-644: team visibility. No ON DELETE CASCADE/SET NULL — deleting
+    # an Org-Unit that's still referenced is rejected at the DB level, mirrors
+    # Document/TF-620, Prompt/TF-641, Question/TF-642, Exam/TF-643 (see
     # services.org_unit_service.delete_org_unit).
     org_unit_id = Column(
         Integer,
@@ -95,10 +95,10 @@ class CompetencyFramework(Base):
         nullable=True,
         index=True,
     )
-    # TF-644: von String(20)+CHECK (TF-400) auf natives PG-Enum promoviert,
-    # damit CompetencyFramework wie Document/Prompt/Question/Exam eine
-    # Python-seitig typisierte Visibility trägt (siehe
-    # CompetencyFrameworkVisibility-Docstring).
+    # TF-644: promoted from String(20)+CHECK (TF-400) to a native PG enum,
+    # so CompetencyFramework carries a Python-side typed visibility like
+    # Document/Prompt/Question/Exam (see the
+    # CompetencyFrameworkVisibility docstring).
     visibility = Column(
         Enum(
             CompetencyFrameworkVisibility,
@@ -151,7 +151,7 @@ class CompetencyFramework(Base):
 
 
 class Competency(Base):
-    """Einzelne Handlungskompetenz (HK) innerhalb eines Frameworks."""
+    """A single competency (HK) within a framework."""
 
     __tablename__ = "competencies"
 
@@ -164,7 +164,7 @@ class Competency(Base):
     )
     code = Column(String(10), nullable=False)
     title = Column(Text, nullable=False)
-    # Liste von Deskriptoren: [{"text": str, "ln_level": int}]
+    # List of descriptors: [{"text": str, "ln_level": int}]
     descriptors = Column(JSON, nullable=True)
     position = Column(Integer, default=0, nullable=False)
 

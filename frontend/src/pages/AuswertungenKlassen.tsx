@@ -1,11 +1,11 @@
 /**
- * Klassen-Liste (TF-336 G2).
+ * Class list (TF-336 G2).
  *
- * Tabelle mit allen Klassen der Institution + Action "Klasse anlegen".
- * Klick auf eine Zeile → /auswertungen/klassen/[classId].
+ * Table with all of the institution's classes + a "Klasse anlegen" (create
+ * class) action. Clicking a row → /auswertungen/klassen/[classId].
  *
- * RBAC: Backend prüft `students:manage` — Forward-Errors werden
- * über `ApiError.kind === 'permission'` (403/402) angezeigt.
+ * RBAC: the backend checks `students:manage` — forwarded errors are
+ * surfaced via `ApiError.kind === 'permission'` (403/402).
  */
 
 import React, { useEffect, useState } from 'react';

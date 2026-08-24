@@ -1,5 +1,5 @@
 """
-API Tests für RAG Endpoints
+API tests for RAG endpoints
 
 NOTE: Some tests use mock patching for TenantFilter and SubscriptionLimits
 which can be unreliable in full suite context due to import caching.
@@ -136,7 +136,7 @@ def _make_mock_rag_response():
 
 
 class TestRAGAPI:
-    """Test Suite für RAG API Endpoints"""
+    """Test suite for RAG API endpoints"""
 
     @pytest.fixture(autouse=True)
     def ensure_rag_router(self):
@@ -149,12 +149,12 @@ class TestRAGAPI:
 
     @pytest.fixture
     def mock_processed_document(self):
-        """Mock verarbeitetes Dokument"""
+        """Mock a processed document"""
         doc = Mock(spec=Document)
         doc.id = 1
         doc.original_filename = "test_document.txt"
-        # TF-605: title/display_name werden vom available-documents Endpoint
-        # ausgeliefert — als Mock-Attribute wären sie nicht serialisierbar.
+        # TF-605: title/display_name are served by the available-documents
+        # endpoint — as mock attributes they wouldn't be serializable.
         doc.display_name = None
         doc.title = "test_document"
         doc.mime_type = "text/plain"
@@ -176,7 +176,7 @@ class TestRAGAPI:
         IN_CI, reason="TenantFilter mock patching unreliable in full suite"
     )
     def test_generate_rag_exam_success(self, auth_client, mock_processed_document):
-        """Test erfolgreiche RAG Exam Generation — gibt jetzt task_id zurück"""
+        """Test successful RAG exam generation — now returns task_id"""
         request_data = {
             "topic": "ExamCraft AI",
             "document_ids": [1],
@@ -207,11 +207,11 @@ class TestRAGAPI:
         assert "message" in data
 
     def test_generate_rag_exam_document_not_found(self, auth_client):
-        """Test RAG Exam Generation mit nicht existierendem Dokument"""
+        """Test RAG exam generation with a non-existent document"""
 
         request_data = {
             "topic": "Test Topic",
-            "document_ids": [999],  # Nicht existierende ID
+            "document_ids": [999],  # Non-existent ID
             "question_count": 1,
         }
 
@@ -229,9 +229,9 @@ class TestRAGAPI:
     def test_generate_rag_exam_document_not_processed(
         self, auth_client, mock_processed_document
     ):
-        """Test RAG Exam Generation mit nicht verarbeitetem Dokument"""
+        """Test RAG exam generation with an unprocessed document"""
 
-        # Setze Status auf nicht verarbeitet
+        # Set status to unprocessed
         mock_processed_document.status = DocumentStatus.UPLOADED
         # institution_id already set in fixture
 
@@ -249,7 +249,7 @@ class TestRAGAPI:
         assert "nicht verarbeitet" in detail or "not processed" in detail.lower()
 
     def test_generate_rag_exam_invalid_question_type(self, auth_client):
-        """Test RAG Exam Generation mit ungültigem Fragetyp"""
+        """Test RAG exam generation with an invalid question type"""
 
         request_data = {
             "topic": "Test Topic",
@@ -264,23 +264,23 @@ class TestRAGAPI:
         assert "Ungültiger" in detail or "Invalid" in detail
 
     def test_generate_rag_exam_validation_errors(self, auth_client):
-        """Test RAG Exam Generation mit Validierungsfehlern"""
+        """Test RAG exam generation with validation errors"""
 
-        # Leeres Topic
+        # Empty topic
         response = auth_client.post(
             "/api/v1/rag/generate-exam",
             json={"topic": "", "question_count": 1},
         )
         assert response.status_code == 422
 
-        # Zu viele Fragen
+        # Too many questions
         response = auth_client.post(
             "/api/v1/rag/generate-exam",
             json={"topic": "Valid Topic", "question_count": 25},
         )
         assert response.status_code == 422
 
-        # Negative Fragen
+        # Negative question count
         response = auth_client.post(
             "/api/v1/rag/generate-exam",
             json={"topic": "Valid Topic", "question_count": -1},
@@ -334,7 +334,7 @@ class TestRAGAPI:
         assert job.question_count == 5
 
     def test_generate_rag_exam_broker_unavailable(self, mock_processed_document):
-        """Test RAG Exam Generation wenn Celery Broker nicht erreichbar ist"""
+        """Test RAG exam generation when the Celery broker is unreachable"""
         from main import app
         from database import get_db
         from utils.auth_utils import get_current_user
@@ -372,7 +372,7 @@ class TestRAGAPI:
         assert "nicht verfügbar" in detail or "unavailable" in detail.lower()
 
     def test_retrieve_context_success(self, auth_client):
-        """Test erfolgreiche Context Retrieval"""
+        """Test successful context retrieval"""
 
         request_data = {
             "query": "ExamCraft AI",
@@ -418,7 +418,7 @@ class TestRAGAPI:
         assert data["context_length"] == 180
 
     def test_retrieve_context_validation_errors(self, auth_client):
-        """Test Context Retrieval mit Validierungsfehlern"""
+        """Test context retrieval with validation errors"""
 
         response = auth_client.post("/api/v1/rag/retrieve-context", json={"query": ""})
         assert response.status_code == 422
@@ -438,7 +438,7 @@ class TestRAGAPI:
     def test_get_available_documents_success(
         self, auth_client, mock_db, mock_processed_document
     ):
-        """Test erfolgreiche Available Documents Abfrage"""
+        """Test successful available documents query"""
 
         mock_query = Mock()
         mock_db.query.return_value = mock_query
@@ -466,13 +466,13 @@ class TestRAGAPI:
         assert data["processed_documents"] == 1
 
     def test_get_available_documents_exposes_display_title(self, auth_client, mock_db):
-        """TF-605: Response führt den Anzeigenamen, nicht nur den Upload-Namen.
+        """TF-605: Response carries the display name, not just the upload name.
 
-        Ohne ``title``/``display_name`` kann die Fragengenerierung den in der
-        Dokumentbibliothek vergebenen Namen gar nicht anzeigen und fällt auf
-        ``original_filename`` (inkl. Endung) zurück. Bewusst mit einer echten
-        ``Document``-Instanz statt einem Mock, damit die Fallback-Kette der
-        ``title``-Property real durchlaufen wird.
+        Without ``title``/``display_name``, question generation can't show
+        the name assigned in the document library and falls back to
+        ``original_filename`` (including extension). Deliberately uses a
+        real ``Document`` instance instead of a mock so the ``title``
+        property's fallback chain actually runs.
         """
 
         doc = Document(
@@ -507,13 +507,13 @@ class TestRAGAPI:
         doc_info = response.json()["documents"][0]
         assert doc_info["title"] == "Kapitel 3 — Normalisierung"
         assert doc_info["display_name"] == "Kapitel 3 — Normalisierung"
-        # filename bleibt erhalten — bestehende Consumer dürfen nicht brechen
+        # filename is kept — existing consumers must not break
         assert doc_info["filename"] == "2026-02-03_Skript_Kapitel_3_final_v2.pdf"
 
     def test_get_available_documents_title_falls_back_to_filename(
         self, auth_client, mock_db
     ):
-        """TF-605: Ohne Umbenennung liefert ``title`` den Dateinamen ohne Endung."""
+        """TF-605: Without a rename, ``title`` falls back to the filename without extension."""
 
         doc = Document(
             id=8,
@@ -633,13 +633,13 @@ class TestRAGAPI:
         data = response.json()
         assert data["status"] == "healthy"
         assert data["components"]["claude_service"]["status"] == "unavailable"
-        # `fallback_enabled` wurde aus dem API-Schema entfernt, als Demo-Mode
-        # als Fallback-Pfad gestrichen wurde (siehe claude_service.py:208).
+        # `fallback_enabled` was removed from the API schema when demo mode
+        # was dropped as a fallback path (see claude_service.py:208).
 
     def test_generate_rag_exam_with_valid_tag_ids_returns_200(
         self, auth_client, mock_db
     ):
-        """tag_ids=[1] mit gültigem Tag der eigenen Institution → 200."""
+        """tag_ids=[1] with a valid tag from the caller's own institution → 200."""
         mock_tag = Mock()
         mock_tag.id = 1
         mock_tag.institution_id = 1  # same as mock_user.institution_id
@@ -679,7 +679,7 @@ class TestRAGAPI:
     def test_generate_rag_exam_with_missing_tag_id_returns_422(
         self, auth_client, mock_db
     ):
-        """tag_ids=[999] — Tag existiert nicht → uniform 422 (Enumeration-Prevention)."""
+        """tag_ids=[999] — tag does not exist → uniform 422 (enumeration prevention)."""
         mock_db.query.return_value.filter.return_value.all.return_value = []
 
         response = auth_client.post(
@@ -699,8 +699,8 @@ class TestRAGAPI:
     def test_generate_rag_exam_with_foreign_institution_tag_returns_422(
         self, auth_client, mock_db
     ):
-        """tag_ids=[2] — Tag gehört anderer Institution, scope='institution' →
-        uniform 422 (Cross-Tenant-Enumeration-Prevention)."""
+        """tag_ids=[2] — tag belongs to another institution, scope='institution' →
+        uniform 422 (cross-tenant enumeration prevention)."""
         # Route's visibility query already filters out foreign-institution tags,
         # so it returns the same 422 as for missing IDs — no echo of the ID.
         mock_db.query.return_value.filter.return_value.all.return_value = []
@@ -722,7 +722,7 @@ class TestRAGAPI:
     def test_generate_rag_exam_with_archived_tag_returns_422(
         self, auth_client, mock_db
     ):
-        """tag_ids=[3] — Tag ist archiviert → 422."""
+        """tag_ids=[3] — tag is archived → 422."""
         mock_tag = Mock()
         mock_tag.id = 3
         mock_tag.name = "Archiviert"
@@ -748,7 +748,7 @@ class TestRAGAPI:
 
 
 class TestRAGAPIIntegration:
-    """Integration Tests für RAG API mit echten Services"""
+    """Integration tests for RAG API with real services"""
 
     @pytest.fixture(autouse=True)
     def ensure_rag_router(self):
@@ -763,12 +763,12 @@ class TestRAGAPIIntegration:
         IN_CI, reason="TenantFilter mock patching unreliable in full suite"
     )
     def test_full_rag_workflow_mock(self, auth_client, mock_db):
-        """Test vollständiger RAG Workflow mit Mocks"""
+        """Test complete RAG workflow with mocks"""
 
         mock_doc = Mock()
         mock_doc.id = 1
         mock_doc.original_filename = "integration_test.txt"
-        # TF-605: siehe mock_processed_document — Endpoint liefert beide Felder.
+        # TF-605: see mock_processed_document — the endpoint serves both fields.
         mock_doc.display_name = None
         mock_doc.title = "integration_test"
         mock_doc.status = DocumentStatus.PROCESSED
@@ -863,7 +863,7 @@ class TestRAGAPIIntegration:
             assert "message" in exam_data
 
     def test_error_handling_chain(self, auth_client):
-        """Test Error Handling in der gesamten Chain"""
+        """Test error handling across the whole chain"""
 
         with patch.object(
             actual_document_service, "get_document_by_id", return_value=None
@@ -875,7 +875,7 @@ class TestRAGAPIIntegration:
             assert response.status_code == 404
 
     def test_concurrent_requests(self):
-        """Test gleichzeitige RAG Requests (public endpoint)"""
+        """Test concurrent RAG requests (public endpoint)"""
         import threading
 
         results = []

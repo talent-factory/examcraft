@@ -1,6 +1,6 @@
 """
-Database Configuration für ExamCraft AI
-SQLAlchemy Setup und Session Management
+Database Configuration for ExamCraft AI
+SQLAlchemy setup and session management
 """
 
 import os
@@ -34,7 +34,7 @@ def _normalize_db_url(url: str) -> str:
     return url
 
 
-# Database URL - für Development verwenden wir PostgreSQL aus Docker
+# Database URL - for development we use PostgreSQL from Docker
 DATABASE_URL = _normalize_db_url(
     os.getenv(
         "DATABASE_URL", "postgresql://examcraft:examcraft_dev@localhost:5432/examcraft"
@@ -67,7 +67,7 @@ Base = declarative_base()
 
 def get_db():
     """
-    Dependency für FastAPI um Database Session zu bekommen
+    Dependency for FastAPI to obtain a database session
     """
     db = SessionLocal()
     try:
@@ -78,9 +78,9 @@ def get_db():
 
 def create_tables():
     """
-    Erstelle alle Tabellen in der Datenbank
+    Create all tables in the database
 
-    WICHTIG: Importiert alle Models, damit sie bei Base registriert sind
+    IMPORTANT: Imports all models so they are registered with Base
     """
     # Import all models to register them with Base
     # This must be done before create_all() is called
@@ -167,20 +167,20 @@ def create_tables():
 
         traceback.print_exc()
 
-    # Migrationen ausfuehren (Alembic) oder Tabellen direkt erstellen (Fallback)
+    # Run migrations (Alembic) or create tables directly (fallback)
     _run_migrations_or_create_all()
 
 
 def _seed_system_data():
-    """Seedet Migrations-eingebettete Referenzdaten, die der create_all-Pfad überspringt.
+    """Seeds migration-embedded reference data that the create_all path skips.
 
-    Der create_all-Bootstrap (Fresh-DB-Zweig + Fallback) baut das Schema aus den
-    Modellen, führt aber keine Migrationskörper aus — Daten-Seeds, die in einer
-    Migration leben (z.B. tf333' SYSTEM_GRADING_SCHEMES), fehlten sonst. Idempotent
-    per Name; bei jedem Bootstrap sicher aufrufbar (TF-433). Im stationären Prod-
-    Betrieb wird der Seed nicht erreicht (DB bereits gestampt → früher return); auf
-    einer erstmalig leeren Prod-DB läuft der Fresh-Zweig und damit der Seed sehr
-    wohl — das ist idempotent und gewollt.
+    The create_all bootstrap (fresh-DB branch + fallback) builds the schema from
+    the models, but does not run migration bodies — data seeds that live inside
+    a migration (e.g. tf333's SYSTEM_GRADING_SCHEMES) would otherwise be missing.
+    Idempotent by name; safe to call on every bootstrap (TF-433). In steady-state
+    prod operation the seed is never reached (DB already stamped → early return);
+    on a first-time empty prod DB the fresh branch runs and so does the seed —
+    that is idempotent and intentional.
     """
     try:
         from db_seed import seed_system_grading_schemes
@@ -189,7 +189,7 @@ def _seed_system_data():
             inserted = seed_system_grading_schemes(conn)
         if inserted:
             print(f"🌱 Seeded {inserted} system grading scheme(s)")
-    except Exception as e:  # noqa: BLE001 — ein Seed-Fehler darf den Boot nie blockieren
+    except Exception as e:  # noqa: BLE001 — a seed failure must never block boot
         print(
             f"⚠️  System-Seed übersprungen ({e}) — grading_schemes evtl. leer; "
             "Notenauflösung kann fehlschlagen. Manuell nachholbar via "
@@ -199,15 +199,15 @@ def _seed_system_data():
 
 def _run_migrations_or_create_all():
     """
-    Fuehre Alembic-Migrationen aus oder erstelle Tabellen direkt.
+    Run Alembic migrations or create tables directly.
 
-    Verhalten je nach AUTO_MIGRATE env var:
-    - AUTO_MIGRATE=true: Fuehre 'alembic upgrade head' aus (fuer Development)
-    - AUTO_MIGRATE absent or not 'true': Nur pruefen ob Migrationen ausstehen und warnen
-    - Fallback: Base.metadata.create_all() wenn Alembic nicht verfuegbar
+    Behavior depends on the AUTO_MIGRATE env var:
+    - AUTO_MIGRATE=true: run 'alembic upgrade head' (for development)
+    - AUTO_MIGRATE absent or not 'true': only check whether migrations are pending and warn
+    - Fallback: Base.metadata.create_all() if Alembic is not available
 
-    WICHTIG: In Production NIEMALS automatisch migrieren. Migrationen muessen
-    dort manuell nach Review ausgefuehrt werden:
+    IMPORTANT: NEVER auto-migrate in production. Migrations must be
+    run there manually after review:
         alembic upgrade head
     """
     import os
@@ -226,7 +226,7 @@ def _run_migrations_or_create_all():
             alembic_cfg = Config(alembic_ini)
             alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
 
-            # Pruefe ob Migrationen ausstehen
+            # Check whether migrations are pending
             script = ScriptDirectory.from_config(alembic_cfg)
             head_rev = script.get_current_head()
 
@@ -249,8 +249,8 @@ def _run_migrations_or_create_all():
                     print("🆕 Fresh database detected — creating schema from models...")
                     Base.metadata.create_all(bind=engine)
                     command.stamp(alembic_cfg, "head")
-                    # create_all überspringt Migrationskörper → Daten-Seeds
-                    # nachholen (TF-433).
+                    # create_all skips migration bodies → catch up on data
+                    # seeds (TF-433).
                     _seed_system_data()
                     print(f"✅ Schema created and stamped at {head_rev}")
                     return
@@ -267,7 +267,7 @@ def _run_migrations_or_create_all():
             else:
                 print(f"⚠️  {pending_msg}")
                 print("⚠️  Set AUTO_MIGRATE=true or run manually: alembic upgrade head")
-                # Nicht abbrechen — App soll starten, aber Warnung ist sichtbar
+                # Don't abort — the app should still start, but the warning stays visible
                 return
 
         except ImportError:
@@ -295,7 +295,7 @@ def _run_migrations_or_create_all():
             )
 
     Base.metadata.create_all(bind=engine)
-    # create_all überspringt Migrationskörper → Daten-Seeds nachholen (TF-433).
+    # create_all skips migration bodies → catch up on data seeds (TF-433).
     _seed_system_data()
     print("Database tables created/verified (create_all fallback)")
 

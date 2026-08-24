@@ -36,9 +36,9 @@ describe('sanitizeWizardSnapshot', () => {
   });
 
   it('clamps activeStep to the last restorable step', () => {
-    // Schritt 3 ist die Ergebnisansicht — sie hängt an einem generierten
-    // Prüfungsobjekt, das nicht im Snapshot steht. Ohne Deckel landete der
-    // Nutzer auf einem leeren Ergebnisschritt.
+    // Step 3 is the results view — it depends on a generated exam object
+    // that isn't in the snapshot. Without a cap, the user would land on
+    // an empty results step.
     expect(sanitizeWizardSnapshot({ activeStep: 3 })?.activeStep).toBe(
       MAX_RESTORABLE_WIZARD_STEP
     );
@@ -90,7 +90,7 @@ describe('sanitizeWizardSnapshot', () => {
   });
 
   it('keeps a partial snapshot so unaffected fields still survive', () => {
-    // Formdrift darf nicht alles wegwerfen: was noch passt, wird übernommen.
+    // Shape drift must not discard everything: whatever still fits is kept.
     const result = sanitizeWizardSnapshot({
       ragRequest: { topic: 'Heapsort' },
       frameworkId: 12,

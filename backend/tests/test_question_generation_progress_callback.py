@@ -1,6 +1,6 @@
 """
-Tests für den progress_callback-Parameter in generate_rag_exam.
-Testet die Callback-Integration ohne echten Claude API-Aufruf.
+Tests for the progress_callback parameter in generate_rag_exam.
+Tests the callback integration without a real Claude API call.
 """
 
 import pytest
@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 @pytest.mark.asyncio
 async def test_generate_rag_exam_accepts_progress_callback():
-    """generate_rag_exam akzeptiert progress_callback ohne Fehler"""
-    # Importiere nur wenn Premium verfügbar
+    """generate_rag_exam accepts progress_callback without error"""
+    # Import only if Premium is available
     pytest.importorskip("premium.services.rag_service")
     from premium.services.rag_service import RAGService
     import inspect
@@ -21,7 +21,7 @@ async def test_generate_rag_exam_accepts_progress_callback():
 
 @pytest.mark.asyncio
 async def test_generate_rag_exam_calls_callback_after_context():
-    """Callback wird nach dem Context-Laden aufgerufen (Step 1)"""
+    """Callback is invoked after context loading (step 1)"""
     pytest.importorskip("premium.services.rag_service")
     from premium.services.rag_service import RAGService
     from services.rag_service import RAGExamRequest
@@ -50,7 +50,7 @@ async def test_generate_rag_exam_calls_callback_after_context():
 
     await service.generate_rag_exam(request, progress_callback=mock_callback)
 
-    # Step 1 = Context geladen (current=1)
+    # Step 1 = context loaded (current=1)
     assert any(call[0] == 1 for call in callback_calls), (
         f"Expected callback with current=1, got: {callback_calls}"
     )
@@ -58,7 +58,7 @@ async def test_generate_rag_exam_calls_callback_after_context():
 
 @pytest.mark.asyncio
 async def test_generate_rag_exam_calls_callback_per_question():
-    """Callback wird nach jeder generierten Frage aufgerufen"""
+    """Callback is invoked after every generated question"""
     pytest.importorskip("premium.services.rag_service")
     from premium.services.rag_service import RAGService
     from services.rag_service import RAGExamRequest
@@ -99,7 +99,7 @@ async def test_generate_rag_exam_calls_callback_per_question():
 
 @pytest.mark.asyncio
 async def test_generate_rag_exam_callback_messages_are_german():
-    """Callback-Messages sind auf Deutsch"""
+    """Callback messages are in German"""
     pytest.importorskip("premium.services.rag_service")
     from premium.services.rag_service import RAGService
     from services.rag_service import RAGExamRequest
@@ -136,7 +136,7 @@ async def test_generate_rag_exam_callback_messages_are_german():
 
 @pytest.mark.asyncio
 async def test_generate_rag_exam_works_without_callback():
-    """generate_rag_exam funktioniert ohne Callback (None)"""
+    """generate_rag_exam works without a callback (None)"""
     pytest.importorskip("premium.services.rag_service")
     from premium.services.rag_service import RAGService
     from services.rag_service import RAGExamRequest
@@ -156,6 +156,6 @@ async def test_generate_rag_exam_works_without_callback():
     service.generate_question = AsyncMock(return_value=mock_question)
     service._calculate_quality_metrics = MagicMock(return_value={})
 
-    # Sollte kein Fehler werfen
+    # Should not raise an error
     result = await service.generate_rag_exam(request, progress_callback=None)
     assert result is not None

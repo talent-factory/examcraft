@@ -138,7 +138,7 @@ describe('ImportDialog', () => {
       );
     });
 
-    // 3. Preview rendered (warten auf React re-render nach state update)
+    // 3. Preview rendered (waiting for React re-render after state update)
     expect(
       await screen.findByTestId('preview-student-count'),
     ).toHaveTextContent('2');

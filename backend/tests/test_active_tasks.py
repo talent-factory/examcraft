@@ -273,12 +273,12 @@ class TestGetActiveTasks:
 
 
 class TestRecentlyCompletedTasks:
-    """TF-608: kürzlich abgeschlossene Jobs bleiben wiederherstellbar.
+    """TF-608: recently completed jobs stay recoverable.
 
-    Wird die Seite gewechselt oder neu geladen, während ein Task fertig wird,
-    stirbt der WebSocket — ohne diese Jobs im Recovery-Payload wäre das Ergebnis
-    aus der UI verschwunden (die Fragen liegen zwar in der Prüf-Queue, aber ohne
-    Rückweg in die Generierungsansicht).
+    If the page is switched or reloaded while a task is finishing, the
+    WebSocket dies — without these jobs in the recovery payload, the result
+    would vanish from the UI (the questions do sit in the review queue, but
+    there's no way back into the generation view).
     """
 
     def _setup_db_query(self, mock_db, jobs: list):
@@ -290,7 +290,7 @@ class TestRecentlyCompletedTasks:
         mock_db.query.return_value = query_mock
 
     def test_completed_job_is_returned_with_full_progress(self, auth_client, mock_db):
-        """Ein Job mit DB-Status SUCCESS erscheint mit progress=100."""
+        """A job with DB status SUCCESS appears with progress=100."""
         job = _make_job("task-done", status="SUCCESS")
         self._setup_db_query(mock_db, [job])
 
@@ -302,14 +302,14 @@ class TestRecentlyCompletedTasks:
         assert task["task_id"] == "task-done"
         assert task["status"] == "SUCCESS"
         assert task["progress"] == 100
-        # Der Status steht in der DB — Celery muss dafür nicht befragt werden.
+        # The status lives in the DB — Celery doesn't need to be queried for it.
         mock_ar_cls.assert_not_called()
 
     @pytest.mark.parametrize("status", ["FAILURE", "REVOKED"])
     def test_failed_job_is_returned_without_progress(
         self, auth_client, mock_db, status
     ):
-        """FAILURE/REVOKED erscheinen ebenfalls, aber ohne Fortschrittsanspruch."""
+        """FAILURE/REVOKED also appear, but without a progress claim."""
         job = _make_job(f"task-{status.lower()}", status=status)
         self._setup_db_query(mock_db, [job])
 
@@ -322,7 +322,7 @@ class TestRecentlyCompletedTasks:
         assert task["progress"] == 0
 
     def test_active_and_completed_jobs_are_mixed(self, auth_client, mock_db):
-        """Laufende und abgeschlossene Jobs erscheinen nebeneinander."""
+        """Running and completed jobs appear side by side."""
         jobs = [
             _make_job("task-running", status="PROGRESS"),
             _make_job("task-finished", status="SUCCESS"),
@@ -341,12 +341,12 @@ class TestRecentlyCompletedTasks:
         tasks = {t["task_id"]: t for t in response.json()["tasks"]}
         assert tasks["task-running"]["progress"] == 25
         assert tasks["task-finished"]["progress"] == 100
-        # Nur der laufende Job löst eine Celery-Abfrage aus.
+        # Only the running job triggers a Celery query.
         assert mock_ar_cls.call_count == 1
 
 
 class TestActiveTasksSuperuser:
-    """Superuser-Bypass für /active-tasks: alle aktiven Jobs + Audit-Log."""
+    """Superuser bypass for /active-tasks: all active jobs + audit log."""
 
     @pytest.fixture
     def super_user(self):
@@ -370,7 +370,7 @@ class TestActiveTasksSuperuser:
     def test_superuser_lists_all_active_jobs_and_logs_bypass(
         self, super_client, mock_db
     ):
-        """Superuser sieht Jobs von allen Usern; ein Bypass-Audit-Log entsteht."""
+        """Superuser sees jobs from all users; a bypass audit log entry is created."""
         foreign_job = _make_job("task-foreign", user_id=42)
         own_job = _make_job("task-own", user_id=99)
 

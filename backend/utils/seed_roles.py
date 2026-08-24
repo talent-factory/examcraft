@@ -87,20 +87,20 @@ def seed_default_roles(db: Session):
                 # TF-335: Admin manages institution-scoped Grading-
                 # Schemes; System schemes stay read-only via the API.
                 "grading_schemes:manage",
-                # TF-336: Admin pflegt Studierenden-Stammdaten und Klassen
-                # sowie Moodle-Web-Service-Verbindungen.
+                # TF-336: Admin maintains student master data and classes
+                # as well as Moodle web service connections.
                 "students:manage",
                 "moodle:configure",
-                # Org-Unit-Hierarchie Stufe 0: Admin verwaltet die
-                # institutionsinterne Abteilungs-/Team-Hierarchie (CRUD +
-                # Mitgliedschaften).
+                # Org-unit hierarchy stage 0: admin manages the
+                # institution-internal department/team hierarchy (CRUD +
+                # memberships).
                 "manage_org_units",
-                # TF-639: Institutions-Admin-Immer-Lesezugriff pro
-                # Ressourcentyp (nur Lesen). Drei der fünf sind aktuell noch
-                # unenforced (Fragen/Prüfungen/Competency-Frameworks haben
-                # noch keine Visibility-Stufe) — wird hier bereits geseedet,
-                # damit kein Ressourcen-Ticket seed_roles.py separat
-                # anfassen muss.
+                # TF-639: institution-admin always-read-access per
+                # resource type (read only). Three of the five are currently
+                # still unenforced (questions/exams/competency frameworks
+                # don't have a visibility level yet) — already seeded here
+                # so no resource ticket has to touch seed_roles.py
+                # separately.
                 "documents:read_all",
                 "prompt:read_all",
                 "questions:read_all",
@@ -131,13 +131,13 @@ def seed_default_roles(db: Session):
                 "prompt:read",
                 "prompt:update",
                 "prompt:delete",
-                # Lehrperson can import results and approve grades.
+                # Teacher can import results and approve grades.
                 "submissions:read",
                 "submissions:import",
                 "submissions:grade",
-                # TF-421: Lehrperson can delete a result-import (clean re-import).
+                # TF-421: Teacher can delete a result-import (clean re-import).
                 "submissions:delete",
-                # TF-435: Lehrperson pushes graded feedback back to Moodle.
+                # TF-435: Teacher pushes graded feedback back to Moodle.
                 "submissions:moodle_feedback_push",
             ],
             "is_system_role": True,
@@ -156,9 +156,9 @@ def seed_default_roles(db: Session):
                 "delete_documents",
                 "prompt:create",
                 "prompt:read",
-                # TF-336: Reviewer-Rolle bekommt Lese- + Bewertungs-
-                # Permission. Importieren bleibt der Lehrperson
-                # vorbehalten, weil dort auch das Quota-Buchen passiert.
+                # TF-336: reviewer role gets read + grading permission.
+                # Importing stays reserved for the teacher, because that's
+                # also where quota booking happens.
                 "submissions:read",
                 "submissions:grade",
             ],

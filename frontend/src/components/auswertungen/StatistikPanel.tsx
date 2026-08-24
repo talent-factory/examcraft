@@ -1,15 +1,15 @@
 /**
- * Statistik-Panel — TF-335 Spec 8.
+ * Statistics panel — TF-335 Spec 8.
  *
- * Drei Abschnitte:
- *   - KPI-Cards: Ø Punkte, Erfolgsquote, Anzahl Submissions, Reviewed
- *   - Recharts-Histogramm der Punkteverteilung (10 %-Buckets)
- *   - Tabelle "Pro Frage" mit sortierbaren Spalten Erfolgsquote /
- *     Trennschärfe / Schwierigkeit
+ * Three sections:
+ *   - KPI cards: avg points, pass rate, submission count, reviewed
+ *   - Recharts histogram of the score distribution (10% buckets)
+ *   - "Per question" table with sortable columns for pass rate /
+ *     discrimination / difficulty
  *
- * Lädt die zwei Endpoints `stats/overview` und `stats/per-question`
- * parallel beim Mount; rendert Skeletons während des Ladens und
- * Empty-State, wenn noch keine Submissions importiert wurden.
+ * Loads the two endpoints `stats/overview` and `stats/per-question`
+ * in parallel on mount; renders skeletons while loading and an
+ * empty state when no submissions have been imported yet.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';

@@ -6,10 +6,10 @@ describe('useRoleBasedNavigation - Tag Label', () => {
     const hookFile = path.resolve(__dirname, '../useRoleBasedNavigation.ts');
     const content = fs.readFileSync(hookFile, 'utf8');
 
-    // Der Hook sollte den i18n-Key 'nav.sidebar.tagSettings' verwenden
+    // The hook should use the i18n key 'nav.sidebar.tagSettings'
     expect(content).toContain("t('nav.sidebar.tagSettings'");
 
-    // Der Hook sollte NICHT mehr den alten Key 'nav.sidebar.myTags' verwenden
+    // The hook should NOT use the old key 'nav.sidebar.myTags' anymore
     expect(content).not.toContain("t('nav.sidebar.myTags'");
   });
 
@@ -17,10 +17,10 @@ describe('useRoleBasedNavigation - Tag Label', () => {
     const hookFile = path.resolve(__dirname, '../useRoleBasedNavigation.ts');
     const content = fs.readFileSync(hookFile, 'utf8');
 
-    // Überprüfe dass der Pfad korrekt ist
+    // Check that the path is correct
     expect(content).toContain("path: '/settings/tags'");
 
-    // Überprüfe dass das Icon 🏷 vorhanden ist
+    // Check that the 🏷 icon is present
     expect(content).toContain("icon: '🏷'");
   });
 
@@ -28,7 +28,7 @@ describe('useRoleBasedNavigation - Tag Label', () => {
     const hookFile = path.resolve(__dirname, '../useRoleBasedNavigation.ts');
     const content = fs.readFileSync(hookFile, 'utf8');
 
-    // Überprüfe dass die Rolle-Anforderungen korrekt sind
+    // Check that the role requirements are correct
     expect(content).toContain('requiredRoles: [UserRole.DOZENT, UserRole.ASSISTANT]');
     expect(content).toContain('excludedRoles: [UserRole.ADMIN]');
     expect(content).toContain('excludeSuperuser: true');

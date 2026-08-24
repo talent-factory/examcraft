@@ -1,6 +1,6 @@
 """
-Document Service für ExamCraft AI
-Verwaltet File Upload, Validierung und Speicherung
+Document Service for ExamCraft AI
+Manages file upload, validation, and storage
 Supports both local filesystem and S3-compatible storage
 """
 
@@ -46,10 +46,10 @@ class DocumentService:
             logger.info("Using S3 storage for document uploads")
         else:
             logger.info("Using local filesystem storage for document uploads")
-            # Erstelle Upload-Verzeichnis nur wenn lokaler Storage verwendet wird
+            # Create the upload directory only when local storage is used
             os.makedirs(upload_dir, exist_ok=True)
 
-        # Initialisiere Docling Service
+        # Initialize Docling service
         self.docling_service = DoclingService()
 
     async def upload_document(
@@ -59,18 +59,18 @@ class DocumentService:
         db: Optional[Session] = None,
     ) -> Document:
         """
-        Upload und speichere Dokument
+        Upload and store document
 
         Args:
-            file: FastAPI UploadFile Objekt
-            user_id: Optional User ID für Zuordnung (Integer)
-            db: Database Session
+            file: FastAPI UploadFile object
+            user_id: Optional user ID for association (integer)
+            db: Database session
 
         Returns:
-            Document: Erstelltes Document Objekt
+            Document: Created Document object
 
         Raises:
-            HTTPException: Bei Validierungsfehlern
+            HTTPException: On validation errors
         """
         file_path = None
         object_key = None
@@ -140,7 +140,7 @@ class DocumentService:
             raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
     async def _validate_file(self, file: UploadFile) -> None:
-        """Validiere hochgeladene Datei"""
+        """Validate the uploaded file"""
 
         # Check file size
         if file.size and file.size > self.max_file_size:
@@ -168,7 +168,7 @@ class DocumentService:
             )
 
     def _is_supported_format(self, filename: str) -> bool:
-        """Prüfe ob Dateiformat unterstützt wird"""
+        """Check whether the file format is supported"""
         if not filename:
             return False
 
@@ -176,13 +176,13 @@ class DocumentService:
         return extension.lower() in self.supported_formats.values()
 
     def _get_file_extension(self, filename: str) -> str:
-        """Extrahiere Dateierweiterung"""
+        """Extract the file extension"""
         if not filename:
             return ""
         return os.path.splitext(filename)[1].lower()
 
     async def _save_file_to_disk(self, file: UploadFile, file_path: str) -> None:
-        """Speichere Datei auf Festplatte"""
+        """Save file to disk"""
         try:
             async with aiofiles.open(file_path, "wb") as f:
                 content = await file.read()
@@ -197,7 +197,7 @@ class DocumentService:
             )
 
     def _detect_mime_type(self, file_path: str) -> str:
-        """Erkenne MIME-Type der gespeicherten Datei"""
+        """Detect the MIME type of the stored file"""
         try:
             mime_type = magic.from_file(file_path, mime=True)
             return mime_type
@@ -211,7 +211,7 @@ class DocumentService:
             return "application/octet-stream"
 
     def _detect_mime_type_from_bytes(self, content: bytes, filename: str) -> str:
-        """Erkenne MIME-Type aus Datei-Bytes.
+        """Detect the MIME type from file bytes.
 
         The file extension is authoritative when it maps to one of our
         ``supported_formats``. ``magic.from_buffer`` reads only the leading
@@ -267,7 +267,7 @@ class DocumentService:
         return None
 
     def get_document_by_id(self, document_id: int, db: Session) -> Optional[Document]:
-        """Hole Dokument nach ID"""
+        """Get document by ID"""
         return db.query(Document).filter(Document.id == document_id).first()
 
     def update_document_status(
@@ -277,7 +277,7 @@ class DocumentService:
         db: Session,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[Document]:
-        """Aktualisiere Dokument Status"""
+        """Update document status"""
         document = self.get_document_by_id(document_id, db)
         if not document:
             return None
@@ -296,7 +296,7 @@ class DocumentService:
         return document
 
     def delete_document(self, document_id: int, db: Session) -> bool:
-        """Lösche Dokument und Datei"""
+        """Delete document and file"""
         document = self.get_document_by_id(document_id, db)
         if not document:
             return False
@@ -380,18 +380,18 @@ class DocumentService:
         processor: Optional[Any] = None,
     ) -> Optional[ProcessedDocument]:
         """
-        Verarbeite Dokumenteninhalt mit Docling Service
+        Process document content using the Docling service
 
         Args:
-            document_id: ID des zu verarbeitenden Dokuments
-            db: Database Session (optional - erstellt neue Session wenn nicht vorhanden)
-            processor: Optionaler Prozessor-Override (z. B. PyMuPDF mit OCR);
-                fällt auf den konfigurierten Default-Service zurück
+            document_id: ID of the document to process
+            db: Database session (optional - creates a new session if not provided)
+            processor: Optional processor override (e.g. PyMuPDF with OCR);
+                falls back to the configured default service
 
         Returns:
-            ProcessedDocument oder None bei Fehlern
+            ProcessedDocument or None on errors
         """
-        # Erstelle neue Session wenn nicht vorhanden (für Background Tasks)
+        # Create a new session if not provided (for background tasks)
         from database import SessionLocal
 
         if db is None:
@@ -409,16 +409,16 @@ class DocumentService:
                 logger.error(f"Document {document_id} not found")
                 return None
 
-            # Setze Status auf Processing
+            # Set status to processing
             document.status = DocumentStatus.PROCESSING
             db.commit()
 
             # Get local file path (downloads from S3 if needed)
             local_file_path = self._get_local_file_path(document)
 
-            # Prozessor-Override für die OCR-Eskalation (TF-360): wenn ein
-            # expliziter Prozessor übergeben wird (PyMuPDF mit OCR), diesen
-            # nutzen, sonst den konfigurierten Default-Service (PyMuPDF).
+            # Processor override for the OCR escalation (TF-360): if an
+            # explicit processor is passed (PyMuPDF with OCR), use it,
+            # otherwise use the configured default service (PyMuPDF).
             active_processor = processor or self.docling_service
             processed_doc = await active_processor.process_document(
                 document_id=document.id,
@@ -439,13 +439,13 @@ class DocumentService:
                 )
 
             first_chunk = processed_doc.chunks[0].content
-            # Entferne NUL-Zeichen die PostgreSQL nicht unterstützt
+            # Strip NUL characters, which PostgreSQL doesn't support
             clean_chunk = first_chunk.replace("\x00", "").replace("\0", "")
             content_preview = (
                 clean_chunk[:200] + "..." if len(clean_chunk) > 200 else clean_chunk
             )
 
-            # Aktualisiere Dokument mit verarbeiteten Daten
+            # Update document with processed data
             document.status = DocumentStatus.PROCESSED
             document.doc_metadata = processed_doc.metadata
             document.content_preview = content_preview
@@ -462,8 +462,8 @@ class DocumentService:
         except Exception as e:
             logger.error(f"Document processing failed for {document_id}: {str(e)}")
 
-            # Setze Status auf Error mit strukturiertem Code, damit die UI den
-            # Fehler lokalisiert anzeigen kann statt nur die englische Raw-Message.
+            # Set status to error with a structured code, so the UI can
+            # display a localized error instead of just the raw English message.
             error_code, error_details = classify_error(e)
             document = self.get_document_by_id(document_id, db)
             if document:
@@ -491,19 +491,19 @@ class DocumentService:
         processor: Optional[Any] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        Verarbeite Dokument UND erstelle Vector Embeddings (prozessor-agnostisch)
+        Process document AND create vector embeddings (processor-agnostic)
 
         Args:
-            document_id: ID des zu verarbeitenden Dokuments
-            db: Database Session (optional - erstellt neue Session wenn nicht vorhanden)
-            processor: Optionaler Prozessor-Override (z. B. PyMuPDF mit OCR);
-                fällt auf den konfigurierten Default-Prozessor zurück
-                (siehe process_document_content).
+            document_id: ID of the document to process
+            db: Database session (optional - creates a new session if not provided)
+            processor: Optional processor override (e.g. PyMuPDF with OCR);
+                falls back to the configured default processor
+                (see process_document_content).
 
         Returns:
-            Dictionary mit Processing- und Embedding-Statistiken
+            Dictionary with processing and embedding statistics
         """
-        # Erstelle neue Session wenn nicht vorhanden (für Background Tasks)
+        # Create a new session if not provided (for background tasks)
         from database import SessionLocal
 
         if db is None:
@@ -514,7 +514,7 @@ class DocumentService:
 
         processed_doc = None
         try:
-            # Erst normale Dokumentenverarbeitung (ggf. mit OCR-Prozessor)
+            # First run normal document processing (possibly with OCR processor)
             processed_doc = await self.process_document_content(
                 document_id, db, processor=processor
             )
@@ -523,22 +523,22 @@ class DocumentService:
                 logger.error(f"Document processing failed for {document_id}")
                 return None
 
-            # Erstelle Vector Embeddings
+            # Create vector embeddings
             logger.info(f"Creating vector embeddings for document {document_id}")
             vector_service = get_vector_service()
             embedding_stats = await vector_service.add_document_chunks(processed_doc)
 
-            # Aktualisiere Dokument mit Vector Collection Info
+            # Update document with vector collection info
             info: Dict[str, Any] = {}
             document = self.get_document_by_id(document_id, db)
             if document:
-                # Setze Vector Collection Name
+                # Set vector collection name
                 document.vector_collection = f"doc_{document_id}"
 
-                # Setze has_vectors Flag
+                # Set has_vectors flag
                 document.has_vectors = True
 
-                # Erweitere Metadaten um Embedding-Info
+                # Extend metadata with embedding info
                 if not document.doc_metadata:
                     document.doc_metadata = {}
 
@@ -560,8 +560,8 @@ class DocumentService:
 
                 flag_modified(document, "doc_metadata")
 
-                # Qualitäts-Verdict berechnen und in processing_info ablegen
-                # (separate Spalte von doc_metadata; keine Migration nötig).
+                # Compute the quality verdict and store it in processing_info
+                # (a column separate from doc_metadata; no migration needed).
                 from services.quality_assessor import (
                     assess_quality,
                     compute_quality_stats,
@@ -588,8 +588,9 @@ class DocumentService:
                 db.commit()
                 db.refresh(document)
 
-            # Dokument zwischen Embedding und Reload verschwunden: sauberes None
-            # statt KeyError auf info["quality"] (TF-360 Review-Fix).
+            # Document disappeared between embedding and reload: return a
+            # clean None instead of a KeyError on info["quality"] (TF-360
+            # review fix).
             if document is None:
                 logger.error(
                     f"Document {document_id} disappeared after embedding; aborting"
@@ -641,12 +642,12 @@ class DocumentService:
                 try:
                     db.commit()
                 except Exception as commit_err:
-                    # Persistieren des ERROR-Status fehlgeschlagen (z. B. DB nicht
-                    # erreichbar). Zurückrollen, damit der Aufrufer keine
-                    # vergiftete Transaktion erbt; das Fehler-Envelope unten wird
-                    # trotzdem zurückgegeben (vector_embeddings.error), sodass der
-                    # Task success=False meldet statt das Dokument still als
-                    # "Verarbeitet" ohne Vektoren zu hinterlassen.
+                    # Persisting the ERROR status failed (e.g. DB
+                    # unreachable). Roll back so the caller doesn't inherit a
+                    # poisoned transaction; the error envelope below is still
+                    # returned (vector_embeddings.error), so the task reports
+                    # success=False instead of silently leaving the document
+                    # as "processed" without vectors.
                     logger.error(
                         f"Persistieren des ERROR-Status fehlgeschlagen für "
                         f"{document_id}: {commit_err}"
@@ -680,14 +681,14 @@ class DocumentService:
         self, document_id: int, db: Session
     ) -> Optional[List[Dict[str, Any]]]:
         """
-        Hole verarbeitete Chunks eines Dokuments aus dem Vector Store
+        Get a document's processed chunks from the vector store
 
         Args:
-            document_id: ID des Dokuments
-            db: Database Session
+            document_id: ID of the document
+            db: Database session
 
         Returns:
-            Liste der Chunks oder None
+            List of chunks or None
         """
         document = self.get_document_by_id(document_id, db)
         if not document or document.status != DocumentStatus.PROCESSED:
@@ -696,7 +697,7 @@ class DocumentService:
         local_file_path = None
 
         try:
-            # Hole Chunks aus Vector Store (Qdrant)
+            # Get chunks from the vector store (Qdrant)
             vector_service = get_vector_service()
 
             # Check if vector service has get_document_chunks method
@@ -704,7 +705,7 @@ class DocumentService:
                 logger.warning(
                     "Vector service does not support get_document_chunks, falling back to re-processing"
                 )
-                # Fallback: Verarbeite Dokument erneut um Chunks zu erhalten
+                # Fallback: reprocess the document to obtain chunks
                 # Get local file path (downloads from S3 if needed)
                 local_file_path = self._get_local_file_path(document)
 
@@ -715,7 +716,7 @@ class DocumentService:
                     mime_type=document.mime_type,
                 )
 
-                # Konvertiere Chunks zu Dictionary Format
+                # Convert chunks to dictionary format
                 chunks_data = []
                 for chunk in processed_doc.chunks:
                     chunks_data.append(
@@ -728,7 +729,7 @@ class DocumentService:
                     )
                 return chunks_data
 
-            # Hole Chunks aus Vector Store
+            # Get chunks from the vector store
             search_results = await vector_service.get_document_chunks(document_id)
 
             if not search_results:
@@ -737,12 +738,12 @@ class DocumentService:
                 )
                 return []
 
-            # Sortiere nach chunk_index
+            # Sort by chunk_index
             search_results.sort(
                 key=lambda x: x.chunk_index if hasattr(x, "chunk_index") else 0
             )
 
-            # Konvertiere SearchResult zu Dictionary Format
+            # Convert SearchResult to dictionary format
             chunks_data = []
             for result in search_results:
                 chunk_data = {
@@ -771,14 +772,14 @@ class DocumentService:
         self, document_id: int, db: Session
     ) -> Optional[str]:
         """
-        Hole vollständigen Dokumenteninhalt für Content Preview
+        Get the full document content for content preview
 
         Args:
-            document_id: ID des Dokuments
-            db: Database Session
+            document_id: ID of the document
+            db: Database session
 
         Returns:
-            Vollständiger Dokumenteninhalt als String oder None
+            Full document content as a string, or None
         """
         document = self.get_document_by_id(document_id, db)
         if not document:
@@ -787,34 +788,34 @@ class DocumentService:
         local_file_path = None
 
         try:
-            # Spezialbehandlung für Chat-Exports
+            # Special handling for chat exports
             if (
                 document.doc_metadata
                 and document.doc_metadata.get("source") == "chat_export"
             ):
-                # Vollständiger Content ist in doc_metadata gespeichert
+                # Full content is stored in doc_metadata
                 full_content = document.doc_metadata.get("full_content")
                 if full_content:
                     return full_content
-                # Fallback auf content_preview wenn full_content nicht vorhanden
+                # Fall back to content_preview if full_content isn't available
                 return document.content_preview or "Chat-Content nicht verfügbar"
 
-            # Wenn Dokument noch nicht verarbeitet wurde, verarbeite es zuerst
+            # If the document hasn't been processed yet, process it first
             if document.status == DocumentStatus.UPLOADED:
                 processed_doc = await self.process_document_content(document_id, db)
                 if not processed_doc:
                     return None
             elif document.status == DocumentStatus.PROCESSING:
-                # Dokument wird gerade verarbeitet, warte kurz und prüfe erneut
+                # Document is currently being processed, wait briefly and retry
                 return None
             elif document.status == DocumentStatus.ERROR:
-                # Dokument konnte nicht verarbeitet werden
+                # Document could not be processed
                 return None
 
             # Get local file path (downloads from S3 if needed)
             local_file_path = self._get_local_file_path(document)
 
-            # Verarbeite Dokument um vollständigen Inhalt zu erhalten
+            # Process document to obtain the full content
             processed_doc = await self.docling_service.process_document(
                 document_id=document.id,
                 file_path=local_file_path,
@@ -825,10 +826,10 @@ class DocumentService:
             if not processed_doc or not processed_doc.chunks:
                 return None
 
-            # Kombiniere alle Chunks zu vollständigem Inhalt
+            # Combine all chunks into the full content
             full_content = []
             for chunk in processed_doc.chunks:
-                # Entferne NUL-Zeichen die PostgreSQL nicht unterstützt
+                # Strip NUL characters, which PostgreSQL doesn't support
                 clean_content = chunk.content.replace("\x00", "").replace("\0", "")
                 full_content.append(clean_content)
 
@@ -845,5 +846,5 @@ class DocumentService:
                 self._cleanup_temp_file(local_file_path, document)
 
 
-# Globale Service Instanz
+# Global service instance
 document_service = DocumentService()

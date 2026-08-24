@@ -1,7 +1,7 @@
 """API tests for /api/v1/exams/{id}/review-queue + /api/v1/grades/*.
 
-Deckt: Filter, RBAC, Multi-Tenancy, approve/override/bulk-approve.
-Re-Grading-Endpoint hat seinen eigenen Test.
+Covers: filters, RBAC, multi-tenancy, approve/override/bulk-approve.
+The re-grading endpoint has its own test.
 """
 
 from __future__ import annotations
@@ -70,9 +70,9 @@ def _make_user(
 def _seed_exam_with_proposed_grades(
     db: Session, inst: Institution, *, count: int = 3
 ) -> tuple[Exam, list[Grade]]:
-    """``count`` open_ended-Antworten von ``count`` verschiedenen
-    Studis. Konfidenz absteigend pro Index, damit Sortierung sichtbar
-    wird."""
+    """``count`` open_ended answers from ``count`` different
+    students. Confidence descending by index, so sorting is
+    observable."""
     qr = QuestionReview(
         question_text="Erkläre Polymorphie.",
         question_type="open_ended",
@@ -147,9 +147,9 @@ def _seed_exam_with_proposed_grades(
 
 
 def _client(test_db: Session, user: User) -> TestClient:
-    """TestClient mit Override für DB + User. Stellt sicher, dass die
-    grades-Routes registriert sind, falls der lifespan in
-    Test-Umgebungen sie nicht via importlib lädt."""
+    """TestClient with DB + user override. Ensures the grades routes are
+    registered in case the lifespan doesn't load them via importlib in
+    test environments."""
     import api.grades as grades_module
 
     if grades_module.router_grades not in app.router.routes:
@@ -181,9 +181,9 @@ def test_review_queue_returns_proposed_open_ended_sorted_by_confidence(
     body = response.json()
     assert body["total"] == 3
     confidences = [item["confidence"] for item in body["items"]]
-    # Sortierung asc — niedrigste zuerst.
+    # Ascending order — lowest first.
     assert confidences == sorted(confidences)
-    # Erster Eintrag enthält Frage + Musterlösung + Aspekte.
+    # First entry contains question + model answer + aspects.
     first = body["items"][0]
     assert first["question_text"] == "Erkläre Polymorphie."
     assert first["correct_answer"].startswith("Methoden")
@@ -227,7 +227,7 @@ def test_review_queue_blocks_foreign_institution(test_db: Session) -> None:
     client = _client(test_db, user_b)
 
     response = client.get(f"/api/v1/exams/{exam_a.id}/review-queue")
-    # 404 statt 403 — kein Information-Leak.
+    # 404 instead of 403 — no information leak.
     assert response.status_code == 404
 
 
@@ -294,7 +294,7 @@ def test_bulk_approve_by_confidence_min(test_db: Session) -> None:
     inst = _make_institution(test_db, "bulk")
     user = _make_user(test_db, inst, email="bulk@rq.org")
     exam, grades = _seed_exam_with_proposed_grades(test_db, inst, count=3)
-    # Konfidenzen 0.3 / 0.5 / 0.7 — Schwelle 0.5 trifft 2.
+    # Confidences 0.3 / 0.5 / 0.7 — threshold 0.5 matches 2.
     client = _client(test_db, user)
 
     response = client.post(
@@ -304,7 +304,7 @@ def test_bulk_approve_by_confidence_min(test_db: Session) -> None:
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["approved_count"] == 2
-    # Alle approved-Grades haben Konfidenz >= 0.5
+    # All approved grades have confidence >= 0.5
     approved_ids = set(body["grade_ids"])
     high_confidence_ids = {g.id for g in grades if g.llm_confidence >= 0.5}
     assert approved_ids == high_confidence_ids
@@ -325,9 +325,9 @@ def test_bulk_approve_by_grade_ids(test_db: Session) -> None:
 
 
 def test_bulk_approve_rejects_both_filters(test_db: Session) -> None:
-    """Beide Filter gleichzeitig wäre Auto-Approve durch die Hintertür —
-    Spec 6.4 sagt ausdrücklich "kein Auto-Approve". Ohne Filter ebenso:
-    sonst approved man unbeabsichtigt eine ganze Prüfung."""
+    """Both filters set at once would be auto-approve through the back door —
+    spec 6.4 explicitly says "no auto-approve". Same for no filter set:
+    otherwise you'd unintentionally approve an entire exam."""
     inst = _make_institution(test_db, "bulkno")
     user = _make_user(test_db, inst, email="bulkno@rq.org")
     exam, _ = _seed_exam_with_proposed_grades(test_db, inst, count=1)
@@ -349,9 +349,9 @@ def test_bulk_approve_rejects_both_filters(test_db: Session) -> None:
 
 
 def test_bulk_approve_blocks_foreign_grade_ids(test_db: Session) -> None:
-    """Bulk-Approve mit Grade-IDs eines anderen Tenants — Service muss
-    die Grade-Set per institution_id-Filter aussortieren, sonst kann
-    Tenant A Grades von Tenant B approven."""
+    """Bulk-approve with grade IDs from another tenant — the service must
+    filter out the grade set via institution_id, otherwise tenant A could
+    approve grades belonging to tenant B."""
     inst_a = _make_institution(test_db, "fa")
     inst_b = _make_institution(test_db, "fb")
     user_b = _make_user(test_db, inst_b, email="fb@rq.org")
@@ -359,32 +359,32 @@ def test_bulk_approve_blocks_foreign_grade_ids(test_db: Session) -> None:
     exam_b, _ = _seed_exam_with_proposed_grades(test_db, inst_b, count=1)
     client = _client(test_db, user_b)
 
-    # Tenant B versucht, Grades von Tenant A zu approven, schummelt
-    # den exam_id-Parameter aber auf B's eigene Prüfung.
+    # Tenant B tries to approve grades from tenant A, but cheats by
+    # setting the exam_id parameter to B's own exam.
     response = client.post(
         "/api/v1/grades/bulk-approve",
         json={"exam_id": exam_b.id, "grade_ids": [g.id for g in grades_a]},
     )
-    # Endpoint nimmt exam_id von B an, filter findet aber keine
-    # passenden Grades → 0 approved.
+    # Endpoint accepts B's exam_id, but the filter finds no matching
+    # grades → 0 approved.
     assert response.status_code == 200
     assert response.json()["approved_count"] == 0
 
 
 # ---------------------------------------------------------------------------
-# RBAC: User ohne submissions:grade darf nicht approven
+# RBAC: A user without submissions:grade must not be able to approve
 # ---------------------------------------------------------------------------
 
 
 def test_approve_requires_submissions_grade_permission(test_db: Session) -> None:
-    """Permission-Check ist das Sicherheitsnetz, falls ein Frontend-Bug
-    den Approve-Button auch für reine Reader sichtbar macht."""
+    """The permission check is the safety net in case a frontend bug
+    makes the approve button visible even to read-only users."""
     from models.auth import Role, UserRole
 
     inst = _make_institution(test_db, "rbac")
     role = test_db.query(Role).filter(Role.name == UserRole.VIEWER.value).one_or_none()
     if role is None:
-        # Viewer-Role hat KEINE submissions:grade-Permission.
+        # Viewer role has NO submissions:grade permission.
         role = Role(
             name=UserRole.VIEWER.value,
             display_name="Viewer",
@@ -422,7 +422,7 @@ def test_regrade_question_endpoint_resets_grades(test_db: Session) -> None:
     inst = _make_institution(test_db, "regrade-api")
     user = _make_user(test_db, inst, email="rg@rq.org")
     exam, grades = _seed_exam_with_proposed_grades(test_db, inst, count=2)
-    # Approve einen, sodass Re-Grading auch den approved-Pfad reset.
+    # Approve one, so re-grading also resets the approved path.
     test_db.query(Grade).filter(Grade.id == grades[0].id).update(
         {"status": GradeStatus.APPROVED.value, "reviewer_id": user.id}
     )
@@ -436,7 +436,7 @@ def test_regrade_question_endpoint_resets_grades(test_db: Session) -> None:
     response = client.post(f"/api/v1/exams/{exam.id}/questions/{eq_id}/regrade")
     assert response.status_code == 200, response.text
     body = response.json()
-    # 2 wurden re-gradet (proposed + approved); kein manual_override im
-    # Setup, sonst wäre count = 1.
+    # 2 were re-graded (proposed + approved); no manual_override in the
+    # setup, otherwise count would be 1.
     assert body["regraded_count"] == 2
     assert body["exam_question_id"] == eq_id

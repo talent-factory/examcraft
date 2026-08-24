@@ -1,6 +1,6 @@
 """
-Question Review Models für ExamCraft AI
-Implementiert Review-Workflow für generierte Prüfungsfragen
+Question Review models for ExamCraft AI
+Implements the review workflow for generated exam questions
 """
 
 from sqlalchemy import (
@@ -23,13 +23,13 @@ import enum
 
 
 class ReviewStatus(str, enum.Enum):
-    """Status einer Question Review (Python Enum für Type-Safety)"""
+    """Status of a question review (Python Enum for type safety)"""
 
-    PENDING = "pending"  # Wartet auf Review
-    APPROVED = "approved"  # Genehmigt
-    REJECTED = "rejected"  # Abgelehnt
-    EDITED = "edited"  # Bearbeitet (wartet auf erneute Genehmigung)
-    IN_REVIEW = "in_review"  # Wird gerade überprüft
+    PENDING = "pending"  # Awaiting review
+    APPROVED = "approved"  # Approved
+    REJECTED = "rejected"  # Rejected
+    EDITED = "edited"  # Edited (awaiting re-approval)
+    IN_REVIEW = "in_review"  # Currently being reviewed
 
 
 class QuestionReviewVisibility(enum.Enum):
@@ -69,8 +69,8 @@ class QuestionReviewVisibility(enum.Enum):
 
 class QuestionReview(Base):
     """
-    Haupttabelle für Question Reviews
-    Speichert generierte Fragen mit Review-Status
+    Main table for question reviews
+    Stores generated questions with review status
     """
 
     __tablename__ = "question_reviews"
@@ -84,7 +84,7 @@ class QuestionReview(Base):
     )  # single_choice, open_ended, true_false
     options = Column(
         JSON, nullable=True
-    )  # Für Multiple Choice: ["A) ...", "B) ...", ...]
+    )  # For multiple choice: ["A) ...", "B) ...", ...]
     correct_answer = Column(Text, nullable=True)
     explanation = Column(Text, nullable=True)
 
@@ -103,10 +103,11 @@ class QuestionReview(Base):
     estimated_time_minutes = Column(Integer, nullable=True)
     quality_tier = Column(String(1), nullable=True)  # A, B, C
 
-    # Kompetenz-Zuordnung (TF-400): geprüfte Handlungskompetenz + Ziel-LN-Stufe.
-    # ln_level (1-4) ist distinkt von bloom_level (1-6). NULL für Altbestand und
-    # für Fragen ohne Kompetenz-Bezug. Der Wert stammt aus Modell-Output; der
-    # Bereich wird per CHECK (check_ln_level_range, s. __table_args__) erzwungen.
+    # Competency mapping (TF-400): the competency being tested + target LN
+    # level. ln_level (1-4) is distinct from bloom_level (1-6). NULL for legacy
+    # rows and for questions without a competency link. The value comes from
+    # model output; the range is enforced via CHECK (check_ln_level_range, see
+    # __table_args__).
     competency_id = Column(
         Integer,
         ForeignKey("competencies.id", ondelete="SET NULL"),
@@ -115,18 +116,18 @@ class QuestionReview(Base):
     )
     ln_level = Column(Integer, nullable=True)
 
-    # Generation provenance (TF-383): Snapshot der Vorlage/des Prompts, mit dem
-    # diese Frage erzeugt wurde. Eingefroren zum Generierungszeitpunkt, damit
-    # spätere Template-Änderungen die Herkunft alter Fragen nicht verfälschen.
-    # Form: {"prompt_id", "prompt_name", "prompt_version", "is_default_template",
-    #        "fallback_to_default", "variables": {...}} — siehe das Envelope in
-    #        schemas/generation_metadata.py. "fallback_to_default" ist IMMER
-    #        präsent (Default false; true nur, wenn ein Custom-Prompt-Render
-    #        fehlschlug und aufs Default-Template zurückfiel). NULL für Altbestand
-    #        (Daten existierten nie).
+    # Generation provenance (TF-383): a snapshot of the template/prompt this
+    # question was generated with. Frozen at generation time so later template
+    # changes never falsify the provenance of old questions.
+    # Shape: {"prompt_id", "prompt_name", "prompt_version", "is_default_template",
+    #        "fallback_to_default", "variables": {...}} — see the envelope in
+    #        schemas/generation_metadata.py. "fallback_to_default" is ALWAYS
+    #        present (default false; true only when a custom-prompt render
+    #        failed and fell back to the default template). NULL for legacy
+    #        rows (the data never existed).
     generation_metadata = Column(JSON, nullable=True)
 
-    # Review Status (String mit CHECK Constraint statt Enum)
+    # Review status (String with CHECK constraint instead of Enum)
     review_status = Column(
         String(20), default=ReviewStatus.PENDING.value, nullable=False, index=True
     )
@@ -177,10 +178,10 @@ class QuestionReview(Base):
     # Exam Association
     exam_id = Column(String(100), nullable=True, index=True)  # RAG Exam ID
 
-    # TF-396: Archiv-Achse (orthogonal zu review_status).
-    # archived_at IS NULL  => aktiv; gesetzt => archiviert (aus Bank/Listen
-    # ausgeblendet, in Prüfungen aber erhalten). Wiederherstellen = archived_at
-    # zurück auf NULL, review_status bleibt unverändert.
+    # TF-396: archive axis (orthogonal to review_status).
+    # archived_at IS NULL  => active; set => archived (hidden from bank/lists,
+    # but retained in exams). Restoring = archived_at back to NULL,
+    # review_status stays unchanged.
     archived_at = Column(DateTime, nullable=True, index=True)
     archived_by = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -210,12 +211,13 @@ class QuestionReview(Base):
         cascade="all, delete-orphan",
         back_populates="question",
     )
-    # TF-400: read-only Anzeige-Relationship auf die geprüfte Handlungskompetenz.
-    # viewonly + kein cascade — die FK ist SET NULL, die Frage darf die Kompetenz
-    # überleben. lazy="selectin" batcht den competency-Load über die Queue.
-    # ACHTUNG: _serialize_competency liest zusätzlich competency.framework
-    # (Competency.framework ist default-lazy) → ein Folge-Query pro HK-behafteter
-    # Frage; bei wachsender Queue dort ebenfalls selectin setzen.
+    # TF-400: read-only display relationship to the tested competency.
+    # viewonly + no cascade — the FK is SET NULL, the question must outlive
+    # the competency. lazy="selectin" batches the competency load across the
+    # queue.
+    # NOTE: _serialize_competency also reads competency.framework
+    # (Competency.framework is default-lazy) → one follow-up query per
+    # competency-linked question; set selectin there too if the queue grows.
     competency = relationship("Competency", lazy="selectin", viewonly=True)
 
     # Table constraints
@@ -224,7 +226,7 @@ class QuestionReview(Base):
             "review_status IN ('pending', 'approved', 'rejected', 'edited', 'in_review')",
             name="check_review_status",
         ),
-        # TF-400: ln_level ist 1–4 oder NULL (distinkt von bloom_level 1–6).
+        # TF-400: ln_level is 1–4 or NULL (distinct from bloom_level 1–6).
         CheckConstraint(
             "ln_level IS NULL OR (ln_level >= 1 AND ln_level <= 4)",
             name="check_ln_level_range",
@@ -249,8 +251,8 @@ class QuestionReview(Base):
 
 class ReviewComment(Base):
     """
-    Kommentare zu Question Reviews
-    Ermöglicht Feedback und Diskussion
+    Comments on question reviews
+    Enables feedback and discussion
     """
 
     __tablename__ = "review_comments"
@@ -288,8 +290,8 @@ class ReviewComment(Base):
 
 class ReviewHistory(Base):
     """
-    Änderungshistorie für Question Reviews
-    Audit Trail für alle Änderungen
+    Change history for question reviews
+    Audit trail for all changes
     """
 
     __tablename__ = "review_history"

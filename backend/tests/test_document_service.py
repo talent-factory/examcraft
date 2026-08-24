@@ -1,5 +1,5 @@
 """
-Unit Tests für DocumentService
+Unit tests for DocumentService
 """
 
 import pytest
@@ -13,16 +13,16 @@ from models.document import Document, DocumentStatus
 
 
 class TestDocumentService:
-    """Test Suite für DocumentService"""
+    """Test suite for DocumentService"""
 
     @pytest.fixture
     def document_service(self, temp_upload_dir):
-        """DocumentService Instanz für Tests"""
+        """DocumentService instance for tests"""
         return DocumentService(upload_dir=temp_upload_dir)
 
     @pytest.fixture
     def mock_upload_file(self):
-        """Mock UploadFile für Tests"""
+        """Mock UploadFile for tests"""
         content = b"Test document content for unit testing"
         BytesIO(content)
 
@@ -36,7 +36,7 @@ class TestDocumentService:
         return upload_file
 
     def test_init(self, temp_upload_dir):
-        """Test DocumentService Initialisierung"""
+        """Test DocumentService initialization"""
         service = DocumentService(upload_dir=temp_upload_dir)
 
         assert service.upload_dir == temp_upload_dir
@@ -45,7 +45,7 @@ class TestDocumentService:
         assert len(service.supported_formats) == 5
 
     def test_supported_formats(self, document_service):
-        """Test unterstützte Dateiformate"""
+        """Test supported file formats"""
         expected_formats = {
             "application/pdf": ".pdf",
             "application/msword": ".doc",
@@ -57,7 +57,7 @@ class TestDocumentService:
         assert document_service.supported_formats == expected_formats
 
     def test_get_file_extension(self, document_service):
-        """Test Dateierweiterung-Extraktion"""
+        """Test file extension extraction"""
         assert document_service._get_file_extension("test.txt") == ".txt"
         assert document_service._get_file_extension("document.pdf") == ".pdf"
         assert document_service._get_file_extension("file.DOCX") == ".docx"
@@ -65,7 +65,7 @@ class TestDocumentService:
         assert document_service._get_file_extension("") == ""
 
     def test_is_supported_format(self, document_service):
-        """Test Dateiformate-Validierung"""
+        """Test file format validation"""
         assert document_service._is_supported_format("test.txt") is True
         assert document_service._is_supported_format("document.pdf") is True
         assert document_service._is_supported_format("file.docx") is True
@@ -74,13 +74,13 @@ class TestDocumentService:
 
     @pytest.mark.asyncio
     async def test_validate_file_success(self, document_service, mock_upload_file):
-        """Test erfolgreiche Datei-Validierung"""
-        # Sollte keine Exception werfen
+        """Test successful file validation"""
+        # Should not raise an exception
         await document_service._validate_file(mock_upload_file)
 
     @pytest.mark.asyncio
     async def test_validate_file_too_large(self, document_service):
-        """Test Datei zu groß"""
+        """Test file too large"""
         large_file = Mock(spec=UploadFile)
         large_file.filename = "large.txt"
         large_file.size = 100 * 1024 * 1024  # 100MB
@@ -94,7 +94,7 @@ class TestDocumentService:
 
     @pytest.mark.asyncio
     async def test_validate_file_no_filename(self, document_service):
-        """Test Datei ohne Filename"""
+        """Test file without filename"""
         no_name_file = Mock(spec=UploadFile)
         no_name_file.filename = None
         no_name_file.size = 1000
@@ -107,7 +107,7 @@ class TestDocumentService:
 
     @pytest.mark.asyncio
     async def test_validate_file_unsupported_format(self, document_service):
-        """Test nicht unterstütztes Dateiformat"""
+        """Test unsupported file format"""
         unsupported_file = Mock(spec=UploadFile)
         unsupported_file.filename = "test.xyz"
         unsupported_file.size = 1000
@@ -123,7 +123,7 @@ class TestDocumentService:
     async def test_save_file_to_disk(
         self, document_service, mock_upload_file, temp_upload_dir
     ):
-        """Test Datei auf Festplatte speichern"""
+        """Test saving file to disk"""
         file_path = os.path.join(temp_upload_dir, "test_save.txt")
 
         await document_service._save_file_to_disk(mock_upload_file, file_path)
@@ -137,7 +137,7 @@ class TestDocumentService:
 
     @patch("magic.from_file")
     def test_detect_mime_type(self, mock_magic, document_service, temp_upload_dir):
-        """Test MIME-Type Erkennung"""
+        """Test MIME type detection"""
         # Setup
         test_file = os.path.join(temp_upload_dir, "test.txt")
         with open(test_file, "w") as f:
@@ -155,7 +155,7 @@ class TestDocumentService:
     def test_detect_mime_type_fallback(
         self, mock_magic, document_service, temp_upload_dir
     ):
-        """Test MIME-Type Fallback bei Fehlern"""
+        """Test MIME type fallback on errors"""
         # Setup
         test_file = os.path.join(temp_upload_dir, "test.pdf")
         with open(test_file, "w") as f:
@@ -166,14 +166,14 @@ class TestDocumentService:
         # Test
         mime_type = document_service._detect_mime_type(test_file)
 
-        assert mime_type == "application/pdf"  # Fallback basierend auf Extension
+        assert mime_type == "application/pdf"  # Fallback based on extension
 
     @pytest.mark.asyncio
     @patch("services.document_service.uuid.uuid4")
     async def test_upload_document_success(
         self, mock_uuid, document_service, mock_upload_file
     ):
-        """Test erfolgreicher Document Upload"""
+        """Test successful document upload"""
         # Setup
         mock_uuid_obj = Mock()
         mock_uuid_obj.hex = "test123"
@@ -193,7 +193,7 @@ class TestDocumentService:
         assert document.mime_type == "text/plain"
         assert document.status == DocumentStatus.UPLOADED
         assert document.user_id == "test_user"
-        # Prüfe dass filename gesetzt wurde (UUID wird als Mock-String dargestellt)
+        # Check that filename was set (UUID is represented as a mock string)
         assert document.filename is not None
         assert ".txt" in document.filename
 
@@ -203,7 +203,7 @@ class TestDocumentService:
         mock_db.refresh.assert_called_once()
 
     def test_get_document_by_id(self, document_service):
-        """Test Dokument nach ID holen"""
+        """Test getting document by ID"""
         mock_db = Mock()
         mock_query = Mock()
         mock_db.query.return_value = mock_query
@@ -216,7 +216,7 @@ class TestDocumentService:
         mock_db.query.assert_called_once()
 
     def test_update_document_status(self, document_service):
-        """Test Dokument Status Update"""
+        """Test document status update"""
         mock_db = Mock()
         mock_document = Mock()
         mock_document.status = DocumentStatus.UPLOADED
@@ -235,7 +235,7 @@ class TestDocumentService:
         mock_db.refresh.assert_called_once()
 
     def test_delete_document_success(self, document_service, temp_upload_dir):
-        """Test erfolgreiche Dokument-Löschung"""
+        """Test successful document deletion"""
         # Setup
         test_file = os.path.join(temp_upload_dir, "test_delete.txt")
         with open(test_file, "w") as f:
@@ -256,7 +256,7 @@ class TestDocumentService:
         mock_db.commit.assert_called_once()
 
     def test_delete_document_not_found(self, document_service):
-        """Test Dokument-Löschung wenn nicht gefunden"""
+        """Test document deletion when not found"""
         mock_db = Mock()
 
         with patch.object(document_service, "get_document_by_id", return_value=None):
@@ -266,10 +266,10 @@ class TestDocumentService:
 
     @pytest.mark.asyncio
     async def test_get_full_document_content_chat_export(self, document_service):
-        """Test get_full_document_content für Chat-Exports (TF-111 Fix)"""
+        """Test get_full_document_content for chat exports (TF-111 fix)"""
         mock_db = Mock()
 
-        # Mock Chat-Export Dokument
+        # Mock chat export document
         mock_document = Mock(spec=Document)
         mock_document.id = 1
         mock_document.doc_metadata = {
@@ -284,7 +284,7 @@ class TestDocumentService:
         ):
             content = await document_service.get_full_document_content(1, mock_db)
 
-        # Sollte full_content aus doc_metadata zurückgeben
+        # Should return full_content from doc_metadata
         assert content is not None
         assert content == mock_document.doc_metadata["full_content"]
         assert len(content) > 500
@@ -293,15 +293,15 @@ class TestDocumentService:
     async def test_get_full_document_content_chat_export_fallback(
         self, document_service
     ):
-        """Test get_full_document_content Fallback für alte Chat-Exports"""
+        """Test get_full_document_content fallback for old chat exports"""
         mock_db = Mock()
 
-        # Mock altes Chat-Export Dokument ohne full_content
+        # Mock old chat export document without full_content
         mock_document = Mock(spec=Document)
         mock_document.id = 1
         mock_document.doc_metadata = {
             "source": "chat_export"
-            # Kein full_content (alte Exports)
+            # No full_content (old exports)
         }
         mock_document.content_preview = "# Wissensdokumentation\n\nPreview..."
 
@@ -310,5 +310,5 @@ class TestDocumentService:
         ):
             content = await document_service.get_full_document_content(1, mock_db)
 
-        # Sollte auf content_preview zurückfallen
+        # Should fall back to content_preview
         assert content == mock_document.content_preview

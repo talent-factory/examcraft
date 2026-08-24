@@ -124,7 +124,7 @@ async def complete_onboarding_step(
         completed.append(request.step)
     progress.completed_steps = completed
 
-    # Catch-up: wenn step in skipped_steps war, daraus entfernen
+    # Catch-up: if the step was in skipped_steps, remove it from there
     skipped = list(progress.skipped_steps or [])
     if request.step in skipped:
         skipped.remove(request.step)

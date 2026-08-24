@@ -51,9 +51,9 @@ const Auswertungen: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    // TF-335: Echte Pagination — Backend-Cap auf 500 angehoben, UI
-    // schickt limit=rowsPerPage + offset. Daten kommen page-weise,
-    // ``total`` wird vom Backend mitgeliefert.
+    // TF-335: real pagination — backend cap raised to 500, UI
+    // sends limit=rowsPerPage + offset. Data arrives page by page,
+    // ``total`` is supplied by the backend.
     ComposerService.listExams({ limit: rowsPerPage, offset: page * rowsPerPage })
       .then((response) => {
         if (cancelled) return;
@@ -197,7 +197,7 @@ const Auswertungen: React.FC = () => {
           examTitle={importExam.title}
           onClose={() => setImportExam(null)}
           onImported={() => {
-            // Schnell weiterklicken — der User soll die Submissions sehen.
+            // Quick follow-up navigation — the user should see the submissions.
             const id = importExam.id;
             setImportExam(null);
             navigate(`/auswertungen/${id}/submissions`);

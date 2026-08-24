@@ -1,8 +1,8 @@
 """
-Integration-Tests: Superuser darf fremde Dokumente verarbeiten/löschen.
+Integration tests: superuser may process/delete documents belonging to others.
 
-Ruft die Endpoint-Funktionen direkt (statt via TestClient mit Lifespan) auf,
-um Test-Isolation gegen `core_api_*` re-import zu vermeiden.
+Calls the endpoint functions directly (instead of via TestClient with
+lifespan) to avoid test isolation issues with `core_api_*` re-import.
 """
 
 import asyncio
@@ -84,7 +84,7 @@ def _run(coro):
 
 
 def test_process_foreign_doc_as_owner_returns_200(stage_data, test_db):
-    """Owner kann eigenes Dokument processen — kein Audit-Bypass-Log."""
+    """Owner can process their own document — no audit bypass log."""
     s = stage_data
     result = _run(
         process_document(
@@ -104,7 +104,7 @@ def test_process_foreign_doc_as_owner_returns_200(stage_data, test_db):
 
 
 def test_process_foreign_doc_as_other_user_raises_403(stage_data, test_db):
-    """Anderer User (kein Superuser) bekommt 403."""
+    """Another user (not a superuser) gets 403."""
     s = stage_data
     with pytest.raises(HTTPException) as exc:
         _run(
@@ -121,7 +121,7 @@ def test_process_foreign_doc_as_other_user_raises_403(stage_data, test_db):
 
 
 def test_process_foreign_doc_as_superuser_logs_bypass(stage_data, test_db):
-    """Superuser bypassed Owner-Check + Bypass wird im audit_logs festgehalten."""
+    """Superuser bypasses the owner check + the bypass is recorded in audit_logs."""
     s = stage_data
     result = _run(
         process_document(
@@ -152,7 +152,7 @@ def test_process_foreign_doc_as_superuser_logs_bypass(stage_data, test_db):
 
 
 def test_delete_foreign_doc_as_superuser_logs_bypass(stage_data, test_db):
-    """Superuser darf fremdes Dokument löschen + Audit-Eintrag."""
+    """Superuser may delete a document belonging to someone else + audit entry."""
     s = stage_data
     _run(
         delete_document(
@@ -177,7 +177,7 @@ def test_delete_foreign_doc_as_superuser_logs_bypass(stage_data, test_db):
 def test_delete_foreign_doc_as_same_institution_admin_logs_admin_cross_owner(
     stage_data, test_db
 ):
-    """Same-institution-Admin (kein Superuser) darf löschen, wird aber auditiert."""
+    """Same-institution admin (not a superuser) may delete, but it is audited."""
     s = stage_data
 
     # Add admin role to `other` user, same institution as the doc owner.
@@ -223,7 +223,7 @@ def test_delete_foreign_doc_as_same_institution_admin_logs_admin_cross_owner(
 
 
 def test_upload_over_doc_quota_as_superuser_logs_bypass(stage_data, test_db):
-    """Superuser darf trotz erschöpftem max_documents weiter hochladen + Bypass-Audit."""
+    """Superuser may keep uploading despite exhausted max_documents + bypass audit."""
     s = stage_data
     s.owner.institution.max_documents = 0
     test_db.commit()
@@ -249,9 +249,9 @@ def test_upload_over_doc_quota_as_superuser_logs_bypass(stage_data, test_db):
 def test_delete_foreign_doc_as_superuser_aborts_when_audit_fails(
     stage_data, test_db, mocker
 ):
-    """DSGVO-Vertrag: Wenn der Audit-Log nicht persistiert werden kann, darf
-    der Superuser-Bypass NICHT durchgehen — HTTP 500, Dokument bleibt
-    bestehen."""
+    """GDPR contract: if the audit log cannot be persisted, the
+    superuser bypass must NOT go through — HTTP 500, document remains
+    intact."""
     s = stage_data
     mocker.patch("services.audit_service.AuditService.log_action", return_value=None)
 
@@ -266,7 +266,7 @@ def test_delete_foreign_doc_as_superuser_aborts_when_audit_fails(
         )
     assert exc.value.status_code == 500
 
-    # Dokument muss noch existieren — Bypass wurde abgebrochen.
+    # Document must still exist — bypass was aborted.
     from models.document import Document
 
     assert test_db.query(Document).filter(Document.id == s.doc.id).first() is not None
@@ -275,8 +275,8 @@ def test_delete_foreign_doc_as_superuser_aborts_when_audit_fails(
 def test_delete_foreign_doc_as_admin_aborts_when_audit_fails(
     stage_data, test_db, mocker
 ):
-    """DSGVO-Vertrag: Same-institution-Admin darf bei Audit-Persistenz-Fehler
-    ebenfalls nicht durchgehen — analog zum Superuser."""
+    """GDPR contract: a same-institution admin must also not go through
+    on an audit persistence failure — analogous to the superuser."""
     from models.auth import Role
 
     s = stage_data

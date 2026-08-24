@@ -2,28 +2,29 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * TF-626-Review: `types/index.ts` re-exportiert mehrere Module per
- * `export * from './x'`. TypeScript loest einen Namenskonflikt zwischen zwei
- * `export *`-Quellen NICHT mit einem Fehler auf — der kollidierende Name
- * verschwindet einfach lautlos aus dem Barrel (kein Compiler-Diagnostic am
- * Ort des Konflikts, nur ein spaeteres "no exported member", falls und wenn
- * jemand versucht, ihn zu importieren). Genau das ist bei `SupportedLanguage`
- * passiert (kollidierte zwischen auth.ts und document.ts, siehe PR #191 /
- * TF-626) und wurde erst durch einen zufaelligen Compile-Fehler entdeckt.
+ * TF-626-Review: `types/index.ts` re-exports several modules via
+ * `export * from './x'`. TypeScript does NOT resolve a name conflict
+ * between two `export *` sources with an error — the colliding name
+ * simply vanishes silently from the barrel (no compiler diagnostic at
+ * the point of conflict, only a later "no exported member" if and when
+ * someone tries to import it). Exactly that happened with
+ * `SupportedLanguage` (collided between auth.ts and document.ts, see
+ * PR #191 / TF-626) and was only discovered through an unrelated
+ * compile error.
  *
- * `rbac.ts` umgeht das bereits bewusst per selektivem `export type { ... }`
- * (siehe Kommentar dort: "Selective export to avoid conflicts with
- * auth.ts") — dieser Test macht dieselbe Garantie fuer die verbleibenden,
- * per Wildcard re-exportierten Module maschinell pruefbar, statt sie nur zu
- * dokumentieren. Er ersetzt keinen echten Typecheck (der die tatsaechliche
- * Barrel-Aufloesung braucht), ist aber eine reine Textanalyse — schnell,
- * ohne `ts-morph`/Compiler-API-Abhaengigkeit, und faellt fuer jede neue
- * Namenskollision unter denselben Dateien rot.
+ * `rbac.ts` already sidesteps this deliberately via a selective
+ * `export type { ... }` (see the comment there: "Selective export to
+ * avoid conflicts with auth.ts") — this test makes the same guarantee
+ * machine-checkable for the remaining wildcard-re-exported modules
+ * instead of only documenting it. It doesn't replace a real typecheck
+ * (which needs the actual barrel resolution), but is pure text
+ * analysis — fast, no `ts-morph`/compiler-API dependency, and fails for
+ * any new name collision across these files.
  */
 
 const TYPES_DIR = path.join(__dirname, '..');
 
-// Muss mit den `export * from './x'`-Zeilen in `types/index.ts` uebereinstimmen.
+// Must match the `export * from './x'` lines in `types/index.ts`.
 const WILDCARD_EXPORTED_MODULES = [
   'auth',
   'document',
@@ -34,8 +35,8 @@ const WILDCARD_EXPORTED_MODULES = [
 ];
 
 // Top-level `export interface X`, `export type X`, `export enum X`,
-// `export const X`, `export class X`, `export function X` — bewusst nur
-// Top-level (kein `export default`, das kollidiert nicht namentlich).
+// `export const X`, `export class X`, `export function X` — deliberately
+// top-level only (not `export default`, which doesn't collide by name).
 const EXPORT_NAME_PATTERN =
   /^export\s+(?:interface|type|enum|class|function|const|abstract class)\s+([A-Za-z_$][A-Za-z0-9_$]*)/gm;
 
@@ -44,8 +45,8 @@ function extractExportedNames(moduleName: string): string[] {
   const content = fs.readFileSync(filePath, 'utf-8');
   const names: string[] = [];
   let match: RegExpExecArray | null;
-  // Regex hat globalen State — pro Datei einen frischen Aufruf, kein
-  // gemeinsames Aufrufmuster ueber Iterationen hinweg.
+  // Regex has global state — reset before each file, no shared call
+  // pattern across iterations.
   EXPORT_NAME_PATTERN.lastIndex = 0;
   while ((match = EXPORT_NAME_PATTERN.exec(content)) !== null) {
     names.push(match[1]);
@@ -87,9 +88,10 @@ describe('types/index.ts barrel — keine stillen export*-Kollisionen (TF-626-Re
   });
 
   it('deckt genau die in types/index.ts per export* re-exportierten Module ab', () => {
-    // Fail-safe: wenn jemand types/index.ts um ein weiteres `export * from` erweitert,
-    // ohne diese Liste nachzuziehen, soll der Test das melden statt still zu
-    // schweigen (er wuerde die neue Datei sonst nicht mitpruefen).
+    // Fail-safe: if someone extends types/index.ts with another
+    // `export * from` without updating this list, the test should flag
+    // it instead of staying silent (it would otherwise not check the
+    // new file at all).
     const indexContent = fs.readFileSync(
       path.join(TYPES_DIR, 'index.ts'),
       'utf-8'

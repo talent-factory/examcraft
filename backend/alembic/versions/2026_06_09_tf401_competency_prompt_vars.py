@@ -1,10 +1,10 @@
-"""TF-401: Kompetenz-Variablen in Default-Prompt-Templates (Data-Migration).
+"""TF-401: competency variables in default prompt templates (data migration).
 
-Aktualisiert die bereits geseedeten Default-Prompt-Zeilen (Jinja2-Pfad) in
-bestehenden Datenbanken um den Handlungskompetenzen-Block und die beiden
-Output-Keys (competency_code, ln_level). Die NEUEN Bodies sind byte-identisch
-zu premium/backend/scripts/seed_prompts.py; die ALTEN (downgrade) byte-identisch
-zum git-HEAD-Stand vor dieser Migration.
+Updates the already-seeded default prompt rows (Jinja2 path) in existing
+databases with the competency block and the two output keys
+(competency_code, ln_level). The NEW bodies are byte-identical to
+premium/backend/scripts/seed_prompts.py; the OLD ones (downgrade) are
+byte-identical to the git HEAD state before this migration.
 
 Revision ID: tf401_competency_prompt_vars
 Revises: tf400_competency_frameworks
@@ -47,9 +47,9 @@ _OLD = {
 
 def upgrade() -> None:
     bind = op.get_bind()
-    # Nur Zeilen migrieren, die noch byte-identisch auf dem bekannten ALTEN Body
-    # stehen. Individuell angepasste Default-Prompts (via Prompt-KB-UI editiert)
-    # bleiben unangetastet — sonst ginge ihre Anpassung verloren.
+    # Only migrate rows that are still byte-identical to the known OLD body.
+    # Individually customized default prompts (edited via the prompt KB UI)
+    # remain untouched — otherwise their customization would be lost.
     for name, new_content in _NEW.items():
         bind.execute(
             sa.text(
@@ -61,9 +61,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
-    # Spiegelbildlich: nur die von upgrade() tatsächlich geänderten Zeilen
-    # zurücksetzen (noch byte-identisch auf dem NEUEN Body) — ein zwischenzeitlich
-    # angepasster Prompt wird nicht überschrieben.
+    # Mirror image: only reset rows actually changed by upgrade() (still
+    # byte-identical to the NEW body) — a prompt customized in the meantime
+    # is not overwritten.
     for name, old_content in _OLD.items():
         bind.execute(
             sa.text(

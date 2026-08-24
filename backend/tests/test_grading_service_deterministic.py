@@ -373,7 +373,7 @@ def test_true_false_normalisation(
 def test_true_false_unrecognised_token_is_wrong(
     grader: DeterministicGrader,
 ) -> None:
-    """Spec 6.2: nicht-erkennbare Antworten werten als falsch."""
+    """Spec 6.2: unrecognized answers are scored as wrong."""
     outcome = grader.grade(
         question_type="true_false",
         given_answer="vielleicht",
@@ -410,7 +410,7 @@ def test_unknown_question_type_raises(grader: DeterministicGrader) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Stub für offene Fragen (Phase-1-Verhalten)
+# Stub for open-ended questions (phase-1 behavior)
 # ---------------------------------------------------------------------------
 
 
@@ -433,7 +433,7 @@ def test_grade_outcome_is_immutable() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Multi-Select-MC: dokumentiert das Strict-Equality-Verhalten
+# Multi-select MC: documents the strict-equality behavior
 # ---------------------------------------------------------------------------
 
 

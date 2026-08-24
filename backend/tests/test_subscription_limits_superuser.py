@@ -1,6 +1,6 @@
 """
-Tests für Superuser-Bypass in SubscriptionLimits.
-Deckt alle 4 Quota-Methoden ab: User, Document, Storage, Question.
+Tests for superuser bypass in SubscriptionLimits.
+Covers all 4 quota methods: User, Document, Storage, Question.
 """
 
 import json
@@ -82,7 +82,7 @@ def test_user_limit_normal_user_blocked(test_db, test_institution, normal_user):
 
 
 def test_user_limit_superuser_bypass_logs_audit(test_db, test_institution, super_user):
-    """Superuser-Bypass wird unbedingt geloggt, wenn Quota konfiguriert ist."""
+    """Superuser bypass is always logged when a quota is configured."""
     test_institution.max_users = 5
     test_db.commit()
 
@@ -99,7 +99,7 @@ def test_user_limit_superuser_bypass_logs_audit(test_db, test_institution, super
 def test_user_limit_superuser_no_log_when_unlimited(
     test_db, test_institution, super_user
 ):
-    """Superuser bei -1 (unlimited) → kein Bypass-Log (nichts zu bypassen)."""
+    """Superuser with -1 (unlimited) → no bypass log (nothing to bypass)."""
     test_institution.max_users = -1
     test_db.commit()
 
@@ -111,7 +111,7 @@ def test_user_limit_superuser_no_log_when_unlimited(
 
 
 def test_user_limit_backwards_compat_no_user_kwarg(test_db, test_institution):
-    """Aufruf ohne user-Param funktioniert weiter (Backwards-Compat)."""
+    """Calling without the user param keeps working (backwards compat)."""
     test_institution.max_users = 100
     test_db.commit()
     SubscriptionLimits.check_user_limit(test_institution, test_db)  # no exception
@@ -149,7 +149,7 @@ def test_document_limit_normal_user_blocked(test_db, test_institution, normal_us
 def test_document_limit_superuser_bypass_logs_audit(
     test_db, test_institution, super_user
 ):
-    """Bypass wird unbedingt geloggt, wenn Limit konfiguriert."""
+    """Bypass is always logged when a limit is configured."""
     test_institution.max_documents = 100
     test_db.commit()
 
@@ -216,7 +216,7 @@ def test_question_limit_normal_user_blocked(test_db, test_institution, normal_us
 def test_question_limit_superuser_bypass_logs_audit(
     test_db, test_institution, super_user
 ):
-    """Bypass wird unbedingt geloggt, wenn Limit konfiguriert."""
+    """Bypass is always logged when a limit is configured."""
     test_institution.max_questions_per_month = 100
     test_db.commit()
 
@@ -263,10 +263,10 @@ def _seed_storage_quota(test_db, institution, quota_mb: int):
             display_name=institution.subscription_tier.capitalize(),
         )
     )
-    # Echtes Upsert: TierQuota hat (tier_id, resource_type) als Unique Index,
-    # aber id als Primary Key — merge() ohne id würde immer INSERT machen
-    # und gegen idx_tier_quota_unique kollidieren, wenn vorherige Tests die
-    # Zeile commit-leaked haben (test_seed_pricing, test_quota_enforcement_integration).
+    # Real upsert: TierQuota has (tier_id, resource_type) as a unique index,
+    # but id as the primary key — merge() without an id would always INSERT
+    # and collide with idx_tier_quota_unique if a previous test leaked the
+    # row via commit (test_seed_pricing, test_quota_enforcement_integration).
     existing = (
         test_db.query(TierQuota)
         .filter_by(tier_id=tier_id, resource_type="storage_mb")
@@ -288,7 +288,7 @@ def _seed_storage_quota(test_db, institution, quota_mb: int):
 def test_storage_limit_normal_user_blocked(test_db, test_institution, normal_user):
     _seed_storage_quota(test_db, test_institution, quota_mb=1)
     _create_documents(test_db, test_institution, 1, start_id=900)
-    # Mit nur 1MB Quota würde ein 10MB-Upload überschreiten:
+    # With only a 1MB quota, a 10MB upload would exceed it:
     with pytest.raises(HTTPException) as exc:
         SubscriptionLimits.check_storage_limit(
             test_institution,
@@ -302,7 +302,7 @@ def test_storage_limit_normal_user_blocked(test_db, test_institution, normal_use
 def test_storage_limit_superuser_bypass_logs_audit(
     test_db, test_institution, super_user
 ):
-    """Bypass wird unbedingt geloggt, wenn Limit konfiguriert (auch unter Limit)."""
+    """Bypass is always logged when a limit is configured (even when under the limit)."""
     _seed_storage_quota(test_db, test_institution, quota_mb=1000)
     SubscriptionLimits.check_storage_limit(
         test_institution,

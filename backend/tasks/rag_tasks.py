@@ -13,9 +13,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Geschlossene Wertemenge für das ``status``-Feld des reindex-Result-Envelopes
-# (TF-370). Als Literal getypt, damit Tippfehler an Schreib-/Lesestellen
-# statisch auffallen statt erst im Consumer zu einem stillen Mismatch zu werden.
+# Closed set of values for the ``status`` field of the reindex result envelope
+# (TF-370). Typed as a Literal so typos at write/read sites are caught
+# statically instead of becoming a silent mismatch in the consumer.
 ReindexStatus = Literal["reindexed", "deferred", "not_found"]
 
 
@@ -35,9 +35,9 @@ def create_embeddings(document_id: str, chunks: List[str]) -> Dict[str, Any]:
         Dict with embedding status and statistics
     """
     db = SessionLocal()
-    # Vor dem try binden: schlägt die Query unten fehl (z. B. DB nicht
-    # erreichbar), referenziert der except-Block `document` sonst ungebunden
-    # (UnboundLocalError) und verdeckt den eigentlichen Fehler.
+    # Bind before the try: if the query below fails (e.g. DB unreachable),
+    # the except block would otherwise reference `document` unbound
+    # (UnboundLocalError), masking the actual error.
     document = None
 
     try:

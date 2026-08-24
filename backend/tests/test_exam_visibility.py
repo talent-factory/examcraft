@@ -1,24 +1,24 @@
-"""TF-643: Tests für Exam-Sichtbarkeit (private/team/institution)
-+ Institutions-Admin-Bypass (``exams:read_all``).
+"""TF-643: Tests for exam visibility (private/team/institution)
++ institution admin bypass (``exams:read_all``).
 
-Scope-Grenze (siehe utils/exam_visibility.py Modul-Docstring +
-/grilling-Entscheidungen TF-643): Sichtbarkeit gilt für Exam-Browsing
-(``list_exams``/``get_exam``) UND — ohne den ``exams:read_all``-Bypass — für
-jede Exam-Mutation (update/update-grading-scheme/delete/archive/restore/
+Scope boundary (see the utils/exam_visibility.py module docstring +
+the /grilling decisions for TF-643): visibility applies to exam browsing
+(``list_exams``/``get_exam``) AND — without the ``exams:read_all`` bypass —
+to every exam mutation (update/update-grading-scheme/delete/archive/restore/
 add-questions/update-question/remove-question/reorder/auto-fill/finalize/
-unfinalize/export), da diese alle über ``_get_exam_or_404`` laufen.
-Deliberately NICHT für ``submissions:grade``/``submissions:read`` (bleibt
-institutionsflach über ``api.submissions._load_exam_for_user``, ebenso
-``api.stats``/``api.grades``/``api.grade_export``) und NICHT gekoppelt an
-``ExamStatus`` — Sichtbarkeit gilt uniform über DRAFT/FINALIZED/EXPORTED.
-Diese drei Punkte haben je einen expliziten Regressions-Test unten.
+unfinalize/export), since these all go through ``_get_exam_or_404``.
+Deliberately NOT for ``submissions:grade``/``submissions:read`` (which stays
+institution-flat via ``api.submissions._load_exam_for_user``, likewise
+``api.stats``/``api.grades``/``api.grade_export``) and NOT coupled to
+``ExamStatus`` — visibility applies uniformly across DRAFT/FINALIZED/EXPORTED.
+Each of these three points has an explicit regression test below.
 
-PR-#193-Review-Nachlese (fix-all): zusätzlich Tests für den
-Institutions-Drift-Fix in der Creator-Branch von ``is_exam_visible_for``
-(``require_same_institution``), den SuperUser-Team-Sichtbarkeits-Bugfix
-(Create- UND Update-Pfad), zwei DB-CHECK-Constraint-Regressionstests, den
-No-op-403-Fix in ``_resolve_exam_visibility_update`` und einen
-parametrisierten Test über alle 13 mutierenden Endpunkte.
+PR #193 review follow-up (fix-all): additionally tests for the
+institution-drift fix in the creator branch of ``is_exam_visible_for``
+(``require_same_institution``), the superuser team-visibility bugfix
+(both create AND update paths), two DB CHECK constraint regression tests,
+the no-op-403 fix in ``_resolve_exam_visibility_update``, and a
+parametrized test across all 13 mutating endpoints.
 """
 
 import json
@@ -101,11 +101,11 @@ def make_user(db, institution_id, suffix, is_superuser=False):
 
 
 def make_user_with_role(db, institution_id, suffix, perms):
-    """Non-Superuser mit einer Rolle, die genau ``perms`` trägt.
+    """Non-superuser with a role that carries exactly ``perms``.
 
-    Rollenname mit ``tf643-`` genamespaced — ``Role.name`` ist global unique
-    (CI-Gotcha, siehe TF-640-Nachlese), Kollision mit anderen Testdateien
-    vermeiden.
+    Role name namespaced with ``tf643-`` — ``Role.name`` is globally unique
+    (CI gotcha, see the TF-640 follow-up), to avoid collisions with other
+    test files.
     """
     user = make_user(db, institution_id, suffix)
     role = Role(
@@ -162,7 +162,7 @@ def make_exam(
 
 
 def login(client, user):
-    """Override beide Auth-Dependencies auf denselben User."""
+    """Override both auth dependencies to the same user."""
     client.app.dependency_overrides[get_current_user] = lambda: user
     client.app.dependency_overrides[get_current_active_user] = lambda: user
 
@@ -357,7 +357,7 @@ def test_is_exam_visible_for_matches_filter(ev_db):
 
 
 # ---------------------------------------------------------------------------
-# Wired: Exam-Liste + Detail (HTTP) — list_exams / get_exam
+# Wired: exam list + detail (HTTP) — list_exams / get_exam
 # ---------------------------------------------------------------------------
 
 

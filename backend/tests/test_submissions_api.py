@@ -28,7 +28,7 @@ from utils.auth_utils import get_current_user, get_current_active_user
 
 
 # ---------------------------------------------------------------------------
-# Fixtures-Helper (ohne Pytest-Fixture, damit pro Test-Setup steuerbar)
+# Fixture helpers (not pytest fixtures, so each test can control its own setup)
 # ---------------------------------------------------------------------------
 
 
@@ -60,7 +60,7 @@ def _make_user(
         password_hash="dummy",  # pragma: allowlist secret
         institution_id=institution_id,
         status=UserStatus.ACTIVE.value,
-        is_superuser=is_superuser,  # Skip Rollen-Setup im Test
+        is_superuser=is_superuser,  # Skip role setup in the test
     )
     db.add(user)
     db.flush()
@@ -121,10 +121,10 @@ def _make_exam(db: Session, institution_id: int) -> Exam:
 
 
 def _client(test_db: Session, user: User) -> TestClient:
-    """TestClient mit DB-Override + injiziertem User."""
+    """TestClient with DB override + injected user."""
     import api.submissions as submissions_module
 
-    # Router registrieren, falls noch nicht durch lifespan geladen.
+    # Register the router if it hasn't been loaded via lifespan yet.
     if submissions_module.router not in app.router.routes:
         app.include_router(submissions_module.router)
         app.include_router(submissions_module.exams_alias_router)
@@ -457,7 +457,7 @@ def test_commit_rejects_json_without_question_texts_before_enqueue(
 
 
 # ---------------------------------------------------------------------------
-# Liste + Detail
+# List + Detail
 # ---------------------------------------------------------------------------
 
 
@@ -481,7 +481,7 @@ def test_list_submissions_returns_imported(test_db: Session) -> None:
 
 
 def test_list_submissions_via_exam_alias(test_db: Session) -> None:
-    """Spec-konformer Alias: GET /api/v1/exams/{exam_id}/submissions"""
+    """Spec-compliant alias: GET /api/v1/exams/{exam_id}/submissions"""
     inst = _make_institution(test_db)
     user = _make_user(test_db, inst.id)
     exam = _make_exam(test_db, inst.id)
@@ -561,14 +561,14 @@ def test_cannot_read_submission_from_other_institution(test_db: Session) -> None
     exam_b = _make_exam(test_db, inst_b.id)
     test_db.commit()
 
-    # Import als User B (worker-Pfad direkt gegen test_db geseedet)
+    # Import as user B (worker path seeded directly against test_db)
     client_b = _client(test_db, user_b)
     job = _seed_import(test_db, exam_b, triggered_by=user_b.id)
     list_b = client_b.get("/api/v1/submissions", params={"exam_id": exam_b.id})
     submission_id = list_b.json()["items"][0]["id"]
     job_id = job.id
 
-    # User A darf weder Liste, Detail, noch Job sehen
+    # User A must not see the list, detail, or job
     client_a = _client(test_db, user_a)
     assert (
         client_a.get("/api/v1/submissions", params={"exam_id": exam_b.id}).status_code
@@ -584,7 +584,7 @@ def test_cannot_read_submission_from_other_institution(test_db: Session) -> None
 
 
 def test_user_without_import_permission_gets_403(test_db: Session) -> None:
-    """Reviewer-User (nur submissions:read) darf nicht importieren."""
+    """Reviewer user (only submissions:read) must not be able to import."""
     from models.auth import Role, UserRole
 
     inst = _make_institution(test_db, slug="rbac")
@@ -616,7 +616,7 @@ def test_user_without_import_permission_gets_403(test_db: Session) -> None:
         password_hash="dummy",  # pragma: allowlist secret
         institution_id=inst.id,
         status=UserStatus.ACTIVE.value,
-        is_superuser=False,  # NICHT Superuser → echter RBAC-Check
+        is_superuser=False,  # NOT a superuser → real RBAC check
     )
     user.roles.append(reviewer_role)
     test_db.add(user)

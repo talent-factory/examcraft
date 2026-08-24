@@ -1,9 +1,9 @@
-"""Rekursive Hierarchie-Traversal fuer OrgUnit (Composite-Pattern-Domain-Layer).
+"""Recursive hierarchy traversal for OrgUnit (Composite-pattern domain layer).
 
-Adjacency-List-Speicherung (OrgUnit.parent_org_unit_id) + rekursive CTEs fuer
-Vorfahren-/Nachfahren-Abfragen. Kapselt die "Blatt vs. Teilbaum ist egal"-
-Eigenschaft aus dem Composite-Pattern in zwei Funktionen, die von Service- und
-API-Schicht einheitlich genutzt werden.
+Adjacency-list storage (OrgUnit.parent_org_unit_id) + recursive CTEs for
+ancestor/descendant queries. Encapsulates the "leaf vs. subtree doesn't
+matter" property from the Composite pattern in two functions, used
+uniformly by the service and API layers.
 
 Design: docs/superpowers/specs/2026-08-07-org-unit-hierarchie-design.md
 """
@@ -20,14 +20,15 @@ from models.org_unit import OrgUnit, UserOrgUnit
 
 logger = logging.getLogger(__name__)
 
-# Alle drei rekursiven CTEs tragen einen ``path``-Array-Guard
-# (``NOT o.id = ANY(d.path)``), obwohl der Schreibpfad (``would_create_cycle``
-# in ``move_org_unit``) Ringe bereits verhindert. Defense-in-depth: sollte der
-# Check je umgangen werden (Race, zukuenftiger Aufrufer, manuelle DB-Aenderung),
-# wuerde ein ungeguardeter ``UNION ALL`` hier sonst endlos rekursieren und die
-# DB-Verbindung fuer jede Institution mit einem Datenring aufhaengen --
-# insbesondere fatal, weil ``get_descendant_counts_for_institution`` bei jedem
-# ``GET /org-units`` aufgerufen wird.
+# All three recursive CTEs carry a ``path`` array guard
+# (``NOT o.id = ANY(d.path)``), even though the write path
+# (``would_create_cycle`` in ``move_org_unit``) already prevents cycles.
+# Defense in depth: should the check ever be bypassed (a race, a future
+# caller, a manual DB change), an unguarded ``UNION ALL`` here would
+# otherwise recurse forever and hang the DB connection for any
+# institution with a data cycle -- especially fatal because
+# ``get_descendant_counts_for_institution`` is called on every
+# ``GET /org-units``.
 _DESCENDANTS_SQL = text(
     """
     WITH RECURSIVE descendants AS (
@@ -76,13 +77,13 @@ _DESCENDANT_COUNTS_SQL = text(
 
 
 def get_descendant_ids(db: Session, org_unit_id: int) -> set[int]:
-    """Alle Nachfahren von ``org_unit_id``, inkl. sich selbst."""
+    """All descendants of ``org_unit_id``, including itself."""
     rows = db.execute(_DESCENDANTS_SQL, {"org_unit_id": org_unit_id}).fetchall()
     return {row[0] for row in rows}
 
 
 def get_ancestor_ids(db: Session, org_unit_id: int) -> set[int]:
-    """Alle Vorfahren von ``org_unit_id``, inkl. sich selbst."""
+    """All ancestors of ``org_unit_id``, including itself."""
     rows = db.execute(_ANCESTORS_SQL, {"org_unit_id": org_unit_id}).fetchall()
     return {row[0] for row in rows}
 
@@ -90,12 +91,12 @@ def get_ancestor_ids(db: Session, org_unit_id: int) -> set[int]:
 def get_descendant_counts_for_institution(
     db: Session, institution_id: int
 ) -> dict[int, int]:
-    """Nachfahren-Anzahl (ohne sich selbst) fuer *alle* OrgUnits einer Institution.
+    """Descendant count (excluding itself) for *all* OrgUnits of an institution.
 
-    Eine einzelne rekursive CTE statt einer pro Zeile -- vermeidet das N+1-
-    Muster, das entsteht, wenn ``get_descendant_ids`` (eine Abfrage pro
-    OrgUnit) in einer Listen-Ansicht pro Zeile aufgerufen wird. Fehlende IDs im
-    Rueckgabe-Dict (kein Eintrag -> 0 Nachfahren) sind normal.
+    A single recursive CTE instead of one per row -- avoids the N+1
+    pattern that would arise if ``get_descendant_ids`` (one query per
+    OrgUnit) were called per row in a list view. Missing IDs in the
+    returned dict (no entry -> 0 descendants) are normal.
     """
     rows = db.execute(
         _DESCENDANT_COUNTS_SQL, {"institution_id": institution_id}
@@ -106,10 +107,10 @@ def get_descendant_counts_for_institution(
 def would_create_cycle(
     db: Session, org_unit_id: int, new_parent_id: int | None
 ) -> bool:
-    """True, wenn ``new_parent_id`` ein Nachfahre (oder ``org_unit_id`` selbst) ist.
+    """True if ``new_parent_id`` is a descendant (or ``org_unit_id`` itself).
 
-    Verhindert Ringe beim Verschieben: ein Knoten darf nicht unter einem
-    seiner eigenen Nachfahren (oder sich selbst) haengen.
+    Prevents cycles when moving: a node must not be attached under one
+    of its own descendants (or itself).
     """
     if new_parent_id is None:
         return False
@@ -119,19 +120,19 @@ def would_create_cycle(
 def get_user_accessible_org_unit_ids(
     db: Session, user_id: int, institution_id: int
 ) -> set[int]:
-    """Alle OrgUnits, auf die ``user_id`` via Mitgliedschaft + Vererbung Zugriff hat.
+    """All OrgUnits that ``user_id`` can access via membership + inheritance.
 
-    Vereinigung der Nachfahren-Mengen aller OrgUnits, denen der User direkt
-    zugeordnet ist (Mehrfachmitgliedschaft moeglich). Wird von Stufe-1-Piloten
-    konsumiert, um Ressourcen-Scoping um OrgUnit-Ebene zu erweitern -- in
-    Stufe 0 noch nirgends verdrahtet (siehe Global Constraints).
+    Union of the descendant sets of all OrgUnits the user is directly
+    assigned to (multiple memberships possible). Consumed by tier-1
+    pilots to extend resource scoping to OrgUnit level -- not yet wired
+    up anywhere in tier 0 (see Global Constraints).
 
-    ``get_descendant_ids`` selbst validiert keine Institution -- das ist heute
-    unkritisch, weil ``create_org_unit``/``move_org_unit`` gleiche Institution
-    bereits beim Schreiben erzwingen. Da diese Funktion aber die zukuenftige
-    Berechtigungs-Erweiterungs-Primitive fuer Stufe 1 ist, filtern wir hier
-    zusaetzlich defense-in-depth auf ``institution_id``, statt uns implizit
-    auf die Schreibpfad-Validierung zu verlassen.
+    ``get_descendant_ids`` itself doesn't validate an institution -- this
+    is uncritical today because ``create_org_unit``/``move_org_unit``
+    already enforce the same institution on write. But since this
+    function is the future permission-extension primitive for tier 1,
+    we additionally filter on ``institution_id`` here as defense in
+    depth, instead of implicitly relying on the write-path validation.
     """
     member_ids = {
         row[0]
@@ -215,20 +216,22 @@ def create_org_unit(
     try:
         db.commit()
     except IntegrityError as exc:
-        # Race-Fallback: der Sibling-Name-Check oben ist SELECT-dann-INSERT,
-        # nicht atomar. Die partiellen Unique-Indizes aus der Migration
-        # (ix_org_units_unique_sibling_name / ix_org_units_unique_root_name)
-        # fangen einen gleichzeitigen Duplikat-Insert ab, der die Vor-Prüfung
-        # umgangen hat, statt ihn als 500 durchschlagen zu lassen.
+        # Race fallback: the sibling-name check above is SELECT-then-
+        # INSERT, not atomic. The partial unique indexes from the
+        # migration (ix_org_units_unique_sibling_name /
+        # ix_org_units_unique_root_name) catch a concurrent duplicate
+        # insert that bypassed the pre-check, instead of letting it
+        # surface as a 500.
         #
-        # TF-637 review fix: das war der einzige mögliche IntegrityError-
-        # Grund, bis role_id (FK auf roles.id) dazukam -- wird eine Role
-        # zwischen dem role_id-Validierungs-Check in der API und diesem
-        # Commit geloescht (TOCTOU-Fenster), verletzt der INSERT stattdessen
-        # die FK-Constraint, nicht den Sibling-Name-Unique-Index. Denselben
-        # Namenskonflikt-Text dafuer auszugeben waere irrefuehrend und
-        # unauffindbar -- Constraint-Name inspizieren + immer loggen, wie in
-        # delete_org_unit (gleiches Prinzip, andere FK).
+        # TF-637 review fix: that used to be the only possible
+        # IntegrityError cause, until role_id (FK to roles.id) was
+        # added -- if a role is deleted between the role_id validation
+        # check in the API and this commit (TOCTOU window), the INSERT
+        # instead violates the FK constraint, not the sibling-name
+        # unique index. Returning the same name-conflict text for that
+        # would be misleading and hard to diagnose -- inspect the
+        # constraint name + always log, as in delete_org_unit (same
+        # principle, different FK).
         db.rollback()
         constraint_name = getattr(
             getattr(exc.orig, "diag", None), "constraint_name", None
@@ -285,13 +288,13 @@ def move_org_unit(
     try:
         db.commit()
     except IntegrityError as exc:
-        # Gleicher Race-Fallback wie in create_org_unit -- inkl. desselben
-        # TF-637-Nachtrags: dieser Commit kann auch einen bereits auf
-        # ``org_unit`` gestagten (aber ungecommitteten) ``role_id``-Wert
-        # aus dem Aufrufer (api/org_units.py::update_org_unit_endpoint)
-        # mit-committen, wenn ein Reparent gleichzeitig angefragt wurde --
-        # also denselben Constraint-Namen inspizieren statt den
-        # Sibling-Name-Konflikt anzunehmen.
+        # Same race fallback as in create_org_unit -- including the same
+        # TF-637 addendum: this commit can also co-commit an already
+        # staged (but uncommitted) ``role_id`` value on ``org_unit``
+        # from the caller (api/org_units.py::update_org_unit_endpoint)
+        # if a reparent was requested at the same time -- so inspect
+        # the same constraint name instead of assuming a sibling-name
+        # conflict.
         db.rollback()
         constraint_name = getattr(
             getattr(exc.orig, "diag", None), "constraint_name", None
@@ -317,27 +320,27 @@ def move_org_unit(
 
 
 def delete_org_unit(db: Session, org_unit: OrgUnit) -> int:
-    """Loescht ``org_unit`` inkl. aller Nachfahren (CASCADE).
+    """Deletes ``org_unit`` including all descendants (CASCADE).
 
-    Gibt die Anzahl der mitgeloeschten Nachfahren zurueck (ohne sich selbst).
-    Hinweis: Das ist die Anzahl *vor* dem Loeschen -- die UI-Warnung muss
-    also vorher (via GET) angezeigt und bestaetigt werden; dieser Rueckgabewert
-    dient nur der Rueckmeldung/Protokollierung durch den Aufrufer, nicht der
-    Bestaetigung selbst.
+    Returns the number of descendants deleted along with it (excluding
+    itself). Note: this is the count *before* the delete -- so the UI
+    warning must be shown and confirmed beforehand (via GET); this
+    return value only serves for feedback/logging by the caller, not
+    for the confirmation itself.
 
-    Raises ``ValueError`` (-> 409 beim Aufrufer) wenn noch Dokumente, Prompts,
-    Fragen, Prüfungen oder Kompetenz-Frameworks auf diese -- oder eine ihrer
-    Nachfahren-OrgUnits -- via ``visibility='team'`` verweisen
+    Raises ``ValueError`` (-> 409 at the caller) if documents, prompts,
+    questions, exams, or competency frameworks still reference this --
+    or one of its descendant OrgUnits -- via ``visibility='team'``
     (TF-620/TF-641/TF-642/TF-643/TF-644): ``documents.org_unit_id``,
     ``prompts.org_unit_id``, ``question_reviews.org_unit_id``,
-    ``exams.org_unit_id`` und ``competency_frameworks.org_unit_id`` haben
-    alle fünf bewusst kein ``ON DELETE CASCADE/SET NULL`` (siehe Migrationen
-    ``tf620_doc_org_unit_scope``, ``tf641_prompt_org_unit_scope``,
-    ``tf642_question_visibility``, ``tf643_exam_visibility`` bzw.
-    ``tf644_competency_visibility``), also schlaegt der DB-seitige FK hier
-    mit einem ``IntegrityError`` fehl statt die referenzierenden Zeilen
-    stillschweigend zu loeschen oder in einen Constraint-Verletzungs-Zustand
-    zu bringen.
+    ``exams.org_unit_id``, and ``competency_frameworks.org_unit_id`` all
+    five deliberately have no ``ON DELETE CASCADE/SET NULL`` (see
+    migrations ``tf620_doc_org_unit_scope``,
+    ``tf641_prompt_org_unit_scope``, ``tf642_question_visibility``,
+    ``tf643_exam_visibility``, and ``tf644_competency_visibility``
+    respectively), so the DB-side FK fails here with an
+    ``IntegrityError`` instead of silently deleting the referencing rows
+    or leaving them in a constraint-violated state.
     """
     descendant_count = len(get_descendant_ids(db, org_unit.id)) - 1
     db.delete(org_unit)
@@ -417,10 +420,10 @@ def assign_user_to_org_unit(
     try:
         db.commit()
     except IntegrityError as exc:
-        # Race-Fallback fuer den gleichen SELECT-dann-INSERT-Zeitfenster wie
-        # oben: die Composite-PK (user_id, org_unit_id) fängt einen
-        # gleichzeitigen Duplikat-Insert DB-seitig ab, statt einen
-        # unbehandelten 500 durchschlagen zu lassen.
+        # Race fallback for the same SELECT-then-INSERT time window as
+        # above: the composite PK (user_id, org_unit_id) catches a
+        # concurrent duplicate insert on the DB side, instead of letting
+        # an unhandled 500 surface.
         db.rollback()
         raise ValueError("User ist dieser OrgUnit bereits zugeordnet") from exc
     db.refresh(membership)
