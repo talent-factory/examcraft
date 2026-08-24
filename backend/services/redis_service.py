@@ -16,6 +16,9 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 REDIS_DB_SESSIONS = 0  # Database 0 for sessions
 REDIS_DB_BLACKLIST = 1  # Database 1 for token blacklist
 REDIS_DB_RATELIMIT = 2  # Database 2 for rate limiting
+REDIS_DB_MCP_OAUTH = (
+    3  # Database 3 for MCP OAuth store (clients, tokens, auth codes, state) — TF-726
+)
 
 
 class RedisService:
@@ -24,6 +27,7 @@ class RedisService:
     _session_client: Optional[redis.Redis] = None
     _blacklist_client: Optional[redis.Redis] = None
     _ratelimit_client: Optional[redis.Redis] = None
+    _mcp_oauth_client: Optional[redis.Redis] = None
 
     @classmethod
     def get_session_client(cls) -> redis.Redis:
@@ -56,6 +60,24 @@ class RedisService:
         return cls._ratelimit_client
 
     @classmethod
+    def get_mcp_oauth_client(cls) -> redis.Redis:
+        """Get Redis client for the MCP OAuth store.
+
+        Backs dynamically-registered OAuth clients, bearer tokens, auth
+        codes and OAuth state nonces (see premium/backend/mcp/store.py).
+        Shared via REDIS_URL across every `examcraft-api` machine — unlike
+        the previous per-machine JSON file on a Fly volume, which caused a
+        registered client to be invisible to requests routed to a different
+        machine (TF-726).
+        """
+        if cls._mcp_oauth_client is None:
+            cls._mcp_oauth_client = redis.from_url(
+                REDIS_URL, db=REDIS_DB_MCP_OAUTH, decode_responses=True
+            )
+            logger.info("Redis MCP OAuth client initialized")
+        return cls._mcp_oauth_client
+
+    @classmethod
     def close_all(cls):
         """Close all Redis connections"""
         if cls._session_client:
@@ -67,6 +89,9 @@ class RedisService:
         if cls._ratelimit_client:
             cls._ratelimit_client.close()
             cls._ratelimit_client = None
+        if cls._mcp_oauth_client:
+            cls._mcp_oauth_client.close()
+            cls._mcp_oauth_client = None
         logger.info("All Redis clients closed")
 
 
