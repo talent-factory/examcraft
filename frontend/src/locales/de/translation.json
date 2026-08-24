@@ -942,6 +942,8 @@
       "resourceLimitsTitle": "Ressourcen-Limits pro Tier",
       "resourceCol": "Ressource",
       "infoNote": "Ressourcen-Limits werden monatlich zurückgesetzt. Unlimited bedeutet keine Beschränkung.",
+      "enterpriseUsersFootnote": "Technisch unbegrenzt – kommerziell gestaffelt: 10 Benutzer inklusive, +CHF 10/Benutzer ab dem 11., individuelle Offerte ab 30 Benutzern.",
+      "enterpriseUsersInfoNote": "Bei Enterprise ist die Nutzeranzahl kommerziell (nicht technisch) gestaffelt: 10 Benutzer im Basispreis inklusive, weitere Benutzer bis 29 gegen Aufpreis, ab 30 Benutzern eine individuelle Offerte.",
       "failedLoad": "Abonnement-Stufen konnten nicht geladen werden"
     },
     "promptLibrary": {

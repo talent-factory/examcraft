@@ -94,6 +94,8 @@ const SubscriptionTierOverview: React.FC = () => {
     );
   }
 
+  const hasEnterpriseTier = tiers.some((tier) => tier.id === 'tier_enterprise');
+
   return (
     <Box>
       <Typography variant="h5" component="h2" gutterBottom>
@@ -190,13 +192,25 @@ const SubscriptionTierOverview: React.FC = () => {
                 {tiers.map((tier) => {
                   const quota = quotas[tier.id]?.find(q => q.resource_type === resourceType);
                   const value = quota?.quota_limit ?? 0;
+                  const isEnterpriseUsersRow = tier.id === 'tier_enterprise' && resourceType === 'users';
 
                   return (
                     <TableCell key={tier.id} align="center">
                       {value === -1 ? (
-                        <Box display="flex" alignItems="center" justifyContent="center">
-                          <InfinityIcon sx={{ mr: 0.5 }} />
-                          <Typography variant="body2">{t('admin.subscriptionTier.unlimited')}</Typography>
+                        <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center">
+                          <Box display="flex" alignItems="center" justifyContent="center">
+                            <InfinityIcon sx={{ mr: 0.5 }} />
+                            <Typography variant="body2">{t('admin.subscriptionTier.unlimited')}</Typography>
+                          </Box>
+                          {isEnterpriseUsersRow && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ mt: 0.5, maxWidth: 220, display: 'block' }}
+                            >
+                              {t('admin.subscriptionTier.enterpriseUsersFootnote')}
+                            </Typography>
+                          )}
                         </Box>
                       ) : value > 0 ? (
                         <Typography variant="body2" fontWeight="medium">
@@ -219,6 +233,11 @@ const SubscriptionTierOverview: React.FC = () => {
           <Typography variant="body2">
             {t('admin.subscriptionTier.infoNote')}
           </Typography>
+          {hasEnterpriseTier && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              {t('admin.subscriptionTier.enterpriseUsersInfoNote')}
+            </Typography>
+          )}
         </Alert>
       </Box>
     </Box>
