@@ -25,7 +25,7 @@ export const RAG_WIZARD_SNAPSHOT_VERSION = 1;
  * und die Fragen stehen ohnehin in der Prüf-Queue).
  *
  * (Nicht mit dem 1-basierten "Schritt 3" in `RAGExamCreator.tsx` verwechseln
- * — das bezeichnet dort denselben `activeStep === 2`, die Kontext-Vorschau.)
+ * — das bezeichnet dort denselben `activeStep === 2`, die Kontextanalyse.)
  */
 export const MAX_RESTORABLE_WIZARD_STEP = 2;
 

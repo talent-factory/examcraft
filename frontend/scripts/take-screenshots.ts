@@ -384,16 +384,25 @@ const SCREENSHOTS: ScreenshotDef[] = [
         return;
       }
 
-      // Schritt 3: "Kontext-Vorschau laden" klicken + warten
-      const previewBtn = page.locator('button:has-text("Kontext-Vorschau")').first();
-      if (await previewBtn.isVisible({ timeout: SELECTOR_TIMEOUT_MS }).catch(() => false)) {
-        await previewBtn.click();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(WIZARD_CONTEXT_WAIT_MS);
-      } else {
-        console.warn('  ⚠ SKIP questions-step3 — "Kontext-Vorschau" Button nicht sichtbar');
+      // Schritt 3: "Kontext analysieren" klicken + warten.
+      //
+      // TF-658: `isVisible()` wartet NICHT — es liefert den Zustand im Moment
+      // des Aufrufs, die `timeout`-Option ändert daran nichts. Seit TF-608
+      // startet Schritt 3 die Analyse beim Betreten selbst; der Button trägt
+      // dann für rund eine Sekunde das Lade-Label und die Prüfung schlug
+      // sofort fehl. Der Screenshot wurde seither still übersprungen — die
+      // Warnung unten ging im Log unter, weil der Lauf trotzdem grün endete.
+      // `waitFor` wartet echt, bis der Button sein Ruhe-Label zurückhat.
+      const previewBtn = page.locator('button:has-text("Kontext analysieren")').first();
+      try {
+        await previewBtn.waitFor({ state: 'visible', timeout: SELECTOR_TIMEOUT_MS });
+      } catch {
+        console.warn('  ⚠ SKIP questions-step3 — "Kontext analysieren" Button nicht sichtbar');
         return;
       }
+      await previewBtn.click();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(WIZARD_CONTEXT_WAIT_MS);
       if (shouldCapture('questions-step3-context-preview.png')) {
         await page.screenshot({
           path: path.join(wizardDir, 'questions-step3-context-preview.png'),

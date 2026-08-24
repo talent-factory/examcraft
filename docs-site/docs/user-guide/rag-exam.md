@@ -44,11 +44,24 @@ In der Dokumentenbibliothek:
 - **Kompetenzrahmen** (optional): Wählen Sie einen [Kompetenzrahmen](kompetenzrahmen.md), damit jede generierte
   Frage automatisch einer Handlungskompetenz und deren LN-Stufe (1–4) zugeordnet wird
 
-### 3. Generierung starten
+### 3. Kontextanalyse und Generierung
 
-![Schritt 3 — Kontext-Vorschau](../screenshots/questions/questions-step3-context-preview.png)
+![Schritt 3 — Kontextanalyse](../screenshots/questions/questions-step3-context-preview.png)
 
-Klicken Sie **RAG-Prüfung generieren**. Wartezeit: 20–60 Sekunden.
+Beim Betreten dieses Schritts durchsucht ExamCraft die gewählten Dokumente
+automatisch nach passenden Textabschnitten. Angezeigt werden die gefundenen
+Quellen, die Anzahl der Textabschnitte, die durchschnittliche Ähnlichkeit und
+wie viele Fragen sich daraus schätzungsweise erzeugen lassen.
+
+**Kontext analysieren** wiederholt die Analyse — nützlich, wenn Sie über
+**Zurück** Thema oder Dokumentenauswahl geändert haben.
+
+!!! note "Die Analyse ist Voraussetzung, nicht optional"
+    **Fragen generieren** bleibt inaktiv, solange kein Kontext gefunden wurde.
+
+Klicken Sie anschliessend **Fragen generieren**. Wartezeit: 20–60 Sekunden.
+Sie können die Seite währenddessen verlassen — die Generierung läuft im
+Hintergrund weiter.
 
 ### 4. Ergebnis prüfen
 

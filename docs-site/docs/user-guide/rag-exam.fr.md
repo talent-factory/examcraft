@@ -38,9 +38,22 @@ Dans la bibliothèque de documents:
 - **Niveau de difficulté**: Facile / Moyen / Difficile
 - **Modèle de prompt**: Choisissez un modèle de prompt avec aperçu en direct
 
-### 3. Démarrer la génération
+### 3. Analyse du contexte et génération
 
-Cliquez sur **Générer l'examen RAG**. Temps d'attente: 20–60 secondes.
+À l'ouverture de cette étape, ExamCraft parcourt automatiquement les documents
+sélectionnés à la recherche de passages pertinents. S'affichent ensuite les
+sources trouvées, le nombre de segments de texte, la similarité moyenne et le
+nombre de questions envisageables.
+
+**Analyser le contexte** relance l'analyse — utile après un retour en arrière
+via **Retour** pour modifier le sujet ou la sélection de documents.
+
+!!! note "L'analyse est un prérequis, pas une option"
+    **Générer l'examen** reste inactif tant qu'aucun contexte n'a été trouvé.
+
+Cliquez ensuite sur **Générer l'examen**. Temps d'attente: 20–60 secondes.
+Vous pouvez quitter la page entre-temps — la génération se poursuit en
+arrière-plan.
 
 ### 4. Vérifier les résultats
 

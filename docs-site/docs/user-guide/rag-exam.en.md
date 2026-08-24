@@ -38,9 +38,20 @@ In the document library:
 - **Difficulty Level**: Easy / Medium / Hard
 - **Prompt Template**: Select a prompt template with live preview
 
-### 3. Start Generation
+### 3. Context Analysis and Generation
 
-Click **Generate RAG Exam**. Wait time: 20–60 seconds.
+Entering this step automatically searches the selected documents for matching
+passages. You then see the sources found, the number of text chunks, the
+average similarity, and roughly how many questions they support.
+
+**Analyze context** repeats the analysis — useful after going **Back** to
+change the topic or the document selection.
+
+!!! note "The analysis is a prerequisite, not an option"
+    **Generate Questions** stays disabled until context has been found.
+
+Then click **Generate Questions**. Wait time: 20–60 seconds. You can leave the
+page meanwhile — generation continues in the background.
 
 ### 4. Review Results
 
