@@ -37,6 +37,7 @@ ExamCraft AI prevede due ruoli:
 | Gestione studenti (`students:manage`) | — | ✓ |
 | Configurazione connessione Moodle (`moodle:configure`) | — | ✓ |
 | Gestione schemi di valutazione (`grading_schemes:manage`) | — | ✓ (Enterprise) |
+| Gestione unità organizzative (`manage_org_units`) | — | ✓ |
 
 ## Assegnare o modificare un ruolo
 
@@ -75,8 +76,23 @@ I due meccanismi agiscono indipendentemente l'uno dall'altro: un ADMIN con tier 
 | ADMIN | Tutte le precedenti + `students:manage`, `moodle:configure` |
 | Institution Owner | Aggiuntivamente `grading_schemes:manage` (Enterprise) |
 
+## Nota di aggiornamento v1.8 — Nuova permission
+
+!!! info "Unità organizzative"
+    Con la v1.8 è stata introdotta la permission `manage_org_units`. È assegnata di default al ruolo di sistema ADMIN e controlla la creazione, lo spostamento, l'eliminazione e la visualizzazione dell'elenco completo delle unità organizzative (dipartimenti/team) nel pannello admin. Senza questa permission la scheda resta invisibile; ogni utente continua a vedere le proprie appartenenze.
+
+    Un'unità organizzativa può inoltre concedere automaticamente un ruolo ai propri membri diretti e controllare chi può vedere le risorse con visibilità team. Per i dettagli vedi [Unità organizzative](org-units.md).
+
+### Mapping ruoli predefiniti (da v1.8)
+
+| Ruolo | Nuove permissions |
+|-------|--------------------|
+| ADMIN | `manage_org_units` |
+| DOCENTE | — |
+
 ## Passaggi successivi
 
 - [:octicons-arrow-right-24: Gestione utenti](user-mgmt.md)
+- [:octicons-arrow-right-24: Gestione unità organizzative](org-units.md)
 - [:octicons-arrow-right-24: Abbonamento e quote](subscription.md)
 - [:octicons-arrow-right-24: Gestione istituzioni](institutions.md)

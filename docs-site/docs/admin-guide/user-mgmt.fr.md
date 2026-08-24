@@ -69,7 +69,12 @@ Vous pouvez modifier l'affectation institutionnelle à tout moment:
 
 Pour plus d'informations sur les institutions: [Gérer les institutions](institutions.md)
 
+## Assigner un utilisateur à une unité organisationnelle
+
+Ouvrez l'utilisateur et cliquez sur **Unités org.** pour gérer les appartenances aux départements/équipes. Plus d'informations : [Unités organisationnelles](org-units.md)
+
 ## Étapes suivantes
 
 - [:octicons-arrow-right-24: Gérer les institutions](institutions.md)
+- [:octicons-arrow-right-24: Gérer les unités organisationnelles](org-units.md)
 - [:octicons-arrow-right-24: Aperçu de l'utilisation](monitoring.md)

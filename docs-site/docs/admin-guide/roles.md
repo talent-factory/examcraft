@@ -37,6 +37,7 @@ ExamCraft AI kennt zwei Rollen:
 | Studierende verwalten (`students:manage`) | — | ✓ |
 | Moodle-Connection konfigurieren (`moodle:configure`) | — | ✓ |
 | Notenschemata verwalten (`grading_schemes:manage`) | — | ✓ (Enterprise) |
+| Organisationseinheiten verwalten (`manage_org_units`) | — | ✓ |
 
 ## Rolle zuweisen oder ändern
 
@@ -75,8 +76,23 @@ Beide Mechanismen greifen unabhängig voneinander: Ein ADMIN mit Free-Tier hat Z
 | ADMIN | Alle obigen + `students:manage`, `moodle:configure` |
 | Institution Owner | Zusätzlich `grading_schemes:manage` (Enterprise) |
 
+## Update-Hinweis v1.8 — Neue Permission
+
+!!! info "Organisationseinheiten"
+    Mit v1.8 wurde die Permission `manage_org_units` eingeführt. Sie ist standardmässig der ADMIN-Systemrolle zugewiesen und steuert das Anlegen, Verschieben, Löschen und das Einsehen der vollständigen Liste von Organisationseinheiten (Abteilungen/Teams) im Admin-Panel. Ohne die Permission bleibt der Tab unsichtbar; jeder Benutzer sieht weiterhin seine eigenen Zugehörigkeiten.
+
+    Eine Organisationseinheit kann zusätzlich ihren direkten Mitgliedern automatisch eine Rolle verleihen und für Ressourcen mit Team-Sichtbarkeit steuern, wer sie sehen darf. Details siehe [Organisationseinheiten](org-units.md).
+
+### Default-Rollen-Mapping (ab v1.8)
+
+| Rolle | Neue Permissions |
+|-------|-------------------|
+| ADMIN | `manage_org_units` |
+| DOZENT | — |
+
 ## Nächste Schritte
 
 - [:octicons-arrow-right-24: Benutzer verwalten](user-mgmt.md)
+- [:octicons-arrow-right-24: Organisationseinheiten verwalten](org-units.md)
 - [:octicons-arrow-right-24: Abonnement und Quotas](subscription.md)
 - [:octicons-arrow-right-24: Institutionen verwalten](institutions.md)

@@ -71,7 +71,12 @@ Sie können die Institutionszuweisung jederzeit ändern:
 
 Weitere Informationen zu Institutionen: [Institutionen verwalten](institutions.md)
 
+## Benutzer einer Organisationseinheit zuweisen
+
+Öffnen Sie den Benutzer und klicken Sie auf **Org-Units**, um Abteilungs-/Team-Zugehörigkeiten zu verwalten. Weitere Informationen: [Organisationseinheiten](org-units.md)
+
 ## Nächste Schritte
 
 - [:octicons-arrow-right-24: Institutionen verwalten](institutions.md)
+- [:octicons-arrow-right-24: Organisationseinheiten verwalten](org-units.md)
 - [:octicons-arrow-right-24: Nutzungsübersicht](monitoring.md)

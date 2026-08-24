@@ -68,7 +68,12 @@ You can change the institution assignment at any time:
 
 More information about institutions: [Manage Institutions](institutions.md)
 
+## Assign User to an Organizational Unit
+
+Open the user and click **Org Units** to manage department/team memberships. More information: [Organizational Units](org-units.md)
+
 ## Next Steps
 
 - [:octicons-arrow-right-24: Manage Institutions](institutions.md)
+- [:octicons-arrow-right-24: Manage Organizational Units](org-units.md)
 - [:octicons-arrow-right-24: Usage Overview](monitoring.md)

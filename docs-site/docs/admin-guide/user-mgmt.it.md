@@ -69,7 +69,12 @@ Potete cambiare l'assegnazione dell'istituzione in qualsiasi momento:
 
 Ulteriori informazioni sulle istituzioni: [Gestire istituzioni](institutions.md)
 
+## Assegnare un utente a un'unità organizzativa
+
+Aprite l'utente e fate clic su **Unità org.** per gestire le appartenenze a dipartimenti/team. Ulteriori informazioni: [Unità organizzative](org-units.md)
+
 ## Passaggi successivi
 
 - [:octicons-arrow-right-24: Gestire istituzioni](institutions.md)
+- [:octicons-arrow-right-24: Gestione unità organizzative](org-units.md)
 - [:octicons-arrow-right-24: Panoramica utilizzo](monitoring.md)

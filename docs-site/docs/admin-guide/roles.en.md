@@ -37,6 +37,7 @@ ExamCraft AI has two roles:
 | Manage students (`students:manage`) | — | ✓ |
 | Configure Moodle connection (`moodle:configure`) | — | ✓ |
 | Manage grading schemes (`grading_schemes:manage`) | — | ✓ (Enterprise) |
+| Manage organizational units (`manage_org_units`) | — | ✓ |
 
 ## Assigning or Changing a Role
 
@@ -75,8 +76,23 @@ Both mechanisms operate independently: an ADMIN on the Free tier has access to t
 | ADMIN | All of the above + `students:manage`, `moodle:configure` |
 | Institution Owner | Additionally `grading_schemes:manage` (Enterprise) |
 
+## Update Notice v1.8 — New Permission
+
+!!! info "Organizational Units"
+    With v1.8, the `manage_org_units` permission was introduced. It is assigned to the ADMIN system role by default and controls creating, moving, deleting, and viewing the full list of organizational units (departments/teams) in the admin panel. Without the permission, the tab stays hidden; every user still sees their own memberships.
+
+    An organizational unit can additionally grant its direct members a role automatically, and control who can see resources with team visibility. See [Organizational Units](org-units.md) for details.
+
+### Default Role Mapping (from v1.8)
+
+| Role | New Permissions |
+|------|------------------|
+| ADMIN | `manage_org_units` |
+| INSTRUCTOR | — |
+
 ## Next Steps
 
 - [:octicons-arrow-right-24: Manage Users](user-mgmt.md)
+- [:octicons-arrow-right-24: Manage Organizational Units](org-units.md)
 - [:octicons-arrow-right-24: Subscription and Quotas](subscription.md)
 - [:octicons-arrow-right-24: Manage Institutions](institutions.md)

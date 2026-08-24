@@ -37,6 +37,7 @@ ExamCraft AI connaît deux rôles:
 | Gérer les étudiants (`students:manage`) | — | ✓ |
 | Configurer la connexion Moodle (`moodle:configure`) | — | ✓ |
 | Gérer les schémas de notation (`grading_schemes:manage`) | — | ✓ (Enterprise) |
+| Gérer les unités organisationnelles (`manage_org_units`) | — | ✓ |
 
 ## Attribuer ou modifier un rôle
 
@@ -73,8 +74,23 @@ Les deux mécanismes fonctionnent indépendamment l'un de l'autre: un ADMIN avec
 | ADMIN | Toutes les précédentes + `students:manage`, `moodle:configure` |
 | Institution Owner | En plus `grading_schemes:manage` (Enterprise) |
 
+## Note de mise à jour v1.8 — Nouvelle permission
+
+!!! info "Unités organisationnelles"
+    Avec la v1.8, la permission `manage_org_units` a été introduite. Elle est attribuée par défaut au rôle système ADMIN et contrôle la création, le déplacement, la suppression et la consultation de la liste complète des unités organisationnelles (départements/équipes) dans le panneau d'administration. Sans cette permission, l'onglet reste invisible ; chaque utilisateur continue de voir ses propres appartenances.
+
+    Une unité organisationnelle peut en outre accorder automatiquement un rôle à ses membres directs et contrôler qui peut voir les ressources en visibilité d'équipe. Voir [Unités organisationnelles](org-units.md) pour plus de détails.
+
+### Mapping des rôles par défaut (à partir de v1.8)
+
+| Rôle | Nouvelles permissions |
+|------|-----------------------|
+| ADMIN | `manage_org_units` |
+| ENSEIGNANT | — |
+
 ## Étapes suivantes
 
 - [:octicons-arrow-right-24: Gérer les utilisateurs](user-mgmt.md)
+- [:octicons-arrow-right-24: Gérer les unités organisationnelles](org-units.md)
 - [:octicons-arrow-right-24: Abonnement et quotas](subscription.md)
 - [:octicons-arrow-right-24: Gérer les institutions](institutions.md)

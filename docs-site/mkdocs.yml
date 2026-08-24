@@ -66,6 +66,7 @@ plugins:
             Aktivitäten: Activities
             Moodle-Anbindung: Moodle Connection
             Notenschemata: Grading Schemes
+            Organisationseinheiten: Organizational Units
         - locale: fr
           name: Français
           build: true
@@ -84,6 +85,7 @@ plugins:
             Aktivitäten: Activités
             Moodle-Anbindung: Connexion Moodle
             Notenschemata: Schémas de notation
+            Organisationseinheiten: Unités organisationnelles
         - locale: it
           name: Italiano
           build: true
@@ -102,6 +104,7 @@ plugins:
             Aktivitäten: Attività
             Moodle-Anbindung: Connessione Moodle
             Notenschemata: Schemi di valutazione
+            Organisationseinheiten: Unità organizzative
 
 markdown_extensions:
   - admonition
@@ -151,6 +154,7 @@ nav:
       - admin-guide/user-mgmt.md
       - admin-guide/institutions.md
       - admin-guide/roles.md
+      - Organisationseinheiten: admin-guide/org-units.md
       - Moodle-Anbindung: admin-guide/moodle.md
       - Notenschemata: admin-guide/grading-schemes.md
       - admin-guide/monitoring.md
