@@ -944,7 +944,10 @@
       "infoNote": "Resource limits reset monthly. Unlimited means no restriction.",
       "enterpriseUsersFootnote": "Technically unlimited – commercially tiered: 10 users included, +CHF 10/user from the 11th, custom quote from 30 users.",
       "enterpriseUsersInfoNote": "For Enterprise, the user count is commercially (not technically) tiered: 10 users included in the base price, additional users up to 29 at a surcharge, custom quotes from 30 users onward.",
-      "failedLoad": "Failed to load subscription tiers"
+      "failedLoad": "Failed to load subscription tiers",
+      "yourCurrentTier": "Your Current Tier",
+      "yourCurrentTierWithName": "Your Current Tier: {{tier}}",
+      "highestTierNote": "Your institution is already on the highest available tier, so a price comparison with other tiers doesn't apply — for Enterprise, the list price also often differs from your individually negotiated contract price."
     },
     "promptLibrary": {
       "title": "Prompt Knowledge Base",

@@ -22,9 +22,11 @@ import {
   TableRow,
   Paper
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
   Cancel as CancelIcon,
-  AllInclusive as InfinityIcon
+  AllInclusive as InfinityIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { SubscriptionTier, TierQuota, TIER_COLORS, RESOURCE_TYPE_LABELS } from '../../types/rbac';
 import RBACService from '../../services/RBACService';
@@ -33,6 +35,7 @@ const SubscriptionTierOverview: React.FC = () => {
   const { t } = useTranslation();
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
   const [quotas, setQuotas] = useState<Record<string, TierQuota[]>>({});
+  const [myTier, setMyTier] = useState<SubscriptionTier | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,9 +48,21 @@ const SubscriptionTierOverview: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Load tiers
-      const tiersData = await RBACService.listSubscriptionTiers();
+      // Load tiers and the admin's own institution tier in parallel. The own-tier
+      // lookup hits the same /tiers/my endpoint the header's PackageTierBadge
+      // separately calls and is best-effort: if it fails, the overview still
+      // renders as before, just without the "own tier" highlighting. The failure
+      // is logged (not silently dropped) so a production regression is still
+      // visible, matching PackageTierBadge's handling of the same endpoint.
+      const [tiersData, myTierData] = await Promise.all([
+        RBACService.listSubscriptionTiers(),
+        RBACService.getMyTier().catch((err) => {
+          console.warn('Failed to fetch own subscription tier, own-tier highlighting disabled:', err);
+          return null;
+        })
+      ]);
       setTiers(tiersData);
+      setMyTier(myTierData);
 
       // Load quotas for each tier
       const quotasData: Record<string, TierQuota[]> = {};
@@ -96,6 +111,16 @@ const SubscriptionTierOverview: React.FC = () => {
 
   const hasEnterpriseTier = tiers.some((tier) => tier.id === 'tier_enterprise');
 
+  // Highest available tier by sort_order — if the admin's own institution is
+  // already there, the price cards are dead upsell UI (no upgrade target left,
+  // and e.g. Enterprise's list price rarely matches the individually negotiated
+  // contract price), so they're replaced by a single "your current tier" note.
+  const highestTier = tiers.reduce<SubscriptionTier | null>(
+    (highest, tier) => (!highest || tier.sort_order > highest.sort_order ? tier : highest),
+    null
+  );
+  const isAtHighestTier = !!myTier && !!highestTier && myTier.id === highestTier.id;
+
   return (
     <Box>
       <Typography variant="h5" component="h2" gutterBottom>
@@ -105,60 +130,77 @@ const SubscriptionTierOverview: React.FC = () => {
         {t('admin.subscriptionTier.subtitle')}
       </Typography>
 
-      <Grid container spacing={3} mb={4}>
-        {tiers.map((tier) => (
-          <Grid item xs={12} sm={6} md={3} key={tier.id}>
-            <Card
-              sx={{
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                borderTop: `4px solid ${TIER_COLORS[tier.id] || '#9E9E9E'}`,
-                '&:hover': {
-                  boxShadow: 6
-                }
-              }}
-            >
-              <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <Typography variant="h6" component="h3" gutterBottom>
-                  {tier.display_name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  {tier.description}
-                </Typography>
-
-                <Box mb={2}>
-                  <Typography variant="h4" component="div" color="primary">
-                    {formatPrice(tier.price_monthly)}
+      {isAtHighestTier ? (
+        <Alert
+          severity="success"
+          icon={<CheckCircleIcon fontSize="inherit" />}
+          sx={{ mb: 4 }}
+        >
+          <Typography variant="subtitle1" fontWeight="bold">
+            {t('admin.subscriptionTier.yourCurrentTierWithName', { tier: myTier!.display_name })}
+          </Typography>
+          <Typography variant="body2">
+            {t('admin.subscriptionTier.highestTierNote')}
+          </Typography>
+        </Alert>
+      ) : (
+        <Grid container spacing={3} mb={4}>
+          {tiers.map((tier) => (
+            <Grid item xs={12} sm={6} md={3} key={tier.id}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  borderTop: `4px solid ${TIER_COLORS[tier.id] || '#9E9E9E'}`,
+                  '&:hover': {
+                    boxShadow: 6
+                  }
+                }}
+              >
+                <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Typography variant="h6" component="h3" gutterBottom>
+                    {tier.display_name}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {t('admin.subscriptionTier.perMonth')}
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    {tier.description}
                   </Typography>
-                </Box>
 
-                {tier.price_yearly > 0 && (
                   <Box mb={2}>
-                    <Typography variant="body2" color="text.secondary">
-                      {formatPrice(tier.price_yearly)} {t('admin.subscriptionTier.perYear')}
+                    <Typography variant="h4" component="div" color="primary">
+                      {formatPrice(tier.price_monthly)}
                     </Typography>
-                    <Typography variant="caption" color="success.main">
-                      {t('admin.subscriptionTier.save', { amount: formatPrice(tier.price_monthly * 12 - tier.price_yearly) })}
+                    <Typography variant="caption" color="text.secondary">
+                      {t('admin.subscriptionTier.perMonth')}
                     </Typography>
                   </Box>
-                )}
 
-                <Box mt="auto" pt={2}>
-                  {tier.is_active ? (
-                    <Chip label={t('admin.subscriptionTier.available')} size="small" color="success" />
-                  ) : (
-                    <Chip label={t('admin.subscriptionTier.notAvailable')} size="small" color="default" />
+                  {tier.price_yearly > 0 && (
+                    <Box mb={2}>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatPrice(tier.price_yearly)} {t('admin.subscriptionTier.perYear')}
+                      </Typography>
+                      <Typography variant="caption" color="success.main">
+                        {t('admin.subscriptionTier.save', { amount: formatPrice(tier.price_monthly * 12 - tier.price_yearly) })}
+                      </Typography>
+                    </Box>
                   )}
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+
+                  <Box mt="auto" pt={2}>
+                    {tier.id === myTier?.id ? (
+                      <Chip label={t('admin.subscriptionTier.yourCurrentTier')} size="small" color="primary" />
+                    ) : tier.is_active ? (
+                      <Chip label={t('admin.subscriptionTier.available')} size="small" color="success" />
+                    ) : (
+                      <Chip label={t('admin.subscriptionTier.notAvailable')} size="small" color="default" />
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
 
       <Typography variant="h6" component="h3" gutterBottom>
         {t('admin.subscriptionTier.resourceLimitsTitle')}
@@ -169,18 +211,33 @@ const SubscriptionTierOverview: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>{t('admin.subscriptionTier.resourceCol')}</TableCell>
-              {tiers.map((tier) => (
-                <TableCell key={tier.id} align="center">
-                  <Box
-                    sx={{
-                      fontWeight: 'bold',
-                      color: TIER_COLORS[tier.id] || '#9E9E9E'
-                    }}
+              {tiers.map((tier) => {
+                const isOwnTier = tier.id === myTier?.id;
+                return (
+                  <TableCell
+                    key={tier.id}
+                    align="center"
+                    sx={isOwnTier ? { backgroundColor: alpha(TIER_COLORS[tier.id] || '#9E9E9E', 0.14) } : undefined}
                   >
-                    {tier.display_name}
-                  </Box>
-                </TableCell>
-              ))}
+                    <Box
+                      sx={{
+                        fontWeight: 'bold',
+                        color: TIER_COLORS[tier.id] || '#9E9E9E'
+                      }}
+                    >
+                      {tier.display_name}
+                    </Box>
+                    {isOwnTier && (
+                      <Chip
+                        label={t('admin.subscriptionTier.yourCurrentTier')}
+                        size="small"
+                        color="primary"
+                        sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }}
+                      />
+                    )}
+                  </TableCell>
+                );
+              })}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -193,9 +250,14 @@ const SubscriptionTierOverview: React.FC = () => {
                   const quota = quotas[tier.id]?.find(q => q.resource_type === resourceType);
                   const value = quota?.quota_limit ?? 0;
                   const isEnterpriseUsersRow = tier.id === 'tier_enterprise' && resourceType === 'users';
+                  const isOwnTier = tier.id === myTier?.id;
 
                   return (
-                    <TableCell key={tier.id} align="center">
+                    <TableCell
+                      key={tier.id}
+                      align="center"
+                      sx={isOwnTier ? { backgroundColor: alpha(TIER_COLORS[tier.id] || '#9E9E9E', 0.06) } : undefined}
+                    >
                       {value === -1 ? (
                         <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center">
                           <Box display="flex" alignItems="center" justifyContent="center">

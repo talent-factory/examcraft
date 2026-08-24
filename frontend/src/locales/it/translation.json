@@ -515,7 +515,10 @@
       "resourceLimitsTitle": "Limiti di risorse per livello",
       "resourceCol": "Risorsa",
       "infoNote": "I limiti di risorse vengono reimpostati mensilmente. Illimitato significa nessuna restrizione.",
-      "failedLoad": "Impossibile caricare i livelli di abbonamento"
+      "failedLoad": "Impossibile caricare i livelli di abbonamento",
+      "yourCurrentTier": "Il tuo livello attuale",
+      "yourCurrentTierWithName": "Il tuo livello attuale: {{tier}}",
+      "highestTierNote": "La tua istituzione si trova già al livello più elevato disponibile. Un confronto di prezzo con altri livelli non è quindi rilevante – per Enterprise, il prezzo di listino differisce inoltre spesso dal prezzo contrattuale negoziato individualmente."
     },
     "promptLibrary": {
       "title": "Base di conoscenza dei prompt",

@@ -515,7 +515,10 @@
       "resourceLimitsTitle": "Limites de ressources par niveau",
       "resourceCol": "Ressource",
       "infoNote": "Les limites de ressources sont réinitialisées chaque mois. Illimité signifie aucune restriction.",
-      "failedLoad": "Impossible de charger les niveaux d'abonnement"
+      "failedLoad": "Impossible de charger les niveaux d'abonnement",
+      "yourCurrentTier": "Votre niveau actuel",
+      "yourCurrentTierWithName": "Votre niveau actuel : {{tier}}",
+      "highestTierNote": "Votre institution se trouve déjà au niveau le plus élevé disponible. Une comparaison de prix avec d'autres niveaux n'est donc pas pertinente – pour Enterprise, le prix catalogue diffère par ailleurs souvent du prix contractuel négocié individuellement."
     },
     "promptLibrary": {
       "title": "Base de connaissances de prompts",

@@ -226,6 +226,26 @@ class RBACService {
     return response.json();
   }
 
+  /**
+   * Get the subscription tier of the current user's own institution (GET /tiers/my).
+   */
+  async getMyTier(): Promise<SubscriptionTier> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/rbac/tiers/my`,
+      {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to fetch own subscription tier');
+    }
+
+    return response.json();
+  }
+
   // ============================================
   // PERMISSION & QUOTA CHECK ENDPOINTS
   // ============================================
