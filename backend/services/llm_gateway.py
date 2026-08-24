@@ -1,10 +1,12 @@
 # core/backend/services/llm_gateway.py
-"""Zentrale Anbindung an den self-hosted LLM-Gateway (LiteLLM, TF-439).
+"""Zentrale Anbindung an den self-hosted LLM-Gateway (LiteLLM, TF-439/440).
 
-Einzige Quelle der Wahrheit für den globalen Rollback-Schalter
-``LLM_GATEWAY_URL``: ist die Variable leer, laufen ALLE Call-Sites auf
-dem Legacy-Provider-Direktpfad. Ist sie gesetzt, routen Generierung,
-Grading, Embeddings, Chatbot und Wizard über den Gateway (OpenAI-Wire).
+Der Gateway ist die einzige Quelle für Modell-Routing (TF-440: der frühere
+Legacy-Provider-Direktpfad, der bei leerem ``LLM_GATEWAY_URL`` griff, wurde
+aus allen Call-Sites entfernt). ``LLM_GATEWAY_URL`` ist jetzt Pflicht für
+echten Betrieb — ist sie leer, laufen Generierung, Grading, Embeddings,
+Chatbot und Wizard im jeweiligen ``demo_mode``/Fail-Fast statt in einem
+Provider-Fallback.
 
 Logische Aliase statt roher Modell-IDs: ein zurückgezogenes Modell wird
 zum 1-Zeilen-Config-Edit am Gateway statt zum App-Incident (TF-437/438).
@@ -82,8 +84,8 @@ def _require_gateway_key() -> str:
     key = gateway_api_key()
     if not key:
         raise RuntimeError(
-            "LLM_GATEWAY_URL ist gesetzt, aber LLM_GATEWAY_API_KEY fehlt — "
-            "der Gateway erwartet einen Virtual Key (fail-fast statt 401)."
+            "LLM_GATEWAY_API_KEY fehlt — der Gateway erwartet einen Virtual "
+            "Key (fail-fast statt eines verwirrenden 401)."
         )
     return key
 

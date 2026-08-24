@@ -1,8 +1,8 @@
 """Tests for ``LlmGrader`` + ``GradingService`` open_ended-Routing
-(TF-334).
+(TF-334, TF-440).
 
-Pure-functional Stubs für den Anthropic-Client — der echte SDK-Call
-ist nie Teil eines Tests. Wir mocken auf Client-Ebene, weil das
+Pure-functional Stubs für den Gateway-Client (OpenAI-Wire) — der echte
+SDK-Call ist nie Teil eines Tests. Wir mocken auf Client-Ebene, weil das
 genau die Naht ist, an der ``LlmGrader`` injizierbar gebaut wurde.
 """
 
@@ -37,22 +37,24 @@ from services.grading_service import GradingService
 # ---------------------------------------------------------------------------
 
 
-def _stub_anthropic(json_payload: dict | str | Exception):
-    """Build a fake anthropic-client whose ``messages.create`` returns a
-    response shaped like the real SDK does (object with ``.content``
-    list of blocks with ``.type``/``.text``).
+def _stub_gateway_client(json_payload: dict | str | Exception):
+    """Build a fake Gateway-Client (OpenAI-Wire) whose
+    ``chat.completions.create`` returns a response shaped like the real
+    OpenAI-SDK/LiteLLM-Gateway does (object with
+    ``.choices[0].message.content``) — TF-440.
 
     Pass an ``Exception`` instance to make the call raise — covers the
     fail-soft path back to the 0-Punkte-Stub.
     """
     client = MagicMock()
     if isinstance(json_payload, Exception):
-        client.messages.create.side_effect = json_payload
+        client.chat.completions.create.side_effect = json_payload
         return client
 
     text = json_payload if isinstance(json_payload, str) else json.dumps(json_payload)
-    block = SimpleNamespace(type="text", text=text)
-    client.messages.create.return_value = SimpleNamespace(content=[block])
+    message = SimpleNamespace(content=text)
+    choice = SimpleNamespace(message=message)
+    client.chat.completions.create.return_value = SimpleNamespace(choices=[choice])
     return client
 
 
@@ -79,7 +81,7 @@ def test_open_ended_grade_schema_accepts_minimal_payload() -> None:
 
 
 def test_llm_grader_returns_outcome_from_model_response() -> None:
-    client = _stub_anthropic(
+    client = _stub_gateway_client(
         {
             "points_awarded": 4.0,
             "confidence": 0.85,
@@ -105,7 +107,7 @@ def test_llm_grader_returns_outcome_from_model_response() -> None:
 
 def test_llm_grader_clamps_overshooting_points() -> None:
     """Modell-Halluzination: 12/10 Punkte → clamp auf points_max."""
-    client = _stub_anthropic(
+    client = _stub_gateway_client(
         {
             "points_awarded": 12.0,
             "confidence": 0.95,
@@ -130,7 +132,7 @@ def test_llm_grader_clamps_overshooting_points() -> None:
 
 
 def test_llm_grader_falls_back_when_model_raises() -> None:
-    client = _stub_anthropic(RuntimeError("API down"))
+    client = _stub_gateway_client(RuntimeError("API down"))
     grader = LlmGrader(client=client)
     outcome = grader.grade(
         question_text="X",
@@ -144,7 +146,7 @@ def test_llm_grader_falls_back_when_model_raises() -> None:
 
 
 def test_llm_grader_falls_back_on_invalid_json() -> None:
-    client = _stub_anthropic("not json at all")
+    client = _stub_gateway_client("not json at all")
     grader = LlmGrader(client=client)
     outcome = grader.grade(
         question_text="X",
@@ -157,10 +159,10 @@ def test_llm_grader_falls_back_on_invalid_json() -> None:
 
 
 def test_llm_grader_falls_back_on_empty_content_blocks() -> None:
-    """Anthropic kann content=[] zurückgeben (z. B. wenn nur thinking-
-    Blöcke ohne Text geliefert werden). _extract_text wirft → fail-soft."""
+    """Der Gateway kann eine leere ``choices``-Liste zurückgeben (z. B. bei
+    einem Content-Filter-Abbruch). ``_call_gateway`` wirft → fail-soft."""
     client = MagicMock()
-    client.messages.create.return_value = SimpleNamespace(content=[])
+    client.chat.completions.create.return_value = SimpleNamespace(choices=[])
     grader = LlmGrader(client=client)
     outcome = grader.grade(
         question_text="X",
@@ -172,11 +174,11 @@ def test_llm_grader_falls_back_on_empty_content_blocks() -> None:
     assert outcome.confidence == 0.0
 
 
-def test_llm_grader_demo_mode_without_api_key(monkeypatch) -> None:
-    """Ohne ANTHROPIC_API_KEY und ohne injizierten Client läuft der
-    Grader im Stub-Modus. Wichtig für Free-Tier-Setups und CI ohne
-    Secret-Provisionierung."""
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_llm_grader_demo_mode_without_gateway(monkeypatch) -> None:
+    """Ohne LLM_GATEWAY_URL und ohne injizierten Client läuft der
+    Grader im Stub-Modus. Wichtig für lokale Dev-Setups und CI ohne
+    Gateway-Provisionierung (TF-440)."""
+    monkeypatch.delenv("LLM_GATEWAY_URL", raising=False)
     grader = LlmGrader()
     assert grader.demo_mode is True
     outcome = grader.grade(
@@ -187,7 +189,7 @@ def test_llm_grader_demo_mode_without_api_key(monkeypatch) -> None:
     )
     assert outcome.points_awarded == 0.0
     assert outcome.confidence == 0.0
-    assert "ANTHROPIC_API_KEY" in outcome.rationale
+    assert "LLM_GATEWAY_URL" in outcome.rationale
 
 
 def test_llm_grader_strips_markdown_code_block() -> None:
@@ -200,7 +202,7 @@ def test_llm_grader_strips_markdown_code_block() -> None:
         '"missing_aspects": []}\n'
         "```"
     )
-    client = _stub_anthropic(fenced)
+    client = _stub_gateway_client(fenced)
     grader = LlmGrader(client=client)
     outcome = grader.grade(
         question_text="X",
@@ -223,7 +225,7 @@ def test_llm_grader_strips_plain_fence_without_language_tag() -> None:
         '"missing_aspects": []}\n'
         "```"
     )
-    client = _stub_anthropic(fenced)
+    client = _stub_gateway_client(fenced)
     grader = LlmGrader(client=client)
     outcome = grader.grade(
         question_text="X",
@@ -247,7 +249,7 @@ def test_llm_grader_fence_preserves_backticks_in_rationale() -> None:
         "missing_aspects": [],
     }
     fenced = f"```json\n{__import__('json').dumps(payload)}\n```"
-    client = _stub_anthropic(fenced)
+    client = _stub_gateway_client(fenced)
     grader = LlmGrader(client=client)
     outcome = grader.grade(
         question_text="X",
@@ -262,7 +264,7 @@ def test_llm_grader_fence_preserves_backticks_in_rationale() -> None:
 def test_llm_grader_returns_stub_when_correct_answer_missing() -> None:
     """Ohne Musterlösung lohnt sich ein API-Call gar nicht; stattdessen
     klar markieren, dass die Lehrperson manuell ranmuss."""
-    grader = LlmGrader(client=_stub_anthropic({}))
+    grader = LlmGrader(client=_stub_gateway_client({}))
     outcome = grader.grade(
         question_text="X",
         correct_answer="",
@@ -277,7 +279,7 @@ def test_llm_grader_uses_prompt_caching_on_static_blocks() -> None:
     """Spec 6.3: Frage + Musterlösung als statischer Cache-Anteil pro
     Prüfung. System-Prompt ebenfalls gecached. Studi-Antwort variabel.
     """
-    client = _stub_anthropic(
+    client = _stub_gateway_client(
         {
             "points_awarded": 2.0,
             "confidence": 0.6,
@@ -294,14 +296,16 @@ def test_llm_grader_uses_prompt_caching_on_static_blocks() -> None:
         points_max=4.0,
     )
 
-    call_kwargs = client.messages.create.call_args.kwargs
-    # System-Prompt cached
-    system = call_kwargs["system"]
-    assert isinstance(system, list)
-    assert system[0]["cache_control"] == {"type": "ephemeral"}
+    call_kwargs = client.chat.completions.create.call_args.kwargs
+    messages = call_kwargs["messages"]
 
-    # User-Block: erster (statischer) cached, zweiter (variabel) nicht
-    contents = call_kwargs["messages"][0]["content"]
+    # System-Prompt cached (TF-440: OpenAI-Wire-Nachricht statt top-level `system`)
+    assert messages[0]["role"] == "system"
+    assert messages[0]["content"][0]["cache_control"] == {"type": "ephemeral"}
+
+    # User-Block: erster (statischer Fragenblock) cached, zweiter (Studi-Antwort) nicht
+    assert messages[1]["role"] == "user"
+    contents = messages[1]["content"]
     assert contents[0]["cache_control"] == {"type": "ephemeral"}
     assert "cache_control" not in contents[1]
 
@@ -540,7 +544,12 @@ def test_enterprise_model_override_is_used_and_cached(
     """Enterprise tier: Institution.llm_model_for_grading is picked up by
     _resolve_llm_grader via the Exam.institution relationship, a new LlmGrader
     is built for that model, and the same instance is reused on subsequent calls.
+
+    Also covers TF-440: a raw (non-alias-shaped) override value logs an
+    error exactly once (at cache-miss time), not once per graded submission.
     """
+    from unittest.mock import patch
+
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     submission, _ = _seed_open_ended_submission(test_db)
@@ -559,15 +568,20 @@ def test_enterprise_model_override_is_used_and_cached(
     assert exam.institution is not None
     assert exam.institution.llm_model_for_grading == "claude-opus-enterprise"
 
-    service = GradingService(test_db)
-    service.grade_submission(submission.id)
+    with patch("services.grading_service.logger") as mock_log:
+        service = GradingService(test_db)
+        service.grade_submission(submission.id)
 
-    assert "claude-opus-enterprise" in service._llm_grader_by_model
-    custom_grader = service._llm_grader_by_model["claude-opus-enterprise"]
-    assert custom_grader.model == "claude-opus-enterprise"
+        assert "claude-opus-enterprise" in service._llm_grader_by_model
+        custom_grader = service._llm_grader_by_model["claude-opus-enterprise"]
+        assert custom_grader.model == "claude-opus-enterprise"
+        mock_log.error.assert_called_once()
+        assert "claude-opus-enterprise" in mock_log.error.call_args.args
 
-    service.grade_submission(submission.id)
-    assert service._llm_grader_by_model["claude-opus-enterprise"] is custom_grader
+        service.grade_submission(submission.id)
+        assert service._llm_grader_by_model["claude-opus-enterprise"] is custom_grader
+        # Zweiter grade_submission-Call trifft den Cache — kein weiterer Log.
+        mock_log.error.assert_called_once()
 
 
 def test_resolve_llm_grader_warns_when_exam_not_loaded(

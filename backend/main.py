@@ -908,9 +908,11 @@ async def api_health_check():
         health_status["services"]["vector_db"] = "error"
         health_status["status"] = "degraded"
 
-    # Check Claude API
+    # Check Claude API (TF-440: Gateway ist die einzige Quelle für Modell-Routing)
+    from services import llm_gateway
+
     health_status["services"]["claude_api"] = (
-        "configured" if os.getenv("ANTHROPIC_API_KEY") else "not_configured"
+        "configured" if llm_gateway.gateway_enabled() else "not_configured"
     )
 
     # Check Document Processor
@@ -948,13 +950,17 @@ async def get_claude_health():
     """Get Claude API health status (development only)"""
     if os.getenv("ENVIRONMENT", "development") != "development":
         raise HTTPException(status_code=404, detail="Not found")
+    from services import llm_gateway
+
     claude_service = get_claude_service()
     stats = claude_service.get_usage_stats()
     return {
         "status": "healthy" if not stats["demo_mode"] else "demo_mode",
         "service": "Claude API",
         "demo_mode": stats["demo_mode"],
-        "api_key_configured": bool(claude_service.api_key),
+        # TF-440: kein direkter Provider-Key mehr in der App — der Gateway
+        # hält die Credentials, hier zählt nur, ob er konfiguriert ist.
+        "gateway_configured": llm_gateway.gateway_enabled(),
         "model": claude_service.model,
         "usage": stats,
     }
@@ -1006,7 +1012,7 @@ async def generate_exam(request: ExamRequest):
                 "question_count": len(questions),
                 "language": request.language,
                 "generated_by": "ExamCraft AI with Claude"
-                if get_claude_service().api_key
+                if not get_claude_service().demo_mode
                 else "ExamCraft AI Demo",
             },
         )

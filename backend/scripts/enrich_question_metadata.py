@@ -1,6 +1,6 @@
 """
 One-time script to enrich existing questions with bloom_level and estimated_time_minutes.
-Bloom-level is determined by Claude API in batches.
+Bloom-level is determined via the LLM-Gateway in batches (TF-440).
 Estimated time is computed via a lookup table.
 
 Usage:
@@ -11,7 +11,7 @@ Usage:
 
 Requires:
     - DATABASE_URL env var (or .env file)
-    - ANTHROPIC_API_KEY env var
+    - LLM_GATEWAY_URL + LLM_GATEWAY_API_KEY env var
 """
 
 import json
@@ -38,11 +38,13 @@ BATCH_SIZE = 10
 
 
 def get_bloom_levels(client, questions: list[dict]) -> list[dict]:
-    """Ask Claude to determine bloom levels for a batch of questions."""
+    """Ask the LLM-Gateway to determine bloom levels for a batch of questions."""
+    from services import llm_gateway
+
     questions_text = json.dumps(questions, ensure_ascii=False, indent=2)
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model=llm_gateway.ALIAS_GENERATION,
         max_tokens=1024,
         messages=[
             {
@@ -59,14 +61,17 @@ Antwort als JSON-Array (NUR das Array, kein Markdown):
         ],
     )
 
-    text = response.content[0].text.strip()
+    choices = getattr(response, "choices", None) or []
+    if not choices:
+        raise ValueError("Gateway-Antwort enthielt keine Choices")
+    text = (choices[0].message.content or "").strip()
     # Handle potential markdown code fences
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
 
     results = json.loads(text, strict=False)
     if not isinstance(results, list):
-        raise ValueError(f"Expected list from Claude, got {type(results).__name__}")
+        raise ValueError(f"Expected list from Gateway, got {type(results).__name__}")
     return results
 
 
@@ -78,26 +83,29 @@ def main():
 
     load_dotenv()
 
-    import anthropic
+    import openai
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
     from models.question_review import QuestionReview
+    from services import llm_gateway
 
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         logger.error("DATABASE_URL not set")
         return
-    api_key = os.getenv("ANTHROPIC_API_KEY")
 
-    if not api_key:
-        logger.error("ANTHROPIC_API_KEY not set")
+    if not llm_gateway.gateway_enabled():
+        logger.error("LLM_GATEWAY_URL not set")
+        return
+    if not llm_gateway.gateway_api_key():
+        logger.error("LLM_GATEWAY_API_KEY not set")
         return
 
     engine = create_engine(database_url)
     Session = sessionmaker(bind=engine)
     db = Session()
-    client = anthropic.Anthropic(api_key=api_key)
+    client = llm_gateway.make_openai_client()
 
     try:
         # Find questions missing bloom_level
@@ -147,15 +155,15 @@ def main():
                 enriched += actually_enriched
                 logger.info(f"Progress: {enriched}/{total} questions enriched")
 
-            except anthropic.AuthenticationError:
-                logger.error("ANTHROPIC_API_KEY is invalid. Aborting enrichment.")
+            except openai.AuthenticationError:
+                logger.error("LLM_GATEWAY_API_KEY is invalid. Aborting enrichment.")
                 break
-            except anthropic.RateLimitError:
+            except openai.RateLimitError:
                 logger.warning(f"Rate limited at batch {i}. Stopping enrichment.")
                 break
             except json.JSONDecodeError as e:
                 logger.error(
-                    f"Batch {i}-{i + BATCH_SIZE}: Claude returned unparseable JSON: {e}"
+                    f"Batch {i}-{i + BATCH_SIZE}: Gateway returned unparseable JSON: {e}"
                 )
                 db.rollback()
                 continue

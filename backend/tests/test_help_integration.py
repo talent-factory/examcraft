@@ -9,8 +9,127 @@ from services.help_service import HelpService
 
 
 @pytest.mark.asyncio
-async def test_low_confidence_retries_with_sonnet():
-    """answer_question retries with model='sonnet' when first call returns confidence < 0.6."""
+async def test_call_claude_uses_gateway(monkeypatch):
+    """_call_claude() geht über den LLM-Gateway (ALIAS_CHAT), nicht über den
+    entfernten Anthropic-Direktpfad (TF-440). Nutzt PydanticAI TestModel als
+    Stub-Modell, damit kein echter Gateway-Call nötig ist."""
+    from pydantic_ai.models.test import TestModel
+
+    import services.llm_gateway as gw
+
+    seen: dict = {}
+
+    def fake_make(alias, **_kwargs):
+        seen["alias"] = alias
+        return TestModel(
+            custom_output_text=(
+                '{"answer": "Du kannst PDFs im Upload-Tab hochladen.", '
+                '"confidence": 0.9, "docs_links": []}'
+            )
+        )
+
+    monkeypatch.setattr(gw, "make_pydantic_model", fake_make)
+
+    service = HelpService(MagicMock())
+    result = await service._call_claude(
+        question="Wie lade ich ein PDF hoch?",
+        chunks=[
+            {
+                "content": "PDFs koennen im Upload-Tab hochgeladen werden.",
+                "source_file": "docs/upload.md",
+                "section": "Upload",
+                "language": "de",
+                "score": 0.9,
+            }
+        ],
+        user_role="teacher",
+        user_tier="starter",
+        route="/documents",
+        history=None,
+        locale="de",
+    )
+
+    assert seen["alias"] == gw.ALIAS_CHAT
+    assert result["answer"] == "Du kannst PDFs im Upload-Tab hochladen."
+    assert result["confidence"] == 0.9
+
+
+@pytest.mark.asyncio
+async def test_call_claude_folds_history_into_prompt(monkeypatch):
+    """TF-440: die neue History-Folding-Logik in _call_claude war bisher
+    ungetestet (der einzige Gateway-Test übergibt history=None). Deckt ab:
+    dict- UND objekt-förmige History-Einträge, [-10:]-Trunkierung, korrekte
+    User:/Assistant:-Label-Reihenfolge."""
+    import types
+
+    from pydantic_ai import Agent
+    from pydantic_ai.models.test import TestModel
+
+    import services.llm_gateway as gw
+
+    monkeypatch.setattr(
+        gw,
+        "make_pydantic_model",
+        lambda alias, **_kwargs: TestModel(
+            custom_output_text='{"answer": "ok", "confidence": 0.9, "docs_links": []}'
+        ),
+    )
+
+    captured: dict = {}
+    original_run = Agent.run
+
+    async def spy_run(self, user_prompt=None, **kwargs):
+        captured["user_prompt"] = user_prompt
+        return await original_run(self, user_prompt=user_prompt, **kwargs)
+
+    monkeypatch.setattr(Agent, "run", spy_run)
+
+    service = HelpService(MagicMock())
+    # 11 Einträge: der älteste ("alte Frage 0") muss durch [-10:] wegfallen.
+    history = [{"role": "user", "content": f"alte Frage {i}"} for i in range(9)]
+    history.append(types.SimpleNamespace(role="assistant", content="objekt-antwort"))
+    history.append({"role": "user", "content": "neueste Frage"})
+
+    await service._call_claude(
+        question="Aktuelle Frage?",
+        chunks=[
+            {
+                "content": "doc",
+                "source_file": "f.md",
+                "section": "s",
+                "language": "de",
+                "score": 0.9,
+            }
+        ],
+        user_role="teacher",
+        user_tier="starter",
+        route="/x",
+        history=history,
+        locale="de",
+    )
+
+    prompt = captured["user_prompt"]
+    assert "Conversation history:" in prompt
+    assert "alte Frage 0" not in prompt  # durch [-10:] getrimmt
+    assert "alte Frage 1" in prompt
+    assert "Assistant: objekt-antwort" in prompt  # objekt-förmiger Eintrag
+    assert "User: neueste Frage" in prompt
+    assert prompt.index("Assistant: objekt-antwort") < prompt.index(
+        "User: neueste Frage"
+    )
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_does_not_retry():
+    """TF-440: answer_question no longer retries on low confidence.
+
+    Vor der Gateway-Migration lief der Retry auf einem stärkeren Modell
+    (haiku -> sonnet). Seit ALIAS_CHAT die einzige Modellquelle ist, würde
+    ein Retry denselben Alias mit demselben Prompt nochmal aufrufen — reine
+    Kostenverdopplung ohne Nutzen. _call_claude wird deshalb bei jeder
+    Confidence nur noch einmal aufgerufen; die Escalate-Markierung
+    (confidence < 0.5) bleibt unverändert bestehen.
+    """
     mock_db = MagicMock()
     service = HelpService(mock_db)
 
@@ -22,15 +141,9 @@ async def test_low_confidence_retries_with_sonnet():
         "score": 0.85,
     }
 
-    first_result = {
+    low_confidence_result = {
         "answer": "Weak answer",
         "confidence": 0.4,
-        "sources": [],
-        "docs_links": [],
-    }
-    second_result = {
-        "answer": "Strong answer",
-        "confidence": 0.85,
         "sources": [],
         "docs_links": [],
     }
@@ -43,7 +156,7 @@ async def test_low_confidence_retries_with_sonnet():
         patch.object(
             service,
             "_call_claude",
-            new=AsyncMock(side_effect=[first_result, second_result]),
+            new=AsyncMock(return_value=low_confidence_result),
         ) as mock_call,
     ):
         result = await service.answer_question(
@@ -53,11 +166,9 @@ async def test_low_confidence_retries_with_sonnet():
             route="/exams",
         )
 
-    assert mock_call.call_count == 2
-    # Second call must have model="sonnet"
-    _, second_kwargs = mock_call.call_args_list[1]
-    assert second_kwargs.get("model") == "sonnet"
-    assert result["confidence"] == 0.85
+    mock_call.assert_awaited_once()
+    assert result["confidence"] == 0.4
+    assert result["escalate"] is True
 
 
 @pytest.mark.asyncio

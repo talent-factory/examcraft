@@ -1,16 +1,17 @@
 """LLM-basierter Grader für offene Fragen (Spec 6.3).
 
-Bewertet ``open_ended`` Antworten via Anthropic Claude und liefert ein
-strukturiertes ``LlmGradeOutcome`` zurück, das die ``GradingService``
-1:1 in den ``Grade``-Datensatz übernimmt.
+Bewertet ``open_ended`` Antworten über den self-hosted LLM-Gateway und
+liefert ein strukturiertes ``LlmGradeOutcome`` zurück, das die
+``GradingService`` 1:1 in den ``Grade``-Datensatz übernimmt.
 
 Architektur-Entscheidungen:
 
-* **Anthropic SDK direkt statt PydanticAI.** Cache-Control auf
-  System- und User-Blöcken ist mit dem Anthropic-Native-API genau
-  einen Parameter; PydanticAI würde einen weiteren Layer einziehen,
-  der für genau einen Use-Case nicht gerechtfertigt ist. Strukturiertes
-  Output-Parsing ist via ``OpenEndedGrade.model_validate_json`` trivial.
+* **Gateway (OpenAI-Wire) statt Anthropic SDK direkt.** TF-440: der
+  frühere Anthropic-Direktpfad (eigener SDK-Import, Anthropic-natives
+  ``messages.create``) wurde entfernt — der Gateway ist die einzige
+  Quelle für Modell-Routing. Cache-Control auf System- und User-Blöcken
+  bleibt möglich: LiteLLM leitet ``cache_control``-Felder aus dem
+  OpenAI-Wire-Format als Anthropic-Header durch.
 * **Prompt-Caching.** Der pro-Frage statische Block (System-Prompt +
   Frage + Musterlösung + Erklärung + Bewertungsregeln) trägt
   ``cache_control: ephemeral``; nur die Studi-Antwort ist variabel.
@@ -22,10 +23,24 @@ Architektur-Entscheidungen:
   ``confidence=0.0`` zurück, sodass die Lehrperson das Item garantiert
   in der Review-Queue sieht. Ein Schema-Fail darf nie eine ganze
   Submission scheitern lassen.
-* **Demo-Mode.** Ohne ``ANTHROPIC_API_KEY`` läuft der Grader im
-  Stub-Modus (Confidence 0.0, Rationale-Hinweis). Das hält Tests und
-  Free-Tier-Setups grün, ohne dass die Lehrperson ein leises 0-Resultat
-  bekommt.
+* **Demo-Mode.** Ohne konfigurierten Gateway (``LLM_GATEWAY_URL``)
+  läuft der Grader im Stub-Modus (Confidence 0.0, Rationale-Hinweis).
+  Das hält Tests und Setups ohne Gateway-Zugang grün, ohne dass die
+  Lehrperson ein leises 0-Resultat bekommt.
+
+.. note::
+   ``Institution.llm_model_for_grading`` (Enterprise-Tier-Override):
+   die TF-439-Migration ``tf439_grade_logical`` hat alle zum Zeitpunkt
+   ihrer Ausführung bestehenden rohen Modell-IDs bereits auf den
+   logischen Alias ``'examcraft/grading'`` normalisiert (siehe
+   ``alembic/versions/2026_06_19_tf439_grading_model_logical.py``), und
+   es gibt derzeit keinen App-Schreibpfad (kein Admin-Endpoint, kein
+   Pydantic-Schema) für dieses Feld. Ein zukünftiger roher Wert (z. B.
+   via Direkt-DB-Zugriff) würde unverändert an den Gateway durchgereicht
+   und dort scheitern, falls er nicht in der Virtual-Key-Allowlist steht
+   — ``grading_service._resolve_llm_grader`` loggt diesen Fall seit
+   TF-440 laut, statt ihn erst als kryptische Gateway-Ablehnung sichtbar
+   werden zu lassen.
 """
 
 from __future__ import annotations
@@ -48,14 +63,6 @@ from services.grading.grading_prompts import (
 logger = logging.getLogger(__name__)
 
 
-# Default-Modell folgt dem aktuellen Projektstandard. Pro Institution
-# ist eine Override-Mechanik in Phase 4 vorgesehen (Spec 6.3); hier
-# bleibt es eine ENV-Override.
-_DEFAULT_MODEL = (
-    os.getenv("CLAUDE_GRADING_MODEL")
-    or os.getenv("CLAUDE_MODEL")
-    or "claude-sonnet-4-5"
-)
 _DEFAULT_MAX_TOKENS = int(os.getenv("CLAUDE_GRADING_MAX_TOKENS", "1024"))
 _DEFAULT_TIMEOUT_S = float(os.getenv("CLAUDE_GRADING_TIMEOUT", "30.0"))
 
@@ -90,31 +97,24 @@ class LlmGradeOutcome:
 
 
 class LlmGrader:
-    """Anthropic-basierter Bewerter für offene Fragen."""
+    """Gateway-basierter Bewerter für offene Fragen (TF-440)."""
 
     PROMPT_ID = GRADING_OPEN_ENDED_PROMPT_ID
 
     def __init__(self, *, client=None, model: str | None = None) -> None:
+        # ``client`` ist ein optionaler injizierter OpenAI-SDK-Client
+        # (Test-Naht — siehe test_grading_service_llm.py::_stub_gateway_client).
         self._client = client
-        api_key = os.getenv("ANTHROPIC_API_KEY")
         from services import llm_gateway
-
-        # Gateway-Pfad hat Vorrang vor dem Anthropic-Direkt-Pfad.
-        self._gateway = client is None and llm_gateway.gateway_enabled()
 
         # Fix 1: Kein expliziter model-Override → logischen Alias wählen,
         # damit rohe Modell-IDs nie die Gateway-Allowlist treffen (TF-439).
-        if model is not None:
-            self.model = model
-        elif self._gateway:
-            self.model = llm_gateway.ALIAS_GRADING
-        else:
-            self.model = _DEFAULT_MODEL
-        # Demo-Mode nur, wenn weder Client, noch Gateway, noch API-Key vorhanden.
-        self.demo_mode = client is None and not self._gateway and not api_key
+        self.model = model if model is not None else llm_gateway.ALIAS_GRADING
+        # Demo-Mode nur, wenn weder Client injiziert noch Gateway konfiguriert.
+        self.demo_mode = client is None and not llm_gateway.gateway_enabled()
         if self.demo_mode:
             logger.warning(
-                "LlmGrader: ANTHROPIC_API_KEY nicht gesetzt — offene "
+                "LlmGrader: LLM_GATEWAY_URL nicht gesetzt — offene "
                 "Fragen werden als 0-Punkte-Stub gegradet (Review nötig)."
             )
 
@@ -138,7 +138,7 @@ class LlmGrader:
             return self._stub(
                 points_max=points_max,
                 rationale=(
-                    "ANTHROPIC_API_KEY nicht konfiguriert — automatische "
+                    "LLM_GATEWAY_URL nicht konfiguriert — automatische "
                     "Bewertung übersprungen, bitte manuell bewerten."
                 ),
             )
@@ -201,21 +201,14 @@ class LlmGrader:
     # ------------------------------------------------------------------
 
     def _client_or_create(self):
-        if self._client is not None:
-            return self._client
-        # Lazy import: anthropic ist eine schwere Dep; Tests, die einen
-        # Stub-Client injizieren, wollen den Import nicht erzwingen.
-        from anthropic import Anthropic
-
-        self._client = Anthropic(timeout=_DEFAULT_TIMEOUT_S)
-        return self._client
-
-    def _client_or_create_gateway(self):
-        """Holt oder erstellt den OpenAI-SDK-Client gegen den Gateway.
+        """Holt den injizierten Test-Client oder erstellt den OpenAI-SDK-
+        Client gegen den Gateway.
 
         Modulattribut-Zugriff (``llm_gateway.make_openai_client``) statt
         direktem Funktionsaufruf, damit Tests via monkeypatch greifen.
         """
+        if self._client is not None:
+            return self._client
         from services import llm_gateway
 
         return llm_gateway.make_openai_client()
@@ -228,7 +221,7 @@ class LlmGrader:
         System- und Fragen-Block sind statisch pro Frage (Cache-Kandidaten);
         der Studi-Block variiert und trägt deshalb kein ``cache_control``.
         """
-        client = self._client_or_create_gateway()
+        client = self._client_or_create()
         # Fix 2: Grading-Timeout explizit setzen — make_openai_client() setzt
         # kein Timeout (OpenAI-SDK-Default ~600 s würde Celery-Worker blockieren).
         response = client.chat.completions.create(
@@ -286,53 +279,8 @@ class LlmGrader:
         )
         student_block = build_student_answer_block(given_answer)
 
-        # Zweig: Gateway (OpenAI-Wire) statt Anthropic-Direkt
-        if self._gateway:
-            return self._call_gateway(question_block, student_block)
-
-        client = self._client_or_create()
-        response = client.messages.create(
-            model=self.model,
-            max_tokens=_DEFAULT_MAX_TOKENS,
-            system=[
-                {
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": question_block,
-                            "cache_control": {"type": "ephemeral"},
-                        },
-                        {"type": "text", "text": student_block},
-                    ],
-                }
-            ],
-        )
-
-        text = self._extract_text(response)
-        return self._parse_response(text)
-
-    @staticmethod
-    def _extract_text(response) -> str:
-        """Hol den ersten Text-Block aus der Antwort.
-
-        Anthropic kann in seltenen Fällen mehrere Content-Blöcke liefern
-        (etwa wenn das Modell mit ``thinking``-Steps arbeitet); wir
-        nehmen den ersten ``text``-Typ-Block. Verfehlt, wenn die Antwort
-        keine Text-Blöcke enthält — der Caller fängt das ab.
-        """
-        for block in getattr(response, "content", []) or []:
-            block_type = getattr(block, "type", None)
-            if block_type == "text":
-                return getattr(block, "text", "") or ""
-        raise ValueError("Anthropic-Antwort enthielt keinen Text-Block")
+        # TF-440: Gateway ist der einzige Pfad — kein Anthropic-Direkt-Zweig mehr.
+        return self._call_gateway(question_block, student_block)
 
     @staticmethod
     def _parse_response(text: str) -> OpenEndedGrade:

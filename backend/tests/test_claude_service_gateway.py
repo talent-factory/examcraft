@@ -57,12 +57,8 @@ async def test_generate_questions_delegates_to_gateway(monkeypatch):
 
     service = ClaudeService()
 
-    # Legacy-httpx darf NICHT aufgerufen werden.
-    async def boom(_payload):
-        raise AssertionError("Legacy-httpx-Pfad darf bei aktivem Gateway nicht laufen")
-
-    monkeypatch.setattr(service, "_make_api_request_with_retry", boom)
-
+    # TF-440: Legacy-httpx-Pfad existiert nicht mehr — es gibt nur noch den
+    # Gateway-Zweig, keine Assertion mehr nötig, dass er "nicht aufgerufen wird".
     out = await service.generate_questions(topic="Loops", question_count=1)
 
     assert out == [{"id": "q1", "type": "single_choice"}]

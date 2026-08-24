@@ -1,10 +1,10 @@
 # core/backend/services/gateway_generator.py
-"""Fragengenerierung über den LLM-Gateway mit typisiertem Output (TF-439).
+"""Fragengenerierung über den LLM-Gateway mit typisiertem Output (TF-439/440).
 
-Ersetzt das brüchige Regex-/JSON-Parsing aus
+Ersetzt das brüchige Regex-/JSON-Parsing des früheren
 ``claude_service._parse_claude_response`` durch PydanticAI ``output_type``.
-Wird nur betreten, wenn ``llm_gateway.gateway_enabled()`` True ist; der
-Legacy-httpx-Pfad in ``ClaudeService`` bleibt für den Rollback erhalten.
+TF-440: der Legacy-httpx-Pfad in ``ClaudeService`` wurde entfernt — dieses
+Modul ist jetzt der einzige Fragengenerierungs-Pfad.
 """
 
 from __future__ import annotations
@@ -33,11 +33,11 @@ class GeneratedQuestion(BaseModel):
     ``competency_code``/``ln_level`` bei TF-400-Kompetenzrahmen), gingen
     diese Felder beim getypten Gateway-Call still verloren — obwohl
     ``rag_service._convert_to_rag_question`` sie längst korrekt ausliest.
-    Der Legacy-Pfad (``claude_service._parse_claude_response``, reines
-    ``json.loads`` ohne Schema) kannte dieses Problem nicht, weil er jedes
-    Feld unverändert durchreicht. Alle Zusatzfelder sind rein additiv/
-    optional — bestehende single_choice/true_false-Generierung bleibt
-    unverändert.
+    Der frühere Legacy-Pfad (``claude_service._parse_claude_response``,
+    reines ``json.loads`` ohne Schema — inzwischen entfernt, TF-440) kannte
+    dieses Problem nicht, weil er jedes Feld unverändert durchreichte. Alle
+    Zusatzfelder sind rein additiv/optional — bestehende
+    single_choice/true_false-Generierung bleibt unverändert.
     """
 
     id: str

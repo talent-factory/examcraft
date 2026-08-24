@@ -125,12 +125,13 @@ class GradingService:
         self.db = db
         self.grader = deterministic_grader or DeterministicGrader()
         # LlmGrader-Konstruktion ist günstig (kein API-Call); im Demo-
-        # Mode (kein API-Key) liefert sie einen 0-Punkte-Stub.
+        # Mode (kein Gateway konfiguriert, TF-440) liefert sie einen
+        # 0-Punkte-Stub.
         self._explicit_llm_grader = llm_grader
         self.llm_grader = llm_grader or LlmGrader()
         # TF-336: Cache pro Modell-String, damit Enterprise-
         # Institutionen mit eigenem ``llm_model_for_grading`` kein
-        # Re-Build der Anthropic-Client-Konstruktion pro Submission
+        # Re-Build der Gateway-Client-Konstruktion pro Submission
         # bezahlen, aber gleichzeitig zwei verschiedene Modelle in
         # einer Pipeline nicht teilen.
         self._llm_grader_by_model: dict[str | None, LlmGrader] = {None: self.llm_grader}
@@ -158,6 +159,29 @@ class GradingService:
         if model_override:
             cached = self._llm_grader_by_model.get(model_override)
             if cached is None:
+                # TF-440: kein Schreibpfad in der App setzt derzeit einen
+                # rohen Modellnamen (kein Admin-Endpoint/Schema für dieses
+                # Feld) — die TF-439-Migration `tf439_grade_logical` hat
+                # bestehende Werte bereits auf 'examcraft/grading'
+                # normalisiert. Falls dennoch ein roher Wert auftaucht
+                # (Altdaten/Direkt-DB-Zugriff), scheitert er sonst erst am
+                # Gateway mit einer schwer diagnostizierbaren Allowlist-
+                # Ablehnung — UND degradiert damit JEDE Freitext-Bewertung
+                # dieser Institution auf den 0-Punkte-Stub, bis wer es
+                # bemerkt. Deshalb `error`, nicht `warning`, und nur einmal
+                # pro erstmals gesehenem Modellwert (Cache-Miss), nicht pro
+                # Submission.
+                if "/" not in model_override:
+                    logger.error(
+                        "_resolve_llm_grader: Institution %s hat llm_model_for_grading=%r "
+                        "gesetzt — sieht nicht wie ein logischer Gateway-Alias aus "
+                        "(erwartet z. B. 'examcraft/grading'). Der Gateway wird diesen "
+                        "Wert vermutlich ablehnen, sofern er nicht in der Virtual-Key-"
+                        "Allowlist steht — Freitext-Bewertung dieser Institution "
+                        "degradiert dadurch auf den 0-Punkte-Stub.",
+                        getattr(institution, "id", None),
+                        model_override,
+                    )
                 cached = LlmGrader(model=model_override)
                 self._llm_grader_by_model[model_override] = cached
             return cached
