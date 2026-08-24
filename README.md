@@ -48,6 +48,34 @@ Alle Features werden ausschliesslich ueber RBAC gesteuert -- keine Environment-F
 - **GDPR Compliance** (Data Export, Account Deletion)
 - **Billing & Subscription Management** mit Stripe Integration
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs-site/docs/screenshots/dashboard/dashboard-overview.png" width="100%" alt="Dashboard – Dokumente, Fragen und Prüfungen auf einen Blick" />
+      <p align="center"><sub><a href="https://docs.examcraft.ch/user-guide/dashboard/"><b>Dashboard</b></a> – Dokumente, Fragen und Prüfungen auf einen Blick</sub></p>
+    </td>
+    <td width="50%">
+      <img src="docs-site/docs/screenshots/questions/questions-step4-generated.png" width="100%" alt="KI-Fragengenerierung – Frage generiert und zur Überprüfung gespeichert" />
+      <p align="center"><sub><a href="https://docs.examcraft.ch/user-guide/rag-exam/"><b>KI-Fragengenerierung</b></a> – Frage generiert und zur Überprüfung gespeichert</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs-site/docs/screenshots/exam-composer/exam-composer-reorder.png" width="100%" alt="Exam Composer – Prüfung per Drag-and-Drop zusammenstellen" />
+      <p align="center"><sub><a href="https://docs.examcraft.ch/user-guide/exam-composer/"><b>Exam Composer</b></a> – Prüfung per Drag-and-Drop zusammenstellen</sub></p>
+    </td>
+    <td width="50%">
+      <img src="docs-site/docs/screenshots/review-queue/review-queue-overview.png" width="100%" alt="Review-Queue – generierte Fragen prüfen und freigeben" />
+      <p align="center"><sub><a href="https://docs.examcraft.ch/user-guide/review-queue/"><b>Review-Queue</b></a> – generierte Fragen prüfen und freigeben</sub></p>
+    </td>
+  </tr>
+</table>
+
+Weitere Screenshots (Admin, Auth, Auswertungen, Moodle-Integration, Chatbot u. a.) finden sich in der
+[gehosteten Dokumentation](https://docs.examcraft.ch) sowie unter [`docs-site/docs/screenshots/`](docs-site/docs/screenshots/).
+
 ## Architektur
 
 ```text
