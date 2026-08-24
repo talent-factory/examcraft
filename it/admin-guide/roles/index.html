@@ -16,7 +16,7 @@
         <link rel="prev" href="../institutions/">
       
       
-        <link rel="next" href="../moodle/">
+        <link rel="next" href="../org-units/">
       
       
         
@@ -1273,6 +1273,8 @@
       
         
       
+        
+      
     
     
     
@@ -1544,6 +1546,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#nota-di-aggiornamento-v18-nuova-permission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nota di aggiornamento v1.8 — Nuova permission
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Nota di aggiornamento v1.8 — Nuova permission">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mapping-ruoli-predefiniti-da-v18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mapping ruoli predefiniti (da v1.8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#passaggi-successivi" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1558,6 +1588,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../org-units/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unità organizzative
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1957,6 +2015,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#nota-di-aggiornamento-v18-nuova-permission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nota di aggiornamento v1.8 — Nuova permission
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Nota di aggiornamento v1.8 — Nuova permission">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mapping-ruoli-predefiniti-da-v18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mapping ruoli predefiniti (da v1.8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#passaggi-successivi" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2116,6 +2202,11 @@
 <td style="text-align: center;">—</td>
 <td style="text-align: center;">✓ (Enterprise)</td>
 </tr>
+<tr>
+<td>Gestione unità organizzative (<code>manage_org_units</code>)</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">✓</td>
+</tr>
 </tbody>
 </table>
 <h2 id="assegnare-o-modificare-un-ruolo">Assegnare o modificare un ruolo</h2>
@@ -2165,9 +2256,35 @@ il rischio di modifiche di configurazione involontarie.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="nota-di-aggiornamento-v18-nuova-permission">Nota di aggiornamento v1.8 — Nuova permission</h2>
+<div class="admonition info">
+<p class="admonition-title">Unità organizzative</p>
+<p>Con la v1.8 è stata introdotta la permission <code>manage_org_units</code>. È assegnata di default al ruolo di sistema ADMIN e controlla la creazione, lo spostamento, l'eliminazione e la visualizzazione dell'elenco completo delle unità organizzative (dipartimenti/team) nel pannello admin. Senza questa permission la scheda resta invisibile; ogni utente continua a vedere le proprie appartenenze.</p>
+<p>Un'unità organizzativa può inoltre concedere automaticamente un ruolo ai propri membri diretti e controllare chi può vedere le risorse con visibilità team. Per i dettagli vedi <a href="../org-units/">Unità organizzative</a>.</p>
+</div>
+<h3 id="mapping-ruoli-predefiniti-da-v18">Mapping ruoli predefiniti (da v1.8)</h3>
+<table>
+<thead>
+<tr>
+<th>Ruolo</th>
+<th>Nuove permissions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ADMIN</td>
+<td><code>manage_org_units</code></td>
+</tr>
+<tr>
+<td>DOCENTE</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
 <h2 id="passaggi-successivi">Passaggi successivi</h2>
 <ul>
 <li><a href="../user-mgmt/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Gestione utenti</a></li>
+<li><a href="../org-units/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Gestione unità organizzative</a></li>
 <li><a href="../subscription/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Abbonamento e quote</a></li>
 <li><a href="../institutions/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Gestione istituzioni</a></li>
 </ul>
@@ -2225,13 +2342,13 @@ il rischio di modifiche di configurazione involontarie.</p>
         
         
           
-          <a href="../moodle/" class="md-footer__link md-footer__link--next" aria-label="Successivo: Connessione Moodle">
+          <a href="../org-units/" class="md-footer__link md-footer__link--next" aria-label="Successivo: Unità organizzative">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Successivo
               </span>
               <div class="md-ellipsis">
-                Connessione Moodle
+                Unità organizzative
               </div>
             </div>
             <div class="md-footer__button md-icon">

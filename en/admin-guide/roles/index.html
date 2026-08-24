@@ -16,7 +16,7 @@
         <link rel="prev" href="../institutions/">
       
       
-        <link rel="next" href="../moodle/">
+        <link rel="next" href="../org-units/">
       
       
         
@@ -1273,6 +1273,8 @@
       
         
       
+        
+      
     
     
     
@@ -1544,6 +1546,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#update-notice-v18-new-permission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Update Notice v1.8 — New Permission
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Update Notice v1.8 — New Permission">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#default-role-mapping-from-v18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default Role Mapping (from v1.8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1558,6 +1588,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../org-units/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Organizational Units
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1957,6 +2015,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#update-notice-v18-new-permission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Update Notice v1.8 — New Permission
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Update Notice v1.8 — New Permission">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#default-role-mapping-from-v18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default Role Mapping (from v1.8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2116,6 +2202,11 @@
 <td style="text-align: center;">—</td>
 <td style="text-align: center;">✓ (Enterprise)</td>
 </tr>
+<tr>
+<td>Manage organizational units (<code>manage_org_units</code>)</td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;">✓</td>
+</tr>
 </tbody>
 </table>
 <h2 id="assigning-or-changing-a-role">Assigning or Changing a Role</h2>
@@ -2165,9 +2256,35 @@ unintentional configuration changes.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="update-notice-v18-new-permission">Update Notice v1.8 — New Permission</h2>
+<div class="admonition info">
+<p class="admonition-title">Organizational Units</p>
+<p>With v1.8, the <code>manage_org_units</code> permission was introduced. It is assigned to the ADMIN system role by default and controls creating, moving, deleting, and viewing the full list of organizational units (departments/teams) in the admin panel. Without the permission, the tab stays hidden; every user still sees their own memberships.</p>
+<p>An organizational unit can additionally grant its direct members a role automatically, and control who can see resources with team visibility. See <a href="../org-units/">Organizational Units</a> for details.</p>
+</div>
+<h3 id="default-role-mapping-from-v18">Default Role Mapping (from v1.8)</h3>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>New Permissions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ADMIN</td>
+<td><code>manage_org_units</code></td>
+</tr>
+<tr>
+<td>INSTRUCTOR</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
 <h2 id="next-steps">Next Steps</h2>
 <ul>
 <li><a href="../user-mgmt/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Manage Users</a></li>
+<li><a href="../org-units/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Manage Organizational Units</a></li>
 <li><a href="../subscription/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Subscription and Quotas</a></li>
 <li><a href="../institutions/"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.22 19.03a.75.75 0 0 1 0-1.06L18.19 13H3.75a.75.75 0 0 1 0-1.5h14.44l-4.97-4.97a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0"/></svg></span> Manage Institutions</a></li>
 </ul>
@@ -2225,13 +2342,13 @@ unintentional configuration changes.</p>
         
         
           
-          <a href="../moodle/" class="md-footer__link md-footer__link--next" aria-label="Next: Moodle Connection">
+          <a href="../org-units/" class="md-footer__link md-footer__link--next" aria-label="Next: Organizational Units">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Moodle Connection
+                Organizational Units
               </div>
             </div>
             <div class="md-footer__button md-icon">

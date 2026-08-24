@@ -63,6 +63,15 @@
         <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/admin-guide/moodle/" />
     </url>
     <url>
+        <loc>https://docs.examcraft.ch/en/admin-guide/org-units/</loc>
+        <lastmod>2026-08-24</lastmod>
+        <changefreq>daily</changefreq>
+        <html:link rel="alternate" hreflang="en" href="https://docs.examcraft.ch/en/admin-guide/org-units/" />
+        <html:link rel="alternate" hreflang="de" href="https://docs.examcraft.ch/admin-guide/org-units/" />
+        <html:link rel="alternate" hreflang="fr" href="https://docs.examcraft.ch/fr/admin-guide/org-units/" />
+        <html:link rel="alternate" hreflang="it" href="https://docs.examcraft.ch/it/admin-guide/org-units/" />
+    </url>
+    <url>
         <loc>https://docs.examcraft.ch/en/admin-guide/prompts/</loc>
         <lastmod>2026-08-24</lastmod>
         <changefreq>daily</changefreq>
