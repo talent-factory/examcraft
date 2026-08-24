@@ -38,7 +38,6 @@ docs/
 
 # CI/CD
 .github/
-.gitlab-ci.yml
 
 # Python
 **/__pycache__

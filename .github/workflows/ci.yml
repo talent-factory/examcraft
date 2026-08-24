@@ -1,0 +1,257 @@
+name: CI Pipeline
+
+# Dies ist das GitHub-Actions-Pendant zum privaten Monorepo examcraft-private:
+# Diese Datei lebt bewusst unter core/.github/workflows/ statt im Repo-Root,
+# damit sie vom Mirror-Job (.github/workflows/mirror.yml, git subtree split
+# --prefix=core) ins öffentliche Repo talent-factory/examcraft übernommen
+# wird — dort landet core/ als Root. GitHub scannt aber nur das Root-level
+# .github/workflows/ jedes Repos: in examcraft-private selbst ist diese
+# Datei deshalb inert und läuft nie als Workflow; erst nach dem Mirror-Sync
+# an ihrem neuen Pfad .github/workflows/ci.yml im öffentlichen Repo wird sie
+# aktiv. Pfade hier beziehen sich deshalb bewusst auf backend/ und frontend/
+# (nicht core/backend, core/frontend) — das Layout nach dem Split. Scope ist
+# Core-only: keine Premium-/Enterprise-Jobs, kein Full-Compose-Szenario (TF-728).
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  # Kein github.sha im Group-Key: dieser Workflow ist der einzige, der auf
+  # push/pull_request reagiert, es gibt also kein zweites, parallel
+  # laufendes CI-System, gegen das dedupliziert werden müsste. Mit SHA im
+  # Key bekäme jeder neue Commit seine eigene Gruppe — cancel-in-progress
+  # würde dann bei aufeinanderfolgenden Pushes auf denselben PR-Branch nie
+  # greifen, weil nie zwei Läufe dieselbe Gruppe teilen.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # ===========================================================================
+  # Job 1: Test Backend
+  # ===========================================================================
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: examcraft
+          POSTGRES_PASSWORD: examcraft_test
+          POSTGRES_DB: examcraft_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Backend Dependencies
+        working-directory: backend
+        run: uv pip install --system -r requirements.txt
+
+      - name: Lint Backend with Ruff
+        working-directory: backend
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Run Backend Tests
+        working-directory: backend
+        run: pytest tests/ -v --cov=. --cov-report=xml
+        env:
+          DATABASE_URL: postgresql://examcraft:examcraft_test@localhost:5432/examcraft_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET_KEY: test_secret_key_for_ci
+          JWT_ALGORITHM: HS256
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 7
+
+  # ===========================================================================
+  # Job 2: Test Frontend
+  # ===========================================================================
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: bun install
+
+      - name: Typecheck Frontend
+        # Non-blocking wie "Lint Frontend": es können vorbestehende,
+        # von einzelnen PRs unabhängige Typfehler auftreten. Der Schritt
+        # macht sie sichtbar, ohne den Merge zu blockieren.
+        working-directory: frontend
+        run: bun run typecheck
+        continue-on-error: true
+
+      - name: Lint Frontend
+        working-directory: frontend
+        run: bun run lint
+        continue-on-error: true
+
+      - name: Run Frontend Tests
+        working-directory: frontend
+        run: bun run test --coverage --watchAll=false
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+          retention-days: 7
+
+  # ===========================================================================
+  # Job 3: Docker Build Test
+  # ===========================================================================
+  docker-build-test:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    timeout-minutes: 20
+
+    steps:
+      # Der Backend-Build zieht via sentence-transformers/torch + Tesseract +
+      # libmupdf mehrere GB — Standard-Runner-Diskgröße reicht sonst knapp
+      # nicht (identisches Muster im privaten Root-Workflow).
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          docker system prune -af --volumes
+
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Docker Compose
+        run: docker compose config
+
+      - name: Build Docker Images
+        run: docker compose build api frontend
+
+      - name: Cleanup Build Cache
+        if: always()
+        run: |
+          docker builder prune -af
+          docker system prune -af --volumes
+
+  # ===========================================================================
+  # Job 4: Security Scan
+  # ===========================================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [test-backend]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      # Persistiert die Trivy-Vulnerability-DB über Job-Läufe hinweg (nicht
+      # nur innerhalb dieses Jobs) — die beiden Läufe unten teilen sich denselben
+      # cache-dir, das spart pro Lauf einen DB-Download von ghcr.io und
+      # reduziert die Exposition gegenüber dessen bekanntem Rate-Limit-Flake.
+      - name: Restore Trivy DB Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.cache/trivy
+          key: trivy-db-cache
+
+      # Zwei Trivy-Läufe statt einem: SARIF-Upload liefert das dauerhafte
+      # Ergebnis im Security-Tab, der Table-Lauf mit exit-code:'1' ist das
+      # eigentliche Gate. Mit format:'table' allein (Default exit-code '0')
+      # würde dieser Job HIGH/CRITICAL-Funde nie zum Scheitern bringen.
+      # ignore-unfixed: true auf beiden Läufen, weil dieses Repo öffentlich
+      # ist — ein Gate auf CVEs, für die es noch keinen Fix gibt, blockiert
+      # jeden PR (auch von externen Erstbeitragenden), ohne dass jemand im
+      # PR selbst etwas dagegen tun könnte.
+      - name: Run Trivy Vulnerability Scanner (SARIF)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true
+          cache-dir: ${{ github.workspace }}/.cache/trivy
+
+      - name: Upload Trivy Results to Security Tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy Vulnerability Scanner (Gate)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true
+          cache-dir: ${{ github.workspace }}/.cache/trivy
+          exit-code: '1'

@@ -168,25 +168,14 @@ npx playwright test --headed --debug
 
 ## CI/CD Integration
 
-### GitLab CI
-
-Die Tests sind in `.gitlab-ci.yml` integriert:
-
-```yaml
-test:e2e:
-  stage: test
-  image: mcr.microsoft.com/playwright:v1.40.0
-  script:
-    - cd frontend
-    - bun install --frozen-lockfile
-    - bun run test:e2e
-  artifacts:
-    when: on_failure
-    paths:
-      - frontend/test-results/
-```
-
 ### GitHub Actions
+
+Im öffentlichen Mirror-Repo (`talent-factory/examcraft`, siehe
+`core/.github/workflows/ci.yml`) sind die E2E-Tests aktuell **nicht** Teil der
+CI (Scope dort: Backend-/Frontend-Tests, Docker-Build-Test, Security-Scan).
+Im privaten Monorepo läuft die auth-freie Smoke-Suite bereits im Job
+`e2e-smoke` (`.github/workflows/ci.yml`, Root). Ein eigener E2E-Job liesse
+sich im öffentlichen Repo nach diesem Muster ergänzen:
 
 ```yaml
 - name: Run E2E Tests
