@@ -35,14 +35,13 @@ const renderWithRouter = (component: React.ReactElement) => {
 
 describe('DashboardLayout Component', () => {
   it('renders navigation bar', () => {
-    const { container } = renderWithRouter(
+    renderWithRouter(
       <DashboardLayout>
         <div>Test Content</div>
       </DashboardLayout>
     );
 
-    const nav = container.querySelector('nav');
-    expect(nav).toBeInTheDocument();
+    expect(screen.getByTestId('navigation-bar')).toBeInTheDocument();
   });
 
   it('renders sidebar', () => {
@@ -66,41 +65,50 @@ describe('DashboardLayout Component', () => {
   });
 
   it('has correct layout structure', () => {
-    const { container } = renderWithRouter(
+    renderWithRouter(
       <DashboardLayout>
         <div>Test Content</div>
       </DashboardLayout>
     );
 
     // Check for main element
-    const main = container.querySelector('main');
-    expect(main).toBeInTheDocument();
+    expect(screen.getByRole('main')).toBeInTheDocument();
 
-    // Check for min-h-screen class
-    const wrapper = container.querySelector('.min-h-screen');
-    expect(wrapper).toBeInTheDocument();
+    // Check for dashboard layout wrapper
+    expect(screen.getByTestId('dashboard-layout')).toBeInTheDocument();
   });
 
   it('applies correct margin to main content', () => {
-    const { container } = renderWithRouter(
+    renderWithRouter(
       <DashboardLayout>
         <div>Test Content</div>
       </DashboardLayout>
     );
 
-    const main = container.querySelector('main');
-    expect(main).toHaveClass('ml-sidebar');
+    expect(screen.getByRole('main')).toHaveClass('ml-sidebar');
+  });
+
+  it('renders footer with legal links', () => {
+    renderWithRouter(
+      <DashboardLayout>
+        <div>Test Content</div>
+      </DashboardLayout>
+    );
+
+    expect(screen.getByTestId('app-footer')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Datenschutzerklärung/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Nutzungsbedingungen/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Impressum/i })).toBeInTheDocument();
   });
 
   it('renders the navigation bar as a fixed element', () => {
-    const { container } = renderWithRouter(
+    renderWithRouter(
       <DashboardLayout>
         <div>Test Content</div>
       </DashboardLayout>
     );
 
-    const nav = container.querySelector('nav');
-    expect(nav).not.toBeNull();
+    const nav = screen.getByTestId('navigation-bar');
     expect(nav).toHaveClass('fixed');
     expect(nav).toHaveClass('top-0');
   });

@@ -92,11 +92,9 @@
     "authPage": {
       "tagline": "Generazione di domande d'esame con IA",
       "backToLogin": "← Torna al login",
-      "footer": "Continuando, accetti i nostri",
       "terms": "Termini di servizio",
-      "and": "e",
       "privacy": "Informativa sulla privacy",
-      "footerEnd": ""
+      "imprint": "Informazioni legali"
     },
     "verification": {
       "bannerTitle": "Verifica e-mail richiesta",
@@ -148,6 +146,147 @@
       "passwordNumber": "La password deve contenere almeno un numero",
       "invalidEmail": "Inserisci un indirizzo e-mail valido",
       "fillAllFields": "Compila tutti i campi"
+    }
+  },
+  "footer": {
+    "tagline": "Assistente d'esame assistito dall'IA",
+    "legalLinks": "Informazioni legali"
+  },
+  "legal": {
+    "backToLogin": "Torna al login",
+    "privacy": {
+      "title": "Informativa sulla privacy",
+      "lastUpdated": "Ultimo aggiornamento: agosto 2026",
+      "controller": {
+        "title": "Titolare del trattamento",
+        "email": "E-mail"
+      },
+      "purpose": {
+        "title": "Finalità del trattamento dei dati",
+        "text": "ExamCraft AI tratta i dati personali esclusivamente per fornire l'assistenza agli esami basata sull'IA: account utente, elaborazione di documenti, generazione di domande, suggerimenti di valutazione e comunicazione. Il trattamento si basa sul GDPR o sulla revisione della Legge federale svizzera sulla protezione dei dati (nDSG)."
+      },
+      "hosting": {
+        "title": "Hosting e localizzazione dei dati",
+        "text": "La piattaforma è gestita nella regione Fly.io di Francoforte (Germania). Database, database vettoriale e coda di messaggi operano nella stessa regione. Il tracciamento degli errori è gestito tramite Sentry con ingest in Germania e dati mascherati."
+      },
+      "subprocessors": {
+        "title": "Responsabili del trattamento e sub-responsabili",
+        "intro": "Utilizziamo responsabili del trattamento attentamente selezionati per fornire i nostri servizi. Un elenco completo con le sedi di hosting e i meccanismi di trasferimento verso paesi terzi è disponibile nella nostra appendice DPA.",
+        "note": "Nota: l'elenco dei sub-responsabili viene aggiornato continuamente. Informiamo tempestivamente i titolari in caso di modifiche sostanziali.",
+        "items": [
+          {
+            "name": "Fly.io",
+            "description": "Hosting (regione Francoforte, DE); Fornitore: Fly.io, USA (SCC/DPF)"
+          },
+          {
+            "name": "Anthropic",
+            "description": "Modello IA per la generazione di domande e i suggerimenti di valutazione; Fornitore: Anthropic PBC, USA (SCC/DPF)"
+          },
+          {
+            "name": "OpenAI",
+            "description": "Embeddings; Fornitore: OpenAI, USA (SCC/DPF)"
+          },
+          {
+            "name": "Stripe",
+            "description": "Elaborazione pagamenti; Fornitore: Stripe, Inc., USA/Irlanda (SCC/DPF)"
+          },
+          {
+            "name": "Resend",
+            "description": "E-mail transazionali; Fornitore: Resend, USA (SCC/DPF)"
+          },
+          {
+            "name": "Sentry",
+            "description": "Analisi degli errori (ingest in Germania, PII mascherati); Fornitore: Functional Software, Inc., USA (SCC/DPF)"
+          }
+        ]
+      },
+      "ai": {
+        "title": "Elaborazione tramite IA",
+        "text": "ExamCraft AI segue un approccio human-in-the-loop: l'IA genera suggerimenti per domande d'esame e valutazioni, che devono essere esaminati e approvati da un insegnante prima di lasciare il sistema. I dati personali degli studenti vengono minimizzati prima dell'elaborazione tramite IA ove possibile."
+      },
+      "rights": {
+        "title": "I tuoi diritti",
+        "intro": "Gli interessati hanno i seguenti diritti:",
+        "access": "Diritto di accesso ai dati trattati (art. 15 GDPR)",
+        "rectification": "Diritto di rettifica (art. 16 GDPR)",
+        "erasure": "Diritto alla cancellazione (art. 17 GDPR)",
+        "portability": "Diritto alla portabilità dei dati (art. 20 GDPR)",
+        "restriction": "Diritto di limitazione del trattamento (art. 18 GDPR)",
+        "objection": "Diritto di opposizione (art. 21 GDPR)"
+      },
+      "contact": {
+        "title": "Contatto",
+        "text": "Per domande sulla privacy, contattaci all'indirizzo privacy@talent-factory.ch."
+      }
+    },
+    "terms": {
+      "title": "Termini di servizio",
+      "lastUpdated": "Ultimo aggiornamento: agosto 2026",
+      "scope": {
+        "title": "Ambito di applicazione",
+        "text": "I presenti Termini di servizio regolano l'utilizzo di ExamCraft AI da parte degli utenti registrati nonché da scuole e istituzioni educative."
+      },
+      "accounts": {
+        "title": "Account utente",
+        "text": "Gli utenti sono responsabili della sicurezza delle proprie credenziali. Gli account non possono essere condivisi con terzi."
+      },
+      "use": {
+        "title": "Uso consentito",
+        "text": "ExamCraft AI può essere utilizzato esclusivamente per la creazione e la correzione di domande d'esame in contesto scolastico o universitario. È vietato qualsiasi uso improprio."
+      },
+      "ai": {
+        "title": "Contenuto generato dall'IA",
+        "text": "L'IA fornisce suggerimenti. L'insegnante responsabile conserva la decisione pedagogica finale e la valutazione finale. ExamCraft AI non garantisce l'esattezza dei singoli suggerimenti."
+      },
+      "subscriptions": {
+        "title": "Abbonamenti e pagamenti",
+        "text": "Gli abbonamenti vengono fatturati tramite Stripe. I termini di cancellazione e i periodi contrattuali sono definiti nell'offerta rispettiva."
+      },
+      "liability": {
+        "title": "Responsabilità",
+        "text": "La responsabilità di Talent Factory GmbH è limitata a dolo e colpa grave, nella misura consentita dalla legge."
+      },
+      "changes": {
+        "title": "Modifiche",
+        "text": "Ci riserviamo il diritto di modificare i presenti Termini di servizio con un preavviso ragionevole."
+      },
+      "law": {
+        "title": "Legge applicabile e foro",
+        "text": "Si applica il diritto svizzero, escluse le norme di diritto internazionale privato. Il foro è Soletta, nella misura consentita dalla legge."
+      }
+    },
+    "imprint": {
+      "title": "Informazioni legali",
+      "lastUpdated": "Ultimo aggiornamento: agosto 2026",
+      "provider": {
+        "title": "Fornitore del servizio",
+        "email": "E-mail",
+        "website": "Sito web"
+      },
+      "representation": {
+        "title": "Rappresentanti",
+        "text": "Daniel Senften, Amministratore delegato"
+      },
+      "vat": {
+        "title": "Partita IVA",
+        "text": "CHE-xxx.xxx.xxx IVA"
+      },
+      "responsibility": {
+        "title": "Responsabile del contenuto",
+        "text": "Talent Factory GmbH, Hohlgasse 6, 4500 Soletta, Svizzera"
+      },
+      "disclaimer": {
+        "title": "Esclusione di responsabilità",
+        "text": "Nonostante un attento controllo dei contenuti, decliniamo ogni responsabilità per i contenuti dei link esterni. Sono responsabili esclusivamente i gestori delle pagine collegate."
+      }
+    },
+    "logoLink": "ExamCraft AI",
+    "legalNavigation": "Informazioni legali",
+    "provider": {
+      "name": "Talent Factory GmbH",
+      "street": "Hofstattweg 6",
+      "city": "3422 Kirchberg BE",
+      "country": "Svizzera"
     }
   },
   "pages": {

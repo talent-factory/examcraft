@@ -92,11 +92,9 @@
     "authPage": {
       "tagline": "Génération de questions d'examen par IA",
       "backToLogin": "← Retour à la connexion",
-      "footer": "En continuant, vous acceptez nos",
       "terms": "Conditions d'utilisation",
-      "and": "et",
       "privacy": "Politique de confidentialité",
-      "footerEnd": ""
+      "imprint": "Mentions légales"
     },
     "verification": {
       "bannerTitle": "Vérification de l'e-mail requise",
@@ -148,6 +146,147 @@
       "passwordNumber": "Le mot de passe doit contenir au moins un chiffre",
       "invalidEmail": "Veuillez saisir une adresse e-mail valide",
       "fillAllFields": "Veuillez remplir tous les champs"
+    }
+  },
+  "footer": {
+    "tagline": "Assistant d'examens assisté par IA",
+    "legalLinks": "Informations légales"
+  },
+  "legal": {
+    "backToLogin": "Retour à la connexion",
+    "privacy": {
+      "title": "Politique de confidentialité",
+      "lastUpdated": "Dernière mise à jour : août 2026",
+      "controller": {
+        "title": "Responsable du traitement",
+        "email": "E-mail"
+      },
+      "purpose": {
+        "title": "Finalité du traitement des données",
+        "text": "ExamCraft AI traite les données personnelles uniquement pour fournir l'assistance aux examens basée sur l'IA : comptes utilisateurs, traitement de documents, génération de questions, suggestions de notation et communication. Le traitement est fondé sur le RGPD ou la révision de la loi fédérale suisse sur la protection des données (nDSG)."
+      },
+      "hosting": {
+        "title": "Hébergement et localisation des données",
+        "text": "La plateforme est exploitée dans la région Fly.io de Francfort (Allemagne). Les bases de données, la base vectorielle et la file de messages fonctionnent dans la même région. Le suivi des erreurs est géré via Sentry avec ingestion en Allemagne et données masquées."
+      },
+      "subprocessors": {
+        "title": "Sous-traitants et sous-processeurs",
+        "intro": "Nous utilisons des sous-traitants soigneusement sélectionnés pour fournir nos services. Une liste complète avec les lieux d'hébergement et les mécanismes de transfert vers des pays tiers figure dans notre annexe DPA.",
+        "note": "Remarque : la liste des sous-processeurs est mise à jour en continu. Nous informons les responsables en temps utile en cas de modification substantielle.",
+        "items": [
+          {
+            "name": "Fly.io",
+            "description": "Hébergement (région Francfort, DE); Fournisseur : Fly.io, USA (SCC/DPF)"
+          },
+          {
+            "name": "Anthropic",
+            "description": "Modèle IA pour la génération de questions et les suggestions de notation; Fournisseur : Anthropic PBC, USA (SCC/DPF)"
+          },
+          {
+            "name": "OpenAI",
+            "description": "Embeddings; Fournisseur : OpenAI, USA (SCC/DPF)"
+          },
+          {
+            "name": "Stripe",
+            "description": "Traitement des paiements; Fournisseur : Stripe, Inc., USA/Irlande (SCC/DPF)"
+          },
+          {
+            "name": "Resend",
+            "description": "E-mails transactionnels; Fournisseur : Resend, USA (SCC/DPF)"
+          },
+          {
+            "name": "Sentry",
+            "description": "Analyse des erreurs (ingestion DE, PII masquées); Fournisseur : Functional Software, Inc., USA (SCC/DPF)"
+          }
+        ]
+      },
+      "ai": {
+        "title": "Traitement par IA",
+        "text": "ExamCraft AI suit une approche human-in-the-loop : l'IA génère des suggestions de questions d'examen et de notation, qui doivent être examinées et approuvées par un enseignant avant de quitter le système. Les données personnelles des élèves sont minimisées avant le traitement par IA dans la mesure du possible."
+      },
+      "rights": {
+        "title": "Vos droits",
+        "intro": "Les personnes concernées disposent des droits suivants :",
+        "access": "Droit d'accès aux données traitées (art. 15 RGPD)",
+        "rectification": "Droit de rectification (art. 16 RGPD)",
+        "erasure": "Droit à l'effacement (art. 17 RGPD)",
+        "portability": "Droit à la portabilité des données (art. 20 RGPD)",
+        "restriction": "Droit à la limitation du traitement (art. 18 RGPD)",
+        "objection": "Droit d'opposition (art. 21 RGPD)"
+      },
+      "contact": {
+        "title": "Contact",
+        "text": "Pour toute question relative à la protection des données, veuillez nous contacter à privacy@talent-factory.ch."
+      }
+    },
+    "terms": {
+      "title": "Conditions d'utilisation",
+      "lastUpdated": "Dernière mise à jour : août 2026",
+      "scope": {
+        "title": "Champ d'application",
+        "text": "Les présentes conditions d'utilisation régissent l'utilisation d'ExamCraft AI par les utilisateurs enregistrés ainsi que par les écoles et établissements d'enseignement."
+      },
+      "accounts": {
+        "title": "Comptes utilisateurs",
+        "text": "Les utilisateurs sont responsables de la sécurité de leurs identifiants. Les comptes ne peuvent pas être partagés avec des tiers."
+      },
+      "use": {
+        "title": "Utilisation autorisée",
+        "text": "ExamCraft AI ne peut être utilisé que pour la création et la correction de questions d'examen dans un contexte scolaire ou universitaire. Toute utilisation abusive est interdite."
+      },
+      "ai": {
+        "title": "Contenu généré par l'IA",
+        "text": "L'IA fournit des suggestions. L'enseignant responsable conserve la décision pédagogique finale et la notation finale. ExamCraft AI ne garantit pas l'exactitude factuelle de chaque suggestion."
+      },
+      "subscriptions": {
+        "title": "Abonnements et paiements",
+        "text": "Les abonnements sont facturés via Stripe. Les délais de résiliation et les durées de contrat sont définis dans l'offre respective."
+      },
+      "liability": {
+        "title": "Responsabilité",
+        "text": "La responsabilité de Talent Factory GmbH est limitée à l'intention et à la faute grave, dans la mesure permise par la loi."
+      },
+      "changes": {
+        "title": "Modifications",
+        "text": "Nous nous réservons le droit de modifier les présentes conditions d'utilisation avec un préavis raisonnable."
+      },
+      "law": {
+        "title": "Droit applicable et juridiction",
+        "text": "Le droit suisse s'applique, à l'exclusion des règles de conflit de lois. Le lieu de juridiction est Soleure, dans la mesure permise par la loi."
+      }
+    },
+    "imprint": {
+      "title": "Mentions légales",
+      "lastUpdated": "Dernière mise à jour : août 2026",
+      "provider": {
+        "title": "Fournisseur du service",
+        "email": "E-mail",
+        "website": "Site web"
+      },
+      "representation": {
+        "title": "Représentants",
+        "text": "Daniel Senften, Directeur général"
+      },
+      "vat": {
+        "title": "Numéro de TVA",
+        "text": "CHE-xxx.xxx.xxx TVA"
+      },
+      "responsibility": {
+        "title": "Responsable du contenu",
+        "text": "Talent Factory GmbH, Hohlgasse 6, 4500 Soleure, Suisse"
+      },
+      "disclaimer": {
+        "title": "Clause de non-responsabilité",
+        "text": "Malgré un contrôle attentif du contenu, nous déclinons toute responsabilité quant au contenu des liens externes. Les exploitants des pages liées en sont seuls responsables."
+      }
+    },
+    "logoLink": "ExamCraft AI",
+    "legalNavigation": "Informations légales",
+    "provider": {
+      "name": "Talent Factory GmbH",
+      "street": "Hofstattweg 6",
+      "city": "3422 Kirchberg BE",
+      "country": "Suisse"
     }
   },
   "pages": {

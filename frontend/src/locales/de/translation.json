@@ -445,11 +445,9 @@
     "authPage": {
       "tagline": "KI-gestützte Prüfungsfragengenerierung",
       "backToLogin": "← Zurück zur Anmeldung",
-      "footer": "Durch die Nutzung stimmen Sie unseren",
       "terms": "Nutzungsbedingungen",
-      "and": "und",
       "privacy": "Datenschutzrichtlinie",
-      "footerEnd": "zu"
+      "imprint": "Impressum"
     },
     "verification": {
       "bannerTitle": "E-Mail-Verifizierung erforderlich",
@@ -501,6 +499,147 @@
       "passwordNumber": "Das Passwort muss mindestens eine Zahl enthalten",
       "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
       "fillAllFields": "Bitte füllen Sie alle Felder aus"
+    }
+  },
+  "footer": {
+    "tagline": "KI-gestützte Prüfungsassistenz",
+    "legalLinks": "Rechtliche Informationen"
+  },
+  "legal": {
+    "backToLogin": "Zurück zur Anmeldung",
+    "privacy": {
+      "title": "Datenschutzerklärung",
+      "lastUpdated": "Stand: August 2026",
+      "controller": {
+        "title": "Verantwortlicher",
+        "email": "E-Mail"
+      },
+      "purpose": {
+        "title": "Zweck der Datenverarbeitung",
+        "text": "ExamCraft AI verarbeitet personenbezogene Daten ausschliesslich zur Bereitstellung der KI-gestützten Prüfungsassistenz: Benutzerkonten, Dokumentenverarbeitung, Fragengenerierung, Korrekturvorschläge und Kommunikation. Die Verarbeitung erfolgt auf Grundlage der DSGVO bzw. des revidierten schweizerischen Datenschutzgesetzes (nDSG)."
+      },
+      "hosting": {
+        "title": "Hosting und Speicherort",
+        "text": "Die Plattform wird in der Fly.io-Region Frankfurt (Deutschland) betrieben. Datenbanken, Vektor-DB und Message-Queue laufen in derselben Region. Fehleranalysen werden über Sentry mit DE-Ingest und maskierten Daten verarbeitet."
+      },
+      "subprocessors": {
+        "title": "Auftragsverarbeiter und Subprozessoren",
+        "intro": "Für die Erbringung unserer Dienstleistungen setzen wir sorgfältig ausgewählte Auftragsverarbeiter ein. Eine vollständige Liste mit Hosting-Standorten und Drittland-Transfermechanismen findet sich in unserer AVV-Anlage.",
+        "note": "Hinweis: Die Subprozessoren-Liste wird laufend aktualisiert. Bei materiellen Änderungen informieren wir die verantwortlichen Stellen rechtzeitig.",
+        "items": [
+          {
+            "name": "Fly.io",
+            "description": "Hosting (Region Frankfurt, DE); Anbieter: Fly.io, USA (SCC/DPF)"
+          },
+          {
+            "name": "Anthropic",
+            "description": "KI-Modell für Fragengenerierung und Bewertungsvorschläge; Anbieter: Anthropic PBC, USA (SCC/DPF)"
+          },
+          {
+            "name": "OpenAI",
+            "description": "Embeddings; Anbieter: OpenAI, USA (SCC/DPF)"
+          },
+          {
+            "name": "Stripe",
+            "description": "Zahlungsabwicklung; Anbieter: Stripe, Inc., USA/Irland (SCC/DPF)"
+          },
+          {
+            "name": "Resend",
+            "description": "Transaktions-E-Mails; Anbieter: Resend, USA (SCC/DPF)"
+          },
+          {
+            "name": "Sentry",
+            "description": "Fehleranalyse (DE-Ingest, PII-maskiert); Anbieter: Functional Software, Inc., USA (SCC/DPF)"
+          }
+        ]
+      },
+      "ai": {
+        "title": "KI-Verarbeitung",
+        "text": "ExamCraft AI arbeitet nach dem Human-in-the-Loop-Prinzip: Die KI erstellt Vorschläge für Prüfungsfragen und Bewertungen, die von einer Lehrkraft geprüft und freigegeben werden müssen, bevor sie das System verlassen. Personenbezogene Daten von Schülerinnen und Schülern werden vor der KI-Verarbeitung soweit möglich minimiert."
+      },
+      "rights": {
+        "title": "Ihre Rechte",
+        "intro": "Betroffene Personen haben folgende Rechte:",
+        "access": "Auskunft über die verarbeiteten Daten (Art. 15 DSGVO)",
+        "rectification": "Berichtigung unrichtiger Daten (Art. 16 DSGVO)",
+        "erasure": "Löschung der Daten (Art. 17 DSGVO)",
+        "portability": "Datenübertragbarkeit (Art. 20 DSGVO)",
+        "restriction": "Einschränkung der Verarbeitung (Art. 18 DSGVO)",
+        "objection": "Widerspruch gegen die Verarbeitung (Art. 21 DSGVO)"
+      },
+      "contact": {
+        "title": "Kontakt",
+        "text": "Bei Fragen zum Datenschutz erreichen Sie uns unter privacy@talent-factory.ch."
+      }
+    },
+    "terms": {
+      "title": "Nutzungsbedingungen",
+      "lastUpdated": "Stand: August 2026",
+      "scope": {
+        "title": "Geltungsbereich",
+        "text": "Diese Nutzungsbedingungen regeln die Nutzung von ExamCraft AI durch registrierte Benutzerinnen und Benutzer sowie durch Schulen und Bildungseinrichtungen."
+      },
+      "accounts": {
+        "title": "Benutzerkonten",
+        "text": "Die Nutzer sind für die Sicherheit ihrer Zugangsdaten verantwortlich. Konten dürfen nicht an Dritte weitergegeben werden."
+      },
+      "use": {
+        "title": "Zulässige Nutzung",
+        "text": "ExamCraft AI darf ausschliesslich für die Erstellung und Korrektur von Prüfungsaufgaben im schulischen oder hochschulischen Kontext genutzt werden. Jede missbräuchliche Nutzung ist untersagt."
+      },
+      "ai": {
+        "title": "KI-generierte Inhalte",
+        "text": "Die KI liefert Vorschläge. Die verantwortliche Lehrkraft behält die pädagogische Letztentscheidung und die finale Notenvergabe. ExamCraft AI übernimmt keine Gewähr für die inhaltliche Richtigkeit einzelner Vorschläge."
+      },
+      "subscriptions": {
+        "title": "Abonnements und Zahlungen",
+        "text": "Abonnements werden über Stripe abgerechnet. Kündigungsfristen und Vertragslaufzeiten ergeben sich aus dem jeweiligen Angebot."
+      },
+      "liability": {
+        "title": "Haftung",
+        "text": "Die Haftung von Talent Factory GmbH ist auf Vorsatz und grobe Fahrlässigkeit beschränkt, soweit gesetzlich zulässig."
+      },
+      "changes": {
+        "title": "Änderungen",
+        "text": "Wir behalten uns vor, diese Nutzungsbedingungen mit angemessener Vorankündigung zu ändern."
+      },
+      "law": {
+        "title": "Anwendbares Recht und Gerichtsstand",
+        "text": "Es gilt schweizerisches Recht unter Ausschluss der Kollisionsnormen. Gerichtsstand ist Bern, soweit gesetzlich zulässig."
+      }
+    },
+    "imprint": {
+      "title": "Impressum",
+      "lastUpdated": "Stand: August 2026",
+      "provider": {
+        "title": "Dienstanbieter",
+        "email": "E-Mail",
+        "website": "Webseite"
+      },
+      "representation": {
+        "title": "Vertretungsberechtigte Personen",
+        "text": "Raffaele Senften, Geschäftsführer"
+      },
+      "vat": {
+        "title": "UID-Nummer",
+        "text": "CHE-482.316.670 MWST"
+      },
+      "responsibility": {
+        "title": "Inhaltliche Verantwortung",
+        "text": "Talent Factory GmbH, Hofstattweg 6, 3422 Kirchberg BE"
+      },
+      "disclaimer": {
+        "title": "Haftungsausschluss",
+        "text": "Trotz sorgfältiger inhaltlicher Kontrolle übernehmen wir keine Haftung für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten sind ausschliesslich deren Betreiber verantwortlich."
+      }
+    },
+    "logoLink": "ExamCraft AI",
+    "legalNavigation": "Rechtliche Informationen",
+    "provider": {
+      "name": "Talent Factory GmbH",
+      "street": "Hofstattweg 6",
+      "city": "3422 Kirchberg BE",
+      "country": "Schweiz"
     }
   },
   "pages": {

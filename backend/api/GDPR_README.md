@@ -336,7 +336,7 @@ ALTER TABLE users ADD COLUMN scheduled_deletion_date TIMESTAMP WITH TIME ZONE;
 ## Support
 
 For GDPR-related questions or data requests, contact:
-- Email: privacy@examcraft.ai
+- Email: support@examcraft.ai
 - Data Protection Officer: dpo@examcraft.ai
 
 ## References
