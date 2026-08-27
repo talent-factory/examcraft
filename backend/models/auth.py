@@ -13,10 +13,12 @@ from sqlalchemy import (
     Table,
     Text,
     CheckConstraint,
+    Index,
     ARRAY,
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
+from datetime import datetime, timezone
 import enum
 import sys
 import os
@@ -341,7 +343,10 @@ class User(Base):
         "UserSession", back_populates="user", cascade="all, delete-orphan"
     )
     audit_logs = relationship(
-        "AuditLog", back_populates="user", cascade="all, delete-orphan"
+        "AuditLog",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="AuditLog.user_id",
     )
     oauth_accounts = relationship(
         "OAuthAccount", back_populates="user", cascade="all, delete-orphan"
@@ -473,6 +478,16 @@ class AuditLog(Base):
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    # TF-740: set when this action happened while an admin was impersonating
+    # user_id (see ImpersonationSession). user_id stays the target user so
+    # institution-scoping (join on User.institution_id) is unaffected;
+    # impersonator_user_id records who actually performed the action.
+    # Not yet populated by this PR — auto-filled by AuditService.log_action
+    # from a context-local value set during impersonated requests, see TF-742.
+    impersonator_user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     # Action Details
     action = Column(
         String(100), nullable=False, index=True
@@ -501,11 +516,123 @@ class AuditLog(Base):
     )
 
     # Relationships
-    user = relationship("User", back_populates="audit_logs")
+    user = relationship("User", back_populates="audit_logs", foreign_keys=[user_id])
+    impersonator = relationship("User", foreign_keys=[impersonator_user_id])
 
     def __repr__(self):
         return (
             f"<AuditLog(id={self.id}, action='{self.action}', status='{self.status}')>"
+        )
+
+
+# TF-740: the closed set of valid ImpersonationSession.end_reason values.
+# "manual" = admin explicitly returned; "timeout" = the hard 30-minute
+# session timeout enforced by the auth layer (see TF-741). Reused by the
+# CHECK constraint below and by ImpersonationSession.end() so the two
+# cannot drift apart.
+IMPERSONATION_END_REASONS = ("manual", "timeout")
+
+
+class ImpersonationSession(Base):
+    """
+    Impersonation session model (TF-740, part of the TF-739 epic).
+
+    Tracks each "switch user" session an admin (holding the opt-in
+    ``users:impersonate`` permission) starts against a target user. One row
+    per session, from start (``started_at``) to either a manual return
+    (``end_reason="manual"``) or the hard 30-minute timeout enforced by the
+    auth layer (``end_reason="timeout"``, see TF-741). A session with
+    ``ended_at is None`` is still active; use ``end()`` to transition it.
+
+    ``admin_user_id``/``target_user_id`` are nullable despite always being
+    set at creation: ``ondelete="SET NULL"`` needs somewhere to null the FK
+    to when a referenced user is later deleted (e.g. GDPR erasure, see
+    api/gdpr.py) — the row survives with a NULL actor/target instead of
+    blocking the delete. A CHECK constraint still requires the two to differ
+    whenever both are set (no self-impersonation), and a partial-unique
+    index (migration-only, not expressible in the ORM layer) allows at most
+    one *active* (``ended_at IS NULL``) session per admin at a time — no
+    nested impersonation, per the TF-739 epic's scope rules.
+    """
+
+    __tablename__ = "impersonation_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    admin_user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    target_user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    reason = Column(Text, nullable=False)
+
+    started_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    ended_at = Column(DateTime(timezone=True), nullable=True)
+    end_reason = Column(String(20), nullable=True)  # see IMPERSONATION_END_REASONS
+
+    __table_args__ = (
+        CheckConstraint(
+            "end_reason IN ('manual', 'timeout') OR end_reason IS NULL",
+            name="ck_impersonation_sessions_end_reason",
+        ),
+        # NULL-safe on purpose: once either FK is nulled out by a user
+        # deletion, this comparison evaluates to NULL (not FALSE) and the
+        # constraint passes — it only guards against admin == target while
+        # both are still set.
+        CheckConstraint(
+            "admin_user_id <> target_user_id",
+            name="ck_impersonation_sessions_admin_target_distinct",
+        ),
+        CheckConstraint(
+            "(ended_at IS NULL) = (end_reason IS NULL)",
+            name="ck_impersonation_sessions_end_pairing",
+        ),
+        # TF-739: an admin can't nest a second impersonation while one is
+        # already active — enforced at the DB level via a partial unique
+        # index over "still-active" rows (ended_at IS NULL). Declared here
+        # (not just in the migration) so it also applies to Base.metadata
+        # .create_all()-built schemas, e.g. in tests.
+        Index(
+            "ix_impersonation_sessions_one_active_per_admin",
+            "admin_user_id",
+            unique=True,
+            postgresql_where=text("ended_at IS NULL"),
+        ),
+    )
+
+    # Relationships
+    admin_user = relationship("User", foreign_keys=[admin_user_id])
+    target_user = relationship("User", foreign_keys=[target_user_id])
+
+    def end(self, reason: str) -> None:
+        """Mark this session as ended, setting ``ended_at``/``end_reason``
+        together so the pairing invariant enforced by the CHECK constraint
+        above can never be violated from here.
+
+        Raises ``ValueError`` if the session is already ended or ``reason``
+        isn't one of ``IMPERSONATION_END_REASONS``.
+        """
+        if self.ended_at is not None:
+            raise ValueError(
+                f"ImpersonationSession {self.id} is already ended "
+                f"(end_reason={self.end_reason!r})"
+            )
+        if reason not in IMPERSONATION_END_REASONS:
+            raise ValueError(
+                f"invalid end_reason {reason!r}, expected one of "
+                f"{IMPERSONATION_END_REASONS}"
+            )
+        self.ended_at = datetime.now(timezone.utc)
+        self.end_reason = reason
+
+    def __repr__(self):
+        return (
+            f"<ImpersonationSession(id={self.id}, admin_user_id={self.admin_user_id}, "
+            f"target_user_id={self.target_user_id})>"
         )
 
 

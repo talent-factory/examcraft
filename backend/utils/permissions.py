@@ -10,6 +10,11 @@ permission lists in ``utils/seed_roles.py``.
 nowhere (see the design doc, "Permission Registry" section). Both groups
 are deliberately listed together here: editing an existing role via the
 new admin GUI must not silently strip permissions it already held.
+
+A third group is opt-in only: registered here so it is assignable via the
+custom role editor, but deliberately never seeded to any default role — see
+``OPT_IN_ONLY_PERMISSIONS`` for the current set (``users:impersonate``,
+TF-740, is the first member).
 """
 
 import json
@@ -94,11 +99,36 @@ _KNOWN_PERMISSIONS: dict[str, PermissionMeta] = {
         "label": "Alle Kompetenz-Frameworks einsehen (Institutions-Admin)",
         "category": "Kompetenzen",
     },
+    # TF-740: opt-in only — registered so it is assignable via the custom
+    # role editor, but deliberately NOT part of any default role's seed
+    # permissions (see OPT_IN_ONLY_PERMISSIONS below and the TF-739 epic).
+    "users:impersonate": {
+        "label": "Als anderen Benutzer anmelden (Impersonation)",
+        "category": "System",
+    },
 }
 
 # Read-only view: prevents accidental mutation of the single source of truth
 # from anywhere other than this module (e.g. `KNOWN_PERMISSIONS.clear()`).
 KNOWN_PERMISSIONS: Mapping[str, PermissionMeta] = MappingProxyType(_KNOWN_PERMISSIONS)
+
+# Permissions that are registered in KNOWN_PERMISSIONS (and therefore
+# assignable via the custom role editor) but deliberately excluded from every
+# default system role's seed permissions in utils/seed_roles.py — opt-in
+# only. test_known_permissions_covers_all_seeded_strings excludes this set
+# when comparing KNOWN_PERMISSIONS against the seeded permission union, so
+# any *other* drift between the two is still caught.
+OPT_IN_ONLY_PERMISSIONS: frozenset[str] = frozenset({"users:impersonate"})
+
+# Fail fast at import time if an opt-in permission is ever added here
+# without a matching KNOWN_PERMISSIONS entry (silent otherwise: set
+# subtraction against a missing key is a no-op, so the equality test above
+# wouldn't catch it) — see test_known_permissions_covers_all_seeded_strings.
+assert OPT_IN_ONLY_PERMISSIONS <= set(KNOWN_PERMISSIONS.keys()), (
+    "OPT_IN_ONLY_PERMISSIONS contains permission(s) not registered in "
+    "KNOWN_PERMISSIONS: "
+    f"{OPT_IN_ONLY_PERMISSIONS - set(KNOWN_PERMISSIONS.keys())}"
+)
 
 
 def parse_role_permissions(permissions: Any) -> List[str]:

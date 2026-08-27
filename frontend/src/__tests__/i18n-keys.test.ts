@@ -97,7 +97,11 @@ function flattenKeys(obj: unknown, prefix = '', out: Set<string> = new Set()): S
   if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
     for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
       const next = prefix ? `${prefix}.${k}` : k;
-      if (typeof v === 'string') out.add(next);
+      // Arrays are a valid leaf translation value (used with
+      // t(key, { returnObjects: true }), e.g. legal.privacy.subprocessors.items)
+      // — treat them like strings instead of recursing into them, which
+      // would otherwise silently drop the key from the resolved set.
+      if (typeof v === 'string' || Array.isArray(v)) out.add(next);
       else flattenKeys(v, next, out);
     }
   }

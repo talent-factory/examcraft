@@ -14,6 +14,8 @@ drift between frontend and backend (e.g. 'questions:create' vs 'create_questions
 import os
 import re
 
+from utils.permissions import OPT_IN_ONLY_PERMISSIONS
+
 
 # ============================================================================
 # Constants: Source of truth
@@ -149,9 +151,11 @@ class TestPermissionConsistency:
     def test_all_backend_permissions_exist_in_seed_roles(self):
         """
         Every permission used in require_permission() must exist
-        in at least one seed role.
+        in at least one seed role — or be a deliberately-unseeded opt-in
+        permission (TF-740, see OPT_IN_ONLY_PERMISSIONS), which is
+        assignable via the custom role editor without ever being seeded.
         """
-        valid_perms = _get_all_seed_permission_names()
+        valid_perms = _get_all_seed_permission_names() | OPT_IN_ONLY_PERMISSIONS
         api_perms = _get_backend_require_permission_calls()
 
         mismatches = []
@@ -171,11 +175,13 @@ class TestPermissionConsistency:
         """
         Every permission used in frontend PermissionGuard must exist either:
         - In the seed role permissions (role-based check), OR
-        - In the Feature enum (tier-based check)
+        - In the Feature enum (tier-based check), OR
+        - A deliberately-unseeded opt-in permission (TF-740, see
+          OPT_IN_ONLY_PERMISSIONS)
         """
         valid_role_perms = _get_all_seed_permission_names()
         valid_feature_names = _get_frontend_feature_names()
-        valid_all = valid_role_perms | valid_feature_names
+        valid_all = valid_role_perms | valid_feature_names | OPT_IN_ONLY_PERMISSIONS
 
         frontend_perms = _get_frontend_required_permissions()
 
@@ -227,6 +233,11 @@ class TestPermissionConsistency:
             "students:manage",
             "moodle:configure",
         }
+        # TF-740 — opt-in-only permissions (e.g. "users:impersonate") are
+        # colon-format by convention and never seeded, so they'd otherwise
+        # trip this guard the moment TF-741/742 add a require_permission()
+        # or requiredPermissions call for them.
+        allowed_colon_perms = allowed_colon_perms | OPT_IN_ONLY_PERMISSIONS
 
         frontend_perms = _get_frontend_required_permissions()
         backend_perms = _get_backend_require_permission_calls()

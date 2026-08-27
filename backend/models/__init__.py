@@ -23,6 +23,7 @@ from models.auth import (
     UserStatus,
     OAuthAccount,
     OAuthProvider,
+    ImpersonationSession,
 )
 from models.rbac import (
     Feature,
@@ -77,6 +78,7 @@ __all__ = [
     "UserStatus",
     "OAuthAccount",
     "OAuthProvider",
+    "ImpersonationSession",
     # RBAC Models
     "Feature",
     "RoleFeature",
