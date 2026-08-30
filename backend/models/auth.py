@@ -345,7 +345,12 @@ class User(Base):
     audit_logs = relationship(
         "AuditLog",
         back_populates="user",
-        cascade="all, delete-orphan",
+        # TF-745: KEIN cascade="all, delete-orphan" — die DB-FK ist
+        # ondelete="SET NULL" (AuditLog.user_id soll bei User-Löschung
+        # anonymisiert werden, nicht die Zeile gelöscht werden).
+        # passive_deletes=True lässt die DB die FK-Aktion ausführen, statt
+        # dass der ORM vorher selbst löscht.
+        passive_deletes=True,
         foreign_keys="AuditLog.user_id",
     )
     oauth_accounts = relationship(

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from database import get_db
@@ -16,6 +16,7 @@ from services.auth_service import AuthService
 from services.audit_service import AuditService
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import get_current_user, block_during_impersonation
+from services.gdpr_deletion_service import delete_user_and_gdpr_data
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +47,11 @@ async def export_user_data(
 
         # Collect all user data
         user_data = {
-            "export_date": datetime.utcnow().isoformat(),
+            "export_date": datetime.now(timezone.utc).isoformat(),
             "user_profile": {
                 "id": current_user.id,
                 "email": current_user.email,
-                "name": current_user.name,
+                "name": current_user.full_name,
                 "created_at": current_user.created_at.isoformat()
                 if current_user.created_at
                 else None,
@@ -116,7 +117,7 @@ async def export_user_data(
         user_data["activity_logs"] = [
             {
                 "action": log.action,
-                "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+                "timestamp": log.created_at.isoformat() if log.created_at else None,
                 "ip_address": log.ip_address,
                 "user_agent": log.user_agent,
             }
@@ -124,10 +125,10 @@ async def export_user_data(
         ]
 
         # Log the export action
-        await audit_service.log_action(
+        audit_service.log_action(
             user_id=current_user.id,
             action="data_export",
-            details={"export_size": len(json.dumps(user_data))},
+            additional_data={"export_size": len(json.dumps(user_data))},
             db=db,
         )
 
@@ -156,7 +157,7 @@ async def request_account_deletion(
     db: Session = Depends(get_db),
     audit_service: AuditService = Depends(),
     _guard: None = Depends(block_during_impersonation),
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """
     Request account deletion (GDPR Article 17 - Right to Erasure)
 
@@ -183,17 +184,17 @@ async def request_account_deletion(
         # Mark account for deletion (30-day grace period)
         from datetime import timedelta
 
-        deletion_date = datetime.utcnow() + timedelta(days=30)
+        deletion_date = datetime.now(timezone.utc) + timedelta(days=30)
 
-        current_user.deletion_requested_at = datetime.utcnow()
+        current_user.deletion_requested_at = datetime.now(timezone.utc)
         current_user.scheduled_deletion_date = deletion_date
         db.commit()
 
         # Log the deletion request
-        await audit_service.log_action(
+        audit_service.log_action(
             user_id=current_user.id,
             action="deletion_requested",
-            details={
+            additional_data={
                 "scheduled_deletion_date": deletion_date.isoformat(),
                 "grace_period_days": 30,
             },
@@ -231,7 +232,7 @@ async def cancel_account_deletion(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     audit_service: AuditService = Depends(),
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """
     Cancel pending account deletion
 
@@ -260,8 +261,11 @@ async def cancel_account_deletion(
         db.commit()
 
         # Log the cancellation
-        await audit_service.log_action(
-            user_id=current_user.id, action="deletion_cancelled", details={}, db=db
+        audit_service.log_action(
+            user_id=current_user.id,
+            action="deletion_cancelled",
+            additional_data={},
+            db=db,
         )
 
         return {"success": True, "message": "Account deletion cancelled successfully"}
@@ -287,9 +291,8 @@ async def delete_account_immediately(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     auth_service: AuthService = Depends(),
-    audit_service: AuditService = Depends(),
     _guard: None = Depends(block_during_impersonation),
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """
     Immediately delete account (requires password confirmation)
 
@@ -308,41 +311,17 @@ async def delete_account_immediately(
         )
 
         # Verify password
-        if not auth_service.verify_password(password, current_user.hashed_password):
+        if not auth_service.verify_password(password, current_user.password_hash):
             raise HTTPException(
                 status_code=401, detail=t("gdpr_invalid_password", locale=locale)
             )
 
-        # Log the deletion (before deleting the user)
-        await audit_service.log_action(
-            user_id=current_user.id,
-            action="account_deleted_immediately",
-            details={"email": current_user.email},
-            db=db,
+        email = current_user.email
+        delete_user_and_gdpr_data(
+            db, current_user, action="account_deleted_immediately"
         )
 
-        # Delete all user data
-        from models.document import Document
-
-        db.query(Document).filter(Document.user_id == current_user.id).delete()
-
-        try:
-            from models.question_review import QuestionReview
-
-            db.query(QuestionReview).filter(
-                QuestionReview.created_by == current_user.id
-            ).delete()
-        except Exception as e:
-            logger.warning(f"Could not delete questions: {e}")
-
-        # Delete audit logs (keep for compliance)
-        # db.query(AuditLog).filter(AuditLog.user_id == current_user.id).delete()
-
-        # Delete user
-        db.delete(current_user)
-        db.commit()
-
-        logger.info(f"Account deleted successfully: {current_user.email}")
+        logger.info(f"Account deleted successfully: {email}")
 
         return {
             "success": True,
@@ -352,6 +331,23 @@ async def delete_account_immediately(
 
     except HTTPException:
         raise
+    except RuntimeError as e:
+        # Fail-closed-Abbruch aus delete_user_and_gdpr_data: der Audit-Log-
+        # Eintrag konnte nicht geschrieben werden, die Löschung wurde
+        # bewusst NICHT durchgeführt (siehe gdpr_deletion_service.py). Eigener
+        # Log-Marker statt im generischen `except Exception` unterzugehen —
+        # für On-Call der Unterschied zwischen "DB-Problem beim Audit-Log,
+        # dringend" und "unbekannter Bug".
+        logger.error(
+            f"Account deletion aborted (fail-closed audit log) for user "
+            f"{current_user.id}: {e}",
+            exc_info=True,
+        )
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=t("gdpr_deletion_failed", locale=locale),
+        )
     except Exception as e:
         logger.error(
             f"Account deletion failed for user {current_user.id}: {e}", exc_info=True

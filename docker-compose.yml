@@ -117,7 +117,15 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
-    command: celery -A celery_app worker --loglevel=info --concurrency=3 --queues=document_processing,rag_embedding,question_generation,notifications,import_processing
+    # --beat: TF-745 Review-Fix — ohne laufenden Beat-Prozess feuert
+    # `celery_app.conf.beat_schedule` (TF-329-Watchdogs + täglicher
+    # GDPR-Sweep) nie, weder lokal noch in Prod (siehe fly.celery.toml).
+    # --schedule=/tmp/...: der Container mountet ./backend nach /app und
+    # läuft als root (kein USER im Dockerfile) — ohne diesen Flag legt
+    # Beat seinen Shelve-State (celerybeat-schedule.*) root-owned im
+    # gemounteten Repo-Arbeitsbaum an (CWD=/app), was mit der bekannten
+    # Worktree-Deny-Delete-ACL-Problematik kollidiert.
+    command: celery -A celery_app worker --beat --schedule=/tmp/celerybeat-schedule --loglevel=info --concurrency=3 --queues=document_processing,rag_embedding,question_generation,notifications,import_processing,maintenance_processing
 
   frontend:
     build:

@@ -4,6 +4,7 @@ Handles asynchronous task processing with RabbitMQ broker
 """
 
 from celery import Celery
+from celery.schedules import crontab
 from celery.signals import celeryd_init
 from kombu import Exchange, Queue
 import os
@@ -77,6 +78,7 @@ celery_app = Celery(
         "tasks.diagnostics_tasks",  # TF-359 Sentry worker-pipeline verification
         "tasks.import_submissions_task",  # TF-412 async result import
         "tasks.moodle_feedback_push_task",  # TF-435 feedback push back to Moodle
+        "tasks.gdpr_tasks",  # TF-745 GDPR scheduled deletion
     ],
 )
 
@@ -96,12 +98,12 @@ celery_app.conf.update(
     worker_disable_rate_limits=False,
 )
 
-# Beat schedule for periodic maintenance (TF-329 watchdog).
-# Prerequisite: a running `celery -A celery_app beat` process. In the
-# Fly.io deployment, Beat runs as a sidecar process in `fly.celery.toml`
-# (or as a `--beat` flag on the worker for single-instance setups). See
-# docs/superpowers/plans/2026-04-28-tf329-watchdog-pending-jobs.md for the
-# deployment recipe.
+# Beat schedule for periodic maintenance (TF-329 watchdog) and the TF-745
+# GDPR sweep. Prerequisite: a running `celery -A celery_app beat` process —
+# as of TF-745 the single Fly worker runs it in-process via `--beat` on
+# `fly.celery.toml` (see the comment there on the single-instance caveat).
+# See docs/superpowers/plans/2026-04-28-tf329-watchdog-pending-jobs.md for
+# the original deployment recipe.
 celery_app.conf.beat_schedule = {
     "reconcile-stuck-jobs-every-5-minutes": {
         "task": "tasks.maintenance_tasks.reconcile_stuck_jobs",
@@ -124,6 +126,19 @@ celery_app.conf.beat_schedule = {
     "reap-stuck-impersonation-sessions-every-5-minutes": {
         "task": "tasks.maintenance_tasks.reap_stuck_impersonation_sessions",
         "schedule": 300.0,  # 5 minutes
+    },
+    # TF-745: täglicher Sweep für fällige DSGVO-Löschanträge
+    # (scheduled_deletion_date <= jetzt). Wall-clock-verankertes crontab
+    # statt eines 86400s-Intervalls (Review-Fix): Fly setzt den In-Prozess-
+    # `--beat` bei jedem Deploy/Machine-Replace neu auf, der PersistentScheduler
+    # verliert dabei seinen Shelve-State — ein Intervall-Schedule würde bei
+    # häufigen Deploys "letzter Lauf + 24h" ab dem letzten Neustart rechnen
+    # und könnte den Sweep so über Tage hinweg verzögern. `crontab` wertet
+    # stattdessen die aktuelle Uhrzeit aus (03:00 in `timezone`, siehe
+    # celery_app.conf.update oben) und ist damit neustart-sicher.
+    "process-scheduled-gdpr-deletions-daily": {
+        "task": "tasks.gdpr_tasks.process_scheduled_deletions",
+        "schedule": crontab(hour=3, minute=0),
     },
 }
 
@@ -174,6 +189,19 @@ celery_app.conf.task_queues = (
         durable=True,
         queue_arguments={"x-max-priority": 10},
     ),
+    Queue(
+        # TF-745 review fix: all ``beat_schedule`` tasks (the TF-329
+        # watchdogs *and* the GDPR sweep/deletion tasks) previously had no
+        # route and landed on the unconsumed default ``celery`` queue — see
+        # the ``import_processing`` comment above for why that means the
+        # task never runs at all. Beat itself was never deployed either
+        # (see fly.celery.toml), so this went unnoticed until TF-745 made a
+        # working daily sweep a hard compliance requirement.
+        "maintenance_processing",
+        default_exchange,
+        routing_key="maintenance.process",
+        durable=True,
+    ),
 )
 
 # Task Routes
@@ -205,6 +233,35 @@ celery_app.conf.task_routes = {
     "tasks.import_submissions_task.import_submissions": {
         "queue": "import_processing",
         "routing_key": "import.process",
+    },
+    # TF-329 watchdogs + TF-745 GDPR sweep/deletion — all beat-scheduled
+    # maintenance tasks. See the ``maintenance_processing`` queue comment.
+    "tasks.maintenance_tasks.reconcile_stuck_jobs": {
+        "queue": "maintenance_processing",
+        "routing_key": "maintenance.process",
+    },
+    "tasks.maintenance_tasks.reap_stuck_import_jobs": {
+        "queue": "maintenance_processing",
+        "routing_key": "maintenance.process",
+    },
+    "tasks.maintenance_tasks.reap_stuck_moodle_feedback_jobs": {
+        "queue": "maintenance_processing",
+        "routing_key": "maintenance.process",
+    },
+    # TF-741, gemergt nach TF-745 hierher — derselbe Routing-Fix nötig, sonst
+    # exakt derselbe Bug (Task landet auf der nie konsumierten Default-Queue
+    # "celery"), den diese PR für die übrigen beat_schedule-Tasks behebt.
+    "tasks.maintenance_tasks.reap_stuck_impersonation_sessions": {
+        "queue": "maintenance_processing",
+        "routing_key": "maintenance.process",
+    },
+    "tasks.gdpr_tasks.process_scheduled_deletions": {
+        "queue": "maintenance_processing",
+        "routing_key": "maintenance.process",
+    },
+    "tasks.gdpr_tasks.execute_gdpr_deletion": {
+        "queue": "maintenance_processing",
+        "routing_key": "maintenance.process",
     },
 }
 

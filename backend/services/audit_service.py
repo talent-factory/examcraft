@@ -606,11 +606,13 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             AuditService.ACTION_CREATE_GRADING_SCHEME,
             AuditService.ACTION_UPDATE_GRADING_SCHEME,
             AuditService.ACTION_DELETE_GRADING_SCHEME,
-            # GDPR data actions (api/gdpr.py)
+            # GDPR data actions (api/gdpr.py, tasks/gdpr_tasks.py — TF-745)
             "data_export",
             "deletion_requested",
             "deletion_cancelled",
             "account_deleted_immediately",
+            "account_deleted_scheduled",
+            "gdpr_scheduled_deletion_failed",
         }
     ),
     "admin": frozenset(
