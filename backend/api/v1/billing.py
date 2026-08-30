@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from services.payment_service import PaymentService
 from services.translation_service import t, get_request_locale
-from utils.auth_utils import get_current_active_user
+from utils.auth_utils import get_current_active_user, block_during_impersonation
 from utils.billing_utils import get_allowed_price_ids, get_tier_from_price_id
 from models.auth import User, Institution
 from models.subscription import Subscription, SubscriptionStatus
@@ -330,6 +330,7 @@ async def get_payment_methods(
 async def create_customer_portal(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
+    _guard: None = Depends(block_during_impersonation),
 ):
     """
     Create a Stripe Customer Portal session for managing subscription and payment methods.
@@ -398,6 +399,7 @@ async def create_checkout_session(
     http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
+    _guard: None = Depends(block_during_impersonation),
 ):
     """
     Create a Stripe Checkout Session for the current user's institution.

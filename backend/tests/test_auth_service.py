@@ -273,3 +273,78 @@ class TestTokenRevocation:
         token_jti = access_payload["jti"]
 
         assert AuthService.is_token_revoked(token_jti, test_db) is False
+
+
+class TestImpersonationTokens:
+    """Test impersonation token minting (TF-741)."""
+
+    def test_create_impersonation_token_carries_target_and_impersonation_claims(
+        self, test_db: Session, test_user: User
+    ):
+        tokens = AuthService.create_impersonation_token(
+            test_user,
+            test_db,
+            impersonator_id=999,
+            impersonation_session_id=42,
+        )
+
+        assert "access_token" in tokens
+        assert "refresh_token" not in tokens
+        assert tokens["token_type"] == "bearer"
+
+        payload = AuthService.decode_token(tokens["access_token"])
+        assert payload is not None
+        assert payload["sub"] == str(test_user.id)
+        assert payload["impersonator_id"] == 999
+        assert payload["impersonation_session_id"] == 42
+
+    def test_create_impersonation_token_expires_in_30_minutes_hard_cap(
+        self, test_db: Session, test_user: User
+    ):
+        from services.auth_service import IMPERSONATION_TOKEN_EXPIRE_MINUTES
+
+        assert IMPERSONATION_TOKEN_EXPIRE_MINUTES == 30
+
+        tokens = AuthService.create_impersonation_token(
+            test_user, test_db, impersonator_id=999, impersonation_session_id=42
+        )
+        assert tokens["expires_in"] == 30 * 60
+
+        payload = AuthService.decode_token(tokens["access_token"])
+        lifetime_seconds = payload["exp"] - payload["iat"]
+        assert abs(lifetime_seconds - 30 * 60) < 5
+
+    def test_create_impersonation_token_creates_session_without_refresh_jti(
+        self, test_db: Session, test_user: User
+    ):
+        """No refresh token means no refresh_token_jti — otherwise the shared
+        /auth/refresh endpoint could mint an uncapped, un-flagged access
+        token for the target user and defeat the 30-minute hard cap.
+        """
+        tokens = AuthService.create_impersonation_token(
+            test_user, test_db, impersonator_id=999, impersonation_session_id=42
+        )
+        access_payload = AuthService.decode_token(tokens["access_token"])
+
+        session = (
+            test_db.query(UserSession)
+            .filter(UserSession.token_jti == access_payload["jti"])
+            .first()
+        )
+        assert session is not None
+        assert session.user_id == test_user.id
+        assert session.refresh_token_jti is None
+        assert session.is_active is True
+
+    def test_impersonation_token_can_be_revoked_via_existing_mechanism(
+        self, test_db: Session, test_user: User
+    ):
+        tokens = AuthService.create_impersonation_token(
+            test_user, test_db, impersonator_id=999, impersonation_session_id=42
+        )
+        access_payload = AuthService.decode_token(tokens["access_token"])
+        token_jti = access_payload["jti"]
+
+        assert AuthService.is_token_revoked(token_jti, test_db) is False
+        assert AuthService.revoke_token(token_jti, test_db) is True
+        assert AuthService.is_token_revoked(token_jti, test_db) is True

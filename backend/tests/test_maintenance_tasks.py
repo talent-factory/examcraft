@@ -329,6 +329,16 @@ def test_reconcile_stuck_jobs_registered_in_beat_schedule():
     assert "tasks.maintenance_tasks.reconcile_stuck_jobs" in task_names
 
 
+def test_reap_stuck_impersonation_sessions_registered_in_beat_schedule():
+    """TF-741: a typo in the task name would silently disable the reaper,
+    leaving stuck ImpersonationSession rows open forever."""
+    from celery_app import celery_app
+
+    schedule = celery_app.conf.beat_schedule
+    task_names = [entry["task"] for entry in schedule.values()]
+    assert "tasks.maintenance_tasks.reap_stuck_impersonation_sessions" in task_names
+
+
 def test_watchdog_beat_schedule_interval_within_sla():
     """Beat-Schedule interval must stay within the operational SLA.
 
@@ -450,3 +460,97 @@ def test_moodle_feedback_reaper_age_fails_stuck_jobs_only(test_db):
     reaped = test_db.get(MoodleFeedbackPushJob, stuck_queued)
     assert reaped.finished_at is not None
     assert reaped.error_log and reaped.error_log[-1]["scope"] == "job"
+
+
+def test_impersonation_reaper_closes_stuck_sessions_only(test_db):
+    """``reap_stuck_impersonation_sessions`` (TF-741 watchdog) age-closes
+    ImpersonationSession rows left open past the 30-min access-token cap.
+    The token itself already expired via JWT ``exp`` -- this task only
+    fixes up the DB bookkeeping for correct reporting/audit (TF-742).
+    Fresh and already-ended rows are untouched.
+    """
+    from models.auth import ImpersonationSession, Institution, User, UserStatus
+    from tasks.maintenance_tasks import (
+        _IMPERSONATION_STUCK_THRESHOLD,
+        reap_stuck_impersonation_sessions,
+    )
+
+    inst = Institution(
+        name="reaper-impersonation-inst",
+        slug="reaper-tf741",
+        subscription_tier="free",
+        max_users=10,
+        max_documents=10,
+        max_questions_per_month=10,
+    )
+    test_db.add(inst)
+    test_db.flush()
+
+    def _user(email: str) -> User:
+        user = User(
+            email=email,
+            password_hash="dummy",
+            first_name="R",
+            last_name="U",
+            institution_id=inst.id,
+            status=UserStatus.ACTIVE.value,
+        )
+        test_db.add(user)
+        test_db.flush()
+        return user
+
+    now = datetime.now(timezone.utc)
+    old = now - _IMPERSONATION_STUCK_THRESHOLD - timedelta(minutes=10)
+
+    def _session(
+        admin_email: str, target_email: str, started_at: datetime, ended: bool = False
+    ) -> int:
+        # Each session needs its own admin: the DB enforces at most one
+        # *active* (ended_at IS NULL) session per admin_user_id.
+        admin = _user(admin_email)
+        target = _user(target_email)
+        session = ImpersonationSession(
+            admin_user_id=admin.id,
+            target_user_id=target.id,
+            reason="x",
+            started_at=started_at,
+        )
+        if ended:
+            session.ended_at = started_at
+            session.end_reason = "manual"
+        test_db.add(session)
+        test_db.commit()
+        test_db.refresh(session)
+        return session.id
+
+    stuck_id = _session(
+        "reaper-admin-stuck@reaper-tf741.ch", "reaper-stuck@reaper-tf741.ch", old
+    )
+    fresh_id = _session(
+        "reaper-admin-fresh@reaper-tf741.ch", "reaper-fresh@reaper-tf741.ch", now
+    )
+    already_ended_id = _session(
+        "reaper-admin-ended@reaper-tf741.ch",
+        "reaper-ended@reaper-tf741.ch",
+        old,
+        ended=True,
+    )
+
+    with (
+        patch("tasks.maintenance_tasks.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+    ):
+        result = reap_stuck_impersonation_sessions.run()
+
+    assert result["reaped"] == 1
+    test_db.expire_all()
+
+    stuck = test_db.get(ImpersonationSession, stuck_id)
+    assert stuck.ended_at is not None
+    assert stuck.end_reason == "timeout"
+
+    fresh = test_db.get(ImpersonationSession, fresh_id)
+    assert fresh.ended_at is None
+
+    already_ended = test_db.get(ImpersonationSession, already_ended_id)
+    assert already_ended.end_reason == "manual"

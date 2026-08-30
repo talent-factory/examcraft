@@ -726,6 +726,12 @@ from middleware.sentry_context import SentryContextMiddleware  # noqa: E402
 
 app.add_middleware(SentryContextMiddleware)
 
+# Impersonation Context Middleware (TF-741) - resets the request-scoped
+# impersonation ContextVar so it can never leak between requests.
+from middleware.impersonation_context import ImpersonationContextMiddleware  # noqa: E402
+
+app.add_middleware(ImpersonationContextMiddleware)
+
 # Rate Limiting middleware
 rate_limit_enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
 requests_per_minute = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))

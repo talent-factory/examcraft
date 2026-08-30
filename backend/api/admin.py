@@ -6,16 +6,24 @@ User Management, Role Assignment, Institution Management
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 import logging
 
 from database import get_db
-from models.auth import User, Role, Institution, UserStatus
+from models.auth import User, Role, Institution, UserStatus, ImpersonationSession
 from services.translation_service import t, get_request_locale
-from utils.auth_utils import get_current_superuser, get_current_user
+from utils.auth_utils import (
+    get_current_superuser,
+    get_current_user,
+    get_current_active_user,
+    require_permission,
+)
 from services.audit_service import AuditService
+from services.auth_service import AuthService
 from utils.permissions import KNOWN_PERMISSIONS, parse_role_permissions
+from utils.impersonation_context import get_impersonation_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
@@ -24,6 +32,30 @@ router = APIRouter(prefix="/api/admin", tags=["Admin"])
 def _is_admin_role(user: User) -> bool:
     """Check if user has admin role."""
     return any(role.name == "admin" for role in user.roles)
+
+
+# TF-741 review fix: an institution admin's impersonation scope rule
+# ("non-admin users of their own institution only") relied solely on
+# ``_is_admin_role``, which matches only the literal role name "admin".
+# ``Role.name`` is a free-form, admin-assignable string -- a target holding
+# a custom-named role with one of these admin-class permissions (or the
+# impersonation permission itself) is administratively privileged in every
+# way that matters for this check, even though ``_is_admin_role`` misses
+# it. Checked in addition to (not instead of) ``_is_admin_role``.
+_IMPERSONATION_TARGET_ADMIN_PERMISSIONS = frozenset(
+    {"manage_users", "manage_roles", "manage_institutions", "users:impersonate"}
+)
+
+
+def _is_impersonation_privileged(user: User) -> bool:
+    """True if impersonating ``user`` would hand the admin admin-class power.
+
+    Used only for the impersonation target-scope check -- broader than
+    ``_is_admin_role`` on its own, see the module comment above.
+    """
+    return _is_admin_role(user) or any(
+        user.has_permission(perm) for perm in _IMPERSONATION_TARGET_ADMIN_PERMISSIONS
+    )
 
 
 def _require_same_institution(
@@ -819,6 +851,217 @@ async def remove_role_from_user(
         created_at=user.created_at.isoformat(),
         updated_at=user.updated_at.isoformat() if user.updated_at else None,
     )
+
+
+class ImpersonateRequest(BaseModel):
+    """Request body for POST /users/{user_id}/impersonate."""
+
+    reason: str = Field(..., min_length=3, max_length=500)
+
+
+class ImpersonateResponse(BaseModel):
+    access_token: str
+    token_type: str
+    expires_in: int
+    impersonation_session_id: int
+    target_user_id: int
+    target_user_email: str
+
+
+@router.post("/users/{user_id}/impersonate", response_model=ImpersonateResponse)
+async def start_impersonation(
+    user_id: int,
+    request: ImpersonateRequest,
+    http_request: Request,
+    current_user: User = Depends(require_permission("users:impersonate")),
+    db: Session = Depends(get_db),
+):
+    """Start an impersonation session for ``user_id`` (TF-741).
+
+    Scope: SuperAdmin may impersonate anyone, including other admins.
+    An institution admin (``users:impersonate`` permission, not
+    superuser) may only impersonate non-admin users of their own
+    institution. Nested impersonation (already impersonating, or
+    already having an unfinished session as admin) is rejected.
+    """
+    locale = get_request_locale(http_request, current_user)
+
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=t("admin_user_not_found", locale=locale),
+        )
+
+    if target.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=t("impersonation_self_not_allowed", locale=locale),
+        )
+
+    if not current_user.is_superuser:
+        if current_user.institution_id != target.institution_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=t("admin_cross_institution_access_denied", locale=locale),
+            )
+        if _is_impersonation_privileged(target) or target.is_superuser:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=t("admin_insufficient_permissions", locale=locale),
+            )
+
+    # No nesting: reject if this very request is itself already running
+    # under an impersonation token, or if the admin already has an
+    # unfinished session open from a previous call with their own token.
+    already_nested = get_impersonation_context() is not None
+    already_active_own_session = (
+        db.query(ImpersonationSession)
+        .filter(
+            ImpersonationSession.admin_user_id == current_user.id,
+            ImpersonationSession.ended_at.is_(None),
+        )
+        .first()
+        is not None
+    )
+    if already_nested or already_active_own_session:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=t("impersonation_already_active", locale=locale),
+        )
+
+    session = ImpersonationSession(
+        admin_user_id=current_user.id,
+        target_user_id=target.id,
+        reason=request.reason,
+    )
+    db.add(session)
+
+    # TF-741 review fix: flush (not commit) here so ``session.id`` is
+    # assigned but the row isn't durable yet. The application-level
+    # nesting check above is a check-then-act race against the DB's
+    # partial unique index (one active session per admin) -- two
+    # concurrent requests from the same admin can both pass it, and the
+    # second one's flush hits the constraint. Surfacing that as the same
+    # 409 the sequential check already returns (instead of an unhandled
+    # 500) needs the flush isolated in its own try/except.
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=t("impersonation_already_active", locale=locale),
+        )
+
+    # Minting the token and persisting the session are one transaction:
+    # create_impersonation_token() does the final db.commit(), covering
+    # both the (still just flushed) ImpersonationSession row and its own
+    # UserSession row together. If minting fails partway (decode failure,
+    # DB blip), the whole thing rolls back instead of leaving an orphaned
+    # "active" ImpersonationSession that no token was ever issued for --
+    # which previously locked the admin out of impersonating anyone until
+    # the reaper aged it out (TF-741 review fix).
+    try:
+        tokens = AuthService.create_impersonation_token(
+            target,
+            db,
+            impersonator_id=current_user.id,
+            impersonation_session_id=session.id,
+        )
+    except Exception:
+        db.rollback()
+        logger.error(
+            "Failed to mint impersonation token for admin %s -> target %s; "
+            "rolled back, no session was created",
+            current_user.id,
+            target.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=t("impersonation_start_failed", locale=locale),
+        )
+
+    logger.info(
+        f"Impersonation started: admin {current_user.email} (ID {current_user.id}) "
+        f"-> target {target.email} (ID {target.id}), session {session.id}"
+    )
+
+    return ImpersonateResponse(
+        access_token=tokens["access_token"],
+        token_type=tokens["token_type"],
+        expires_in=tokens["expires_in"],
+        impersonation_session_id=session.id,
+        target_user_id=target.id,
+        target_user_email=target.email,
+    )
+
+
+@router.post("/impersonate/end", status_code=status.HTTP_204_NO_CONTENT)
+async def end_impersonation(
+    http_request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """End the current impersonation session (TF-741).
+
+    Revokes the impersonation access token immediately via the existing
+    ``AuthService.revoke_token`` mechanism — the admin's own original
+    token is untouched, so "back to my account" needs no further
+    server-side action.
+
+    Also callable with the admin's *own* token instead of the impersonation
+    token: if the impersonation token was lost (closed tab, cleared
+    storage, browser crash) this falls back to closing the admin's own
+    open session by ``admin_user_id`` instead of leaving them locked out of
+    impersonating anyone else until the reaper eventually ages the row out
+    (TF-741 review fix).
+    """
+    locale = get_request_locale(http_request, current_user)
+    ctx = get_impersonation_context()
+
+    if ctx is None:
+        closed_session_id = AuthService.end_own_impersonation_session(
+            admin_user_id=current_user.id, db=db
+        )
+        if closed_session_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=t("impersonation_not_active", locale=locale),
+            )
+        logger.info(
+            f"Impersonation session {closed_session_id} ended by admin "
+            f"{current_user.id} using their own token (impersonation token "
+            "was lost/unavailable)"
+        )
+        return None
+
+    result = AuthService.end_impersonation_session(
+        impersonation_session_id=ctx.impersonation_session_id,
+        token_jti=ctx.token_jti,
+        db=db,
+    )
+    if not result["session_closed"]:
+        logger.warning(
+            "end_impersonation: session %s already ended or missing "
+            "(admin ID %s) -- proceeding regardless",
+            ctx.impersonation_session_id,
+            ctx.impersonator_id,
+        )
+    if not result["token_revoked"]:
+        logger.warning(
+            "end_impersonation: no active UserSession found for the "
+            "impersonation token (session %s, admin ID %s) -- nothing to "
+            "revoke",
+            ctx.impersonation_session_id,
+            ctx.impersonator_id,
+        )
+
+    logger.info(
+        f"Impersonation ended: session {ctx.impersonation_session_id} "
+        f"(admin ID {ctx.impersonator_id})"
+    )
+    return None
 
 
 @router.get("/permissions", response_model=List[PermissionResponse])

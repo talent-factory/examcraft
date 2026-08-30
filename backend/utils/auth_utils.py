@@ -14,6 +14,11 @@ from models.auth import User, UserStatus
 from models.org_unit import OrgUnit, UserOrgUnit
 from services.auth_service import AuthService
 from services.translation_service import get_request_locale, t
+from utils.impersonation_context import (
+    ImpersonationContext,
+    get_impersonation_context,
+    set_impersonation_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +102,33 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Check if user is active
-    if user.status != UserStatus.ACTIVE.value:
+    # TF-741: recognize impersonation claims minted by
+    # AuthService.create_impersonation_token and populate the
+    # request-scoped ImpersonationContext from them. This is the
+    # foundation the audit follow-up ticket (TF-742) will build on, and is
+    # also what the account-security guard (block_during_impersonation)
+    # reads.
+    impersonator_id = payload.get("impersonator_id")
+    impersonation_session_id = payload.get("impersonation_session_id")
+    is_impersonating = (
+        impersonator_id is not None and impersonation_session_id is not None
+    )
+    set_impersonation_context(
+        ImpersonationContext(
+            impersonator_id=impersonator_id,
+            impersonation_session_id=impersonation_session_id,
+            token_jti=token_jti,
+        )
+        if is_impersonating
+        else None
+    )
+
+    # Check if user is active — skipped for impersonation tokens: the
+    # ticket explicitly allows starting a session against a
+    # suspended/inactive/pending user (support use case), which only
+    # works end-to-end if this check doesn't then 403 every subsequent
+    # request made with that token.
+    if not is_impersonating and user.status != UserStatus.ACTIVE.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"User account is {user.status}",
@@ -122,12 +152,44 @@ async def get_current_active_user(
     Raises:
         HTTPException: If user is not active
     """
-    if current_user.status != UserStatus.ACTIVE.value:
+    # TF-741: same impersonation bypass as get_current_user — this
+    # dependency re-checks status independently, so without this an
+    # impersonated request for a suspended/inactive/pending user would
+    # still 403 here even though get_current_user already let it through.
+    if (
+        get_impersonation_context() is None
+        and current_user.status != UserStatus.ACTIVE.value
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="User account is not active"
         )
 
     return current_user
+
+
+def block_during_impersonation(
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+) -> None:
+    """FastAPI dependency: reject account-security actions during impersonation.
+
+    TF-741 acceptance criterion: account-security actions are locked while
+    an impersonation session is active (one test per locked action). Add
+    as an extra ``Depends()`` on any endpoint that changes credentials,
+    deletes the account, or changes billing.
+
+    Depends on ``get_current_active_user`` (rather than reading the
+    ImpersonationContext standalone) so FastAPI's dependency graph
+    guarantees ``get_current_user`` has already run — and therefore
+    already populated the ImpersonationContext for this request — before
+    this check executes, regardless of parameter order on the endpoint.
+    """
+    if get_impersonation_context() is not None:
+        locale = get_request_locale(request, current_user)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=t("impersonation_action_locked", locale=locale),
+        )
 
 
 async def get_current_superuser(

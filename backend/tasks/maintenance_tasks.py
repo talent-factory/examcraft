@@ -15,8 +15,10 @@ from celery.result import AsyncResult
 from celery_app import celery_app
 from database import SessionLocal
 from enums import ImportJobStatus, MoodleFeedbackPushStatus
+from models.auth import ImpersonationSession
 from models.question_generation_job import QuestionGenerationJob
 from models.submission import ImportJob, MoodleFeedbackPushJob
+from services.auth_service import IMPERSONATION_TOKEN_EXPIRE_MINUTES
 from tasks.question_tasks import _safe_update_job_status
 
 logger = logging.getLogger(__name__)
@@ -334,6 +336,75 @@ def reap_stuck_moodle_feedback_jobs() -> dict[str, int]:
     except Exception:
         logger.exception("reap_stuck_moodle_feedback_jobs failed")
         session.rollback()
+    finally:
+        session.close()
+
+    return {"reaped": reaped}
+
+
+# TF-741: matches the hard 30-minute cap on impersonation access tokens.
+# Derived from AuthService.IMPERSONATION_TOKEN_EXPIRE_MINUTES rather than
+# restated as an independent literal, so the two can't drift apart (review
+# fix: they used to be two separately-hardcoded 30s that nothing enforced
+# were equal -- a future change to one without the other would make this
+# reaper close still-valid sessions early, or leave expired ones open too
+# long, either way corrupting the audit picture this task exists to keep
+# accurate). The token itself is already unusable once expired (normal 401
+# path) -- this is pure DB bookkeeping cleanup for open ImpersonationSession
+# rows nobody ended manually, so reporting/audit (TF-742) sees an accurate
+# picture.
+_IMPERSONATION_STUCK_THRESHOLD = timedelta(minutes=IMPERSONATION_TOKEN_EXPIRE_MINUTES)
+
+
+@celery_app.task(name="tasks.maintenance_tasks.reap_stuck_impersonation_sessions")
+def reap_stuck_impersonation_sessions() -> dict[str, int]:
+    """Close ImpersonationSession rows left open past the token's lifetime.
+
+    The impersonation token already stopped working via JWT ``exp`` — this
+    task never invalidates anything, it only sets ``ended_at``/
+    ``end_reason="timeout"`` on rows nobody called
+    ``POST /impersonate/end`` for.
+
+    Uses a single conditional bulk UPDATE (``WHERE ended_at IS NULL``,
+    re-evaluated by the DB at write time) rather than SELECT-then-mutate-
+    then-commit: a manual ``POST /impersonate/end`` that commits in the gap
+    between this task's query and its own commit would otherwise get its
+    ``end_reason="manual"`` silently clobbered back to ``"timeout"``
+    (TF-741 review fix) -- the bulk UPDATE's WHERE clause excludes any row
+    a concurrent commit already closed, so whichever write lands first wins
+    cleanly instead of the second blindly overwriting the first.
+    """
+    cutoff = datetime.now(timezone.utc) - _IMPERSONATION_STUCK_THRESHOLD
+    reaped = 0
+
+    session = SessionLocal()
+    try:
+        reaped = (
+            session.query(ImpersonationSession)
+            .filter(
+                ImpersonationSession.ended_at.is_(None),
+                ImpersonationSession.started_at < cutoff,
+            )
+            .update(
+                {
+                    "ended_at": datetime.now(timezone.utc),
+                    "end_reason": "timeout",
+                },
+                synchronize_session=False,
+            )
+        )
+
+        if reaped:
+            session.commit()
+            logger.warning("Reaped %s stuck impersonation_sessions (timeout)", reaped)
+    except Exception:
+        logger.exception("reap_stuck_impersonation_sessions failed")
+        session.rollback()
+        # Nothing was actually persisted on this path -- report 0, not the
+        # in-progress count, so a caller/dashboard reading the task result
+        # can't mistake a rolled-back attempt for a successful reap
+        # (TF-741 review fix).
+        reaped = 0
     finally:
         session.close()
 

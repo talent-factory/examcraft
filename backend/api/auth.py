@@ -25,7 +25,12 @@ from services.audit_service import AuditService
 from services.oauth_service import OAuthService
 from services.redis_service import RedisService
 from services.translation_service import t, get_request_locale
-from utils.auth_utils import get_current_user, get_current_active_user
+from utils.auth_utils import (
+    get_current_user,
+    get_current_active_user,
+    block_during_impersonation,
+)
+from utils.impersonation_context import get_impersonation_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -557,7 +562,35 @@ async def logout(
 
     - Revokes all active sessions
     - Invalidates all tokens
+
+    TF-741 review fix: while impersonating, ``current_user`` resolves to
+    the *target* user, not the admin. Without this check, logging out
+    during a support session would call ``revoke_all_user_sessions`` on
+    the real target and forcibly kill all of *their* other devices/tabs —
+    a much bigger side effect than "end my impersonation session". Logout
+    while impersonating now just ends the impersonation instead, exactly
+    like ``POST /admin/impersonate/end``.
     """
+    ctx = get_impersonation_context()
+    if ctx is not None:
+        result = AuthService.end_impersonation_session(
+            impersonation_session_id=ctx.impersonation_session_id,
+            token_jti=ctx.token_jti,
+            db=db,
+        )
+        if not result["session_closed"]:
+            logger.warning(
+                "logout during impersonation: session %s already ended or "
+                "missing (admin ID %s)",
+                ctx.impersonation_session_id,
+                ctx.impersonator_id,
+            )
+        logger.info(
+            f"Impersonation ended via /auth/logout: session "
+            f"{ctx.impersonation_session_id} (admin ID {ctx.impersonator_id})"
+        )
+        return None
+
     count = AuthService.revoke_all_user_sessions(current_user.id, db)
 
     # Audit log: User logout
@@ -761,6 +794,7 @@ async def set_password(
     http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
+    _guard: None = Depends(block_during_impersonation),
 ):
     """
     Set password for OAuth-only users (no existing password)
@@ -768,6 +802,13 @@ async def set_password(
     - Only works if user has no password (OAuth-only)
     - Allows email/password login after this
     - Does NOT revoke sessions (user stays logged in)
+
+    TF-741 review fix: this is a credential-changing endpoint like
+    ``/change-password``, but a more dangerous one during impersonation —
+    it needs no existing credential at all, so an admin impersonating an
+    OAuth-only target (``password_hash is None``) could otherwise give
+    that account a password of their own choosing that outlives the
+    30-minute impersonation session entirely. Gated the same way.
     """
     from services.audit_service import AuditService
 
@@ -802,6 +843,7 @@ async def change_password(
     http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
+    _guard: None = Depends(block_during_impersonation),
 ):
     """
     Change password for authenticated user

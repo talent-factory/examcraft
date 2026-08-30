@@ -15,7 +15,7 @@ from models.auth import User
 from services.auth_service import AuthService
 from services.audit_service import AuditService
 from services.translation_service import t, get_request_locale
-from utils.auth_utils import get_current_user
+from utils.auth_utils import get_current_user, block_during_impersonation
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +155,7 @@ async def request_account_deletion(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     audit_service: AuditService = Depends(),
+    _guard: None = Depends(block_during_impersonation),
 ) -> Dict[str, str]:
     """
     Request account deletion (GDPR Article 17 - Right to Erasure)
@@ -287,6 +288,7 @@ async def delete_account_immediately(
     db: Session = Depends(get_db),
     auth_service: AuthService = Depends(),
     audit_service: AuditService = Depends(),
+    _guard: None = Depends(block_during_impersonation),
 ) -> Dict[str, str]:
     """
     Immediately delete account (requires password confirmation)

@@ -118,6 +118,13 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.maintenance_tasks.reap_stuck_moodle_feedback_jobs",
         "schedule": 300.0,  # 5 minutes
     },
+    # TF-741: close ImpersonationSession rows nobody ended manually once
+    # their 30-minute access token has expired. Pure DB bookkeeping --
+    # the token itself is already unusable via JWT exp.
+    "reap-stuck-impersonation-sessions-every-5-minutes": {
+        "task": "tasks.maintenance_tasks.reap_stuck_impersonation_sessions",
+        "schedule": 300.0,  # 5 minutes
+    },
 }
 
 # Queue Definitions
