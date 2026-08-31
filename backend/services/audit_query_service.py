@@ -110,6 +110,19 @@ def query_audit_logs(
       - no request + admin → action IN (business+admin) (fail-closed: excludes
         uncategorized actions).
       - no request + superuser → no action restriction (sees uncategorized too).
+    Action rules:
+      - ``action`` accepts a single exact value or a CSV of several, OR-matched
+        (mirrors ``categories``). E.g. "impersonation.start,impersonation.end"
+        for a "only impersonation events" filter (TF-761). A single value with
+        no comma behaves exactly like the old ``==`` filter — every existing
+        caller (core/backend/api/audit.py, the audit-log-search MCP tool)
+        keeps working unchanged.
+      - The resulting ``action IN (...)`` filter is always ANDed onto whatever
+        the category rules above already applied — it can only narrow the
+        result set further, never widen it past ``scope.allowed_categories``.
+      - A blank/whitespace-only ``action`` (e.g. ``""``) splits to an empty
+        list and is treated as "not provided" (no filter added) rather than
+        as a literal ``action == ""`` match (which would always be empty).
     """
     if categories:
         invalid = [c for c in categories if c not in scope.allowed_categories]
@@ -165,7 +178,9 @@ def query_audit_logs(
         q = q.filter(AuditLog.user_id == user_id)
 
     if action is not None:
-        q = q.filter(AuditLog.action == action)
+        actions = [a.strip() for a in action.split(",") if a.strip()]
+        if actions:
+            q = q.filter(AuditLog.action.in_(actions))
     if status is not None:
         q = q.filter(AuditLog.status == status)
     if resource_type is not None:

@@ -703,6 +703,7 @@
         "filterCategory": "Category",
         "filterStatus": "Status",
         "filterInstitution": "Institution ID",
+        "filterImpersonationOnly": "Impersonation events only",
         "loadError": "Failed to load audit logs",
         "colTime": "Time",
         "colActor": "Actor",

@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import AuditLogView from './AuditLogView';
 import * as auditService from '../../services/auditService';
 import { AuditLogListResponse } from '../../types/audit';
@@ -78,5 +79,52 @@ describe('AuditLogView', () => {
     // actually reaches `t(...)` for both the label and the tooltip.
     expect(chip).toHaveTextContent('Admin Person');
     expect(chip.title).toContain('Admin Person');
+  });
+
+  // TF-761: dedicated "only impersonation events" filter.
+  describe('impersonation-only filter', () => {
+    it('sends the impersonation actions as a CSV `action` filter when checked, and clears it when unchecked', async () => {
+      const spy = jest.spyOn(auditService, 'fetchAuditLogs').mockResolvedValue(oneRow);
+      render(<AuditLogView isSuperuser={false} />);
+      await screen.findByText('create_document');
+      expect(spy).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ action: expect.anything() })
+      );
+
+      await userEvent.click(screen.getByTestId('audit-filter-impersonation-only'));
+      await screen.findByText('create_document');
+      expect(spy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ action: 'impersonation.start,impersonation.end' })
+      );
+
+      await userEvent.click(screen.getByTestId('audit-filter-impersonation-only'));
+      await screen.findByText('create_document');
+      expect(spy).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ action: expect.anything() })
+      );
+    });
+
+    it('clears a previously selected category filter once impersonation-only is checked', async () => {
+      const spy = jest.spyOn(auditService, 'fetchAuditLogs').mockResolvedValue(oneRow);
+      render(<AuditLogView isSuperuser={false} />);
+      await screen.findByText('create_document');
+
+      await userEvent.click(
+        within(screen.getByTestId('audit-filter-category')).getByRole('combobox')
+      );
+      await userEvent.click(
+        await screen.findByRole('option', { name: 'pages.admin.audit.category.admin' })
+      );
+      await screen.findByText('create_document');
+      expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ category: ['admin'] }));
+
+      await userEvent.click(screen.getByTestId('audit-filter-impersonation-only'));
+      await screen.findByText('create_document');
+      const lastCall = spy.mock.calls[spy.mock.calls.length - 1][0];
+      expect(lastCall).toEqual(
+        expect.objectContaining({ action: 'impersonation.start,impersonation.end' })
+      );
+      expect(lastCall).not.toHaveProperty('category');
+    });
   });
 });

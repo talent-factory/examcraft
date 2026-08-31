@@ -339,6 +339,7 @@
         "filterCategory": "Catégorie",
         "filterStatus": "Statut",
         "filterInstitution": "ID d'institution",
+        "filterImpersonationOnly": "Événements d'usurpation uniquement",
         "loadError": "Échec du chargement des journaux d'audit",
         "colTime": "Heure",
         "colActor": "Acteur",

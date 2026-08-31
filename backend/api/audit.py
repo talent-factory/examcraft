@@ -113,7 +113,9 @@ def list_audit_logs(
     category: str | None = Query(
         default=None, description="CSV: business,admin,auth,security"
     ),
-    action: str | None = Query(default=None),
+    action: str | None = Query(
+        default=None, description="Exact action, or CSV to OR-match several"
+    ),
     status: str | None = Query(default=None),
     resource_type: str | None = Query(default=None),
     user_id: int | None = Query(default=None),

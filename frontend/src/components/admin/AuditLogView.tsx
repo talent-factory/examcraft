@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Box, FormControl, InputLabel, MenuItem, Select, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, TablePagination,
-  Paper, TextField, CircularProgress, Alert, Chip,
+  Paper, TextField, CircularProgress, Alert, Chip, Checkbox, FormControlLabel,
 } from '@mui/material';
 import { fetchAuditLogs } from '../../services/auditService';
 import { AuditCategory, AuditLogItem, AuditQueryParams } from '../../types/audit';
@@ -16,6 +16,12 @@ interface AuditLogViewProps {
 const CATEGORIES_BASE: AuditCategory[] = ['business', 'admin'];
 const CATEGORIES_SUPER: AuditCategory[] = ['business', 'admin', 'auth', 'security'];
 
+// TF-761: impersonation.start/impersonation.end live in the "admin" category
+// alongside unrelated actions (create_user, assign_role, ...), so isolating
+// them needs an exact action filter, not just category=admin. The backend
+// OR-matches a CSV of actions (mirrors the `category` param).
+const IMPERSONATION_ACTIONS = 'impersonation.start,impersonation.end';
+
 const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
   const { t } = useTranslation();
   const [rows, setRows] = useState<AuditLogItem[]>([]);
@@ -25,6 +31,7 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
   const [category, setCategory] = useState<AuditCategory | ''>('');
   const [status, setStatus] = useState<string>('');
   const [institutionId, setInstitutionId] = useState<string>('');
+  const [impersonationOnly, setImpersonationOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +45,14 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
         limit: rowsPerPage,
         offset: page * rowsPerPage,
       };
-      if (category) params.category = [category];
+      if (impersonationOnly) {
+        // This exact-action filter is a narrower subset of category=admin,
+        // so sending both would be redundant at best — and would needlessly
+        // restrict results (to nothing) if a stale category were ever set.
+        params.action = IMPERSONATION_ACTIONS;
+      } else if (category) {
+        params.category = [category];
+      }
       if (status) params.status = status as AuditQueryParams['status'];
       if (isSuperuser && institutionId) {
         const instId = Number(institutionId);
@@ -52,7 +66,7 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
     } finally {
       setLoading(false);
     }
-  }, [category, status, institutionId, isSuperuser, page, rowsPerPage, t]);
+  }, [category, status, institutionId, impersonationOnly, isSuperuser, page, rowsPerPage, t]);
 
   useEffect(() => {
     load();
@@ -61,7 +75,7 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
   return (
     <Box data-testid="audit-log-view">
       <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
+        <FormControl size="small" sx={{ minWidth: 160 }} disabled={impersonationOnly}>
           <InputLabel>{t('pages.admin.audit.filterCategory')}</InputLabel>
           <Select
             data-testid="audit-filter-category"
@@ -75,6 +89,22 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
             ))}
           </Select>
         </FormControl>
+
+        <FormControlLabel
+          sx={{ ml: 0 }}
+          control={
+            <Checkbox
+              data-testid="audit-filter-impersonation-only"
+              checked={impersonationOnly}
+              onChange={(e) => {
+                setPage(0);
+                setImpersonationOnly(e.target.checked);
+                if (e.target.checked) setCategory('');
+              }}
+            />
+          }
+          label={t('pages.admin.audit.filterImpersonationOnly')}
+        />
 
         <FormControl size="small" sx={{ minWidth: 160 }}>
           <InputLabel>{t('pages.admin.audit.filterStatus')}</InputLabel>

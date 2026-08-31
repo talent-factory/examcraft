@@ -339,6 +339,7 @@
         "filterCategory": "Categoria",
         "filterStatus": "Stato",
         "filterInstitution": "ID istituzione",
+        "filterImpersonationOnly": "Solo eventi di impersonazione",
         "loadError": "Impossibile caricare i log di audit",
         "colTime": "Ora",
         "colActor": "Attore",

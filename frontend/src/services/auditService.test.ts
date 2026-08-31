@@ -26,4 +26,12 @@ describe('auditService.fetchAuditLogs', () => {
     expect(spy).toHaveBeenCalledWith('/api/v1/audit');
     spy.mockRestore();
   });
+
+  it('passes a CSV `action` filter through untouched (TF-761: impersonation-only filter)', async () => {
+    const spy = jest.spyOn(httpClient, 'getJson').mockResolvedValue(empty);
+    await fetchAuditLogs({ action: 'impersonation.start,impersonation.end' });
+    const calledPath = spy.mock.calls[0][0] as string;
+    expect(calledPath).toContain('action=impersonation.start%2Cimpersonation.end');
+    spy.mockRestore();
+  });
 });

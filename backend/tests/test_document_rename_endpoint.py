@@ -29,20 +29,26 @@ from models.document import Document, DocumentStatus
 
 @pytest.fixture
 def stage_data(test_db):
-    """Owner + Foreign-User in unterschiedlichen Institutionen + Doc."""
+    """Owner + Foreign-User in unterschiedlichen Institutionen + Doc.
+
+    No hardcoded primary keys: this fixture ``commit()``s (real rows, not a
+    rollback-isolated savepoint), and the full CI suite shares one Postgres
+    test DB across every test file — a fixed id here can collide with an
+    unrelated test's committed row (``IntegrityError: duplicate key ...
+    users_pkey``), reproducible only in a full-suite run, never in isolation.
+    Let the DB assign ids and reference them via ``.id`` after ``flush()``.
+    """
     inst_a = Institution(
-        id=300,
-        name="Inst A",
-        slug="inst-a",
+        name="TF331 Inst A",
+        slug="tf331-inst-a",
         subscription_tier="professional",
         max_users=10,
         max_documents=100,
         max_questions_per_month=1000,
     )
     inst_b = Institution(
-        id=301,
-        name="Inst B",
-        slug="inst-b",
+        name="TF331 Inst B",
+        slug="tf331-inst-b",
         subscription_tier="professional",
         max_users=10,
         max_documents=100,
@@ -52,22 +58,20 @@ def stage_data(test_db):
     test_db.flush()
 
     owner = User(
-        id=300,
-        email="owner@a.ch",
+        email="tf331-owner@a.ch",
         first_name="O",
         last_name="W",
         password_hash="x",
-        institution_id=300,
+        institution_id=inst_a.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=False,
     )
     foreign = User(
-        id=301,
-        email="foreign@b.ch",
+        email="tf331-foreign@b.ch",
         first_name="F",
         last_name="O",
         password_hash="x",
-        institution_id=301,
+        institution_id=inst_b.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=False,
     )
@@ -75,15 +79,14 @@ def stage_data(test_db):
     test_db.flush()
 
     doc = Document(
-        id=600,
         filename="paper.pdf",
         original_filename="Paper-Final.pdf",
         file_path="/tmp/paper.pdf",
         file_size=10,
         mime_type="application/pdf",
         status=DocumentStatus.PROCESSED,
-        institution_id=300,
-        user_id=300,
+        institution_id=inst_a.id,
+        user_id=owner.id,
         doc_metadata={"title": "1"},  # the bug TF-331 surfaces
     )
     test_db.add(doc)

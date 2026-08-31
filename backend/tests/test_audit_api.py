@@ -246,6 +246,17 @@ class TestSecurityRegressionGuards:
         assert r.status_code == 200
         assert r.json()["items"] == []
 
+    def test_csv_action_cannot_bypass_category_scope(self, test_db, world):
+        # TF-761: the CSV `action` filter is ANDed onto the category scope,
+        # not a replacement for it — combining an in-scope value
+        # ("create_user", admin) with an out-of-scope one ("login", auth,
+        # both already seeded by `world`) must still only surface the
+        # in-scope one for an institution-admin.
+        r = _get(test_db, world["admin_a"], action="login,create_user")
+        assert r.status_code == 200
+        actions = {i["action"] for i in r.json()["items"]}
+        assert actions == {"create_user"}
+
     def test_uncategorized_action_is_superadmin_only(self, test_db, world):
         # An action absent from every category fails closed → SuperAdmin-only.
         make_audit(test_db, world["plain_a"].id, "ws_subscribe")
@@ -258,6 +269,64 @@ class TestSecurityRegressionGuards:
             i["action"] for i in _get(test_db, world["superuser"]).json()["items"]
         }
         assert "ws_subscribe" in super_actions
+
+
+class TestActionCsvFilter:
+    """TF-761: `action` accepts a CSV of exact values, OR-matched.
+
+    Needed so the frontend's "only impersonation events" filter can isolate
+    `impersonation.start`/`impersonation.end` in one query — both actions
+    live in the "admin" category alongside unrelated ones (create_user,
+    assign_role, ...), so a category filter alone can't isolate them.
+    """
+
+    def test_csv_action_or_matches_multiple_exact_actions(self, test_db, world):
+        make_audit(test_db, world["admin_a"].id, "impersonation.start")
+        make_audit(test_db, world["admin_a"].id, "impersonation.end")
+        test_db.commit()
+
+        r = _get(
+            test_db, world["admin_a"], action="impersonation.start,impersonation.end"
+        )
+        assert r.status_code == 200
+        actions = sorted(i["action"] for i in r.json()["items"])
+        assert actions == ["impersonation.end", "impersonation.start"]
+
+    def test_csv_action_excludes_other_admin_actions(self, test_db, world):
+        # world already seeds a "create_user" (admin-category) event for
+        # institution A — the CSV filter must exclude it, proving this isn't
+        # just a looser category filter in disguise.
+        make_audit(test_db, world["admin_a"].id, "impersonation.start")
+        test_db.commit()
+
+        r = _get(
+            test_db, world["admin_a"], action="impersonation.start,impersonation.end"
+        )
+        actions = {i["action"] for i in r.json()["items"]}
+        assert actions == {"impersonation.start"}
+
+    def test_single_action_value_still_exact_matches(self, test_db, world):
+        # Backward compatibility: a plain value (no comma) must keep behaving
+        # like the pre-TF-761 `==` filter.
+        make_audit(test_db, world["admin_a"].id, "impersonation.start")
+        test_db.commit()
+
+        r = _get(test_db, world["admin_a"], action="impersonation.start")
+        actions = {i["action"] for i in r.json()["items"]}
+        assert actions == {"impersonation.start"}
+
+    def test_blank_action_string_behaves_like_omitted(self, test_db, world):
+        # A blank `action=""` (e.g. a UI field cleared to empty rather than
+        # omitted) splits to an empty action list, which must be treated as
+        # "no action filter" — not as a literal `action == ""` match (which
+        # would always be empty) and not as anything wider than the scope's
+        # existing category restriction.
+        r_blank = _get(test_db, world["admin_a"], action="")
+        r_omitted = _get(test_db, world["admin_a"])
+        blank_actions = {i["action"] for i in r_blank.json()["items"]}
+        omitted_actions = {i["action"] for i in r_omitted.json()["items"]}
+        assert blank_actions == omitted_actions
+        assert blank_actions  # sanity: not vacuously true on an empty result
 
 
 class TestAuditTheAuditorPayload:
