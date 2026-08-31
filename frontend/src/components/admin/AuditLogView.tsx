@@ -123,7 +123,19 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
             {rows.map((row) => (
               <TableRow key={row.id}>
                 <TableCell>{new Date(row.created_at).toLocaleString()}</TableCell>
-                <TableCell>{row.actor ?? '—'}</TableCell>
+                <TableCell>
+                  {row.actor ?? '—'}
+                  {row.impersonator && (
+                    <Chip
+                      data-testid="audit-impersonated-chip"
+                      size="small"
+                      color="warning"
+                      sx={{ ml: 1 }}
+                      label={t('pages.admin.audit.impersonatedBy', { name: row.impersonator })}
+                      title={t('pages.admin.audit.impersonatedByTooltip', { name: row.impersonator })}
+                    />
+                  )}
+                </TableCell>
                 <TableCell><Chip size="small" label={row.category} /></TableCell>
                 <TableCell>{row.action}</TableCell>
                 <TableCell>{row.resource_type ? `${row.resource_type}#${row.resource_id ?? '?'}` : '—'}</TableCell>

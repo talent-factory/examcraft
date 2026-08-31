@@ -38,6 +38,7 @@ class AuditLogOut(BaseModel):
     created_at: datetime
     user_id: int | None = None
     actor: str | None = None
+    impersonator: str | None = None
     action: str
     category: str
     resource_type: str | None = None
@@ -81,11 +82,15 @@ def _row_to_out(log, *, can_see_pii: bool) -> AuditLogOut:
     actor = None
     if log.user is not None:
         actor = log.user.full_name or log.user.email
+    impersonator = None
+    if log.impersonator is not None:
+        impersonator = log.impersonator.full_name or log.impersonator.email
     return AuditLogOut(
         id=log.id,
         created_at=_to_utc(log.created_at),
         user_id=log.user_id,
         actor=actor,
+        impersonator=impersonator,
         action=log.action,
         category=category_for_action(log.action),
         resource_type=log.resource_type,

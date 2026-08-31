@@ -712,6 +712,8 @@
         "colStatus": "Status",
         "colIp": "IP-Adresse",
         "colUserAgent": "User-Agent",
+        "impersonatedBy": "Impersoniert von {{name}}",
+        "impersonatedByTooltip": "Dieser Eintrag wurde während einer Impersonation-Session erstellt — {{name}} war als der Ziel-Benutzer angemeldet.",
         "category": {
           "business": "Geschäftlich",
           "admin": "Administration",

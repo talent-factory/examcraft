@@ -348,6 +348,8 @@
         "colStatus": "Stato",
         "colIp": "Indirizzo IP",
         "colUserAgent": "User agent",
+        "impersonatedBy": "Impersonato da {{name}}",
+        "impersonatedByTooltip": "Questa voce è stata creata durante una sessione di impersonazione — {{name}} era connesso come utente di destinazione.",
         "category": {
           "business": "Business",
           "admin": "Amministrazione",

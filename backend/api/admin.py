@@ -987,6 +987,19 @@ async def start_impersonation(
         f"-> target {target.email} (ID {target.id}), session {session.id}"
     )
 
+    # TF-742: audit trail. Runs on the admin's own request, so
+    # impersonator_user_id can't be auto-filled from context (that only
+    # kicks in for the next request, made with the impersonation token) --
+    # passed explicitly here instead.
+    AuthService.record_impersonation_started(
+        db,
+        admin_user_id=current_user.id,
+        target_user_id=target.id,
+        session_id=session.id,
+        reason=request.reason,
+        request=http_request,
+    )
+
     return ImpersonateResponse(
         access_token=tokens["access_token"],
         token_type=tokens["token_type"],
@@ -1022,7 +1035,7 @@ async def end_impersonation(
 
     if ctx is None:
         closed_session_id = AuthService.end_own_impersonation_session(
-            admin_user_id=current_user.id, db=db
+            admin_user_id=current_user.id, db=db, request=http_request
         )
         if closed_session_id is None:
             raise HTTPException(
@@ -1040,6 +1053,7 @@ async def end_impersonation(
         impersonation_session_id=ctx.impersonation_session_id,
         token_jti=ctx.token_jti,
         db=db,
+        request=http_request,
     )
     if not result["session_closed"]:
         logger.warning(

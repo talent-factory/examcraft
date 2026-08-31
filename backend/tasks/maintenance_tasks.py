@@ -18,7 +18,7 @@ from enums import ImportJobStatus, MoodleFeedbackPushStatus
 from models.auth import ImpersonationSession
 from models.question_generation_job import QuestionGenerationJob
 from models.submission import ImportJob, MoodleFeedbackPushJob
-from services.auth_service import IMPERSONATION_TOKEN_EXPIRE_MINUTES
+from services.auth_service import AuthService, IMPERSONATION_TOKEN_EXPIRE_MINUTES
 from tasks.question_tasks import _safe_update_job_status
 
 logger = logging.getLogger(__name__)
@@ -373,12 +373,48 @@ def reap_stuck_impersonation_sessions() -> dict[str, int]:
     (TF-741 review fix) -- the bulk UPDATE's WHERE clause excludes any row
     a concurrent commit already closed, so whichever write lands first wins
     cleanly instead of the second blindly overwriting the first.
+
+    TF-742: each row this task actually reaps also needs an
+    ``impersonation.end`` audit entry and a notification email to its
+    target user -- the same guarantee ``POST /impersonate/end`` gives, just
+    on the timeout path. The candidate rows are read *before* the bulk
+    UPDATE to get their (immutable) ``admin_user_id``/``target_user_id``/
+    ``reason``/``started_at``.
+
+    Determining which candidates *this* invocation's UPDATE actually won
+    is more than a ``end_reason == "timeout"`` check (review fix): that
+    alone tells manual vs. timeout apart, but not *whose* timeout write it
+    was. Two overlapping executions of this same task -- plausible given
+    ``task_acks_late=True`` (``celery_app.py``) plus at-least-once
+    redelivery, or more than one machine embedding ``--beat`` -- can each
+    read an overlapping ``candidate_ids`` snapshot before either commits;
+    a candidate the *other* execution's UPDATE actually closed also comes
+    back ``end_reason == "timeout"`` and would be indistinguishable from
+    one this execution closed, causing a duplicate audit row + duplicate
+    notification email for the same session. Filtering on this
+    execution's own ``ended_at`` value in addition -- generated once,
+    locally, before either query, and never reused by a different
+    invocation -- pins ``won`` down to exactly the rows *this* UPDATE
+    touched. A candidate a concurrent manual end grabbed in the gap still
+    comes back ``end_reason == "manual"`` and is excluded the same as
+    before.
     """
     cutoff = datetime.now(timezone.utc) - _IMPERSONATION_STUCK_THRESHOLD
+    ended_at = datetime.now(timezone.utc)
     reaped = 0
 
     session = SessionLocal()
     try:
+        candidate_ids = [
+            row.id
+            for row in session.query(ImpersonationSession.id)
+            .filter(
+                ImpersonationSession.ended_at.is_(None),
+                ImpersonationSession.started_at < cutoff,
+            )
+            .all()
+        ]
+
         reaped = (
             session.query(ImpersonationSession)
             .filter(
@@ -387,7 +423,7 @@ def reap_stuck_impersonation_sessions() -> dict[str, int]:
             )
             .update(
                 {
-                    "ended_at": datetime.now(timezone.utc),
+                    "ended_at": ended_at,
                     "end_reason": "timeout",
                 },
                 synchronize_session=False,
@@ -397,6 +433,48 @@ def reap_stuck_impersonation_sessions() -> dict[str, int]:
         if reaped:
             session.commit()
             logger.warning("Reaped %s stuck impersonation_sessions (timeout)", reaped)
+
+            won = (
+                session.query(ImpersonationSession)
+                .filter(
+                    ImpersonationSession.id.in_(candidate_ids),
+                    ImpersonationSession.end_reason == "timeout",
+                    # review fix: pin "won" down to rows *this* invocation's
+                    # UPDATE touched -- see the docstring above. `end_reason
+                    # == "timeout"` alone can't tell this execution's write
+                    # apart from a concurrent execution's, but the locally-
+                    # generated `ended_at` value only this UPDATE could have
+                    # written can.
+                    ImpersonationSession.ended_at == ended_at,
+                )
+                .all()
+            )
+            for row in won:
+                try:
+                    AuthService.record_impersonation_ended(
+                        session,
+                        admin_user_id=row.admin_user_id,
+                        target_user_id=row.target_user_id,
+                        session_id=row.id,
+                        reason=row.reason,
+                        started_at=row.started_at,
+                        ended_at=ended_at,
+                        end_reason="timeout",
+                    )
+                except Exception:
+                    logger.exception(
+                        "record_impersonation_ended failed for reaped "
+                        "impersonation_session %s",
+                        row.id,
+                    )
+                    # review fix: without a rollback, this session is left
+                    # in an invalid/pending-rollback state after any
+                    # DB-level failure inside record_impersonation_ended --
+                    # every subsequent row in this loop would then fail too
+                    # (same session object reused across iterations),
+                    # silently dropping audit+email for the rest of the
+                    # batch instead of just the one row that failed.
+                    session.rollback()
     except Exception:
         logger.exception("reap_stuck_impersonation_sessions failed")
         session.rollback()

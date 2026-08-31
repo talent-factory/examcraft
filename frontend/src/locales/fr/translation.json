@@ -348,6 +348,8 @@
         "colStatus": "Statut",
         "colIp": "Adresse IP",
         "colUserAgent": "Agent utilisateur",
+        "impersonatedBy": "Usurpé par {{name}}",
+        "impersonatedByTooltip": "Cette entrée a été créée pendant une session d'usurpation d'identité — {{name}} était connecté en tant qu'utilisateur cible.",
         "category": {
           "business": "Métier",
           "admin": "Administration",

@@ -7,6 +7,9 @@ export interface AuditLogItem {
   created_at: string;
   user_id: number | null;
   actor: string | null;
+  /** Set when this row was written during an impersonated request (TF-742):
+   *  the administrator actually behind `actor`, who is the target user. */
+  impersonator: string | null;
   action: string;
   category: AuditCategory;
   resource_type: string | null;

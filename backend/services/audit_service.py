@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from fastapi import Request
 
 from models.auth import AuditLog
+from utils.impersonation_context import get_impersonation_context
 
 if TYPE_CHECKING:
     from models.auth import User
@@ -80,6 +81,13 @@ class AuditService:
     ACTION_UPDATE_PROMPT = "update_prompt"
     ACTION_DELETE_PROMPT = "delete_prompt"
 
+    # TF-742: written by AuthService (start_impersonation / the two
+    # session-end paths / the timeout reaper), never here -- see
+    # ACTIONS_BY_CATEGORY below for why they live in "admin" (institution
+    # admins see them, not just SuperAdmin's "security" category).
+    ACTION_IMPERSONATION_START = "impersonation.start"
+    ACTION_IMPERSONATION_END = "impersonation.end"
+
     ACTION_API_ACCESS = "api_access"
     ACTION_PERMISSION_DENIED = "permission_denied"
     ACTION_RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
@@ -118,6 +126,7 @@ class AuditService:
         error_message: Optional[str] = None,
         request: Optional[Request] = None,
         commit: bool = True,
+        impersonator_user_id: Optional[int] = None,
     ) -> AuditLog:
         """
         Log an audit action
@@ -134,6 +143,16 @@ class AuditService:
             additional_data: Additional data as dict (will be JSON serialized)
             error_message: Error message if status is failure/error
             request: FastAPI Request object (auto-extracts IP and user agent)
+            impersonator_user_id: Who is *really* behind ``user_id`` (TF-742).
+                Left unset by all ~90 existing call sites -- when omitted,
+                it is read from the request-scoped ``ImpersonationContext``
+                instead, so every call site gets impersonation attribution
+                for free during an impersonated request without having to
+                thread the admin's id through its own signature. Pass it
+                explicitly only from code that runs on the *admin's own*
+                (not-yet-impersonated) request, where there is no context
+                to read it from -- currently just
+                ``AuthService.record_impersonation_started``.
 
         Returns:
             Created AuditLog entry
@@ -145,6 +164,11 @@ class AuditService:
                     ip_address = request.client.host if request.client else None
                 if not user_agent:
                     user_agent = request.headers.get("user-agent")
+
+            if impersonator_user_id is None:
+                ctx = get_impersonation_context()
+                if ctx is not None:
+                    impersonator_user_id = ctx.impersonator_id
 
             # Serialize additional data to JSON. If serialization fails we
             # preserve the original keys (truncated repr) so the audit row
@@ -172,6 +196,7 @@ class AuditService:
             # Create audit log entry
             audit_log = AuditLog(
                 user_id=user_id,
+                impersonator_user_id=impersonator_user_id,
                 action=action,
                 resource_type=resource_type,
                 resource_id=str(resource_id) if resource_id else None,
@@ -525,6 +550,7 @@ class AuditService:
         resource_id: Optional[Any] = None,
         additional_data: Optional[dict] = None,
         request: Optional[Request] = None,
+        impersonator_user_id: Optional[int] = None,
     ) -> None:
         """Best-effort audit write for an already-committed mutation.
 
@@ -544,6 +570,7 @@ class AuditService:
                 resource_id=resource_id,
                 additional_data=additional_data,
                 request=request,
+                impersonator_user_id=impersonator_user_id,
             )
         except Exception:
             logger.error(
@@ -643,6 +670,13 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             AuditService.ACTION_CLEAR_ORG_UNIT_ROLE,
             AuditService.ACTION_ASSIGN_ORG_UNIT_MEMBER,
             AuditService.ACTION_REMOVE_ORG_UNIT_MEMBER,
+            # Impersonation lifecycle (api/admin.py + AuthService, TF-742).
+            # Deliberately "admin", not "security": institution-admins must
+            # see both their own impersonation activity and SuperAdmin
+            # impersonations of their institution's users, which the
+            # SuperAdmin-only "security" category would hide from them.
+            AuditService.ACTION_IMPERSONATION_START,
+            AuditService.ACTION_IMPERSONATION_END,
         }
     ),
     "auth": frozenset(

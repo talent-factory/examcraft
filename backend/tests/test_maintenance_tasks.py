@@ -554,3 +554,202 @@ def test_impersonation_reaper_closes_stuck_sessions_only(test_db):
 
     already_ended = test_db.get(ImpersonationSession, already_ended_id)
     assert already_ended.end_reason == "manual"
+
+
+def test_impersonation_reaper_writes_audit_event_and_queues_email(test_db):
+    """TF-742: a session the reaper age-closes still needs an
+    ``impersonation.end`` audit row (impersonator_user_id populated) and a
+    notification email to the target -- the same guarantee the manual
+    ``/impersonate/end`` endpoint gives, just via the timeout path instead
+    of an HTTP request."""
+    from models.auth import (
+        AuditLog,
+        ImpersonationSession,
+        Institution,
+        User,
+        UserStatus,
+    )
+    from services.audit_service import AuditService
+    from tasks.maintenance_tasks import (
+        _IMPERSONATION_STUCK_THRESHOLD,
+        reap_stuck_impersonation_sessions,
+    )
+
+    inst = Institution(
+        name="reaper-impersonation-audit-inst",
+        slug="reaper-tf742-audit",
+        subscription_tier="free",
+        max_users=10,
+        max_documents=10,
+        max_questions_per_month=10,
+    )
+    test_db.add(inst)
+    test_db.flush()
+
+    admin = User(
+        email="reaper-audit-admin@reaper-tf742-audit.ch",
+        password_hash="dummy",
+        first_name="R",
+        last_name="Admin",
+        institution_id=inst.id,
+        status=UserStatus.ACTIVE.value,
+    )
+    target = User(
+        email="reaper-audit-target@reaper-tf742-audit.ch",
+        password_hash="dummy",
+        first_name="R",
+        last_name="Target",
+        institution_id=inst.id,
+        status=UserStatus.ACTIVE.value,
+    )
+    test_db.add_all([admin, target])
+    test_db.flush()
+
+    old = (
+        datetime.now(timezone.utc)
+        - _IMPERSONATION_STUCK_THRESHOLD
+        - timedelta(minutes=10)
+    )
+    session = ImpersonationSession(
+        admin_user_id=admin.id,
+        target_user_id=target.id,
+        reason="stuck-for-audit",
+        started_at=old,
+    )
+    test_db.add(session)
+    test_db.commit()
+    test_db.refresh(session)
+
+    with (
+        patch("tasks.maintenance_tasks.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+        patch("tasks.notification_tasks.send_impersonation_ended_email") as mock_task,
+    ):
+        result = reap_stuck_impersonation_sessions.run()
+
+    assert result["reaped"] == 1
+
+    row = (
+        test_db.query(AuditLog)
+        .filter(AuditLog.action == AuditService.ACTION_IMPERSONATION_END)
+        .order_by(AuditLog.id.desc())
+        .first()
+    )
+    assert row is not None
+    assert row.user_id == target.id
+    assert row.impersonator_user_id == admin.id
+    import json
+
+    data = json.loads(row.additional_data)
+    assert data["end_reason"] == "timeout"
+    assert data["reason"] == "stuck-for-audit"
+
+    mock_task.delay.assert_called_once()
+    kwargs = mock_task.delay.call_args.kwargs
+    assert kwargs["to_email"] == target.email
+    assert kwargs["end_reason"] == "timeout"
+
+
+def test_reaper_won_query_excludes_row_closed_by_a_different_invocation(test_db):
+    """TF-742 review fix: two overlapping executions of
+    ``reap_stuck_impersonation_sessions`` (plausible given
+    ``task_acks_late=True`` plus at-least-once redelivery, or more than one
+    machine embedding ``--beat``) can each read an overlapping
+    ``candidate_ids`` snapshot before either commits. Before the fix, the
+    post-UPDATE "won" query filtered only on
+    ``id IN candidate_ids AND end_reason == "timeout"`` -- which cannot
+    tell "my UPDATE closed this row" apart from "a *different*, concurrent
+    execution's UPDATE closed this row and it happens to also be timeout",
+    causing a duplicate ``impersonation.end`` audit row + duplicate
+    notification email for the same session.
+
+    Reliably interleaving two real concurrent DB transactions inside a
+    single-threaded test is inherently flaky, so this instead pins the fix
+    down at the level of the actual SQL predicate `reap_stuck_impersonation_
+    sessions` runs: two rows both marked ``end_reason == "timeout"`` (as
+    they would be regardless of *which* execution closed them) but with
+    different ``ended_at`` values -- one matching "this invocation's" own
+    timestamp, one not (standing in for a row a concurrent sibling
+    execution closed with its own, different timestamp) -- both present in
+    one stale ``candidate_ids`` snapshot. Only the row carrying this
+    invocation's own ``ended_at`` may come back as "won"."""
+    from models.auth import ImpersonationSession, Institution, User, UserStatus
+    from tasks.maintenance_tasks import _IMPERSONATION_STUCK_THRESHOLD
+
+    inst = Institution(
+        name="reaper-race-inst",
+        slug="reaper-tf742-race",
+        subscription_tier="free",
+        max_users=10,
+        max_documents=10,
+        max_questions_per_month=10,
+    )
+    test_db.add(inst)
+    test_db.flush()
+
+    admin = User(
+        email="reaper-race-admin@reaper-tf742-race.ch",
+        password_hash="dummy",
+        first_name="R",
+        last_name="Admin",
+        institution_id=inst.id,
+        status=UserStatus.ACTIVE.value,
+    )
+    target = User(
+        email="reaper-race-target@reaper-tf742-race.ch",
+        password_hash="dummy",
+        first_name="R",
+        last_name="Target",
+        institution_id=inst.id,
+        status=UserStatus.ACTIVE.value,
+    )
+    test_db.add_all([admin, target])
+    test_db.flush()
+
+    old = (
+        datetime.now(timezone.utc)
+        - _IMPERSONATION_STUCK_THRESHOLD
+        - timedelta(minutes=10)
+    )
+    this_invocations_ended_at = datetime.now(timezone.utc)
+    other_invocations_ended_at = this_invocations_ended_at - timedelta(seconds=3)
+
+    # Row this invocation's own UPDATE closed.
+    won_by_this_run = ImpersonationSession(
+        admin_user_id=admin.id,
+        target_user_id=target.id,
+        reason="closed-by-this-run",
+        started_at=old,
+        ended_at=this_invocations_ended_at,
+        end_reason="timeout",
+    )
+    # Row a *different*, concurrent execution's UPDATE closed in the gap
+    # between this run's stale candidate read and its own UPDATE.
+    won_by_other_run = ImpersonationSession(
+        admin_user_id=admin.id,
+        target_user_id=target.id,
+        reason="closed-by-other-run",
+        started_at=old,
+        ended_at=other_invocations_ended_at,
+        end_reason="timeout",
+    )
+    test_db.add_all([won_by_this_run, won_by_other_run])
+    test_db.commit()
+    test_db.refresh(won_by_this_run)
+    test_db.refresh(won_by_other_run)
+
+    # A stale candidate_ids snapshot this invocation would have read
+    # before either UPDATE ran, including both rows.
+    candidate_ids = [won_by_this_run.id, won_by_other_run.id]
+
+    won = (
+        test_db.query(ImpersonationSession)
+        .filter(
+            ImpersonationSession.id.in_(candidate_ids),
+            ImpersonationSession.end_reason == "timeout",
+            ImpersonationSession.ended_at == this_invocations_ended_at,
+        )
+        .all()
+    )
+
+    assert [row.id for row in won] == [won_by_this_run.id]

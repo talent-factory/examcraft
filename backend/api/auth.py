@@ -577,6 +577,7 @@ async def logout(
             impersonation_session_id=ctx.impersonation_session_id,
             token_jti=ctx.token_jti,
             db=db,
+            request=http_request,
         )
         if not result["session_closed"]:
             logger.warning(

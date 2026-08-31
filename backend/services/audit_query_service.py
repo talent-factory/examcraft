@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy.orm import Session, contains_eager
+from sqlalchemy.orm import Session, contains_eager, joinedload
 
 from models.auth import AuditLog, User
 from services.audit_service import ACTIONS_BY_CATEGORY, AUDIT_CATEGORIES
@@ -124,15 +124,22 @@ def query_audit_logs(
 
     q = db.query(AuditLog)
 
+    # impersonator (TF-742) is a second, unrelated relationship to the same
+    # `users` table -- eager-loaded via a plain joinedload on its own alias
+    # rather than folded into the contains_eager(AuditLog.user) chain above,
+    # which is bound to the *scoping* join on User. It is deliberately not
+    # institution-scoped: an institution-admin must see a SuperAdmin's own
+    # impersonation of one of their institution's users, scoping is already
+    # enforced via the target (AuditLog.user_id -> User.institution_id).
     if scope.institution_id is not None:
         q = (
             q.join(User, AuditLog.user_id == User.id)
             .filter(User.institution_id == scope.institution_id)
-            .options(contains_eager(AuditLog.user))
+            .options(contains_eager(AuditLog.user), joinedload(AuditLog.impersonator))
         )
     else:
         q = q.outerjoin(User, AuditLog.user_id == User.id).options(
-            contains_eager(AuditLog.user)
+            contains_eager(AuditLog.user), joinedload(AuditLog.impersonator)
         )
         if institution_id is not None:
             q = q.filter(User.institution_id == institution_id)

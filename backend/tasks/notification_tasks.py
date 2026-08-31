@@ -67,3 +67,51 @@ def subscribe_to_newsletter(
         raise subscribe_to_newsletter.retry(
             exc=exc, countdown=10 * (2**subscribe_to_newsletter.request.retries)
         )
+
+
+@celery_app.task(
+    name="tasks.notification_tasks.send_impersonation_ended_email",
+    max_retries=5,
+    default_retry_delay=10,
+)
+def send_impersonation_ended_email(
+    to_email: str,
+    to_name: str,
+    admin_name: str,
+    reason: str,
+    started_at: Optional[str],
+    ended_at: Optional[str],
+    end_reason: str,
+) -> Dict[str, Any]:
+    """Notify an impersonation target after their session has ended (TF-742).
+
+    Runs as a Celery task so a slow/unavailable email provider never blocks
+    the request that closed the session (manual end, lost-token fallback,
+    logout-while-impersonating, or the timeout reaper). Retries with
+    exponential backoff, same pattern as ``subscribe_to_newsletter`` above.
+    """
+    from services.email_service import EmailService
+
+    try:
+        result = EmailService.send_impersonation_ended_email(
+            to_email=to_email,
+            to_name=to_name,
+            admin_name=admin_name,
+            reason=reason,
+            started_at=started_at,
+            ended_at=ended_at,
+            end_reason=end_reason,
+        )
+        logger.info(f"Impersonation-ended email sent to {to_email}")
+        return result
+
+    except Exception as exc:
+        logger.warning(
+            f"Impersonation-ended email attempt failed for {to_email}: {exc} "
+            f"(retry {send_impersonation_ended_email.request.retries}/"
+            f"{send_impersonation_ended_email.max_retries})"
+        )
+        raise send_impersonation_ended_email.retry(
+            exc=exc,
+            countdown=10 * (2**send_impersonation_ended_email.request.retries),
+        )

@@ -8,11 +8,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 import bcrypt
+from fastapi import Request
 from sqlalchemy.orm import Session
 import secrets
 import logging
 
 from models.auth import ImpersonationSession, User, UserSession, UserStatus
+from services.audit_service import AuditService
 from services.redis_service import SessionStore, TokenBlacklist
 
 logger = logging.getLogger(__name__)
@@ -317,10 +319,124 @@ class AuthService:
         }
 
     @staticmethod
+    def record_impersonation_started(
+        db: Session,
+        *,
+        admin_user_id: int,
+        target_user_id: int,
+        session_id: int,
+        reason: str,
+        request: Optional[Request] = None,
+    ) -> None:
+        """Write the ``impersonation.start`` audit event (TF-742).
+
+        Called from ``start_impersonation`` while still on the admin's own,
+        not-yet-impersonated request -- the request-scoped
+        ``ImpersonationContext`` isn't set yet at that point (it only
+        starts applying to the *next* request, the one authenticated with
+        the freshly-minted impersonation token), so
+        ``impersonator_user_id`` has to be passed explicitly instead of
+        relying on ``AuditService.log_action``'s auto-fill.
+        """
+        AuditService.log_event_best_effort(
+            db,
+            action=AuditService.ACTION_IMPERSONATION_START,
+            user_id=target_user_id,
+            resource_type=AuditService.RESOURCE_USER,
+            resource_id=target_user_id,
+            additional_data={
+                "reason": reason,
+                "impersonation_session_id": session_id,
+            },
+            impersonator_user_id=admin_user_id,
+            request=request,
+        )
+
+    @staticmethod
+    def record_impersonation_ended(
+        db: Session,
+        *,
+        admin_user_id: Optional[int],
+        target_user_id: Optional[int],
+        session_id: int,
+        reason: Optional[str],
+        started_at: Optional[datetime],
+        ended_at: Optional[datetime],
+        end_reason: str,
+        request: Optional[Request] = None,
+    ) -> None:
+        """Audit + notify once an ``ImpersonationSession`` is durably closed
+        (TF-742). Shared by the manual end endpoint, its lost-token
+        fallback, ``POST /auth/logout`` while impersonating, and the
+        timeout reaper -- one place so all four paths behave identically.
+
+        Never raises: called after the session-closing UPDATE has already
+        committed, so a failure here (audit write, missing user rows, a DB
+        hiccup on the lookups below, a Celery broker outage) must never
+        unwind or fail that request. ``log_event_best_effort`` already
+        swallows audit-write failures; everything from the ``db.get()``
+        lookups through the notification dispatch is wrapped in its own
+        try/except for the same reason (review fix: the two lookups used to
+        sit *outside* that guard, so a DB-level error there -- e.g. a
+        dropped connection -- would have propagated past this "never
+        raises" contract and turned an already-successful session-close
+        into a 500 for the caller).
+        """
+        AuditService.log_event_best_effort(
+            db,
+            action=AuditService.ACTION_IMPERSONATION_END,
+            user_id=target_user_id,
+            resource_type=AuditService.RESOURCE_USER,
+            resource_id=target_user_id,
+            additional_data={
+                "reason": reason,
+                "impersonation_session_id": session_id,
+                "ended_at": ended_at.isoformat() if ended_at else None,
+                "end_reason": end_reason,
+            },
+            impersonator_user_id=admin_user_id,
+            request=request,
+        )
+
+        # ondelete="SET NULL" on both FKs: the admin or target row may
+        # already be gone (e.g. GDPR erasure) by the time this runs.
+        # Nothing to notify and no one left to attribute it to.
+        if target_user_id is None or admin_user_id is None:
+            return
+
+        try:
+            target = db.get(User, target_user_id)
+            admin = db.get(User, admin_user_id)
+            if target is None or admin is None:
+                return
+
+            from tasks.notification_tasks import send_impersonation_ended_email
+
+            send_impersonation_ended_email.delay(
+                to_email=target.email,
+                to_name=target.first_name or target.email,
+                admin_name=admin.full_name or admin.email,
+                reason=reason,
+                started_at=started_at.isoformat() if started_at else None,
+                ended_at=ended_at.isoformat() if ended_at else None,
+                end_reason=end_reason,
+            )
+        except Exception:
+            logger.error(
+                "Failed to dispatch impersonation-ended email (session %s, "
+                "admin %s, target %s)",
+                session_id,
+                admin_user_id,
+                target_user_id,
+                exc_info=True,
+            )
+
+    @staticmethod
     def end_impersonation_session(
         impersonation_session_id: int,
         token_jti: str,
         db: Session,
+        request: Optional[Request] = None,
     ) -> Dict[str, bool]:
         """Atomically close an ``ImpersonationSession`` row and revoke its
         token (TF-741 review fix).
@@ -339,8 +455,20 @@ class AuthService:
         overwriting the winner's ``end_reason``.
 
         Returns ``{"session_closed": ..., "token_revoked": ...}`` so the
-        caller can log when either step found nothing to do.
+        caller can log when either step found nothing to do. The row is
+        read once *before* the conditional UPDATE below so the TF-742 audit
+        + email side effects have ``reason``/``admin_user_id``/
+        ``target_user_id`` to work with -- those columns are immutable
+        once the session is created, so pre-reading them is race-safe; only
+        ``updated_rows > 0`` decides whether *this* call actually won the
+        race and gets to fire the side effects at all.
         """
+        session_row = (
+            db.query(ImpersonationSession)
+            .filter(ImpersonationSession.id == impersonation_session_id)
+            .first()
+        )
+        ended_at = datetime.now(timezone.utc)
         updated_rows = (
             db.query(ImpersonationSession)
             .filter(
@@ -348,7 +476,7 @@ class AuthService:
                 ImpersonationSession.ended_at.is_(None),
             )
             .update(
-                {"ended_at": datetime.now(timezone.utc), "end_reason": "manual"},
+                {"ended_at": ended_at, "end_reason": "manual"},
                 synchronize_session=False,
             )
         )
@@ -356,10 +484,25 @@ class AuthService:
 
         token_revoked = AuthService.revoke_token(token_jti, db)
 
+        if updated_rows > 0 and session_row is not None:
+            AuthService.record_impersonation_ended(
+                db,
+                admin_user_id=session_row.admin_user_id,
+                target_user_id=session_row.target_user_id,
+                session_id=session_row.id,
+                reason=session_row.reason,
+                started_at=session_row.started_at,
+                ended_at=ended_at,
+                end_reason="manual",
+                request=request,
+            )
+
         return {"session_closed": updated_rows > 0, "token_revoked": token_revoked}
 
     @staticmethod
-    def end_own_impersonation_session(admin_user_id: int, db: Session) -> Optional[int]:
+    def end_own_impersonation_session(
+        admin_user_id: int, db: Session, request: Optional[Request] = None
+    ) -> Optional[int]:
         """Close the admin's own still-open impersonation session, if any.
 
         Fallback for ``POST /admin/impersonate/end`` when it's called with
@@ -390,6 +533,7 @@ class AuthService:
         if session is None:
             return None
 
+        ended_at = datetime.now(timezone.utc)
         updated_rows = (
             db.query(ImpersonationSession)
             .filter(
@@ -397,11 +541,24 @@ class AuthService:
                 ImpersonationSession.ended_at.is_(None),
             )
             .update(
-                {"ended_at": datetime.now(timezone.utc), "end_reason": "manual"},
+                {"ended_at": ended_at, "end_reason": "manual"},
                 synchronize_session=False,
             )
         )
         db.commit()
+
+        if updated_rows > 0:
+            AuthService.record_impersonation_ended(
+                db,
+                admin_user_id=session.admin_user_id,
+                target_user_id=session.target_user_id,
+                session_id=session.id,
+                reason=session.reason,
+                started_at=session.started_at,
+                ended_at=ended_at,
+                end_reason="manual",
+                request=request,
+            )
 
         return session.id if updated_rows > 0 else None
 
