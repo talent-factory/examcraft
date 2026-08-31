@@ -5,3 +5,4 @@
 
 export { NavigationBar } from './NavigationBar';
 export { AppLayout } from './AppLayout';
+export { ImpersonationBanner } from './ImpersonationBanner';

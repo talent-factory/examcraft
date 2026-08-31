@@ -14,6 +14,7 @@ interface UserListProps {
   onEditUser: (userId: number) => void;
   onManageRoles: (userId: number) => void;
   onManageOrgUnits: (userId: number) => void;
+  onImpersonateUser: (userId: number) => void;
   onRefresh?: () => void;
   canEdit?: boolean;
 }
@@ -22,12 +23,31 @@ export const UserList: React.FC<UserListProps> = ({
   onEditUser,
   onManageRoles,
   onManageOrgUnits,
+  onImpersonateUser,
   onRefresh,
   canEdit = false,
 }) => {
   const { t, i18n } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user: currentUser } = useAuth();
   const canManageOrgUnits = hasPermission('manage_org_units');
+  const canImpersonate = hasPermission('users:impersonate');
+
+  /**
+   * Client-side pre-filter only (UX comfort) — the actual scope rule is
+   * enforced server-side by `_is_impersonation_privileged` in
+   * `api/admin.py`, which additionally checks the target's *permissions*,
+   * not just their role name. This mirrors just the role-name check, plus
+   * the institution/self-exclusion rules the ticket calls out explicitly.
+   */
+  const canImpersonateUser = (target: UserListItem): boolean => {
+    if (!canImpersonate || !currentUser || target.id === currentUser.id) return false;
+    if (currentUser.is_superuser) return true;
+    return (
+      target.institution_id === currentUser.institution_id &&
+      !target.roles.includes('admin') &&
+      !target.is_superuser
+    );
+  };
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +240,7 @@ export const UserList: React.FC<UserListProps> = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {t('admin.userList.colLastLogin')}
                 </th>
-                {canEdit && (
+                {(canEdit || canImpersonate) && (
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {t('admin.userList.colActions')}
                   </th>
@@ -268,36 +288,53 @@ export const UserList: React.FC<UserListProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(user.last_login_at)}
                   </td>
-                  {canEdit && (
+                  {(canEdit || canImpersonateUser(user)) && (
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => onEditUser(user.id)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          {t('admin.userList.btnEdit')}
-                        </button>
-                        <button
-                          onClick={() => onManageRoles(user.id)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          {t('admin.userList.btnRoles')}
-                        </button>
-                        {canManageOrgUnits && (
+                        {canEdit && (
+                          <>
+                            <button
+                              onClick={() => onEditUser(user.id)}
+                              className="text-blue-600 hover:text-blue-900"
+                            >
+                              {t('admin.userList.btnEdit')}
+                            </button>
+                            <button
+                              onClick={() => onManageRoles(user.id)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                            >
+                              {t('admin.userList.btnRoles')}
+                            </button>
+                            {canManageOrgUnits && (
+                              <button
+                                onClick={() => onManageOrgUnits(user.id)}
+                                className="text-teal-600 hover:text-teal-900"
+                                data-testid={`ul-btn-org-units-${user.id}`}
+                              >
+                                {t('admin.userList.btnOrgUnits')}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleStatusToggle(user.id, user.status)}
+                              className={user.status === UserStatus.ACTIVE ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}
+                            >
+                              {user.status === UserStatus.ACTIVE ? t('admin.userList.btnDeactivate') : t('admin.userList.btnActivate')}
+                            </button>
+                          </>
+                        )}
+                        {/* TF-743: impersonation is its own permission
+                            (users:impersonate), deliberately not folded into
+                            the coarse canEdit prop — a support role granted
+                            only this permission must still see the button. */}
+                        {canImpersonateUser(user) && (
                           <button
-                            onClick={() => onManageOrgUnits(user.id)}
-                            className="text-teal-600 hover:text-teal-900"
-                            data-testid={`ul-btn-org-units-${user.id}`}
+                            onClick={() => onImpersonateUser(user.id)}
+                            className="text-orange-600 hover:text-orange-900"
+                            data-testid={`ul-btn-impersonate-${user.id}`}
                           >
-                            {t('admin.userList.btnOrgUnits')}
+                            {t('admin.userList.btnImpersonate')}
                           </button>
                         )}
-                        <button
-                          onClick={() => handleStatusToggle(user.id, user.status)}
-                          className={user.status === UserStatus.ACTIVE ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}
-                        >
-                          {user.status === UserStatus.ACTIVE ? t('admin.userList.btnDeactivate') : t('admin.userList.btnActivate')}
-                        </button>
                       </div>
                     </td>
                   )}

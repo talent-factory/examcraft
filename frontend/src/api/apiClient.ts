@@ -1,5 +1,17 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { withTokenRefreshLock, ACCESS_TOKEN_KEY, RefreshTrigger } from './tokenRefreshLock';
+import { withTokenRefreshLock, ACCESS_TOKEN_KEY, RefreshTrigger, ImpersonationEndedError } from './tokenRefreshLock';
+
+// Endpoints excluded from the automatic 401-refresh-and-retry flow below,
+// beyond the existing `/api/auth/` exclusion:
+// - `/api/admin/impersonate/end` (TF-743) must run under the caller's
+//   *current* identity (AdminService.endImpersonation()'s contract). If it
+//   401s because the impersonation token already expired, letting this
+//   interceptor transparently refresh (which restores the admin's own
+//   session, see ImpersonationEndedError below) and retry would resend the
+//   "end impersonation" call as the admin instead of the target user.
+const RETRY_EXCLUDED_URL_PATTERNS = ['/api/auth/', '/api/admin/impersonate/end'];
+const isRetryExcluded = (url: string | undefined): boolean =>
+  !!url && RETRY_EXCLUDED_URL_PATTERNS.some((pattern) => url.includes(pattern));
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -84,11 +96,19 @@ export function setupFetchInterceptor(): void {
     if (response.status !== 401) return response;
 
     const url = input instanceof Request ? input.url : String(input);
-    if (url.includes('/api/auth/')) return response;
+    if (isRetryExcluded(url)) return response;
 
     try {
       await executeTokenRefresh('fetch-401');
     } catch (err) {
+      if (err instanceof ImpersonationEndedError) {
+        // The admin's own session was restored locally in place of the
+        // impersonation token that just 401'd. Retrying would silently
+        // resend this request as the admin rather than the impersonated
+        // user, and the admin session is valid, so this is not a logout —
+        // just surface the original 401 to the caller.
+        return response;
+      }
       console.error('[apiClient] Fetch refresh failed:', err);
       triggerAuthLogout();
       return response;
@@ -124,7 +144,7 @@ apiClient.interceptors.response.use(
     if (
       !originalRequest ||
       error.response?.status !== 401 ||
-      originalRequest.url?.includes('/api/auth/')
+      isRetryExcluded(originalRequest.url)
     ) {
       return Promise.reject(error);
     }
@@ -139,6 +159,12 @@ apiClient.interceptors.response.use(
     try {
       await executeTokenRefresh('axios-401');
     } catch (refreshErr) {
+      if (refreshErr instanceof ImpersonationEndedError) {
+        // See the matching branch in setupFetchInterceptor above: the admin
+        // session is already restored and valid, so this is not a logout —
+        // just don't retry under the wrong identity.
+        return Promise.reject(error);
+      }
       console.error('[apiClient] Axios refresh failed:', refreshErr);
       triggerAuthLogout();
       return Promise.reject(error);

@@ -443,7 +443,24 @@
       "paginationPage": "Page {{page}} sur {{total}}",
       "paginationShowing": "Affichage de {{from}} à {{to}} sur {{total}} résultats",
       "failedLoad": "Impossible de charger les utilisateurs",
-      "failedStatus": "Impossible de mettre à jour le statut"
+      "failedStatus": "Impossible de mettre à jour le statut",
+      "btnImpersonate": "Se connecter en tant qu'utilisateur"
+    },
+    "impersonation": {
+      "dialogTitle": "Se connecter en tant qu'utilisateur",
+      "dialogTargetLabel": "Vous vous connectez en tant que :",
+      "dialogReasonLabel": "Motif (obligatoire)",
+      "dialogReasonPlaceholder": "p. ex. reproduire le ticket de support TICKET-123",
+      "dialogConfirm": "Se connecter",
+      "dialogStarting": "Démarrage...",
+      "dialogCancel": "Annuler",
+      "dialogLoadFailed": "Impossible de charger l'utilisateur",
+      "dialogError": "Échec de la connexion en tant qu'utilisateur",
+      "reasonTooShort": "Veuillez indiquer au moins {{min}} caractères comme motif",
+      "bannerLabel": "Connecté en tant que :",
+      "bannerTimeRemaining": "Temps restant : {{time}}",
+      "bannerReturnButton": "Retour à mon compte",
+      "bannerServerEndFailed": "Retour à votre compte — impossible de confirmer la fermeture de la session côté serveur. Elle expirera automatiquement."
     },
     "userEditDialog": {
       "title": "Modifier l'utilisateur",

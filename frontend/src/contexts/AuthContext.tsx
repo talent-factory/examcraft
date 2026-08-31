@@ -8,11 +8,13 @@ import {
   AuthState,
   AuthContextType,
   UserRole,
+  User,
   RegisterRequest,
   UpdateProfileRequest,
   ChangePasswordRequest,
 } from '../types/auth';
 import AuthService from '../services/AuthService';
+import AdminService from '../services/AdminService';
 import i18n from '../i18n';
 import { SubscriptionTier, hasFeature as tierHasFeature, isFeatureName } from '../config/features';
 import {
@@ -27,8 +29,14 @@ import {
   getTokenRemainingMs,
   REFRESH_LEAD_MS,
   ACCESS_TOKEN_KEY,
+  ImpersonationEndedError,
 } from '../api/tokenRefreshLock';
-import { clearAllSessionSnapshots } from '../utils/sessionSnapshot';
+import {
+  clearAllSessionSnapshots,
+  readSessionSnapshot,
+  writeSessionSnapshot,
+  clearSessionSnapshot,
+} from '../utils/sessionSnapshot';
 
 // ============================================================================
 // Context Creation
@@ -50,6 +58,25 @@ const USER_KEY = 'examcraft_user';
 // (TF-607).
 const LOGOUT_BROADCAST_KEY = 'examcraft_logout_broadcast';
 
+// TF-743: sessionStorage snapshot of the admin's own tokens+profile, taken
+// right before swapping the active session over to an impersonation token.
+// Tab-scoped on purpose (sessionSnapshot.ts) — the admin snapshot must not
+// leak to another tab or survive a full logout beyond what
+// clearAllSessionSnapshots() already handles.
+const IMPERSONATION_SNAPSHOT_KEY = 'impersonation.adminSession';
+const IMPERSONATION_SNAPSHOT_VERSION = 1;
+
+interface AdminSessionSnapshot {
+  accessToken: string;
+  refreshToken: string;
+  user: User;
+}
+
+// Set on AuthState whenever a full state object is constructed for a
+// non-impersonated session, so every existing call site only needs to spread
+// this in instead of restating both fields by hand.
+const NOT_IMPERSONATING = { isImpersonating: false, impersonationExpiresAt: null } as const;
+
 // ============================================================================
 // Auth Provider Component
 // ============================================================================
@@ -62,12 +89,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAuthenticated: false,
     isLoading: true,
     error: null,
+    ...NOT_IMPERSONATING,
   });
+  // TF-743: set by the mount effect (below) when it finds an
+  // impersonation-shaped token pair on a cold reload. Deferred to a
+  // separate effect — declared further down, after `restoreAdminSession`
+  // — rather than called directly from the mount effect: that effect runs,
+  // and its async body reaches this call, synchronously within the same
+  // initial effect-flush pass as the ref-sync effect that populates
+  // `restoreAdminSessionRef`, before that effect has had a chance to run.
+  const [pendingReloadImpersonationRestore, setPendingReloadImpersonationRestore] = useState(false);
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshAccessTokenRef = useRef<() => Promise<void>>(async () => {});
   const scheduleTokenRefreshRef = useRef<(token: string) => void>(() => {});
+  // Forward-reference to `restoreAdminSession` (declared further down) for
+  // the mount effect and `logout`, which both run/are defined earlier in
+  // this component than `restoreAdminSession` itself — mirrors the same
+  // pattern already used for refreshAccessTokenRef/scheduleTokenRefreshRef.
+  const restoreAdminSessionRef = useRef<() => Promise<{ restored: boolean; backendEndFailed: boolean }>>(
+    async () => ({ restored: false, backendEndFailed: false }),
+  );
   const isAuthenticatedRef = useRef(false);
+  // TF-743: mirrors state.isImpersonating for the storage listener below.
+  // An impersonating tab's proactive timer alone owns its lifecycle
+  // end-to-end (auto-fallback to the admin session); it must not react to
+  // *other* tabs' unrelated token churn (see handleStorage below).
+  const isImpersonatingRef = useRef(false);
   // Mirrors state.{accessToken,refreshToken} for the storage listener below,
   // which runs outside React's render cycle and needs this tab's current,
   // still-valid tokens without taking a dependency that would re-subscribe
@@ -80,6 +128,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     isAuthenticatedRef.current = state.isAuthenticated;
   }, [state.isAuthenticated]);
+
+  useEffect(() => {
+    isImpersonatingRef.current = state.isImpersonating;
+  }, [state.isImpersonating]);
 
   useEffect(() => {
     currentTokensRef.current = {
@@ -131,6 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: false,
         isLoading: false,
         error: null,
+        ...NOT_IMPERSONATING,
       });
     }
   }, [cancelRefreshTimer]);
@@ -219,6 +272,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               isAuthenticated: true,
               isLoading: false,
               error: null,
+              ...NOT_IMPERSONATING,
             });
             scheduleTokenRefreshRef.current(accessToken);
           } catch (error) {
@@ -259,6 +313,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isAuthenticated: true,
                 isLoading: false,
                 error: null,
+                ...NOT_IMPERSONATING,
               });
             };
 
@@ -323,9 +378,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isAuthenticated: false,
                 isLoading: false,
                 error: null,
+                ...NOT_IMPERSONATING,
               });
             }
           }
+        } else if (accessToken && !refreshToken) {
+          // TF-743: an access token with no refresh token means this tab
+          // was mid-impersonation before this reload — impersonation
+          // tokens are deliberately minted without a refresh token
+          // (TF-741's hard 30-min cap, no renewal). There is no safe way
+          // to resume impersonating across a reload (the token may already
+          // be stale/expired, and its remaining lifetime can't be
+          // recovered here), so fall back to the stashed admin session
+          // instead of the previous behavior of leaving the admin fully
+          // logged out on every impersonation-tab reload.
+          //
+          // Deferred to the effect below rather than called directly here
+          // — see pendingReloadImpersonationRestore's declaration for why.
+          // isLoading stays true; that effect resolves it.
+          setPendingReloadImpersonationRestore(true);
         } else {
           setState(prev => ({ ...prev, isLoading: false }));
         }
@@ -365,6 +436,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: true,
         isLoading: false,
         error: null,
+        ...NOT_IMPERSONATING,
       });
       scheduleTokenRefresh(tokens.access_token);
     } catch (error) {
@@ -405,6 +477,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: true,
         isLoading: false,
         error: null,
+        ...NOT_IMPERSONATING,
       });
       scheduleTokenRefresh(accessToken);
     } catch (error) {
@@ -445,6 +518,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: true,
         isLoading: false,
         error: null,
+        ...NOT_IMPERSONATING,
       });
       scheduleTokenRefresh(tokens.access_token);
     } catch (error) {
@@ -462,6 +536,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Logout
    */
   const logout = useCallback(async () => {
+    // TF-743: logging out while impersonating must only end the
+    // impersonation, mirroring the backend (auth.py's logout endpoint
+    // treats logout-while-impersonating the same as POST
+    // /admin/impersonate/end). A full logout here would broadcast
+    // LOGOUT_BROADCAST_KEY to every tab and wipe the stashed admin
+    // snapshot via clearLocalSession(), signing the admin out everywhere
+    // over what the user meant as "stop impersonating".
+    if (state.isImpersonating) {
+      await restoreAdminSessionRef.current();
+      return;
+    }
+
     // Cancel before awaiting so the proactive timer cannot fire a refresh
     // against the session we are about to revoke.
     cancelRefreshTimer();
@@ -480,7 +566,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(LOGOUT_BROADCAST_KEY, String(Date.now()));
       clearLocalSession();
     }
-  }, [state.accessToken, cancelRefreshTimer, clearLocalSession]);
+  }, [state.accessToken, state.isImpersonating, cancelRefreshTimer, clearLocalSession]);
+
+  /**
+   * Restore the admin session stashed by `startImpersonation` (TF-743).
+   *
+   * Called several ways: reactively, when `refreshAccessToken` finds no
+   * refresh token (an impersonation token never has one — TF-741's hard
+   * 30-min cap) and a stash exists; directly, from the banner's "back to my
+   * account" button, from `logout()` while impersonating, and from a
+   * cold-mount reload that finds an impersonation-shaped token pair.
+   * Returns `{ restored: false, backendEndFailed: false }` when there is
+   * nothing to restore — either impersonation was never active in this tab,
+   * or it was already restored — so every caller can treat a repeat call as
+   * a harmless no-op instead of an error.
+   *
+   * Before touching localStorage, this best-effort tells the backend the
+   * impersonation session is over (`AdminService.endImpersonation()`,
+   * identified via the *current* — still impersonation — access token).
+   * `backendEndFailed` reports whether that call failed so a caller like
+   * the banner can surface it, but it never blocks the local restore: every
+   * exit path must still land the admin back on their own session even if
+   * the network call failed or the session had already expired server-side.
+   *
+   * The stashed pair is re-refreshed rather than reused as-is: it may have
+   * sat idle for the whole impersonation window and be close to its own
+   * expiry by now. If that refresh itself fails (the admin's own session
+   * lapsed too), the stashed access token is restored as a last resort —
+   * the next request re-authenticates normally if it's also no longer
+   * valid, but the admin at least isn't logged out purely because they
+   * happened to be impersonating when their own token came due.
+   */
+  const restoreAdminSession = useCallback(async (): Promise<{
+    restored: boolean;
+    backendEndFailed: boolean;
+  }> => {
+    const snapshot = readSessionSnapshot<AdminSessionSnapshot>(
+      IMPERSONATION_SNAPSHOT_KEY,
+      IMPERSONATION_SNAPSHOT_VERSION,
+    );
+    if (!snapshot) return { restored: false, backendEndFailed: false };
+
+    clearSessionSnapshot(IMPERSONATION_SNAPSHOT_KEY);
+
+    let backendEndFailed = false;
+    try {
+      await AdminService.endImpersonation();
+    } catch (error) {
+      console.error('[AuthContext] Failed to end impersonation server-side:', error);
+      backendEndFailed = true;
+    }
+
+    try {
+      const tokens = await AuthService.refreshToken({ refresh_token: snapshot.refreshToken });
+      localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
+      localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
+      localStorage.setItem(USER_KEY, JSON.stringify(snapshot.user));
+      setState({
+        user: snapshot.user,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        ...NOT_IMPERSONATING,
+      });
+      scheduleTokenRefreshRef.current(tokens.access_token);
+    } catch (error) {
+      console.error('[AuthContext] Failed to refresh admin session on restore:', error);
+      try {
+        localStorage.setItem(ACCESS_TOKEN_KEY, snapshot.accessToken);
+        localStorage.setItem(REFRESH_TOKEN_KEY, snapshot.refreshToken);
+        localStorage.setItem(USER_KEY, JSON.stringify(snapshot.user));
+      } catch (storageError) {
+        console.error('[AuthContext] Failed to persist fallback admin tokens:', storageError);
+      }
+      setState({
+        user: snapshot.user,
+        accessToken: snapshot.accessToken,
+        refreshToken: snapshot.refreshToken,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        ...NOT_IMPERSONATING,
+      });
+      scheduleTokenRefreshRef.current(snapshot.accessToken);
+    }
+    return { restored: true, backendEndFailed };
+  }, []);
 
   /**
    * Refresh access token.
@@ -494,6 +667,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshAccessToken = useCallback(async () => {
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     if (!refreshToken) {
+      // TF-743: an impersonation access token carries no refresh token by
+      // design. Both the proactive timer (armed like any other token, 2 min
+      // before its `exp` — see REFRESH_LEAD_MS) and a reactive 401 land
+      // here while impersonating; restore the stashed admin session instead
+      // of tearing the tab down, so the fallback lands the admin back on
+      // their own identity rather than logging them out mid-support-session.
+      //
+      // Throwing ImpersonationEndedError (rather than just returning) on a
+      // successful restore matters: apiClient's interceptors treat a
+      // resolved refresh as "retry the original request with the new
+      // token", which would silently replay it under the admin's identity
+      // instead of the impersonated user's. This distinct error tells them
+      // to surface the original 401 instead of retrying.
+      const { restored } = await restoreAdminSession();
+      if (restored) throw new ImpersonationEndedError();
       clearLocalSession();
       throw new Error('No refresh token available');
     }
@@ -523,11 +711,165 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearLocalSession();
       throw error;
     }
-  }, [clearLocalSession, adoptStoredTokens]);
+  }, [clearLocalSession, adoptStoredTokens, restoreAdminSession]);
+
+  /**
+   * Swap the active session over to an impersonation token (TF-743).
+   *
+   * Stashes the current (admin) session to sessionStorage — tab-scoped, see
+   * IMPERSONATION_SNAPSHOT_KEY — then makes the target user's token the
+   * active one, exactly like `login` does for a normal session, so the rest
+   * of the app (every existing service call reads the token from
+   * localStorage) transparently starts acting as the target user. No
+   * refresh token is stored: TF-741 mints impersonation tokens without one
+   * (hard 30-min cap, never renewed), which is also the signal
+   * `refreshAccessToken` uses to route into `restoreAdminSession` later.
+   *
+   * Known limitation: localStorage — not sessionStorage — is what every tab
+   * of this browser reads its token from at request time (TF-607's
+   * cross-tab design), so another already-open tab of the same admin will
+   * transiently send requests as the impersonated user too. Two of the
+   * three ways that can go wrong are guarded in the storage listener below:
+   * this tab silently switching to a *different* token pair a sibling tab's
+   * ordinary rotation writes (`isImpersonatingRef`), and a sibling tab
+   * clobbering *this* tab's impersonation token on the same signal
+   * (`isImpersonationHandoff`). Not yet guarded: a sibling tab's own
+   * *proactive timer* (not the storage listener) firing independently,
+   * finding the shared `REFRESH_TOKEN_KEY` gone (removed by this tab's
+   * `startImpersonation`), concluding *its own* session died, and calling
+   * `clearLocalSession()` — which wipes this tab's impersonation token too.
+   * Scoped out here as pre-existing (TF-739/TF-743's own AC only covers a
+   * single active session); flagged for a follow-up.
+   */
+  const startImpersonation = useCallback(async (payload: { accessToken: string; expiresIn: number }) => {
+    if (state.isImpersonating) {
+      // Starting a second impersonation on top of an active one would
+      // overwrite the stashed admin snapshot with the *current target's*
+      // session, losing the actual admin's way back. Checked before the
+      // "active admin session" guard below: while impersonating,
+      // state.refreshToken is legitimately null by design, which would
+      // otherwise be misreported as "no active admin session".
+      throw new Error('Already impersonating another user; end the current impersonation first');
+    }
+    if (!state.accessToken || !state.refreshToken || !state.user) {
+      throw new Error('Cannot start impersonation without an active admin session');
+    }
+
+    // TF-743 fix: verify the recovery snapshot actually persisted before
+    // committing to the swap. sessionStorage writes fail silently on quota
+    // limits or in private-browsing mode (see sessionSnapshot.ts) — without
+    // this check, that failure would only surface ~28 minutes later as an
+    // unexplained forced logout when the hard-cap fallback finds no way
+    // back to the admin session. Refuse to start instead.
+    const snapshotSaved = writeSessionSnapshot<AdminSessionSnapshot>(
+      IMPERSONATION_SNAPSHOT_KEY,
+      IMPERSONATION_SNAPSHOT_VERSION,
+      { accessToken: state.accessToken, refreshToken: state.refreshToken, user: state.user },
+    );
+    if (!snapshotSaved) {
+      throw new Error(
+        'Impersonation session snapshot could not be saved; browser storage may be full or restricted',
+      );
+    }
+
+    // Stop the admin's own proactive timer before it can fire a refresh
+    // against the session we are about to leave.
+    cancelRefreshTimer();
+
+    try {
+      const targetUser = await AuthService.getProfile(payload.accessToken);
+
+      try {
+        localStorage.setItem(ACCESS_TOKEN_KEY, payload.accessToken);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        localStorage.setItem(USER_KEY, JSON.stringify(targetUser));
+      } catch (error) {
+        // A partial write here (e.g. the access token lands but the
+        // refresh-token removal fails) must not be treated as a soft
+        // warning: every subsequent request would read this half-written
+        // state from localStorage while the setState below still claims
+        // the swap fully succeeded. Rethrow so the outer catch rolls back.
+        console.error('[AuthContext] Failed to persist impersonation session:', error);
+        throw error;
+      }
+
+      const expiresAt = new Date(Date.now() + payload.expiresIn * 1000).toISOString();
+      setState({
+        user: targetUser,
+        accessToken: payload.accessToken,
+        refreshToken: null,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        isImpersonating: true,
+        impersonationExpiresAt: expiresAt,
+      });
+      scheduleTokenRefreshRef.current(payload.accessToken);
+    } catch (error) {
+      // Roll back. localStorage may be partially written if the inner
+      // write above is what failed, so explicitly restore the admin's own
+      // token pair rather than assuming it is still untouched.
+      try {
+        localStorage.setItem(ACCESS_TOKEN_KEY, state.accessToken);
+        localStorage.setItem(REFRESH_TOKEN_KEY, state.refreshToken);
+        localStorage.setItem(USER_KEY, JSON.stringify(state.user));
+      } catch (restoreError) {
+        console.error('[AuthContext] Failed to restore admin tokens after rollback:', restoreError);
+      }
+      clearSessionSnapshot(IMPERSONATION_SNAPSHOT_KEY);
+      scheduleTokenRefreshRef.current(state.accessToken);
+
+      // Best-effort: AdminService.impersonateUser() already created the
+      // impersonation session server-side before this failure, so tell the
+      // backend it was abandoned rather than leaving it open until the
+      // 30-min hard cap / reaper reclaims it. localStorage still holds the
+      // admin's own token at this point, so the just-issued target token
+      // must be passed explicitly (see AdminService.endImpersonation).
+      AdminService.endImpersonation(payload.accessToken).catch((endError) => {
+        console.error('[AuthContext] Failed to close orphaned impersonation session after rollback:', endError);
+      });
+
+      throw error;
+    }
+  }, [state.accessToken, state.refreshToken, state.user, state.isImpersonating, cancelRefreshTimer]);
+
+  /**
+   * Public entry point for ending impersonation from the UI (the banner's
+   * "back to my account" button). Tells the backend via `POST
+   * /api/admin/impersonate/end` and restores local state — safe to call
+   * regardless of whether the backend call succeeded, so the admin is never
+   * stuck on the impersonated identity purely because the end-call itself
+   * hit a network error. Returns `backendEndFailed` so the caller can
+   * surface that to the admin (the local restore itself always succeeds
+   * when this resolves).
+   */
+  const endImpersonation = useCallback(async (): Promise<{ backendEndFailed: boolean }> => {
+    const { backendEndFailed } = await restoreAdminSession();
+    return { backendEndFailed };
+  }, [restoreAdminSession]);
 
   useEffect(() => {
     refreshAccessTokenRef.current = refreshAccessToken;
   }, [refreshAccessToken]);
+
+  useEffect(() => {
+    restoreAdminSessionRef.current = restoreAdminSession;
+  }, [restoreAdminSession]);
+
+  // TF-743: performs the reload-time admin-session restore the mount effect
+  // deferred (see pendingReloadImpersonationRestore's declaration above).
+  // Declared after `restoreAdminSession` so it can reference it directly —
+  // no ref/TDZ concern here, since this effect only ever needs to run
+  // *after* mount, never synchronously during the initial effect flush.
+  useEffect(() => {
+    if (!pendingReloadImpersonationRestore) return;
+    setPendingReloadImpersonationRestore(false);
+    restoreAdminSession().then(({ restored }) => {
+      if (!restored) {
+        setState(prev => ({ ...prev, isLoading: false }));
+      }
+    });
+  }, [pendingReloadImpersonationRestore, restoreAdminSession]);
 
   useEffect(() => {
     scheduleTokenRefreshRef.current = scheduleTokenRefresh;
@@ -584,7 +926,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      // TF-743: this tab's own token is intrinsically shaped differently
+      // while it is impersonating (no refresh token), and its proactive
+      // timer already owns its entire lifecycle end-to-end (auto-fallback
+      // to the admin session). Reacting to *another* tab's unrelated token
+      // rotation here — adopting a foreign admin token pair, or writing
+      // this tab's impersonation token back over it — would silently swap
+      // the identity behind every subsequent request while the banner
+      // keeps claiming to impersonate the original target.
+      if (isImpersonatingRef.current) return;
+
       if (!adoptStoredTokens()) {
+        // TF-743: an access-token change with no refresh token alongside it
+        // means another tab just started (or is mid-)impersonation — never
+        // the "failed rotation" case below, which always clears both keys
+        // together. Writing this tab's own admin tokens back over it would
+        // immediately break the impersonating tab's very next request, so
+        // leave localStorage alone and let this tab's own state ride out
+        // unaffected until it next needs to refresh.
+        //
+        // Safe default: if the storage reads below fail, assume this MIGHT
+        // be a handoff and do nothing, rather than assuming it isn't and
+        // clobbering whatever the other tab just wrote. Getting this wrong
+        // in the other direction is exactly the bug this check exists to
+        // prevent.
+        let isImpersonationHandoff = true;
+        try {
+          isImpersonationHandoff =
+            !!localStorage.getItem(ACCESS_TOKEN_KEY) && !localStorage.getItem(REFRESH_TOKEN_KEY);
+        } catch (err) {
+          console.error('[AuthContext] Failed to inspect storage during token-change handling:', err);
+          // isImpersonationHandoff stays at its safe default (true) above.
+        }
+        if (isImpersonationHandoff) return;
+
         // The token vanished without a logout broadcast: another tab's own
         // refresh attempt failed and tore down *its* local session, which is
         // not proof this tab's session is dead too. This tab's own tokens
@@ -759,6 +1134,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearError,
     hasPermission,
     hasRole,
+    startImpersonation,
+    endImpersonation,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

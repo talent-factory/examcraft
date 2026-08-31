@@ -24,6 +24,8 @@ import { SIDEBAR_REVEAL_NAV_EVENT, SidebarRevealNavDetail } from './sidebarNavRe
 interface SidebarProps {
   isOpen?: boolean;
   onToggle?: (isOpen: boolean) => void;
+  /** TF-743: push the sidebar down below the persistent impersonation banner. */
+  offsetForImpersonationBanner?: boolean;
 }
 
 const GROUPS_STORAGE_KEY = 'examcraft.sidebar.expandedGroups';
@@ -51,7 +53,7 @@ const writeStoredGroups = (ids: string[]): void => {
   }
 };
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, offsetForImpersonationBanner = false }) => {
   const { t } = useTranslation();
   const { navigationGroups, navigationItems } = useRoleBasedNavigation();
   const location = useLocation();
@@ -314,9 +316,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true }) => {
       // the theme key, because tailwind.config.js isn't mounted in the dev
       // container (only src/ is) — config changes would otherwise require an
       // image rebuild (TF-506).
-      className={`fixed left-0 top-16 h-[calc(100vh_-_64px)] bg-white border-r border-gray-200 transition-all duration-250 z-40 ${
-        isOpen ? 'w-sidebar' : 'w-sidebar-collapsed'
-      }`}
+      className={`fixed left-0 bg-white border-r border-gray-200 transition-all duration-250 z-40 ${
+        // TF-743: pushed down below the persistent impersonation banner
+        // (h-10, 40px) while it is shown, same static-class-ternary trick as
+        // DashboardLayout/NavigationBar — Tailwind's JIT scanner needs the
+        // full class name literally in the source, so this can't be built
+        // from an interpolated pixel value.
+        offsetForImpersonationBanner ? 'top-[104px] h-[calc(100vh_-_104px)]' : 'top-16 h-[calc(100vh_-_64px)]'
+      } ${isOpen ? 'w-sidebar' : 'w-sidebar-collapsed'}`}
     >
       {/* Sidebar Content */}
       <div className="h-full flex flex-col">

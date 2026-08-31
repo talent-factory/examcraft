@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { PackageTierBadge } from './PackageTierBadge';
 
 export const NavigationBar: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isImpersonating } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
@@ -40,7 +40,13 @@ export const NavigationBar: React.FC = () => {
   const currentLanguageLabel = LANGUAGE_LABELS[i18n.language?.substring(0, 2)] || i18n.language;
 
   return (
-    <nav data-testid="navigation-bar" className="fixed top-0 inset-x-0 z-50 bg-white shadow-lg">
+    <nav
+      data-testid="navigation-bar"
+      // TF-743: pushed below the persistent impersonation banner (h-10)
+      // while active — static-class ternary so Tailwind's JIT scanner sees
+      // both literal class names.
+      className={`fixed inset-x-0 z-50 bg-white shadow-lg ${isImpersonating ? 'top-10' : 'top-0'}`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}

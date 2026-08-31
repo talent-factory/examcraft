@@ -68,12 +68,18 @@ export function readSessionSnapshot<T>(key: string, version: number): T | null {
 }
 
 /**
- * Writes a snapshot. If this fails (quota, private mode), only the
- * restorability is lost — never the current work step.
+ * Writes a snapshot. Returns whether the write actually landed.
+ *
+ * If this fails (quota, private mode), for most callers only the
+ * restorability of some background work step is lost — never the current
+ * work step itself, so they are free to ignore the return value. Callers
+ * for whom the snapshot is the *only* way back to a prior state (e.g.
+ * TF-743's admin-session stash before impersonating) must check it and
+ * refuse to proceed rather than silently accepting a point of no return.
  */
-export function writeSessionSnapshot<T>(key: string, version: number, data: T): void {
+export function writeSessionSnapshot<T>(key: string, version: number, data: T): boolean {
   const storage = getStorage();
-  if (!storage) return;
+  if (!storage) return false;
 
   const envelope: SnapshotEnvelope<T> = {
     version,
@@ -83,8 +89,10 @@ export function writeSessionSnapshot<T>(key: string, version: number, data: T): 
 
   try {
     storage.setItem(storageKey(key), JSON.stringify(envelope));
+    return true;
   } catch (err) {
     console.warn(`[sessionSnapshot] Snapshot "${key}" konnte nicht gespeichert werden:`, err);
+    return false;
   }
 }
 

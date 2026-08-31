@@ -5,19 +5,23 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { UserList } from './UserList';
 import { UserEditDialog } from './UserEditDialog';
 import { RoleAssignmentDialog } from './RoleAssignmentDialog';
 import { OrgUnitAssignmentDialog } from './OrgUnitAssignmentDialog';
+import { ImpersonationReasonDialog } from './ImpersonationReasonDialog';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = user?.is_superuser || user?.roles?.some(r => r.name === 'admin') || false;
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [manageRolesUserId, setManageRolesUserId] = useState<number | null>(null);
   const [manageOrgUnitsUserId, setManageOrgUnitsUserId] = useState<number | null>(null);
+  const [impersonateUserId, setImpersonateUserId] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleEditUser = (userId: number) => {
@@ -33,6 +37,18 @@ export const UserManagementPage: React.FC = () => {
   const handleManageOrgUnits = (userId: number) => {
     if (!hasPermission('manage_org_units')) return;
     setManageOrgUnitsUserId(userId);
+  };
+
+  const handleImpersonateUser = (userId: number) => {
+    if (!hasPermission('users:impersonate')) return;
+    setImpersonateUserId(userId);
+  };
+
+  const handleImpersonationStarted = () => {
+    // Land on the dashboard as the target user, same as a fresh login would
+    // — the admin's own /admin route is not guaranteed to stay reachable
+    // once the active session is a non-admin user's.
+    navigate('/dashboard');
   };
 
   const handleRefresh = () => {
@@ -68,6 +84,7 @@ export const UserManagementPage: React.FC = () => {
           onEditUser={handleEditUser}
           onManageRoles={handleManageRoles}
           onManageOrgUnits={handleManageOrgUnits}
+          onImpersonateUser={handleImpersonateUser}
           onRefresh={handleRefresh}
           canEdit={isAdmin}
         />
@@ -108,6 +125,21 @@ export const UserManagementPage: React.FC = () => {
           isOpen={manageOrgUnitsUserId !== null}
           onClose={() => setManageOrgUnitsUserId(null)}
           onSuccess={handleOrgUnitsSuccess}
+        />
+
+        {/*
+          Impersonation Reason Dialog (TF-743): same "unconditional render,
+          gate on the trigger" reasoning as OrgUnitAssignmentDialog above —
+          impersonateUserId is only ever set by handleImpersonateUser, which
+          re-checks users:impersonate before opening it. The scope rule
+          itself (SuperAdmin: anyone; institution admin: non-admin users of
+          the same institution) is enforced server-side regardless.
+        */}
+        <ImpersonationReasonDialog
+          userId={impersonateUserId}
+          isOpen={impersonateUserId !== null}
+          onClose={() => setImpersonateUserId(null)}
+          onSuccess={handleImpersonationStarted}
         />
       </div>
     </div>

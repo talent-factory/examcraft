@@ -443,7 +443,24 @@
       "paginationPage": "Pagina {{page}} di {{total}}",
       "paginationShowing": "Visualizzazione da {{from}} a {{to}} di {{total}} risultati",
       "failedLoad": "Impossibile caricare gli utenti",
-      "failedStatus": "Impossibile aggiornare lo stato dell'utente"
+      "failedStatus": "Impossibile aggiornare lo stato dell'utente",
+      "btnImpersonate": "Accedi come utente"
+    },
+    "impersonation": {
+      "dialogTitle": "Accedi come utente",
+      "dialogTargetLabel": "Stai accedendo come:",
+      "dialogReasonLabel": "Motivo (obbligatorio)",
+      "dialogReasonPlaceholder": "es. riprodurre il ticket di supporto TICKET-123",
+      "dialogConfirm": "Accedi",
+      "dialogStarting": "Avvio in corso...",
+      "dialogCancel": "Annulla",
+      "dialogLoadFailed": "Impossibile caricare l'utente",
+      "dialogError": "Accesso come utente non riuscito",
+      "reasonTooShort": "Inserisci almeno {{min}} caratteri come motivo",
+      "bannerLabel": "Connesso come:",
+      "bannerTimeRemaining": "Tempo rimanente: {{time}}",
+      "bannerReturnButton": "Torna al mio account",
+      "bannerServerEndFailed": "Tornato al tuo account — impossibile confermare la chiusura della sessione lato server. Scadrà automaticamente."
     },
     "userEditDialog": {
       "title": "Modifica utente",

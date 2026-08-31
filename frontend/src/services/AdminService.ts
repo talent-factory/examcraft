@@ -31,6 +31,16 @@ export interface UserListResponse {
   can_edit: boolean;
 }
 
+/** Response of `POST /api/admin/users/{id}/impersonate` (TF-741/TF-743). */
+export interface ImpersonateResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  impersonation_session_id: number;
+  target_user_id: number;
+  target_user_email: string;
+}
+
 export interface UserDetailResponse {
   id: number;
   email: string;
@@ -207,6 +217,62 @@ class AdminService {
     }
 
     return response.json();
+  }
+
+  /**
+   * Start impersonating a user (TF-741/TF-743). Requires `users:impersonate`;
+   * scope (SuperAdmin: anyone; institution admin: non-admin users of the
+   * same institution) is enforced server-side.
+   */
+  async impersonateUser(userId: number, reason: string): Promise<ImpersonateResponse> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/admin/users/${userId}/impersonate`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ reason }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Failed to start impersonation');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Ends the active impersonation session (TF-741). Uses the *current*
+   * (impersonation) token — the target-user identity — to identify which
+   * session to end, so this must be called before the caller restores the
+   * admin's own token locally.
+   *
+   * `accessTokenOverride` lets a caller pass the impersonation token
+   * explicitly instead of relying on `localStorage` at call time — needed
+   * when the token was never persisted there in the first place (e.g. a
+   * rollback right after `AdminService.impersonateUser` succeeded but
+   * before the frontend session swap, where `localStorage` still holds the
+   * admin's own token, not the freshly-issued target token this call needs
+   * to identify the orphaned session).
+   */
+  async endImpersonation(accessTokenOverride?: string): Promise<void> {
+    const headers: HeadersInit = accessTokenOverride
+      ? { 'Content-Type': 'application/json', Authorization: `Bearer ${accessTokenOverride}` }
+      : this.getAuthHeaders();
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/admin/impersonate/end`,
+      {
+        method: 'POST',
+        headers,
+      }
+    );
+
+    if (!response.ok && response.status !== 204) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Failed to end impersonation');
+    }
   }
 
   /**

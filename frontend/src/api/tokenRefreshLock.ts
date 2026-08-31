@@ -73,6 +73,26 @@ export type RefreshTrigger =
   | 'httpClient-401'
   | 'unknown';
 
+/**
+ * Thrown by the registered token-refresh callback (AuthContext's
+ * `refreshAccessToken`) when there was no refresh token to rotate because
+ * the caller was impersonating a user, and the admin's own session was
+ * restored instead (TF-743's automatic fallback out of impersonation).
+ *
+ * This is distinct from an ordinary refresh failure: the caller's identity
+ * changed from the target user to the admin mid-request. `apiClient`'s
+ * interceptors must recognise it and must NOT retry the original request —
+ * doing so would silently replay it under the admin's identity instead of
+ * the impersonated user's — and must NOT treat it as a logout, since the
+ * admin session is valid and already active.
+ */
+export class ImpersonationEndedError extends Error {
+  constructor() {
+    super('Impersonation session ended; admin session restored');
+    this.name = 'ImpersonationEndedError';
+  }
+}
+
 /** Milliseconds until the token expires, or null if it cannot be read. */
 export function getTokenRemainingMs(token: string): number | null {
   try {

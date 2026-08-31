@@ -209,6 +209,10 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  /** True while `user` reflects an impersonated target, not the admin who started the session (TF-743). */
+  isImpersonating: boolean;
+  /** ISO timestamp of the impersonation token's hard TF-741 30-min cap, or null when not impersonating. */
+  impersonationExpiresAt: string | null;
 }
 
 export interface AuthContextType extends AuthState {
@@ -223,6 +227,20 @@ export interface AuthContextType extends AuthState {
   clearError: () => void;
   hasPermission: (permission: string) => boolean;
   hasRole: (role: UserRole) => boolean;
+  /**
+   * Swap the active session over to an impersonation token minted by
+   * `POST /api/admin/users/{id}/impersonate` (TF-743). Stashes the current
+   * (admin) session so `endImpersonation` can restore it.
+   */
+  startImpersonation: (payload: { accessToken: string; expiresIn: number }) => Promise<void>;
+  /**
+   * Restore the admin session stashed by `startImpersonation`. Safe to call
+   * even if impersonation already ended (e.g. via the automatic TF-741
+   * expiry fallback) — it then does nothing. `backendEndFailed` reports
+   * whether the server-side `POST /api/admin/impersonate/end` call failed;
+   * the local restore always succeeds regardless.
+   */
+  endImpersonation: () => Promise<{ backendEndFailed: boolean }>;
 }
 
 // ============================================================================
