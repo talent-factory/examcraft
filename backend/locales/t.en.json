@@ -57,6 +57,7 @@
     "impersonation_not_active": "No impersonation session is currently active",
     "impersonation_action_locked": "This action is locked during an active impersonation session",
     "impersonation_start_failed": "Failed to start the impersonation session",
+    "impersonation_rate_limit_exceeded": "Too many impersonation sessions started. Please try again later.",
     "documents_upload_failed": "Document upload failed",
     "documents_invalid_status": "Invalid status filter",
     "documents_invalid_filter": "Invalid filter value.",

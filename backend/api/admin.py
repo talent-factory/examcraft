@@ -10,8 +10,10 @@ from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 import logging
+import os
 
 from database import get_db
+from middleware.rate_limit import ImpersonationRateLimiter
 from models.auth import User, Role, Institution, UserStatus, ImpersonationSession
 from services.translation_service import t, get_request_locale
 from utils.auth_utils import (
@@ -27,6 +29,15 @@ from utils.impersonation_context import get_impersonation_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+# TF-760: per-admin cap on impersonation-start attempts, independent of the
+# "one active session" nesting guard below. Configurable so ops can loosen
+# it for large institutions with legitimate support-request bursts without
+# a code change.
+_impersonation_rate_limiter = ImpersonationRateLimiter(
+    requests_per_hour=int(os.getenv("IMPERSONATION_RATE_LIMIT_PER_HOUR", "10")),
+    requests_per_day=int(os.getenv("IMPERSONATION_RATE_LIMIT_PER_DAY", "30")),
+)
 
 
 def _is_admin_role(user: User) -> bool:
@@ -885,6 +896,24 @@ async def start_impersonation(
     already having an unfinished session as admin) is rejected.
     """
     locale = get_request_locale(http_request, current_user)
+
+    # TF-760: per-admin rate limit, checked before any DB lookup so an
+    # admin who is already over budget doesn't cost us a query. Counts
+    # every start attempt (this one included), not just successful ones --
+    # see ImpersonationRateLimiter's docstring for why.
+    is_limited, retry_after = _impersonation_rate_limiter.check(current_user.id)
+    if is_limited:
+        AuditService.log_rate_limit_exceeded(
+            db,
+            user_id=current_user.id,
+            request=http_request,
+            limit_type="impersonation",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=t("impersonation_rate_limit_exceeded", locale=locale),
+            headers={"Retry-After": str(retry_after)},
+        )
 
     target = db.query(User).filter(User.id == user_id).first()
     if not target:

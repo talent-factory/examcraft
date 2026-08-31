@@ -217,6 +217,73 @@ class UserRateLimiter:
             pass
 
 
+class ImpersonationRateLimiter:
+    """
+    Per-admin rate limiter for starting impersonation sessions (TF-760).
+
+    Bounds how many ``POST /users/{id}/impersonate`` attempts a single
+    admin can make per hour and per day, independent of whether the
+    attempt actually succeeds (nested/already-active/target-not-found
+    attempts count too -- this is abuse protection on the endpoint, not
+    a cap on live sessions).
+
+    Unlike ``UserRateLimiter``, the Redis client is fetched fresh on
+    every ``check()`` call rather than cached at construction time, so
+    a single long-lived instance (e.g. a module-level singleton wired
+    into an endpoint) can still be exercised in tests that patch
+    ``RedisService.get_ratelimit_client``.
+
+    ``check()`` intentionally mirrors ``RateLimitMiddleware._check_rate_limit``'s
+    shape (pure decision, no exception) rather than ``UserRateLimiter.check_limit``'s
+    (raises ``HTTPException`` directly) -- the caller needs the decision to also
+    drive an audit log entry and a localized error message before raising.
+    """
+
+    def __init__(self, requests_per_hour: int = 10, requests_per_day: int = 30):
+        self.requests_per_hour = requests_per_hour
+        self.requests_per_day = requests_per_day
+
+    def check(self, admin_user_id: int) -> tuple[bool, int]:
+        """
+        Check whether the admin has exceeded the hourly or daily limit.
+
+        Returns:
+            (is_limited, retry_after_seconds)
+        """
+        try:
+            redis_client = RedisService.get_ratelimit_client()
+            current_time = int(time.time())
+
+            hour_key = (
+                f"ratelimit:impersonation:hour:{admin_user_id}:{current_time // 3600}"
+            )
+            hour_count = redis_client.incr(hour_key)
+            if hour_count == 1:
+                redis_client.expire(hour_key, 3600)
+
+            if hour_count > self.requests_per_hour:
+                return True, 3600 - (current_time % 3600)
+
+            day_key = (
+                f"ratelimit:impersonation:day:{admin_user_id}:{current_time // 86400}"
+            )
+            day_count = redis_client.incr(day_key)
+            if day_count == 1:
+                redis_client.expire(day_key, 86400)
+
+            if day_count > self.requests_per_day:
+                return True, 86400 - (current_time % 86400)
+
+            return False, 0
+
+        except Exception as e:
+            logger.error(f"Impersonation rate limit check failed: {str(e)}")
+            # On Redis failure, allow the request through (fail open) --
+            # blocking impersonation entirely during a Redis outage would
+            # take support capability down with it.
+            return False, 0
+
+
 def rate_limit_dependency(requests_per_minute: int = 30, requests_per_hour: int = 500):
     """
     FastAPI dependency for user-based rate limiting

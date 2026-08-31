@@ -13,13 +13,105 @@ from fastapi.testclient import TestClient
 
 from database import get_db
 from main import app
-from models.auth import ImpersonationSession, Institution, Role, User, UserStatus
+from models.auth import (
+    AuditLog,
+    ImpersonationSession,
+    Institution,
+    Role,
+    User,
+    UserStatus,
+)
 from services.auth_service import AuthService
 
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
+
+
+class FakeRatelimitRedis:
+    """Minimal in-memory stand-in for the Redis ratelimit client -- just
+    the INCR/EXPIRE operations ``ImpersonationRateLimiter`` relies on.
+    Same shape as the one in test_impersonation_rate_limit.py; duplicated
+    rather than shared since it's a handful of lines and this file is
+    otherwise self-contained.
+    """
+
+    def __init__(self):
+        self._counts: dict[str, int] = {}
+
+    def incr(self, key: str) -> int:
+        self._counts[key] = self._counts.get(key, 0) + 1
+        return self._counts[key]
+
+    def expire(self, key: str, ttl: int) -> None:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def _fake_ratelimit_redis(monkeypatch):
+    """Every impersonation start now runs an admin-scoped rate-limit check
+    (TF-760), which talks to Redis. Stub it out for every test in this file
+    so that check is fast and deterministic and doesn't depend on a
+    reachable Redis instance -- tests that actually exercise rate limiting
+    configure their own tight limiter instance explicitly (see below).
+    """
+    client = FakeRatelimitRedis()
+    monkeypatch.setattr(
+        "middleware.rate_limit.RedisService.get_ratelimit_client",
+        lambda: client,
+    )
+    return client
+
+
+def _patch_impersonation_rate_limiter(monkeypatch, limiter):
+    """Patch ``_impersonation_rate_limiter`` on whatever module actually
+    backs the registered impersonation-start route(s) on ``app`` -- not on
+    a module reached by name.
+
+    ``main.py`` additionally loads ``admin.py`` a *second* time via
+    ``importlib.util.spec_from_file_location("core_api_admin", ...)`` /
+    ``exec_module`` to build (one copy of) the router registered on the
+    FastAPI app, without ever inserting that module into ``sys.modules``
+    (unlike e.g. its ``api.activity`` / ``api.audit`` counterparts a few
+    lines above it in main.py, which do). That copy is therefore only
+    reachable through the route objects it produced -- there is no module
+    name to patch it by. It has its own independent copy of every
+    module-level global, including this singleton.
+
+    Which copy ends up serving a given request is then a function of test
+    *order*: once any earlier test in the suite triggers the app's
+    lifespan (``with TestClient(app) as client:``), that unreachable
+    copy's router gets registered into ``app.routes`` and -- since routes
+    are matched in registration order and ``app`` is a process-wide
+    singleton whose routes are never reset between tests -- keeps winning
+    route resolution for the rest of the test session, regardless of what
+    this file's own ``test_client`` fixture registers afterwards.
+
+    So instead of guessing a module name (a plain ``monkeypatch.setattr
+    (admin_api, ...)``, or even a ``sys.modules`` lookup by every name
+    ``admin.py`` might have been loaded under -- which still misses this
+    unregistered copy), walk ``app.routes`` for every endpoint function
+    whose globals carry this singleton and patch it there directly. That
+    finds -- and covers -- every copy actually wired into the app,
+    including ones with no importable name, sidestepping the ordering
+    question entirely. Same underlying gotcha as TF-745's dual-module
+    test bug.
+    """
+    patched_globals_ids = set()
+    for route in app.routes:
+        endpoint = getattr(route, "endpoint", None)
+        route_globals = getattr(endpoint, "__globals__", None)
+        if route_globals is None or "_impersonation_rate_limiter" not in route_globals:
+            continue
+        if id(route_globals) in patched_globals_ids:
+            continue
+        patched_globals_ids.add(id(route_globals))
+        monkeypatch.setitem(route_globals, "_impersonation_rate_limiter", limiter)
+    assert patched_globals_ids, (
+        "no registered route exposes _impersonation_rate_limiter -- "
+        "has start_impersonation's module path changed?"
+    )
 
 
 @pytest.fixture
@@ -654,3 +746,85 @@ def test_change_password_endpoint_reachable_without_impersonation(test_client, t
     )
 
     assert response.status_code == 204
+
+
+# ---------------------------------------------------------------------------
+# Per-admin rate limiting (TF-760)
+# ---------------------------------------------------------------------------
+
+
+def test_admin_is_rate_limited_after_too_many_impersonation_attempts(
+    test_client, test_db, monkeypatch
+):
+    """The limiter counts every start *attempt*, not just successful
+    starts -- so the 2nd call (blocked as 409 "already active" by the
+    unrelated nesting guard) still counts toward the admin's budget, and
+    the 3rd call is rejected by the limiter itself before it even reaches
+    that check."""
+    from middleware.rate_limit import ImpersonationRateLimiter
+
+    _patch_impersonation_rate_limiter(
+        monkeypatch,
+        ImpersonationRateLimiter(requests_per_hour=2, requests_per_day=30),
+    )
+
+    inst = _make_institution(test_db, "tf760-hourly")
+    superadmin = _make_user(test_db, inst, "super@tf760-hourly.ch", is_superuser=True)
+    target = _make_user(test_db, inst, "target@tf760-hourly.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, superadmin)["access_token"]
+
+    first = _impersonate(test_client, admin_token, target.id)
+    assert first.status_code == 200
+
+    second = _impersonate(test_client, admin_token, target.id)
+    assert second.status_code == 409
+
+    third = _impersonate(test_client, admin_token, target.id)
+
+    assert third.status_code == 429
+    assert "Retry-After" in third.headers
+    assert 0 < int(third.headers["Retry-After"]) <= 3600
+
+    audit_rows = (
+        test_db.query(AuditLog)
+        .filter(
+            AuditLog.user_id == superadmin.id,
+            AuditLog.action == "rate_limit_exceeded",
+        )
+        .all()
+    )
+    assert len(audit_rows) == 1
+
+
+def test_impersonation_rate_limit_is_tracked_per_admin(
+    test_client, test_db, monkeypatch
+):
+    """One admin hitting their limit must not affect a different admin."""
+    from middleware.rate_limit import ImpersonationRateLimiter
+
+    _patch_impersonation_rate_limiter(
+        monkeypatch,
+        ImpersonationRateLimiter(requests_per_hour=1, requests_per_day=30),
+    )
+
+    inst = _make_institution(test_db, "tf760-per-admin")
+    admin_one = _make_user(
+        test_db, inst, "admin-one@tf760-per-admin.ch", is_superuser=True
+    )
+    admin_two = _make_user(
+        test_db, inst, "admin-two@tf760-per-admin.ch", is_superuser=True
+    )
+    target = _make_user(test_db, inst, "target@tf760-per-admin.ch")
+    test_db.commit()
+    admin_one_token = _tokens(test_db, admin_one)["access_token"]
+    admin_two_token = _tokens(test_db, admin_two)["access_token"]
+
+    first = _impersonate(test_client, admin_one_token, target.id)
+    assert first.status_code == 200
+
+    blocked = _impersonate(test_client, admin_one_token, target.id)
+    assert blocked.status_code == 429
+
+    still_allowed = _impersonate(test_client, admin_two_token, target.id)
+    assert still_allowed.status_code == 200
