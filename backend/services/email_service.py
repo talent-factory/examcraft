@@ -111,8 +111,16 @@ class EmailService:
         """
         verification_url = f"{FRONTEND_URL}/verify-email?token={verification_token}"
 
+        # TF-762: `first_name` is freely chosen at registration and lands in
+        # an HTML email delivered to that same address. Without escaping, a
+        # crafted name could inject markup into what looks like a trusted
+        # ExamCraft notice (same class of issue fixed for
+        # `send_impersonation_ended_email` under TF-742). The plain `text`
+        # body below is unaffected -- it can't render markup.
+        safe_first_name = html.escape(first_name)
+
         subject = "Verify your ExamCraft AI account"
-        html = f"""
+        html_body = f"""
         <!DOCTYPE html>
         <html>
         <head>
@@ -125,7 +133,7 @@ class EmailService:
             </div>
 
             <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="font-size: 16px;">Hi {first_name},</p>
+                <p style="font-size: 16px;">Hi {safe_first_name},</p>
 
                 <p style="font-size: 16px;">
                     Thank you for signing up for ExamCraft AI! We're excited to have you on board.
@@ -190,7 +198,7 @@ class EmailService:
         return EmailService._send_email(
             to=email,
             subject=subject,
-            html=html,
+            html=html_body,
             text=text,
             tags={"type": "verification"},
         )
@@ -207,8 +215,12 @@ class EmailService:
         Returns:
             Response from Resend API
         """
+        # TF-762: same reasoning as `send_verification_email` above --
+        # `first_name` is user-supplied and must not reach the HTML body raw.
+        safe_first_name = html.escape(first_name)
+
         subject = "Welcome to ExamCraft AI - Let's Get Started! 🚀"
-        html = f"""
+        html_body = f"""
         <!DOCTYPE html>
         <html>
         <head>
@@ -221,7 +233,7 @@ class EmailService:
             </div>
 
             <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="font-size: 16px;">Hi {first_name},</p>
+                <p style="font-size: 16px;">Hi {safe_first_name},</p>
 
                 <p style="font-size: 16px;">
                     Your email has been verified successfully! You're now ready to start creating amazing exam questions with AI.
@@ -285,7 +297,7 @@ class EmailService:
         return EmailService._send_email(
             to=email,
             subject=subject,
-            html=html,
+            html=html_body,
             text=text,
             tags={"type": "welcome"},
         )
