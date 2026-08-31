@@ -57,6 +57,7 @@
     "impersonation_not_active": "Aucune session d'impersonation n'est actuellement active",
     "impersonation_action_locked": "Cette action est verrouillée pendant une session d'impersonation active",
     "impersonation_start_failed": "Échec du démarrage de la session d'impersonation",
+    "impersonation_no_password_set": "Aucun mot de passe n'est défini pour votre compte. Veuillez d'abord définir un mot de passe dans votre profil pour pouvoir utiliser l'impersonation.",
     "impersonation_rate_limit_exceeded": "Trop de sessions d'impersonation démarrées. Veuillez réessayer plus tard.",
     "documents_upload_failed": "Échec du téléchargement du document",
     "documents_invalid_status": "Filtre de statut invalide",

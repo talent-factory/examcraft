@@ -3,7 +3,7 @@ Tests für Authentication Service
 """
 
 import pytest
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from services.auth_service import AuthService
@@ -81,6 +81,23 @@ class TestPasswordHashing:
         hash2 = AuthService.get_password_hash(password2)
 
         assert hash1 != hash2
+
+    def test_verify_password_with_malformed_hash_returns_false(self):
+        """TF-758 review fix: a corrupted/malformed stored hash must fail
+        closed -- like a wrong password -- rather than raise and turn into
+        an unhandled 500 for whichever endpoint is checking a password
+        (login, change-password, the impersonation step-up)."""
+        assert (
+            AuthService.verify_password("anything", "not-a-valid-bcrypt-hash") is False
+        )
+
+    def test_verify_password_with_overlong_password_returns_false(self):
+        """bcrypt raises ValueError for plaintext passwords over 72 bytes --
+        must also fail closed instead of propagating (TF-758)."""
+        hashed = AuthService.get_password_hash("testpassword123")
+        too_long = "x" * 200
+
+        assert AuthService.verify_password(too_long, hashed) is False
 
 
 class TestTokenCreation:
@@ -348,3 +365,61 @@ class TestImpersonationTokens:
         assert AuthService.is_token_revoked(token_jti, test_db) is False
         assert AuthService.revoke_token(token_jti, test_db) is True
         assert AuthService.is_token_revoked(token_jti, test_db) is True
+
+
+class TestPasswordLockout:
+    """TF-758: the shared failed-attempt lockout used by both POST
+    /auth/login and the impersonation step-up in api/admin.py."""
+
+    def test_fresh_user_is_not_locked_out(self, test_user: User):
+        assert AuthService.is_locked_out(test_user) is False
+
+    def test_not_locked_out_below_the_threshold(self, test_user: User):
+        test_user.failed_login_attempts = AuthService.MAX_FAILED_PASSWORD_ATTEMPTS - 1
+        test_user.last_failed_login = datetime.now(timezone.utc)
+
+        assert AuthService.is_locked_out(test_user) is False
+
+    def test_locked_out_at_the_threshold_within_the_window(self, test_user: User):
+        test_user.failed_login_attempts = AuthService.MAX_FAILED_PASSWORD_ATTEMPTS
+        test_user.last_failed_login = datetime.now(timezone.utc)
+
+        assert AuthService.is_locked_out(test_user) is True
+
+    def test_not_locked_out_once_the_window_has_elapsed(self, test_user: User):
+        test_user.failed_login_attempts = AuthService.MAX_FAILED_PASSWORD_ATTEMPTS
+        test_user.last_failed_login = datetime.now(timezone.utc) - timedelta(
+            seconds=AuthService.PASSWORD_LOCKOUT_DURATION_SECONDS + 1
+        )
+
+        assert AuthService.is_locked_out(test_user) is False
+
+    def test_record_failed_attempt_increments_counter_and_persists(
+        self, test_db: Session, test_user: User
+    ):
+        AuthService.record_failed_own_password_attempt(test_user, test_db)
+
+        assert test_user.failed_login_attempts == 1
+        assert test_user.last_failed_login is not None
+
+        test_db.refresh(test_user)
+        assert test_user.failed_login_attempts == 1
+
+    def test_repeated_failed_attempts_eventually_lock_the_account(
+        self, test_db: Session, test_user: User
+    ):
+        for _ in range(AuthService.MAX_FAILED_PASSWORD_ATTEMPTS):
+            AuthService.record_failed_own_password_attempt(test_user, test_db)
+
+        assert AuthService.is_locked_out(test_user) is True
+
+    def test_reset_clears_the_counter(self, test_db: Session, test_user: User):
+        test_user.failed_login_attempts = AuthService.MAX_FAILED_PASSWORD_ATTEMPTS
+        test_user.last_failed_login = datetime.now(timezone.utc)
+        test_db.commit()
+
+        AuthService.reset_failed_own_password_attempts(test_user, test_db)
+
+        assert test_user.failed_login_attempts == 0
+        assert test_user.last_failed_login is None
+        assert AuthService.is_locked_out(test_user) is False

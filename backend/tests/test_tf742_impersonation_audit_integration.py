@@ -132,10 +132,16 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _impersonate(client, admin_token, target_id, reason="Support-Anfrage TICKET-1"):
+def _impersonate(
+    client,
+    admin_token,
+    target_id,
+    reason="Support-Anfrage TICKET-1",
+    admin_password="Test1234!",
+):
     return client.post(
         f"/api/admin/users/{target_id}/impersonate",
-        json={"reason": reason},
+        json={"reason": reason, "admin_password": admin_password},
         headers=_auth(admin_token),
     )
 

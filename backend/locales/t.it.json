@@ -57,6 +57,7 @@
     "impersonation_not_active": "Nessuna sessione di impersonazione attualmente attiva",
     "impersonation_action_locked": "Questa azione è bloccata durante una sessione di impersonazione attiva",
     "impersonation_start_failed": "Impossibile avviare la sessione di impersonazione",
+    "impersonation_no_password_set": "Per il tuo account non è impostata alcuna password. Imposta prima una password nel tuo profilo per poter utilizzare l'impersonazione.",
     "impersonation_rate_limit_exceeded": "Troppe sessioni di impersonazione avviate. Riprovare più tardi.",
     "documents_upload_failed": "Caricamento del documento fallito",
     "documents_invalid_status": "Filtro di stato non valido",

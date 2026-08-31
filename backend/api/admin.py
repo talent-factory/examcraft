@@ -868,6 +868,11 @@ class ImpersonateRequest(BaseModel):
     """Request body for POST /users/{user_id}/impersonate."""
 
     reason: str = Field(..., min_length=3, max_length=500)
+    # TF-758: step-up re-authentication -- the admin re-enters their own
+    # (current) password so a hijacked/left-open admin session cannot be
+    # used to mint an impersonation token without proving fresh knowledge
+    # of the credential.
+    admin_password: str = Field(..., min_length=1)
 
 
 class ImpersonateResponse(BaseModel):
@@ -897,10 +902,13 @@ async def start_impersonation(
     """
     locale = get_request_locale(http_request, current_user)
 
-    # TF-760: per-admin rate limit, checked before any DB lookup so an
-    # admin who is already over budget doesn't cost us a query. Counts
-    # every start attempt (this one included), not just successful ones --
-    # see ImpersonationRateLimiter's docstring for why.
+    # TF-760: per-admin rate limit, checked before any DB lookup -- and
+    # before the TF-758 step-up below, which does a deliberately expensive
+    # bcrypt comparison -- so an admin who is already over budget doesn't
+    # cost us a query or spend CPU on a password check for a request we're
+    # rejecting anyway. Counts every start attempt (this one included), not
+    # just successful ones -- see ImpersonationRateLimiter's docstring for
+    # why.
     is_limited, retry_after = _impersonation_rate_limiter.check(current_user.id)
     if is_limited:
         AuditService.log_rate_limit_exceeded(
@@ -914,6 +922,82 @@ async def start_impersonation(
             detail=t("impersonation_rate_limit_exceeded", locale=locale),
             headers={"Retry-After": str(retry_after)},
         )
+
+    # TF-758: step-up re-authentication happens next, before anything about
+    # the target is revealed (404 vs 403 vs scope checks) -- a hijacked
+    # admin session shouldn't be able to probe target user IDs without
+    # first proving fresh knowledge of the admin's own password. This is a
+    # different defense than the TF-760 rate limit above: that one caps
+    # *overall* impersonation-start volume per admin regardless of
+    # correctness (abuse/support-burst protection); this one specifically
+    # locks the account after repeated *wrong* password guesses, mirroring
+    # POST /auth/login's own lockout.
+    #
+    # All three rejection branches below log to the audit trail under
+    # `user_id=current_user.id` (the admin), never `impersonator_user_id`.
+    # That's a deliberate asymmetry with the success path further down
+    # (`record_impersonation_started`, which attributes the row to
+    # `user_id=target_user_id` / `impersonator_user_id=admin_user_id`): at
+    # this point `target` is intentionally not loaded yet, and
+    # `AuditLog.user_id` has a FK to `users.id` -- attributing a failed
+    # attempt to an unconfirmed or nonexistent target could silently drop
+    # exactly the audit row a probing/brute-forcing attacker most needs
+    # captured.
+    if current_user.password_hash is None:
+        AuditService.log_action(
+            db=db,
+            action=AuditService.ACTION_IMPERSONATION_START,
+            status=AuditService.STATUS_FAILURE,
+            user_id=current_user.id,
+            resource_type=AuditService.RESOURCE_USER,
+            resource_id=user_id,
+            error_message="Impersonation step-up unavailable: admin has no password set",
+            request=http_request,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=t("impersonation_no_password_set", locale=locale),
+        )
+
+    if AuthService.is_locked_out(current_user):
+        AuditService.log_action(
+            db=db,
+            action=AuditService.ACTION_IMPERSONATION_START,
+            status=AuditService.STATUS_FAILURE,
+            user_id=current_user.id,
+            resource_type=AuditService.RESOURCE_USER,
+            resource_id=user_id,
+            error_message="Impersonation step-up blocked: account locked after too many failed password attempts",
+            request=http_request,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=t("auth_account_locked", locale=locale),
+        )
+
+    if not AuthService.verify_password(
+        request.admin_password, current_user.password_hash
+    ):
+        # Same failed-attempt counter POST /auth/login uses -- guessing the
+        # admin's password through the step-up locks the account exactly
+        # like guessing it at login would (TF-758).
+        AuthService.record_failed_own_password_attempt(current_user, db)
+        AuditService.log_action(
+            db=db,
+            action=AuditService.ACTION_IMPERSONATION_START,
+            status=AuditService.STATUS_FAILURE,
+            user_id=current_user.id,
+            resource_type=AuditService.RESOURCE_USER,
+            resource_id=user_id,
+            error_message="Incorrect admin password on impersonation step-up",
+            request=http_request,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=t("auth_password_incorrect", locale=locale),
+        )
+
+    AuthService.reset_failed_own_password_attempts(current_user, db)
 
     target = db.query(User).filter(User.id == user_id).first()
     if not target:

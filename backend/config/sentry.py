@@ -14,6 +14,21 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST
+
+# TF-758 review fix: sentry_sdk's EventScrubber matches denylist entries by
+# *exact* key name (`key.lower() in denylist`), not substring -- its
+# DEFAULT_DENYLIST covers a bare "password" but not our field names
+# `admin_password` (impersonation step-up), `current_password`, and
+# `new_password` (both change-password), so any of the three would reach
+# Sentry in clear text if the request body were ever attached to an event
+# (e.g. a future integration/version that captures it despite
+# send_default_pii=False below). Extending the denylist is cheap insurance.
+_ADDITIONAL_SCRUB_DENYLIST = DEFAULT_DENYLIST + [
+    "admin_password",
+    "current_password",
+    "new_password",
+]
 
 
 def filter_errors(event, hint):
@@ -108,6 +123,9 @@ def init_sentry():
         ],
         # GDPR Compliance: Don't send PII by default
         send_default_pii=False,
+        # TF-758: extend the default key-name denylist with our own
+        # password-carrying field names (see _ADDITIONAL_SCRUB_DENYLIST above).
+        event_scrubber=EventScrubber(denylist=_ADDITIONAL_SCRUB_DENYLIST),
         # Error Filtering
         before_send=filter_errors,
         # Ignore specific errors

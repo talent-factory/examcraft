@@ -211,10 +211,16 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _impersonate(client, admin_token, target_id, reason="Support-Anfrage TICKET-1"):
+def _impersonate(
+    client,
+    admin_token,
+    target_id,
+    reason="Support-Anfrage TICKET-1",
+    admin_password="Test1234!",
+):
     return client.post(
         f"/api/admin/users/{target_id}/impersonate",
-        json={"reason": reason},
+        json={"reason": reason, "admin_password": admin_password},
         headers=_auth(admin_token),
     )
 
@@ -746,6 +752,320 @@ def test_change_password_endpoint_reachable_without_impersonation(test_client, t
     )
 
     assert response.status_code == 204
+
+
+# ---------------------------------------------------------------------------
+# TF-758: admin password re-entry (step-up) before minting the token
+# ---------------------------------------------------------------------------
+
+
+def test_impersonation_wrong_admin_password_rejected(test_client, test_db):
+    """Wrong ``admin_password`` blocks the start -- no session is created."""
+    inst = _make_institution(test_db, "tf758-wrong-pw")
+    superadmin = _make_user(test_db, inst, "super@tf758-wrong-pw.ch", is_superuser=True)
+    target = _make_user(test_db, inst, "target@tf758-wrong-pw.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, superadmin)["access_token"]
+
+    response = _impersonate(
+        test_client, admin_token, target.id, admin_password="WrongPassword!"
+    )
+
+    assert response.status_code == 400
+    assert (
+        test_db.query(ImpersonationSession)
+        .filter(ImpersonationSession.admin_user_id == superadmin.id)
+        .count()
+        == 0
+    )
+
+
+def test_impersonation_wrong_admin_password_is_audited(test_client, test_db):
+    """A failed step-up attempt is written to the audit trail (STATUS_FAILURE,
+    same ACTION_IMPERSONATION_START action as a successful start)."""
+    from services.audit_service import AuditService
+
+    inst = _make_institution(test_db, "tf758-wrong-pw-audit")
+    superadmin = _make_user(
+        test_db, inst, "super@tf758-wrong-pw-audit.ch", is_superuser=True
+    )
+    target = _make_user(test_db, inst, "target@tf758-wrong-pw-audit.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, superadmin)["access_token"]
+
+    _impersonate(test_client, admin_token, target.id, admin_password="WrongPassword!")
+
+    log_entry = (
+        test_db.query(AuditLog)
+        .filter(
+            AuditLog.action == AuditService.ACTION_IMPERSONATION_START,
+            AuditLog.status == AuditService.STATUS_FAILURE,
+            AuditLog.user_id == superadmin.id,
+        )
+        .first()
+    )
+    assert log_entry is not None
+    assert log_entry.resource_id == str(target.id)
+
+
+def test_impersonation_missing_admin_password_field_rejected(test_client, test_db):
+    """``admin_password`` is a required field -- omitting it is a 422, not a
+    silent bypass of the step-up."""
+    inst = _make_institution(test_db, "tf758-missing-pw")
+    superadmin = _make_user(
+        test_db, inst, "super@tf758-missing-pw.ch", is_superuser=True
+    )
+    target = _make_user(test_db, inst, "target@tf758-missing-pw.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, superadmin)["access_token"]
+
+    response = test_client.post(
+        f"/api/admin/users/{target.id}/impersonate",
+        json={"reason": "Support-Anfrage TICKET-1"},
+        headers=_auth(admin_token),
+    )
+
+    assert response.status_code == 422
+
+
+def test_impersonation_oauth_only_admin_blocked(test_client, test_db):
+    """An admin with no password set (OAuth-only account) cannot use the
+    step-up at all -- rejected outright rather than silently skipped."""
+    inst = _make_institution(test_db, "tf758-oauth-admin")
+    oauth_admin = User(
+        email="oauth-admin@tf758-oauth-admin.ch",
+        password_hash=None,
+        first_name="Test",
+        last_name="Admin",
+        institution_id=inst.id,
+        status=UserStatus.ACTIVE.value,
+        is_superuser=True,
+        oauth_provider="google",
+    )
+    test_db.add(oauth_admin)
+    test_db.flush()
+    target = _make_user(test_db, inst, "target@tf758-oauth-admin.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, oauth_admin)["access_token"]
+
+    response = _impersonate(test_client, admin_token, target.id)
+
+    assert response.status_code == 403
+    assert (
+        test_db.query(ImpersonationSession)
+        .filter(ImpersonationSession.admin_user_id == oauth_admin.id)
+        .count()
+        == 0
+    )
+
+
+def test_impersonation_correct_admin_password_still_succeeds(test_client, test_db):
+    """Sanity check: the step-up doesn't break the happy path."""
+    inst = _make_institution(test_db, "tf758-correct-pw")
+    superadmin = _make_user(
+        test_db, inst, "super@tf758-correct-pw.ch", is_superuser=True
+    )
+    target = _make_user(test_db, inst, "target@tf758-correct-pw.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, superadmin)["access_token"]
+
+    response = _impersonate(
+        test_client, admin_token, target.id, admin_password="Test1234!"
+    )
+
+    assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# TF-758 review fixes: check-ordering regression coverage, lockout, audit
+# symmetry
+# ---------------------------------------------------------------------------
+
+
+def test_impersonation_wrong_password_and_nonexistent_target_returns_400_not_404(
+    test_client, test_db
+):
+    """The step-up's whole point is that a hijacked admin session can't use
+    404-vs-400 as an oracle to enumerate target user IDs -- so a wrong
+    password against a *nonexistent* target must still be a plain 400, not
+    the 404 that ``test_target_user_not_found_returns_404`` gets with the
+    correct password. Regression guard for the check ordering described in
+    the comment above the step-up in api/admin.py."""
+    inst = _make_institution(test_db, "tf758-wrong-pw-404")
+    superadmin = _make_user(
+        test_db, inst, "super@tf758-wrong-pw-404.ch", is_superuser=True
+    )
+    test_db.commit()
+    admin_token = _tokens(test_db, superadmin)["access_token"]
+
+    response = _impersonate(
+        test_client, admin_token, 999_999_999, admin_password="WrongPassword!"
+    )
+
+    assert response.status_code == 400
+
+
+def test_impersonation_wrong_password_and_cross_institution_target_returns_400_not_403(
+    test_client, test_db
+):
+    """Same regression guard as the 404 case above, but against the
+    institution-scope 403 that ``test_institution_admin_blocked_cross_institution``
+    gets with the correct password -- a wrong password must pre-empt that
+    too, not reveal that the target exists in another institution."""
+    inst = _make_institution(test_db, "tf758-wrong-pw-cross-a")
+    other_inst = _make_institution(test_db, "tf758-wrong-pw-cross-b")
+    admin = _make_user(test_db, inst, "admin@tf758-wrong-pw-cross-a.ch")
+    _grant_impersonate_permission(test_db, admin)
+    target = _make_user(test_db, other_inst, "target@tf758-wrong-pw-cross-b.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, admin)["access_token"]
+
+    response = _impersonate(
+        test_client, admin_token, target.id, admin_password="WrongPassword!"
+    )
+
+    assert response.status_code == 400
+
+
+def test_impersonation_empty_admin_password_rejected(test_client, test_db):
+    """``min_length=1`` on ``admin_password`` is enforced by Pydantic, not
+    just by the frontend's non-empty guard -- an empty string sent directly
+    to the API is a 422, same as omitting the field entirely."""
+    inst = _make_institution(test_db, "tf758-empty-pw")
+    superadmin = _make_user(test_db, inst, "super@tf758-empty-pw.ch", is_superuser=True)
+    target = _make_user(test_db, inst, "target@tf758-empty-pw.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, superadmin)["access_token"]
+
+    response = _impersonate(test_client, admin_token, target.id, admin_password="")
+
+    assert response.status_code == 422
+
+
+def test_impersonation_oauth_only_admin_rejection_is_audited(test_client, test_db):
+    """Review fix: the "no password set" (403) branch must be audited just
+    like the "wrong password" (400) branch -- both are attempts to use the
+    step-up on a hijacked/left-open admin session, so both need a trail."""
+    from services.audit_service import AuditService
+
+    inst = _make_institution(test_db, "tf758-oauth-audit")
+    oauth_admin = User(
+        email="oauth-admin@tf758-oauth-audit.ch",
+        password_hash=None,
+        first_name="Test",
+        last_name="Admin",
+        institution_id=inst.id,
+        status=UserStatus.ACTIVE.value,
+        is_superuser=True,
+        oauth_provider="google",
+    )
+    test_db.add(oauth_admin)
+    test_db.flush()
+    target = _make_user(test_db, inst, "target@tf758-oauth-audit.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, oauth_admin)["access_token"]
+
+    response = _impersonate(test_client, admin_token, target.id)
+    assert response.status_code == 403
+
+    log_entry = (
+        test_db.query(AuditLog)
+        .filter(
+            AuditLog.action == AuditService.ACTION_IMPERSONATION_START,
+            AuditLog.status == AuditService.STATUS_FAILURE,
+            AuditLog.user_id == oauth_admin.id,
+        )
+        .first()
+    )
+    assert log_entry is not None
+    assert log_entry.resource_id == str(target.id)
+
+
+def test_impersonation_locks_out_after_repeated_wrong_password_attempts(
+    test_client, test_db, monkeypatch
+):
+    """Critical review fix: without a lockout, the step-up would be a free
+    password oracle for a hijacked admin token. After
+    ``MAX_FAILED_PASSWORD_ATTEMPTS`` wrong guesses, even the *correct*
+    password is rejected with 429 -- same account-wide lockout
+    POST /auth/login enforces, since both share the same counter.
+
+    Uses a generously loosened TF-760 rate limiter so this test exercises
+    the TF-758 lockout specifically and isn't coincidentally gated by the
+    (independent, differently-scoped) per-admin rate limit instead --
+    which defaults to the same threshold (10/hour) this test's own
+    ``MAX_FAILED_PASSWORD_ATTEMPTS`` happens to use."""
+    from middleware.rate_limit import ImpersonationRateLimiter
+
+    _patch_impersonation_rate_limiter(
+        monkeypatch,
+        ImpersonationRateLimiter(requests_per_hour=1000, requests_per_day=1000),
+    )
+
+    inst = _make_institution(test_db, "tf758-lockout")
+    superadmin = _make_user(test_db, inst, "super@tf758-lockout.ch", is_superuser=True)
+    target = _make_user(test_db, inst, "target@tf758-lockout.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, superadmin)["access_token"]
+
+    for _ in range(AuthService.MAX_FAILED_PASSWORD_ATTEMPTS):
+        response = _impersonate(
+            test_client, admin_token, target.id, admin_password="WrongPassword!"
+        )
+        assert response.status_code == 400
+
+    locked_response = _impersonate(
+        test_client, admin_token, target.id, admin_password="Test1234!"
+    )
+
+    assert locked_response.status_code == 429
+    assert (
+        test_db.query(ImpersonationSession)
+        .filter(ImpersonationSession.admin_user_id == superadmin.id)
+        .count()
+        == 0
+    )
+
+
+def test_impersonation_correct_password_resets_failed_attempt_counter(
+    test_client, test_db, monkeypatch
+):
+    """A successful step-up clears the shared failed-attempt counter, same
+    as a successful POST /auth/login -- a few wrong guesses followed by the
+    right password must not carry a residual count toward a later
+    lockout.
+
+    Same TF-760 rate-limiter decoupling as the lockout test above -- 10
+    total calls here would otherwise sit right at that limiter's own
+    default hourly threshold too."""
+    from middleware.rate_limit import ImpersonationRateLimiter
+
+    _patch_impersonation_rate_limiter(
+        monkeypatch,
+        ImpersonationRateLimiter(requests_per_hour=1000, requests_per_day=1000),
+    )
+
+    inst = _make_institution(test_db, "tf758-reset-counter")
+    superadmin = _make_user(
+        test_db, inst, "super@tf758-reset-counter.ch", is_superuser=True
+    )
+    target = _make_user(test_db, inst, "target@tf758-reset-counter.ch")
+    test_db.commit()
+    admin_token = _tokens(test_db, superadmin)["access_token"]
+
+    for _ in range(AuthService.MAX_FAILED_PASSWORD_ATTEMPTS - 1):
+        _impersonate(
+            test_client, admin_token, target.id, admin_password="WrongPassword!"
+        )
+
+    success_response = _impersonate(
+        test_client, admin_token, target.id, admin_password="Test1234!"
+    )
+    assert success_response.status_code == 200
+
+    test_db.refresh(superadmin)
+    assert superadmin.failed_login_attempts == 0
+    assert superadmin.last_failed_login is None
 
 
 # ---------------------------------------------------------------------------

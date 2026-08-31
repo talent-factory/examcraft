@@ -61,14 +61,25 @@ class AuthService:
             hashed_password: Hashed password from database
 
         Returns:
-            True if password matches, False otherwise
+            True if password matches, False otherwise. Also False -- not a
+            raised exception -- for a malformed/corrupted hash or an
+            unencodable password (TF-758 review fix): callers on
+            security-sensitive paths (login, impersonation step-up) build
+            audit trails and lockout counters around this check, and a
+            bcrypt ``ValueError``/``UnicodeEncodeError`` bubbling up past
+            them as an unhandled 500 would skip both. Failing closed here
+            makes any such error behave exactly like a wrong password.
         """
-        return bcrypt.checkpw(
-            plain_password.encode("utf-8"),
-            hashed_password.encode("utf-8")
-            if isinstance(hashed_password, str)
-            else hashed_password,
-        )
+        try:
+            return bcrypt.checkpw(
+                plain_password.encode("utf-8"),
+                hashed_password.encode("utf-8")
+                if isinstance(hashed_password, str)
+                else hashed_password,
+            )
+        except (ValueError, TypeError, UnicodeEncodeError, UnicodeDecodeError):
+            logger.exception("verify_password: malformed password or password hash")
+            return False
 
     @staticmethod
     def get_password_hash(password: str) -> str:
@@ -317,6 +328,62 @@ class AuthService:
             "token_type": "bearer",
             "expires_in": IMPERSONATION_TOKEN_EXPIRE_MINUTES * 60,
         }
+
+    # TF-758: shared with the impersonation step-up in api/admin.py so that
+    # repeatedly guessing an account's own password through *either* surface
+    # locks the same account. Same thresholds as POST /auth/login (kept as
+    # its own inline copy there -- see auth.py's `login()` -- so this change
+    # doesn't touch that already-tested flow); both surfaces read/write the
+    # same `failed_login_attempts`/`last_failed_login` columns, so a lockout
+    # triggered from one blocks the other too.
+    MAX_FAILED_PASSWORD_ATTEMPTS = 10
+    PASSWORD_LOCKOUT_DURATION_SECONDS = 30 * 60  # 30 minutes
+
+    @staticmethod
+    def is_locked_out(user: User) -> bool:
+        """True if ``user`` is currently locked out of re-proving their own
+        password (TF-758), e.g. via the impersonation step-up."""
+        if (user.failed_login_attempts or 0) < AuthService.MAX_FAILED_PASSWORD_ATTEMPTS:
+            return False
+        if user.last_failed_login is None:
+            return False
+        elapsed = (datetime.now(timezone.utc) - user.last_failed_login).total_seconds()
+        return elapsed < AuthService.PASSWORD_LOCKOUT_DURATION_SECONDS
+
+    @staticmethod
+    def record_failed_own_password_attempt(user: User, db: Session) -> None:
+        """Increment the shared failed-attempt counter after ``user`` gets
+        their own password wrong (TF-758). Committed immediately and
+        separately from any audit write -- mirrors POST /auth/login's
+        pattern -- so a later audit-log failure can't roll this back."""
+        user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+        user.last_failed_login = datetime.now(timezone.utc)
+        try:
+            db.commit()
+        except Exception:
+            logger.exception(
+                "Failed to persist failed-password-attempt counter for user %s",
+                user.id,
+            )
+            db.rollback()
+
+    @staticmethod
+    def reset_failed_own_password_attempts(user: User, db: Session) -> None:
+        """Clear the shared failed-attempt counter after ``user`` proves
+        their own password again (TF-758), mirroring the reset on a
+        successful POST /auth/login."""
+        if not user.failed_login_attempts and user.last_failed_login is None:
+            return  # nothing to reset -- avoid a no-op commit on every step-up
+        user.failed_login_attempts = 0
+        user.last_failed_login = None
+        try:
+            db.commit()
+        except Exception:
+            logger.exception(
+                "Failed to reset failed-password-attempt counter for user %s",
+                user.id,
+            )
+            db.rollback()
 
     @staticmethod
     def record_impersonation_started(

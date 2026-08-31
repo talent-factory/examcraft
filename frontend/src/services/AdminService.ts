@@ -224,13 +224,17 @@ class AdminService {
    * scope (SuperAdmin: anyone; institution admin: non-admin users of the
    * same institution) is enforced server-side.
    */
-  async impersonateUser(userId: number, reason: string): Promise<ImpersonateResponse> {
+  async impersonateUser(
+    userId: number,
+    reason: string,
+    adminPassword: string
+  ): Promise<ImpersonateResponse> {
     const response = await fetch(
       `${API_BASE_URL}/api/admin/users/${userId}/impersonate`,
       {
         method: 'POST',
         headers: this.getAuthHeaders(),
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ reason, admin_password: adminPassword }),
       }
     );
 

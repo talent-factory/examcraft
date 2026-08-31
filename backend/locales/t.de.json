@@ -57,6 +57,7 @@
     "impersonation_not_active": "Es läuft keine aktive Impersonation-Sitzung",
     "impersonation_action_locked": "Diese Aktion ist während einer aktiven Impersonation-Sitzung gesperrt",
     "impersonation_start_failed": "Impersonation-Sitzung konnte nicht gestartet werden",
+    "impersonation_no_password_set": "Für Ihr Konto ist kein Passwort hinterlegt. Bitte legen Sie zuerst unter Profil ein Passwort fest, um Impersonation nutzen zu können.",
     "impersonation_rate_limit_exceeded": "Zu viele Impersonation-Sitzungen gestartet. Bitte versuchen Sie es später erneut.",
     "documents_upload_failed": "Dokument-Upload fehlgeschlagen",
     "documents_invalid_status": "Ungültiger Statusfilter",

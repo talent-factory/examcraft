@@ -25,12 +25,15 @@ const DE_STRINGS: Record<string, string> = {
   'admin.impersonation.dialogTargetLabel': 'Sie melden sich an als:',
   'admin.impersonation.dialogReasonLabel': 'Grund (Pflichtfeld)',
   'admin.impersonation.dialogReasonPlaceholder': 'z. B. Support-Anfrage TICKET-123 nachstellen',
+  'admin.impersonation.dialogPasswordLabel': 'Ihr Passwort (Bestätigung)',
+  'admin.impersonation.dialogPasswordPlaceholder': 'Ihr aktuelles Passwort',
   'admin.impersonation.dialogConfirm': 'Anmelden',
   'admin.impersonation.dialogStarting': 'Wird gestartet...',
   'admin.impersonation.dialogCancel': 'Abbrechen',
   'admin.impersonation.dialogLoadFailed': 'Benutzer konnte nicht geladen werden',
   'admin.impersonation.dialogError': 'Anmeldung als Nutzer fehlgeschlagen',
   'admin.impersonation.reasonTooShort': 'Bitte geben Sie mindestens {{min}} Zeichen als Grund an',
+  'admin.impersonation.passwordRequired': 'Bitte bestätigen Sie Ihr Passwort',
 };
 const mockStableT = (key: string, params?: Record<string, unknown>) => {
   let value = DE_STRINGS[key] ?? key;
@@ -144,8 +147,8 @@ describe('ImpersonationReasonDialog', () => {
     expect(mockStartImpersonation).not.toHaveBeenCalled();
   });
 
-  it('starts impersonation and closes on a valid reason', async () => {
-    const { onClose, onSuccess } = renderDialog();
+  it('rejects submit without an admin password, without calling the API', async () => {
+    renderDialog();
     await screen.findByText(/Max Muster/);
 
     fireEvent.change(screen.getByLabelText(/Grund/), {
@@ -153,10 +156,28 @@ describe('ImpersonationReasonDialog', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
+    expect(await screen.findByText('Bitte bestätigen Sie Ihr Passwort')).toBeInTheDocument();
+    expect(mockedAdminService.impersonateUser).not.toHaveBeenCalled();
+    expect(mockStartImpersonation).not.toHaveBeenCalled();
+  });
+
+  it('starts impersonation and closes on a valid reason and password', async () => {
+    const { onClose, onSuccess } = renderDialog();
+    await screen.findByText(/Max Muster/);
+
+    fireEvent.change(screen.getByLabelText(/Grund/), {
+      target: { value: 'reproduce support ticket TICKET-123' },
+    });
+    fireEvent.change(screen.getByLabelText(/Ihr Passwort/), {
+      target: { value: 'MyOwnPassword1!' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(mockedAdminService.impersonateUser).toHaveBeenCalledWith(
       7,
       'reproduce support ticket TICKET-123',
+      'MyOwnPassword1!',
     );
     expect(mockStartImpersonation).toHaveBeenCalledWith({
       accessToken: 'target-access-token',
@@ -171,12 +192,16 @@ describe('ImpersonationReasonDialog', () => {
     await screen.findByText(/Max Muster/);
 
     fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
+    fireEvent.change(screen.getByLabelText(/Ihr Passwort/), { target: { value: 'MyOwnPassword1!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
     expect(await screen.findByText('quota exceeded')).toBeInTheDocument();
     expect(mockStartImpersonation).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+    // TF-758 review fix: a failed attempt (e.g. wrong password) must not
+    // leave the password sitting in the input.
+    expect((screen.getByLabelText(/Ihr Passwort/) as HTMLInputElement).value).toBe('');
   });
 
   it('shows an error and stays open when startImpersonation fails after the backend already created the session', async () => {
@@ -185,11 +210,13 @@ describe('ImpersonationReasonDialog', () => {
     await screen.findByText(/Max Muster/);
 
     fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
+    fireEvent.change(screen.getByLabelText(/Ihr Passwort/), { target: { value: 'MyOwnPassword1!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
     expect(await screen.findByText('storage restricted')).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+    expect((screen.getByLabelText(/Ihr Passwort/) as HTMLInputElement).value).toBe('');
   });
 
   it('resets target, reason, and error when closed, so reopening for a different user starts clean', async () => {
@@ -197,6 +224,7 @@ describe('ImpersonationReasonDialog', () => {
     const { rerender } = renderDialog();
     await screen.findByText('boom');
     fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'some leftover text' } });
+    fireEvent.change(screen.getByLabelText(/Ihr Passwort/), { target: { value: 'leftover-pw' } });
 
     rerender(
       <ImpersonationReasonDialog userId={7} isOpen={false} onClose={jest.fn()} onSuccess={jest.fn()} />,
@@ -210,6 +238,7 @@ describe('ImpersonationReasonDialog', () => {
     await screen.findByText(/Erika/);
     expect(screen.queryByText('boom')).not.toBeInTheDocument();
     expect((screen.getByLabelText(/Grund/) as HTMLTextAreaElement).value).toBe('');
+    expect((screen.getByLabelText(/Ihr Passwort/) as HTMLInputElement).value).toBe('');
   });
 
   it('does not close on a backdrop click while saving, but does once saving finishes', async () => {
@@ -224,6 +253,7 @@ describe('ImpersonationReasonDialog', () => {
     await screen.findByText(/Max Muster/);
 
     fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
+    fireEvent.change(screen.getByLabelText(/Ihr Passwort/), { target: { value: 'MyOwnPassword1!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
     // Still saving: clicking the backdrop must not close the dialog out
