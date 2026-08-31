@@ -2349,7 +2349,14 @@
       "dismissNotice": "Hinweis schliessen",
       "reviewQueueHint": "Die generierten Fragen landen automatisch in der Prüf-Queue. Sie können die Seite während der Generierung verlassen — sie läuft im Hintergrund weiter.",
       "restoredStateDocsReplaced": "Neue Dokumentauswahl übernommen — die übrige Konfiguration wurde zurückgesetzt.",
-      "restorePreviousConfig": "Vorherige Konfiguration übernehmen"
+      "restorePreviousConfig": "Vorherige Konfiguration übernehmen",
+      "stepGoTo": "Zu Schritt {{number}} wechseln: {{label}}",
+      "stepLockedHint": "Dieser Schritt wird verfügbar, sobald die vorherigen Angaben vollständig sind.",
+      "summaryDocs_one": "1 Dokument",
+      "summaryDocs_other": "{{count}} Dokumente",
+      "summaryConfig": "{{topic}} · {{count}} Fragen · {{difficulty}}",
+      "summaryPreview": "Kontext geprüft · {{count}} Textabschnitte",
+      "previewOutdated": "Thema oder Dokumentauswahl wurde geändert — die Kontext-Vorschau wird neu geladen."
     },
     "ragExamDisplay": {
       "questions": "{{count}} Fragen",

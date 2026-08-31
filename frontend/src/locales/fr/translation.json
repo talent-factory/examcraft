@@ -1905,7 +1905,14 @@
       "dismissNotice": "Fermer l'avis",
       "reviewQueueHint": "Les questions générées arrivent automatiquement dans la file de révision. Vous pouvez quitter cette page pendant la génération — elle se poursuit en arrière-plan.",
       "restoredStateDocsReplaced": "Nouvelle sélection de documents appliquée — le reste de la configuration a été réinitialisé.",
-      "restorePreviousConfig": "Reprendre la configuration précédente"
+      "restorePreviousConfig": "Reprendre la configuration précédente",
+      "stepGoTo": "Aller à l'étape {{number}} : {{label}}",
+      "stepLockedHint": "Cette étape sera disponible dès que les informations précédentes seront complètes.",
+      "summaryDocs_one": "1 document",
+      "summaryDocs_other": "{{count}} documents",
+      "summaryConfig": "{{topic}} · {{count}} questions · {{difficulty}}",
+      "summaryPreview": "Contexte vérifié · {{count}} extraits de texte",
+      "previewOutdated": "Le sujet ou la sélection de documents a changé — l'aperçu du contexte est rechargé."
     },
     "ragExamDisplay": {
       "questions": "{{count}} Questions",

@@ -15,8 +15,15 @@ import type { TagValue } from '../api/tagsApi';
 /** Key of the snapshot in sessionStorage (see `sessionSnapshot.ts`). */
 export const RAG_WIZARD_SNAPSHOT_KEY = 'ragExamWizard';
 /** Bump on every form change — older snapshots are then discarded instead
- *  of being read in half-restored. */
-export const RAG_WIZARD_SNAPSHOT_VERSION = 1;
+ *  of being read in half-restored.
+ *
+ *  2 (TF-719): `activeStep` is no longer the sole source for the entry step —
+ *  a `?step=` in the URL beats the snapshot, and the restored step is
+ *  additionally checked against its reachability (no step 1 without a
+ *  document selection). A version 1 snapshot may carry a step that the new
+ *  check resolves differently; discarding it is more honest than restoring
+ *  it half-way. */
+export const RAG_WIZARD_SNAPSHOT_VERSION = 2;
 /**
  * Last `activeStep` index (0-based) a snapshot is allowed to restore. The
  * final wizard step (`activeStep === 3`, UI label `step4Label` /

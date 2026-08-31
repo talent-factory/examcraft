@@ -1905,7 +1905,14 @@
       "dismissNotice": "Chiudi l'avviso",
       "reviewQueueHint": "Le domande generate finiscono automaticamente nella coda di revisione. Puoi lasciare questa pagina durante la generazione: prosegue in background.",
       "restoredStateDocsReplaced": "Nuova selezione di documenti applicata: il resto della configurazione è stato reimpostato.",
-      "restorePreviousConfig": "Riprendi la configurazione precedente"
+      "restorePreviousConfig": "Riprendi la configurazione precedente",
+      "stepGoTo": "Vai al passo {{number}}: {{label}}",
+      "stepLockedHint": "Questo passo sarà disponibile non appena i dati precedenti saranno completi.",
+      "summaryDocs_one": "1 documento",
+      "summaryDocs_other": "{{count}} documenti",
+      "summaryConfig": "{{topic}} · {{count}} domande · {{difficulty}}",
+      "summaryPreview": "Contesto verificato · {{count}} sezioni di testo",
+      "previewOutdated": "L'argomento o la selezione dei documenti è cambiata — l'anteprima del contesto viene ricaricata."
     },
     "ragExamDisplay": {
       "questions": "{{count}} Domande",

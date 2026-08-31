@@ -2349,7 +2349,14 @@
       "dismissNotice": "Dismiss notice",
       "reviewQueueHint": "Generated questions land in the review queue automatically. You can leave this page while generation runs — it continues in the background.",
       "restoredStateDocsReplaced": "New document selection applied — the rest of the configuration was reset.",
-      "restorePreviousConfig": "Keep previous configuration"
+      "restorePreviousConfig": "Keep previous configuration",
+      "stepGoTo": "Go to step {{number}}: {{label}}",
+      "stepLockedHint": "This step becomes available once the previous entries are complete.",
+      "summaryDocs_one": "1 document",
+      "summaryDocs_other": "{{count}} documents",
+      "summaryConfig": "{{topic}} · {{count}} questions · {{difficulty}}",
+      "summaryPreview": "Context checked · {{count}} text chunks",
+      "previewOutdated": "The topic or document selection changed — the context preview is being reloaded."
     },
     "ragExamDisplay": {
       "questions": "{{count}} Questions",
