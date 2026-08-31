@@ -1016,16 +1016,17 @@ async def start_impersonation(
         f"-> target {target.email} (ID {target.id}), session {session.id}"
     )
 
-    # TF-742: audit trail. Runs on the admin's own request, so
-    # impersonator_user_id can't be auto-filled from context (that only
-    # kicks in for the next request, made with the impersonation token) --
-    # passed explicitly here instead.
+    # TF-742: audit trail. TF-759: real-time email to the target. Runs on
+    # the admin's own request, so impersonator_user_id can't be
+    # auto-filled from context (that only kicks in for the next request,
+    # made with the impersonation token) -- passed explicitly here instead.
     AuthService.record_impersonation_started(
         db,
         admin_user_id=current_user.id,
         target_user_id=target.id,
         session_id=session.id,
         reason=request.reason,
+        started_at=session.started_at,
         request=http_request,
     )
 

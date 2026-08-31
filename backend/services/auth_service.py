@@ -326,9 +326,15 @@ class AuthService:
         target_user_id: int,
         session_id: int,
         reason: str,
+        started_at: Optional[datetime] = None,
         request: Optional[Request] = None,
     ) -> None:
-        """Write the ``impersonation.start`` audit event (TF-742).
+        """Audit + notify when an ``ImpersonationSession`` begins (TF-742
+        audit, TF-759 real-time notify). Symmetric counterpart of
+        ``record_impersonation_ended`` below -- same "audit event, then a
+        best-effort email to the target" shape, this time fired at the
+        start of the session instead of its end, so the target learns
+        about an ongoing session without waiting for it to close.
 
         Called from ``start_impersonation`` while still on the admin's own,
         not-yet-impersonated request -- the request-scoped
@@ -337,6 +343,17 @@ class AuthService:
         the freshly-minted impersonation token), so
         ``impersonator_user_id`` has to be passed explicitly instead of
         relying on ``AuditService.log_action``'s auto-fill.
+
+        Never raises: called on the admin's own request right after the
+        impersonation token has already been minted and returned to the
+        caller, so a failure here (audit write, a DB hiccup on the lookups
+        below, a Celery broker outage) must never turn an already-granted
+        session into a 500 for the admin. ``log_event_best_effort`` already
+        swallows audit-write failures; the ``db.get()`` lookups through the
+        notification dispatch are wrapped in their own try/except for the
+        same reason, and logged the same way (``logger.error`` with
+        ``exc_info=True`` and all three correlating IDs), mirroring the
+        review fix already applied to ``record_impersonation_ended`` below.
         """
         AuditService.log_event_best_effort(
             db,
@@ -351,6 +368,31 @@ class AuthService:
             impersonator_user_id=admin_user_id,
             request=request,
         )
+
+        try:
+            target = db.get(User, target_user_id)
+            admin = db.get(User, admin_user_id)
+            if target is None or admin is None:
+                return
+
+            from tasks.notification_tasks import send_impersonation_started_email
+
+            send_impersonation_started_email.delay(
+                to_email=target.email,
+                to_name=target.first_name or target.email,
+                admin_name=admin.full_name or admin.email,
+                reason=reason,
+                started_at=started_at.isoformat() if started_at else None,
+            )
+        except Exception:
+            logger.error(
+                "Failed to dispatch impersonation-started email (session %s, "
+                "admin %s, target %s)",
+                session_id,
+                admin_user_id,
+                target_user_id,
+                exc_info=True,
+            )
 
     @staticmethod
     def record_impersonation_ended(

@@ -79,6 +79,13 @@ celery_app = Celery(
         "tasks.import_submissions_task",  # TF-412 async result import
         "tasks.moodle_feedback_push_task",  # TF-435 feedback push back to Moodle
         "tasks.gdpr_tasks",  # TF-745 GDPR scheduled deletion
+        # TF-759 review fix: was missing entirely, so the worker never
+        # imported this module at startup and none of its tasks (incl. the
+        # already-merged TF-742 send_impersonation_ended_email and the
+        # pre-existing subscribe_to_newsletter) were registered on the
+        # worker -- same "task never runs" failure mode documented on the
+        # queues below, just at the include-list level instead of routing.
+        "tasks.notification_tasks",
     ],
 )
 
@@ -219,6 +226,19 @@ celery_app.conf.task_routes = {
         "routing_key": "rag.embed",
     },
     "tasks.notification_tasks.subscribe_to_newsletter": {
+        "queue": "notifications",
+        "routing_key": "notification.send",
+    },
+    # TF-759 review fix: these two impersonation notification tasks had no
+    # route (and, until the ``include`` fix above, weren't even imported by
+    # the worker), so they silently never ran -- see the ``import_processing``
+    # queue comment for why an unrouted task lands on the unconsumed default
+    # ``celery`` queue forever.
+    "tasks.notification_tasks.send_impersonation_started_email": {
+        "queue": "notifications",
+        "routing_key": "notification.send",
+    },
+    "tasks.notification_tasks.send_impersonation_ended_email": {
         "queue": "notifications",
         "routing_key": "notification.send",
     },

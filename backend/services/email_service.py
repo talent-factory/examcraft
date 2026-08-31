@@ -459,3 +459,122 @@ class EmailService:
             text=text,
             tags={"type": "impersonation_ended"},
         )
+
+    @staticmethod
+    def send_impersonation_started_email(
+        to_email: str,
+        to_name: str,
+        admin_name: str,
+        reason: str,
+        started_at: Optional[str],
+    ) -> Dict[str, Any]:
+        """
+        Notify a user in real time that an administrator has started an
+        impersonation session on their account (TF-759).
+
+        Sibling of ``send_impersonation_ended_email`` (TF-742): same template
+        pattern (layout, escaping approach), dispatched at the *start* of
+        the session instead of after it closes, so the target learns about
+        an ongoing session without having to wait for it to end. Subject
+        line and body copy differ (there's no ``ended_at``/duration yet).
+        The TF-742 ended-email still fires separately when the session
+        closes -- this one doesn't replace it, it's the earlier half of
+        the pair.
+
+        Args:
+            to_email: Target user's email address
+            to_name: Target user's display name
+            admin_name: Display name of the admin impersonating them
+            reason: Reason the admin gave when starting the session
+            started_at: ISO timestamp the session started, if known
+
+        Returns:
+            Response from Resend API
+        """
+        # Same escaping rationale as send_impersonation_ended_email: `reason`
+        # is free text the impersonating admin typed, delivered to a
+        # *different* user inside a trusted-looking security notice.
+        safe_to_name = html.escape(to_name)
+        safe_admin_name = html.escape(admin_name)
+        safe_reason = html.escape(reason)
+
+        subject = "An administrator started accessing your ExamCraft AI account"
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h1 style="color: white; margin: 0;">Account Access Notice</h1>
+            </div>
+
+            <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+                <p style="font-size: 16px;">Hi {safe_to_name},</p>
+
+                <p style="font-size: 16px;">
+                    An administrator, <strong>{safe_admin_name}</strong>, has just
+                    started accessing your ExamCraft AI account on your behalf.
+                    The session is active now and expires automatically after
+                    30 minutes if it isn't ended sooner.
+                </p>
+
+                <table style="width: 100%; font-size: 14px; margin: 20px 0; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 6px 0; color: #666;">Administrator</td>
+                        <td style="padding: 6px 0;"><strong>{safe_admin_name}</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px 0; color: #666;">Reason given</td>
+                        <td style="padding: 6px 0;">{safe_reason}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px 0; color: #666;">Started</td>
+                        <td style="padding: 6px 0;">{started_at or "unknown"}</td>
+                    </tr>
+                </table>
+
+                <p style="font-size: 14px; color: #666; margin-top: 30px;">
+                    If you did not expect this, or have any concerns, please
+                    contact your institution's administrator or ExamCraft AI
+                    support.
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+
+                <p style="font-size: 12px; color: #999; text-align: center;">
+                    © {datetime.now().year} ExamCraft AI. All rights reserved.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+
+        text = f"""
+        Account Access Notice
+
+        Hi {to_name},
+
+        An administrator, {admin_name}, has just started accessing your
+        ExamCraft AI account on your behalf. The session is active now and
+        expires automatically after 30 minutes if it isn't ended sooner.
+
+        Administrator: {admin_name}
+        Reason given: {reason}
+        Started: {started_at or "unknown"}
+
+        If you did not expect this, or have any concerns, please contact your
+        institution's administrator or ExamCraft AI support.
+
+        © {datetime.now().year} ExamCraft AI
+        """
+
+        return EmailService._send_email(
+            to=to_email,
+            subject=subject,
+            html=html_body,
+            text=text,
+            tags={"type": "impersonation_started"},
+        )

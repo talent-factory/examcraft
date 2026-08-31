@@ -115,3 +115,48 @@ def send_impersonation_ended_email(
             exc=exc,
             countdown=10 * (2**send_impersonation_ended_email.request.retries),
         )
+
+
+@celery_app.task(
+    name="tasks.notification_tasks.send_impersonation_started_email",
+    max_retries=5,
+    default_retry_delay=10,
+)
+def send_impersonation_started_email(
+    to_email: str,
+    to_name: str,
+    admin_name: str,
+    reason: str,
+    started_at: Optional[str],
+) -> Dict[str, Any]:
+    """Notify an impersonation target in real time that their session has
+    just started (TF-759).
+
+    Sibling of ``send_impersonation_ended_email`` above -- same Celery
+    retry/backoff pattern, dispatched at session start instead of at
+    session end so the target doesn't have to wait for the session to
+    close to find out about it.
+    """
+    from services.email_service import EmailService
+
+    try:
+        result = EmailService.send_impersonation_started_email(
+            to_email=to_email,
+            to_name=to_name,
+            admin_name=admin_name,
+            reason=reason,
+            started_at=started_at,
+        )
+        logger.info(f"Impersonation-started email sent to {to_email}")
+        return result
+
+    except Exception as exc:
+        logger.warning(
+            f"Impersonation-started email attempt failed for {to_email}: {exc} "
+            f"(retry {send_impersonation_started_email.request.retries}/"
+            f"{send_impersonation_started_email.max_retries})"
+        )
+        raise send_impersonation_started_email.retry(
+            exc=exc,
+            countdown=10 * (2**send_impersonation_started_email.request.retries),
+        )
