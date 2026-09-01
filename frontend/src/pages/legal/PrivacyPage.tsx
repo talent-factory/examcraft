@@ -5,12 +5,27 @@
  * and approved by legal counsel before production use.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { LegalPageLayout } from './LegalPageLayout';
 
 export const PrivacyPage: React.FC = () => {
   const { t } = useTranslation();
+  const location = useLocation();
+
+  // TF-766: deep-link support for the footer's "Mehr erfahren" link
+  // (/privacy#ai-data-flows). Guarded for jsdom, where scrollIntoView is
+  // unavailable (same pattern as DocumentLibrary.tsx).
+  useEffect(() => {
+    if (!location.hash) {
+      return;
+    }
+    const el = document.getElementById(location.hash.slice(1));
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location.hash]);
 
   return (
     <LegalPageLayout>
@@ -76,11 +91,34 @@ export const PrivacyPage: React.FC = () => {
         </p>
       </section>
 
-      <section className="mb-8">
+      <section className="mb-8" id="ai-data-flows" data-testid="ai-data-flows-section">
         <h2 className="text-xl font-semibold text-gray-900 mb-3">
           {t('legal.privacy.ai.title')}
         </h2>
-        <p>{t('legal.privacy.ai.text')}</p>
+        <p className="mb-4">{t('legal.privacy.ai.humanInTheLoop')}</p>
+        <p className="mb-2">{t('legal.privacy.ai.intro')}</p>
+        <ul className="list-disc pl-5 space-y-2 mb-4">
+          {(
+            t('legal.privacy.ai.functions', { returnObjects: true }) as Array<{
+              label: string;
+              description: string;
+            }>
+          ).map((item) => (
+            <li key={item.label}>
+              <strong>{item.label}:</strong> {item.description}
+            </li>
+          ))}
+        </ul>
+        <p className="mb-4 text-sm text-gray-600">
+          {t('legal.privacy.ai.premiumNote')}
+        </p>
+        <p className="mb-2">
+          <strong>{t('legal.privacy.ai.notTransmittedTitle')}</strong>{' '}
+          {t('legal.privacy.ai.notTransmittedText')}
+        </p>
+        <p className="text-sm text-gray-600">
+          {t('legal.privacy.ai.gatewayNote')}
+        </p>
       </section>
 
       <section className="mb-8">

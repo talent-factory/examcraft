@@ -28,4 +28,15 @@ describe('Footer Component', () => {
     renderWithRouter(<Footer />);
     expect(screen.getByText(/ExamCraft AI/i)).toBeInTheDocument();
   });
+
+  it('renders the AI/privacy notice with a deep link to the AI section of the Privacy Page', () => {
+    renderWithRouter(<Footer />);
+    const notice = screen.getByTestId('footer-ai-notice');
+    expect(notice).toHaveTextContent(/KI-Modelle/i);
+    const aiNoticeLink = screen.getByRole('link', { name: /Mehr erfahren/i });
+    expect(aiNoticeLink).toHaveAttribute('href', '/privacy#ai-data-flows');
+    // The accessible name (from aria-label) must still start with the visible
+    // link text ("Mehr erfahren") per WCAG 2.5.3 Label in Name.
+    expect(aiNoticeLink.textContent).toBe('Mehr erfahren');
+  });
 });

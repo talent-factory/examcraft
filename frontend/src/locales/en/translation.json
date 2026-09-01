@@ -503,7 +503,10 @@
   },
   "footer": {
     "tagline": "AI-assisted exam assistant",
-    "legalLinks": "Legal information"
+    "legalLinks": "Legal information",
+    "aiNoticeText": "AI notice: content is sent to AI models for question generation, help chat, automatic grading, and indexing of uploaded documents. Structured personal data such as names, email addresses, or grades is not deliberately transmitted.",
+    "aiNoticeLinkLabel": "Learn more",
+    "aiNoticeLinkAriaLabel": "Learn more: transmission of content to AI models"
   },
   "legal": {
     "backToLogin": "Back to login",
@@ -562,8 +565,31 @@
         ]
       },
       "ai": {
-        "title": "AI processing",
-        "text": "ExamCraft AI follows a human-in-the-loop approach: the AI generates suggestions for exam questions and grading, which must be reviewed and approved by a teacher before leaving the system. Personal data of students is minimized before AI processing wherever possible."
+        "title": "Transmission of content to AI models",
+        "humanInTheLoop": "ExamCraft AI follows a human-in-the-loop approach: the AI generates suggestions for exam questions and grading, which must be reviewed and approved by a teacher before leaving the system. Personal data of students is minimized before AI processing wherever possible.",
+        "intro": "ExamCraft uses AI models through a central LLM gateway for functions including the following:",
+        "functions": [
+          {
+            "label": "Question generation",
+            "description": "Topic, difficulty level, question types, language, and the content of selected documents (for document-based generation)."
+          },
+          {
+            "label": "Help chat",
+            "description": "Your question, matching documentation excerpts, the chat history so far, and your role, subscription tier, and current page."
+          },
+          {
+            "label": "Automatic grading",
+            "description": "Question text, model answer, grading criteria, and the answer text entered by the student."
+          },
+          {
+            "label": "Document indexing",
+            "description": "When a document is uploaded, its content is split into text chunks and sent to an embedding model for full-text search (RAG) — independent of whether a question is later generated from it."
+          }
+        ],
+        "premiumNote": "Institutions with Premium features also use the document-based chat assistant and the prompt wizard, which transmit content to the LLM gateway following the same principle.",
+        "notTransmittedTitle": "Not transmitted:",
+        "notTransmittedText": "Names, email addresses, student IDs, grades, or other structured personal data of students or teachers. If a student's own free-text answer contains personal information, that content is not filtered out.",
+        "gatewayNote": "Whether the data leaves the EU depends on the configuration of the LLM gateway. Please contact your institution for details on the specific configuration."
       },
       "rights": {
         "title": "Your rights",

@@ -150,7 +150,10 @@
   },
   "footer": {
     "tagline": "Assistente d'esame assistito dall'IA",
-    "legalLinks": "Informazioni legali"
+    "legalLinks": "Informazioni legali",
+    "aiNoticeText": "Nota IA: per la generazione delle domande, la chat di aiuto, la valutazione automatica e l'indicizzazione dei documenti caricati vengono trasmessi contenuti a modelli di IA. I dati personali strutturati come nomi, indirizzi e-mail o voti non vengono trasmessi in modo mirato.",
+    "aiNoticeLinkLabel": "Scopri di più",
+    "aiNoticeLinkAriaLabel": "Scopri di più: trasmissione di contenuti a modelli di IA"
   },
   "legal": {
     "backToLogin": "Torna al login",
@@ -209,8 +212,31 @@
         ]
       },
       "ai": {
-        "title": "Elaborazione tramite IA",
-        "text": "ExamCraft AI segue un approccio human-in-the-loop: l'IA genera suggerimenti per domande d'esame e valutazioni, che devono essere esaminati e approvati da un insegnante prima di lasciare il sistema. I dati personali degli studenti vengono minimizzati prima dell'elaborazione tramite IA ove possibile."
+        "title": "Trasmissione di contenuti a modelli di IA",
+        "humanInTheLoop": "ExamCraft AI segue un approccio human-in-the-loop: l'IA genera suggerimenti per domande d'esame e valutazioni, che devono essere esaminati e approvati da un insegnante prima di lasciare il sistema. I dati personali degli studenti vengono minimizzati prima dell'elaborazione tramite IA ove possibile.",
+        "intro": "ExamCraft utilizza modelli di IA tramite un gateway LLM centrale, tra l'altro per le seguenti funzioni:",
+        "functions": [
+          {
+            "label": "Generazione delle domande",
+            "description": "Argomento, livello di difficoltà, tipi di domanda, lingua e contenuto dei documenti selezionati (per la generazione basata su documenti)."
+          },
+          {
+            "label": "Chat di aiuto",
+            "description": "La tua domanda, gli estratti di documentazione pertinenti, la cronologia della chat, nonché il tuo ruolo, il piano di abbonamento e la pagina attualmente visualizzata."
+          },
+          {
+            "label": "Valutazione automatica",
+            "description": "Testo della domanda, soluzione modello, criteri di valutazione e il testo di risposta inserito dallo studente."
+          },
+          {
+            "label": "Indicizzazione dei documenti",
+            "description": "Al momento del caricamento di un documento, il suo contenuto viene suddiviso in blocchi di testo e inviato a un modello di embedding per la ricerca full-text (RAG), indipendentemente dal fatto che in seguito venga generata una domanda a riguardo."
+          }
+        ],
+        "premiumNote": "Per le istituzioni con funzioni Premium si aggiungono anche l'assistente chat basato sui documenti e l'assistente per i prompt, che trasmettono contenuti al gateway LLM secondo lo stesso principio.",
+        "notTransmittedTitle": "Non vengono trasmessi:",
+        "notTransmittedText": "Nomi, indirizzi e-mail, numeri di matricola, voti o altri dati personali strutturati di studenti o docenti. Se una risposta a testo libero scritta da uno studente contiene informazioni personali, tale contenuto non viene filtrato.",
+        "gatewayNote": "Il fatto che i dati lascino l'UE dipende dalla configurazione del gateway LLM. Per i dettagli sulla configurazione specifica, contatta la tua istituzione."
       },
       "rights": {
         "title": "I tuoi diritti",

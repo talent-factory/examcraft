@@ -503,7 +503,10 @@
   },
   "footer": {
     "tagline": "KI-gestützte Prüfungsassistenz",
-    "legalLinks": "Rechtliche Informationen"
+    "legalLinks": "Rechtliche Informationen",
+    "aiNoticeText": "KI-Hinweis: Für Fragengenerierung, Hilfe-Chat, automatische Bewertung und die Indexierung hochgeladener Dokumente werden Inhalte an KI-Modelle übermittelt. Strukturierte Personendaten wie Namen, E-Mail-Adressen oder Noten werden dabei nicht gezielt übermittelt.",
+    "aiNoticeLinkLabel": "Mehr erfahren",
+    "aiNoticeLinkAriaLabel": "Mehr erfahren: Übermittlung von Inhalten an KI-Modelle"
   },
   "legal": {
     "backToLogin": "Zurück zur Anmeldung",
@@ -562,8 +565,31 @@
         ]
       },
       "ai": {
-        "title": "KI-Verarbeitung",
-        "text": "ExamCraft AI arbeitet nach dem Human-in-the-Loop-Prinzip: Die KI erstellt Vorschläge für Prüfungsfragen und Bewertungen, die von einer Lehrkraft geprüft und freigegeben werden müssen, bevor sie das System verlassen. Personenbezogene Daten von Schülerinnen und Schülern werden vor der KI-Verarbeitung soweit möglich minimiert."
+        "title": "Übermittlung von Inhalten an KI-Modelle",
+        "humanInTheLoop": "ExamCraft AI arbeitet nach dem Human-in-the-Loop-Prinzip: Die KI erstellt Vorschläge für Prüfungsfragen und Bewertungen, die von einer Lehrkraft geprüft und freigegeben werden müssen, bevor sie das System verlassen. Personenbezogene Daten von Studierenden werden vor der KI-Verarbeitung soweit möglich minimiert.",
+        "intro": "ExamCraft nutzt KI-Modelle über ein zentrales LLM-Gateway unter anderem für folgende Funktionen:",
+        "functions": [
+          {
+            "label": "Fragengenerierung",
+            "description": "Thema, Schwierigkeitsgrad, Fragetypen, Sprache sowie Inhalte ausgewählter Dokumente (bei dokumentenbasierter Generierung)."
+          },
+          {
+            "label": "Hilfe-Chat",
+            "description": "Ihre Frage, passende Dokumentations-Auszüge, der bisherige Chat-Verlauf sowie Ihre Rolle, Ihr Abonnement-Tarif und die aktuell aufgerufene Seite."
+          },
+          {
+            "label": "Automatische Bewertung",
+            "description": "Fragetext, Musterlösung, Bewertungskriterien und der von der Studierenden eingegebene Antworttext."
+          },
+          {
+            "label": "Dokumentenindexierung",
+            "description": "Beim Hochladen eines Dokuments wird dessen Inhalt in Textabschnitte zerlegt und zur Volltextsuche (RAG) an ein Embedding-Modell gesendet — unabhängig davon, ob später eine Frage dazu generiert wird."
+          }
+        ],
+        "premiumNote": "Bei Institutionen mit Premium-Funktionen kommen ausserdem der dokumentengestützte Chat-Assistent und der Prompt-Assistent hinzu, die nach demselben Prinzip Inhalte an das LLM-Gateway übermitteln.",
+        "notTransmittedTitle": "Nicht übermittelt werden:",
+        "notTransmittedText": "Namen, E-Mail-Adressen, Matrikelnummern, Noten oder andere strukturierte Personendaten von Studierenden oder Lehrpersonen. Enthält eine von einer Studierenden selbst verfasste Freitextantwort personenbezogene Angaben, werden diese inhaltlich nicht herausgefiltert.",
+        "gatewayNote": "Ob die Daten die EU verlassen, hängt von der Konfiguration des LLM-Gateways ab. Details zur konkreten Konfiguration erfragen Sie bitte bei Ihrer Institution."
       },
       "rights": {
         "title": "Ihre Rechte",
