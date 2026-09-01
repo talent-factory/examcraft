@@ -12,7 +12,7 @@ import { ProtectedRoute, GuestRoute, PermissionGuard, RoleGuard } from './compon
 import { AppLayout } from './components/layout';
 import { AuthPage } from './components/auth/AuthPage';
 import { OAuthCallback } from './components/auth/OAuthCallback';
-import { PrivacyPage, TermsPage, ImprintPage } from './pages/legal';
+import { PrivacyPage, TermsPage, ImprintPage, CompliancePage } from './pages/legal';
 import { PasswordResetRequest } from './components/auth/PasswordResetRequest';
 import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
@@ -99,6 +99,7 @@ export const AppWithAuth: React.FC = () => {
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/imprint" element={<ImprintPage />} />
+              <Route path="/legal/compliance" element={<CompliancePage />} />
 
               {/* Protected Routes - Require authentication */}
               <Route

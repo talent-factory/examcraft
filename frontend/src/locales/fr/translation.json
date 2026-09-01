@@ -197,6 +197,14 @@
           {
             "name": "Sentry",
             "description": "Analyse des erreurs (ingestion DE, PII masquées); Fournisseur : Functional Software, Inc., USA (SCC/DPF)"
+          },
+          {
+            "name": "PostgreSQL/Redis",
+            "description": "Base de données et cache (hébergement propre, région Francfort, DE); fait partie de notre hébergement Fly.io"
+          },
+          {
+            "name": "Google/Microsoft (OAuth)",
+            "description": "Connexion unique (SSO) facultative; Fournisseur : Google LLC / Microsoft Corporation, USA (CCT/DPF)"
           }
         ]
       },
@@ -278,6 +286,35 @@
       "disclaimer": {
         "title": "Clause de non-responsabilité",
         "text": "Malgré un contrôle attentif du contenu, nous déclinons toute responsabilité quant au contenu des liens externes. Les exploitants des pages liées en sont seuls responsables."
+      }
+    },
+    "compliance": {
+      "title": "AVV, TOM et documents de conformité",
+      "intro": "Pour les écoles et les autorités scolaires : modèle de contrat de sous-traitance, annexe des mesures techniques et organisationnelles, liste des sous-traitants et modèle de texte pour votre registre des activités de traitement — à consulter et à télécharger.",
+      "germanOnlyNotice": "Ces documents de conformité ne sont disponibles qu'en allemand.",
+      "loadError": "Les documents de conformité n'ont pas pu être chargés. Veuillez réessayer plus tard.",
+      "loading": "Chargement des documents …",
+      "retry": "Réessayer",
+      "avv": {
+        "downloadPdf": "Télécharger l'AVV en PDF"
+      },
+      "tom": {
+        "downloadPdf": "Télécharger l'annexe TOM en PDF"
+      },
+      "subprocessors": {
+        "heading": "Aperçu des sous-traitants",
+        "columnService": "Service",
+        "columnPurpose": "Finalité",
+        "columnLocation": "Siège/région",
+        "columnTransfer": "Mécanisme de transfert",
+        "columnChangeNotice": "Notification de changement"
+      },
+      "vvt": {
+        "heading": "Modèle de texte pour le registre des activités de traitement",
+        "intro": "Modèle de texte à reprendre dans le registre des activités de traitement de votre école (art. 30 RGPD).",
+        "copyButton": "Copier dans le presse-papiers",
+        "copied": "Copié !",
+        "copyUnavailable": "Copie automatique impossible — veuillez sélectionner et copier le texte ci-dessus manuellement."
       }
     },
     "logoLink": "ExamCraft AI",

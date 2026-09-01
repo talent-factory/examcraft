@@ -21,6 +21,7 @@ export const LegalPageLayout: React.FC<LegalPageLayoutProps> = ({ children }) =>
     { path: '/privacy', label: t('legal.privacy.title') },
     { path: '/terms', label: t('legal.terms.title') },
     { path: '/imprint', label: t('legal.imprint.title') },
+    { path: '/legal/compliance', label: t('legal.compliance.title') },
   ];
 
   return (

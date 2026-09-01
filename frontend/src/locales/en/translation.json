@@ -550,6 +550,14 @@
           {
             "name": "Sentry",
             "description": "Error tracking (DE ingest, PII-masked); Provider: Functional Software, Inc., USA (SCC/DPF)"
+          },
+          {
+            "name": "PostgreSQL/Redis",
+            "description": "Database and cache (self-hosted, Frankfurt region, DE); part of our Fly.io hosting"
+          },
+          {
+            "name": "Google/Microsoft (OAuth)",
+            "description": "Optional single sign-on login; Provider: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },
@@ -631,6 +639,35 @@
       "disclaimer": {
         "title": "Disclaimer",
         "text": "Despite careful content control, we assume no liability for the content of external links. The operators of the linked pages are solely responsible for their content."
+      }
+    },
+    "compliance": {
+      "title": "DPA, TOMs & Compliance Documents",
+      "intro": "For schools and school authorities: sample data-processing agreement, technical and organisational measures annex, subprocessor list, and a text module for your record of processing activities — to read and download.",
+      "germanOnlyNotice": "These compliance documents are only available in German.",
+      "loadError": "The compliance documents could not be loaded. Please try again later.",
+      "loading": "Loading documents …",
+      "retry": "Try again",
+      "avv": {
+        "downloadPdf": "Download DPA as PDF"
+      },
+      "tom": {
+        "downloadPdf": "Download TOM annex as PDF"
+      },
+      "subprocessors": {
+        "heading": "Subprocessor overview",
+        "columnService": "Service",
+        "columnPurpose": "Purpose",
+        "columnLocation": "Location",
+        "columnTransfer": "Transfer mechanism",
+        "columnChangeNotice": "Change notice"
+      },
+      "vvt": {
+        "heading": "Record-of-processing text module for schools",
+        "intro": "Text module to copy into your school's own record of processing activities (Art. 30 GDPR).",
+        "copyButton": "Copy to clipboard",
+        "copied": "Copied!",
+        "copyUnavailable": "Automatic copy isn't available — please select and copy the text above manually."
       }
     },
     "logoLink": "ExamCraft AI",

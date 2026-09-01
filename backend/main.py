@@ -465,6 +465,24 @@ async def lifespan(app: FastAPI):
     help_api = importlib.util.module_from_spec(spec_help)
     spec_help.loader.exec_module(help_api)
 
+    # Import Legal API (public compliance downloads — TF-746)
+    #
+    # Registered as "api.legal" in sys.modules (unlike the older
+    # "core_api_*"-named imports above) so this loaded instance IS the
+    # module that `from api import legal` resolves to elsewhere (e.g.
+    # tests/test_legal_api.py, and Pydantic's forward-ref resolution for
+    # `from __future__ import annotations` in api/legal.py itself). The
+    # older naming convention creates a second, distinct module object —
+    # see the TF-745 "dual-module" test-patching bug in git history for
+    # what that costs. Prefer this "api.<module>" naming for new API
+    # modules going forward.
+    spec_legal = importlib.util.spec_from_file_location(
+        "api.legal", os.path.join(core_api_path, "legal.py")
+    )
+    legal_api = importlib.util.module_from_spec(spec_legal)
+    sys.modules["api.legal"] = legal_api
+    spec_legal.loader.exec_module(legal_api)
+
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(gdpr.router)
@@ -498,6 +516,7 @@ async def lifespan(app: FastAPI):
     )
     app.include_router(websocket_api.router)
     app.include_router(help_api.router)
+    app.include_router(legal_api.router)
 
     # Email Webhooks (Resend)
     try:

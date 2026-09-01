@@ -197,6 +197,14 @@
           {
             "name": "Sentry",
             "description": "Analisi degli errori (ingest in Germania, PII mascherati); Fornitore: Functional Software, Inc., USA (SCC/DPF)"
+          },
+          {
+            "name": "PostgreSQL/Redis",
+            "description": "Database e cache (gestiti internamente, regione Francoforte, DE); parte del nostro hosting Fly.io"
+          },
+          {
+            "name": "Google/Microsoft (OAuth)",
+            "description": "Accesso Single Sign-On facoltativo; Fornitore: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },
@@ -278,6 +286,35 @@
       "disclaimer": {
         "title": "Esclusione di responsabilità",
         "text": "Nonostante un attento controllo dei contenuti, decliniamo ogni responsabilità per i contenuti dei link esterni. Sono responsabili esclusivamente i gestori delle pagine collegate."
+      }
+    },
+    "compliance": {
+      "title": "AVV, TOM e documenti di conformità",
+      "intro": "Per scuole ed enti scolastici: modello di accordo sul trattamento dei dati, allegato sulle misure tecniche e organizzative, elenco dei subresponsabili e modulo di testo per il vostro registro delle attività di trattamento — da consultare e scaricare.",
+      "germanOnlyNotice": "Questi documenti di conformità sono disponibili solo in tedesco.",
+      "loadError": "Non è stato possibile caricare i documenti di conformità. Riprovare più tardi.",
+      "loading": "Caricamento dei documenti …",
+      "retry": "Riprova",
+      "avv": {
+        "downloadPdf": "Scarica l'AVV in PDF"
+      },
+      "tom": {
+        "downloadPdf": "Scarica l'allegato TOM in PDF"
+      },
+      "subprocessors": {
+        "heading": "Panoramica dei subresponsabili",
+        "columnService": "Servizio",
+        "columnPurpose": "Finalità",
+        "columnLocation": "Sede/regione",
+        "columnTransfer": "Meccanismo di trasferimento",
+        "columnChangeNotice": "Notifica di modifica"
+      },
+      "vvt": {
+        "heading": "Modulo di testo per il registro delle attività di trattamento",
+        "intro": "Modulo di testo da riprendere nel registro delle attività di trattamento della propria scuola (art. 30 RGPD).",
+        "copyButton": "Copia negli appunti",
+        "copied": "Copiato!",
+        "copyUnavailable": "Copia automatica non disponibile — selezionare e copiare il testo sopra manualmente."
       }
     },
     "logoLink": "ExamCraft AI",

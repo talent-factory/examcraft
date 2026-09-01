@@ -550,6 +550,14 @@
           {
             "name": "Sentry",
             "description": "Fehleranalyse (DE-Ingest, PII-maskiert); Anbieter: Functional Software, Inc., USA (SCC/DPF)"
+          },
+          {
+            "name": "PostgreSQL/Redis",
+            "description": "Datenbank und Zwischenspeicher (selbst betrieben, Region Frankfurt, DE); Teil unseres Fly.io-Hostings"
+          },
+          {
+            "name": "Google/Microsoft (OAuth)",
+            "description": "Optionale Single-Sign-On-Anmeldung; Anbieter: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },
@@ -631,6 +639,35 @@
       "disclaimer": {
         "title": "Haftungsausschluss",
         "text": "Trotz sorgfältiger inhaltlicher Kontrolle übernehmen wir keine Haftung für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten sind ausschliesslich deren Betreiber verantwortlich."
+      }
+    },
+    "compliance": {
+      "title": "AVV, TOM & Compliance-Dokumente",
+      "intro": "Für Schulen und Schulträger: Muster-Auftragsverarbeitungsvertrag, TOM-Anlage, Subprozessoren-Liste und Textbaustein für Ihr Verzeichnis von Verarbeitungstätigkeiten — zum Lesen und Herunterladen.",
+      "germanOnlyNotice": "Diese Compliance-Dokumente liegen ausschliesslich auf Deutsch vor.",
+      "loadError": "Die Compliance-Dokumente konnten nicht geladen werden. Bitte später erneut versuchen.",
+      "loading": "Dokumente werden geladen …",
+      "retry": "Erneut versuchen",
+      "avv": {
+        "downloadPdf": "AVV als PDF herunterladen"
+      },
+      "tom": {
+        "downloadPdf": "TOM-Anlage als PDF herunterladen"
+      },
+      "subprocessors": {
+        "heading": "Subprozessoren-Übersicht",
+        "columnService": "Dienst",
+        "columnPurpose": "Zweck",
+        "columnLocation": "Sitz/Region",
+        "columnTransfer": "Transfermechanismus",
+        "columnChangeNotice": "Änderungsbenachrichtigung"
+      },
+      "vvt": {
+        "heading": "VVT-Textbaustein für Schulen",
+        "intro": "Textbaustein zum Übernehmen in das schulinterne Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO).",
+        "copyButton": "In Zwischenablage kopieren",
+        "copied": "Kopiert!",
+        "copyUnavailable": "Automatisches Kopieren nicht möglich — bitte den Text oben manuell markieren und kopieren."
       }
     },
     "logoLink": "ExamCraft AI",

@@ -83,10 +83,20 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _impersonate(client, admin_token, target_id, reason="Support-Anfrage TICKET-1"):
+def _impersonate(
+    client,
+    admin_token,
+    target_id,
+    reason="Support-Anfrage TICKET-1",
+    admin_password="Test1234!",
+):
+    # TF-758 (merged after this file was written) added a required
+    # `admin_password` step-up field to `ImpersonateRequest` — matches
+    # the password `_make_user()` hashes below, and the same default
+    # already used by `test_impersonation_api.py::_impersonate`.
     return client.post(
         f"/api/admin/users/{target_id}/impersonate",
-        json={"reason": reason},
+        json={"reason": reason, "admin_password": admin_password},
         headers=_auth(admin_token),
     )
 
