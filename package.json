@@ -1,6 +1,6 @@
 {
   "name": "examcraft-monorepo",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": true,
   "description": "ExamCraft AI — Versions-Anker fuer den Release-Workflow (.github/workflows/release.yml liest hier '.version'). Bewusst KEIN Bun-Workspace-Root: core/ wird per 'git subtree split' als eigenstaendiges OpenSource-Repo gespiegelt, und core/frontend/bun.lock muss darum allein lauffaehig bleiben. Die Frontend-Pakete werden je einzeln in ihrem eigenen Verzeichnis installiert; premium/ und enterprise/ nutzen die Toolchain aus core/frontend (siehe premium/frontend/jest.config.js).",
   "engines": {
