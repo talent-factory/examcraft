@@ -195,7 +195,7 @@
           },
           {
             "name": "Resend",
-            "description": "E-mail transazionali; Fornitore: Resend, USA (SCC/DPF)"
+            "description": "E-mail transazionali, temporaneo fino al completamento della migrazione a SubscribeFlow (vedi sotto); Fornitore: Resend, USA (SCC/DPF)"
           },
           {
             "name": "Sentry",
@@ -204,6 +204,14 @@
           {
             "name": "PostgreSQL/Redis",
             "description": "Database e cache (gestiti internamente, regione Francoforte, DE); parte del nostro hosting Fly.io"
+          },
+          {
+            "name": "SubscribeFlow",
+            "description": "Iscrizione alla newsletter e automazione dell'invio (gestiti internamente, regione Francoforte, DE); parte del nostro hosting Fly.io"
+          },
+          {
+            "name": "Brevo",
+            "description": "Invio e-mail per le iscrizioni alla newsletter (fornitore di trasporto di SubscribeFlow); Fornitore: Sendinblue SA (Brevo), Francia — sede/meccanismo di trasferimento in fase di chiarimento con Legal/DPO"
           },
           {
             "name": "Google/Microsoft (OAuth)",

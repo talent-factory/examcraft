@@ -24,6 +24,8 @@ REQUIRED_SUBPROCESSORS = {
     "Redis",
     "Google",
     "Microsoft",
+    "SubscribeFlow",
+    "Brevo",
 }
 
 # Art. 28 Abs. 3 DSGVO lit. a-h — every AVV must address each of these.

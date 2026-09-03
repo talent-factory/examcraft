@@ -409,7 +409,11 @@ def _build_subprocessors() -> tuple[Subprocessor, ...]:
         Subprocessor(
             name="Resend (Resend, Inc.)",
             purpose="Versand transaktionaler E-Mails (Verifizierung, "
-            "Benachrichtigungen)",
+            "Benachrichtigungen) — Geltungsbereich aktuell auf "
+            "Transaktions-E-Mails beschränkt; Newsletter-Anmeldungen "
+            "laufen bereits über SubscribeFlow/Brevo (siehe unten). "
+            "Dieser Eintrag entfällt nach Abschluss der Migration der "
+            "Transaktions-Mails auf SubscribeFlow (TF-764)",
             location="USA/EU je nach Versanderegion",
             transfer_mechanism="EU-Standardvertragsklauseln (SCC)",
             change_notice=_CHANGE_NOTICE_STANDARD,
@@ -431,6 +435,27 @@ def _build_subprocessors() -> tuple[Subprocessor, ...]:
             "App im gleichen Rechenzentrum wie die Applikation betrieben",
             transfer_mechanism="Kein Drittlandtransfer (Selbstbetrieb "
             "innerhalb der EU)",
+            change_notice=_CHANGE_NOTICE_STANDARD,
+        ),
+        Subprocessor(
+            name="SubscribeFlow (selbst betrieben)",
+            purpose="Newsletter-Anmeldung (Double-Opt-in) und "
+            "Versand-Automatisierung für Newsletter-Abonnenten",
+            location="Frankfurt am Main, Deutschland (EU) — als Fly.io-"
+            "App im gleichen Rechenzentrum wie die Applikation betrieben",
+            transfer_mechanism="Kein Drittlandtransfer (Selbstbetrieb "
+            "innerhalb der EU)",
+            change_notice=_CHANGE_NOTICE_STANDARD,
+        ),
+        Subprocessor(
+            name="Brevo (Sendinblue SA)",
+            purpose="E-Mail-Versand für Newsletter-Anmeldungen als "
+            "Transport-Anbieter von SubscribeFlow",
+            location="Frankreich (EU)",
+            transfer_mechanism="Sitz und Transfermechanismus mit "
+            "Rechtsabteilung/DPO in Abklärung — als EU-Anbieter "
+            "voraussichtlich kein Drittlandtransfer, dies ist jedoch "
+            "noch nicht rechtlich bestätigt",
             change_notice=_CHANGE_NOTICE_STANDARD,
         ),
         Subprocessor(
