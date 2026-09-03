@@ -334,6 +334,7 @@ def test_end_impersonation_writes_audit_event_and_queues_email(test_client, test
     assert kwargs["admin_name"] == superadmin.full_name
     assert kwargs["end_reason"] == "manual"
     assert kwargs["reason"] == "Ticket-7"
+    assert kwargs["session_id"] == int(session_id)
 
 
 def test_end_impersonation_via_lost_token_fallback_writes_audit_and_email(

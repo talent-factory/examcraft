@@ -1,410 +1,213 @@
-"""
-Tests für Email Service (Resend Integration)
+"""Tests for EmailService (TF-764: SubscribeFlow-backed sending).
 
-Tests für:
-- ResendService: Transactional email sending
-- EmailService: Unified email router
-- Webhook handling
-- Email event tracking
+Escaping of user-supplied values (first_name etc.) now happens inside
+SubscribeFlow's sandboxed, autoescaping Jinja2 environment
+(TemplateRenderingService._create_jinja_env, autoescape=True) -- ExamCraft
+passes raw values through as template variables and must NOT pre-escape
+them (that would double-escape). These tests assert the SDK call
+composition, not HTML string content.
 """
+
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
-from services.email.base import EmailAddress, EmailTemplate, TransactionalEmail
-from services.email.resend_service import ResendService
-from services.email.email_service import EmailService
+from services.email_service import EmailService
 
 
-class TestEmailAddress:
-    """Tests für EmailAddress model"""
-
-    def test_email_address_str_with_name(self):
-        """EmailAddress with name formats correctly"""
-        addr = EmailAddress(email="test@example.com", name="Test User")
-        assert str(addr) == "Test User <test@example.com>"
-
-    def test_email_address_str_without_name(self):
-        """EmailAddress without name returns just email"""
-        addr = EmailAddress(email="test@example.com")
-        assert str(addr) == "test@example.com"
+def _mock_sdk_client():
+    """Patch SubscribeFlowClient so EmailService._send never makes a real
+    network call. Returns the mocked `emails.send` coroutine for assertions."""
+    mock_client = AsyncMock()
+    mock_response = AsyncMock()
+    mock_response.id = "es_123"
+    mock_response.status = "queued"
+    mock_client.emails.send = AsyncMock(return_value=mock_response)
+    return mock_client
 
 
-class TestResendService:
-    """Tests für ResendService"""
+@pytest.mark.asyncio
+async def test_send_verification_email_calls_sdk_with_raw_variables():
+    mock_client = _mock_sdk_client()
+    with (
+        patch("services.email_service.SubscribeFlowClient") as mock_client_cls,
+        patch("services.email_service.SUBSCRIBEFLOW_EMAILS_API_KEY", "sf_live_test"),
+    ):
+        mock_client_cls.return_value.__aenter__.return_value = mock_client
+        mock_client_cls.return_value.__aexit__.return_value = None
 
-    def test_resend_service_init_without_api_key(self):
-        """ResendService initializes in demo mode without API key"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = ResendService()
-            assert not service.is_configured
-
-    def test_resend_service_init_with_api_key(self):
-        """ResendService initializes correctly with API key"""
-        with patch.dict(
-            "os.environ",
-            {"RESEND_API_KEY": "re_test_key"},  # pragma: allowlist secret
-        ):
-            service = ResendService()
-            assert service.is_configured
-
-    @pytest.mark.asyncio
-    async def test_send_transactional_demo_mode(self):
-        """send_transactional returns demo ID when not configured"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = ResendService()
-
-            email = TransactionalEmail(
-                to=EmailAddress(email="user@example.com", name="User"),
-                from_=EmailAddress(email="noreply@examcraft.ai", name="ExamCraft"),
-                subject="Test Subject",
-                template=EmailTemplate(
-                    subject="Test Subject",
-                    html="<p>Test content</p>",
-                ),
-            )
-
-            result = await service.send_transactional(email)
-            assert result.startswith("demo_email_")
-
-    @pytest.mark.asyncio
-    async def test_send_transactional_api_call(self):
-        """send_transactional makes correct API call when configured"""
-        with patch.dict(
-            "os.environ",
-            {
-                "RESEND_API_KEY": "re_test_key",  # pragma: allowlist secret
-                "RESEND_FROM_EMAIL": "noreply@test.com",
-            },
-        ):
-            service = ResendService()
-
-            email = TransactionalEmail(
-                to=EmailAddress(email="user@example.com", name="User"),
-                from_=EmailAddress(email="noreply@test.com", name="ExamCraft"),
-                subject="Test Subject",
-                template=EmailTemplate(
-                    subject="Test Subject",
-                    html="<p>Test content</p>",
-                ),
-                tags=["test", "verification"],
-            )
-
-            # Mock httpx response
-            mock_response = MagicMock()
-            mock_response.json.return_value = {"id": "email_123"}
-            mock_response.raise_for_status = MagicMock()
-
-            with patch("httpx.AsyncClient") as mock_client:
-                mock_instance = AsyncMock()
-                mock_instance.post = AsyncMock(return_value=mock_response)
-                mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
-                mock_instance.__aexit__ = AsyncMock(return_value=None)
-                mock_client.return_value = mock_instance
-
-                result = await service.send_transactional(email)
-
-                assert result == "email_123"
-                mock_instance.post.assert_called_once()
-
-                # Verify API call payload
-                call_kwargs = mock_instance.post.call_args
-                assert call_kwargs[1]["json"]["to"] == ["user@example.com"]
-                assert call_kwargs[1]["json"]["subject"] == "Test Subject"
-
-    @pytest.mark.asyncio
-    async def test_send_verification_email(self):
-        """send_verification_email generates correct template"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = ResendService()
-
-            result = await service.send_verification_email(
-                user_email="user@example.com",
-                user_name="Test User",
-                verification_url="https://examcraft.ai/verify/token123",
-            )
-
-            assert result.startswith("demo_email_")
-
-    @pytest.mark.asyncio
-    async def test_send_password_reset_email(self):
-        """send_password_reset_email generates correct template"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = ResendService()
-
-            result = await service.send_password_reset_email(
-                user_email="user@example.com",
-                user_name="Test User",
-                reset_url="https://examcraft.ai/reset/token456",
-            )
-
-            assert result.startswith("demo_email_")
-
-    @pytest.mark.asyncio
-    async def test_send_payment_confirmation(self):
-        """send_payment_confirmation generates correct template"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = ResendService()
-
-            payment_details = {
-                "plan_name": "Professional",
-                "amount": "99.00",
-                "currency": "CHF",
-                "next_billing_date": "2025-02-01",
-                "receipt_url": "https://examcraft.ai/receipt/123",
-            }
-
-            result = await service.send_payment_confirmation(
-                user_email="user@example.com",
-                user_name="Test User",
-                payment_details=payment_details,
-            )
-
-            assert result.startswith("demo_email_")
-
-    @pytest.mark.asyncio
-    async def test_get_status_demo_mode(self):
-        """get_status returns demo status when not configured"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = ResendService()
-
-            result = await service.get_status("demo_email_123")
-
-            assert result["id"] == "demo_email_123"
-            assert result["status"] == "demo"
-            assert result["provider"] == "resend"
-
-
-class TestEmailService:
-    """Tests für EmailService (unified router)"""
-
-    def test_email_service_init(self):
-        """EmailService initializes with Resend provider"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = EmailService()
-            assert hasattr(service, "resend")
-            assert isinstance(service.resend, ResendService)
-
-    @pytest.mark.asyncio
-    async def test_send_verification_email(self):
-        """EmailService routes verification email correctly"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = EmailService()
-
-            result = await service.send_verification_email(
-                user_email="user@example.com",
-                user_name="Test User",
-                verification_url="https://examcraft.ai/verify/token",
-            )
-
-            assert result["provider"] == "resend"
-            assert result["type"] == "verification"
-            assert "email_id" in result
-
-    @pytest.mark.asyncio
-    async def test_send_password_reset_email(self):
-        """EmailService routes password reset email correctly"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = EmailService()
-
-            result = await service.send_password_reset_email(
-                user_email="user@example.com",
-                user_name="Test User",
-                reset_url="https://examcraft.ai/reset/token",
-            )
-
-            assert result["provider"] == "resend"
-            assert result["type"] == "password_reset"
-            assert "email_id" in result
-
-    @pytest.mark.asyncio
-    async def test_send_payment_confirmation(self):
-        """EmailService routes payment confirmation correctly"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = EmailService()
-
-            payment_details = {
-                "plan_name": "Starter",
-                "amount": "29.00",
-                "currency": "CHF",
-                "next_billing_date": "2025-02-01",
-                "receipt_url": "https://examcraft.ai/receipt/456",
-            }
-
-            result = await service.send_payment_confirmation(
-                user_email="user@example.com",
-                user_name="Test User",
-                payment_details=payment_details,
-            )
-
-            assert result["provider"] == "resend"
-            assert result["type"] == "payment_confirmation"
-            assert "email_id" in result
-
-    @pytest.mark.asyncio
-    async def test_send_system_notification(self):
-        """EmailService routes system notification correctly"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = EmailService()
-
-            result = await service.send_system_notification(
-                user_email="user@example.com",
-                user_name="Test User",
-                subject="Important Update",
-                message="<p>Your account has been updated.</p>",
-                action_url="https://examcraft.ai/dashboard",
-                action_text="View Dashboard",
-            )
-
-            assert result["provider"] == "resend"
-            assert result["type"] == "notification"
-            assert "email_id" in result
-
-    @pytest.mark.asyncio
-    async def test_on_user_signup_logs_event(self):
-        """on_user_signup logs event (marketing not yet implemented)"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = EmailService()
-
-            result = await service.on_user_signup(
-                user_email="new@example.com",
-                user_name="New User",
-                source="web",
-            )
-
-            assert result["status"] == "logged"
-            assert result["marketing_enabled"] is False
-
-    @pytest.mark.asyncio
-    async def test_get_email_status(self):
-        """get_email_status retrieves status correctly"""
-        with patch.dict("os.environ", {}, clear=True):
-            service = EmailService()
-
-            result = await service.get_email_status("demo_email_123", "resend")
-
-            assert result["id"] == "demo_email_123"
-
-
-class TestEmailTemplates:
-    """Tests für Email Template Rendering"""
-
-    def test_verification_template_contains_url(self):
-        """Verification template includes verification URL"""
-        service = ResendService()
-        html = service._render_verification_template(
-            "Test User",
-            "https://examcraft.ai/verify/abc123",
+        result = await EmailService.send_verification_email(
+            email="target@example.com",
+            first_name='<img src=x onerror="alert(1)">',
+            verification_token="tok123",
         )
 
-        assert "Test User" in html
-        assert "https://examcraft.ai/verify/abc123" in html
-        assert "Verify Email Address" in html
-        assert "24 hours" in html
+    mock_client.emails.send.assert_called_once_with(
+        template_slug="verification",
+        to="target@example.com",
+        variables={
+            "first_name": '<img src=x onerror="alert(1)">',
+            "verification_url": "http://localhost:3000/verify-email?token=tok123",
+        },
+        idempotency_key=None,
+    )
+    assert result == {"id": "es_123", "status": "queued"}
 
-    def test_password_reset_template_contains_url(self):
-        """Password reset template includes reset URL"""
-        service = ResendService()
-        html = service._render_password_reset_template(
-            "Test User",
-            "https://examcraft.ai/reset/xyz789",
+
+@pytest.mark.asyncio
+async def test_send_welcome_email_calls_sdk_with_expected_variables():
+    mock_client = _mock_sdk_client()
+    with (
+        patch("services.email_service.SubscribeFlowClient") as mock_client_cls,
+        patch("services.email_service.SUBSCRIBEFLOW_EMAILS_API_KEY", "sf_live_test"),
+    ):
+        mock_client_cls.return_value.__aenter__.return_value = mock_client
+        mock_client_cls.return_value.__aexit__.return_value = None
+
+        await EmailService.send_welcome_email(
+            email="target@example.com", first_name="Käthe"
         )
 
-        assert "Test User" in html
-        assert "https://examcraft.ai/reset/xyz789" in html
-        assert "Reset Password" in html
-        assert "1 hour" in html
+    mock_client.emails.send.assert_called_once_with(
+        template_slug="welcome",
+        to="target@example.com",
+        variables={
+            "first_name": "Käthe",
+            "dashboard_url": "http://localhost:3000/dashboard",
+            "docs_url": "http://localhost:3000/docs",
+        },
+        idempotency_key=None,
+    )
 
-    def test_payment_confirmation_template_contains_details(self):
-        """Payment confirmation template includes all payment details"""
-        service = ResendService()
-        html = service._render_payment_confirmation_template(
-            "Test User",
-            {
-                "plan_name": "Professional",
-                "amount": "99.00",
-                "currency": "CHF",
-                "next_billing_date": "2025-02-01",
-                "receipt_url": "https://examcraft.ai/receipt/123",
-            },
+
+@pytest.mark.asyncio
+async def test_send_skips_when_api_key_not_configured():
+    with patch("services.email_service.SUBSCRIBEFLOW_EMAILS_API_KEY", ""):
+        result = await EmailService.send_verification_email(
+            email="target@example.com", first_name="A", verification_token="t"
+        )
+    assert result == {"id": "test-email-id", "status": "skipped"}
+
+
+@pytest.mark.asyncio
+async def test_send_forwards_idempotency_key_to_sdk():
+    """The literal wiring point connecting the impersonation-email
+    idempotency-key feature to the SDK: every impersonation-email test
+    mocks EmailService._send itself, so none of them would catch a
+    typo'd/renamed `idempotency_key` kwarg in the actual SDK call inside
+    _send. This test goes through the mocked SDK client instead, closing
+    that gap."""
+    mock_client = _mock_sdk_client()
+    with (
+        patch("services.email_service.SubscribeFlowClient") as mock_client_cls,
+        patch("services.email_service.SUBSCRIBEFLOW_EMAILS_API_KEY", "sf_live_test"),
+    ):
+        mock_client_cls.return_value.__aenter__.return_value = mock_client
+        mock_client_cls.return_value.__aexit__.return_value = None
+
+        await EmailService._send(
+            template_slug="impersonation-started",
+            to="target@example.com",
+            variables={"to_name": "Target"},
+            idempotency_key="impersonation-started:42",
         )
 
-        assert "Test User" in html
-        assert "Professional" in html
-        assert "99.00" in html
-        assert "CHF" in html
-        assert "2025-02-01" in html
+    mock_client.emails.send.assert_called_once_with(
+        template_slug="impersonation-started",
+        to="target@example.com",
+        variables={"to_name": "Target"},
+        idempotency_key="impersonation-started:42",
+    )
 
-    def test_notification_template_with_action(self):
-        """Notification template includes action button when provided"""
-        service = ResendService()
-        html = service._render_notification_template(
-            "Test User",
-            "<p>Your exam is ready.</p>",
-            "https://examcraft.ai/exam/123",
-            "View Exam",
+
+@pytest.mark.asyncio
+async def test_send_propagates_sdk_errors():
+    mock_client = AsyncMock()
+    mock_client.emails.send = AsyncMock(side_effect=RuntimeError("network down"))
+    with (
+        patch("services.email_service.SubscribeFlowClient") as mock_client_cls,
+        patch("services.email_service.SUBSCRIBEFLOW_EMAILS_API_KEY", "sf_live_test"),
+    ):
+        mock_client_cls.return_value.__aenter__.return_value = mock_client
+        mock_client_cls.return_value.__aexit__.return_value = None
+
+        with pytest.raises(RuntimeError, match="network down"):
+            await EmailService.send_verification_email(
+                email="target@example.com", first_name="A", verification_token="t"
+            )
+
+
+def test_generate_verification_token_is_url_safe_and_unique():
+    token_a = EmailService.generate_verification_token()
+    token_b = EmailService.generate_verification_token()
+    assert token_a != token_b
+    assert len(token_a) > 20
+
+
+class TestFormatDuration:
+    """Direct unit tests for the branching logic in _format_duration --
+    previously only indirectly exercised via impersonation-ended email tests."""
+
+    def test_minutes_and_seconds(self):
+        assert (
+            EmailService._format_duration(
+                "2026-08-30T10:00:00+00:00", "2026-08-30T10:12:34+00:00"
+            )
+            == "12 min 34 sec"
         )
 
-        assert "Test User" in html
-        assert "Your exam is ready" in html
-        assert "View Exam" in html
-        assert "https://examcraft.ai/exam/123" in html
-
-    def test_notification_template_without_action(self):
-        """Notification template works without action button"""
-        service = ResendService()
-        html = service._render_notification_template(
-            "Test User",
-            "<p>Simple notification.</p>",
-            None,
-            None,
+    def test_minutes_only(self):
+        assert (
+            EmailService._format_duration(
+                "2026-08-30T10:00:00+00:00", "2026-08-30T10:05:00+00:00"
+            )
+            == "5 min"
         )
 
-        assert "Test User" in html
-        assert "Simple notification" in html
-        assert "button" not in html.lower() or "View" not in html
-
-
-class TestTransactionalEmailModel:
-    """Tests für TransactionalEmail Pydantic model"""
-
-    def test_transactional_email_with_all_fields(self):
-        """TransactionalEmail accepts all fields"""
-        email = TransactionalEmail(
-            to=EmailAddress(email="to@example.com", name="Recipient"),
-            from_=EmailAddress(email="from@example.com", name="Sender"),
-            subject="Test Subject",
-            template=EmailTemplate(
-                subject="Test Subject",
-                html="<p>HTML content</p>",
-                text="Text content",
-            ),
-            variables={"key": "value"},
-            attachments=[{"filename": "test.pdf", "content": "base64..."}],
-            reply_to=EmailAddress(email="reply@example.com"),
-            tags=["test", "important"],
+    def test_seconds_only(self):
+        assert (
+            EmailService._format_duration(
+                "2026-08-30T10:00:00+00:00", "2026-08-30T10:00:45+00:00"
+            )
+            == "45 sec"
         )
 
-        assert email.to.email == "to@example.com"
-        assert email.from_address.email == "from@example.com"
-        assert email.subject == "Test Subject"
-        assert email.template.html == "<p>HTML content</p>"
-        assert email.variables == {"key": "value"}
-        assert len(email.attachments) == 1
-        assert email.reply_to.email == "reply@example.com"
-        assert "test" in email.tags
-
-    def test_transactional_email_minimal(self):
-        """TransactionalEmail works with minimal fields"""
-        email = TransactionalEmail(
-            to=EmailAddress(email="to@example.com"),
-            from_=EmailAddress(email="from@example.com"),
-            subject="Test",
-            template=EmailTemplate(subject="Test", html="<p>Content</p>"),
+    def test_zero_duration(self):
+        assert (
+            EmailService._format_duration(
+                "2026-08-30T10:00:00+00:00", "2026-08-30T10:00:00+00:00"
+            )
+            == "0 sec"
         )
 
-        assert email.to.email == "to@example.com"
-        assert email.variables == {}
-        assert email.attachments == []
-        assert email.reply_to is None
-        assert email.tags == []
+    def test_negative_duration_clamped_to_zero(self):
+        """ended_at before started_at (clock skew, bad data) must not raise
+        or produce a nonsensical negative duration."""
+        assert (
+            EmailService._format_duration(
+                "2026-08-30T10:12:00+00:00", "2026-08-30T10:00:00+00:00"
+            )
+            == "0 sec"
+        )
+
+    def test_missing_started_at_returns_unknown(self):
+        assert (
+            EmailService._format_duration(None, "2026-08-30T10:00:00+00:00")
+            == "unknown"
+        )
+
+    def test_missing_ended_at_returns_unknown(self):
+        assert (
+            EmailService._format_duration("2026-08-30T10:00:00+00:00", None)
+            == "unknown"
+        )
+
+    def test_malformed_non_empty_timestamp_returns_unknown(self):
+        """Non-empty but unparsable input (not the "missing" early-return
+        path) must hit the except branch, not raise."""
+        assert (
+            EmailService._format_duration(
+                "not-a-timestamp", "2026-08-30T10:00:00+00:00"
+            )
+            == "unknown"
+        )

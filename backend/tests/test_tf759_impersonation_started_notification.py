@@ -142,6 +142,7 @@ def test_start_impersonation_dispatches_started_email(test_client, test_db):
     assert session_row is not None
     assert session_row.started_at is not None
     assert kwargs["started_at"] == session_row.started_at.isoformat()
+    assert kwargs["session_id"] == session_row.id
 
 
 def test_start_impersonation_email_dispatch_failure_does_not_break_endpoint(

@@ -359,14 +359,21 @@ async def register(
     # Audit log: User registration
     AuditService.log_register(db, user.id, user.email, request=http_request)
 
-    # Send verification email (async via background task)
+    # Send verification email (inline, awaited -- not a background task; a
+    # slow/unavailable SubscribeFlow adds up to its 30s timeout to this response)
     try:
-        EmailService.send_verification_email(
+        result = await EmailService.send_verification_email(
             email=user.email,
             first_name=user.first_name,
             verification_token=verification_token,
         )
-        logger.info(f"Verification email sent to {user.email}")
+        if result.get("status") == "skipped":
+            logger.warning(
+                f"Verification email NOT sent to {user.email}: "
+                "SUBSCRIBEFLOW_EMAILS_API_KEY not configured"
+            )
+        else:
+            logger.info(f"Verification email sent to {user.email}")
     except Exception as e:
         logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
         # Don't fail registration if email fails
@@ -379,9 +386,10 @@ async def register(
         ip_address=http_request.client.host if http_request.client else None,
     )
 
-    logger.info(
-        f"New user registered: {user.email} (ID: {user.id}) - Verification email sent"
-    )
+    # The actual verification-email outcome (sent/skipped/failed) was
+    # already logged above -- this line must not repeat "sent" unconditionally,
+    # or a skipped/failed send would still read as a success in the logs.
+    logger.info(f"New user registered: {user.email} (ID: {user.id})")
 
     return tokens
 
@@ -1003,8 +1011,16 @@ async def verify_email(token: str, request: Request, db: Session = Depends(get_d
 
     # Send welcome email
     try:
-        EmailService.send_welcome_email(email=user.email, first_name=user.first_name)
-        logger.info(f"Welcome email sent to {user.email}")
+        result = await EmailService.send_welcome_email(
+            email=user.email, first_name=user.first_name
+        )
+        if result.get("status") == "skipped":
+            logger.warning(
+                f"Welcome email NOT sent to {user.email}: "
+                "SUBSCRIBEFLOW_EMAILS_API_KEY not configured"
+            )
+        else:
+            logger.info(f"Welcome email sent to {user.email}")
     except Exception as e:
         logger.error(f"Failed to send welcome email to {user.email}: {str(e)}")
         # Don't fail verification if welcome email fails
@@ -1098,12 +1114,18 @@ async def resend_verification_email(
 
     # Send verification email
     try:
-        EmailService.send_verification_email(
+        result = await EmailService.send_verification_email(
             email=user.email,
             first_name=user.first_name,
             verification_token=verification_token,
         )
-        logger.info(f"Verification email resent to {user.email}")
+        if result.get("status") == "skipped":
+            logger.warning(
+                f"Verification email NOT resent to {user.email}: "
+                "SUBSCRIBEFLOW_EMAILS_API_KEY not configured"
+            )
+        else:
+            logger.info(f"Verification email resent to {user.email}")
     except Exception as e:
         logger.error(f"Failed to resend verification email to {user.email}: {str(e)}")
         raise HTTPException(

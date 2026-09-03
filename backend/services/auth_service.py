@@ -450,6 +450,7 @@ class AuthService:
                 admin_name=admin.full_name or admin.email,
                 reason=reason,
                 started_at=started_at.isoformat() if started_at else None,
+                session_id=session_id,
             )
         except Exception:
             logger.error(
@@ -529,6 +530,7 @@ class AuthService:
                 started_at=started_at.isoformat() if started_at else None,
                 ended_at=ended_at.isoformat() if ended_at else None,
                 end_reason=end_reason,
+                session_id=session_id,
             )
         except Exception:
             logger.error(

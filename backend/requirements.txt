@@ -30,8 +30,13 @@ amqp==5.2.0                             # AMQP Protocol Implementation
 # HTTP client for Claude API
 httpx>=0.28.1
 
-# SubscribeFlow SDK (Newsletter Subscription)
-subscribeflow>=1.0.5
+# SubscribeFlow SDK (Newsletter Subscription + Transactional Emails, TF-764).
+# Floor raised to the version that introduced client.emails.send()'s
+# idempotency_key param and subscribeflow.exceptions.SubscribeFlowError,
+# both hard dependencies since TF-764; capped below 2.0 to avoid a silent
+# breaking upgrade (this repo has been bitten by exactly that before, see
+# the fastapi/anthropic pins elsewhere in this file).
+subscribeflow>=1.4.1,<2
 
 # Internationalization
 python-i18n[YAML]>=0.3.9            # i18n Translation Support

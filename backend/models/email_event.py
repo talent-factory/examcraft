@@ -1,12 +1,13 @@
 """
 Email Event Model für ExamCraft AI
 
-Tracks all email events from providers (Resend, Kit) for analytics
-and deliverability monitoring.
+Tracks all email events from providers (SubscribeFlow, since TF-764; the
+Resend-era rows already in this table keep "resend" as their historical
+``provider`` value) for analytics and deliverability monitoring.
 """
 
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
@@ -19,6 +20,14 @@ from sqlalchemy import (
     Index,
 )
 from database import Base
+
+
+def _utcnow() -> datetime:
+    """Naive UTC "now" for the naive DateTime columns below. Same value
+    datetime.utcnow() produced, just without its deprecation warning --
+    these columns aren't timezone-aware, so a tz-aware datetime must never
+    be assigned to them."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class EmailEventType(str, Enum):
@@ -60,7 +69,9 @@ class EmailEvent(Base):
 
     # Email identification
     email_id = Column(String(255), nullable=False, index=True)
-    provider = Column(String(50), nullable=False)  # "resend" or "kit"
+    provider = Column(
+        String(50), nullable=False
+    )  # "subscribeflow" (or "resend" for pre-TF-764 rows)
 
     # Event details
     event_type = Column(SQLEnum(EmailEventType), nullable=False)
@@ -71,7 +82,7 @@ class EmailEvent(Base):
 
     # Timestamps
     event_timestamp = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
 
     # Additional event metadata (provider-specific data, link URLs, etc.)
     # Renamed from 'metadata' to avoid SQLAlchemy reserved attribute conflict
@@ -133,10 +144,8 @@ class EmailSuppressionList(Base):
     original_event_id = Column(String(255), nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f"<EmailSuppressionList(email={self.email}, reason={self.reason})>"
@@ -188,6 +197,7 @@ async def add_to_suppression_list(
     event_id: Optional[str] = None,
     suppress_transactional: bool = False,
     suppress_marketing: bool = True,
+    commit: bool = True,
 ) -> EmailSuppressionList:
     """
     Add an email to the suppression list.
@@ -200,6 +210,11 @@ async def add_to_suppression_list(
         event_id: Original event ID
         suppress_transactional: Also suppress transactional emails
         suppress_marketing: Suppress marketing emails
+        commit: Whether to commit (and, for a new entry, refresh) here.
+            Callers that need this write to be part of a larger atomic
+            transaction (e.g. the SubscribeFlow webhook handlers, which
+            also write an ``EmailEvent`` in the same handler invocation)
+            pass ``False`` and issue a single commit themselves afterward.
 
     Returns:
         EmailSuppressionList: Created or updated suppression entry
@@ -222,8 +237,11 @@ async def add_to_suppression_list(
             existing.suppress_transactional = 1
         if suppress_marketing:
             existing.suppress_marketing = 1
-        existing.updated_at = datetime.utcnow()
-        db.commit()
+        existing.updated_at = _utcnow()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         return existing
 
     # Create new entry
@@ -236,7 +254,10 @@ async def add_to_suppression_list(
         suppress_marketing=1 if suppress_marketing else 0,
     )
     db.add(suppression)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(suppression)
 
     return suppression

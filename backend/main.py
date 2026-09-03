@@ -518,16 +518,24 @@ async def lifespan(app: FastAPI):
     app.include_router(help_api.router)
     app.include_router(legal_api.router)
 
-    # Email Webhooks (Resend)
+    # Email Webhooks (SubscribeFlow)
     try:
-        from webhooks import resend_router
+        from webhooks import subscribeflow_router
 
-        app.include_router(resend_router)
-        print("✅ Email webhooks loaded (Resend)")
+        app.include_router(subscribeflow_router)
+        logger.info("Email webhooks loaded (SubscribeFlow)")
     except ImportError as e:
-        print(f"⚠️  Email webhooks not available: {e}")
+        logger.warning(f"Email webhooks not available: {e}")
     except Exception as e:
-        print(f"❌ Error loading email webhooks: {e}")
+        # print() here previously meant a broken webhook receiver could
+        # boot the app "successfully" (health checks pass) with zero
+        # logged error and zero Sentry event -- every SubscribeFlow
+        # delivery-status call would then 404 with nothing pointing at why.
+        # logger.error reaches Sentry (config/sentry.py's LoggingIntegration
+        # sends ERROR+ as events); this is still a soft-continue rather than
+        # a fatal startup failure, since email deliverability tracking
+        # shouldn't take down exam-generation with it.
+        logger.error(f"Error loading email webhooks: {e}", exc_info=True)
 
     # Sentry Test Router (only in development)
     if os.getenv("ENVIRONMENT", "development") == "development":

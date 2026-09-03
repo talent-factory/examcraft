@@ -1,90 +1,124 @@
 """
-Email Service using Resend API
-Handles transactional emails: verification, password reset, welcome emails
+Email Service using SubscribeFlow API (TF-764)
+
+Handles the transactional email types that are actually wired into the
+app: verification, welcome, impersonation-started, impersonation-ended.
+Templates and their HTML rendering (incl. autoescaping of user-supplied
+values, replacing the manual html.escape() calls TF-742/TF-762 added)
+live in SubscribeFlow -- see scripts/provision_subscribeflow_email.py.
 """
 
-import html
 import os
 import logging
-import httpx
 from typing import Optional, Dict, Any
 from datetime import datetime
 import secrets
 
+from subscribeflow import SubscribeFlowClient
+
 logger = logging.getLogger(__name__)
 
-# Resend Configuration
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "noreply@examcraft.ai")
-RESEND_FROM_NAME = os.getenv("RESEND_FROM_NAME", "ExamCraft AI")
-RESEND_API_URL = "https://api.resend.com/emails"
+# SubscribeFlow Configuration (TF-764)
+# Named after the env var it actually reads, not "SUBSCRIBEFLOW_API_KEY" --
+# that's a DIFFERENT, more broadly-scoped admin key used only by
+# scripts/provision_subscribeflow_email.py and services/subscribeflow_service.py.
+# A same-ish name here previously invited exactly the wrong kind of "fix".
+SUBSCRIBEFLOW_EMAILS_API_KEY = os.getenv("SUBSCRIBEFLOW_EMAILS_API_KEY", "")
+SUBSCRIBEFLOW_BASE_URL = os.getenv(
+    "SUBSCRIBEFLOW_BASE_URL", "https://api.subscribeflow.net"
+)
 
 # Frontend URL for email links
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
 class EmailService:
-    """Service for sending transactional emails via Resend"""
+    """Service for sending transactional emails via SubscribeFlow"""
 
     @staticmethod
-    def _send_email(
+    async def _send(
+        template_slug: str,
         to: str,
-        subject: str,
-        html: str,
-        text: Optional[str] = None,
-        tags: Optional[Dict[str, str]] = None,
+        variables: Dict[str, Any],
+        idempotency_key: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Send email via Resend API
+        """Send a templated transactional email via SubscribeFlow.
 
         Args:
-            to: Recipient email address
-            subject: Email subject
-            html: HTML email body
-            text: Plain text email body (optional)
-            tags: Email tags for tracking (optional)
+            template_slug: Slug of the SubscribeFlow template to use.
+            to: Recipient email address.
+            variables: Raw (unescaped) template variables -- SubscribeFlow's
+                sandboxed Jinja2 environment autoescapes on render, so
+                pre-escaping here would double-escape.
+            idempotency_key: Optional key passed through to the SDK, intended
+                to let a Celery retry of the same logical send (e.g. after
+                the send itself succeeded but a subsequent step raised)
+                dedupe at SubscribeFlow. CAVEAT: as of this migration,
+                SubscribeFlow's server-side idempotency check
+                (email_send_service.py::_check_idempotency in the
+                SubscribeFlow repo) is an unimplemented stub that always
+                returns None -- it logs "duplicate sends possible" and does
+                not actually dedupe. Passing this key currently has no
+                effect; it's forwarded so no ExamCraft-side change is
+                needed once SubscribeFlow implements the check for real.
 
         Returns:
-            Response from Resend API
+            {"id": ..., "status": ...} -- callers only ever log or pass
+            this through, never inspect further fields.
 
         Raises:
-            Exception: If email sending fails
+            Exception: propagated from the SDK on network/API errors, same
+                as the previous Resend-based ``_send_email``.
         """
-        if not RESEND_API_KEY:
-            logger.warning("RESEND_API_KEY not configured, skipping email send")
+        if not SUBSCRIBEFLOW_EMAILS_API_KEY:
+            # This is the only place a missing key is discovered, so its
+            # log level has to carry the whole alerting story: a WARNING
+            # never reaches Sentry (config/sentry.py's LoggingIntegration
+            # only sends ERROR+ as events), which would make a misconfigured
+            # key in production a *total, silent* transactional-email
+            # outage -- every verification/welcome/impersonation send
+            # "succeeds" as {"status": "skipped"} with nothing but a
+            # scrollback line to notice it. Mirrors the dev/prod split
+            # webhooks/subscribeflow_webhooks.py already uses for the
+            # analogous missing-webhook-secret case.
+            environment = os.getenv("ENVIRONMENT", "production").lower()
+            if environment in ("development", "dev", "local"):
+                logger.warning(
+                    "SUBSCRIBEFLOW_EMAILS_API_KEY not configured, skipping email send"
+                )
+            else:
+                logger.error(
+                    "SUBSCRIBEFLOW_EMAILS_API_KEY not configured in "
+                    f"{environment} -- skipping email send. This means "
+                    "verification/welcome/impersonation emails are NOT "
+                    "being sent."
+                )
             return {"id": "test-email-id", "status": "skipped"}
 
-        headers = {
-            "Authorization": f"Bearer {RESEND_API_KEY}",
-            "Content-Type": "application/json",
-        }
-
-        payload = {
-            "from": f"{RESEND_FROM_NAME} <{RESEND_FROM_EMAIL}>",
-            "to": [to],
-            "subject": subject,
-            "html": html,
-        }
-
-        if text:
-            payload["text"] = text
-
-        if tags:
-            payload["tags"] = [{"name": k, "value": v} for k, v in tags.items()]
-
         try:
-            response = httpx.post(
-                RESEND_API_URL, headers=headers, json=payload, timeout=10.0
+            async with SubscribeFlowClient(
+                api_key=SUBSCRIBEFLOW_EMAILS_API_KEY,
+                base_url=SUBSCRIBEFLOW_BASE_URL,
+                timeout=30.0,
+            ) as client:
+                response = await client.emails.send(
+                    template_slug=template_slug,
+                    to=to,
+                    variables=variables,
+                    idempotency_key=idempotency_key,
+                )
+            logger.info(
+                f"Email queued via SubscribeFlow: send_id={response.id} "
+                f"esp_message_id={response.esp_message_id or 'pending'} "
+                f"to={to} ({template_slug})"
             )
-            response.raise_for_status()
-            result = response.json()
-            logger.info(f"Email sent successfully to {to}: {result.get('id')}")
-            return result
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Failed to send email to {to}: {e.response.text}")
-            raise Exception(f"Email sending failed: {e.response.text}")
+            # response.id (the send UUID) is the same value the delivery-status
+            # webhook falls back to as email_id when esp_message_id isn't set
+            # yet (see webhooks/subscribeflow_webhooks.py::_correlation_id) --
+            # logging both here keeps a log line and an EmailEvent row joinable.
+            return {"id": str(response.id), "status": response.status}
         except Exception as e:
-            logger.error(f"Failed to send email to {to}: {str(e)}")
+            logger.error(f"Failed to send {template_slug} email to {to}: {str(e)}")
             raise
 
     @staticmethod
@@ -93,213 +127,30 @@ class EmailService:
         return secrets.token_urlsafe(32)
 
     @staticmethod
-    def send_verification_email(
+    async def send_verification_email(
         email: str,
         first_name: str,
         verification_token: str,
     ) -> Dict[str, Any]:
-        """
-        Send email verification email
-
-        Args:
-            email: User's email address
-            first_name: User's first name
-            verification_token: Verification token
-
-        Returns:
-            Response from Resend API
-        """
+        """Send email verification email via the "verification" SubscribeFlow template."""
         verification_url = f"{FRONTEND_URL}/verify-email?token={verification_token}"
-
-        # TF-762: `first_name` is freely chosen at registration and lands in
-        # an HTML email delivered to that same address. Without escaping, a
-        # crafted name could inject markup into what looks like a trusted
-        # ExamCraft notice (same class of issue fixed for
-        # `send_impersonation_ended_email` under TF-742). The plain `text`
-        # body below is unaffected -- it can't render markup.
-        safe_first_name = html.escape(first_name)
-
-        subject = "Verify your ExamCraft AI account"
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0;">Welcome to ExamCraft AI! 🎓</h1>
-            </div>
-
-            <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="font-size: 16px;">Hi {safe_first_name},</p>
-
-                <p style="font-size: 16px;">
-                    Thank you for signing up for ExamCraft AI! We're excited to have you on board.
-                </p>
-
-                <p style="font-size: 16px;">
-                    To get started, please verify your email address by clicking the button below:
-                </p>
-
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{verification_url}"
-                       style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                              color: white;
-                              padding: 15px 40px;
-                              text-decoration: none;
-                              border-radius: 5px;
-                              font-weight: bold;
-                              display: inline-block;">
-                        Verify Email Address
-                    </a>
-                </div>
-
-                <p style="font-size: 14px; color: #666;">
-                    Or copy and paste this link into your browser:<br>
-                    <a href="{verification_url}" style="color: #667eea; word-break: break-all;">{verification_url}</a>
-                </p>
-
-                <p style="font-size: 14px; color: #666; margin-top: 30px;">
-                    This link will expire in 24 hours for security reasons.
-                </p>
-
-                <p style="font-size: 14px; color: #666;">
-                    If you didn't create an account with ExamCraft AI, you can safely ignore this email.
-                </p>
-
-                <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-
-                <p style="font-size: 12px; color: #999; text-align: center;">
-                    © {datetime.now().year} ExamCraft AI. All rights reserved.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-
-        text = f"""
-        Welcome to ExamCraft AI!
-
-        Hi {first_name},
-
-        Thank you for signing up! Please verify your email address by clicking the link below:
-
-        {verification_url}
-
-        This link will expire in 24 hours.
-
-        If you didn't create an account, you can safely ignore this email.
-
-        © {datetime.now().year} ExamCraft AI
-        """
-
-        return EmailService._send_email(
+        return await EmailService._send(
+            template_slug="verification",
             to=email,
-            subject=subject,
-            html=html_body,
-            text=text,
-            tags={"type": "verification"},
+            variables={"first_name": first_name, "verification_url": verification_url},
         )
 
     @staticmethod
-    def send_welcome_email(email: str, first_name: str) -> Dict[str, Any]:
-        """
-        Send welcome email after successful verification
-
-        Args:
-            email: User's email address
-            first_name: User's first name
-
-        Returns:
-            Response from Resend API
-        """
-        # TF-762: same reasoning as `send_verification_email` above --
-        # `first_name` is user-supplied and must not reach the HTML body raw.
-        safe_first_name = html.escape(first_name)
-
-        subject = "Welcome to ExamCraft AI - Let's Get Started! 🚀"
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0;">You're All Set! 🎉</h1>
-            </div>
-
-            <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="font-size: 16px;">Hi {safe_first_name},</p>
-
-                <p style="font-size: 16px;">
-                    Your email has been verified successfully! You're now ready to start creating amazing exam questions with AI.
-                </p>
-
-                <h2 style="color: #667eea; margin-top: 30px;">What's Next?</h2>
-
-                <ul style="font-size: 16px; line-height: 2;">
-                    <li>📄 Upload your first document</li>
-                    <li>🤖 Generate AI-powered exam questions</li>
-                    <li>✅ Review and refine your questions</li>
-                    <li>📝 Export your exam</li>
-                </ul>
-
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{FRONTEND_URL}/dashboard"
-                       style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                              color: white;
-                              padding: 15px 40px;
-                              text-decoration: none;
-                              border-radius: 5px;
-                              font-weight: bold;
-                              display: inline-block;">
-                        Go to Dashboard
-                    </a>
-                </div>
-
-                <p style="font-size: 14px; color: #666; margin-top: 30px;">
-                    Need help? Check out our <a href="{FRONTEND_URL}/docs" style="color: #667eea;">documentation</a>
-                    or contact our support team.
-                </p>
-
-                <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-
-                <p style="font-size: 12px; color: #999; text-align: center;">
-                    © {datetime.now().year} ExamCraft AI. All rights reserved.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-
-        text = f"""
-        You're All Set!
-
-        Hi {first_name},
-
-        Your email has been verified successfully! You're now ready to start creating amazing exam questions with AI.
-
-        What's Next?
-        - Upload your first document
-        - Generate AI-powered exam questions
-        - Review and refine your questions
-        - Export your exam
-
-        Get started: {FRONTEND_URL}/dashboard
-
-        © {datetime.now().year} ExamCraft AI
-        """
-
-        return EmailService._send_email(
+    async def send_welcome_email(email: str, first_name: str) -> Dict[str, Any]:
+        """Send welcome email after successful verification via the "welcome" template."""
+        return await EmailService._send(
+            template_slug="welcome",
             to=email,
-            subject=subject,
-            html=html_body,
-            text=text,
-            tags={"type": "welcome"},
+            variables={
+                "first_name": first_name,
+                "dashboard_url": f"{FRONTEND_URL}/dashboard",
+                "docs_url": f"{FRONTEND_URL}/docs",
+            },
         )
 
     @staticmethod
@@ -324,7 +175,7 @@ class EmailService:
             return "unknown"
 
     @staticmethod
-    def send_impersonation_ended_email(
+    async def send_impersonation_ended_email(
         to_email: str,
         to_name: str,
         admin_name: str,
@@ -332,22 +183,20 @@ class EmailService:
         started_at: Optional[str],
         ended_at: Optional[str],
         end_reason: str,
-    ) -> Dict[str, Any]:
-        """
-        Notify a user that an administrator's impersonation session against
-        their account has ended (TF-742).
+        session_id: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Notify a user that an administrator's impersonation session against
+        their account has ended (TF-742), via the "impersonation-ended" template.
 
         Args:
-            to_email: Target user's email address
-            to_name: Target user's display name
-            admin_name: Display name of the admin who impersonated them
-            reason: Reason the admin gave when starting the session
-            started_at: ISO timestamp the session started, if known
-            ended_at: ISO timestamp the session ended, if known
-            end_reason: "manual" or "timeout"
-
-        Returns:
-            Response from Resend API
+            session_id: The ``ImpersonationSession.id`` this notification
+                belongs to, when known (both production dispatch sites in
+                ``auth_service.py`` pass it). Preferred over
+                recipient+``started_at`` for the idempotency key below,
+                since it's unconditionally unique and doesn't depend on an
+                optional/lossy timestamp field. See ``_send``'s docstring
+                for the current caveat: SubscribeFlow doesn't yet dedupe on
+                this key server-side, so it has no effect today.
         """
         duration = EmailService._format_duration(started_at, ended_at)
         ended_how = (
@@ -355,226 +204,54 @@ class EmailService:
             if end_reason == "timeout"
             else "manually by the administrator"
         )
-
-        # TF-742 review fix: `reason` is free text the impersonating admin
-        # typed (min 3 / max 500 chars, no character restriction -- see
-        # ImpersonateRequest in api/admin.py). `admin_name`/`to_name` are
-        # also not under this function's control. All three go into an
-        # HTML email delivered to a *different* user than the one who
-        # supplied them, so they must be escaped before interpolation into
-        # `html` -- otherwise an admin could embed markup/links into what
-        # looks like a trusted ExamCraft security notice. Mirrors the
-        # existing ``html.escape()`` convention in
-        # services/moodle_feedback/transports.py:_comment_html. The plain
-        # `text` body below is unaffected -- it can't render markup.
-        safe_to_name = html.escape(to_name)
-        safe_admin_name = html.escape(admin_name)
-        safe_reason = html.escape(reason)
-
-        subject = "Your ExamCraft AI account was accessed by an administrator"
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0;">Account Access Notice</h1>
-            </div>
-
-            <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="font-size: 16px;">Hi {safe_to_name},</p>
-
-                <p style="font-size: 16px;">
-                    An administrator, <strong>{safe_admin_name}</strong>, accessed your
-                    ExamCraft AI account on your behalf. This session has now
-                    ended, {ended_how}.
-                </p>
-
-                <table style="width: 100%; font-size: 14px; margin: 20px 0; border-collapse: collapse;">
-                    <tr>
-                        <td style="padding: 6px 0; color: #666;">Administrator</td>
-                        <td style="padding: 6px 0;"><strong>{safe_admin_name}</strong></td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px 0; color: #666;">Reason given</td>
-                        <td style="padding: 6px 0;">{safe_reason}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px 0; color: #666;">Started</td>
-                        <td style="padding: 6px 0;">{started_at or "unknown"}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px 0; color: #666;">Ended</td>
-                        <td style="padding: 6px 0;">{ended_at or "unknown"}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px 0; color: #666;">Duration</td>
-                        <td style="padding: 6px 0;">{duration}</td>
-                    </tr>
-                </table>
-
-                <p style="font-size: 14px; color: #666; margin-top: 30px;">
-                    If you did not expect this, or have any concerns, please
-                    contact your institution's administrator or ExamCraft AI
-                    support.
-                </p>
-
-                <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-
-                <p style="font-size: 12px; color: #999; text-align: center;">
-                    © {datetime.now().year} ExamCraft AI. All rights reserved.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-
-        text = f"""
-        Account Access Notice
-
-        Hi {to_name},
-
-        An administrator, {admin_name}, accessed your ExamCraft AI account on
-        your behalf. This session has now ended, {ended_how}.
-
-        Administrator: {admin_name}
-        Reason given: {reason}
-        Started: {started_at or "unknown"}
-        Ended: {ended_at or "unknown"}
-        Duration: {duration}
-
-        If you did not expect this, or have any concerns, please contact your
-        institution's administrator or ExamCraft AI support.
-
-        © {datetime.now().year} ExamCraft AI
-        """
-
-        return EmailService._send_email(
+        idempotency_key = (
+            f"impersonation-ended:{session_id}"
+            if session_id is not None
+            else f"impersonation-ended:{to_email}:{started_at or 'unknown'}"
+        )
+        return await EmailService._send(
+            template_slug="impersonation-ended",
             to=to_email,
-            subject=subject,
-            html=html_body,
-            text=text,
-            tags={"type": "impersonation_ended"},
+            variables={
+                "to_name": to_name,
+                "admin_name": admin_name,
+                "reason": reason,
+                "started_at": started_at or "unknown",
+                "ended_at": ended_at or "unknown",
+                "duration": duration,
+                "ended_how": ended_how,
+            },
+            idempotency_key=idempotency_key,
         )
 
     @staticmethod
-    def send_impersonation_started_email(
+    async def send_impersonation_started_email(
         to_email: str,
         to_name: str,
         admin_name: str,
         reason: str,
         started_at: Optional[str],
-    ) -> Dict[str, Any]:
-        """
-        Notify a user in real time that an administrator has started an
-        impersonation session on their account (TF-759).
-
-        Sibling of ``send_impersonation_ended_email`` (TF-742): same template
-        pattern (layout, escaping approach), dispatched at the *start* of
-        the session instead of after it closes, so the target learns about
-        an ongoing session without having to wait for it to end. Subject
-        line and body copy differ (there's no ``ended_at``/duration yet).
-        The TF-742 ended-email still fires separately when the session
-        closes -- this one doesn't replace it, it's the earlier half of
-        the pair.
-
-        Args:
-            to_email: Target user's email address
-            to_name: Target user's display name
-            admin_name: Display name of the admin impersonating them
-            reason: Reason the admin gave when starting the session
-            started_at: ISO timestamp the session started, if known
-
-        Returns:
-            Response from Resend API
-        """
-        # Same escaping rationale as send_impersonation_ended_email: `reason`
-        # is free text the impersonating admin typed, delivered to a
-        # *different* user inside a trusted-looking security notice.
-        safe_to_name = html.escape(to_name)
-        safe_admin_name = html.escape(admin_name)
-        safe_reason = html.escape(reason)
-
-        subject = "An administrator started accessing your ExamCraft AI account"
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-                <h1 style="color: white; margin: 0;">Account Access Notice</h1>
-            </div>
-
-            <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-                <p style="font-size: 16px;">Hi {safe_to_name},</p>
-
-                <p style="font-size: 16px;">
-                    An administrator, <strong>{safe_admin_name}</strong>, has just
-                    started accessing your ExamCraft AI account on your behalf.
-                    The session is active now and expires automatically after
-                    30 minutes if it isn't ended sooner.
-                </p>
-
-                <table style="width: 100%; font-size: 14px; margin: 20px 0; border-collapse: collapse;">
-                    <tr>
-                        <td style="padding: 6px 0; color: #666;">Administrator</td>
-                        <td style="padding: 6px 0;"><strong>{safe_admin_name}</strong></td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px 0; color: #666;">Reason given</td>
-                        <td style="padding: 6px 0;">{safe_reason}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px 0; color: #666;">Started</td>
-                        <td style="padding: 6px 0;">{started_at or "unknown"}</td>
-                    </tr>
-                </table>
-
-                <p style="font-size: 14px; color: #666; margin-top: 30px;">
-                    If you did not expect this, or have any concerns, please
-                    contact your institution's administrator or ExamCraft AI
-                    support.
-                </p>
-
-                <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-
-                <p style="font-size: 12px; color: #999; text-align: center;">
-                    © {datetime.now().year} ExamCraft AI. All rights reserved.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-
-        text = f"""
-        Account Access Notice
-
-        Hi {to_name},
-
-        An administrator, {admin_name}, has just started accessing your
-        ExamCraft AI account on your behalf. The session is active now and
-        expires automatically after 30 minutes if it isn't ended sooner.
-
-        Administrator: {admin_name}
-        Reason given: {reason}
-        Started: {started_at or "unknown"}
-
-        If you did not expect this, or have any concerns, please contact your
-        institution's administrator or ExamCraft AI support.
-
-        © {datetime.now().year} ExamCraft AI
-        """
-
-        return EmailService._send_email(
+        session_id: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """Notify a user in real time that an administrator has started an
+        impersonation session on their account (TF-759), via the
+        "impersonation-started" template. Sibling of
+        ``send_impersonation_ended_email`` -- dispatched at session start
+        instead of end; see that method's docstring for why ``session_id``
+        is preferred for the idempotency key when available."""
+        idempotency_key = (
+            f"impersonation-started:{session_id}"
+            if session_id is not None
+            else f"impersonation-started:{to_email}:{started_at or 'unknown'}"
+        )
+        return await EmailService._send(
+            template_slug="impersonation-started",
             to=to_email,
-            subject=subject,
-            html=html_body,
-            text=text,
-            tags={"type": "impersonation_started"},
+            variables={
+                "to_name": to_name,
+                "admin_name": admin_name,
+                "reason": reason,
+                "started_at": started_at or "unknown",
+            },
+            idempotency_key=idempotency_key,
         )

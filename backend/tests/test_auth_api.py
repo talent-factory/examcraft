@@ -3,6 +3,8 @@ Tests for Auth API Endpoints
 Tests registration, login, logout, password change, etc.
 """
 
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -446,3 +448,129 @@ def test_change_password_without_auth(test_client):
     )
 
     assert response.status_code == 401  # No credentials
+
+
+# ============================================================================
+# TF-764: "skipped" email send (SUBSCRIBEFLOW_EMAILS_API_KEY unset) must be
+# logged as a warning, not the same info line a real send would get -- this
+# is precisely the silent-failure bug TF-764's "skipped" status check fixes.
+# ============================================================================
+
+
+# The three tests below patch logging.Logger.warning/.info at the CLASS
+# level rather than on a specific module's `logger` object (and rather than
+# using caplog).
+#
+# caplog relies on propagation from the named logger to the root logger,
+# which is unreliable across the full backend test suite (some other test/
+# module disables propagation depending on run order) -- see
+# project_caplog_propagation_full_suite.
+#
+# Patching a specific module's `logger` attribute (e.g. "api.auth.logger")
+# is ALSO unreliable here specifically: main.py's lifespan handler loads
+# api/auth.py a second time via importlib under the module name
+# "core_api_auth" (see project_api_import_sysmodules_prod_only) and
+# registers ITS router with `app` -- a distinct module object with its own
+# `logger`, never registered in sys.modules and therefore not reachable by
+# name from a test. Once any earlier test in the same pytest process
+# triggers app startup (e.g. any test using `with TestClient(app):`),
+# core_api_auth's router route wins over the plain `api.auth` router this
+# file's own `test_client` fixture registers (Starlette matches the first
+# route added for a given path), so a request can silently be served by
+# either module instance depending on test run order.
+#
+# Patching logging.Logger.warning/.info at the class level sidesteps the
+# whole problem: it intercepts every Logger instance's calls process-wide
+# for the scope of the `with` block, regardless of which duplicate module
+# instance is actually holding the logger.
+
+
+def test_register_logs_warning_when_verification_email_skipped(test_client):
+    with (
+        patch("services.email_service.SUBSCRIBEFLOW_EMAILS_API_KEY", ""),
+        patch("logging.Logger.warning") as mock_warning,
+        patch("logging.Logger.info") as mock_info,
+    ):
+        response = test_client.post(
+            "/api/auth/register",
+            json={
+                "email": "skipped-register@example.com",
+                "password": "SecurePass123!",
+                "first_name": "Skip",
+                "last_name": "User",
+            },
+        )
+
+    assert response.status_code == 201
+    warning_text = "\n".join(
+        str(arg) for call in mock_warning.call_args_list for arg in call.args
+    )
+    assert "Verification email NOT sent" in warning_text
+    info_text = "\n".join(
+        str(arg) for call in mock_info.call_args_list for arg in call.args
+    )
+    assert "Verification email sent" not in info_text
+
+
+def test_verify_email_logs_warning_when_welcome_email_skipped(test_client, db):
+    from models.auth import EmailVerificationToken
+
+    with patch("services.email_service.SUBSCRIBEFLOW_EMAILS_API_KEY", ""):
+        register_response = test_client.post(
+            "/api/auth/register",
+            json={
+                "email": "skipped-verify@example.com",
+                "password": "SecurePass123!",
+                "first_name": "Skip",
+                "last_name": "User",
+            },
+        )
+        assert register_response.status_code == 201
+
+        email_token = (
+            db.query(EmailVerificationToken)
+            .join(User)
+            .filter(User.email == "skipped-verify@example.com")
+            .first()
+        )
+        assert email_token is not None
+
+        with (
+            patch("logging.Logger.warning") as mock_warning,
+            patch("logging.Logger.info") as mock_info,
+        ):
+            response = test_client.post(
+                "/api/auth/verify-email", params={"token": email_token.token}
+            )
+
+    assert response.status_code == 200
+    warning_text = "\n".join(
+        str(arg) for call in mock_warning.call_args_list for arg in call.args
+    )
+    assert "Welcome email NOT sent" in warning_text
+    info_text = "\n".join(
+        str(arg) for call in mock_info.call_args_list for arg in call.args
+    )
+    assert "Welcome email sent" not in info_text
+
+
+def test_resend_verification_logs_warning_when_email_skipped(test_client, test_user):
+    with (
+        patch("services.email_service.SUBSCRIBEFLOW_EMAILS_API_KEY", ""),
+        patch("logging.Logger.warning") as mock_warning,
+        patch("logging.Logger.info") as mock_info,
+    ):
+        response = test_client.post(
+            "/api/auth/resend-verification",
+            params={"email": test_user.email},
+        )
+
+    assert response.status_code == 200
+    warning_text = "\n".join(
+        str(arg) for call in mock_warning.call_args_list for arg in call.args
+    )
+    assert "Verification email NOT resent" in warning_text
+    info_text = "\n".join(
+        str(arg) for call in mock_info.call_args_list for arg in call.args
+    )
+    assert "Verification email resent" not in info_text
