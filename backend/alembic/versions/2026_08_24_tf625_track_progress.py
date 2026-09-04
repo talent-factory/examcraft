@@ -16,12 +16,11 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "tf625_track_progress"
-# Beim Merge von develop (02.09.2026) auf dessen Kopf umgehängt. Vorher
-# "tf644_competency_visibility" — dieselbe Wurzel wie develops
-# tf740/tf745-Kette, was zwei Alembic-Heads ergab und jedes "upgrade head"
-# abbrechen liess. Diese Datei ist die Wurzel der beiden TF-625-Migrationen
-# (tf625_track_progress -> tf625_hint_i18n_key); es genügt daher, hier
-# umzuhängen.
+# Rebased onto develop's head on merge (2026-09-02). Was previously
+# "tf644_competency_visibility" — the same root as develop's tf740/tf745
+# chain, which produced two Alembic heads and made every "upgrade head" abort.
+# This file is the root of the two TF-625 migrations (tf625_track_progress ->
+# tf625_hint_i18n_key), so rebasing it here is enough.
 down_revision: Union[str, None] = "tf745_fk_ondelete_cascade"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

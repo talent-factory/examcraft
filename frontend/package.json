@@ -112,8 +112,9 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:all": "bun run test:unit && bun run test:e2e",
-    "lint": "eslint src --ext .ts,.tsx,.js,.jsx",
-    "lint:fix": "eslint src --ext .ts,.tsx,.js,.jsx --fix",
+    "lint": "eslint src scripts --ext .ts,.tsx,.js,.jsx",
+    "lint:fix": "eslint src scripts --ext .ts,.tsx,.js,.jsx --fix",
+    "i18n:check": "bun run scripts/check-i18n-keys.ts",
     "clean": "rm -rf dist",
     "eject": "react-scripts eject"
   },

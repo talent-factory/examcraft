@@ -45,20 +45,28 @@ def upgrade() -> None:
         "help_context_hints", sa.Column("i18n_key", sa.String(255), nullable=True)
     )
 
-    # Derive the key from route_pattern, matching seed_help_hints.DEFAULT_HINTS.
-    # A row whose pattern is not one of the six seeded ones cannot exist (the
-    # seed is the only writer), but COALESCE keeps the NOT NULL below safe
-    # rather than failing the migration on unexpected data.
+    # Derive the key from route_pattern. Covers both the current
+    # seed_help_hints.DEFAULT_HINTS patterns and the two renamed-away patterns
+    # a production row can still carry at migration time ("/documents/upload",
+    # "/exam/create" — see seed_help_hints.OBSOLETE_ROUTE_PATTERNS): the seed
+    # only runs once the app finishes starting, so a row created under the old
+    # pattern is not backfilled by it until after this migration has already
+    # run. "/admin/users" is also obsolete and has no current counterpart, so
+    # it — like any row this CASE does not recognize — falls through to the
+    # COALESCE default. That default is not a real translation key; it is
+    # covered by `t(hint.i18n_key, 'Tipp verfügbar')` on the frontend, and the
+    # row itself is deleted by seed_help_hints on the very next startup.
     op.execute(
         """
         UPDATE help_context_hints
         SET i18n_key = COALESCE(
             CASE route_pattern
                 WHEN '/documents'          THEN 'help.hints.documents'
+                WHEN '/documents/upload'   THEN 'help.hints.documents'
                 WHEN '/questions/generate' THEN 'help.hints.questionsGenerate'
+                WHEN '/exam/create'        THEN 'help.hints.questionsGenerate'
                 WHEN '/questions/review'   THEN 'help.hints.questionsReview'
                 WHEN '/exams/compose'      THEN 'help.hints.examsCompose'
-                WHEN '/admin/users'        THEN 'help.hints.adminUsers'
                 WHEN '/prompts'            THEN 'help.hints.prompts'
             END,
             'help.hints.unknown'

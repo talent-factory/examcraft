@@ -228,8 +228,8 @@ describe('HelpWidget — Vertiefungen', () => {
   });
 
   it('bietet bei angefangener Vertiefung «Fortsetzen» statt «Starten» an', async () => {
-    // Der Button beschreibt sonst die falsche Handlung: die Tour setzt bei
-    // Schritt 2 fort, der Text verspricht einen Neustart.
+    // Otherwise the button describes the wrong action: the tour resumes at
+    // step 2, but the label promises a restart.
     const { useHelpContext } = require('../useHelpContext');
     useHelpContext.mockImplementation(() =>
       helpContextValue({

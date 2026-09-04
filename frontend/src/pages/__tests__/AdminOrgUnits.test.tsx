@@ -30,8 +30,20 @@ jest.mock('react-i18next', () => {
     }
     return typeof current === 'string' ? current : key;
   }
+  // Mirrors the plural handling in src/setupTests.ts (TF-670): i18next resolves
+  // `<key>_one` / `<key>_other` when a numeric `count` is passed.
+  function mockResolvePlural(key: string, params?: Record<string, any>): string {
+    if (params && typeof params.count === 'number') {
+      const category = new Intl.PluralRules('de').select(params.count);
+      for (const candidate of [`${key}_${category}`, `${key}_other`]) {
+        const value = mockResolveKey(mockTranslations, candidate);
+        if (value !== candidate) return value;
+      }
+    }
+    return mockResolveKey(mockTranslations, key);
+  }
   const stableT = (key: string, params?: Record<string, any>) => {
-    let value = mockResolveKey(mockTranslations, key);
+    let value = mockResolvePlural(key, params);
     if (params && typeof value === 'string') {
       Object.entries(params).forEach(([k, v]) => {
         value = (value as string).replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v));
@@ -77,6 +89,16 @@ const team = {
   updated_at: '2026-08-07T00:00:00Z',
 };
 
+const fakultaet = {
+  id: 3,
+  parent_org_unit_id: null,
+  unit_type: 'abteilung',
+  name: 'Wirtschaft',
+  descendant_count: 2,
+  created_at: '2026-08-07T00:00:00Z',
+  updated_at: '2026-08-07T00:00:00Z',
+};
+
 describe('AdminOrgUnits', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -114,8 +136,11 @@ describe('AdminOrgUnits', () => {
 
     fireEvent.click(screen.getByTestId('ou-btn-delete-1'));
 
+    // Singular: the fixture has exactly one descendant, and since TF-670 the
+    // key carries _one/_other forms instead of the former "…1 untergeordneten
+    // Einheiten".
     expect(
-      screen.getByText(/Informatik.*1.*untergeordneten Einheiten/),
+      screen.getByText(/Informatik.*1 untergeordnete Einheit werden/),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ou-delete-confirm-btn'));
@@ -123,5 +148,21 @@ describe('AdminOrgUnits', () => {
     await waitFor(() => {
       expect(mockedService.remove).toHaveBeenCalledWith(1);
     });
+  });
+
+  it('shows the plural warning text for more than one descendant', async () => {
+    // Complements the singular case above: without this, a regression in the
+    // mock's `_other` resolution (see setupTests.ts) could pass every other
+    // test in this file while still rendering the raw, unresolved key for
+    // the case that fires for the overwhelming majority of real org units.
+    mockedService.list.mockResolvedValue({ items: [fakultaet] });
+    renderWithTheme();
+    await waitFor(() => screen.getByTestId('ou-row-3'));
+
+    fireEvent.click(screen.getByTestId('ou-btn-delete-3'));
+
+    expect(
+      screen.getByText(/Wirtschaft.*alle 2 untergeordneten Einheiten werden/),
+    ).toBeInTheDocument();
   });
 });

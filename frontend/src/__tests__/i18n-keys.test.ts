@@ -15,12 +15,11 @@
  *      via the DE fallback).
  *   3. DE and EN have full logical-key parity (no extras on either side).
  *
- * Out of scope: FR/IT parity. Both still lag DE (see
- * onboardingStepsI18n.test.ts / help-hint-keys.test.ts for the `help.*`
- * subset specifically, which TF-625 closed to zero — the remaining gap is
- * elsewhere and not attributable to any one feature). Closing it fully is
- * tracked separately; this test relies on the i18next fallback to DE for
- * those locales until then.
+ * Out of scope: FR/IT parity. Since TF-670 those locales are key-identical to
+ * DE and that invariant is enforced by `bun run i18n:check`
+ * (scripts/check-i18n-keys.ts), which also covers EN and interpolation
+ * placeholders. This test stays focused on the other direction — that every
+ * `t()` call site in the source actually has a key to resolve.
  *
  * Limitations: only literal string arguments are scanned. Dynamic keys such
  * as `` t(`pages.dashboard.activityTypes.${type}`) `` are skipped — there is

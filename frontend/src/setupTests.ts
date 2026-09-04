@@ -151,13 +151,35 @@ jest.mock('react-i18next', () => {
       if (current == null || typeof current !== 'object') return key;
       current = current[part];
     }
-    return current;
+    return typeof current === 'string' ? current : key;
+  }
+
+  // i18next picks `<key>_one` / `<key>_other` when a numeric `count` is passed
+  // (JSON v4 plurals). Without this the mock returned the bare key, so every
+  // pluralised key rendered as a raw key string in component tests — silently,
+  // because nothing asserted on the five keys that were pluralised before
+  // TF-670. The plural category follows the mock's own language ('de').
+  //
+  // Checking `value !== candidate` (not `typeof value === 'string'`) matters:
+  // `mockResolveKey` returns the candidate string itself, unchanged, whenever
+  // resolution fails partway through (a missing middle segment, or a leaf that
+  // isn't a string) — which is also typeof 'string'. A plain type check would
+  // treat that failure as success and render the raw, unresolved candidate.
+  function mockResolvePlural(key: string, params?: Record<string, any>): any {
+    if (params && typeof params.count === 'number') {
+      const category = new Intl.PluralRules('de').select(params.count);
+      for (const candidate of [`${key}_${category}`, `${key}_other`]) {
+        const value = mockResolveKey(mockTranslations, candidate);
+        if (value !== candidate) return value;
+      }
+    }
+    return mockResolveKey(mockTranslations, key);
   }
 
   return {
     useTranslation: () => ({
       t: (key: string, params?: Record<string, any>) => {
-        const rawValue = mockResolveKey(mockTranslations, key);
+        const rawValue = mockResolvePlural(key, params);
         if (params?.returnObjects) {
           return rawValue;
         }

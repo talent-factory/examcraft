@@ -60,9 +60,9 @@ class TestContextHints:
     def test_returns_hint_for_matching_route(self, help_client, help_db):
         from models.help import HelpContextHint
 
-        # Ein Muster, das mit keinem gesäten kollidiert: der Abgleich ist ein
-        # Präfix-Test, "/documents/upload" trifft also auch den echten
-        # "/documents"-Hinweis — je nach Reihenfolge gewann mal der, mal dieser.
+        # A pattern that collides with none of the seeded ones: the match is a
+        # prefix test, so "/documents/upload" would also hit the real
+        # "/documents" hint — which one wins would depend on ordering.
         hint = HelpContextHint(
             route_pattern="/zzz-test-route",
             role="teacher",
