@@ -2,17 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { Box, TextField, Button, Alert, Paper, Typography, FormControlLabel, Switch } from '@mui/material';
 import { Unarchive } from '@mui/icons-material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import { tagsApi } from '../../api/tagsApi';
 import { useAuth } from '../../contexts/AuthContext';
-
-const extractApiDetail = (err: unknown, fallback: string): string => {
-  if (axios.isAxiosError(err)) {
-    const detail = err.response?.data?.detail;
-    if (typeof detail === 'string' && detail.trim()) return detail;
-  }
-  return fallback;
-};
+import { apiDetail, translateError } from '../../errors';
 
 export interface ExistingTagInfo {
   id: number;
@@ -26,6 +19,7 @@ interface Props {
 }
 
 const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isSuperuser = user?.is_superuser === true;
@@ -35,8 +29,8 @@ const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
 
   const existingMatch = useMemo(
     () => existingTags.find(
-      (t) => t.name.toLowerCase() === name.trim().toLowerCase() &&
-             t.scope === (isGlobal ? 'global' : 'institution')
+      (tag) => tag.name.toLowerCase() === name.trim().toLowerCase() &&
+             tag.scope === (isGlobal ? 'global' : 'institution')
     ) ?? null,
     [existingTags, name, isGlobal],
   );
@@ -49,7 +43,7 @@ const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
       setCreateError(null);
     },
     onError: (err) =>
-      setCreateError(extractApiDetail(err, 'Tag konnte nicht erstellt werden.')),
+      setCreateError(apiDetail(err) ?? translateError(err, t, 'components.tags.createErrorFallback')),
   });
 
   const unarchiveMutation = useMutation({
@@ -59,7 +53,7 @@ const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
       setName('');
     },
     onError: (err) =>
-      setCreateError(extractApiDetail(err, 'Wiederherstellen fehlgeschlagen.')),
+      setCreateError(apiDetail(err) ?? translateError(err, t, 'components.tags.restoreFailed')),
   });
 
   const handleCreate = () => {
@@ -75,7 +69,7 @@ const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
         color="primary"
         sx={{ display: 'block', mb: 1, fontWeight: 600, lineHeight: 1.5 }}
       >
-        Neuen Tag erstellen
+        {t('components.tags.createTitle')}
       </Typography>
 
       {isSuperuser && (
@@ -90,7 +84,7 @@ const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
           }
           label={
             <Typography variant="caption" color={isGlobal ? 'primary' : 'text.secondary'}>
-              Globaler Tag (systemweit, alle Institutionen)
+              {t('components.tags.globalTag')}
             </Typography>
           }
         />
@@ -99,7 +93,7 @@ const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
       <Box sx={{ display: 'flex', gap: 1 }}>
         <TextField
           size="small"
-          placeholder="Tag-Name eingeben..."
+          placeholder={t('components.tags.namePlaceholder')}
           value={name}
           onChange={(e) => { setName(e.target.value); setCreateError(null); }}
           onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
@@ -114,20 +108,20 @@ const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
           disabled={!name.trim() || !!existingMatch || createMutation.isPending}
           sx={{ whiteSpace: 'nowrap' }}
         >
-          Tag erstellen
+          {t('components.tags.createButton')}
         </Button>
       </Box>
 
       {existingMatch && !existingMatch.is_archived && (
         <Alert severity="warning" sx={{ mt: 1, py: 0.5 }}>
-          Tag <strong>#{existingMatch.name}</strong> existiert bereits.
+          {t('components.tags.existsPrefix')} <strong>#{existingMatch.name}</strong> {t('components.tags.existsSuffix')}
         </Alert>
       )}
 
       {existingMatch?.is_archived && (
         <Alert severity="info" sx={{ mt: 1, py: 0.5 }}>
           <Box>
-            Tag <strong>#{existingMatch.name}</strong> ist archiviert.
+            {t('components.tags.existsPrefix')} <strong>#{existingMatch.name}</strong> {t('components.tags.archivedSuffix')}
             <Box sx={{ mt: 1 }}>
               <Button
                 variant="contained"
@@ -136,7 +130,7 @@ const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
                 onClick={() => unarchiveMutation.mutate(existingMatch.id)}
                 disabled={unarchiveMutation.isPending}
               >
-                Wiederherstellen
+                {t('components.tags.restore')}
               </Button>
             </Box>
           </Box>

@@ -16,6 +16,7 @@ import PublicIcon from '@mui/icons-material/Public';
 import CheckIcon from '@mui/icons-material/Check';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { tagsApi, type Tag, type TagValue, type TagKind, isPendingTag } from '../../api/tagsApi';
 
 interface TagAutocompleteProps {
@@ -43,10 +44,12 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
   value,
   onChange,
   disabled = false,
-  label = 'Tags',
+  label,
   deferCreation = false,
   kind = 'content',
 }) => {
+  const { t } = useTranslation();
+  const resolvedLabel = label ?? t('components.tags.label');
   // Prompt tags are global-scoped; content tags default to institution scope.
   const createScope: 'global' | 'institution' =
     kind === 'prompt' ? 'global' : 'institution';
@@ -68,7 +71,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
     staleTime: 60_000,
   });
   const allTags = useMemo(() =>
-    [...allTagsWithArchived.filter((t) => !t.is_archived)].sort((a, b) => {
+    [...allTagsWithArchived.filter((tag) => !tag.is_archived)].sort((a, b) => {
       if (a.scope === b.scope) return a.name.localeCompare(b.name);
       return a.scope === 'global' ? 1 : -1;
     }),
@@ -89,7 +92,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
     },
     onError: (err) => {
       pendingCreateRef.current = false;
-      console.error('Tag konnte nicht erstellt werden.', err);
+      console.error('Failed to create tag.', err);
       setCreateError(true);
     },
   });
@@ -116,7 +119,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
 
     // Archived check: immediate feedback without an API call
     const archivedMatch = allTagsWithArchived.find(
-      (t) => t.is_archived && t.name.toLowerCase() === trimmed.toLowerCase()
+      (tag) => tag.is_archived && tag.name.toLowerCase() === trimmed.toLowerCase()
     );
     if (archivedMatch) {
       setArchivedWarning(archivedMatch.name);
@@ -160,8 +163,8 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
         noOptionsText={
           inputValue.trim() &&
           value.some((v) => v.name.toLowerCase() === inputValue.trim().toLowerCase())
-            ? `"${inputValue.trim()}" ist bereits ausgewählt`
-            : 'Keine Optionen'
+            ? t('components.tags.alreadySelected', { value: inputValue.trim() })
+            : t('components.tags.noOptions')
         }
         componentsProps={{
           paper: {
@@ -188,8 +191,8 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
         options={allTags as TagOption[]}
         groupBy={(option) =>
           !isCreateOption(option) && (option as Tag).scope === 'global'
-            ? 'Vorgegebene Tags'
-            : 'Tags dieser Institution'
+            ? t('components.tags.groupGlobal')
+            : t('components.tags.groupInstitution')
         }
         renderGroup={(params) => (
           <React.Fragment key={params.key}>
@@ -210,13 +213,13 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
                 fontWeight: 700,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                color: params.group === 'Tags dieser Institution' ? '#1565c0' : '#757575',
-                bgcolor: params.group === 'Tags dieser Institution' ? '#e8f4ff' : '#f5f5f5',
+                color: params.group === t('components.tags.groupInstitution') ? '#1565c0' : '#757575',
+                bgcolor: params.group === t('components.tags.groupInstitution') ? '#e8f4ff' : '#f5f5f5',
                 borderBottom: '1px solid',
                 borderColor: 'divider',
               }}
             >
-              {params.group === 'Vorgegebene Tags' && (
+              {params.group === t('components.tags.groupGlobal') && (
                 <PublicIcon sx={{ fontSize: 12 }} />
               )}
               {params.group}
@@ -235,7 +238,10 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
             allTags.some((o) => o.name.toLowerCase() === trimmedLower) ||
             value.some((v) => v.name.toLowerCase() === trimmedLower);
           if (trimmedLower && !alreadyExists) {
-            return [{ inputValue: trimmed, name: `"${trimmed}" erstellen` }, ...filtered];
+            return [
+              { inputValue: trimmed, name: t('components.tags.createOption', { value: trimmed }) },
+              ...filtered,
+            ];
           }
           return filtered;
         }}
@@ -291,7 +297,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
           return (
             <TextField
               {...params}
-              label={label}
+              label={resolvedLabel}
               size="small"
               inputRef={(el) => {
                 inputElRef.current = el;
@@ -302,7 +308,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
                   if (e.key === 'Enter' && inputValue.trim()) {
                     const trimmedLower = inputValue.trim().toLowerCase();
                     const alreadyExists =
-                      allTags.some((t) => t.name.toLowerCase() === trimmedLower) ||
+                      allTags.some((tag) => tag.name.toLowerCase() === trimmedLower) ||
                       value.some((v) => v.name.toLowerCase() === trimmedLower);
                     if (!alreadyExists) {
                       e.preventDefault();
@@ -343,7 +349,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
           }}
         >
           <Typography variant="body2" color="error.dark">
-            🚫 Tag &ldquo;{archivedWarning}&rdquo; ist archiviert und kann nicht verwendet werden.
+            {t('components.tags.archivedCannotUse', { name: archivedWarning })}
           </Typography>
         </Box>
       )}
@@ -352,7 +358,7 @@ const TagAutocomplete: React.FC<TagAutocompleteProps> = ({
       {createError && (
         <Box sx={{ mt: 1, p: 1.5, bgcolor: 'error.50', border: '1px solid', borderColor: 'error.200', borderRadius: 1 }}>
           <Typography variant="body2" color="error.dark">
-            Tag konnte nicht erstellt werden. Bitte versuche es erneut.
+            {t('components.tags.createFailed')}
           </Typography>
         </Box>
       )}

@@ -15,7 +15,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { AppError, translateError } from '../errors';
 
 // ============================================================================
 // Types
@@ -62,6 +64,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export const useFeatures = (): UseFeaturesReturn => {
   const { user, accessToken, isAuthenticated } = useAuth();
+  const { t } = useTranslation();
   const [data, setData] = useState<UserFeatures | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +92,7 @@ export const useFeatures = (): UseFeaturesReturn => {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch features: ${response.statusText}`);
+        throw new AppError('features.loadFailed', response.statusText, response.status);
       }
 
       const featuresData: UserFeatures = await response.json();
@@ -102,13 +105,12 @@ export const useFeatures = (): UseFeaturesReturn => {
 
       setData(featuresData);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch features';
-      setError(errorMessage);
+      setError(translateError(err, t, 'errors.features.loadFailed'));
       console.error('[useFeatures] Error fetching features:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, accessToken]);
+  }, [isAuthenticated, accessToken, t]);
 
   /**
    * Load features from cache or fetch from API

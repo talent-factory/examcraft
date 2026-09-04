@@ -10,6 +10,7 @@ import React from 'react';
 import { Box, Typography, Alert, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { InfoOutlined } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 
 
 /**
@@ -18,6 +19,7 @@ import { InfoOutlined } from '@mui/icons-material';
  */
 const UpgradePrompt: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <Box
@@ -37,14 +39,13 @@ const UpgradePrompt: React.FC = () => {
         sx={{ maxWidth: 600 }}
       >
         <Typography variant="h6" sx={{ mb: 1 }}>
-          Document Chat - Premium Feature
+          {t('components.documentChatPage.title')}
         </Typography>
         <Typography variant="body2" sx={{ mb: 2 }}>
-          The Document Chat feature is available in the Premium package.
-          This feature allows you to have interactive conversations with your documents using AI-powered RAG (Retrieval-Augmented Generation).
+          {t('components.documentChatPage.description')}
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          To access this feature, please upgrade to the Professional or Enterprise plan.
+          {t('components.documentChatPage.upgradeHint')}
         </Typography>
       </Alert>
 
@@ -54,7 +55,7 @@ const UpgradePrompt: React.FC = () => {
           color="primary"
           onClick={() => navigate('/documents')}
         >
-          Back to Documents
+          {t('components.documentChatPage.backToDocuments')}
         </Button>
         <Button
           variant="outlined"
@@ -62,7 +63,7 @@ const UpgradePrompt: React.FC = () => {
           href="https://examcraft.ai/pricing"
           target="_blank"
         >
-          View Premium Plans
+          {t('components.documentChatPage.viewPlans')}
         </Button>
       </Box>
     </Box>

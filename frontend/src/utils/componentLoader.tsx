@@ -12,51 +12,58 @@
 
 import React, { lazy, Suspense, ComponentType } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { isFullDeployment } from './deploymentMode';
 import { withFeatureGate } from '../components/common/withFeatureGate';
 
 /**
  * Feature unavailable component
  */
-const FeatureUnavailable: React.FC<{ featureName: string }> = ({ featureName }) => (
-  <Box
-    display="flex"
-    flexDirection="column"
-    justifyContent="center"
-    alignItems="center"
-    minHeight="200px"
-    sx={{ p: 3 }}
-  >
-    <Typography variant="h6" color="textSecondary" gutterBottom>
-      {featureName} Not Available
-    </Typography>
-    <Typography variant="body2" color="textSecondary" align="center">
-      This feature is only available in the Full deployment (Premium/Enterprise).
-      <br />
-      Please upgrade your subscription or contact your administrator.
-    </Typography>
-  </Box>
-);
+const FeatureUnavailable: React.FC<{ featureName: string }> = ({ featureName }) => {
+  const { t } = useTranslation();
+  return (
+    <Box
+      display="flex"
+      flexDirection="column"
+      justifyContent="center"
+      alignItems="center"
+      minHeight="200px"
+      sx={{ p: 3 }}
+    >
+      <Typography variant="h6" color="textSecondary" gutterBottom>
+        {t('components.featureUnavailable.title', { feature: featureName })}
+      </Typography>
+      <Typography variant="body2" color="textSecondary" align="center">
+        {t('components.featureUnavailable.body')}
+        <br />
+        {t('components.featureUnavailable.hint')}
+      </Typography>
+    </Box>
+  );
+};
 
 /**
  * Loading fallback component
  */
-const LoadingFallback: React.FC<{ componentName?: string }> = ({ componentName }) => (
-  <Box
-    display="flex"
-    flexDirection="column"
-    justifyContent="center"
-    alignItems="center"
-    minHeight="200px"
-  >
-    <CircularProgress />
-    {componentName && (
-      <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
-        Loading {componentName}...
-      </Typography>
-    )}
-  </Box>
-);
+const LoadingFallback: React.FC<{ componentName?: string }> = ({ componentName }) => {
+  const { t } = useTranslation();
+  return (
+    <Box
+      display="flex"
+      flexDirection="column"
+      justifyContent="center"
+      alignItems="center"
+      minHeight="200px"
+    >
+      <CircularProgress />
+      {componentName && (
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
+          {t('components.componentLoader.loading', { component: componentName })}
+        </Typography>
+      )}
+    </Box>
+  );
+};
 
 /**
  * Generic component loader with error handling
@@ -99,8 +106,8 @@ export const loadRAGExamCreator = () => {
           module.RAGExamCreator,
           'rag_generation',
           'starter',
-          'RAG Exam Creator',
-          'Generate exam questions using Retrieval-Augmented Generation with semantic search.'
+          'components.featureGate.ragExamCreator.name',
+          'components.featureGate.ragExamCreator.description'
         );
         return { default: ProtectedComponent };
       })
@@ -138,8 +145,8 @@ export const loadDocumentChat = () => {
     LazyComponent,
     'document_chatbot',
     'professional',
-    'Document Chat',
-    'Chat with your documents using AI-powered conversations'
+    'components.featureGate.documentChat.name',
+    'components.featureGate.documentChat.description'
   );
 };
 
@@ -164,8 +171,8 @@ export const loadPromptManagement = () => {
     LazyComponent,
     'advanced_prompt_management',
     'professional',
-    'Prompt Management',
-    'Manage and customize your prompt templates with advanced features'
+    'components.featureGate.promptManagement.name',
+    'components.featureGate.promptManagement.description'
   );
 };
 
@@ -190,8 +197,8 @@ export const loadPromptTemplateSelector = () => {
           module.PromptTemplateSelector,
           'prompt_templates',
           'starter',
-          'Prompt Template Selector',
-          'Select and customize prompt templates for question generation.'
+          'components.featureGate.promptTemplateSelector.name',
+          'components.featureGate.promptTemplateSelector.description'
         );
         return { default: ProtectedComponent };
       })
@@ -235,8 +242,8 @@ export const loadPromptLibraryWithUpload = () => {
           module.PromptLibraryWithUpload,
           'advanced_prompt_management',
           'professional',
-          'Advanced Prompt Management',
-          'Upload and manage custom prompt templates with semantic search.'
+          'components.featureGate.advancedPromptManagement.name',
+          'components.featureGate.advancedPromptManagement.description'
         );
         return { default: ProtectedComponent };
       })
@@ -268,10 +275,9 @@ export const loadCustomBranding = () => {
     return () => <FeatureUnavailable featureName="Custom Branding" />;
   }
 
-  // TODO: Implement lazy loading when CustomBranding component is ready
-  // const LazyComponent = lazy(() =>
-  //   import('@examcraft/enterprise').then(module => ({ default: module.CustomBranding }))
-  // );
+  // A CustomBranding component existed as an unwired placeholder but was
+  // never lazy-loaded from here; it was removed as dead code in TF-671.
+  // Implementing this feature means building the component from scratch.
   return () => <FeatureUnavailable featureName="Custom Branding" />;
 };
 
@@ -288,10 +294,9 @@ export const loadSSOConfiguration = () => {
     return () => <FeatureUnavailable featureName="SSO Configuration" />;
   }
 
-  // TODO: Implement lazy loading when SSOConfiguration component is ready
-  // const LazyComponent = lazy(() =>
-  //   import('@examcraft/enterprise').then(module => ({ default: module.SSOConfiguration }))
-  // );
+  // An SSOConfiguration component existed as an unwired placeholder but was
+  // never lazy-loaded from here; it was removed as dead code in TF-671.
+  // Implementing this feature means building the component from scratch.
   return () => <FeatureUnavailable featureName="SSO Configuration" />;
 };
 

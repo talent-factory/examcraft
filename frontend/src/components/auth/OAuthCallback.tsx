@@ -9,6 +9,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Typography, Alert } from '@mui/material';
 import AuthService from '../../services/AuthService';
 import { useAuth } from '../../contexts/AuthContext';
+import { translateError } from '../../errors';
 
 export const OAuthCallback: React.FC = () => {
   const { t } = useTranslation();
@@ -36,7 +37,7 @@ export const OAuthCallback: React.FC = () => {
         const error = searchParams.get('error');
         if (error) {
           console.error('[OAuthCallback] OAuth error:', error);
-          setError(`OAuth error: ${error}`);
+          setError(t('errors.oauth.providerError'));
           setIsProcessing(false);
           return;
         }
@@ -70,12 +71,16 @@ export const OAuthCallback: React.FC = () => {
         navigate('/dashboard', { replace: true });
       } catch (err) {
         console.error('[OAuthCallback] Error:', err);
-        setError(err instanceof Error ? err.message : 'OAuth authentication failed');
+        setError(translateError(err, t, 'errors.oauth.callbackFailed'));
         setIsProcessing(false);
       }
     };
 
     handleCallback();
+    // `t` intentionally omitted below: this effect is meant to run once per
+    // mount (guarded by hasProcessed.current above), not re-fire on a
+    // language switch mid-callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, navigate, loginWithTokens]);
 
   if (isProcessing) {

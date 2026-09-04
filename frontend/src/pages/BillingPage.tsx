@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { paymentService } from '../services/paymentService';
 import { STRIPE_PRICES, getStripeConfigStatus } from '../config/stripe.config';
+import { translateError } from '../errors';
 
 const ENTERPRISE_CONTACT_EMAIL = process.env.REACT_APP_ENTERPRISE_CONTACT_EMAIL || 'info@talent-factory.ch';
 
@@ -19,7 +20,7 @@ export const BillingPage: React.FC = () => {
                 setCurrentTier(subscription.tier || 'free');
             } catch (err: any) {
                 console.error('Failed to load subscription:', err);
-                setError(err.response?.data?.detail || t('pages.billing.subscriptionError'));
+                setError(translateError(err, t, 'pages.billing.subscriptionError'));
             }
         };
         loadCurrentTier();
@@ -33,8 +34,7 @@ export const BillingPage: React.FC = () => {
             window.location.href = session.url;
         } catch (err: any) {
             console.error('Subscription error:', err);
-            const errorMessage = err.response?.data?.detail || t('pages.billing.subscriptionError');
-            setError(errorMessage);
+            setError(translateError(err, t, 'pages.billing.subscriptionError'));
             setLoading(false);
         }
     };
@@ -56,7 +56,7 @@ export const BillingPage: React.FC = () => {
 
             {!stripeConfigStatus.configured && (
                 <div className="mt-8 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative" role="alert">
-                    <strong className="font-bold">Configuration Required: </strong>
+                    <strong className="font-bold">{t('pages.billing.configurationRequired')}</strong>
                     <span className="block sm:inline">{stripeConfigStatus.message}</span>
                 </div>
             )}
@@ -71,8 +71,14 @@ export const BillingPage: React.FC = () => {
                 {/* Free Tier */}
                 <div className="border border-gray-200 rounded-lg shadow-sm bg-white flex flex-col">
                     <div className="p-6 flex flex-col flex-grow">
+                        {/* Plan names (Free/Starter/Professional/Enterprise below) are kept
+                            identical across all four locales on purpose — not a translation
+                            gap (TF-671). */}
                         <h2 className="text-lg leading-6 font-medium text-gray-900">Free</h2>
                         <p className="mt-4">
+                            {/* CHF amounts (here and in the Starter/Professional cards below)
+                                are kept identical across all four locales on purpose — not a
+                                translation gap (TF-671). */}
                             <span className="text-4xl font-extrabold text-gray-900">CHF 0</span>
                             <span className="text-base font-medium text-gray-500">{t('pages.billing.perMonth')}</span>
                         </p>
@@ -83,7 +89,7 @@ export const BillingPage: React.FC = () => {
                             disabled
                             className="mt-auto pt-6 block w-full bg-gray-100 border border-transparent rounded-md py-2 text-sm font-semibold text-gray-400 text-center cursor-not-allowed"
                         >
-                            {currentTier === 'free' ? t('pages.billing.currentPlan') : 'Free Plan'}
+                            {currentTier === 'free' ? t('pages.billing.currentPlan') : t('pages.billing.freePlan')}
                         </button>
                     </div>
                 </div>

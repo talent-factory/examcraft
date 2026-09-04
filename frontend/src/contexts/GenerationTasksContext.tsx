@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { useAuth } from './AuthContext';
 import i18n from '../i18n';
+import { AppError } from '../errors';
 import {
   readSessionSnapshot,
   writeSessionSnapshot,
@@ -309,7 +310,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
   const startGeneration = useCallback(async (request: RAGExamRequest): Promise<string> => {
     const { loadRAGService } = await import('../utils/componentLoader');
     const RAGService = await loadRAGService();
-    if (!RAGService) throw new Error('RAGService not available in Core mode');
+    if (!RAGService) throw new AppError('rag.notAvailableInCore', 'RAGService not available in Core mode');
 
     const { task_id } = await RAGService.triggerGeneration(request);
 
@@ -337,7 +338,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
   const retryTask = useCallback(async (taskId: string): Promise<string> => {
     const { loadRAGService } = await import('../utils/componentLoader');
     const RAGService = await loadRAGService();
-    if (!RAGService) throw new Error('RAGService not available in Core mode');
+    if (!RAGService) throw new AppError('rag.notAvailableInCore', 'RAGService not available in Core mode');
 
     const { task_id: newTaskId } = await RAGService.retryGeneration(taskId);
 

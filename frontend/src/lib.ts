@@ -93,3 +93,13 @@ export { tagsApi } from './api/tagsApi';
 export type { Tag, TagValue, PendingTag } from './api/tagsApi';
 export { isPendingTag } from './api/tagsApi';
 export { default as TagAutocomplete } from './components/shared/TagAutocomplete';
+
+// ============================================================================
+// Errors
+// ============================================================================
+
+// Shared error contract, available to all tiers (TF-671). As of this PR only
+// Premium actually uses it (RAGService throws AppError, ChatInterface
+// resolves it via translateError); Enterprise has no services yet. Update
+// this comment once Enterprise's first service adopts the pattern.
+export * from './errors';

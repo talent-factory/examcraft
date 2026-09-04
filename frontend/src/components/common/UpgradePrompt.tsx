@@ -5,18 +5,24 @@
  * Shows:
  * - Feature name and description
  * - Current tier vs required tier
- * - Pricing comparison
  * - Upgrade CTA button
+ *
+ * `featureNameKey`/`featureDescriptionKey` are i18n keys, not display text —
+ * resolved via `t()` in here (TF-671 follow-up: the previous `featureName`/
+ * `featureDescription` string props rendered whatever the caller passed
+ * verbatim, and every real caller passed hardcoded English prose, so a
+ * German-locale user saw translated chrome around untranslated content).
  *
  * @example
  * <UpgradePrompt
- *   featureName="Document Chatbot"
+ *   featureNameKey="components.featureGate.documentChat.name"
  *   requiredTier="professional"
  *   currentTier="free"
  * />
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, Paper, Chip, Stack } from '@mui/material';
 import { Lock as LockIcon, ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 
@@ -25,10 +31,10 @@ import { Lock as LockIcon, ArrowForward as ArrowForwardIcon } from '@mui/icons-m
 // ============================================================================
 
 export interface UpgradePromptProps {
-  /** Name of the feature requiring upgrade */
-  featureName: string;
-  /** Description of the feature (optional) */
-  featureDescription?: string;
+  /** i18n key for the feature's display name, resolved via t() */
+  featureNameKey: string;
+  /** i18n key for the feature's description, resolved via t() (optional) */
+  featureDescriptionKey?: string;
   /** Required subscription tier */
   requiredTier: 'starter' | 'professional' | 'enterprise';
   /** Current user's subscription tier */
@@ -47,22 +53,18 @@ const TIER_CONFIG = {
   free: {
     label: 'Free',
     color: '#9e9e9e' as const,
-    price: '$0',
   },
   starter: {
     label: 'Starter',
     color: '#2196f3' as const,
-    price: '$29/month',
   },
   professional: {
     label: 'Professional',
     color: '#4caf50' as const,
-    price: '$99/month',
   },
   enterprise: {
     label: 'Enterprise',
     color: '#ff9800' as const,
-    price: 'Contact Sales',
   },
 };
 
@@ -71,15 +73,18 @@ const TIER_CONFIG = {
 // ============================================================================
 
 export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
-  featureName,
-  featureDescription,
+  featureNameKey,
+  featureDescriptionKey,
   requiredTier,
   currentTier,
-  upgradeUrl = '/pricing',
+  upgradeUrl = '/billing',
   onUpgrade,
 }) => {
+  const { t } = useTranslation();
   const currentConfig = TIER_CONFIG[currentTier];
   const requiredConfig = TIER_CONFIG[requiredTier];
+  const featureName = t(featureNameKey);
+  const featureDescription = featureDescriptionKey ? t(featureDescriptionKey) : undefined;
 
   const handleUpgrade = () => {
     if (onUpgrade) {
@@ -130,7 +135,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
       <Stack direction="row" spacing={2} justifyContent="center" sx={{ mb: 3 }}>
         <Box>
           <Typography variant="caption" color="text.secondary" display="block">
-            Your Plan
+            {t('components.upgradePrompt.yourPlan')}
           </Typography>
           <Chip
             label={currentConfig.label}
@@ -146,7 +151,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
 
         <Box>
           <Typography variant="caption" color="text.secondary" display="block">
-            Required Plan
+            {t('components.upgradePrompt.requiredPlan')}
           </Typography>
           <Chip
             label={requiredConfig.label}
@@ -159,9 +164,12 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
         </Box>
       </Stack>
 
-      {/* Pricing */}
+      {/* Upgrade line — no price here: the authoritative prices live on the
+          in-app /billing page (BillingPage.tsx), which the default upgradeUrl
+          below navigates to. TF-671: the hardcoded $29/$99 that used to be
+          here contradicted BillingPage's CHF 9/CHF 49. */}
       <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
-        Upgrade to <strong>{requiredConfig.label}</strong> for {requiredConfig.price}
+        {t('components.upgradePrompt.upgradeTo', { tier: requiredConfig.label })}
       </Typography>
 
       {/* Upgrade Button */}
@@ -177,7 +185,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
           },
         }}
       >
-        Upgrade Now
+        {t('components.upgradePrompt.upgradeNow')}
       </Button>
     </Paper>
   );

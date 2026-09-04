@@ -812,8 +812,10 @@
       "title": "Preispläne",
       "subtitle": "Wähle den Plan, der zu dir passt.",
       "perMonth": "/Monat",
+      "configurationRequired": "Konfiguration erforderlich: ",
       "freeDescription": "Perfekt zum Ausprobieren von ExamCraft.",
       "currentPlan": "Aktueller Plan",
+      "freePlan": "Free-Tarif",
       "starterDescription": "Für den einzelnen Dozenten.",
       "starterUsers": "1 Benutzer",
       "professionalDescription": "Für Fachgruppen und kleine Schulen.",
@@ -1502,6 +1504,47 @@
       "nameLockedHint": "Name kann nach dem Anlegen nicht mehr geändert werden.",
       "btnSave": "Speichern",
       "btnSaving": "Speichert..."
+    },
+    "helpFeedbackQueue": {
+      "tabFeedback": "Feedback Queue ({{count}})",
+      "tabCandidates": "FAQ-Kandidaten ({{count}})",
+      "tabClusters": "Clusters & Docs-Lücken",
+      "status": "Status",
+      "statusAll": "Alle",
+      "statusOpen": "Offen",
+      "statusInProgress": "In Bearbeitung",
+      "statusDocumented": "Dokumentiert",
+      "statusDocsGap": "Docs-Lücke",
+      "statusOk": "OK",
+      "colQuestion": "Frage",
+      "colRole": "Rolle",
+      "colRating": "Rating",
+      "colStatus": "Status",
+      "colAction": "Aktion",
+      "colAnswerDe": "Antwort (DE)",
+      "colHits": "Hits",
+      "colActions": "Aktionen",
+      "colTopic": "Thema",
+      "colTotal": "Total",
+      "actionEdit": "Bearbeiten",
+      "actionDocumented": "Dokumentiert",
+      "actionApprove": "Freigeben",
+      "actionReject": "Verwerfen",
+      "actionCancel": "Abbrechen",
+      "actionMarkDocsGap": "Als Docs-Lücke markieren",
+      "emptyFeedback": "Keine Einträge",
+      "emptyCandidates": "Keine FAQ-Kandidaten vorhanden. Kandidaten werden automatisch erstellt, wenn Antworten mehrfach positiv bewertet werden.",
+      "emptyClusters": "Noch keine Feedback-Clusters vorhanden. Clusters werden automatisch erstellt, wenn Benutzer Feedback geben.",
+      "dialogEditTitle": "FAQ-Antwort bearbeiten",
+      "fieldAnswerDe": "Antwort (DE)",
+      "fieldAnswerEn": "Antwort (EN)",
+      "errorLoadFeedback": "Feedback laden fehlgeschlagen",
+      "errorLoadClusters": "Clusters laden fehlgeschlagen",
+      "errorLoadCandidates": "FAQ-Kandidaten laden fehlgeschlagen",
+      "errorStatusUpdate": "Status-Update fehlgeschlagen",
+      "errorFaqApprove": "FAQ-Freigabe fehlgeschlagen",
+      "errorFaqReject": "FAQ-Ablehnung fehlgeschlagen",
+      "errorMarkDocsGap": "Docs-Lücke markieren fehlgeschlagen"
     }
   },
   "components": {
@@ -1709,6 +1752,13 @@
         "tagsSummary": "Tags aktualisiert für {{changed}} Dokumente, {{skipped}} übersprungen",
         "tagsSummaryWithErrors": "Tags aktualisiert für {{changed}} Dokumente, {{skipped}} übersprungen, {{failed}} Fehler"
       }
+    },
+    "documentChatPage": {
+      "title": "Dokument-Chat – Premium-Funktion",
+      "description": "Der Dokument-Chat ist im Premium-Paket verfügbar. Damit kannst du interaktiv mit deinen Dokumenten arbeiten.",
+      "upgradeHint": "Für den Zugriff wechsle bitte auf den Professional- oder Enterprise-Tarif.",
+      "backToDocuments": "Zurück zu den Dokumenten",
+      "viewPlans": "Premium-Tarife ansehen"
     },
     "documentUpload": {
       "dropActive": "Dateien hier ablegen...",
@@ -1973,6 +2023,94 @@
       "premiumUpgrade": "Um auf diese Funktion zuzugreifen, upgrade bitte auf den Starter-, Professional- oder Enterprise-Plan.",
       "back": "Zurück",
       "viewPlans": "Premium-Pläne anzeigen"
+    },
+    "upgradePrompt": {
+      "yourPlan": "Dein Tarif",
+      "requiredPlan": "Benötigter Tarif",
+      "upgradeTo": "Upgrade auf {{tier}}",
+      "upgradeNow": "Jetzt upgraden"
+    },
+    "featureGate": {
+      "ragExamCreator": {
+        "name": "RAG-Prüfungsersteller",
+        "description": "Generiere Prüfungsfragen mit Retrieval-Augmented Generation und semantischer Suche."
+      },
+      "documentChat": {
+        "name": "Dokument-Chat",
+        "description": "Chatte mit deinen Dokumenten mittels KI-gestützter Unterhaltungen."
+      },
+      "promptManagement": {
+        "name": "Prompt-Verwaltung",
+        "description": "Verwalte und passe deine Prompt-Vorlagen mit erweiterten Funktionen an."
+      },
+      "promptTemplateSelector": {
+        "name": "Prompt-Vorlagen-Auswahl",
+        "description": "Wähle und passe Prompt-Vorlagen für die Fragengenerierung an."
+      },
+      "advancedPromptManagement": {
+        "name": "Erweiterte Prompt-Verwaltung",
+        "description": "Lade eigene Prompt-Vorlagen hoch und verwalte sie mit semantischer Suche."
+      }
+    },
+    "tags": {
+      "createTitle": "Neuen Tag erstellen",
+      "globalTag": "Globaler Tag (systemweit, alle Institutionen)",
+      "namePlaceholder": "Tag-Name eingeben...",
+      "createButton": "Tag erstellen",
+      "createErrorFallback": "Tag konnte nicht erstellt werden.",
+      "restoreFailed": "Wiederherstellen fehlgeschlagen.",
+      "existsPrefix": "Tag",
+      "existsSuffix": "existiert bereits.",
+      "archivedSuffix": "ist archiviert.",
+      "restore": "Wiederherstellen",
+      "mergeTitle": "Tags zusammenführen",
+      "mergeIntro": "Welcher Tag soll übrig bleiben? Die anderen werden archiviert.",
+      "mergeTarget": "Ziel-Tag (bleibt erhalten)",
+      "mergeOptionUsage_one": "{{count}} Frage",
+      "mergeOptionUsage_other": "{{count}} Fragen",
+      "mergeNone": "Keine Fragen werden migriert.",
+      "mergeMigrate_one": "1 Frage wird auf {{target}} migriert.",
+      "mergeMigrate_other": "{{count}} Fragen werden auf {{target}} migriert.",
+      "mergeArchiveTail_one": "wird archiviert.",
+      "mergeArchiveTail_other": "werden archiviert.",
+      "cancel": "Abbrechen",
+      "merge": "Zusammenführen",
+      "label": "Tags",
+      "createFailed": "Tag konnte nicht erstellt werden. Bitte versuche es erneut.",
+      "noOptions": "Keine Optionen",
+      "alreadySelected": "\"{{value}}\" ist bereits ausgewählt",
+      "createOption": "\"{{value}}\" erstellen",
+      "groupGlobal": "Vorgegebene Tags",
+      "groupInstitution": "Tags dieser Institution",
+      "archivedCannotUse": "🚫 Tag “{{name}}” ist archiviert und kann nicht verwendet werden.",
+      "existingTags": "Bestehende Tags",
+      "searchPlaceholder": "Tags suchen...",
+      "noneFound": "Keine Tags gefunden.",
+      "archivedMarker": "(archiviert)",
+      "rename": "Umbenennen",
+      "archive": "Archivieren",
+      "delete": "Löschen",
+      "renameFailed": "Umbenennen fehlgeschlagen.",
+      "archiveFailed": "Archivieren fehlgeschlagen.",
+      "mergeFailed": "Zusammenführen fehlgeschlagen.",
+      "deleteFailed": "Löschen fehlgeschlagen.",
+      "filterAll": "Alle",
+      "filterActive": "Aktiv",
+      "filterArchived": "Archiviert",
+      "mergeSelectionButton": "{{count}} Tags zusammenführen",
+      "myTags": "Meine Tags",
+      "institutionTags": "Tags der Institution",
+      "questionCount_one": "{{count}} Frage",
+      "questionCount_other": "{{count}} Fragen",
+      "confirmDelete": "Tag \"#{{name}}\" permanent löschen?"
+    },
+    "featureUnavailable": {
+      "title": "{{feature}} ist nicht verfügbar",
+      "body": "Diese Funktion ist nur in der Vollinstallation (Premium/Enterprise) verfügbar.",
+      "hint": "Bitte erweitere dein Abonnement oder wende dich an deine Administration."
+    },
+    "componentLoader": {
+      "loading": "{{component}} wird geladen..."
     }
   },
   "composer": {
@@ -2539,12 +2677,9 @@
       "newDocument": "Neues Dokument",
       "saveAsDocument": "Als Dokument speichern",
       "title": "Chat-Schnittstelle",
-      "unknownError": "Ein unbekannter Fehler ist aufgetreten",
       "documentCount_one": "{{count}} Dokument",
       "documentCount_other": "{{count}} Dokumente",
-      "exportFailed": "Export fehlgeschlagen: {{error}}",
       "savedAsDocument": "Als Dokument gespeichert: {{title}}",
-      "conversionFailed": "Konvertierung fehlgeschlagen: {{error}}",
       "exportDialogTitle": "Als {{format}} exportieren"
     },
     "documentSelector": {
@@ -2612,7 +2747,9 @@
         "description": "Verwalte deine Prompt-Vorlagen und lade neue Prompts hoch.",
         "tabPromptList": "Prompt-Liste",
         "tabFileUpload": "Datei-Upload",
-        "tabAIAssistant": "KI-Assistent"
+        "tabAIAssistant": "KI-Assistent",
+        "tabSemanticSearch": "Semantische Suche",
+        "tabsAriaLabel": "Reiter der Prompt-Bibliothek"
       },
       "preview": {
         "noPromptSelected": "Kein Prompt ausgewählt",
@@ -2667,6 +2804,46 @@
       "variablesEditor": {
         "additionalVariables": "Zusätzliche Template-Variablen"
       }
+    }
+  },
+  "errors": {
+    "network": "Der Server ist nicht erreichbar. Bitte prüfe deine Verbindung.",
+    "compliance": {
+      "loadFailed": "Die Compliance-Unterlagen konnten nicht geladen werden."
+    },
+    "rag": {
+      "examGenerationFailed": "Die Prüfung konnte nicht generiert werden.",
+      "statusFailed": "Der Status der Generierung konnte nicht geladen werden.",
+      "retryFailed": "Der erneute Versuch ist fehlgeschlagen.",
+      "activeTasksFailed": "Laufende Generierungen konnten nicht geladen werden.",
+      "taskResultFailed": "Das Ergebnis der Generierung konnte nicht geladen werden.",
+      "contextRetrievalFailed": "Der Kontext konnte nicht abgerufen werden.",
+      "questionTypesFailed": "Die Fragetypen konnten nicht geladen werden.",
+      "healthCheckFailed": "Der RAG-Dienst ist derzeit nicht verfügbar.",
+      "contextPreviewFailed": "Der Kontext konnte nicht analysiert werden.",
+      "connectionLost": "Die Verbindung zur Generierung ist abgebrochen.",
+      "notAvailableInCore": "Diese Funktion ist in der Core-Version nicht verfügbar."
+    },
+    "help": {
+      "statusFailed": "Der Hilfe-Status konnte nicht geladen werden.",
+      "onboardingStatusFailed": "Der Onboarding-Fortschritt konnte nicht geladen werden.",
+      "onboardingStepFailed": "Der Onboarding-Schritt konnte nicht abgeschlossen werden.",
+      "onboardingSkipFailed": "Der Onboarding-Schritt konnte nicht übersprungen werden.",
+      "contextHintFailed": "Der Hinweis konnte nicht geladen werden.",
+      "hintDismissFailed": "Der Hinweis konnte nicht ausgeblendet werden.",
+      "messageFailed": "Deine Frage konnte nicht gesendet werden.",
+      "feedbackFailed": "Dein Feedback konnte nicht übermittelt werden."
+    },
+    "features": {
+      "loadFailed": "Die verfügbaren Funktionen konnten nicht geladen werden."
+    },
+    "chat": {
+      "downloadFailed": "Der Chat-Verlauf konnte nicht heruntergeladen werden.",
+      "conversionFailed": "Der Chat konnte nicht in ein Dokument umgewandelt werden."
+    },
+    "oauth": {
+      "providerError": "Die Anmeldung beim Anbieter ist fehlgeschlagen.",
+      "callbackFailed": "Die Anmeldung konnte nicht abgeschlossen werden."
     }
   },
   "help": {

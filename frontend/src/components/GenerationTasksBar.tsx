@@ -22,6 +22,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CloseIcon from '@mui/icons-material/Close';
 import { useTranslation } from 'react-i18next';
 import { useGenerationTasks } from '../contexts/GenerationTasksContext';
+import { translateError } from '../errors';
 import type { GenerationTaskState } from '../types';
 
 const AUTO_HIDE_DELAY_MS = 30_000;
@@ -42,7 +43,7 @@ const GenerationTasksBar: React.FC = () => {
       await retryTask(taskId);
     } catch (err) {
       console.error('[GenerationTasks] Retry failed:', err);
-      setRetryError({ taskId, message: err instanceof Error ? err.message : String(err) });
+      setRetryError({ taskId, message: translateError(err, t, 'errors.rag.retryFailed') });
     } finally {
       setRetryingTaskId(null);
     }

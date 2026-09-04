@@ -13,6 +13,7 @@ import {
   Box,
   Chip,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { type Tag } from '../../api/tagsApi';
 
 interface TagMergeModalProps {
@@ -28,22 +29,27 @@ const TagMergeModal: React.FC<TagMergeModalProps> = ({
   onConfirm,
   onClose,
 }) => {
+  const { t } = useTranslation();
   const [targetId, setTargetId] = useState<number | ''>('');
   const [loading, setLoading] = useState(false);
 
-  const targetTag = selectedTags.find((t) => t.id === targetId);
-  const sourcesToArchive = selectedTags.filter((t) => t.id !== targetId);
-  const migratedQuestions = sourcesToArchive.reduce((sum, t) => sum + t.usage_count, 0);
+  const targetTag = selectedTags.find((tag) => tag.id === targetId);
+  const sourcesToArchive = selectedTags.filter((tag) => tag.id !== targetId);
+  const migratedQuestions = sourcesToArchive.reduce((sum, tag) => sum + tag.usage_count, 0);
 
   const handleConfirm = async () => {
     if (!targetId) return;
     setLoading(true);
     try {
       await onConfirm(
-        sourcesToArchive.map((t) => t.id),
+        sourcesToArchive.map((tag) => tag.id),
         targetId as number
       );
       onClose();
+    } catch {
+      // Swallow here only to keep the modal open for a retry instead of
+      // leaving an unhandled rejection — the caller's onError already
+      // surfaced the failure via the parent's error state.
     } finally {
       setLoading(false);
     }
@@ -51,16 +57,16 @@ const TagMergeModal: React.FC<TagMergeModalProps> = ({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Tags zusammenführen</DialogTitle>
+      <DialogTitle>{t('components.tags.mergeTitle')}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" sx={{ mb: 2 }}>
-          Welcher Tag soll übrig bleiben? Die anderen werden archiviert.
+          {t('components.tags.mergeIntro')}
         </Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 3 }}>
-          {selectedTags.map((t) => (
+          {selectedTags.map((tag) => (
             <Chip
-              key={t.id}
-              label={`#${t.name} (${t.usage_count})`}
+              key={tag.id}
+              label={`#${tag.name} (${tag.usage_count})`}
               size="small"
               color="secondary"
               variant="outlined"
@@ -68,15 +74,15 @@ const TagMergeModal: React.FC<TagMergeModalProps> = ({
           ))}
         </Box>
         <FormControl fullWidth>
-          <InputLabel>Ziel-Tag (bleibt erhalten)</InputLabel>
+          <InputLabel>{t('components.tags.mergeTarget')}</InputLabel>
           <Select
             value={targetId}
             onChange={(e) => setTargetId(e.target.value as number)}
-            label="Ziel-Tag (bleibt erhalten)"
+            label={t('components.tags.mergeTarget')}
           >
-            {selectedTags.map((t) => (
-              <MenuItem key={t.id} value={t.id}>
-                #{t.name} ({t.usage_count} Fragen)
+            {selectedTags.map((tag) => (
+              <MenuItem key={tag.id} value={tag.id}>
+                #{tag.name} ({t('components.tags.mergeOptionUsage', { count: tag.usage_count })})
               </MenuItem>
             ))}
           </Select>
@@ -84,25 +90,28 @@ const TagMergeModal: React.FC<TagMergeModalProps> = ({
         {targetId && targetTag && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
             {migratedQuestions === 0 ? (
-              'Keine Fragen werden migriert. '
-            ) : migratedQuestions === 1 ? (
-              <>1 Frage wird auf <strong>#{targetTag.name}</strong> migriert. </>
+              <>{t('components.tags.mergeNone')} </>
             ) : (
-              <>{migratedQuestions} Fragen werden auf <strong>#{targetTag.name}</strong> migriert. </>
+              <>
+                {t('components.tags.mergeMigrate', {
+                  count: migratedQuestions,
+                  target: `#${targetTag.name}`,
+                })}{' '}
+              </>
             )}
-            {sourcesToArchive.map((t, i) => (
-              <React.Fragment key={t.id}>
+            {sourcesToArchive.map((tag, i) => (
+              <React.Fragment key={tag.id}>
                 {i > 0 && ', '}
-                <strong>#{t.name}</strong>
+                <strong>#{tag.name}</strong>
               </React.Fragment>
             ))}{' '}
-            {sourcesToArchive.length === 1 ? 'wird' : 'werden'} archiviert.
+            {t('components.tags.mergeArchiveTail', { count: sourcesToArchive.length })}
           </Typography>
         )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={loading}>
-          Abbrechen
+          {t('components.tags.cancel')}
         </Button>
         <Button
           onClick={handleConfirm}
@@ -110,7 +119,7 @@ const TagMergeModal: React.FC<TagMergeModalProps> = ({
           disabled={!targetId || loading}
           color="error"
         >
-          Zusammenführen
+          {t('components.tags.merge')}
         </Button>
       </DialogActions>
     </Dialog>

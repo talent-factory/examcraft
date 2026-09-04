@@ -5,7 +5,12 @@
  * customers need to read the AVV/TOM before they have an account), so
  * this uses plain ``fetch`` rather than the auth-retry-aware
  * ``httpClient`` helpers — there is no token to refresh.
+ *
+ * The failure path throws an AppError (TF-671): CompliancePage only renders a
+ * translated generic message, but the code keeps that a property of the error
+ * rather than an accident of the caller.
  */
+import { AppError } from '../errors';
 
 export const API_BASE_URL =
   process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -45,7 +50,11 @@ export class ComplianceService {
   static async getContent(): Promise<ComplianceContent> {
     const response = await fetch(`${API_BASE_URL}/api/v1/legal/compliance`);
     if (!response.ok) {
-      throw new Error(`Failed to load compliance content (${response.status})`);
+      throw new AppError(
+        'compliance.loadFailed',
+        `Failed to load compliance content (${response.status})`,
+        response.status,
+      );
     }
     return (await response.json()) as ComplianceContent;
   }

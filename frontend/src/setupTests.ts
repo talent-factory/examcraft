@@ -98,6 +98,7 @@ Object.defineProperty(window, 'sessionStorage', {
 // Mock console methods to reduce noise in tests
 const originalError = console.error;
 const originalWarn = console.warn;
+const originalDebug = console.debug;
 
 beforeAll(() => {
   console.error = (...args: any[]) => {
@@ -116,17 +117,36 @@ beforeAll(() => {
     if (
       typeof args[0] === 'string' &&
       (args[0].includes('deprecated') ||
-       args[0].includes('Warning:'))
+       args[0].includes('Warning:') ||
+       // translateError (TF-671) logs the raw error text via console.warn on its two
+       // genuine-problem branches (code has no translation / error wasn't an AppError
+       // at all) so it is never silently dropped, but never rendered in the UI. That's
+       // noise in test output; keep it silent here while it stays intact in production
+       // console output. Matched by the exact prefixes translateError.ts uses (not a
+       // bare '[i18n]' substring), so this does not also swallow i18n.ts's
+       // missingKeyHandler ('[i18n] Missing translation key: …'), which is the only
+       // runtime signal for missing keys. The third, expected-path branch (code
+       // resolved cleanly) logs via console.debug instead — see below.
+       args[0].startsWith('[i18n] AppError without translation key:') ||
+       args[0].startsWith('[i18n] Untyped error surfaced, using fallback key:'))
     ) {
       return;
     }
     originalWarn.call(console, ...args);
+  };
+
+  console.debug = (...args: any[]) => {
+    if (typeof args[0] === 'string' && args[0].startsWith('[i18n] AppError surfaced:')) {
+      return;
+    }
+    originalDebug.call(console, ...args);
   };
 });
 
 afterAll(() => {
   console.error = originalError;
   console.warn = originalWarn;
+  console.debug = originalDebug;
 });
 
 // Global test utilities
@@ -176,26 +196,32 @@ jest.mock('react-i18next', () => {
     return mockResolveKey(mockTranslations, key);
   }
 
+  // Stable across every `useTranslation()` call within one test file (Jest
+  // isolates the module registry per file, so this still resets between
+  // files). Real react-i18next memoizes `t`/`i18n` by language; a mock that
+  // hands out a fresh `t` closure per render breaks any `useCallback`/
+  // `useEffect` that lists `t` in its deps — the effect re-fires every
+  // render under test even though it wouldn't in production.
+  const stableT = (key: string, params?: Record<string, any>) => {
+    const rawValue = mockResolvePlural(key, params);
+    if (params?.returnObjects) {
+      return rawValue;
+    }
+    let value = typeof rawValue === 'string' ? rawValue : key;
+    if (params && typeof value === 'string') {
+      Object.entries(params).forEach(([k, v]) => {
+        value = (value as string).replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v));
+      });
+    }
+    return value;
+  };
+  const stableI18n = {
+    changeLanguage: jest.fn().mockResolvedValue(undefined),
+    language: 'de',
+  };
+
   return {
-    useTranslation: () => ({
-      t: (key: string, params?: Record<string, any>) => {
-        const rawValue = mockResolvePlural(key, params);
-        if (params?.returnObjects) {
-          return rawValue;
-        }
-        let value = typeof rawValue === 'string' ? rawValue : key;
-        if (params && typeof value === 'string') {
-          Object.entries(params).forEach(([k, v]) => {
-            value = (value as string).replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v));
-          });
-        }
-        return value;
-      },
-      i18n: {
-        changeLanguage: jest.fn().mockResolvedValue(undefined),
-        language: 'de',
-      },
-    }),
+    useTranslation: () => ({ t: stableT, i18n: stableI18n }),
     Trans: ({ children }: { children: React.ReactNode }) => children,
     initReactI18next: { type: '3rdParty', init: jest.fn() },
   };

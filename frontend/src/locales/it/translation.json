@@ -812,8 +812,10 @@
       "title": "Piani tariffari",
       "subtitle": "Scegli il piano più adatto alle tue esigenze.",
       "perMonth": "/mese",
+      "configurationRequired": "Configurazione richiesta: ",
       "freeDescription": "Perfetto per provare ExamCraft.",
       "currentPlan": "Piano attuale",
+      "freePlan": "Piano Free",
       "starterDescription": "Per creatori di esami seri.",
       "starterUsers": "1 utente",
       "professionalDescription": "Potenza illimitata per la creazione professionale di esami.",
@@ -1502,6 +1504,47 @@
       "nameLockedHint": "Il nome non può più essere modificato dopo la creazione del ruolo.",
       "btnSave": "Salva",
       "btnSaving": "Salvataggio..."
+    },
+    "helpFeedbackQueue": {
+      "tabFeedback": "Coda di feedback ({{count}})",
+      "tabCandidates": "Candidati FAQ ({{count}})",
+      "tabClusters": "Cluster e lacune nella documentazione",
+      "status": "Stato",
+      "statusAll": "Tutti",
+      "statusOpen": "Aperto",
+      "statusInProgress": "In lavorazione",
+      "statusDocumented": "Documentato",
+      "statusDocsGap": "Lacuna nella documentazione",
+      "statusOk": "OK",
+      "colQuestion": "Domanda",
+      "colRole": "Ruolo",
+      "colRating": "Valutazione",
+      "colStatus": "Stato",
+      "colAction": "Azione",
+      "colAnswerDe": "Risposta (DE)",
+      "colHits": "Occorrenze",
+      "colActions": "Azioni",
+      "colTopic": "Argomento",
+      "colTotal": "Totale",
+      "actionEdit": "Modifica",
+      "actionDocumented": "Documentato",
+      "actionApprove": "Approva",
+      "actionReject": "Rifiuta",
+      "actionCancel": "Annulla",
+      "actionMarkDocsGap": "Segna come lacuna nella documentazione",
+      "emptyFeedback": "Nessuna voce",
+      "emptyCandidates": "Nessun candidato FAQ disponibile. I candidati vengono creati automaticamente quando le risposte ricevono più valutazioni positive.",
+      "emptyClusters": "Ancora nessun cluster di feedback. I cluster vengono creati automaticamente quando gli utenti inviano feedback.",
+      "dialogEditTitle": "Modifica risposta FAQ",
+      "fieldAnswerDe": "Risposta (DE)",
+      "fieldAnswerEn": "Risposta (EN)",
+      "errorLoadFeedback": "Caricamento del feedback non riuscito",
+      "errorLoadClusters": "Caricamento dei cluster non riuscito",
+      "errorLoadCandidates": "Caricamento dei candidati FAQ non riuscito",
+      "errorStatusUpdate": "Aggiornamento dello stato non riuscito",
+      "errorFaqApprove": "Approvazione della FAQ non riuscita",
+      "errorFaqReject": "Rifiuto della FAQ non riuscito",
+      "errorMarkDocsGap": "Impossibile segnare la lacuna nella documentazione"
     }
   },
   "components": {
@@ -1709,6 +1752,13 @@
         "tagsSummary": "Tag aggiornati per {{changed}} documento/i, {{skipped}} ignorato/i",
         "tagsSummaryWithErrors": "Tag aggiornati per {{changed}} documento/i, {{skipped}} ignorato/i, {{failed}} errore/i"
       }
+    },
+    "documentChatPage": {
+      "title": "Chat documenti – Funzione Premium",
+      "description": "La chat documenti è disponibile nel piano Premium. Ti permette di lavorare in modo interattivo con i tuoi documenti.",
+      "upgradeHint": "Per accedervi, passa al piano Professional o Enterprise.",
+      "backToDocuments": "Torna ai documenti",
+      "viewPlans": "Vedi i piani Premium"
     },
     "documentUpload": {
       "dropActive": "Rilascia i file qui...",
@@ -1973,6 +2023,94 @@
       "premiumUpgrade": "Per accedere a questa funzionalità, esegui l'upgrade al piano Starter, Professional o Enterprise.",
       "back": "Indietro",
       "viewPlans": "Visualizza piani Premium"
+    },
+    "upgradePrompt": {
+      "yourPlan": "Il tuo piano",
+      "requiredPlan": "Piano richiesto",
+      "upgradeTo": "Passa a {{tier}}",
+      "upgradeNow": "Aggiorna ora"
+    },
+    "featureGate": {
+      "ragExamCreator": {
+        "name": "Generatore di esami RAG",
+        "description": "Genera domande d'esame tramite la generazione aumentata dal recupero e la ricerca semantica."
+      },
+      "documentChat": {
+        "name": "Chat sui documenti",
+        "description": "Conversa con i tuoi documenti tramite conversazioni assistite dall'IA."
+      },
+      "promptManagement": {
+        "name": "Gestione dei prompt",
+        "description": "Gestisci e personalizza i tuoi modelli di prompt con funzionalità avanzate."
+      },
+      "promptTemplateSelector": {
+        "name": "Selettore di modelli di prompt",
+        "description": "Seleziona e personalizza i modelli di prompt per la generazione delle domande."
+      },
+      "advancedPromptManagement": {
+        "name": "Gestione avanzata dei prompt",
+        "description": "Carica e gestisci modelli di prompt personalizzati con la ricerca semantica."
+      }
+    },
+    "tags": {
+      "createTitle": "Crea nuovo tag",
+      "globalTag": "Tag globale (a livello di sistema, tutte le istituzioni)",
+      "namePlaceholder": "Inserisci il nome del tag...",
+      "createButton": "Crea tag",
+      "createErrorFallback": "Impossibile creare il tag.",
+      "restoreFailed": "Ripristino non riuscito.",
+      "existsPrefix": "Il tag",
+      "existsSuffix": "esiste già.",
+      "archivedSuffix": "è archiviato.",
+      "restore": "Ripristina",
+      "mergeTitle": "Unisci tag",
+      "mergeIntro": "Quale tag deve rimanere? Gli altri verranno archiviati.",
+      "mergeTarget": "Tag di destinazione (mantenuto)",
+      "mergeOptionUsage_one": "{{count}} domanda",
+      "mergeOptionUsage_other": "{{count}} domande",
+      "mergeNone": "Nessuna domanda verrà migrata.",
+      "mergeMigrate_one": "1 domanda verrà migrata su {{target}}.",
+      "mergeMigrate_other": "{{count}} domande verranno migrate su {{target}}.",
+      "mergeArchiveTail_one": "verrà archiviato.",
+      "mergeArchiveTail_other": "verranno archiviati.",
+      "cancel": "Annulla",
+      "merge": "Unisci",
+      "label": "Tags",
+      "createFailed": "Impossibile creare il tag. Riprova.",
+      "noOptions": "Nessuna opzione",
+      "alreadySelected": "\"{{value}}\" è già selezionato",
+      "createOption": "Crea \"{{value}}\"",
+      "groupGlobal": "Tag predefiniti",
+      "groupInstitution": "Tag di questa istituzione",
+      "archivedCannotUse": "🚫 Il tag “{{name}}” è archiviato e non può essere usato.",
+      "existingTags": "Tag esistenti",
+      "searchPlaceholder": "Cerca tag...",
+      "noneFound": "Nessun tag trovato.",
+      "archivedMarker": "(archiviato)",
+      "rename": "Rinomina",
+      "archive": "Archivia",
+      "delete": "Elimina",
+      "renameFailed": "Rinomina non riuscita.",
+      "archiveFailed": "Archiviazione non riuscita.",
+      "mergeFailed": "Unione non riuscita.",
+      "deleteFailed": "Eliminazione non riuscita.",
+      "filterAll": "Tutti",
+      "filterActive": "Attivi",
+      "filterArchived": "Archiviati",
+      "mergeSelectionButton": "Unisci {{count}} tag",
+      "myTags": "I miei tag",
+      "institutionTags": "Tag dell'istituzione",
+      "questionCount_one": "{{count}} domanda",
+      "questionCount_other": "{{count}} domande",
+      "confirmDelete": "Eliminare definitivamente il tag \"#{{name}}\"?"
+    },
+    "featureUnavailable": {
+      "title": "{{feature}} non è disponibile",
+      "body": "Questa funzione è disponibile solo nell'installazione completa (Premium/Enterprise).",
+      "hint": "Estendi il tuo abbonamento o contatta la tua amministrazione."
+    },
+    "componentLoader": {
+      "loading": "Caricamento di {{component}}..."
     }
   },
   "composer": {
@@ -2539,12 +2677,9 @@
       "newDocument": "Nuovo documento",
       "saveAsDocument": "Salva come documento",
       "title": "Interfaccia chat",
-      "unknownError": "Si è verificato un errore sconosciuto",
       "documentCount_one": "{{count}} documento",
       "documentCount_other": "{{count}} documenti",
-      "exportFailed": "Esportazione non riuscita: {{error}}",
       "savedAsDocument": "Salvato come documento: {{title}}",
-      "conversionFailed": "Conversione non riuscita: {{error}}",
       "exportDialogTitle": "Esporta come {{format}}"
     },
     "documentSelector": {
@@ -2612,7 +2747,9 @@
         "description": "Gestisci i tuoi modelli di prompt e carica nuovi prompt.",
         "tabPromptList": "Lista prompt",
         "tabFileUpload": "Caricamento file",
-        "tabAIAssistant": "Assistente IA"
+        "tabAIAssistant": "Assistente IA",
+        "tabSemanticSearch": "Ricerca semantica",
+        "tabsAriaLabel": "Schede della libreria dei prompt"
       },
       "preview": {
         "noPromptSelected": "Nessun prompt selezionato",
@@ -2667,6 +2804,46 @@
       "variablesEditor": {
         "additionalVariables": "Variabili template aggiuntive"
       }
+    }
+  },
+  "errors": {
+    "network": "Il server non è raggiungibile. Controlla la connessione.",
+    "compliance": {
+      "loadFailed": "Non è stato possibile caricare i documenti di conformità."
+    },
+    "rag": {
+      "examGenerationFailed": "Non è stato possibile generare l'esame.",
+      "statusFailed": "Non è stato possibile caricare lo stato della generazione.",
+      "retryFailed": "Il nuovo tentativo non è riuscito.",
+      "activeTasksFailed": "Non è stato possibile caricare le generazioni in corso.",
+      "taskResultFailed": "Non è stato possibile caricare il risultato della generazione.",
+      "contextRetrievalFailed": "Non è stato possibile recuperare il contesto.",
+      "questionTypesFailed": "Non è stato possibile caricare i tipi di domanda.",
+      "healthCheckFailed": "Il servizio RAG non è al momento disponibile.",
+      "contextPreviewFailed": "Non è stato possibile analizzare il contesto.",
+      "connectionLost": "La connessione alla generazione è stata interrotta.",
+      "notAvailableInCore": "Questa funzione non è disponibile nell'edizione Core."
+    },
+    "help": {
+      "statusFailed": "Non è stato possibile caricare lo stato della guida.",
+      "onboardingStatusFailed": "Non è stato possibile caricare l'avanzamento dell'onboarding.",
+      "onboardingStepFailed": "Non è stato possibile completare il passaggio di onboarding.",
+      "onboardingSkipFailed": "Non è stato possibile saltare il passaggio di onboarding.",
+      "contextHintFailed": "Non è stato possibile caricare il suggerimento.",
+      "hintDismissFailed": "Non è stato possibile nascondere il suggerimento.",
+      "messageFailed": "Non è stato possibile inviare la tua domanda.",
+      "feedbackFailed": "Non è stato possibile trasmettere il tuo feedback."
+    },
+    "features": {
+      "loadFailed": "Non è stato possibile caricare le funzioni disponibili."
+    },
+    "chat": {
+      "downloadFailed": "Non è stato possibile scaricare la cronologia della chat.",
+      "conversionFailed": "Non è stato possibile convertire la chat in un documento."
+    },
+    "oauth": {
+      "providerError": "L'accesso presso il provider non è riuscito.",
+      "callbackFailed": "Non è stato possibile completare l'accesso."
     }
   },
   "help": {

@@ -6,7 +6,9 @@ import {
   DialogContent, DialogActions, Alert,
 } from '@mui/material';
 import { CheckCircle, Cancel, Warning } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { translateError } from '../../errors';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -47,6 +49,7 @@ const STATUS_COLORS: Record<string, 'default' | 'warning' | 'success'> = {
 };
 
 const HelpFeedbackQueue: React.FC = () => {
+  const { t } = useTranslation();
   const { accessToken } = useAuth();
   const [tabIndex, setTabIndex] = useState(0);
 
@@ -71,11 +74,15 @@ const HelpFeedbackQueue: React.FC = () => {
     if (statusFilter) params.set('status', statusFilter);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/feedback-queue?${params}`, { headers });
-      if (!res.ok) { setError(`Feedback laden fehlgeschlagen (${res.status})`); return; }
+      if (!res.ok) {
+        console.error('[HelpFeedbackQueue] Failed to load feedback:', res.status);
+        setError(t('admin.helpFeedbackQueue.errorLoadFeedback'));
+        return;
+      }
       const data = await res.json();
       setItems(data.items);
       setTotal(data.total);
-    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
+    } catch (err) { setError(translateError(err, t, 'errors.network')); }
   };
 
   const fetchClusters = async () => {
@@ -83,10 +90,14 @@ const HelpFeedbackQueue: React.FC = () => {
     setError(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/clusters`, { headers });
-      if (!res.ok) { setError(`Clusters laden fehlgeschlagen (${res.status})`); return; }
+      if (!res.ok) {
+        console.error('[HelpFeedbackQueue] Failed to load clusters:', res.status);
+        setError(t('admin.helpFeedbackQueue.errorLoadClusters'));
+        return;
+      }
       const data = await res.json();
       setClusters(data.items);
-    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
+    } catch (err) { setError(translateError(err, t, 'errors.network')); }
   };
 
   const fetchCandidates = async () => {
@@ -94,10 +105,14 @@ const HelpFeedbackQueue: React.FC = () => {
     setError(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/faq-candidates`, { headers });
-      if (!res.ok) { setError(`FAQ-Kandidaten laden fehlgeschlagen (${res.status})`); return; }
+      if (!res.ok) {
+        console.error('[HelpFeedbackQueue] Failed to load FAQ candidates:', res.status);
+        setError(t('admin.helpFeedbackQueue.errorLoadCandidates'));
+        return;
+      }
       const data = await res.json();
       setCandidates(data.items);
-    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
+    } catch (err) { setError(translateError(err, t, 'errors.network')); }
   };
 
   useEffect(() => {
@@ -114,10 +129,14 @@ const HelpFeedbackQueue: React.FC = () => {
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!res.ok) { setError(`Status-Update fehlgeschlagen (${res.status})`); return; }
+      if (!res.ok) {
+        console.error('[HelpFeedbackQueue] Failed to update status:', res.status);
+        setError(t('admin.helpFeedbackQueue.errorStatusUpdate'));
+        return;
+      }
       setError(null);
       fetchQueue();
-    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
+    } catch (err) { setError(translateError(err, t, 'errors.network')); }
   };
 
   const approveFaq = async (id: number, answerDe?: string, answerEn?: string) => {
@@ -127,11 +146,15 @@ const HelpFeedbackQueue: React.FC = () => {
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ answer_de: answerDe || null, answer_en: answerEn || null }),
       });
-      if (!res.ok) { setError(`FAQ-Freigabe fehlgeschlagen (${res.status})`); return; }
+      if (!res.ok) {
+        console.error('[HelpFeedbackQueue] Failed to approve FAQ:', res.status);
+        setError(t('admin.helpFeedbackQueue.errorFaqApprove'));
+        return;
+      }
       setError(null);
       setEditDialog(null);
       fetchCandidates();
-    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
+    } catch (err) { setError(translateError(err, t, 'errors.network')); }
   };
 
   const rejectFaq = async (id: number) => {
@@ -140,10 +163,14 @@ const HelpFeedbackQueue: React.FC = () => {
         method: 'POST',
         headers: { ...headers },
       });
-      if (!res.ok) { setError(`FAQ-Ablehnung fehlgeschlagen (${res.status})`); return; }
+      if (!res.ok) {
+        console.error('[HelpFeedbackQueue] Failed to reject FAQ:', res.status);
+        setError(t('admin.helpFeedbackQueue.errorFaqReject'));
+        return;
+      }
       setError(null);
       fetchCandidates();
-    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
+    } catch (err) { setError(translateError(err, t, 'errors.network')); }
   };
 
   const markDocsGap = async (clusterId: number) => {
@@ -152,18 +179,22 @@ const HelpFeedbackQueue: React.FC = () => {
         method: 'POST',
         headers: { ...headers },
       });
-      if (!res.ok) { setError(`Docs-Lücke markieren fehlgeschlagen (${res.status})`); return; }
+      if (!res.ok) {
+        console.error('[HelpFeedbackQueue] Failed to mark docs gap:', res.status);
+        setError(t('admin.helpFeedbackQueue.errorMarkDocsGap'));
+        return;
+      }
       setError(null);
       fetchClusters();
-    } catch (err: any) { setError(`Verbindungsfehler: ${err.message}`); }
+    } catch (err) { setError(translateError(err, t, 'errors.network')); }
   };
 
   return (
     <Box>
       <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ mb: 2 }}>
-        <Tab label={`Feedback Queue (${total})`} />
-        <Tab label={`FAQ-Kandidaten (${candidates.length})`} />
-        <Tab label="Clusters & Docs-Lücken" />
+        <Tab label={t('admin.helpFeedbackQueue.tabFeedback', { count: total })} />
+        <Tab label={t('admin.helpFeedbackQueue.tabCandidates', { count: candidates.length })} />
+        <Tab label={t('admin.helpFeedbackQueue.tabClusters')} />
       </Tabs>
 
       {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>{error}</Alert>}
@@ -173,12 +204,12 @@ const HelpFeedbackQueue: React.FC = () => {
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
             <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel>Status</InputLabel>
-              <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
-                <MenuItem value="">Alle</MenuItem>
-                <MenuItem value="offen">Offen</MenuItem>
-                <MenuItem value="in_bearbeitung">In Bearbeitung</MenuItem>
-                <MenuItem value="dokumentiert">Dokumentiert</MenuItem>
+              <InputLabel>{t('admin.helpFeedbackQueue.status')}</InputLabel>
+              <Select value={statusFilter} label={t('admin.helpFeedbackQueue.status')} onChange={(e) => setStatusFilter(e.target.value)}>
+                <MenuItem value="">{t('admin.helpFeedbackQueue.statusAll')}</MenuItem>
+                <MenuItem value="offen">{t('admin.helpFeedbackQueue.statusOpen')}</MenuItem>
+                <MenuItem value="in_bearbeitung">{t('admin.helpFeedbackQueue.statusInProgress')}</MenuItem>
+                <MenuItem value="dokumentiert">{t('admin.helpFeedbackQueue.statusDocumented')}</MenuItem>
               </Select>
             </FormControl>
           </Box>
@@ -186,11 +217,11 @@ const HelpFeedbackQueue: React.FC = () => {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Frage</TableCell>
-                  <TableCell>Rolle</TableCell>
-                  <TableCell>Rating</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Aktion</TableCell>
+                  <TableCell>{t('admin.helpFeedbackQueue.colQuestion')}</TableCell>
+                  <TableCell>{t('admin.helpFeedbackQueue.colRole')}</TableCell>
+                  <TableCell>{t('admin.helpFeedbackQueue.colRating')}</TableCell>
+                  <TableCell>{t('admin.helpFeedbackQueue.colStatus')}</TableCell>
+                  <TableCell>{t('admin.helpFeedbackQueue.colAction')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -210,10 +241,10 @@ const HelpFeedbackQueue: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       {item.status === 'offen' && (
-                        <Button size="small" onClick={() => updateStatus(item.id, 'in_bearbeitung')}>Bearbeiten</Button>
+                        <Button size="small" onClick={() => updateStatus(item.id, 'in_bearbeitung')}>{t('admin.helpFeedbackQueue.actionEdit')}</Button>
                       )}
                       {item.status === 'in_bearbeitung' && (
-                        <Button size="small" color="success" onClick={() => updateStatus(item.id, 'dokumentiert')}>Dokumentiert</Button>
+                        <Button size="small" color="success" onClick={() => updateStatus(item.id, 'dokumentiert')}>{t('admin.helpFeedbackQueue.actionDocumented')}</Button>
                       )}
                     </TableCell>
                   </TableRow>
@@ -221,7 +252,7 @@ const HelpFeedbackQueue: React.FC = () => {
                 {items.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} align="center">
-                      <Typography color="text.secondary">Keine Einträge</Typography>
+                      <Typography color="text.secondary">{t('admin.helpFeedbackQueue.emptyFeedback')}</Typography>
                     </TableCell>
                   </TableRow>
                 )}
@@ -235,16 +266,16 @@ const HelpFeedbackQueue: React.FC = () => {
       {tabIndex === 1 && (
         <Box>
           {candidates.length === 0 ? (
-            <Alert severity="info">Keine FAQ-Kandidaten vorhanden. Kandidaten werden automatisch erstellt, wenn Antworten mehrfach positiv bewertet werden.</Alert>
+            <Alert severity="info">{t('admin.helpFeedbackQueue.emptyCandidates')}</Alert>
           ) : (
             <TableContainer component={Paper}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Frage</TableCell>
-                    <TableCell>Antwort (DE)</TableCell>
-                    <TableCell>Hits</TableCell>
-                    <TableCell>Aktionen</TableCell>
+                    <TableCell>{t('admin.helpFeedbackQueue.colQuestion')}</TableCell>
+                    <TableCell>{t('admin.helpFeedbackQueue.colAnswerDe')}</TableCell>
+                    <TableCell>{t('admin.helpFeedbackQueue.colHits')}</TableCell>
+                    <TableCell>{t('admin.helpFeedbackQueue.colActions')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -259,13 +290,13 @@ const HelpFeedbackQueue: React.FC = () => {
                       <TableCell>{c.hit_count}</TableCell>
                       <TableCell>
                         <Button size="small" color="success" startIcon={<CheckCircle />} onClick={() => approveFaq(c.id)} sx={{ mr: 1 }}>
-                          Freigeben
+                          {t('admin.helpFeedbackQueue.actionApprove')}
                         </Button>
                         <Button size="small" color="warning" onClick={() => { setEditDialog(c); setEditAnswerDe(c.answer_de); setEditAnswerEn(c.answer_en); }}>
-                          Bearbeiten
+                          {t('admin.helpFeedbackQueue.actionEdit')}
                         </Button>
                         <Button size="small" color="error" startIcon={<Cancel />} onClick={() => rejectFaq(c.id)}>
-                          Verwerfen
+                          {t('admin.helpFeedbackQueue.actionReject')}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -276,17 +307,17 @@ const HelpFeedbackQueue: React.FC = () => {
           )}
 
           <Dialog open={!!editDialog} onClose={() => setEditDialog(null)} maxWidth="md" fullWidth>
-            <DialogTitle>FAQ-Antwort bearbeiten</DialogTitle>
+            <DialogTitle>{t('admin.helpFeedbackQueue.dialogEditTitle')}</DialogTitle>
             <DialogContent>
-              <Typography variant="subtitle2" sx={{ mt: 1, mb: 0.5 }}>Frage</Typography>
+              <Typography variant="subtitle2" sx={{ mt: 1, mb: 0.5 }}>{t('admin.helpFeedbackQueue.colQuestion')}</Typography>
               <Typography variant="body2" color="text.secondary">{editDialog?.question_text}</Typography>
-              <TextField fullWidth multiline rows={4} label="Antwort (DE)" value={editAnswerDe} onChange={(e) => setEditAnswerDe(e.target.value)} sx={{ mt: 2 }} />
-              <TextField fullWidth multiline rows={4} label="Antwort (EN)" value={editAnswerEn} onChange={(e) => setEditAnswerEn(e.target.value)} sx={{ mt: 2 }} />
+              <TextField fullWidth multiline rows={4} label={t('admin.helpFeedbackQueue.fieldAnswerDe')} value={editAnswerDe} onChange={(e) => setEditAnswerDe(e.target.value)} sx={{ mt: 2 }} />
+              <TextField fullWidth multiline rows={4} label={t('admin.helpFeedbackQueue.fieldAnswerEn')} value={editAnswerEn} onChange={(e) => setEditAnswerEn(e.target.value)} sx={{ mt: 2 }} />
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setEditDialog(null)}>Abbrechen</Button>
+              <Button onClick={() => setEditDialog(null)}>{t('admin.helpFeedbackQueue.actionCancel')}</Button>
               <Button variant="contained" color="success" onClick={() => editDialog && approveFaq(editDialog.id, editAnswerDe, editAnswerEn)}>
-                Freigeben
+                {t('admin.helpFeedbackQueue.actionApprove')}
               </Button>
             </DialogActions>
           </Dialog>
@@ -297,18 +328,18 @@ const HelpFeedbackQueue: React.FC = () => {
       {tabIndex === 2 && (
         <Box>
           {clusters.length === 0 ? (
-            <Alert severity="info">Noch keine Feedback-Clusters vorhanden. Clusters werden automatisch erstellt, wenn Benutzer Feedback geben.</Alert>
+            <Alert severity="info">{t('admin.helpFeedbackQueue.emptyClusters')}</Alert>
           ) : (
             <TableContainer component={Paper}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Thema</TableCell>
+                    <TableCell>{t('admin.helpFeedbackQueue.colTopic')}</TableCell>
                     <TableCell align="center">👍</TableCell>
                     <TableCell align="center">👎</TableCell>
-                    <TableCell align="center">Total</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Aktionen</TableCell>
+                    <TableCell align="center">{t('admin.helpFeedbackQueue.colTotal')}</TableCell>
+                    <TableCell>{t('admin.helpFeedbackQueue.colStatus')}</TableCell>
+                    <TableCell>{t('admin.helpFeedbackQueue.colActions')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -320,15 +351,15 @@ const HelpFeedbackQueue: React.FC = () => {
                       <TableCell align="center">{c.total_count}</TableCell>
                       <TableCell>
                         {c.docs_gap ? (
-                          <Chip label="Docs-Lücke" size="small" color="error" icon={<Warning />} />
+                          <Chip label={t('admin.helpFeedbackQueue.statusDocsGap')} size="small" color="error" icon={<Warning />} />
                         ) : (
-                          <Chip label="OK" size="small" color="success" />
+                          <Chip label={t('admin.helpFeedbackQueue.statusOk')} size="small" color="success" />
                         )}
                       </TableCell>
                       <TableCell>
                         {!c.docs_gap && c.negative_count > 0 && (
                           <Button size="small" color="warning" onClick={() => markDocsGap(c.id)}>
-                            Als Docs-Lücke markieren
+                            {t('admin.helpFeedbackQueue.actionMarkDocsGap')}
                           </Button>
                         )}
                       </TableCell>

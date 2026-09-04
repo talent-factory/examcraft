@@ -26,10 +26,10 @@ export interface WithFeatureGateOptions {
   requiredFeature: string;
   /** Required subscription tier */
   requiredTier: 'starter' | 'professional' | 'enterprise';
-  /** Feature display name for upgrade prompt */
-  featureName?: string;
-  /** Feature description for upgrade prompt */
-  featureDescription?: string;
+  /** i18n key for the feature's display name shown on the upgrade prompt */
+  featureNameKey?: string;
+  /** i18n key for the feature's description shown on the upgrade prompt */
+  featureDescriptionKey?: string;
 }
 
 // ============================================================================
@@ -42,15 +42,15 @@ export interface WithFeatureGateOptions {
  * @param Component - Component to wrap
  * @param requiredFeature - Feature name required to access component
  * @param requiredTier - Subscription tier required
- * @param featureName - Display name for upgrade prompt (optional)
- * @param featureDescription - Description for upgrade prompt (optional)
+ * @param featureNameKey - i18n key for the upgrade prompt's display name (optional)
+ * @param featureDescriptionKey - i18n key for the upgrade prompt's description (optional)
  */
 export function withFeatureGate<P extends object>(
   Component: ComponentType<P>,
   requiredFeature: string,
   requiredTier: 'starter' | 'professional' | 'enterprise',
-  featureName?: string,
-  featureDescription?: string
+  featureNameKey?: string,
+  featureDescriptionKey?: string
 ): ComponentType<P> {
   const WrappedComponent: React.FC<P> = (props) => {
     const { tier, hasFeature, isLoading } = useFeatures();
@@ -73,8 +73,12 @@ export function withFeatureGate<P extends object>(
     if (!hasFeature(requiredFeature)) {
       return (
         <UpgradePrompt
-          featureName={featureName || requiredFeature}
-          featureDescription={featureDescription}
+          // Falls back to the raw RBAC feature id (e.g. "rag_generation") if
+          // no key was given — not a translation key, but react-i18next's t()
+          // returns an unresolvable key verbatim, so this degrades to the
+          // same "show something" behavior the old string fallback had.
+          featureNameKey={featureNameKey || requiredFeature}
+          featureDescriptionKey={featureDescriptionKey}
           requiredTier={requiredTier}
           currentTier={tier as any || 'free'}
         />

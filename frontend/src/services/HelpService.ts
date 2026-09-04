@@ -1,3 +1,5 @@
+import { AppError } from '../errors';
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export interface HelpStatus {
@@ -55,7 +57,7 @@ class HelpService {
 
   async getStatus(): Promise<HelpStatus> {
     const response = await fetch(`${API_BASE_URL}/api/v1/help/status`);
-    if (!response.ok) throw new Error('Failed to fetch help status');
+    if (!response.ok) throw new AppError('help.statusFailed', undefined, response.status);
     return response.json();
   }
 
@@ -63,7 +65,7 @@ class HelpService {
     const response = await fetch(`${API_BASE_URL}/api/v1/help/onboarding/status`, {
       headers: this.getHeaders(token),
     });
-    if (!response.ok) throw new Error('Failed to fetch onboarding status');
+    if (!response.ok) throw new AppError('help.onboardingStatusFailed', undefined, response.status);
     return response.json();
   }
 
@@ -73,7 +75,7 @@ class HelpService {
       headers: this.getHeaders(token),
       body: JSON.stringify({ step }),
     });
-    if (!response.ok) throw new Error('Failed to complete onboarding step');
+    if (!response.ok) throw new AppError('help.onboardingStepFailed', undefined, response.status);
     return response.json();
   }
 
@@ -83,7 +85,7 @@ class HelpService {
       headers: this.getHeaders(token),
       body: JSON.stringify({ step }),
     });
-    if (!response.ok) throw new Error('Failed to skip onboarding step');
+    if (!response.ok) throw new AppError('help.onboardingSkipFailed', undefined, response.status);
     return response.json();
   }
 
@@ -118,7 +120,7 @@ class HelpService {
     const response = await fetch(`${API_BASE_URL}/api/v1/help/context/${path}`, {
       headers: this.getHeaders(token),
     });
-    if (!response.ok) throw new Error('Failed to fetch context hint');
+    if (!response.ok) throw new AppError('help.contextHintFailed', undefined, response.status);
     return response.json();
   }
 
@@ -128,7 +130,7 @@ class HelpService {
       headers: this.getHeaders(token),
       body: JSON.stringify({ hint_id: hintId }),
     });
-    if (!response.ok) throw new Error('Failed to dismiss hint');
+    if (!response.ok) throw new AppError('help.hintDismissFailed', undefined, response.status);
   }
 
   async sendMessage(
@@ -143,9 +145,7 @@ class HelpService {
       body: JSON.stringify({ question, route, conversation_history: conversationHistory }),
     });
     if (!response.ok) {
-      const err = new Error('Failed to send help message') as Error & { status: number };
-      err.status = response.status;
-      throw err;
+      throw new AppError('help.messageFailed', undefined, response.status);
     }
     return response.json();
   }
@@ -156,7 +156,7 @@ class HelpService {
       headers: this.getHeaders(token),
       body: JSON.stringify(feedback),
     });
-    if (!response.ok) throw new Error('Failed to submit feedback');
+    if (!response.ok) throw new AppError('help.feedbackFailed', undefined, response.status);
   }
 }
 

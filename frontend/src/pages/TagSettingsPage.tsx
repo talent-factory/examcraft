@@ -18,21 +18,13 @@ import {
 } from '@mui/material';
 import { Edit, Archive, Unarchive, Merge, Delete as DeleteIcon, Search as SearchIcon } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { tagsApi, type Tag } from '../api/tagsApi';
 import { useAuth } from '../contexts/AuthContext';
 import TagRenameInline from '../components/tags/TagRenameInline';
 import TagMergeModal from '../components/tags/TagMergeModal';
 import TagCreateForm from '../components/tags/TagCreateForm';
-
-const extractApiDetail = (err: unknown, fallback: string): string => {
-  if (axios.isAxiosError(err)) {
-    const detail = err.response?.data?.detail;
-    if (typeof detail === 'string' && detail.trim()) return detail;
-  }
-  return fallback;
-};
+import { apiDetail, translateError } from '../errors';
 
 type FilterMode = 'all' | 'active' | 'archived';
 
@@ -82,19 +74,19 @@ const TagSettingsPage: React.FC = () => {
       invalidate();
       setRenamingId(null);
     },
-    onError: (err) => setError(extractApiDetail(err, 'Umbenennen fehlgeschlagen.')),
+    onError: (err) => setError(apiDetail(err) ?? translateError(err, t, 'components.tags.renameFailed')),
   });
 
   const archiveMutation = useMutation({
     mutationFn: (id: number) => tagsApi.archiveTag(id),
     onSuccess: invalidate,
-    onError: (err) => setError(extractApiDetail(err, 'Archivieren fehlgeschlagen.')),
+    onError: (err) => setError(apiDetail(err) ?? translateError(err, t, 'components.tags.archiveFailed')),
   });
 
   const unarchiveMutation = useMutation({
     mutationFn: (id: number) => tagsApi.unarchiveTag(id),
     onSuccess: invalidate,
-    onError: (err) => setError(extractApiDetail(err, 'Wiederherstellen fehlgeschlagen.')),
+    onError: (err) => setError(apiDetail(err) ?? translateError(err, t, 'components.tags.restoreFailed')),
   });
 
   const mergeMutation = useMutation({
@@ -105,7 +97,7 @@ const TagSettingsPage: React.FC = () => {
       setSelectedIds(new Set());
       setMergeOpen(false);
     },
-    onError: (err) => setError(extractApiDetail(err, 'Zusammenführen fehlgeschlagen.')),
+    onError: (err) => setError(apiDetail(err) ?? translateError(err, t, 'components.tags.mergeFailed')),
   });
 
   const deleteMutation = useMutation({
@@ -114,7 +106,7 @@ const TagSettingsPage: React.FC = () => {
       invalidate();
       setSelectedIds(new Set());
     },
-    onError: (err) => setError(extractApiDetail(err, 'Löschen fehlgeschlagen.')),
+    onError: (err) => setError(apiDetail(err) ?? translateError(err, t, 'components.tags.deleteFailed')),
   });
 
   const filteredTags = allTags
@@ -167,7 +159,7 @@ const TagSettingsPage: React.FC = () => {
       {/* Trennlinie */}
       <Divider sx={{ mb: 2 }}>
         <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
-          Bestehende Tags
+          {t('components.tags.existingTags')}
         </Typography>
       </Divider>
 
@@ -175,7 +167,7 @@ const TagSettingsPage: React.FC = () => {
       <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
         <TextField
           size="small"
-          placeholder="Tags suchen..."
+          placeholder={t('components.tags.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ flex: 1 }}
@@ -193,9 +185,9 @@ const TagSettingsPage: React.FC = () => {
           exclusive
           onChange={(_, v) => v && setFilter(v)}
         >
-          <ToggleButton value="all">Alle ({countAll})</ToggleButton>
-          <ToggleButton value="active">Aktiv ({countActive})</ToggleButton>
-          <ToggleButton value="archived">Archiviert ({countArchived})</ToggleButton>
+          <ToggleButton value="all">{t('components.tags.filterAll')} ({countAll})</ToggleButton>
+          <ToggleButton value="active">{t('components.tags.filterActive')} ({countActive})</ToggleButton>
+          <ToggleButton value="archived">{t('components.tags.filterArchived')} ({countArchived})</ToggleButton>
         </ToggleButtonGroup>
       </Box>
 
@@ -208,7 +200,7 @@ const TagSettingsPage: React.FC = () => {
             onClick={() => setMergeOpen(true)}
             color="secondary"
           >
-            {selectedIds.size} Tags zusammenführen
+            {t('components.tags.mergeSelectionButton', { count: selectedIds.size })}
           </Button>
         </Box>
       )}
@@ -221,7 +213,7 @@ const TagSettingsPage: React.FC = () => {
           {filteredTags.length === 0 && (
             <Box sx={{ p: 2 }}>
               <Typography variant="body2" color="text.secondary">
-                Keine Tags gefunden.
+                {t('components.tags.noneFound')}
               </Typography>
             </Box>
           )}
@@ -234,25 +226,25 @@ const TagSettingsPage: React.FC = () => {
 
             if (isAdmin) {
               if (filteredInstitution.length > 0) {
-                items.push({ type: 'header', label: 'Tags dieser Institution', scope: 'institution', count: filteredInstitution.length });
+                items.push({ type: 'header', label: t('components.tags.groupInstitution'), scope: 'institution', count: filteredInstitution.length });
               }
-              filteredInstitution.forEach((t) => items.push({ type: 'tag', tag: t, readonly: false }));
+              filteredInstitution.forEach((tag) => items.push({ type: 'tag', tag, readonly: false }));
               if (filteredGlobal.length > 0) {
-                items.push({ type: 'header', label: 'Vorgegebene Tags', scope: 'global', count: filteredGlobal.length });
+                items.push({ type: 'header', label: t('components.tags.groupGlobal'), scope: 'global', count: filteredGlobal.length });
               }
-              filteredGlobal.forEach((t) => items.push({ type: 'tag', tag: t, readonly: !isSuperuser }));
+              filteredGlobal.forEach((tag) => items.push({ type: 'tag', tag, readonly: !isSuperuser }));
             } else {
               if (ownInstitutionTags.length > 0) {
-                items.push({ type: 'header', label: 'Meine Tags', scope: 'institution', count: ownInstitutionTags.length });
-                ownInstitutionTags.forEach((t) => items.push({ type: 'tag', tag: t, readonly: false }));
+                items.push({ type: 'header', label: t('components.tags.myTags'), scope: 'institution', count: ownInstitutionTags.length });
+                ownInstitutionTags.forEach((tag) => items.push({ type: 'tag', tag, readonly: false }));
               }
               if (othersInstitutionTags.length > 0) {
-                items.push({ type: 'header', label: 'Tags der Institution', scope: 'institution', count: othersInstitutionTags.length });
-                othersInstitutionTags.forEach((t) => items.push({ type: 'tag', tag: t, readonly: true }));
+                items.push({ type: 'header', label: t('components.tags.institutionTags'), scope: 'institution', count: othersInstitutionTags.length });
+                othersInstitutionTags.forEach((tag) => items.push({ type: 'tag', tag, readonly: true }));
               }
               if (filteredGlobal.length > 0) {
-                items.push({ type: 'header', label: 'Vorgegebene Tags', scope: 'global', count: filteredGlobal.length });
-                filteredGlobal.forEach((t) => items.push({ type: 'tag', tag: t, readonly: true }));
+                items.push({ type: 'header', label: t('components.tags.groupGlobal'), scope: 'global', count: filteredGlobal.length });
+                filteredGlobal.forEach((tag) => items.push({ type: 'tag', tag, readonly: true }));
               }
             }
 
@@ -308,7 +300,20 @@ const TagSettingsPage: React.FC = () => {
                     {renamingId === tag.id ? (
                       <TagRenameInline
                         currentName={tag.name}
-                        onSave={(name) => renameMutation.mutateAsync({ id: tag.id, name })}
+                        // mutateAsync rejects on failure even though onError above
+                        // already sets the error state — swallow it here so
+                        // TagRenameInline's uncaught `await onSave(...)` doesn't
+                        // surface as an unhandled promise rejection. The `async`
+                        // wrapper (rather than .catch(() => {}), which would still
+                        // leak mutateAsync's Tag resolution type through the union)
+                        // is what makes this satisfy the Promise<void> prop type.
+                        onSave={async (name) => {
+                          try {
+                            await renameMutation.mutateAsync({ id: tag.id, name });
+                          } catch {
+                            // already surfaced via onError above
+                          }
+                        }}
                         onCancel={() => setRenamingId(null)}
                       />
                     ) : (
@@ -328,7 +333,7 @@ const TagSettingsPage: React.FC = () => {
                         />
                         {tag.is_archived && (
                           <Typography variant="caption" color="text.disabled">
-                            (archiviert)
+                            {t('components.tags.archivedMarker')}
                           </Typography>
                         )}
                         <Typography
@@ -343,7 +348,7 @@ const TagSettingsPage: React.FC = () => {
                               : 400,
                           }}
                         >
-                          {tag.usage_count} {tag.usage_count === 1 ? 'Frage' : 'Fragen'}
+                          {t('components.tags.questionCount', { count: tag.usage_count })}
                         </Typography>
                       </Box>
                     )}
@@ -352,12 +357,12 @@ const TagSettingsPage: React.FC = () => {
                       <Box sx={{ display: 'flex', gap: 0.5 }}>
                         {!tag.is_archived && (tag.scope === 'global' ? isSuperuser : true) && (
                           <>
-                            <Tooltip title="Umbenennen">
+                            <Tooltip title={t('components.tags.rename')}>
                               <IconButton size="small" onClick={() => setRenamingId(tag.id)}>
                                 <Edit fontSize="small" />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Archivieren">
+                            <Tooltip title={t('components.tags.archive')}>
                               <IconButton size="small" onClick={() => archiveMutation.mutate(tag.id)}>
                                 <Archive fontSize="small" />
                               </IconButton>
@@ -365,19 +370,19 @@ const TagSettingsPage: React.FC = () => {
                           </>
                         )}
                         {tag.is_archived && (tag.scope === 'global' ? isSuperuser : true) && (
-                          <Tooltip title="Wiederherstellen">
+                          <Tooltip title={t('components.tags.restore')}>
                             <IconButton size="small" onClick={() => unarchiveMutation.mutate(tag.id)}>
                               <Unarchive fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         )}
                         {tag.is_archived && (tag.is_own || isAdmin) && tag.usage_count === 0 && (tag.scope === 'global' ? isSuperuser : true) && (
-                          <Tooltip title="Löschen">
+                          <Tooltip title={t('components.tags.delete')}>
                             <IconButton
                               size="small"
                               color="error"
                               onClick={() => {
-                                if (window.confirm(`Tag "#${tag.name}" permanent löschen?`)) {
+                                if (window.confirm(t('components.tags.confirmDelete', { name: tag.name }))) {
                                   deleteMutation.mutate(tag.id);
                                 }
                               }}
@@ -400,9 +405,17 @@ const TagSettingsPage: React.FC = () => {
       <TagMergeModal
         open={mergeOpen}
         selectedTags={selectedTags}
-        onConfirm={(sourceIds, targetId) =>
-          mergeMutation.mutateAsync({ sourceIds, targetId })
-        }
+        // Deliberately still lets the rejection through (unlike
+        // TagRenameInline's onSave above, which has no success-only
+        // follow-up action): TagMergeModal.handleConfirm relies on it to
+        // skip onClose() and keep the modal open on failure. The `async`
+        // wrapper (rather than returning mutateAsync's Promise<Tag[]>
+        // directly) is what makes this satisfy the Promise<void> prop type
+        // without swallowing the rejection — see TagMergeModal.tsx for
+        // where it's actually caught.
+        onConfirm={async (sourceIds, targetId) => {
+          await mergeMutation.mutateAsync({ sourceIds, targetId });
+        }}
         onClose={() => setMergeOpen(false)}
       />
     </Box>

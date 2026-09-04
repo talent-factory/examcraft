@@ -812,8 +812,10 @@
       "title": "Pricing Plans",
       "subtitle": "Choose the plan that fits your needs.",
       "perMonth": "/month",
+      "configurationRequired": "Configuration required: ",
       "freeDescription": "Perfect for trying out ExamCraft.",
       "currentPlan": "Current Plan",
+      "freePlan": "Free plan",
       "starterDescription": "For individual instructors.",
       "starterUsers": "1 user",
       "professionalDescription": "For departments and small schools.",
@@ -1502,6 +1504,47 @@
       "nameLockedHint": "Name cannot be changed after the role has been created.",
       "btnSave": "Save",
       "btnSaving": "Saving..."
+    },
+    "helpFeedbackQueue": {
+      "tabFeedback": "Feedback Queue ({{count}})",
+      "tabCandidates": "FAQ Candidates ({{count}})",
+      "tabClusters": "Clusters & Docs Gaps",
+      "status": "Status",
+      "statusAll": "All",
+      "statusOpen": "Open",
+      "statusInProgress": "In Progress",
+      "statusDocumented": "Documented",
+      "statusDocsGap": "Docs Gap",
+      "statusOk": "OK",
+      "colQuestion": "Question",
+      "colRole": "Role",
+      "colRating": "Rating",
+      "colStatus": "Status",
+      "colAction": "Action",
+      "colAnswerDe": "Answer (DE)",
+      "colHits": "Hits",
+      "colActions": "Actions",
+      "colTopic": "Topic",
+      "colTotal": "Total",
+      "actionEdit": "Edit",
+      "actionDocumented": "Documented",
+      "actionApprove": "Approve",
+      "actionReject": "Reject",
+      "actionCancel": "Cancel",
+      "actionMarkDocsGap": "Mark as docs gap",
+      "emptyFeedback": "No entries",
+      "emptyCandidates": "No FAQ candidates available. Candidates are created automatically once answers receive multiple positive ratings.",
+      "emptyClusters": "No feedback clusters yet. Clusters are created automatically as users submit feedback.",
+      "dialogEditTitle": "Edit FAQ answer",
+      "fieldAnswerDe": "Answer (DE)",
+      "fieldAnswerEn": "Answer (EN)",
+      "errorLoadFeedback": "Failed to load feedback",
+      "errorLoadClusters": "Failed to load clusters",
+      "errorLoadCandidates": "Failed to load FAQ candidates",
+      "errorStatusUpdate": "Status update failed",
+      "errorFaqApprove": "FAQ approval failed",
+      "errorFaqReject": "FAQ rejection failed",
+      "errorMarkDocsGap": "Failed to mark docs gap"
     }
   },
   "components": {
@@ -1709,6 +1752,13 @@
         "tagsSummary": "Tags updated for {{changed}} documents, {{skipped}} skipped",
         "tagsSummaryWithErrors": "Tags updated for {{changed}} documents, {{skipped}} skipped, {{failed}} errors"
       }
+    },
+    "documentChatPage": {
+      "title": "Document Chat - Premium Feature",
+      "description": "The Document Chat feature is available in the Premium package. This feature allows you to have interactive conversations with your documents using AI-powered RAG (Retrieval-Augmented Generation).",
+      "upgradeHint": "To access this feature, please upgrade to the Professional or Enterprise plan.",
+      "backToDocuments": "Back to Documents",
+      "viewPlans": "View Premium Plans"
     },
     "documentUpload": {
       "dropActive": "Drop files here...",
@@ -1973,6 +2023,94 @@
       "premiumUpgrade": "To access this feature, please upgrade to the Starter, Professional, or Enterprise plan.",
       "back": "Back",
       "viewPlans": "View Premium Plans"
+    },
+    "upgradePrompt": {
+      "yourPlan": "Your plan",
+      "requiredPlan": "Required plan",
+      "upgradeTo": "Upgrade to {{tier}}",
+      "upgradeNow": "Upgrade now"
+    },
+    "featureGate": {
+      "ragExamCreator": {
+        "name": "RAG Exam Creator",
+        "description": "Generate exam questions using Retrieval-Augmented Generation with semantic search."
+      },
+      "documentChat": {
+        "name": "Document Chat",
+        "description": "Chat with your documents using AI-powered conversations."
+      },
+      "promptManagement": {
+        "name": "Prompt Management",
+        "description": "Manage and customize your prompt templates with advanced features."
+      },
+      "promptTemplateSelector": {
+        "name": "Prompt Template Selector",
+        "description": "Select and customize prompt templates for question generation."
+      },
+      "advancedPromptManagement": {
+        "name": "Advanced Prompt Management",
+        "description": "Upload and manage custom prompt templates with semantic search."
+      }
+    },
+    "tags": {
+      "createTitle": "Create new tag",
+      "globalTag": "Global tag (system-wide, all institutions)",
+      "namePlaceholder": "Enter tag name...",
+      "createButton": "Create tag",
+      "createErrorFallback": "Failed to create tag.",
+      "restoreFailed": "Restore failed.",
+      "existsPrefix": "Tag",
+      "existsSuffix": "already exists.",
+      "archivedSuffix": "is archived.",
+      "restore": "Restore",
+      "mergeTitle": "Merge tags",
+      "mergeIntro": "Which tag should remain? The others will be archived.",
+      "mergeTarget": "Target tag (kept)",
+      "mergeOptionUsage_one": "{{count}} question",
+      "mergeOptionUsage_other": "{{count}} questions",
+      "mergeNone": "No questions will be migrated.",
+      "mergeMigrate_one": "1 question will be migrated to {{target}}.",
+      "mergeMigrate_other": "{{count}} questions will be migrated to {{target}}.",
+      "mergeArchiveTail_one": "will be archived.",
+      "mergeArchiveTail_other": "will be archived.",
+      "cancel": "Cancel",
+      "merge": "Merge",
+      "label": "Tags",
+      "createFailed": "Failed to create tag. Please try again.",
+      "noOptions": "No options",
+      "alreadySelected": "\"{{value}}\" is already selected",
+      "createOption": "Create \"{{value}}\"",
+      "groupGlobal": "Predefined tags",
+      "groupInstitution": "Tags of this institution",
+      "archivedCannotUse": "🚫 Tag “{{name}}” is archived and cannot be used.",
+      "existingTags": "Existing tags",
+      "searchPlaceholder": "Search tags...",
+      "noneFound": "No tags found.",
+      "archivedMarker": "(archived)",
+      "rename": "Rename",
+      "archive": "Archive",
+      "delete": "Delete",
+      "renameFailed": "Rename failed.",
+      "archiveFailed": "Archive failed.",
+      "mergeFailed": "Merge failed.",
+      "deleteFailed": "Delete failed.",
+      "filterAll": "All",
+      "filterActive": "Active",
+      "filterArchived": "Archived",
+      "mergeSelectionButton": "Merge {{count}} tags",
+      "myTags": "My tags",
+      "institutionTags": "Institution tags",
+      "questionCount_one": "{{count}} question",
+      "questionCount_other": "{{count}} questions",
+      "confirmDelete": "Permanently delete tag \"#{{name}}\"?"
+    },
+    "featureUnavailable": {
+      "title": "{{feature}} Not Available",
+      "body": "This feature is only available in the Full deployment (Premium/Enterprise).",
+      "hint": "Please upgrade your subscription or contact your administrator."
+    },
+    "componentLoader": {
+      "loading": "Loading {{component}}..."
     }
   },
   "composer": {
@@ -2539,12 +2677,9 @@
       "newDocument": "New Document",
       "saveAsDocument": "Save as Document",
       "title": "Chat Interface",
-      "unknownError": "An unknown error occurred",
       "documentCount_one": "{{count}} document",
       "documentCount_other": "{{count}} documents",
-      "exportFailed": "Export failed: {{error}}",
       "savedAsDocument": "Saved as document: {{title}}",
-      "conversionFailed": "Conversion failed: {{error}}",
       "exportDialogTitle": "Export as {{format}}"
     },
     "documentSelector": {
@@ -2612,7 +2747,9 @@
         "description": "Manage your prompt templates and upload new prompts.",
         "tabPromptList": "Prompt List",
         "tabFileUpload": "File Upload",
-        "tabAIAssistant": "AI Assistant"
+        "tabAIAssistant": "AI Assistant",
+        "tabSemanticSearch": "Semantic Search",
+        "tabsAriaLabel": "Prompt Library Tabs"
       },
       "preview": {
         "noPromptSelected": "No prompt selected",
@@ -2667,6 +2804,46 @@
       "variablesEditor": {
         "additionalVariables": "Additional Template Variables"
       }
+    }
+  },
+  "errors": {
+    "network": "The server is unreachable. Please check your connection.",
+    "compliance": {
+      "loadFailed": "The compliance documents could not be loaded."
+    },
+    "rag": {
+      "examGenerationFailed": "The exam could not be generated.",
+      "statusFailed": "The generation status could not be loaded.",
+      "retryFailed": "The retry failed.",
+      "activeTasksFailed": "Running generations could not be loaded.",
+      "taskResultFailed": "The generation result could not be loaded.",
+      "contextRetrievalFailed": "The context could not be retrieved.",
+      "questionTypesFailed": "The question types could not be loaded.",
+      "healthCheckFailed": "The RAG service is currently unavailable.",
+      "contextPreviewFailed": "The context could not be analysed.",
+      "connectionLost": "The connection to the generation was lost.",
+      "notAvailableInCore": "This feature is not available in the Core edition."
+    },
+    "help": {
+      "statusFailed": "The help status could not be loaded.",
+      "onboardingStatusFailed": "The onboarding progress could not be loaded.",
+      "onboardingStepFailed": "The onboarding step could not be completed.",
+      "onboardingSkipFailed": "The onboarding step could not be skipped.",
+      "contextHintFailed": "The hint could not be loaded.",
+      "hintDismissFailed": "The hint could not be dismissed.",
+      "messageFailed": "Your question could not be sent.",
+      "feedbackFailed": "Your feedback could not be submitted."
+    },
+    "features": {
+      "loadFailed": "The available features could not be loaded."
+    },
+    "chat": {
+      "downloadFailed": "The chat transcript could not be downloaded.",
+      "conversionFailed": "The chat could not be converted into a document."
+    },
+    "oauth": {
+      "providerError": "Sign-in with the provider failed.",
+      "callbackFailed": "The sign-in could not be completed."
     }
   },
   "help": {
