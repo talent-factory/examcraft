@@ -1,20 +1,15 @@
 """Test that the WebSocket route is registered correctly"""
 
-import importlib
-import os
 from starlette.routing import WebSocketRoute
 
 
 def test_websocket_route_registered():
     """The /ws/tasks/{task_id} endpoint must be registered as a WebSocketRoute"""
-    # Import WebSocket API directly
-    core_api_path = os.path.join(os.path.dirname(__file__), "..", "api")
-
-    spec_ws = importlib.util.spec_from_file_location(
-        "core_api_v1_websocket", os.path.join(core_api_path, "v1", "websocket.py")
-    )
-    websocket_api = importlib.util.module_from_spec(spec_ws)
-    spec_ws.loader.exec_module(websocket_api)
+    # Plain import: main.py registers this module under its canonical name
+    # (TF-660), so this is the same module object the app serves from. The
+    # previous spec_from_file_location("core_api_v1_websocket", ...) built a
+    # third, private copy and asserted against that instead.
+    from api.v1 import websocket as websocket_api
 
     # Check that the router is defined
     assert hasattr(websocket_api, "router"), "WebSocket API hat kein router Attribut"

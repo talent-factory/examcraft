@@ -2,12 +2,16 @@
 Tests for RBAC Service
 Tests for RBACService: Permission Checks, Quota Management, Role Management
 
-NOTE: These tests require isolated database state (no pre-seeded data).
-In CI, the app startup seeds RBAC roles/tiers which changes expected values.
-Tests that depend on exact counts or specific tier quotas are skipped in CI.
+These tests run against a database that may already carry the RBAC seed data
+written by the app startup (``scripts/seed_rbac_data``) — in CI it always does.
+The fixture therefore owns its subscription tiers under ids the seed never
+uses (``tier_rbactest_*``), and the assertions check the rows the fixture
+created rather than counting everything in the table. See TF-660: these four
+tests used to carry a ``pytest.mark.skipif`` on the CI environment variable and
+never ran in CI, which left the combined role+tier feature check and the whole
+quota enforcement unverified there.
 """
 
-import os
 import pytest
 from services.rbac_service import RBACService
 from models.rbac import (
@@ -20,7 +24,34 @@ from models.rbac import (
 )
 from models.auth import User, Role, Institution, UserStatus
 
-IN_CI = os.getenv("CI", "false").lower() == "true"
+# Tier ids/names owned by this test module. `RBACService` resolves a tier as
+# f"tier_{institution.subscription_tier}", so the name is what the institution
+# carries and the id is what quotas and tier-features hang off. Deliberately
+# distinct from the seeded tiers (free/starter/professional/enterprise) so the
+# fixture's quota values are the ones under test, seeded DB or not.
+FREE_TIER_NAME = "rbactest_free"
+FREE_TIER_ID = f"tier_{FREE_TIER_NAME}"
+PRO_TIER_NAME = "rbactest_pro"
+PRO_TIER_ID = f"tier_{PRO_TIER_NAME}"
+
+FREE_DOCUMENT_QUOTA = 5
+FREE_QUESTION_QUOTA = 20
+PRO_QUESTION_QUOTA = 1000
+
+# RBACRole ids created by the fixture below. RBACService maps an old-style
+# Role to an RBAC role as f"role_{role.name}", so these two are shared with the
+# seed — the features hanging off them are what makes them distinct.
+FIXTURE_SYSTEM_ROLE_IDS = {"role_admin", "role_user"}
+CUSTOM_ROLE_ID = "role_rbactest_custom"
+
+
+def _test_institution(db):
+    """The institution this module's fixture owns.
+
+    Queried by slug rather than ``.first()`` — on a seeded or shared database
+    the first institution in the table is not necessarily ours.
+    """
+    return db.query(Institution).filter_by(slug="test-university").one()
 
 
 @pytest.fixture(scope="function")
@@ -33,13 +64,15 @@ def rbac_db(test_db):
             name="Test University",
             slug="test-university",
             domain="test.edu",
-            subscription_tier="free",
             max_users=10,
             max_documents=100,
             max_questions_per_month=500,
         )
         test_db.add(institution)
-        test_db.flush()
+    # Set unconditionally: an institution left over from another fixture would
+    # otherwise point at a seeded tier and silently change the quota under test.
+    institution.subscription_tier = FREE_TIER_NAME
+    test_db.flush()
 
     # Create features
     features = [
@@ -89,6 +122,17 @@ def rbac_db(test_db):
             is_system_role=True,
             is_active=True,
         ),
+        # A non-system role. The RBAC seed creates system roles only, so
+        # without one of these the include_system_roles=False path has
+        # nothing it could ever return and passes no matter what it does.
+        RBACRole(
+            id=CUSTOM_ROLE_ID,
+            name="rbactest_custom",
+            display_name="Custom (rbac test)",
+            description="Custom, non-system role",
+            is_system_role=False,
+            is_active=True,
+        ),
     ]
     for role in rbac_roles:
         test_db.merge(role)
@@ -109,42 +153,44 @@ def rbac_db(test_db):
             if not existing:
                 test_db.add(RoleFeature(role_id=role_id, feature_id=fid))
 
-    # Get or create subscription tiers (may already exist from seed data)
-    tier_free = test_db.query(SubscriptionTier).filter_by(name="free").first()
-    if not tier_free:
-        tier_free = SubscriptionTier(
-            id="tier_free",
-            name="free",
-            display_name="Free",
+    # Subscription tiers owned by this module. Unlike the roles/features above
+    # these must NOT reuse a seeded row: the seeded "professional" tier has id
+    # "tier_professional", so quotas attached to it would never be found for an
+    # institution on subscription_tier="pro" — the unlimited test then read a
+    # `no_quota_defined` result and died on a missing key instead of checking
+    # the unlimited path (TF-660).
+    tier_free = test_db.merge(
+        SubscriptionTier(
+            id=FREE_TIER_ID,
+            name=FREE_TIER_NAME,
+            display_name="Free (rbac test)",
             description="Free tier",
             price_monthly=0.0,
             price_yearly=0.0,
             is_active=True,
             sort_order=1,
         )
-        test_db.add(tier_free)
-
-    tier_pro = test_db.query(SubscriptionTier).filter_by(name="professional").first()
-    if not tier_pro:
-        tier_pro = SubscriptionTier(
-            id="tier_pro",
-            name="professional",
-            display_name="Professional",
+    )
+    tier_pro = test_db.merge(
+        SubscriptionTier(
+            id=PRO_TIER_ID,
+            name=PRO_TIER_NAME,
+            display_name="Professional (rbac test)",
             description="Pro tier",
             price_monthly=49.0,
             price_yearly=490.0,
             is_active=True,
             sort_order=2,
         )
-        test_db.add(tier_pro)
+    )
     test_db.flush()
 
     # Get or create tier quotas (may exist from seed data)
     quota_specs = [
-        (tier_free.id, "documents", 5),
-        (tier_free.id, "questions_per_month", 20),
+        (tier_free.id, "documents", FREE_DOCUMENT_QUOTA),
+        (tier_free.id, "questions_per_month", FREE_QUESTION_QUOTA),
         (tier_pro.id, "documents", -1),
-        (tier_pro.id, "questions_per_month", 1000),
+        (tier_pro.id, "questions_per_month", PRO_QUESTION_QUOTA),
     ]
     for tier_id, resource_type, limit in quota_specs:
         existing = (
@@ -152,7 +198,12 @@ def rbac_db(test_db):
             .filter_by(tier_id=tier_id, resource_type=resource_type)
             .first()
         )
-        if not existing:
+        if existing:
+            # Overwrite rather than keep: the quota values are what the tests
+            # assert on, so they have to come from this fixture, not from
+            # whatever happens to be in the database already.
+            existing.quota_limit = limit
+        else:
             test_db.add(
                 TierQuota(
                     tier_id=tier_id,
@@ -202,11 +253,10 @@ def rbac_db(test_db):
 # ============================================
 
 
-@pytest.mark.skipif(IN_CI, reason="Seed data changes expected feature access results")
 def test_user_has_feature_access_with_role_and_tier(rbac_db):
     """Test permission check with both role and tier requirements"""
     # Create user with admin role and free tier
-    institution = rbac_db.query(Institution).first()
+    institution = _test_institution(rbac_db)
     admin_role = rbac_db.query(Role).filter(Role.name == "admin").first()
 
     user = User(
@@ -237,7 +287,7 @@ def test_user_has_feature_access_with_role_and_tier(rbac_db):
 
 def test_user_without_role_permission_denied(rbac_db):
     """Test permission denied when user role doesn't have feature"""
-    institution = rbac_db.query(Institution).first()
+    institution = _test_institution(rbac_db)
     user_role = rbac_db.query(Role).filter(Role.name == "user").first()
 
     user = User(
@@ -266,27 +316,28 @@ def test_user_without_role_permission_denied(rbac_db):
 # ============================================
 
 
-@pytest.mark.skipif(IN_CI, reason="Seed data changes expected quota values")
 def test_check_resource_quota_within_limit(rbac_db):
     """Test quota check when within limit"""
-    institution = rbac_db.query(Institution).first()
+    institution = _test_institution(rbac_db)
     service = RBACService(rbac_db)
 
-    # Free tier has 5 documents limit, no usage yet -> ALLOWED
+    # Fixture free tier allows FREE_DOCUMENT_QUOTA documents, no usage yet
     result = service.check_resource_quota(institution.id, "documents", 1)
 
     assert result["allowed"] is True
-    assert result["quota_limit"] == 5
+    assert result["quota_limit"] == FREE_DOCUMENT_QUOTA
     assert result["current_usage"] == 0
-    assert result["remaining"] == 5
+    assert result["remaining"] == FREE_DOCUMENT_QUOTA
 
 
-@pytest.mark.skipif(IN_CI, reason="Seed data changes expected quota structure")
 def test_check_resource_quota_unlimited(rbac_db):
     """Test quota check for unlimited resource"""
-    # Change institution to pro tier
-    institution = rbac_db.query(Institution).first()
-    institution.subscription_tier = "pro"  # Must match tier_id without "tier_" prefix
+    # Switch the institution to the fixture's pro tier. RBACService resolves
+    # the tier as f"tier_{subscription_tier}" (by id, NOT by SubscriptionTier
+    # .name), so the name stored here has to be the id minus the "tier_"
+    # prefix.
+    institution = _test_institution(rbac_db)
+    institution.subscription_tier = PRO_TIER_NAME
     rbac_db.commit()
 
     service = RBACService(rbac_db)
@@ -294,6 +345,11 @@ def test_check_resource_quota_unlimited(rbac_db):
     # Pro tier has unlimited documents (-1) -> ALLOWED
     result = service.check_resource_quota(institution.id, "documents", 1000)
 
+    # Guard against passing for the wrong reason: a missing TierQuota row also
+    # yields allowed=True, but with reason="no_quota_defined" and no limit —
+    # that is exactly how this test silently stopped testing the unlimited
+    # path on a seeded database (TF-660).
+    assert result.get("reason") != "no_quota_defined"
     assert result["allowed"] is True
     assert result["quota_limit"] == -1
     assert result["remaining"] == -1
@@ -301,7 +357,7 @@ def test_check_resource_quota_unlimited(rbac_db):
 
 def test_increment_resource_usage(rbac_db):
     """Test incrementing resource usage"""
-    institution = rbac_db.query(Institution).first()
+    institution = _test_institution(rbac_db)
 
     service = RBACService(rbac_db)
 
@@ -321,17 +377,43 @@ def test_increment_resource_usage(rbac_db):
 # ============================================
 
 
-@pytest.mark.skipif(IN_CI, reason="Seed data adds extra roles beyond test expectations")
 def test_list_roles(rbac_db):
     """Test listing roles"""
     service = RBACService(rbac_db)
 
-    # List all roles
-    all_roles = service.list_roles(include_system_roles=True, include_inactive=False)
-    assert len(all_roles) == 2  # admin + user
+    # Deactivate one of the fixture's roles so the include_inactive=False
+    # filter has something of ours to exclude — a count over the whole table
+    # would only measure how much the RBAC seed happens to contain.
+    inactive_role = rbac_db.query(RBACRole).filter_by(id="role_user").one()
+    inactive_role.is_active = False
+    rbac_db.flush()
 
-    # List only custom roles
-    custom_roles = service.list_roles(
-        include_system_roles=False, include_inactive=False
-    )
-    assert len(custom_roles) == 0  # No custom roles yet
+    all_roles = service.list_roles(include_system_roles=True, include_inactive=False)
+    listed_ids = {role.id for role in all_roles}
+
+    assert "role_admin" in listed_ids
+    assert "role_user" not in listed_ids  # deactivated above
+
+    all_roles = service.list_roles(include_system_roles=True, include_inactive=True)
+    listed_ids = {role.id for role in all_roles}
+    assert FIXTURE_SYSTEM_ROLE_IDS <= listed_ids
+    assert CUSTOM_ROLE_ID in listed_ids
+
+
+def test_list_roles_excluding_system_roles_returns_the_custom_ones(rbac_db):
+    """include_system_roles=False must drop system roles and keep the rest.
+
+    This asserts the presence of the custom role, not just the absence of the
+    system ones: the filter used to be `not RBACRole.is_system_role`, which
+    Python evaluates to a literal False, so the query returned nothing at all
+    and an absence-only check passed while the endpoint was broken (found in
+    TF-660, fixed alongside it).
+    """
+    service = RBACService(rbac_db)
+
+    custom_roles = service.list_roles(include_system_roles=False, include_inactive=True)
+    custom_ids = {role.id for role in custom_roles}
+
+    assert CUSTOM_ROLE_ID in custom_ids
+    assert not FIXTURE_SYSTEM_ROLE_IDS & custom_ids
+    assert all(role.is_system_role is False for role in custom_roles)

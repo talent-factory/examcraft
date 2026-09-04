@@ -467,22 +467,17 @@ def test_change_password_without_auth(test_client):
 # project_caplog_propagation_full_suite.
 #
 # Patching a specific module's `logger` attribute (e.g. "api.auth.logger")
-# is ALSO unreliable here specifically: main.py's lifespan handler loads
-# api/auth.py a second time via importlib under the module name
-# "core_api_auth" (see project_api_import_sysmodules_prod_only) and
-# registers ITS router with `app` -- a distinct module object with its own
+# used to be unreliable here too: before TF-660 main.py's lifespan loaded
+# api/auth.py a second time under the module name "core_api_auth" and
+# registered ITS router with `app` -- a distinct module object with its own
 # `logger`, never registered in sys.modules and therefore not reachable by
-# name from a test. Once any earlier test in the same pytest process
-# triggers app startup (e.g. any test using `with TestClient(app):`),
-# core_api_auth's router route wins over the plain `api.auth` router this
-# file's own `test_client` fixture registers (Starlette matches the first
-# route added for a given path), so a request can silently be served by
-# either module instance depending on test run order.
+# name from a test. main.py now loads api/ modules under their canonical
+# dotted names, so "api.auth" is a single object again.
 #
-# Patching logging.Logger.warning/.info at the class level sidesteps the
-# whole problem: it intercepts every Logger instance's calls process-wide
-# for the scope of the `with` block, regardless of which duplicate module
-# instance is actually holding the logger.
+# Patching logging.Logger.warning/.info at the class level is kept because
+# it also sidesteps the caplog propagation problem above: it intercepts
+# every Logger instance's calls process-wide for the scope of the `with`
+# block.
 
 
 def test_register_logs_warning_when_verification_email_skipped(test_client):

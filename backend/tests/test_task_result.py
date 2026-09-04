@@ -23,16 +23,14 @@ from fastapi.testclient import TestClient
 from main import app
 from services.rag_errors import GENERIC_TASK_ERROR, NoContextError
 
-# main.py loads core API modules via importlib.spec_from_file_location under
-# special names (avoids the api ↔ premium.api conflict in full deployment;
-# core_api_rag_exams for rag_exams.py, see main.py). A plain
-# `import api.rag_exams` in THIS file would create a completely separate,
-# independent module instance — with a different `logger` object than the
-# one actually used by the app running via `from main import app`.
-# logging.getLogger(name), by contrast, is a global registry lookup: for
-# the same name it always returns the same singleton, regardless of which
-# module instance called `logging.getLogger(__name__)`.
-_rag_exams_logger = logging.getLogger("core_api_rag_exams")
+# main.py still loads the core API modules via
+# importlib.spec_from_file_location, but since TF-660 under their canonical
+# dotted names, so api/rag_exams.py's `logging.getLogger(__name__)` registers
+# as "api.rag_exams". Addressing the logger by name rather than by reaching
+# for a module attribute keeps this independent of who imported the module:
+# logging.getLogger is a global registry lookup that returns the same
+# singleton for a given name.
+_rag_exams_logger = logging.getLogger("api.rag_exams")
 
 
 # ---------------------------------------------------------------------------

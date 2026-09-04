@@ -238,250 +238,124 @@ async def lifespan(app: FastAPI):
             logger.error(f"Error loading Premium RAG Service: {e}", exc_info=True)
 
     # Startup: Load API routers (Core Package)
-    # Premium features (vector_search, chat, prompts) are available in Premium package
-    # Import from core.api explicitly to avoid conflicts with premium.api
+    # Premium features (vector_search, chat, prompts) are available in Premium
+    # package. The router modules live in core/backend/api/ and are loaded here
+    # rather than at module import time to keep app-creation cheap.
     import importlib
     import sys
 
     # Get the core backend path
     core_api_path = os.path.join(os.path.dirname(__file__), "api")
 
-    # Import core API modules directly
-    spec_documents = importlib.util.spec_from_file_location(
-        "core_api_documents", os.path.join(core_api_path, "documents.py")
-    )
-    documents = importlib.util.module_from_spec(spec_documents)
-    spec_documents.loader.exec_module(documents)
+    def _load_api_module(dotted_name: str, *relative_path: str):
+        """Load an api/ router module under its canonical dotted name.
 
-    spec_rag = importlib.util.spec_from_file_location(
-        "core_api_rag_exams", os.path.join(core_api_path, "rag_exams.py")
-    )
-    rag_exams = importlib.util.module_from_spec(spec_rag)
-    spec_rag.loader.exec_module(rag_exams)
+        Every module is registered in ``sys.modules`` under the name it would
+        have if it had been imported normally (``api.documents``, not
+        ``core_api_documents``), and an already-imported module is reused
+        instead of being loaded a second time. That gives exactly ONE module
+        object per name, which matters twice over:
 
-    # TF-320 hotfix: load tags BEFORE question_review and exams because both
-    # do ``from api.tags import TagOut``. Register as "api.tags" (same pattern
-    # as api.activity below) so the absolute import resolves through
-    # sys.modules — the importlib.spec_from_file_location loader machinery
-    # breaks the bare filesystem-based package lookup that would otherwise
-    # find /app/api/tags.py via sys.path.
-    spec_tags = importlib.util.spec_from_file_location(
-        "api.tags", os.path.join(core_api_path, "tags.py")
-    )
-    tags_api = importlib.util.module_from_spec(spec_tags)
-    sys.modules["api.tags"] = tags_api
-    spec_tags.loader.exec_module(tags_api)
+        * Production: absolute imports between router modules (e.g.
+          ``from api.question_review import _serialize_competency`` in
+          exams.py) resolve through ``sys.modules``. Loading under a synthetic
+          name left that lookup to the filesystem, which crash-looped the
+          prod image after v1.8.0 (TF-417; same class of bug as TF-320).
+        * Tests: the router registered below IS the module a test reaches via
+          ``patch("api.<module>....")``. Under the old synthetic names the
+          route was served by a second, unreachable module object, so patches
+          silently missed and results depended on whether some earlier test
+          had already triggered the lifespan (TF-660, TF-745).
 
-    # TF-417 hotfix: register as "api.question_review" (same pattern as
-    # api.tags above) so ``from api.question_review import _serialize_competency``
-    # in exams.py resolves through sys.modules. Loaded via core_api_* the
-    # absolute import breaks in the prod image (Dockerfile.fly) → boot crash.
-    spec_qr = importlib.util.spec_from_file_location(
-        "api.question_review", os.path.join(core_api_path, "question_review.py")
-    )
-    question_review = importlib.util.module_from_spec(spec_qr)
-    sys.modules["api.question_review"] = question_review
-    spec_qr.loader.exec_module(question_review)
+        Load order still matters for modules that import each other at module
+        level — see the ordering comments below.
+        """
+        if dotted_name in sys.modules:
+            return sys.modules[dotted_name]
 
-    spec_exams = importlib.util.spec_from_file_location(
-        "core_api_exams", os.path.join(core_api_path, "exams.py")
-    )
-    exams_api = importlib.util.module_from_spec(spec_exams)
-    spec_exams.loader.exec_module(exams_api)
+        spec = importlib.util.spec_from_file_location(
+            dotted_name, os.path.join(core_api_path, *relative_path)
+        )
+        module = importlib.util.module_from_spec(spec)
+        # Register before exec_module so circular imports between router
+        # modules resolve to the partially initialised module, exactly as
+        # CPython's own import machinery does.
+        sys.modules[dotted_name] = module
+        try:
+            spec.loader.exec_module(module)
+        except BaseException:
+            # Don't leave a half-executed module behind for the next importer.
+            sys.modules.pop(dotted_name, None)
+            raise
+        return module
 
-    spec_submissions = importlib.util.spec_from_file_location(
-        "core_api_submissions", os.path.join(core_api_path, "submissions.py")
-    )
-    submissions_api = importlib.util.module_from_spec(spec_submissions)
-    spec_submissions.loader.exec_module(submissions_api)
+    documents = _load_api_module("api.documents", "documents.py")
+    rag_exams = _load_api_module("api.rag_exams", "rag_exams.py")
 
-    # TF-336: class CRUD + members.
-    spec_student_classes = importlib.util.spec_from_file_location(
-        "core_api_student_classes",
-        os.path.join(core_api_path, "student_classes.py"),
-    )
-    student_classes_api = importlib.util.module_from_spec(spec_student_classes)
-    spec_student_classes.loader.exec_module(student_classes_api)
+    # TF-320: load tags BEFORE question_review and exams because both do
+    # ``from api.tags import TagOut``.
+    tags_api = _load_api_module("api.tags", "tags.py")
 
-    # Org-Unit hierarchy (department/team) — Level 0 foundation.
-    spec_org_units = importlib.util.spec_from_file_location(
-        "core_api_org_units",
-        os.path.join(core_api_path, "org_units.py"),
-    )
-    org_units_api = importlib.util.module_from_spec(spec_org_units)
-    spec_org_units.loader.exec_module(org_units_api)
+    # TF-417: load question_review BEFORE exams — exams.py does
+    # ``from api.question_review import _serialize_competency``.
+    question_review = _load_api_module("api.question_review", "question_review.py")
 
-    # TF-336: student history endpoints.
-    spec_students = importlib.util.spec_from_file_location(
-        "core_api_students",
-        os.path.join(core_api_path, "students.py"),
+    exams_api = _load_api_module("api.exams", "exams.py")
+    submissions_api = _load_api_module("api.submissions", "submissions.py")
+    student_classes_api = _load_api_module("api.student_classes", "student_classes.py")
+    org_units_api = _load_api_module("api.org_units", "org_units.py")
+    students_api = _load_api_module("api.students", "students.py")
+    moodle_connections_api = _load_api_module(
+        "api.moodle_connections", "moodle_connections.py"
     )
-    students_api = importlib.util.module_from_spec(spec_students)
-    spec_students.loader.exec_module(students_api)
+    moodle_roundtrip_api = _load_api_module(
+        "api.moodle_roundtrip", "moodle_roundtrip.py"
+    )
+    grades_api = _load_api_module("api.grades", "grades.py")
+    grading_schemes_api = _load_api_module("api.grading_schemes", "grading_schemes.py")
 
-    # TF-336: Moodle connections (token-encrypted).
-    spec_moodle_connections = importlib.util.spec_from_file_location(
-        "core_api_moodle_connections",
-        os.path.join(core_api_path, "moodle_connections.py"),
+    # TF-400: competency framework CRUD. A later Premium import
+    # ``from api.competency_frameworks import FrameworkOut`` has to resolve to
+    # this instance.
+    competency_frameworks_api = _load_api_module(
+        "api.competency_frameworks", "competency_frameworks.py"
     )
-    moodle_connections_api = importlib.util.module_from_spec(spec_moodle_connections)
-    spec_moodle_connections.loader.exec_module(moodle_connections_api)
 
-    # TF-336: Question-ID-Round-Trip (Export → Sync → API-Re-Import).
-    spec_moodle_roundtrip = importlib.util.spec_from_file_location(
-        "core_api_moodle_roundtrip",
-        os.path.join(core_api_path, "moodle_roundtrip.py"),
-    )
-    moodle_roundtrip_api = importlib.util.module_from_spec(spec_moodle_roundtrip)
-    spec_moodle_roundtrip.loader.exec_module(moodle_roundtrip_api)
-
-    spec_grades = importlib.util.spec_from_file_location(
-        "core_api_grades", os.path.join(core_api_path, "grades.py")
-    )
-    grades_api = importlib.util.module_from_spec(spec_grades)
-    spec_grades.loader.exec_module(grades_api)
-
-    spec_grading_schemes = importlib.util.spec_from_file_location(
-        "core_api_grading_schemes",
-        os.path.join(core_api_path, "grading_schemes.py"),
-    )
-    grading_schemes_api = importlib.util.module_from_spec(spec_grading_schemes)
-    spec_grading_schemes.loader.exec_module(grading_schemes_api)
-
-    # TF-400: competency framework CRUD. Registered as "api.competency_frameworks"
-    # so that a later Premium import `from api.competency_frameworks import FrameworkOut`
-    # resolves — mirroring the api.tags pattern.
-    spec_competency = importlib.util.spec_from_file_location(
-        "api.competency_frameworks",
-        os.path.join(core_api_path, "competency_frameworks.py"),
-    )
-    competency_frameworks_api = importlib.util.module_from_spec(spec_competency)
-    sys.modules["api.competency_frameworks"] = competency_frameworks_api
-    spec_competency.loader.exec_module(competency_frameworks_api)
-
-    spec_stats = importlib.util.spec_from_file_location(
-        "core_api_stats", os.path.join(core_api_path, "stats.py")
-    )
-    stats_api = importlib.util.module_from_spec(spec_stats)
-    spec_stats.loader.exec_module(stats_api)
-
-    spec_grade_export = importlib.util.spec_from_file_location(
-        "core_api_grade_export",
-        os.path.join(core_api_path, "grade_export.py"),
-    )
-    grade_export_api = importlib.util.module_from_spec(spec_grade_export)
-    spec_grade_export.loader.exec_module(grade_export_api)
+    stats_api = _load_api_module("api.stats", "stats.py")
+    grade_export_api = _load_api_module("api.grade_export", "grade_export.py")
 
     # TF-435: push graded feedback (points + comments) back to Moodle.
-    spec_moodle_feedback_push = importlib.util.spec_from_file_location(
-        "core_api_moodle_feedback_push",
-        os.path.join(core_api_path, "moodle_feedback_push.py"),
+    moodle_feedback_push_api = _load_api_module(
+        "api.moodle_feedback_push", "moodle_feedback_push.py"
     )
-    moodle_feedback_push_api = importlib.util.module_from_spec(
-        spec_moodle_feedback_push
-    )
-    spec_moodle_feedback_push.loader.exec_module(moodle_feedback_push_api)
 
     # TF-337: paginated activity endpoint (own / institution scope).
     # Loaded BEFORE dashboard because dashboard.py imports ActivityType from it.
-    # Registered as "api.activity" so the absolute import in dashboard.py resolves.
-    spec_activity = importlib.util.spec_from_file_location(
-        "api.activity", os.path.join(core_api_path, "activity.py")
-    )
-    activity_api = importlib.util.module_from_spec(spec_activity)
-    sys.modules["api.activity"] = activity_api
-    spec_activity.loader.exec_module(activity_api)
+    activity_api = _load_api_module("api.activity", "activity.py")
 
     # TF-415: in-app audit-log view (RBAC-scoped read endpoint).
-    spec_audit = importlib.util.spec_from_file_location(
-        "api.audit", os.path.join(core_api_path, "audit.py")
-    )
-    audit_api = importlib.util.module_from_spec(spec_audit)
-    sys.modules["api.audit"] = audit_api
-    spec_audit.loader.exec_module(audit_api)
+    audit_api = _load_api_module("api.audit", "audit.py")
 
-    spec_dashboard = importlib.util.spec_from_file_location(
-        "core_api_dashboard", os.path.join(core_api_path, "dashboard.py")
-    )
-    dashboard_api = importlib.util.module_from_spec(spec_dashboard)
-    spec_dashboard.loader.exec_module(dashboard_api)
+    dashboard_api = _load_api_module("api.dashboard", "dashboard.py")
+    auth = _load_api_module("api.auth", "auth.py")
+    admin = _load_api_module("api.admin", "admin.py")
+    gdpr = _load_api_module("api.gdpr", "gdpr.py")
+    sentry_test = _load_api_module("api.sentry_test", "sentry_test.py")
 
-    spec_auth = importlib.util.spec_from_file_location(
-        "core_api_auth", os.path.join(core_api_path, "auth.py")
-    )
-    auth = importlib.util.module_from_spec(spec_auth)
-    spec_auth.loader.exec_module(auth)
+    rbac_api = _load_api_module("api.v1.rbac", "v1", "rbac.py")
+    billing_api = _load_api_module("api.v1.billing", "v1", "billing.py")
+    webhooks_api = _load_api_module("api.v1.webhooks", "v1", "webhooks.py")
 
-    spec_admin = importlib.util.spec_from_file_location(
-        "core_api_admin", os.path.join(core_api_path, "admin.py")
-    )
-    admin = importlib.util.module_from_spec(spec_admin)
-    spec_admin.loader.exec_module(admin)
+    # WebSocket API (task progress streaming)
+    websocket_api = _load_api_module("api.v1.websocket", "v1", "websocket.py")
 
-    spec_gdpr = importlib.util.spec_from_file_location(
-        "core_api_gdpr", os.path.join(core_api_path, "gdpr.py")
-    )
-    gdpr = importlib.util.module_from_spec(spec_gdpr)
-    spec_gdpr.loader.exec_module(gdpr)
+    # Smart Help Widget (TF-308)
+    help_api = _load_api_module("api.v1.help", "v1", "help.py")
 
-    spec_sentry = importlib.util.spec_from_file_location(
-        "core_api_sentry_test", os.path.join(core_api_path, "sentry_test.py")
-    )
-    sentry_test = importlib.util.module_from_spec(spec_sentry)
-    spec_sentry.loader.exec_module(sentry_test)
-
-    # Import RBAC API
-    spec_rbac = importlib.util.spec_from_file_location(
-        "core_api_v1_rbac", os.path.join(core_api_path, "v1", "rbac.py")
-    )
-    rbac_api = importlib.util.module_from_spec(spec_rbac)
-    spec_rbac.loader.exec_module(rbac_api)
-
-    # Import Billing API
-    spec_billing = importlib.util.spec_from_file_location(
-        "core_api_v1_billing", os.path.join(core_api_path, "v1", "billing.py")
-    )
-    billing_api = importlib.util.module_from_spec(spec_billing)
-    spec_billing.loader.exec_module(billing_api)
-
-    # Import Webhooks API
-    spec_webhooks = importlib.util.spec_from_file_location(
-        "core_api_v1_webhooks", os.path.join(core_api_path, "v1", "webhooks.py")
-    )
-    webhooks_api = importlib.util.module_from_spec(spec_webhooks)
-    spec_webhooks.loader.exec_module(webhooks_api)
-
-    # Import WebSocket API (for task progress streaming)
-    spec_ws = importlib.util.spec_from_file_location(
-        "core_api_v1_websocket", os.path.join(core_api_path, "v1", "websocket.py")
-    )
-    websocket_api = importlib.util.module_from_spec(spec_ws)
-    spec_ws.loader.exec_module(websocket_api)
-
-    # Import Help API (Smart Help Widget — TF-308)
-    spec_help = importlib.util.spec_from_file_location(
-        "core_api_v1_help", os.path.join(core_api_path, "v1", "help.py")
-    )
-    help_api = importlib.util.module_from_spec(spec_help)
-    spec_help.loader.exec_module(help_api)
-
-    # Import Legal API (public compliance downloads — TF-746)
-    #
-    # Registered as "api.legal" in sys.modules (unlike the older
-    # "core_api_*"-named imports above) so this loaded instance IS the
-    # module that `from api import legal` resolves to elsewhere (e.g.
-    # tests/test_legal_api.py, and Pydantic's forward-ref resolution for
-    # `from __future__ import annotations` in api/legal.py itself). The
-    # older naming convention creates a second, distinct module object —
-    # see the TF-745 "dual-module" test-patching bug in git history for
-    # what that costs. Prefer this "api.<module>" naming for new API
-    # modules going forward.
-    spec_legal = importlib.util.spec_from_file_location(
-        "api.legal", os.path.join(core_api_path, "legal.py")
-    )
-    legal_api = importlib.util.module_from_spec(spec_legal)
-    sys.modules["api.legal"] = legal_api
-    spec_legal.loader.exec_module(legal_api)
+    # Public compliance downloads (TF-746). Pydantic's forward-ref resolution
+    # for ``from __future__ import annotations`` in api/legal.py needs the
+    # module to be reachable under its canonical name.
+    legal_api = _load_api_module("api.legal", "legal.py")
 
     app.include_router(auth.router)
     app.include_router(admin.router)

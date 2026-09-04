@@ -54,13 +54,13 @@ class OrgUnitListOut(BaseModel):
 
 
 # `from __future__ import annotations` turns the field annotations into
-# strings, and main.py loads this module via spec_from_file_location under a
-# synthetic name — so Pydantic can't reliably resolve `datetime` (OrgUnitOut)
-# or the nested `list[OrgUnitOut]` (OrgUnitListOut) once many other modules
-# are already loaded in the same process (same TF-435 pattern as
-# PushJobOut in moodle_feedback_push.py). Rebuild eagerly here, where both
-# names are in the module namespace, so the schema is fully defined under
-# every load path.
+# strings, so Pydantic resolves `datetime` (OrgUnitOut) and the nested
+# `list[OrgUnitOut]` (OrgUnitListOut) lazily via `sys.modules[cls.__module__]`.
+# That used to be unreachable: main.py loaded this file under the synthetic
+# name "core_api_org_units" (same TF-435 pattern as PushJobOut in
+# moodle_feedback_push.py). Since TF-660 the loader uses the canonical
+# "api.org_units", so the lookup resolves — the eager rebuild stays as cheap
+# insurance that the schema is fully defined under every load path.
 OrgUnitOut.model_rebuild()
 OrgUnitListOut.model_rebuild()
 

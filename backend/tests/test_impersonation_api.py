@@ -69,30 +69,24 @@ def _patch_impersonation_rate_limiter(monkeypatch, limiter):
     backs the registered impersonation-start route(s) on ``app`` -- not on
     a module reached by name.
 
-    ``main.py`` additionally loads ``admin.py`` a *second* time via
-    ``importlib.util.spec_from_file_location("core_api_admin", ...)`` /
-    ``exec_module`` to build (one copy of) the router registered on the
-    FastAPI app, without ever inserting that module into ``sys.modules``
-    (unlike e.g. its ``api.activity`` / ``api.audit`` counterparts a few
-    lines above it in main.py, which do). That copy is therefore only
-    reachable through the route objects it produced -- there is no module
-    name to patch it by. It has its own independent copy of every
-    module-level global, including this singleton.
+    Historically (before TF-660) ``main.py`` loaded ``admin.py`` a *second*
+    time via ``importlib.util.spec_from_file_location("core_api_admin",
+    ...)`` and registered THAT copy's router, without ever inserting the
+    module into ``sys.modules`` -- so it was reachable only through the
+    route objects it produced, with its own independent copy of every
+    module-level global including this singleton. Which copy served a
+    request was then a function of test *order*: once any earlier test
+    triggered the app's lifespan (``with TestClient(app) as client:``),
+    routes being matched in registration order on a process-wide ``app``
+    meant the unreachable copy kept winning for the rest of the session.
 
-    Which copy ends up serving a given request is then a function of test
-    *order*: once any earlier test in the suite triggers the app's
-    lifespan (``with TestClient(app) as client:``), that unreachable
-    copy's router gets registered into ``app.routes`` and -- since routes
-    are matched in registration order and ``app`` is a process-wide
-    singleton whose routes are never reset between tests -- keeps winning
-    route resolution for the rest of the test session, regardless of what
-    this file's own ``test_client`` fixture registers afterwards.
-
-    So instead of guessing a module name (a plain ``monkeypatch.setattr
-    (admin_api, ...)``, or even a ``sys.modules`` lookup by every name
-    ``admin.py`` might have been loaded under -- which still misses this
-    unregistered copy), walk ``app.routes`` for every endpoint function
-    whose globals carry this singleton and patch it there directly. That
+    main.py now loads every api/ module under its canonical dotted name, so
+    ``api.admin`` is a single object again. This helper stays anyway: it
+    makes the patch independent of route registration order, which is
+    cheap insurance for a rate limiter that has to be the one the live
+    route reads. Instead of naming a module, walk ``app.routes`` for every
+    endpoint function whose globals carry this singleton and patch it
+    there directly. That
     finds -- and covers -- every copy actually wired into the app,
     including ones with no importable name, sidestepping the ordering
     question entirely. Same underlying gotcha as TF-745's dual-module

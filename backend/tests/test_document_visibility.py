@@ -79,7 +79,6 @@ def vis_data(test_db):
       TF-640).
     """
     inst_a = Institution(
-        id=700,
         name="Vis A",
         slug="vis-a",
         subscription_tier="professional",
@@ -88,7 +87,6 @@ def vis_data(test_db):
         max_questions_per_month=1000,
     )
     inst_b = Institution(
-        id=701,
         name="Vis B",
         slug="vis-b",
         subscription_tier="professional",
@@ -99,9 +97,8 @@ def vis_data(test_db):
     test_db.add_all([inst_a, inst_b])
     test_db.flush()
 
-    def _user(uid, email, inst, superuser=False):
+    def _user(email, inst, superuser=False):
         return User(
-            id=uid,
             email=email,
             first_name="F",
             last_name="L",
@@ -111,11 +108,11 @@ def vis_data(test_db):
             is_superuser=superuser,
         )
 
-    owner = _user(700, "owner@vis.ch", 700)
-    colleague = _user(701, "colleague@vis.ch", 700)
-    foreigner = _user(702, "foreigner@vis.ch", 701)
-    superuser = _user(703, "super@vis.ch", 700, superuser=True)
-    admin_read_all = _user(704, "readall@vis.ch", 700)
+    owner = _user("owner@vis.ch", inst_a.id)
+    colleague = _user("colleague@vis.ch", inst_a.id)
+    foreigner = _user("foreigner@vis.ch", inst_b.id)
+    superuser = _user("super@vis.ch", inst_a.id, superuser=True)
+    admin_read_all = _user("readall@vis.ch", inst_a.id)
     test_db.add_all([owner, colleague, foreigner, superuser, admin_read_all])
     test_db.flush()
 
@@ -129,27 +126,29 @@ def vis_data(test_db):
     test_db.flush()
     admin_read_all.roles.append(read_all_role)
 
-    def _doc(did, visibility, *, institution_id=700, owner_id=700):
+    def _doc(label, visibility, *, institution_id=None, owner_id=None):
         return Document(
-            id=did,
-            filename=f"{did}.pdf",
-            original_filename=f"{did}.pdf",
-            file_path=f"/tmp/{did}.pdf",
+            filename=f"{label}.pdf",
+            original_filename=f"{label}.pdf",
+            file_path=f"/tmp/{label}.pdf",
             file_size=10,
             mime_type="application/pdf",
             status=DocumentStatus.PROCESSED,
-            institution_id=institution_id,
-            user_id=owner_id,
+            institution_id=institution_id if institution_id is not None else inst_a.id,
+            user_id=owner_id if owner_id is not None else owner.id,
             visibility=visibility,
-            vector_collection=f"doc_{did}",
+            vector_collection=f"doc_{label}",
         )
 
-    doc_private = _doc(700, DocumentVisibility.PRIVATE)
-    doc_institution = _doc(701, DocumentVisibility.INSTITUTION)
+    doc_private = _doc("private", DocumentVisibility.PRIVATE)
+    doc_institution = _doc("institution", DocumentVisibility.INSTITUTION)
     # Foreign-institution doc — proves the read_all bypass never crosses the
     # institution boundary, unlike SuperUser (TF-640).
     doc_foreign = _doc(
-        702, DocumentVisibility.PRIVATE, institution_id=701, owner_id=702
+        "foreign",
+        DocumentVisibility.PRIVATE,
+        institution_id=inst_b.id,
+        owner_id=foreigner.id,
     )
     test_db.add_all([doc_private, doc_institution, doc_foreign])
     test_db.commit()
@@ -179,24 +178,24 @@ def _visible_ids(user, db):
 
 def test_owner_sees_both_documents(vis_data, test_db):
     ids = _visible_ids(vis_data.owner, test_db)
-    assert {700, 701} <= ids
+    assert {vis_data.doc_private.id, vis_data.doc_institution.id} <= ids
 
 
 def test_same_institution_user_sees_only_shared(vis_data, test_db):
     ids = _visible_ids(vis_data.colleague, test_db)
-    assert 701 in ids  # institution-shared
-    assert 700 not in ids  # owner's private doc is hidden
+    assert vis_data.doc_institution.id in ids  # institution-shared
+    assert vis_data.doc_private.id not in ids  # owner's private doc is hidden
 
 
 def test_foreign_institution_user_sees_neither(vis_data, test_db):
     ids = _visible_ids(vis_data.foreigner, test_db)
-    assert 700 not in ids
-    assert 701 not in ids
+    assert vis_data.doc_private.id not in ids
+    assert vis_data.doc_institution.id not in ids
 
 
 def test_superuser_bypasses_filter(vis_data, test_db):
     ids = _visible_ids(vis_data.superuser, test_db)
-    assert {700, 701} <= ids
+    assert {vis_data.doc_private.id, vis_data.doc_institution.id} <= ids
 
 
 @pytest.mark.parametrize(
@@ -231,8 +230,8 @@ def test_read_all_admin_sees_colleague_private_doc_in_filter(vis_data, test_db):
     surface a colleague's PRIVATE doc, but a foreign-institution doc — even
     a PRIVATE one this user doesn't own — stays out of reach."""
     ids = _visible_ids(vis_data.admin_read_all, test_db)
-    assert {700, 701} <= ids
-    assert 702 not in ids
+    assert {vis_data.doc_private.id, vis_data.doc_institution.id} <= ids
+    assert vis_data.doc_foreign.id not in ids
 
 
 def test_read_all_admin_sees_colleague_private_doc_via_get_document(vis_data, test_db):
@@ -241,20 +240,20 @@ def test_read_all_admin_sees_colleague_private_doc_via_get_document(vis_data, te
     via ``assert_document_visible_for``."""
     resp = _run(
         get_document(
-            document_id=700,
+            document_id=vis_data.doc_private.id,
             request=None,
             current_user=vis_data.admin_read_all,
             db=test_db,
         )
     )
-    assert resp.id == 700
+    assert resp.id == vis_data.doc_private.id
 
 
 def test_read_all_admin_gets_404_on_foreign_institution_doc(vis_data, test_db):
     with pytest.raises(HTTPException) as exc:
         _run(
             get_document(
-                document_id=702,
+                document_id=vis_data.doc_foreign.id,
                 request=None,
                 current_user=vis_data.admin_read_all,
                 db=test_db,
@@ -271,7 +270,7 @@ def test_read_all_admin_cannot_edit_colleague_private_doc(vis_data, test_db):
     with pytest.raises(HTTPException) as exc:
         _run(
             update_document(
-                document_id=700,
+                document_id=vis_data.doc_private.id,
                 payload=payload,
                 request=None,
                 current_user=vis_data.admin_read_all,
@@ -301,7 +300,7 @@ def test_read_all_admin_cannot_attach_personal_tag_to_colleague_private_doc(
     with pytest.raises(HTTPException) as exc:
         _run(
             attach_document_tags(
-                document_id=700,
+                document_id=vis_data.doc_private.id,
                 body=AttachTagsRequest(tag_ids=[user_tag.id]),
                 request=None,
                 current_user=vis_data.admin_read_all,
@@ -318,7 +317,6 @@ def test_read_all_admin_still_sees_own_orphaned_document(vis_data, test_db):
     is NULL (e.g. uploaded before institution assignment) or points at a
     different institution (e.g. after a SuperAdmin reassignment)."""
     orphan = Document(
-        id=705,
         filename="orphan.pdf",
         original_filename="orphan.pdf",
         file_path="/tmp/orphan.pdf",
@@ -328,14 +326,14 @@ def test_read_all_admin_still_sees_own_orphaned_document(vis_data, test_db):
         institution_id=None,
         user_id=vis_data.admin_read_all.id,
         visibility=DocumentVisibility.PRIVATE,
-        vector_collection="doc_705",
+        vector_collection="doc_orphan",
     )
     test_db.add(orphan)
     test_db.commit()
 
     assert is_document_visible_for(vis_data.admin_read_all, orphan, test_db)
     ids = _visible_ids(vis_data.admin_read_all, test_db)
-    assert 705 in ids
+    assert orphan.id in ids
 
 
 def test_admin_named_role_without_permission_does_not_bypass(vis_data, test_db):
@@ -350,12 +348,11 @@ def test_admin_named_role_without_permission_does_not_bypass(vis_data, test_db):
     the real seeded admin role *does* carry ``documents:read_all``).
     """
     faux_admin = User(
-        id=706,
         email="fauxadmin@vis.ch",
         first_name="F",
         last_name="L",
         password_hash="x",
-        institution_id=700,
+        institution_id=vis_data.owner.institution_id,
         status=UserStatus.ACTIVE.value,
     )
     test_db.add(faux_admin)
@@ -373,7 +370,7 @@ def test_admin_named_role_without_permission_does_not_bypass(vis_data, test_db):
 
     assert not is_document_visible_for(faux_admin, vis_data.doc_private, test_db)
     ids = _visible_ids(faux_admin, test_db)
-    assert 700 not in ids
+    assert vis_data.doc_private.id not in ids
 
 
 # ---------------------------------------------------------------------------
@@ -396,25 +393,25 @@ def get_document_list(user, db):
 
 def test_list_owner_sees_both(vis_data, test_db):
     ids = _list_ids(vis_data.owner, test_db)
-    assert {700, 701} <= ids
+    assert {vis_data.doc_private.id, vis_data.doc_institution.id} <= ids
 
 
 def test_list_colleague_hides_private(vis_data, test_db):
     ids = _list_ids(vis_data.colleague, test_db)
-    assert 701 in ids
-    assert 700 not in ids
+    assert vis_data.doc_institution.id in ids
+    assert vis_data.doc_private.id not in ids
 
 
 def test_list_read_all_admin_sees_colleague_private_not_foreign(vis_data, test_db):
     ids = _list_ids(vis_data.admin_read_all, test_db)
-    assert {700, 701} <= ids
-    assert 702 not in ids
+    assert {vis_data.doc_private.id, vis_data.doc_institution.id} <= ids
+    assert vis_data.doc_foreign.id not in ids
 
 
 def test_list_foreigner_sees_neither(vis_data, test_db):
     ids = _list_ids(vis_data.foreigner, test_db)
-    assert 700 not in ids
-    assert 701 not in ids
+    assert vis_data.doc_private.id not in ids
+    assert vis_data.doc_institution.id not in ids
 
 
 # ---------------------------------------------------------------------------
@@ -425,10 +422,13 @@ def test_list_foreigner_sees_neither(vis_data, test_db):
 def test_get_document_owner_ok(vis_data, test_db):
     resp = _run(
         get_document(
-            document_id=700, request=None, current_user=vis_data.owner, db=test_db
+            document_id=vis_data.doc_private.id,
+            request=None,
+            current_user=vis_data.owner,
+            db=test_db,
         )
     )
-    assert resp.id == 700
+    assert resp.id == vis_data.doc_private.id
     assert resp.visibility == "private"
 
 
@@ -436,7 +436,7 @@ def test_get_document_colleague_private_returns_404(vis_data, test_db):
     with pytest.raises(HTTPException) as exc:
         _run(
             get_document(
-                document_id=700,
+                document_id=vis_data.doc_private.id,
                 request=None,
                 current_user=vis_data.colleague,
                 db=test_db,
@@ -448,10 +448,13 @@ def test_get_document_colleague_private_returns_404(vis_data, test_db):
 def test_get_document_colleague_shared_ok(vis_data, test_db):
     resp = _run(
         get_document(
-            document_id=701, request=None, current_user=vis_data.colleague, db=test_db
+            document_id=vis_data.doc_institution.id,
+            request=None,
+            current_user=vis_data.colleague,
+            db=test_db,
         )
     )
-    assert resp.id == 701
+    assert resp.id == vis_data.doc_institution.id
     assert resp.visibility == "institution"
 
 
@@ -459,7 +462,7 @@ def test_get_status_foreigner_private_returns_404(vis_data, test_db):
     with pytest.raises(HTTPException) as exc:
         _run(
             get_document_status(
-                document_id=700,
+                document_id=vis_data.doc_private.id,
                 request=None,
                 current_user=vis_data.foreigner,
                 db=test_db,
@@ -477,7 +480,7 @@ def test_owner_changes_visibility_and_audit_logged(vis_data, test_db):
     payload = DocumentPatchRequest(visibility=DocumentVisibility.INSTITUTION)
     resp = _run(
         update_document(
-            document_id=700,
+            document_id=vis_data.doc_private.id,
             payload=payload,
             request=None,
             current_user=vis_data.owner,
@@ -492,7 +495,7 @@ def test_owner_changes_visibility_and_audit_logged(vis_data, test_db):
     logs = (
         test_db.query(AuditLog)
         .filter(AuditLog.action == "update_document")
-        .filter(AuditLog.resource_id == "700")
+        .filter(AuditLog.resource_id == str(vis_data.doc_private.id))
         .all()
     )
     assert len(logs) == 1
@@ -509,14 +512,18 @@ def test_flip_to_private_detaches_institution_tags(vis_data, test_db):
     bleiben unangetastet."""
     from models.tag import DocumentTag, Tag
 
-    inst_tag = Tag(name="Abteilung-X", scope="institution", institution_id=700)
-    user_tag = Tag(name="Mein-Tag", scope="user", created_by=700)
+    inst_tag = Tag(
+        name="Abteilung-X",
+        scope="institution",
+        institution_id=vis_data.owner.institution_id,
+    )
+    user_tag = Tag(name="Mein-Tag", scope="user", created_by=vis_data.owner.id)
     test_db.add_all([inst_tag, user_tag])
     test_db.flush()
     test_db.add_all(
         [
-            DocumentTag(document_id=701, tag_id=inst_tag.id),
-            DocumentTag(document_id=701, tag_id=user_tag.id),
+            DocumentTag(document_id=vis_data.doc_institution.id, tag_id=inst_tag.id),
+            DocumentTag(document_id=vis_data.doc_institution.id, tag_id=user_tag.id),
         ]
     )
     test_db.commit()
@@ -524,7 +531,7 @@ def test_flip_to_private_detaches_institution_tags(vis_data, test_db):
     payload = DocumentPatchRequest(visibility=DocumentVisibility.PRIVATE)
     resp = _run(
         update_document(
-            document_id=701,
+            document_id=vis_data.doc_institution.id,
             payload=payload,
             request=None,
             current_user=vis_data.owner,
@@ -534,7 +541,10 @@ def test_flip_to_private_detaches_institution_tags(vis_data, test_db):
 
     assert resp.visibility == "private"
     remaining = {
-        r.tag_id for r in test_db.query(DocumentTag).filter_by(document_id=701).all()
+        r.tag_id
+        for r in test_db.query(DocumentTag)
+        .filter_by(document_id=vis_data.doc_institution.id)
+        .all()
     }
     assert inst_tag.id not in remaining  # institution tag detached
     assert user_tag.id in remaining  # user tag retained
@@ -548,7 +558,7 @@ def test_non_owner_cannot_change_visibility_of_shared_doc(vis_data, test_db):
     with pytest.raises(HTTPException) as exc:
         _run(
             update_document(
-                document_id=701,
+                document_id=vis_data.doc_institution.id,
                 payload=payload,
                 request=None,
                 current_user=vis_data.colleague,
@@ -565,7 +575,7 @@ def test_foreigner_cannot_even_see_private_doc_to_patch(vis_data, test_db):
     with pytest.raises(HTTPException) as exc:
         _run(
             update_document(
-                document_id=700,
+                document_id=vis_data.doc_private.id,
                 payload=payload,
                 request=None,
                 current_user=vis_data.foreigner,
@@ -580,7 +590,7 @@ def test_no_op_visibility_change_writes_no_audit(vis_data, test_db):
     payload = DocumentPatchRequest(visibility=DocumentVisibility.PRIVATE)
     _run(
         update_document(
-            document_id=700,
+            document_id=vis_data.doc_private.id,
             payload=payload,
             request=None,
             current_user=vis_data.owner,
@@ -590,7 +600,7 @@ def test_no_op_visibility_change_writes_no_audit(vis_data, test_db):
     logs = (
         test_db.query(AuditLog)
         .filter(AuditLog.action == "update_document")
-        .filter(AuditLog.resource_id == "700")
+        .filter(AuditLog.resource_id == str(vis_data.doc_private.id))
         .all()
     )
     assert len(logs) == 0
@@ -743,19 +753,21 @@ def _available_doc_ids(user, db):
 
 def test_rag_available_documents_owner_sees_private(vis_data, test_db):
     ids = _available_doc_ids(vis_data.owner, test_db)
-    assert {700, 701} <= ids
+    assert {vis_data.doc_private.id, vis_data.doc_institution.id} <= ids
 
 
 def test_rag_available_documents_colleague_hides_private(vis_data, test_db):
     ids = _available_doc_ids(vis_data.colleague, test_db)
-    assert 701 in ids
-    assert 700 not in ids
+    assert vis_data.doc_institution.id in ids
+    assert vis_data.doc_private.id not in ids
 
 
 def test_rag_generate_rejects_foreign_private_doc(vis_data, test_db):
     # Passing a colleague's private doc id to RAG generation must 404 *before*
     # any Celery dispatch — closing the RAG privacy bypass (spec §7).
-    request_model = RAGExamRequestModel(topic="Privacy Test", document_ids=[700])
+    request_model = RAGExamRequestModel(
+        topic="Privacy Test", document_ids=[vis_data.doc_private.id]
+    )
     with pytest.raises(HTTPException) as exc:
         _run(
             generate_rag_exam(
@@ -771,7 +783,9 @@ def test_rag_generate_rejects_foreign_private_doc(vis_data, test_db):
 def test_rag_retrieve_context_rejects_foreign_private_doc(vis_data, test_db):
     # retrieve-context returns document *text* — at least as sensitive as
     # generation. A colleague's private doc id must 404 before any vector lookup.
-    request_model = ContextRetrievalRequest(query="leak attempt", document_ids=[700])
+    request_model = ContextRetrievalRequest(
+        query="leak attempt", document_ids=[vis_data.doc_private.id]
+    )
     with pytest.raises(HTTPException) as exc:
         _run(
             retrieve_context(
@@ -802,7 +816,7 @@ def test_content_endpoints_404_for_foreign_private(vis_data, test_db, endpoint):
     with pytest.raises(HTTPException) as exc:
         _run(
             endpoint(
-                document_id=700,
+                document_id=vis_data.doc_private.id,
                 request=None,
                 current_user=vis_data.foreigner,
                 db=test_db,
@@ -817,7 +831,7 @@ def test_hidden_doc_404_is_indistinguishable_from_missing(vis_data, test_db):
     with pytest.raises(HTTPException) as hidden:
         _run(
             get_document(
-                document_id=700,
+                document_id=vis_data.doc_private.id,
                 request=None,
                 current_user=vis_data.colleague,
                 db=test_db,
@@ -841,7 +855,7 @@ def test_superuser_can_change_visibility_of_foreign_doc(vis_data, test_db):
     payload = DocumentPatchRequest(visibility=DocumentVisibility.INSTITUTION)
     resp = _run(
         update_document(
-            document_id=700,
+            document_id=vis_data.doc_private.id,
             payload=payload,
             request=None,
             current_user=vis_data.superuser,
@@ -857,7 +871,6 @@ def test_patch_institution_on_doc_without_institution_returns_400(vis_data, test
     # Sharing a doc that has no institution is rejected at PATCH too (mirrors the
     # upload guard); the document stays private.
     orphan = Document(
-        id=720,
         filename="orphan.pdf",
         original_filename="orphan.pdf",
         file_path="/tmp/orphan.pdf",
@@ -875,7 +888,7 @@ def test_patch_institution_on_doc_without_institution_returns_400(vis_data, test
     with pytest.raises(HTTPException) as exc:
         _run(
             update_document(
-                document_id=720,
+                document_id=orphan.id,
                 payload=payload,
                 request=None,
                 current_user=vis_data.owner,
@@ -903,8 +916,8 @@ def test_exam_composer_list_hides_colleague_private_doc(vis_data, test_db):
         list_documents_with_questions(current_user=vis_data.colleague, db=test_db)
     )
     ids = {entry["id"] for entry in result}
-    assert 701 in ids  # institution-shared doc visible
-    assert 700 not in ids  # owner's private doc hidden
+    assert vis_data.doc_institution.id in ids  # institution-shared doc visible
+    assert vis_data.doc_private.id not in ids  # owner's private doc hidden
 
 
 def test_db_check_constraint_blocks_institution_without_institution(vis_data, test_db):
@@ -928,7 +941,7 @@ def test_db_check_constraint_blocks_institution_without_institution(vis_data, te
         status=DocumentStatus.PROCESSED,
         visibility=DocumentVisibility.INSTITUTION,
         institution_id=None,
-        user_id=700,
+        user_id=vis_data.owner.id,
     )
     test_db.add(bad)
     with pytest.raises(IntegrityError):

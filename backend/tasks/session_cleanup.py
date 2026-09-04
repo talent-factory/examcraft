@@ -64,10 +64,21 @@ def cleanup_old_sessions(days: int = 30):
     try:
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
-        # Delete old inactive sessions
+        # Delete old inactive sessions.
+        #
+        # `not UserSession.is_active` would evaluate the column's Python
+        # truthiness (always True) and hand SQLAlchemy a literal False ->
+        # "WHERE false AND ..." -> this delete matched zero rows, forever,
+        # while `deleted_count` still logged as a normal, successful "Deleted
+        # 0 old sessions" outcome. `.is_(False)` builds the SQL predicate
+        # that was meant (same bug class as the RBACService.list_roles fix
+        # in TF-660).
         deleted_count = (
             db.query(UserSession)
-            .filter(not UserSession.is_active, UserSession.revoked_at < cutoff_date)
+            .filter(
+                UserSession.is_active.is_(False),
+                UserSession.revoked_at < cutoff_date,
+            )
             .delete()
         )
 

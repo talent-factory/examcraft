@@ -51,10 +51,14 @@ class PushJobOut(BaseModel):
 
 
 # `from __future__ import annotations` turns the enum field annotations into
-# strings, and main.py loads this module via spec_from_file_location under a
-# synthetic name — so Pydantic can't lazily resolve MoodleFeedbackPushStatus /
-# FeedbackTransportName on its own. Rebuild eagerly here, where both enums are
-# in the module namespace, so the schema is fully defined under every load path.
+# strings, so Pydantic has to resolve MoodleFeedbackPushStatus /
+# FeedbackTransportName lazily, through `sys.modules[cls.__module__]`. That
+# lookup used to fail outright: main.py loaded this file under the synthetic
+# name "core_api_moodle_feedback_push", which was never in sys.modules.
+# TF-660 moved the loader to the canonical "api.moodle_feedback_push", so the
+# lookup now resolves — but rebuilding eagerly here, where both enums are in
+# the module namespace, keeps the schema defined under every load path and
+# costs nothing.
 PushJobOut.model_rebuild()
 
 

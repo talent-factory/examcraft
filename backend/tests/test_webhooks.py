@@ -82,11 +82,13 @@ def _stripe_session(
     )
 
 
-def _seed_institution(db, *, inst_id=1, tier="free"):
+def _seed_institution(db, *, tier="free"):
+    """Ids come from the database: hardcoded primary keys collide with rows
+    other modules leave in the shared test DB once the order changes (TF-660).
+    """
     inst = Institution(
-        id=inst_id,
         name="Webhook Test Inst",
-        slug=f"webhook-test-inst-{inst_id}",
+        slug="webhook-test-inst",
         subscription_tier=tier,
         max_users=10,
         max_documents=100,
@@ -98,10 +100,9 @@ def _seed_institution(db, *, inst_id=1, tier="free"):
     return inst
 
 
-def _seed_user(db, *, user_id=42, institution_id=1):
+def _seed_user(db, *, institution_id):
     user = User(
-        id=user_id,
-        email=f"user{user_id}@webhook-test.example",
+        email="user@webhook-test.example",
         first_name="Test",
         last_name="User",
         institution_id=institution_id,
@@ -177,12 +178,12 @@ def test_require_status_raises_when_missing():
 async def test_checkout_completed_creates_new_subscription(test_db, monkeypatch):
     _set_tier_price(monkeypatch, "STARTER", "price_starter")
     inst = _seed_institution(test_db)
-    _seed_user(test_db, user_id=42, institution_id=inst.id)
+    user = _seed_user(test_db, institution_id=inst.id)
     stripe_sub = _stripe_sub(price_id="price_starter")
 
     with patch("api.v1.webhooks.stripe.Subscription.retrieve", return_value=stripe_sub):
         await handle_checkout_session_completed(
-            _stripe_session(institution_id=str(inst.id)), test_db
+            _stripe_session(institution_id=str(inst.id), user_id=str(user.id)), test_db
         )
 
     persisted = (
@@ -203,13 +204,13 @@ async def test_checkout_completed_creates_new_subscription(test_db, monkeypatch)
 async def test_checkout_completed_updates_existing_subscription(test_db, monkeypatch):
     _set_tier_price(monkeypatch, "STARTER", "price_starter")
     inst = _seed_institution(test_db)
-    _seed_user(test_db, user_id=42, institution_id=inst.id)
+    user = _seed_user(test_db, institution_id=inst.id)
     existing = _seed_local_sub(test_db, institution_id=inst.id)
     stripe_sub = _stripe_sub(status="trialing", price_id="price_starter")
 
     with patch("api.v1.webhooks.stripe.Subscription.retrieve", return_value=stripe_sub):
         await handle_checkout_session_completed(
-            _stripe_session(institution_id=str(inst.id)), test_db
+            _stripe_session(institution_id=str(inst.id), user_id=str(user.id)), test_db
         )
 
     test_db.refresh(existing)
@@ -243,6 +244,8 @@ async def test_checkout_completed_items_empty_raises_value_error(test_db):
         "api.v1.webhooks.stripe.Subscription.retrieve", return_value=stripe_sub_empty
     ):
         with pytest.raises(ValueError, match="has no items"):
+            # No user seeded here: the handler raises on the empty items
+            # list long before it looks at user_id.
             await handle_checkout_session_completed(
                 _stripe_session(institution_id=str(inst.id)), test_db
             )
@@ -253,12 +256,12 @@ async def test_checkout_completed_missing_period_fields_ok(test_db, monkeypatch)
     """Optional current_period_* fields absent should not crash."""
     _set_tier_price(monkeypatch, "STARTER", "price_starter")
     inst = _seed_institution(test_db)
-    _seed_user(test_db, user_id=42, institution_id=inst.id)
+    user = _seed_user(test_db, institution_id=inst.id)
     stripe_sub = _stripe_sub(price_id="price_starter", omit_periods=True)
 
     with patch("api.v1.webhooks.stripe.Subscription.retrieve", return_value=stripe_sub):
         await handle_checkout_session_completed(
-            _stripe_session(institution_id=str(inst.id)), test_db
+            _stripe_session(institution_id=str(inst.id), user_id=str(user.id)), test_db
         )
 
     persisted = (
@@ -313,12 +316,13 @@ async def test_subscription_created_no_local_sub_logs_warning(test_db):
     """If local sub doesn't exist, handler must warn (not crash).
 
     The handler's logger is patched at the module level rather than via
-    caplog. Lifespan in main.py reloads webhooks.py under a different
-    module name via importlib.spec_from_file_location, so by the time this
-    test runs in a full-suite context, two webhooks modules exist with
-    two distinct loggers — caplog can't reliably catch the right one.
-    Replacing the symbol on the imported module avoids that whole class
-    of ordering bugs.
+    caplog, which relies on propagation to the root logger and is unreliable
+    across the full suite. Patching the symbol on the module is exact.
+
+    Historically there was a second reason: the lifespan loaded webhooks.py
+    under a synthetic module name, so two modules with two distinct loggers
+    existed and neither caplog nor a name-based patch could be trusted. Since
+    TF-660 main.py loads it as "api.v1.webhooks" and there is only one.
     """
     incoming = _stripe_sub(sub_id="sub_unknown")
     mock_logger = MagicMock()

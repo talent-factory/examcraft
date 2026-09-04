@@ -261,10 +261,17 @@ class RBACService:
         query = self.db.query(RBACRole)
 
         if not include_system_roles:
-            query = query.filter(not RBACRole.is_system_role)
+            # `not RBACRole.is_system_role` would evaluate the attribute's
+            # truthiness in Python (always True) and hand SQLAlchemy a literal
+            # False -> "WHERE false" -> an unconditionally empty result. The
+            # endpoint GET /api/v1/rbac/roles?include_system_roles=false
+            # returned nothing at all because of it. `.is_(False)` builds the
+            # SQL predicate that was meant. Found while reactivating
+            # test_list_roles in TF-660.
+            query = query.filter(RBACRole.is_system_role.is_(False))
 
         if not include_inactive:
-            query = query.filter(RBACRole.is_active)
+            query = query.filter(RBACRole.is_active.is_(True))
 
         return query.all()
 

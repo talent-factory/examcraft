@@ -5,22 +5,22 @@ from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 from starlette.websockets import WebSocketDisconnect
-import importlib
-import os
 
 
 @pytest.fixture
 def ws_app():
-    """Minimal FastAPI app with the WebSocket router for tests"""
-    import sys
+    """Minimal FastAPI app carrying the real WebSocket router.
+
+    Uses the canonically imported module rather than loading a private copy
+    over ``sys.modules["api.v1.websocket"]``. The old form left that entry
+    pointing at a throwaway module for the rest of the session, so a later
+    app lifespan would register the throwaway router on the real app and
+    ``patch("api.v1.websocket....")`` would reach an object no route used
+    (TF-660).
+    """
+    from api.v1 import websocket as ws_module
 
     app = FastAPI()
-    ws_path = os.path.join(os.path.dirname(__file__), "..", "api", "v1", "websocket.py")
-    spec = importlib.util.spec_from_file_location("ws_module", ws_path)
-    ws_module = importlib.util.module_from_spec(spec)
-    # Register under the canonical name so patch("api.v1.websocket.*") takes effect
-    sys.modules["api.v1.websocket"] = ws_module
-    spec.loader.exec_module(ws_module)
     app.include_router(ws_module.router)
     return app
 
@@ -327,16 +327,12 @@ class TestWebSocketDisconnect:
 
 @pytest.fixture
 def ws_module():
-    """Loads the websocket module (like ws_app) and returns it, so pure
-    helper functions like user_facing_task_error can be tested directly."""
-    import sys
+    """The websocket module, so pure helper functions like
+    user_facing_task_error can be tested directly. Canonical import — see
+    ws_app above for why this must not load a private copy."""
+    from api.v1 import websocket
 
-    ws_path = os.path.join(os.path.dirname(__file__), "..", "api", "v1", "websocket.py")
-    spec = importlib.util.spec_from_file_location("ws_module", ws_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["api.v1.websocket"] = module
-    spec.loader.exec_module(module)
-    return module
+    return websocket
 
 
 class TestUserFacingError:

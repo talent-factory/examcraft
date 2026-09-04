@@ -54,7 +54,6 @@ def _call_download(*, document_id, current_user, db):
 def stage_data(test_db):
     """Owner + foreign user in different institutions + two docs."""
     inst_a = Institution(
-        id=400,
         name="Inst A",
         slug="inst-a-raw",
         subscription_tier="professional",
@@ -63,7 +62,6 @@ def stage_data(test_db):
         max_questions_per_month=1000,
     )
     inst_b = Institution(
-        id=401,
         name="Inst B",
         slug="inst-b-raw",
         subscription_tier="professional",
@@ -75,22 +73,20 @@ def stage_data(test_db):
     test_db.flush()
 
     owner = User(
-        id=400,
         email="owner@a-raw.ch",
         first_name="O",
         last_name="W",
         password_hash="x",
-        institution_id=400,
+        institution_id=inst_a.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=False,
     )
     foreign = User(
-        id=401,
         email="foreign@b-raw.ch",
         first_name="F",
         last_name="O",
         password_hash="x",
-        institution_id=401,
+        institution_id=inst_b.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=False,
     )
@@ -103,28 +99,26 @@ def stage_data(test_db):
     tmp.close()
 
     pdf_doc = Document(
-        id=700,
         filename="paper.pdf",
         original_filename="Paper Final.pdf",
         file_path=tmp.name,
         file_size=os.path.getsize(tmp.name),
         mime_type="application/pdf",
         status=DocumentStatus.PROCESSED,
-        institution_id=400,
-        user_id=400,
+        institution_id=inst_a.id,
+        user_id=owner.id,
         doc_metadata={"title": "Paper"},
     )
 
     chat_doc = Document(
-        id=701,
         filename="chat.md",
         original_filename="Chat-Export.md",
         file_path="virtual://chat/701",
         file_size=42,
         mime_type="text/markdown",
         status=DocumentStatus.PROCESSED,
-        institution_id=400,
-        user_id=400,
+        institution_id=inst_a.id,
+        user_id=owner.id,
         doc_metadata={
             "source": "chat_export",
             "full_content": "# Frage\n\nWas ist 1+1?\n\n## Antwort\n\n2",
@@ -132,20 +126,18 @@ def stage_data(test_db):
     )
 
     chat_empty_doc = Document(
-        id=702,
         filename="chat-empty.md",
         original_filename="Empty.md",
         file_path="virtual://chat/702",
         file_size=0,
         mime_type="text/markdown",
         status=DocumentStatus.PROCESSED,
-        institution_id=400,
-        user_id=400,
+        institution_id=inst_a.id,
+        user_id=owner.id,
         doc_metadata={"source": "chat_export"},  # full_content missing
     )
 
     s3_doc = Document(
-        id=704,
         filename="s3-paper.pdf",
         original_filename="S3 Paper.pdf",
         # uploads/ prefix triggers the S3 path in _build_document_file_response
@@ -153,26 +145,27 @@ def stage_data(test_db):
         file_size=128,
         mime_type="application/pdf",
         status=DocumentStatus.PROCESSED,
-        institution_id=400,
-        user_id=400,
+        institution_id=inst_a.id,
+        user_id=owner.id,
     )
 
     missing_doc = Document(
-        id=703,
         filename="ghost.pdf",
         original_filename="Ghost.pdf",
         file_path="/tmp/this-path-does-not-exist-tf332.pdf",
         file_size=10,
         mime_type="application/pdf",
         status=DocumentStatus.PROCESSED,
-        institution_id=400,
-        user_id=400,
+        institution_id=inst_a.id,
+        user_id=owner.id,
     )
 
     test_db.add_all([pdf_doc, chat_doc, chat_empty_doc, s3_doc, missing_doc])
     test_db.commit()
 
     yield SimpleNamespace(
+        inst_a=inst_a,
+        inst_b=inst_b,
         owner=owner,
         foreign=foreign,
         pdf=pdf_doc,
@@ -314,15 +307,14 @@ def test_raw_s3_text_document_keeps_gzip_eligible(stage_data, monkeypatch):
 
     db = _db_from_stage(stage_data)
     s3_text_doc = Document(
-        id=705,
         filename="s3-notes.txt",
         original_filename="S3 Notes.txt",
         file_path="uploads/inst-400/s3-notes.txt",
         file_size=64,
         mime_type="text/plain",
         status=DocumentStatus.PROCESSED,
-        institution_id=400,
-        user_id=400,
+        institution_id=stage_data.owner.institution_id,
+        user_id=stage_data.owner.id,
     )
     db.add(s3_text_doc)
     db.commit()
@@ -331,7 +323,7 @@ def test_raw_s3_text_document_keeps_gzip_eligible(stage_data, monkeypatch):
     monkeypatch.setattr(documents_api, "storage_service", fake)
 
     response = _call_raw(
-        document_id=705,
+        document_id=s3_text_doc.id,
         current_user=stage_data.owner,
         db=db,
     )
@@ -544,12 +536,11 @@ def test_raw_superuser_from_other_tenant_can_access(stage_data):
     silently break support tooling. Flip this test if the intent changes.
     """
     superuser = User(
-        id=499,
         email="root@b-raw.ch",
         first_name="R",
         last_name="O",
         password_hash="x",
-        institution_id=401,  # different institution from the document owner
+        institution_id=stage_data.inst_b.id,  # not the document owner's institution
         status=UserStatus.ACTIVE.value,
         is_superuser=True,
     )
@@ -574,21 +565,20 @@ def test_raw_plaintext_document_returns_inline_text(stage_data):
     tmp.close()
     try:
         txt_doc = Document(
-            id=720,
             filename="hello.txt",
             original_filename="Hallo Welt.txt",
             file_path=tmp.name,
             file_size=os.path.getsize(tmp.name),
             mime_type="text/plain",
             status=DocumentStatus.PROCESSED,
-            institution_id=400,
-            user_id=400,
+            institution_id=stage_data.owner.institution_id,
+            user_id=stage_data.owner.id,
         )
         db.add(txt_doc)
         db.commit()
 
         response = _call_raw(
-            document_id=720,
+            document_id=txt_doc.id,
             current_user=stage_data.owner,
             db=db,
         )
@@ -612,7 +602,6 @@ def test_raw_docx_local_file_returns_correct_mime(stage_data):
     tmp.close()
     try:
         docx_doc = Document(
-            id=721,
             filename="report.docx",
             original_filename="Report.docx",
             file_path=tmp.name,
@@ -622,14 +611,14 @@ def test_raw_docx_local_file_returns_correct_mime(stage_data):
                 "wordprocessingml.document"
             ),
             status=DocumentStatus.PROCESSED,
-            institution_id=400,
-            user_id=400,
+            institution_id=stage_data.owner.institution_id,
+            user_id=stage_data.owner.id,
         )
         db.add(docx_doc)
         db.commit()
 
         response = _call_raw(
-            document_id=721,
+            document_id=docx_doc.id,
             current_user=stage_data.owner,
             db=db,
         )
@@ -678,7 +667,6 @@ def test_raw_filename_with_crlf_is_safely_quoted(stage_data):
     tmp.close()
     try:
         evil = Document(
-            id=723,
             filename="evil.pdf",
             # Embedded CRLF + quote attempts header injection.
             original_filename='evil"\r\nX-Injected: yes.pdf',
@@ -686,14 +674,14 @@ def test_raw_filename_with_crlf_is_safely_quoted(stage_data):
             file_size=os.path.getsize(tmp.name),
             mime_type="application/pdf",
             status=DocumentStatus.PROCESSED,
-            institution_id=400,
-            user_id=400,
+            institution_id=stage_data.owner.institution_id,
+            user_id=stage_data.owner.id,
         )
         db.add(evil)
         db.commit()
 
         response = _call_raw(
-            document_id=723,
+            document_id=evil.id,
             current_user=stage_data.owner,
             db=db,
         )

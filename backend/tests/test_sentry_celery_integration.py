@@ -19,6 +19,19 @@ from utils.auth_utils import get_current_superuser, get_current_user
 _FAKE_DSN = "https://public@o0.ingest.sentry.io/0"  # pragma: allowlist secret
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _app_routers_registered():
+    """Enter the app lifespan once so the admin routers exist.
+
+    /api/admin/sentry-test/worker-error is registered during startup, not at
+    import time. Without this the three endpoint tests below only pass when
+    some earlier test file happened to trigger a lifespan first — they 404 in
+    any run order that puts this file early (TF-660).
+    """
+    with TestClient(app):
+        pass
+
+
 # ---------------------------------------------------------------------------
 # config/sentry.py — integration registration + enable guard
 # ---------------------------------------------------------------------------

@@ -9,9 +9,24 @@ from db_seed import SYSTEM_GRADING_SCHEMES, seed_system_grading_schemes
 from models.grading_scheme import GradingScheme
 
 
+_SYSTEM_NAMES = {s["name"] for s in SYSTEM_GRADING_SCHEMES}
+
+
 def _system_count(db) -> int:
+    """Count only the schemes this seed owns.
+
+    Counting every institution-less scheme also picks up rows other test
+    modules committed on the app's own connection — outside this test's
+    transaction, so not rolled back. That made the counts order-dependent
+    (TF-660).
+    """
     return (
-        db.query(GradingScheme).filter(GradingScheme.institution_id.is_(None)).count()
+        db.query(GradingScheme)
+        .filter(
+            GradingScheme.institution_id.is_(None),
+            GradingScheme.name.in_(_SYSTEM_NAMES),
+        )
+        .count()
     )
 
 

@@ -219,18 +219,16 @@ def test_delete_account_now_returns_500_when_fail_closed_audit_log_fails(
 
     Patcht bewusst ``services.gdpr_deletion_service.AuditService.log_action``
     (löst den echten Fail-Closed-Pfad aus), NICHT
-    ``api.gdpr.delete_user_and_gdpr_data``: `main.py` lädt `api/gdpr.py`
-    zusätzlich per `importlib.util.spec_from_file_location` als zweites,
-    nie in `sys.modules` registriertes Modulobjekt (`core_api_gdpr`) und
-    registriert dessen Router — welches der beiden Modulobjekte die Route
-    tatsächlich bedient, hängt von der Testreihenfolge ab (ob vorher schon
-    ein anderer Test den FastAPI-Lifespan getriggert hat). Ein Patch auf
-    `api.gdpr.delete_user_and_gdpr_data` greift daher nur in der Hälfte der
-    Fälle — in der anderen Hälfte würde dieser Test lautlos eine ECHTE
-    Kontolöschung auslösen und erst am Status-Code scheitern.
-    `services.gdpr_deletion_service` existiert dagegen nur einmal (normaler
-    Import in beiden `api.gdpr`-Modulinstanzen), der Patch ist damit
-    unabhängig davon, welche Instanz die Route bedient."""
+    ``api.gdpr.delete_user_and_gdpr_data``. Historischer Grund (bis TF-660):
+    `main.py` lud `api/gdpr.py` zusätzlich als zweites, nie in `sys.modules`
+    registriertes Modulobjekt (`core_api_gdpr`) und registrierte dessen
+    Router — welches Modulobjekt die Route bediente, hing von der
+    Testreihenfolge ab, und ein danebengreifender Patch hätte hier lautlos
+    eine ECHTE Kontolöschung ausgelöst. Seit TF-660 lädt `main.py` die
+    `api/`-Module unter ihrem kanonischen Namen, es gibt also nur noch eine
+    Instanz. Der Patch bleibt trotzdem auf dem Service: er trifft den echten
+    Fail-Closed-Pfad statt ihn wegzumocken, und der Preis eines Fehlgriffs
+    wäre hier besonders hoch."""
     headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
     user_id = gdpr_test_user.id
 

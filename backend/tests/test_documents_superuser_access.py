@@ -2,7 +2,10 @@
 Integration tests: superuser may process/delete documents belonging to others.
 
 Calls the endpoint functions directly (instead of via TestClient with
-lifespan) to avoid test isolation issues with `core_api_*` re-import.
+lifespan), which keeps the tests independent of route registration order.
+(Historically this also dodged the `core_api_*` dual-module problem; since
+TF-660 main.py loads the api/ modules under their canonical names, so
+`api.documents` here is the same module object the app serves from.)
 """
 
 import asyncio

@@ -1,13 +1,25 @@
 """
 API tests for RAG endpoints
 
-NOTE: Some tests use mock patching for TenantFilter and SubscriptionLimits
-which can be unreliable in full suite context due to import caching.
-Tests that pass in isolation but fail in the full suite are marked
-with the 'rag_isolation' marker.
+NOTE (TF-660): five of these tests used to carry a ``pytest.mark.skipif`` on
+the CI environment variable — three blaming "unreliable mock patching of
+TenantFilter/SubscriptionLimits due to import caching" and two an
+"unavailable Celery broker". Both explanations were
+wrong — the two Celery ones mock ``generate_questions_task`` and never touch a
+broker — and the markers meant the generate-exam path was never exercised in
+CI at all.
+
+The real cause was a second module object: main.py's lifespan loaded
+api/rag_exams.py under the synthetic name ``core_api_rag_exams`` and
+registered THAT module's router. ``patch("api.rag_exams....")`` reached the
+canonically imported module instead, so the patch had no effect — but only
+once some earlier test had triggered the lifespan. Run alone, the
+``ensure_rag_router`` fixtures below registered the canonical module's router
+themselves, which is why the tests passed in isolation and failed in the full
+suite. main.py now loads every api/ module under its canonical dotted name,
+so there is exactly one module object and the patches always land.
 """
 
-import os
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
@@ -16,9 +28,6 @@ from main import app
 from services.document_service import document_service as actual_document_service
 from models.document import Document, DocumentStatus
 from utils.tenant_utils import TenantFilter
-
-# Skip RAG generate-exam tests in CI (mock patching unreliable in full suite)
-IN_CI = os.getenv("CI", "false").lower() == "true"
 
 
 @pytest.fixture
@@ -172,9 +181,6 @@ class TestRAGAPI:
         doc.user_id = 42  # == mock_user.id → owner-visible (TF-354 filter)
         return doc
 
-    @pytest.mark.skipif(
-        IN_CI, reason="TenantFilter mock patching unreliable in full suite"
-    )
     def test_generate_rag_exam_success(self, auth_client, mock_processed_document):
         """Test successful RAG exam generation — now returns task_id"""
         request_data = {
@@ -287,9 +293,6 @@ class TestRAGAPI:
         )
         assert response.status_code == 422
 
-    @pytest.mark.skipif(
-        IN_CI, reason="TenantFilter mock patching unreliable in full suite"
-    )
     def test_generate_exam_job_created_with_topic_and_count(
         self, auth_client, mock_processed_document
     ):
@@ -647,9 +650,11 @@ class TestRAGAPI:
         mock_tag.is_archived = False
         mock_db.query.return_value.filter.return_value.all.return_value = [mock_tag]
 
-        # The route loaded via lifespan may live in module 'core_api_rag_exams',
-        # so patching by string path can miss. Patch the underlying Celery task
-        # object's apply_async — every importer sees the patched method.
+        # Patches the underlying Celery task object's apply_async rather than
+        # the name in api.rag_exams — every importer sees the patched method,
+        # so this holds regardless of who imported the task. (Before TF-660 it
+        # was also the only form that worked at all here, because the lifespan
+        # served the route from a second module object.)
         from tasks.question_tasks import generate_questions_task
 
         with (
@@ -759,9 +764,6 @@ class TestRAGAPIIntegration:
         if "/api/v1/rag/generate-exam" not in route_paths:
             app.include_router(rag_module.router)
 
-    @pytest.mark.skipif(
-        IN_CI, reason="TenantFilter mock patching unreliable in full suite"
-    )
     def test_full_rag_workflow_mock(self, auth_client, mock_db):
         """Test complete RAG workflow with mocks"""
 
@@ -949,7 +951,6 @@ class TestRAGQuestionPersistence:
         response.quality_metrics = {"total_questions": 2, "average_confidence": 0.815}
         return response
 
-    @pytest.mark.skipif(IN_CI, reason="Celery broker unavailable in CI")
     def test_generate_exam_returns_task_id(
         self, auth_client, mock_db, sample_rag_response
     ):
@@ -976,7 +977,6 @@ class TestRAGQuestionPersistence:
         assert "task_id" in data
         assert "message" in data
 
-    @pytest.mark.skipif(IN_CI, reason="Celery broker unavailable in CI")
     def test_generate_exam_starts_async_task(self, auth_client, sample_rag_response):
         """Generate-exam endpoint starts a Celery task for async generation"""
         with (

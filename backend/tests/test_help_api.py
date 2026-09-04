@@ -104,7 +104,19 @@ class TestContextHints:
 
 class TestHelpMessage:
     def test_requires_auth(self):
+        """No auth override here — the real dependency must reject the call.
+
+        Registers the router first: /api/v1/help/* only exists after the app
+        lifespan (or after a fixture like ``help_client`` adds it). Without
+        this the request 404s instead of 401/403 whenever this test happens to
+        run before anything that registers it — a pass that depends on run
+        order rather than on the auth guard (TF-660).
+        """
         from main import app
+        import api.v1.help as help_module
+
+        if "/api/v1/help/message" not in [r.path for r in app.routes]:
+            app.include_router(help_module.router)
 
         client = TestClient(app)
         response = client.post("/api/v1/help/message", json={"question": "Test?"})
