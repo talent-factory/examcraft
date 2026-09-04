@@ -9,6 +9,9 @@ jest.mock('../../../contexts/AuthContext', () => ({
     user: { id: 1, roles: [{ name: 'teacher' }], institution: null },
     accessToken: 'test-token',
     hasRole: (role: string) => role === 'teacher',
+    // TF-625: HelpWidget uses useRoleBasedNavigation to hide deep dives with
+    // no reachable route — that hook calls hasPermission.
+    hasPermission: () => true,
   }),
 }));
 
@@ -25,10 +28,12 @@ jest.mock('../useHelpContext', () => ({
       skipped_steps: [],
       completed: true,
     },
-    contextHint: { hint_text: null, hint_id: null },
+    contextHint: { i18n_key: null, hint_id: null },
     loading: false,
     completeStep: jest.fn(),
     skipStep: jest.fn(),
+    updateTrackStep: jest.fn(),
+    trackProgress: {},
     chatAvailable: false,
     showOnboarding: false,
     hasContextHint: false,
@@ -36,7 +41,7 @@ jest.mock('../useHelpContext', () => ({
   })),
 }));
 
-import HelpWidget from '../HelpWidget';
+import HelpWidget, { clampPanelDimension } from '../HelpWidget';
 
 const theme = createTheme();
 
@@ -53,6 +58,29 @@ describe('HelpWidget', () => {
   it('renders the floating help button', () => {
     renderWidget();
     expect(screen.getByRole('button', { name: /hilfe/i })).toBeInTheDocument();
+  });
+});
+
+describe('HelpWidget — clampPanelDimension (panel resize)', () => {
+  it('clamps to a value within [min, max] under normal conditions', () => {
+    expect(clampPanelDimension(360, 800, 500)).toBe(500);
+    expect(clampPanelDimension(360, 800, 1000)).toBe(800);
+    expect(clampPanelDimension(360, 800, 100)).toBe(360);
+  });
+
+  it('does not exceed max even when max < min (viewport smaller than the preferred minimum)', () => {
+    // The exact regression this clamp exists to fix: a window shorter than
+    // MIN_HEIGHT + PANEL_VERTICAL_MARGIN makes MAX_HEIGHT < MIN_HEIGHT. The
+    // naive `Math.max(min, Math.min(max, value))` would return `min` (520)
+    // here regardless of `value`, overflowing the 480px actually available.
+    expect(clampPanelDimension(520, 480, 1000)).toBe(480);
+    expect(clampPanelDimension(520, 480, 0)).toBe(480);
+    expect(clampPanelDimension(520, 480, 480)).toBe(480);
+  });
+
+  it('is idempotent (clamping an already-clamped value returns it unchanged)', () => {
+    const once = clampPanelDimension(360, 800, 900);
+    expect(clampPanelDimension(360, 800, once)).toBe(once);
   });
 });
 
@@ -86,10 +114,12 @@ describe('HelpWidget — Modal-Persistenz', () => {
         skipped_steps: [],
         completed: true,
       },
-      contextHint: { hint_text: null, hint_id: null },
+      contextHint: { i18n_key: null, hint_id: null },
       loading: false,
       completeStep: jest.fn(),
       skipStep: jest.fn(),
+      updateTrackStep: jest.fn(),
+      trackProgress: {},
       chatAvailable: false,
       showOnboarding: false,
       hasContextHint: false,
@@ -113,10 +143,12 @@ describe('HelpWidget — Modal-Persistenz', () => {
         skipped_steps: [],
         completed: false,
       },
-      contextHint: { hint_text: null, hint_id: null },
+      contextHint: { i18n_key: null, hint_id: null },
       loading: false,
       completeStep: jest.fn(),
       skipStep: jest.fn(),
+      updateTrackStep: jest.fn(),
+      trackProgress: {},
       chatAvailable: false,
       showOnboarding: true,
       hasContextHint: false,
@@ -141,10 +173,12 @@ describe('HelpWidget — Modal-Persistenz', () => {
         skipped_steps: [],
         completed: false,
       },
-      contextHint: { hint_text: null, hint_id: null },
+      contextHint: { i18n_key: null, hint_id: null },
       loading: false,
       completeStep: jest.fn(),
       skipStep: jest.fn(),
+      updateTrackStep: jest.fn(),
+      trackProgress: {},
       chatAvailable: false,
       showOnboarding: true,
       hasContextHint: false,
@@ -152,7 +186,12 @@ describe('HelpWidget — Modal-Persistenz', () => {
     });
 
     global.fetch = jest.fn().mockResolvedValue({
-      json: () => Promise.resolve({ teacher: [{ step: 0, title_de: 'Willkommen', title_en: 'Welcome', description_de: 'Desc', description_en: 'Desc', route: null, highlight_selector: null, nav_selector: null, tab_selector: null }] }),
+      json: () => Promise.resolve({
+        teacher: {
+          core: [{ step: 0, i18n_key: 'help.tour.teacher.core.0', route: null, highlight_selector: null, nav_selector: null, tab_selector: null }],
+          tracks: [],
+        },
+      }),
     } as any);
 
     renderWidget();
@@ -183,10 +222,12 @@ describe('HelpWidget — Tour-Banner', () => {
         skipped_steps: [],
         completed: true,
       },
-      contextHint: { hint_text: null, hint_id: null },
+      contextHint: { i18n_key: null, hint_id: null },
       loading: false,
       completeStep: jest.fn(),
       skipStep: jest.fn(),
+      updateTrackStep: jest.fn(),
+      trackProgress: {},
       chatAvailable: false,
       showOnboarding: false,
       hasContextHint: false,
@@ -208,10 +249,12 @@ describe('HelpWidget — Tour-Banner', () => {
         skipped_steps: [],
         completed: false,
       },
-      contextHint: { hint_text: null, hint_id: null },
+      contextHint: { i18n_key: null, hint_id: null },
       loading: false,
       completeStep: jest.fn().mockResolvedValue(undefined),
       skipStep: jest.fn(),
+      updateTrackStep: jest.fn(),
+      trackProgress: {},
       chatAvailable: false,
       showOnboarding: true,
       hasContextHint: false,
@@ -220,10 +263,13 @@ describe('HelpWidget — Tour-Banner', () => {
 
     global.fetch = jest.fn().mockResolvedValue({
       json: () => Promise.resolve({
-        teacher: [
-          { step: 0, title_de: 'Start', title_en: 'Start', description_de: '', description_en: '', route: null, highlight_selector: null, nav_selector: null, tab_selector: null },
-          { step: 1, title_de: 'Schritt 1', title_en: 'Step 1', description_de: '', description_en: '', route: '/documents', highlight_selector: '[data-testid="x"]', nav_selector: null, tab_selector: null },
-        ],
+        teacher: {
+          core: [
+            { step: 0, i18n_key: 'help.tour.teacher.core.0', route: null, highlight_selector: null, nav_selector: null, tab_selector: null },
+            { step: 1, i18n_key: 'help.tour.teacher.core.1', route: '/documents', highlight_selector: '[data-testid="x"]', nav_selector: null, tab_selector: null },
+          ],
+          tracks: [],
+        },
       }),
     } as any);
 

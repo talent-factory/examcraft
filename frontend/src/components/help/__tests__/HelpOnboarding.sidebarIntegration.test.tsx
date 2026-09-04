@@ -67,10 +67,7 @@ beforeEach(() => {
 
 const navStep: OnboardingStep = {
   step: 1,
-  title_de: 'Dokumente',
-  title_en: 'Documents',
-  description_de: 'Beschreibung',
-  description_en: 'Description',
+  i18n_key: 'help.tour.teacher.core.2',
   route: '/documents',
   highlight_selector: "[data-testid='upload-area']",
   nav_selector: "[data-testid='nav-documents']",
@@ -79,10 +76,7 @@ const navStep: OnboardingStep = {
 
 const doneStep: OnboardingStep = {
   step: 2,
-  title_de: 'Fertig',
-  title_en: 'Done',
-  description_de: '',
-  description_en: '',
+  i18n_key: 'help.tour.teacher.core.7',
   route: null,
   highlight_selector: null,
   nav_selector: null,
@@ -145,6 +139,50 @@ describe('HelpOnboarding + Sidebar integration (TF-604)', () => {
 
     expect(onSkipStep).not.toHaveBeenCalled();
     expect(screen.getByTestId('nav-documents')).toBeInTheDocument();
+    expect(capturedHighlightConfig?.element).toBe("[data-testid='nav-documents']");
+  });
+
+  it('survives StrictMode double-mounting (TF-625)', async () => {
+    /**
+     * The app renders under `React.StrictMode` (index.tsx), where React 18
+     * runs effect → cleanup → effect in development. The cleanup latches
+     * `isUnmountedRef`; until TF-625 nothing reset it on the second run, so
+     * every waitForNavElement poll bailed on its first tick and left its
+     * promise pending by design. Symptom in the browser: the group expands,
+     * then nothing — no highlight, and the help widget stays unopenable
+     * because `tourActive` never clears.
+     *
+     * This has to run against the real Sidebar. A hand-rolled stand-in that
+     * inserts the link synchronously on the reveal event hides the bug: by
+     * the second effect run the link is already in the DOM and
+     * highlightNavStep takes its fast path, which never polls. The real
+     * Sidebar reveals through a React state update, so the second run still
+     * finds nothing and has to rely on the poll — the path that was broken.
+     */
+    const onSkipStep = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <React.StrictMode>
+        <MemoryRouter initialEntries={['/dashboard']}>
+          <AuthProvider>
+            <Sidebar isOpen />
+            <HelpOnboarding
+              active
+              status={{ id: 1, role: 'teacher', current_step: 1, completed_steps: [0], completed: false }}
+              steps={[doneStep, navStep, doneStep]}
+              onCompleteStep={jest.fn().mockResolvedValue(undefined)}
+              onSkipStep={onSkipStep}
+              onTourComplete={jest.fn()}
+              onTourCancel={jest.fn()}
+            />
+          </AuthProvider>
+        </MemoryRouter>
+      </React.StrictMode>,
+    );
+
+    await waitFor(() => expect(mockHighlight).toHaveBeenCalled(), { timeout: 1000 });
+
+    expect(onSkipStep).not.toHaveBeenCalled();
     expect(capturedHighlightConfig?.element).toBe("[data-testid='nav-documents']");
   });
 });

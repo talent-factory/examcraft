@@ -156,7 +156,7 @@ describe('SubscriptionTierOverview', () => {
 
     // Own-tier chip appears twice: once on the Free price card, once in the
     // resource-limits table's Free column header.
-    expect(screen.getAllByText('Ihr aktueller Tarif')).toHaveLength(2);
+    expect(screen.getAllByText('Dein aktueller Tarif')).toHaveLength(2);
 
     // Enterprise isn't the admin's own tier here, so it keeps the generic chip.
     expect(screen.getByText('Verfügbar')).toBeInTheDocument();
@@ -167,7 +167,7 @@ describe('SubscriptionTierOverview', () => {
 
     renderComponent();
 
-    expect(await screen.findByText(/Ihr aktueller Tarif: Enterprise/)).toBeInTheDocument();
+    expect(await screen.findByText(/Dein aktueller Tarif: Enterprise/)).toBeInTheDocument();
     expect(
       screen.getByText(/bereits im höchsten verfügbaren Tarif/)
     ).toBeInTheDocument();
@@ -178,7 +178,7 @@ describe('SubscriptionTierOverview', () => {
 
     // The resource-limits table (and its own-tier column highlight) still renders.
     expect(await screen.findByText('Ressource')).toBeInTheDocument();
-    expect(screen.getByText('Ihr aktueller Tarif')).toBeInTheDocument();
+    expect(screen.getByText('Dein aktueller Tarif')).toBeInTheDocument();
   });
 
   it('renders normally without own-tier highlighting when the own-tier lookup fails', async () => {
@@ -190,7 +190,7 @@ describe('SubscriptionTierOverview', () => {
 
     // Both cards fall back to the generic chip since no tier is "own tier".
     expect(screen.getAllByText('Verfügbar')).toHaveLength(2);
-    expect(screen.queryByText('Ihr aktueller Tarif')).not.toBeInTheDocument();
+    expect(screen.queryByText('Dein aktueller Tarif')).not.toBeInTheDocument();
   });
 
   it("highlights the own tier's column in the resource-limits table body, not just the header", async () => {
@@ -233,7 +233,7 @@ describe('SubscriptionTierOverview', () => {
     ).not.toBeInTheDocument();
     // Pro B is still recognized as the admin's own tier via the regular chip
     // (once on its price card, once in the resource-limits table header).
-    expect(screen.getAllByText('Ihr aktueller Tarif')).toHaveLength(2);
+    expect(screen.getAllByText('Dein aktueller Tarif')).toHaveLength(2);
   });
 
   it('degrades like a failed lookup when getMyTier resolves to a tier absent from the tiers list', async () => {
@@ -258,7 +258,7 @@ describe('SubscriptionTierOverview', () => {
     await waitFor(() => expect(screen.getAllByText('CHF 0.00').length).toBeGreaterThan(0));
 
     expect(screen.getAllByText('Verfügbar')).toHaveLength(2);
-    expect(screen.queryByText('Ihr aktueller Tarif')).not.toBeInTheDocument();
+    expect(screen.queryByText('Dein aktueller Tarif')).not.toBeInTheDocument();
     expect(
       screen.queryByText(/bereits im höchsten verfügbaren Tarif/)
     ).not.toBeInTheDocument();

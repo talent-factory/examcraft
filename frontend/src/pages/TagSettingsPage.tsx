@@ -147,7 +147,7 @@ const TagSettingsPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3, maxWidth: 800 }}>
+    <Box sx={{ p: 3, maxWidth: 800 }} data-testid="tag-settings-content">
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         {/* TF-506: Titel nutzt den Sidebar-Key, damit Seitentitel und Navigation synchron bleiben */}
         <Typography variant="h5" fontWeight="bold">

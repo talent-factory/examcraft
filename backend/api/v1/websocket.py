@@ -282,7 +282,7 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
                         status=TaskStatus.FAILURE,
                         progress=0,
                         error="Task-Status kann nicht abgerufen werden (Verbindungsfehler). "
-                        "Bitte versuchen Sie es später erneut.",
+                        "Bitte versuch es später erneut.",
                     )
                     await websocket.send_json(msg.model_dump())
                     await websocket.close()

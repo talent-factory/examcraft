@@ -13,7 +13,7 @@ import MoodleConnectionForm from '../components/admin/MoodleConnectionForm';
 
 const MoodleConnectionPage: React.FC = () => {
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3 }} data-testid="moodle-connection-content">
       <MoodleConnectionForm />
     </Box>
   );

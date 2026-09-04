@@ -13,6 +13,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.sql import func
 
 from database import Base
@@ -50,6 +51,24 @@ class HelpOnboardingProgress(Base):
     completed_steps = Column(JSON, default=list, nullable=False)
     skipped_steps = Column(JSON, default=list, nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+    # TF-625: progress of the optional deep-dive tracks, separate from the
+    # linear core-tour progress above. Keyed by track id (from
+    # help-onboarding-steps.json), value per track:
+    #   {"current_step": int, "completed_steps": [int], "skipped_steps": [int],
+    #    "completed_at": iso8601 | None}
+    # Deliberately its own column rather than a number-range convention inside
+    # `completed_steps`: the track id stays stable when steps are renumbered or
+    # inserted, so stored progress does not silently point at different content.
+    # MutableDict.as_mutable, not plain JSON: without it, an in-place write
+    # like `progress.track_progress[track_id]["current_step"] += 1` would not
+    # be seen as a dirty attribute and would silently fail to persist — the
+    # route handler works around this today by rebuilding the dict and
+    # reassigning it wholesale, but that convention is only as strong as the
+    # next contributor remembering it. This makes the safe form the only one
+    # that works, structurally, instead of a rule to keep in mind.
+    track_progress = Column(
+        MutableDict.as_mutable(JSON), default=dict, nullable=False, server_default="{}"
+    )
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -72,6 +91,7 @@ class HelpOnboardingProgress(Base):
             "current_step": self.current_step,
             "completed_steps": self.completed_steps,
             "skipped_steps": self.skipped_steps or [],
+            "track_progress": self.track_progress or {},
             "completed_at": (
                 self.completed_at.isoformat() if self.completed_at else None
             ),
@@ -153,16 +173,20 @@ class HelpContextHint(Base):
     route_pattern = Column(String(255), nullable=False)
     role = Column(String(20), nullable=True)
     tier = Column(String(30), nullable=True)
-    hint_text_de = Column(Text, nullable=False)
-    hint_text_en = Column(Text, nullable=False)
+    # The text itself lives in the frontend's translation.json under this key.
+    # It used to sit here as hint_text_de/en, which made this the only help
+    # surface whose language the server decided — and therefore the only one
+    # that did not follow the language switcher without a reload.
+    i18n_key = Column(String(255), nullable=False)
     priority = Column(Integer, default=0, nullable=False)
     active = Column(Boolean, default=True, nullable=False)
 
-    def to_dict(self, locale="de"):
+    def to_dict(self):
+        """Structure only. The client resolves `i18n_key` in its own locale."""
         return {
             "id": self.id,
             "route_pattern": self.route_pattern,
-            "hint_text": (self.hint_text_de if locale == "de" else self.hint_text_en),
+            "i18n_key": self.i18n_key,
             "priority": self.priority,
         }
 

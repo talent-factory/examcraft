@@ -107,3 +107,14 @@ code {
 .driver-active [role="dialog"] * {
   pointer-events: auto !important;
 }
+
+/* The tour popover (OnboardingPopover) is a MUI Popper portalled onto body, so
+   the same rule hits it: measured without this override, its computed
+   pointer-events was "none" and a hit test on the "Weiter" button missed.
+   Keyed on the popper wrapper rather than relying on the [role="dialog"] rule
+   above, because the arrow sits outside the dialog element. */
+.driver-active [data-testid="onboarding-popover"],
+.driver-active [data-testid="onboarding-popover"] *,
+.driver-active [data-testid="onboarding-popover-arrow"] {
+  pointer-events: auto !important;
+}

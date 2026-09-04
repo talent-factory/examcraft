@@ -336,7 +336,7 @@
       "title": "Students",
       "subtitle": "Master data and cross-exam history per student.",
       "loadError": "Students could not be loaded.",
-      "emptyHint": "No students yet.",
+      "emptyHint": "No students yet. Students are created automatically as soon as you import exam results under 'Analytics'.",
       "searchLabel": "Search by email / name",
       "filterClass": "Class filter",
       "filterAllClasses": "All classes",
@@ -2203,7 +2203,8 @@
       "permissions": "Permissions",
       "settings": "Settings",
       "language": "Language",
-      "languageHint": "Changes the language of the entire application"
+      "languageHint": "Changes the language of the entire application",
+      "languageSaveFailed": "The language applies in this browser but could not be saved to your account. Other devices will not pick it up yet."
     },
     "profileEdit": {
       "header": "Edit Profile",
@@ -2631,7 +2632,21 @@
     "newConversation": "New Conversation",
     "thinking": "Thinking…",
     "catchUp": {
+      "message": "New pages have been unlocked — would you like to catch up on the tour for them?",
       "button": "Explore now"
+    },
+    "tracks": {
+      "title": "Deep dives",
+      "intro": "Short tours of individual areas — none of them are required.",
+      "start": "Start",
+      "resume": "Resume",
+      "restart": "Again",
+      "done": "Completed",
+      "new": "New"
+    },
+    "tabs": {
+      "tours": "Tours",
+      "chat": "Chat"
     },
     "onboarding": {
       "skip": "Skip",
@@ -2640,6 +2655,9 @@
       "resume": "Continue later",
       "later": "Later",
       "startTour": "Start tour",
+      "closeTour": "End tour",
+      "coreTourTitle": "Introductory tour",
+      "coreTourReplayHint": "Walk through the basics once more.",
       "confirmEndTitle": "End tour?",
       "confirmEndText": "You can restart the tour anytime via the help button at the bottom right.",
       "confirmEndCancel": "Cancel",
@@ -2657,6 +2675,229 @@
     "feedback": {
       "helpful": "Was this helpful?",
       "thanks": "Thanks for your feedback!"
+    },
+    "tour": {
+      "teacher": {
+        "core": {
+          "0": {
+            "title": "Welcome to ExamCraft AI!",
+            "description": "I'll show you in a few steps how to create your first exam. Click 'Start tour' for a guided introduction."
+          },
+          "1": {
+            "title": "Dashboard",
+            "description": "This is your personal dashboard. Here you'll find quick access to all key features and an overview of your activity."
+          },
+          "2": {
+            "title": "Upload a Document",
+            "description": "Upload your course material as PDF, Word, or Markdown. Simply drag the file into the upload area or click on it."
+          },
+          "3": {
+            "title": "Document Library",
+            "description": "Here you can see all uploaded documents. Select one or more to generate exam questions from them."
+          },
+          "4": {
+            "title": "Create an Exam",
+            "description": "Choose difficulty, number of questions, and format — the AI generates fitting questions from your documents."
+          },
+          "5": {
+            "title": "Review and Export Questions",
+            "description": "Review the generated questions, rate them, and export the finished exam as PDF or Moodle XML."
+          },
+          "6": {
+            "title": "Prompt Library",
+            "description": "Here you manage the templates the AI uses to phrase questions. Adapt them to your teaching style."
+          },
+          "7": {
+            "title": "All set!",
+            "description": "You now know the path from document to finished exam. The help widget in the bottom right offers short deep dives into analytics, the exam composer, and other areas — start them whenever you like, none are required."
+          }
+        },
+        "tracks": {
+          "auswertungen": {
+            "title": "Analytics",
+            "description": "Evaluate exam results, classes, and individual students.",
+            "steps": {
+              "0": {
+                "title": "Exam Analytics",
+                "description": "This lists every exam in your institution. An exam shows up here once you have created it in the Exam Composer. Each row then offers 'Import results' to read in that exam's results — only after that do you get a grade average, failure rate, and the question-by-question breakdown."
+              },
+              "1": {
+                "title": "Classes",
+                "description": "Classes group students across multiple exams. They are created during an exam import, or you add them here via 'Create class' — after that you see the whole class's performance over time."
+              },
+              "2": {
+                "title": "Students",
+                "description": "The per-student view: all exam results, strengths, and gaps at a glance. Students are created automatically as soon as you import exam results — no manual entry needed."
+              }
+            }
+          },
+          "exam-composer": {
+            "title": "Composing Exams",
+            "description": "Build a tailored exam from reviewed questions.",
+            "steps": {
+              "0": {
+                "title": "Exam Composer",
+                "description": "Instead of generating a whole exam, here you assemble one yourself from already-reviewed questions — you decide order, points, and weighting."
+              }
+            }
+          },
+          "werkzeuge": {
+            "title": "Tools",
+            "description": "Document chat and activity log.",
+            "steps": {
+              "0": {
+                "title": "Document Chat",
+                "description": "Ask questions directly of your uploaded documents. Useful for checking material before generating questions from it."
+              },
+              "1": {
+                "title": "Activity",
+                "description": "The log of everything happening in your account — uploads, generations, exports. Handy for retracing what happened when."
+              }
+            }
+          },
+          "einstellungen": {
+            "title": "Settings",
+            "description": "Tags and competency frameworks for your questions.",
+            "steps": {
+              "0": {
+                "title": "Tag Management",
+                "description": "Tags organise questions by topic, chapter, or learning objective. Well-maintained tags make the exam composer much faster to use."
+              },
+              "1": {
+                "title": "Competency Frameworks",
+                "description": "Define your curriculum's competency framework. The AI then aligns generated questions with the defined learning objective levels."
+              }
+            }
+          }
+        }
+      },
+      "admin": {
+        "core": {
+          "0": {
+            "title": "Welcome, Administrator!",
+            "description": "I'll show you the path from document to finished exam in a few steps. The administration areas follow afterwards as separate deep dives."
+          },
+          "1": {
+            "title": "Dashboard",
+            "description": "This is your personal dashboard. Here you'll find quick access to all key features and an overview of your activity."
+          },
+          "2": {
+            "title": "Upload a Document",
+            "description": "Upload your course material as PDF, Word, or Markdown. Simply drag the file into the upload area or click on it."
+          },
+          "3": {
+            "title": "Document Library",
+            "description": "Here you can see all uploaded documents. Select one or more to generate exam questions from them."
+          },
+          "4": {
+            "title": "Create an Exam",
+            "description": "Choose difficulty, number of questions, and format — the AI generates fitting questions from your documents."
+          },
+          "5": {
+            "title": "Review and Export Questions",
+            "description": "Review the generated questions, rate them, and export the finished exam as PDF or Moodle XML."
+          },
+          "6": {
+            "title": "Prompt Library",
+            "description": "Here you manage the templates the AI uses to phrase questions. Adapt them to your institution's teaching style."
+          },
+          "7": {
+            "title": "All set!",
+            "description": "You now know the path from document to finished exam. The help widget in the bottom right offers short deep dives into analytics, user management, the Moodle connection, and other areas — start them whenever you like, none are required."
+          }
+        },
+        "tracks": {
+          "auswertungen": {
+            "title": "Analytics",
+            "description": "Evaluate exam results, classes, and individual students.",
+            "steps": {
+              "0": {
+                "title": "Exam Analytics",
+                "description": "This lists every exam in your institution. An exam shows up here once you have created it in the Exam Composer. Each row then offers 'Import results' to read in that exam's results — only after that do you get a grade average, failure rate, and the question-by-question breakdown."
+              },
+              "1": {
+                "title": "Classes",
+                "description": "Classes group students across multiple exams. They are created during an exam import, or you add them here via 'Create class' — after that you see the whole class's performance over time."
+              },
+              "2": {
+                "title": "Students",
+                "description": "The per-student view: all exam results, strengths, and gaps at a glance. Students are created automatically as soon as you import exam results — no manual entry needed."
+              }
+            }
+          },
+          "exam-composer": {
+            "title": "Composing Exams",
+            "description": "Build a tailored exam from reviewed questions.",
+            "steps": {
+              "0": {
+                "title": "Exam Composer",
+                "description": "Instead of generating a whole exam, here you assemble one yourself from already-reviewed questions — you decide order, points, and weighting."
+              }
+            }
+          },
+          "werkzeuge": {
+            "title": "Tools",
+            "description": "Document chat and activity log.",
+            "steps": {
+              "0": {
+                "title": "Document Chat",
+                "description": "Ask questions directly of the uploaded documents. Useful for checking material before generating questions from it."
+              },
+              "1": {
+                "title": "Activity",
+                "description": "The log of all operations — uploads, generations, exports. Handy for retracing what happened when."
+              }
+            }
+          },
+          "admin-benutzer": {
+            "title": "Users and Permissions",
+            "description": "User management, institutions, and roles in the admin panel.",
+            "steps": {
+              "0": {
+                "title": "User Management",
+                "description": "Here you create accounts, assign roles, and deactivate departed users."
+              },
+              "1": {
+                "title": "Institutions",
+                "description": "Institutions bundle users, documents, and subscription. Every user belongs to exactly one institution."
+              },
+              "2": {
+                "title": "Roles & Permissions",
+                "description": "Roles determine which features someone sees. Permissions are bundled here rather than granted per person."
+              }
+            }
+          },
+          "admin-betrieb": {
+            "title": "Operations and Integrations",
+            "description": "Audit log, subscription, and the Moodle connection.",
+            "steps": {
+              "0": {
+                "title": "Audit Logs",
+                "description": "Every security-relevant action is logged here — who changed what, and when."
+              },
+              "1": {
+                "title": "Subscription",
+                "description": "Your institution's plan, quotas, and invoices. The plan determines which features are unlocked."
+              },
+              "2": {
+                "title": "Moodle connection",
+                "description": "Connect ExamCraft to your Moodle instance to transfer exams directly instead of exporting them by hand."
+              }
+            }
+          }
+        }
+      },
+      "next": "Next →",
+      "finish": "Finish ✓",
+      "navInstruction": "Click the highlighted menu item to continue.",
+      "tabInstruction": "Click the highlighted tab to continue."
+    },
+    "hints": {
+      "documents": "Tip: Structured PDFs with headings produce better exam questions.",
+      "questionsGenerate": "New here? Select 3–5 documents first for optimal quality.",
+      "questionsReview": "The filters at the top let you show pending, approved, or rejected questions only.",
+      "examsCompose": "Only reviewed questions appear here — if the selection looks empty, the review is still pending.",
+      "prompts": "The live preview shows you how the prompt looks with real variables."
     }
   },
   "competencyFrameworks": {

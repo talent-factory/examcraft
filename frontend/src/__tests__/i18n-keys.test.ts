@@ -15,9 +15,12 @@
  *      via the DE fallback).
  *   3. DE and EN have full logical-key parity (no extras on either side).
  *
- * Out of scope: FR/IT parity. Both currently lag DE by ~70 keys (`help.*`).
- * Closing that gap is tracked separately; this test relies on the i18next
- * fallback to DE for those locales until then.
+ * Out of scope: FR/IT parity. Both still lag DE (see
+ * onboardingStepsI18n.test.ts / help-hint-keys.test.ts for the `help.*`
+ * subset specifically, which TF-625 closed to zero — the remaining gap is
+ * elsewhere and not attributable to any one feature). Closing it fully is
+ * tracked separately; this test relies on the i18next fallback to DE for
+ * those locales until then.
  *
  * Limitations: only literal string arguments are scanned. Dynamic keys such
  * as `` t(`pages.dashboard.activityTypes.${type}`) `` are skipped — there is

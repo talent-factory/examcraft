@@ -58,7 +58,7 @@
   "auth": {
     "login": {
       "title": "Bon retour",
-      "subtitle": "Connectez-vous à votre compte",
+      "subtitle": "Connecte-toi à ton compte",
       "email": "Adresse e-mail",
       "password": "Mot de passe",
       "rememberMe": "Se souvenir de moi",
@@ -66,9 +66,9 @@
       "signingIn": "Connexion en cours...",
       "signIn": "Se connecter",
       "orContinueWith": "Ou continuer avec",
-      "noAccount": "Vous n'avez pas de compte ?",
+      "noAccount": "Tu n'as pas de compte ?",
       "signUp": "S'inscrire",
-      "emailAndPasswordRequired": "Veuillez saisir votre e-mail et votre mot de passe"
+      "emailAndPasswordRequired": "Saisis ton e-mail et ton mot de passe"
     },
     "register": {
       "title": "Créer un compte",
@@ -76,7 +76,7 @@
       "lastName": "Nom de famille",
       "email": "E-mail",
       "institutionCode": "Code d'institution (Optionnel)",
-      "institutionCodeHint": "Entrez votre code d'institution si vous en avez un",
+      "institutionCodeHint": "Entre ton code d'institution si tu en as un",
       "password": "Mot de passe",
       "passwordReqTitle": "Le mot de passe doit contenir :",
       "passwordReqMinLength": "8+ caractères",
@@ -86,8 +86,8 @@
       "confirmPassword": "Confirmer le mot de passe",
       "creatingAccount": "Création du compte...",
       "createAccount": "Créer un compte",
-      "hasAccount": "Vous avez déjà un compte ?",
-      "loginHere": "Connectez-vous ici"
+      "hasAccount": "Tu as déjà un compte ?",
+      "loginHere": "Connecte-toi ici"
     },
     "authPage": {
       "tagline": "Génération de questions d'examen par IA",
@@ -98,11 +98,11 @@
     },
     "verification": {
       "bannerTitle": "Vérification de l'e-mail requise",
-      "bannerText": "Veuillez vérifier votre adresse e-mail pour accéder à toutes les fonctionnalités. Consultez votre boîte de réception pour le lien de vérification.",
+      "bannerText": "Vérifie ton adresse e-mail pour accéder à toutes les fonctionnalités. Consulte ta boîte de réception pour le lien de vérification.",
       "resendButton": "Renvoyer l'e-mail de vérification",
       "sending": "Envoi en cours...",
       "emailSent": "E-mail envoyé !",
-      "successMessage": "E-mail de vérification envoyé ! Veuillez vérifier votre boîte de réception."
+      "successMessage": "E-mail de vérification envoyé ! Vérifie ta boîte de réception."
     },
     "oauth": {
       "processing": "Traitement du rappel OAuth...",
@@ -113,20 +113,20 @@
     },
     "resetRequest": {
       "title": "Réinitialiser le mot de passe",
-      "subtitle": "Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser votre mot de passe.",
+      "subtitle": "Entre ton adresse e-mail et nous t'enverrons un lien pour réinitialiser ton mot de passe.",
       "email": "Adresse e-mail",
       "sending": "Envoi en cours...",
       "sendResetLink": "Envoyer le lien",
       "cancel": "Annuler",
-      "checkEmail": "Vérifiez votre e-mail",
-      "sentTo": "Nous avons envoyé un lien de réinitialisation à <strong>{{email}}</strong>. Veuillez vérifier votre boîte de réception et suivre les instructions.",
+      "checkEmail": "Vérifie ton e-mail",
+      "sentTo": "Nous avons envoyé un lien de réinitialisation à <strong>{{email}}</strong>. Vérifie ta boîte de réception et suis les instructions.",
       "redirecting": "Redirection en cours...",
-      "enterEmail": "Veuillez saisir votre adresse e-mail",
-      "invalidEmail": "Veuillez saisir une adresse e-mail valide"
+      "enterEmail": "Saisis ton adresse e-mail",
+      "invalidEmail": "Saisis une adresse e-mail valide"
     },
     "resetConfirm": {
       "title": "Définir un nouveau mot de passe",
-      "subtitle": "Veuillez saisir votre nouveau mot de passe ci-dessous.",
+      "subtitle": "Saisis ton nouveau mot de passe ci-dessous.",
       "newPassword": "Nouveau mot de passe",
       "passwordHint": "Minimum 8 caractères",
       "confirmPassword": "Confirmer le nouveau mot de passe",
@@ -134,18 +134,18 @@
       "resetPassword": "Réinitialiser le mot de passe",
       "cancel": "Annuler",
       "successTitle": "Mot de passe réinitialisé avec succès",
-      "successMessage": "Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.",
+      "successMessage": "Ton mot de passe a été réinitialisé avec succès. Tu peux maintenant te connecter avec ton nouveau mot de passe.",
       "redirectingToLogin": "Redirection vers la connexion..."
     },
     "validation": {
-      "required": "Veuillez remplir tous les champs obligatoires",
+      "required": "Remplis tous les champs obligatoires",
       "passwordMismatch": "Les mots de passe ne correspondent pas",
       "passwordMinLength": "Le mot de passe doit contenir au moins 8 caractères",
       "passwordUppercase": "Le mot de passe doit contenir au moins une lettre majuscule",
       "passwordLowercase": "Le mot de passe doit contenir au moins une lettre minuscule",
       "passwordNumber": "Le mot de passe doit contenir au moins un chiffre",
-      "invalidEmail": "Veuillez saisir une adresse e-mail valide",
-      "fillAllFields": "Veuillez remplir tous les champs"
+      "invalidEmail": "Saisis une adresse e-mail valide",
+      "fillAllFields": "Remplis tous les champs"
     }
   },
   "footer": {
@@ -326,7 +326,7 @@
       "title": "AVV, TOM et documents de conformité",
       "intro": "Pour les écoles et les autorités scolaires : modèle de contrat de sous-traitance, annexe des mesures techniques et organisationnelles, liste des sous-traitants et modèle de texte pour votre registre des activités de traitement — à consulter et à télécharger.",
       "germanOnlyNotice": "Ces documents de conformité ne sont disponibles qu'en allemand.",
-      "loadError": "Les documents de conformité n'ont pas pu être chargés. Veuillez réessayer plus tard.",
+      "loadError": "Les documents de conformité n'ont pas pu être chargés. Réessaie plus tard.",
       "loading": "Chargement des documents …",
       "retry": "Réessayer",
       "avv": {
@@ -367,7 +367,7 @@
       "subtitle": "Créez des questions d'examen intelligentes avec l'aide de l'IA",
       "quickAccess": "Accès rapide",
       "documents": "Documents",
-      "documentsDescription": "Téléchargez des supports de cours et gérez votre bibliothèque de documents",
+      "documentsDescription": "Télécharge des supports de cours et gère ta bibliothèque de documents",
       "generateQuestions": "Générer des questions",
       "generateQuestionsDescription": "Créez automatiquement des questions d'examen avec l'IA",
       "reviewQueue": "File de révision",
@@ -382,7 +382,7 @@
       "viewAllActivities": "Voir toute l'activité →"
     },
     "documents": {
-      "subtitle": "Gérez vos supports de cours et documents",
+      "subtitle": "Gère tes supports de cours et documents",
       "uploadTitle": "Télécharger un nouveau document",
       "myDocuments": "Mes documents"
     },
@@ -435,7 +435,7 @@
     },
     "billing": {
       "title": "Plans tarifaires",
-      "subtitle": "Choisissez le plan qui vous convient.",
+      "subtitle": "Choisis le plan qui te convient.",
       "perMonth": "/mois",
       "freeDescription": "Parfait pour découvrir ExamCraft.",
       "currentPlan": "Plan actuel",
@@ -443,33 +443,33 @@
       "professionalDescription": "Puissance illimitée pour la création professionnelle d'examens.",
       "processing": "Traitement...",
       "subscribe": "S'abonner",
-      "subscriptionError": "Impossible de démarrer le processus d'abonnement. Veuillez réessayer."
+      "subscriptionError": "Impossible de démarrer le processus d'abonnement. Réessaie."
     },
     "registrationSuccess": {
       "title": "Inscription réussie ! 🎉",
       "subtitle": "Bienvenue sur ExamCraft AI ! Nous avons envoyé un e-mail de vérification à :",
-      "checkInbox": "Veuillez vérifier votre boîte de réception et cliquer sur le lien de vérification pour activer votre compte. Le lien expirera dans 24 heures.",
-      "didntReceive": "Vous n'avez pas reçu l'e-mail ?",
+      "checkInbox": "Vérifie ta boîte de réception et clique sur le lien de vérification pour activer ton compte. Le lien expirera dans 24 heures.",
+      "didntReceive": "Tu n'as pas reçu l'e-mail ?",
       "continueToDashboard": "Continuer vers le tableau de bord",
-      "limitedAccess": "Vous pouvez toujours accéder au tableau de bord, mais certaines fonctionnalités peuvent être limitées tant que vous n'avez pas vérifié votre e-mail."
+      "limitedAccess": "Tu peux toujours accéder au tableau de bord, mais certaines fonctionnalités peuvent être limitées tant que tu n'as pas vérifié ton e-mail."
     },
     "verifyEmail": {
-      "verifying": "Vérification de votre e-mail...",
-      "pleaseWait": "Veuillez patienter pendant que nous vérifions votre adresse e-mail.",
+      "verifying": "Vérification de ton e-mail...",
+      "pleaseWait": "Patiente pendant que nous vérifions ton adresse e-mail.",
       "success": "E-mail vérifié ! 🎉",
-      "welcomeUser": "Bienvenue, {{name}} ! Votre e-mail a été vérifié avec succès.",
-      "fullAccess": "Vous pouvez maintenant accéder à toutes les fonctionnalités d'ExamCraft AI.",
+      "welcomeUser": "Bienvenue, {{name}} ! Ton e-mail a été vérifié avec succès.",
+      "fullAccess": "Tu peux maintenant accéder à toutes les fonctionnalités d'ExamCraft AI.",
       "goToDashboard": "Aller au tableau de bord",
       "failed": "Échec de la vérification",
       "linkExpired": "Le lien de vérification a peut-être expiré ou est invalide.",
       "backToLogin": "Retour à la connexion",
       "noToken": "Lien de vérification invalide. Aucun jeton fourni.",
       "verificationFailed": "Échec de la vérification",
-      "verifyEmailError": "Impossible de vérifier l'e-mail. Veuillez réessayer."
+      "verifyEmailError": "Impossible de vérifier l'e-mail. Réessaie."
     },
     "paymentSuccess": {
       "title": "Paiement réussi !",
-      "subtitle": "Merci pour votre abonnement. Votre compte a été mis à niveau.",
+      "subtitle": "Merci pour ton abonnement. Ton compte a été mis à niveau.",
       "redirecting": "Redirection vers la facturation..."
     },
     "paymentCancel": {
@@ -522,22 +522,22 @@
     },
     "impersonation": {
       "dialogTitle": "Se connecter en tant qu'utilisateur",
-      "dialogTargetLabel": "Vous vous connectez en tant que :",
+      "dialogTargetLabel": "Tu te connectes en tant que :",
       "dialogReasonLabel": "Motif (obligatoire)",
       "dialogReasonPlaceholder": "p. ex. reproduire le ticket de support TICKET-123",
-      "dialogPasswordLabel": "Votre mot de passe (confirmation)",
-      "dialogPasswordPlaceholder": "Votre mot de passe actuel",
+      "dialogPasswordLabel": "Ton mot de passe (confirmation)",
+      "dialogPasswordPlaceholder": "Ton mot de passe actuel",
       "dialogConfirm": "Se connecter",
       "dialogStarting": "Démarrage...",
       "dialogCancel": "Annuler",
       "dialogLoadFailed": "Impossible de charger l'utilisateur",
       "dialogError": "Échec de la connexion en tant qu'utilisateur",
-      "reasonTooShort": "Veuillez indiquer au moins {{min}} caractères comme motif",
-      "passwordRequired": "Veuillez confirmer votre mot de passe",
+      "reasonTooShort": "Indique au moins {{min}} caractères comme motif",
+      "passwordRequired": "Confirme ton mot de passe",
       "bannerLabel": "Connecté en tant que :",
       "bannerTimeRemaining": "Temps restant : {{time}}",
       "bannerReturnButton": "Retour à mon compte",
-      "bannerServerEndFailed": "Retour à votre compte — impossible de confirmer la fermeture de la session côté serveur. Elle expirera automatiquement."
+      "bannerServerEndFailed": "Retour à ton compte — impossible de confirmer la fermeture de la session côté serveur. Elle expirera automatiquement."
     },
     "userEditDialog": {
       "title": "Modifier l'utilisateur",
@@ -559,7 +559,7 @@
       "userLabel": "Utilisateur",
       "currentLabel": "Actuelle",
       "targetLabel": "Institution cible",
-      "targetPlaceholder": "Veuillez choisir…",
+      "targetPlaceholder": "Choisis…",
       "previewLoading": "Chargement de l'aperçu…",
       "transferableHeading": "Artéfacts à transférer",
       "excludedHeading": "Restent dans l'ancienne institution",
@@ -572,7 +572,7 @@
       "submissions": "Soumissions / Tentatives",
       "orgUnitMembershipsWarning": "{{count}} appartenance(s) à une unité organisationnelle seront supprimées (liées à l'institution, sans équivalent dans l'institution cible).",
       "confirmTitle": "Confirmer le transfert",
-      "confirmIntro": "Vous êtes sur le point de déplacer {{user}} de {{source}} → {{target}}.",
+      "confirmIntro": "Tu es sur le point de déplacer {{user}} de {{source}} → {{target}}.",
       "confirmTransferred": "À transférer :",
       "confirmExcluded": "Non transférés :",
       "confirmIrreversible": "Cette action est irréversible.",
@@ -664,7 +664,7 @@
     },
     "roleManagement": {
       "title": "Rôles & Permissions",
-      "subtitle": "Gérez les rôles et leurs affectations de fonctionnalités pour votre équipe."
+      "subtitle": "Gère les rôles et leurs affectations de fonctionnalités pour ton équipe."
     },
     "roleList": {
       "title": "Gestion des rôles",
@@ -685,7 +685,7 @@
     "roleEditor": {
       "titleEdit": "Modifier le rôle : {{name}}",
       "titleCreate": "Créer un nouveau rôle",
-      "systemRoleWarning": "⚠️ Attention : Vous modifiez un rôle système. Les modifications peuvent affecter le fonctionnement de l'application. N'ajoutez ou ne supprimez des fonctionnalités que si vous savez ce que vous faites.",
+      "systemRoleWarning": "⚠️ Attention : tu modifies un rôle système. Les modifications peuvent affecter le fonctionnement de l'application. N'ajoute ou ne supprime des fonctionnalités que si tu sais ce que tu fais.",
       "nameLabel": "Nom du rôle (technique)",
       "namePlaceholder": "ex., custom_reviewer",
       "nameHint": "Lettres minuscules, chiffres et underscores uniquement",
@@ -749,9 +749,9 @@
       "resourceCol": "Ressource",
       "infoNote": "Les limites de ressources sont réinitialisées chaque mois. Illimité signifie aucune restriction.",
       "failedLoad": "Impossible de charger les niveaux d'abonnement",
-      "yourCurrentTier": "Votre niveau actuel",
-      "yourCurrentTierWithName": "Votre niveau actuel : {{tier}}",
-      "highestTierNote": "Votre institution se trouve déjà au niveau le plus élevé disponible. Une comparaison de prix avec d'autres niveaux n'est donc pas pertinente – pour Enterprise, le prix catalogue diffère par ailleurs souvent du prix contractuel négocié individuellement."
+      "yourCurrentTier": "Ton niveau actuel",
+      "yourCurrentTierWithName": "Ton niveau actuel : {{tier}}",
+      "highestTierNote": "Ton institution se trouve déjà au niveau le plus élevé disponible. Une comparaison de prix avec d'autres niveaux n'est donc pas pertinente – pour Enterprise, le prix catalogue diffère par ailleurs souvent du prix contractuel négocié individuellement."
     },
     "promptLibrary": {
       "title": "Base de connaissances de prompts",
@@ -776,11 +776,11 @@
       "btnDelete": "Supprimer",
       "emptyTitle": "Aucun prompt trouvé",
       "emptySearch": "Essayez une autre recherche",
-      "emptyCreate": "Créez votre premier prompt",
+      "emptyCreate": "Crée ton premier prompt",
       "btnCreateFirst": "Créer le premier prompt",
-      "confirmDelete": "Voulez-vous vraiment supprimer ce prompt ?",
-      "confirmDeactivate": "Voulez-vous vraiment désactiver ce prompt ?",
-      "confirmActivate": "Voulez-vous vraiment activer ce prompt ?",
+      "confirmDelete": "Veux-tu vraiment supprimer ce prompt ?",
+      "confirmDeactivate": "Veux-tu vraiment désactiver ce prompt ?",
+      "confirmActivate": "Veux-tu vraiment activer ce prompt ?",
       "failedLoad": "Erreur lors du chargement des prompts",
       "failedDelete": "Erreur lors de la suppression",
       "failedToggle": "Erreur lors du changement de statut",
@@ -839,7 +839,7 @@
       "currentVersion": "Version actuelle : v{{version}}",
       "btnShowVersions": "Afficher les versions",
       "validationRequired": "Le nom, le contenu, la catégorie et le cas d'utilisation sont obligatoires",
-      "useCaseRequired": "Veuillez sélectionner un type de question (cas d'utilisation).",
+      "useCaseRequired": "Sélectionne un type de question (cas d'utilisation).",
       "successUpdated": "Prompt mis à jour avec succès",
       "successVersionCreated": "Nouvelle version v{{version}} créée",
       "successCreated": "Prompt créé avec succès",
@@ -917,7 +917,7 @@
       "resultsTitle": "Résultats de recherche ({{count}})",
       "emptyTitle": "Aucun résultat trouvé",
       "emptySubtitle": "Essayez une autre requête ou ajustez les filtres",
-      "errorEmpty": "Veuillez saisir une requête de recherche",
+      "errorEmpty": "Saisis une requête de recherche",
       "failedSearch": "Erreur de recherche"
     },
     "gradingSchemes": {
@@ -1067,11 +1067,11 @@
       "errorTitle": "Erreur de traitement",
       "errorTooltip": "Type d'erreur : {{code}} · Fichier : {{filename}}",
       "errorMessages": {
-        "legacy_doc_format": "Ancien format Word (.doc) détecté — veuillez enregistrer en .docx et téléverser à nouveau.",
+        "legacy_doc_format": "Ancien format Word (.doc) détecté — enregistre en .docx et téléverse à nouveau.",
         "empty_document": "Aucun contenu extractible trouvé. Le fichier peut ne contenir que des images ou être vide.",
-        "binary_content": "Le fichier ne semble pas être du texte. Veuillez vérifier le format.",
+        "binary_content": "Le fichier ne semble pas être du texte. Vérifie le format.",
         "unsupported_format": "Format non pris en charge. Autorisés : .pdf, .doc, .docx, .txt, .md.",
-        "vectorization_failed": "Échec de la vectorisation. Veuillez réessayer plus tard ou contacter le support.",
+        "vectorization_failed": "Échec de la vectorisation. Réessaie plus tard ou contacte le support.",
         "file_corrupt": "Impossible d'ouvrir le fichier — il est peut-être corrompu.",
         "unknown_error": "Erreur de traitement inattendue. Voir l'aperçu pour les détails."
       },
@@ -1107,7 +1107,7 @@
       "menuProcessing": "Traitement en cours...",
       "menuDelete": "Supprimer",
       "deleteTitle": "Supprimer le document",
-      "deleteConfirm": "Voulez-vous vraiment supprimer le document \"{{title}}\" ? Cette action ne peut pas être annulée.",
+      "deleteConfirm": "Veux-tu vraiment supprimer le document \"{{title}}\" ? Cette action ne peut pas être annulée.",
       "cancel": "Annuler",
       "delete": "Supprimer",
       "close": "Fermer",
@@ -1117,9 +1117,9 @@
       "tabChunks": "Chunks",
       "originalLoading": "Chargement de l'original…",
       "originalError": "Impossible de charger l'original : {{error}}",
-      "originalErrorNetwork": "Erreur réseau — vérifiez votre connexion et réessayez.",
-      "originalErrorAuth": "Session expirée — veuillez vous reconnecter.",
-      "originalErrorPermission": "Vous n'avez pas l'autorisation de consulter ce document.",
+      "originalErrorNetwork": "Erreur réseau — vérifie ta connexion et réessaie.",
+      "originalErrorAuth": "Session expirée — reconnecte-toi.",
+      "originalErrorPermission": "Tu n'as pas l'autorisation de consulter ce document.",
       "originalErrorMissing": "Fichier original introuvable — il a peut-être été supprimé.",
       "originalErrorThrottled": "Service de stockage saturé — réessayez dans quelques secondes.",
       "originalErrorServer": "Erreur serveur lors du chargement de l'aperçu — réessayez ou téléchargez le fichier.",
@@ -1230,7 +1230,7 @@
         "delete": "Supprimer",
         "deleteConfirmButton": "Supprimer",
         "deleteTitle": "Supprimer des documents",
-        "deleteConfirm": "Voulez-vous vraiment supprimer {{count}} document(s) ?",
+        "deleteConfirm": "Veux-tu vraiment supprimer {{count}} document(s) ?",
         "deleteSummary": "{{deleted}} document(s) supprimé(s)",
         "deleteSummaryWithErrors": "{{deleted}} document(s) supprimé(s), {{failed}} échoué(s)",
         "visibilitySummary": "{{changed}} sur {{total}} modifié(s), {{skipped}} ignoré(s)",
@@ -1281,7 +1281,7 @@
       "visibilityPrivate": "Privé — moi seul peux voir ce document",
       "visibilityTeam": "Équipe — seuls les membres de mon Org-Unit peuvent voir ce document",
       "visibilityNoOrgUnit": "Aucune Org-Unit attribuée",
-      "orgUnitsLoadError": "Impossible de charger vos équipes. Veuillez réessayer plus tard.",
+      "orgUnitsLoadError": "Impossible de charger tes équipes. Réessaie plus tard.",
       "orgUnitPickerPlaceholder": "Sélectionner une Org-Unit…",
       "visibilityInstitution": "Institution — tous les membres de {{institution}} peuvent voir ce document",
       "visibilityNoInstitution": "Aucune institution attribuée"
@@ -1291,7 +1291,7 @@
       "private": "Privé — moi seul",
       "team": "Équipe — mon Org-Unit uniquement",
       "noOrgUnit": "Aucune Org-Unit attribuée",
-      "orgUnitsLoadError": "Impossible de charger vos équipes. Veuillez réessayer plus tard.",
+      "orgUnitsLoadError": "Impossible de charger tes équipes. Réessaie plus tard.",
       "orgUnitPickerPlaceholder": "Sélectionner une Org-Unit…",
       "institution": "Institution — tous les membres de {{institution}}",
       "noInstitution": "Aucune institution attribuée",
@@ -1300,7 +1300,7 @@
       "saveError": "Impossible de modifier la visibilité"
     },
     "documentPrivacyBanner": {
-      "message": "ExamCraft a amélioré son modèle de visibilité : les documents que vous avez téléchargés jusqu'à présent ne sont désormais visibles que par vous. Si vous souhaitez partager des documents avec votre institution, vous pouvez les modifier individuellement dans la bibliothèque."
+      "message": "ExamCraft a amélioré son modèle de visibilité : les documents que tu as téléchargés jusqu'à présent ne sont désormais visibles que par toi. Si tu souhaites partager des documents avec ton institution, tu peux les modifier individuellement dans la bibliothèque."
     },
     "reviewQueue": {
       "title": "File de révision des questions",
@@ -1328,7 +1328,7 @@
       "filterOpenEnded": "Question ouverte",
       "filterTrueFalse": "Vrai/Faux",
       "refresh": "Actualiser",
-      "noQuestions": "Aucune question trouvée correspondant à vos filtres.",
+      "noQuestions": "Aucune question trouvée correspondant à tes filtres.",
       "addComment": "Ajouter un commentaire",
       "commentLabel": "Commentaire",
       "cancelBtn": "Annuler",
@@ -1414,7 +1414,7 @@
       "singleChoice": "Choix simple",
       "multipleResponse": "Choix multiple",
       "openQuestion": "Question ouverte",
-      "answerPlaceholder": "Saisissez votre réponse ici...",
+      "answerPlaceholder": "Saisis ta réponse ici...",
       "explanation": "Explication",
       "examId": "ID de l'examen : {{id}}",
       "created": "Créé : {{date}}",
@@ -1451,23 +1451,23 @@
       "bloomLevel": "Niveau de la taxonomie de Bloom",
       "bloomNotSpecified": "Non spécifié",
       "estimatedTime": "Temps estimé (minutes)",
-      "unsavedChanges": "Vous avez des modifications non enregistrées",
-      "unsavedConfirm": "Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir annuler ?",
+      "unsavedChanges": "Tu as des modifications non enregistrées",
+      "unsavedConfirm": "Tu as des modifications non enregistrées. Es-tu sûr de vouloir annuler ?",
       "cancel": "Annuler",
       "saveChanges": "Enregistrer les modifications",
       "validationQuestionLength": "Le texte de la question doit contenir au moins 10 caractères",
       "validationMinOptions": "Les questions à choix multiple nécessitent au moins 2 options",
-      "validationSelectAnswer": "Veuillez sélectionner une réponse correcte",
+      "validationSelectAnswer": "Sélectionne une réponse correcte",
       "validationAnswerInOptions": "La réponse correcte doit être l'une des options",
       "tagCreateError": "Certains tags n'ont pas pu être créés : {{names}}",
-      "saveError": "Échec de l'enregistrement. Veuillez réessayer."
+      "saveError": "Échec de l'enregistrement. Réessaie."
     },
     "errorBoundary": {
       "title": "Une erreur s'est produite",
       "message": "Désolé, une erreur inattendue s'est produite. Nous avons été automatiquement informés et allons résoudre le problème.",
       "retry": "Réessayer",
       "home": "Aller à l'accueil",
-      "support": "Si le problème persiste, veuillez contacter le support."
+      "support": "Si le problème persiste, contacte le support."
     },
     "cards": {
       "open": "Ouvrir →"
@@ -1475,7 +1475,7 @@
     "basicExamCreator": {
       "title": "Générer des questions d'examen",
       "subtitle": "Créez des questions d'examen basées sur un sujet",
-      "topicRequired": "Veuillez saisir un sujet",
+      "topicRequired": "Saisis un sujet",
       "generationError": "Erreur lors de la génération",
       "successMessage": "Questions d'examen générées avec succès !",
       "topicLabel": "Sujet",
@@ -1501,8 +1501,8 @@
     },
     "ragExamCreator": {
       "premiumTitle": "RAG Exam Creator - Fonctionnalité Premium",
-      "premiumDescription": "La fonctionnalité RAG Exam Creator est disponible dans le package Premium. Cette fonctionnalité vous permet de générer automatiquement des questions d'examen à partir de vos documents grâce à la RAG (Retrieval-Augmented Generation) alimentée par l'IA.",
-      "premiumUpgrade": "Pour accéder à cette fonctionnalité, veuillez passer au plan Starter, Professional ou Enterprise.",
+      "premiumDescription": "La fonctionnalité RAG Exam Creator est disponible dans le package Premium. Cette fonctionnalité te permet de générer automatiquement des questions d'examen à partir de tes documents grâce à la RAG (Retrieval-Augmented Generation) alimentée par l'IA.",
+      "premiumUpgrade": "Pour accéder à cette fonctionnalité, passe au plan Starter, Professional ou Enterprise.",
       "back": "Retour",
       "viewPlans": "Voir les plans Premium"
     }
@@ -1524,14 +1524,14 @@
       "closeError": "Fermer l'erreur",
       "searchPlaceholder": "Rechercher des examens...",
       "loading": "Chargement des examens...",
-      "loadError": "Erreur lors du chargement des examens. Veuillez recharger la page.",
+      "loadError": "Erreur lors du chargement des examens. Recharge la page.",
       "empty": "Aucun examen créé. Cliquez sur \"Nouvel examen\" pour commencer.",
       "statusDraft": "Brouillon",
       "statusFinalized": "Finalisé",
       "statusExported": "Exporté",
       "questionCount": "{{count}} questions",
       "pointsCount": "{{count}} points",
-      "confirmDelete": "Voulez-vous vraiment supprimer cet examen ?",
+      "confirmDelete": "Veux-tu vraiment supprimer cet examen ?",
       "delete": "Supprimer",
       "dialogTitle": "Créer un nouvel examen",
       "fieldTitle": "Titre",
@@ -1545,21 +1545,21 @@
       "cancel": "Annuler",
       "creating": "Création...",
       "create": "Créer",
-      "errorCreate": "Impossible de créer l'examen. Veuillez réessayer.",
-      "errorDelete": "Impossible de supprimer l'examen. Veuillez réessayer.",
+      "errorCreate": "Impossible de créer l'examen. Réessaie.",
+      "errorDelete": "Impossible de supprimer l'examen. Réessaie.",
       "deleteDialogTitle": "Supprimer l'examen",
       "deleteDialogMessage": "Cet examen sera définitivement supprimé.",
       "showArchived": "Afficher les archivés",
       "archivedBadge": "Archivé",
       "archive": "Archiver",
       "restore": "Restaurer",
-      "deleteNoPermission": "Vous n'avez pas l'autorisation de supprimer",
+      "deleteNoPermission": "Tu n'as pas l'autorisation de supprimer",
       "deleteExported": "Les examens exportés ne peuvent pas être supprimés",
       "deleteHasSubmissions": "Un examen avec des soumissions ne peut pas être supprimé",
       "errorArchive": "Échec de l'archivage de l'examen",
       "errorRestore": "Échec de la restauration de l'examen",
       "archiveDialogTitle": "Archiver l'examen ?",
-      "archiveDialogMessage": "L'examen sera masqué de la vue active. Vous pouvez le restaurer à tout moment.",
+      "archiveDialogMessage": "L'examen sera masqué de la vue active. Tu peux le restaurer à tout moment.",
       "archiveReasonLabel": "Motif (facultatif)"
     },
     "examMetadata": {
@@ -1587,9 +1587,9 @@
       "cancel": "Annuler",
       "saving": "Enregistrement...",
       "save": "Enregistrer",
-      "errorSave": "Erreur lors de l'enregistrement. Veuillez recharger la page et réessayer.",
-      "errorFinalize": "La finalisation a échoué. Veuillez réessayer.",
-      "errorUnfinalize": "L'annulation a échoué. Veuillez réessayer.",
+      "errorSave": "Erreur lors de l'enregistrement. Recharge la page et réessaie.",
+      "errorFinalize": "La finalisation a échoué. Réessaie.",
+      "errorUnfinalize": "L'annulation a échoué. Réessaie.",
       "archivedBadge": "Archivé",
       "archive": "Archiver",
       "restore": "Restaurer",
@@ -1626,7 +1626,7 @@
       "cancel": "Annuler",
       "exporting": "Exportation...",
       "download": "Télécharger",
-      "errorExport": "L'exportation a échoué. Veuillez réessayer."
+      "errorExport": "L'exportation a échoué. Réessaie."
     },
     "questionPool": {
       "panelTitle": "Pool de questions",
@@ -1687,7 +1687,7 @@
       "compositionFailed": "Composition échouée.",
       "targetPointsRequired": "Les points cibles doivent être un nombre positif.",
       "targetDurationRequired": "La durée cible doit être un nombre positif.",
-      "noConstraints": "Veuillez fournir au moins des points cibles, une durée cible ou une distribution.",
+      "noConstraints": "Fournis au moins des points cibles, une durée cible ou une distribution.",
       "back": "Retour",
       "accept": "Accepter",
       "accepting": "Ajout en cours...",
@@ -1736,7 +1736,7 @@
   "profile": {
     "profilePage": {
       "title": "Mon profil",
-      "subtitle": "Gérez les paramètres et préférences de votre compte",
+      "subtitle": "Gère les paramètres et préférences de ton compte",
       "tabProfile": "Profil",
       "tabEdit": "Modifier le profil",
       "tabPassword": "Changer le mot de passe"
@@ -1759,20 +1759,21 @@
       "permissions": "Permissions",
       "settings": "Paramètres",
       "language": "Langue",
-      "languageHint": "Change la langue de toute l'application"
+      "languageHint": "Change la langue de toute l'application",
+      "languageSaveFailed": "La langue s'applique dans ce navigateur, mais n'a pas pu être enregistrée dans ton compte. Tes autres appareils ne la reprennent pas encore."
     },
     "profileEdit": {
       "header": "Modifier le profil",
       "firstName": "Prénom *",
       "lastName": "Nom de famille *",
       "emailAddress": "Adresse e-mail *",
-      "emailHint": "Changer votre e-mail peut nécessiter une vérification",
+      "emailHint": "Changer ton e-mail peut nécessiter une vérification",
       "readOnlyHeader": "Informations du compte (lecture seule)",
       "institution": "Institution",
       "accountStatus": "Statut du compte",
       "na": "N/D",
-      "validationRequired": "Veuillez remplir tous les champs obligatoires",
-      "validationEmail": "Veuillez saisir une adresse e-mail valide",
+      "validationRequired": "Remplis tous les champs obligatoires",
+      "validationEmail": "Saisis une adresse e-mail valide",
       "cancel": "Annuler",
       "saving": "Enregistrement...",
       "saveChanges": "Enregistrer les modifications"
@@ -1780,15 +1781,15 @@
     "passwordChange": {
       "headerSet": "Définir un mot de passe",
       "headerChange": "Changer le mot de passe",
-      "oauthInfo": "Vous êtes actuellement connecté via {{provider}}. Définissez un mot de passe pour activer la connexion par e-mail/mot de passe.",
-      "validationFillAll": "Veuillez remplir tous les champs",
+      "oauthInfo": "Tu es actuellement connecté via {{provider}}. Définis un mot de passe pour activer la connexion par e-mail/mot de passe.",
+      "validationFillAll": "Remplis tous les champs",
       "validationMismatch": "Les nouveaux mots de passe ne correspondent pas",
       "validationMinLength": "Le nouveau mot de passe doit contenir au moins 8 caractères",
       "validationSamePassword": "Le nouveau mot de passe doit être différent du mot de passe actuel",
       "successSetTitle": "Mot de passe défini avec succès",
       "successChangeTitle": "Mot de passe changé avec succès",
-      "successSetMessage": "Votre mot de passe a été défini. Vous pouvez maintenant vous connecter avec votre e-mail et votre mot de passe.",
-      "successChangeMessage": "Votre mot de passe a été mis à jour. Vous pouvez maintenant utiliser votre nouveau mot de passe pour vous connecter.",
+      "successSetMessage": "Ton mot de passe a été défini. Tu peux maintenant te connecter avec ton e-mail et ton mot de passe.",
+      "successChangeMessage": "Ton mot de passe a été mis à jour. Tu peux maintenant utiliser ton nouveau mot de passe pour te connecter.",
       "currentPassword": "Mot de passe actuel *",
       "newPassword": "Nouveau mot de passe *",
       "passwordHint": "Minimum 8 caractères",
@@ -1841,13 +1842,13 @@
     "loading": "Chargement...",
     "unauthorized": {
       "title": "Accès refusé",
-      "message": "Vous n'avez pas l'autorisation d'accéder à cette page.",
+      "message": "Tu n'as pas l'autorisation d'accéder à cette page.",
       "attemptedAccess": "Tentative d'accès à :",
       "currentUser": "Utilisateur actuel :",
       "roles": "Rôles :",
       "goBack": "Retour",
       "goToDashboard": "Aller au tableau de bord",
-      "helpText": "Si vous pensez qu'il s'agit d'une erreur, veuillez contacter votre administrateur."
+      "helpText": "Si tu penses qu'il s'agit d'une erreur, contacte ton administrateur."
     }
   },
   "layout": {
@@ -1918,7 +1919,7 @@
       "back": "Retour",
       "next": "Suivant",
       "errorLoadingData": "Erreur lors du chargement des données",
-      "errorTopicAndDocument": "Veuillez entrer un sujet et sélectionner au moins un document.",
+      "errorTopicAndDocument": "Entre un sujet et sélectionne au moins un document.",
       "errorContextPreview": "Erreur lors de l'analyse du contexte",
       "errorExamGeneration": "Erreur lors de la création de l'examen",
       "runningGenerations": "Générations en cours",
@@ -1932,8 +1933,8 @@
       "quickRepeat": "Répétition rapide",
       "step1Label": "Sélectionner les documents",
       "step1Description": "Sélectionnez les documents à partir desquels les questions d'examen doivent être générées.",
-      "noDocuments": "Aucun document traité disponible. Veuillez d'abord télécharger des documents et les faire traiter.",
-      "staleRestoredDocs": "{{count}} document(s) restauré(s) ne sont plus disponibles (p. ex. supprimés) et ont été retirés de la sélection. Veuillez compléter la sélection si nécessaire.",
+      "noDocuments": "Aucun document traité disponible. Télécharge d'abord des documents et fais-les traiter.",
+      "staleRestoredDocs": "{{count}} document(s) restauré(s) ne sont plus disponibles (p. ex. supprimés) et ont été retirés de la sélection. Complète la sélection si nécessaire.",
       "textChunks": "{{count}} passages de texte",
       "step2Label": "Configurer les paramètres d'examen",
       "topicLabel": "Sujet de l'examen",
@@ -1972,13 +1973,13 @@
       "tagsLabel": "Tags (optionnel)",
       "competencyFrameworkLabel": "Competency framework / module (optional)",
       "competencyFrameworkNone": "No module",
-      "frameworkRestoreFailed": "Le référentiel de compétences précédemment sélectionné n'est plus disponible (p. ex. archivé). Veuillez le sélectionner à nouveau si nécessaire.",
+      "frameworkRestoreFailed": "Le référentiel de compétences précédemment sélectionné n'est plus disponible (p. ex. archivé). Sélectionne-le à nouveau si nécessaire.",
       "competenciesOverrideLabel": "Competencies (editable)",
       "competenciesOverrideHelper": "Injected verbatim as {{ competencies }} into generation.",
-      "restoredStateNotice": "Votre dernière configuration a été restaurée.",
+      "restoredStateNotice": "Ta dernière configuration a été restaurée.",
       "discardRestoredState": "Recommencer",
       "dismissNotice": "Fermer l'avis",
-      "reviewQueueHint": "Les questions générées arrivent automatiquement dans la file de révision. Vous pouvez quitter cette page pendant la génération — elle se poursuit en arrière-plan.",
+      "reviewQueueHint": "Les questions générées arrivent automatiquement dans la file de révision. Tu peux quitter cette page pendant la génération — elle se poursuit en arrière-plan.",
       "restoredStateDocsReplaced": "Nouvelle sélection de documents appliquée — le reste de la configuration a été réinitialisé.",
       "restorePreviousConfig": "Reprendre la configuration précédente",
       "stepGoTo": "Aller à l'étape {{number}} : {{label}}",
@@ -2006,9 +2007,9 @@
     },
     "documentChat": {
       "title": "ChatBot Documents",
-      "subtitle": "Posez des questions sur vos documents téléchargés",
-      "yourSessions": "Vos sessions de chat",
-      "noSessions": "Aucune session de chat. Créez une nouvelle session pour discuter avec vos documents.",
+      "subtitle": "Pose des questions sur tes documents téléchargés",
+      "yourSessions": "Tes sessions de chat",
+      "noSessions": "Aucune session de chat. Crée une nouvelle session pour discuter avec tes documents.",
       "newSession": "Nouvelle session",
       "minutesAgo": "Il y a {{count}} min",
       "hoursAgo": "Il y a {{count}} h",
@@ -2016,24 +2017,24 @@
       "errorCreatingSession": "Erreur lors de la création de la session",
       "errorLoadingSession": "Erreur lors du chargement de la session",
       "errorLoadingSessions": "Erreur lors du chargement des sessions",
-      "confirmDeleteSession": "Voulez-vous vraiment supprimer cette session de chat ?",
+      "confirmDeleteSession": "Veux-tu vraiment supprimer cette session de chat ?",
       "deleteChat": "Supprimer le chat",
       "errorDeletingSession": "Erreur lors de la suppression de la session",
       "newChat": "Nouveau chat",
-      "noSessionsHint": "Commencez un nouveau chat pour interagir avec vos documents."
+      "noSessionsHint": "Commence un nouveau chat pour interagir avec tes documents."
     },
     "chatInterface": {
-      "errorSending": "Erreur lors de l'envoi du message. Veuillez réessayer.",
+      "errorSending": "Erreur lors de l'envoi du message. Réessaie.",
       "errorExporting": "Erreur lors de l'exportation",
       "exportChat": "Exporter le chat",
       "exportAsMarkdown": "Exporter en Markdown",
       "exportAsJson": "Exporter en JSON",
       "cancel": "Annuler",
       "thinking": "Réflexion en cours...",
-      "placeholder": "Posez une question sur vos documents...",
+      "placeholder": "Pose une question sur tes documents...",
       "sources": "Sources",
       "confidence": "Confiance",
-      "errorNoToken": "Session expirée. Veuillez vous reconnecter.",
+      "errorNoToken": "Session expirée. Reconnecte-toi.",
       "copy": "Copier",
       "copied": "Copié !",
       "document": "Document",
@@ -2068,16 +2069,16 @@
         "errorLoadingSession": "Erreur lors du chargement de la session",
         "errorCreatingSession": "Erreur lors de la création de la session",
         "errorDeleting": "Erreur lors de la suppression",
-        "confirmDelete": "Voulez-vous vraiment supprimer cette session de l'assistant ?",
+        "confirmDelete": "Veux-tu vraiment supprimer cette session de l'assistant ?",
         "selectOrCreateSession": "Sélectionnez une session ou créez-en une nouvelle."
       },
       "chat": {
-        "sessionExpired": "Session expirée. Veuillez vous reconnecter.",
+        "sessionExpired": "Session expirée. Reconnecte-toi.",
         "errorSending": "Erreur lors de l'envoi du message",
         "errorGenerating": "Erreur lors de la génération du template",
         "generateTemplate": "Générer le template",
         "generating": "Génération du template...",
-        "placeholder": "Décrivez ce que votre prompt doit faire...",
+        "placeholder": "Décris ce que ton prompt doit faire...",
         "templateSaved": "Le template a été enregistré"
       },
       "sessionList": {
@@ -2094,7 +2095,7 @@
       },
       "newSession": {
         "title": "Nouvelle session de l'assistant",
-        "description": "Démarrez une nouvelle création de prompt assistée par IA. Vous pouvez optionnellement sélectionner un template existant comme référence.",
+        "description": "Démarre une nouvelle création de prompt assistée par IA. Tu peux optionnellement sélectionner un template existant comme référence.",
         "referenceLabel": "Template de référence (optionnel)",
         "noReference": "Démarrer sans référence",
         "cancel": "Annuler",
@@ -2103,7 +2104,7 @@
       "templatePreview": {
         "generatedTemplate": "Template généré",
         "templateName": "Nom du template",
-        "enterName": "Veuillez entrer un nom",
+        "enterName": "Entre un nom",
         "generatedViaAI": "Généré via l'assistant IA",
         "addTag": "Ajouter un tag...",
         "editInEditor": "Modifier dans l'éditeur",
@@ -2114,7 +2115,7 @@
     "prompts": {
       "library": {
         "title": "Bibliothèque de prompts",
-        "description": "Gérez vos modèles de prompts et téléchargez de nouveaux prompts.",
+        "description": "Gère tes modèles de prompts et télécharge de nouveaux prompts.",
         "tabPromptList": "Liste des prompts",
         "tabFileUpload": "Téléchargement de fichiers",
         "tabAIAssistant": "Assistant IA"
@@ -2133,7 +2134,7 @@
         "typeTrueFalse": "Vrai/Faux",
         "loadingPrompts": "Chargement des prompts pour {{type}}...",
         "errorLoading": "Erreur lors du chargement des prompts : {{message}}",
-        "noPromptsAvailable": "Aucun prompt disponible pour {{type}}. Veuillez d'abord créer un prompt dans la bibliothèque.",
+        "noPromptsAvailable": "Aucun prompt disponible pour {{type}}. Crée d'abord un prompt dans la bibliothèque.",
         "promptTemplateFor": "Template de prompt pour {{type}}",
         "useDefault": "Utiliser le prompt par défaut",
         "errorRendering": "Erreur lors du rendu de l'aperçu",
@@ -2158,13 +2159,13 @@
         "duplicateDialogTitle": "Les modèles existent déjà",
         "duplicateWarning": "Les modèles suivants existent déjà :",
         "currentVersion": "Version actuelle : {{version}} — Fichier : {{filename}}",
-        "duplicateQuestion": "Souhaitez-vous mettre à jour les modèles existants comme nouvelle version ?",
+        "duplicateQuestion": "Souhaites-tu mettre à jour les modèles existants comme nouvelle version ?",
         "cancel": "Annuler",
         "saveAsNewVersion": "Enregistrer comme nouvelle version",
         "hideExample": "Masquer l'exemple",
         "showExample": "Afficher l'exemple de format de fichier",
         "exampleTitle": "Exemple : my_prompt.md",
-        "uploadFailed": "Échec du téléchargement. Veuillez réessayer.",
+        "uploadFailed": "Échec du téléchargement. Réessaie.",
         "maxFilesExceeded": "Maximum 50 fichiers autorisés"
       },
       "variablesEditor": {
@@ -2173,7 +2174,282 @@
     }
   },
   "help": {
-    "thinking": "Réflexion en cours…"
+    "thinking": "Réflexion en cours…",
+    "catchUp": {
+      "message": "De nouvelles pages ont été débloquées — veux-tu rattraper la visite correspondante ?",
+      "button": "Explorer maintenant"
+    },
+    "tracks": {
+      "title": "Approfondissements",
+      "intro": "Courtes visites de domaines particuliers — aucune n'est obligatoire.",
+      "start": "Démarrer",
+      "resume": "Reprendre",
+      "restart": "Refaire",
+      "done": "Terminé",
+      "new": "Nouveau"
+    },
+    "tabs": {
+      "tours": "Visites",
+      "chat": "Chat"
+    },
+    "onboarding": {
+      "closeTour": "Quitter la visite",
+      "coreTourTitle": "Visite d'introduction",
+      "coreTourReplayHint": "Revoir les bases une nouvelle fois.",
+      "skip": "Ignorer",
+      "next": "Suivant",
+      "finish": "Terminé",
+      "resume": "Reprendre plus tard",
+      "later": "Plus tard",
+      "startTour": "Démarrer la visite",
+      "resumeButton": "Reprendre la visite",
+      "resumeText": "Tu n'as pas encore terminé la visite d'introduction.",
+      "confirmEndTitle": "Quitter la visite ?",
+      "confirmEndText": "Tu pourras relancer la visite plus tard via le bouton d'aide en bas à droite.",
+      "confirmEndCancel": "Annuler",
+      "confirmEndConfirm": "Oui, quitter",
+      "completedTitle": "🎉 Visite terminée !",
+      "completedText": "Tu peux ouvrir le widget d'aide à tout moment via le bouton en bas à droite."
+    },
+    "tour": {
+      "teacher": {
+        "core": {
+          "0": {
+            "title": "Bienvenue dans ExamCraft AI !",
+            "description": "Je te montre en quelques étapes comment créer ton premier examen. Clique sur « Démarrer la visite » pour une introduction guidée."
+          },
+          "1": {
+            "title": "Tableau de bord",
+            "description": "Voici ton tableau de bord personnel. Tu y trouves des accès rapides à toutes les fonctions importantes et un aperçu de tes activités."
+          },
+          "2": {
+            "title": "Téléverser un document",
+            "description": "Téléverse ton matériel de cours en PDF, Word ou Markdown. Fais simplement glisser le fichier dans la zone de dépôt ou clique dessus."
+          },
+          "3": {
+            "title": "Bibliothèque de documents",
+            "description": "Tu vois ici tous les documents téléversés. Sélectionne-en un ou plusieurs pour en générer des questions d'examen."
+          },
+          "4": {
+            "title": "Créer un examen",
+            "description": "Choisis le niveau de difficulté, le nombre de questions et le format — l'IA génère des questions adaptées à partir de tes documents."
+          },
+          "5": {
+            "title": "Relire et exporter les questions",
+            "description": "Vérifie les questions générées, évalue-les et exporte l'examen terminé en PDF ou en Moodle XML."
+          },
+          "6": {
+            "title": "Bibliothèque de prompts",
+            "description": "Tu gères ici les modèles avec lesquels l'IA formule les questions. Adapte-les à ton style d'enseignement."
+          },
+          "7": {
+            "title": "C'est prêt !",
+            "description": "Tu connais maintenant le chemin du document à l'examen terminé. Dans le widget d'aide en bas à droite t'attendent de courts approfondissements sur les évaluations, le compositeur d'examen et d'autres domaines — à démarrer quand tu veux, aucun n'est obligatoire."
+          }
+        },
+        "tracks": {
+          "auswertungen": {
+            "title": "Évaluations",
+            "description": "Analyser les résultats d'examen, les classes et chaque étudiant.",
+            "steps": {
+              "0": {
+                "title": "Évaluation des examens",
+                "description": "Tous les examens de ton institution figurent ici. Un examen apparaît dans cette liste dès que tu l'as créé dans le compositeur d'examen. Sur chaque ligne, tu importes ensuite les résultats via « Importer les résultats » — ce n'est qu'après que tu obtiens la moyenne, le taux d'échec et l'analyse question par question."
+              },
+              "1": {
+                "title": "Classes",
+                "description": "Les classes regroupent les étudiants sur plusieurs examens. Elles se créent lors de l'import d'un examen, ou tu les ajoutes ici à la main via « Créer une classe » — tu vois ensuite l'évolution des résultats de toute la classe."
+              },
+              "2": {
+                "title": "Étudiants",
+                "description": "La vue individuelle par étudiant : tous les résultats d'examen, les points forts et les lacunes en un coup d'œil. Les étudiants sont créés automatiquement dès que tu importes des résultats — tu n'as pas à les saisir à la main."
+              }
+            }
+          },
+          "exam-composer": {
+            "title": "Composer des examens",
+            "description": "Construire un examen sur mesure à partir de questions relues.",
+            "steps": {
+              "0": {
+                "title": "Compositeur d'examen",
+                "description": "Plutôt que de faire générer un examen complet, tu le composes ici toi-même à partir de questions déjà relues — c'est toi qui décides de l'ordre, des points et de la pondération."
+              }
+            }
+          },
+          "werkzeuge": {
+            "title": "Outils",
+            "description": "Chat de documents et journal d'activité.",
+            "steps": {
+              "0": {
+                "title": "Chat de documents",
+                "description": "Pose tes questions directement à tes documents téléversés. Utile pour vérifier la matière avant d'en générer des questions."
+              },
+              "1": {
+                "title": "Activité",
+                "description": "Le journal de toutes les opérations de ton compte — téléversements, générations, exports. Pratique pour retracer ce qui s'est passé et quand."
+              }
+            }
+          },
+          "einstellungen": {
+            "title": "Paramètres",
+            "description": "Tags et référentiels de compétences pour tes questions.",
+            "steps": {
+              "0": {
+                "title": "Gestion des tags",
+                "description": "Les tags te permettent de classer les questions par thème, chapitre ou objectif d'apprentissage. Des tags bien tenus rendent le compositeur d'examen nettement plus rapide."
+              },
+              "1": {
+                "title": "Référentiels de compétences",
+                "description": "Enregistre le référentiel de compétences de ton plan d'études. L'IA aligne ensuite les questions générées sur les niveaux d'objectifs définis."
+              }
+            }
+          }
+        }
+      },
+      "admin": {
+        "core": {
+          "0": {
+            "title": "Bienvenue, administrateur !",
+            "description": "Je te montre en quelques étapes le chemin du document à l'examen terminé. Les domaines d'administration suivent ensuite sous forme d'approfondissements distincts."
+          },
+          "1": {
+            "title": "Tableau de bord",
+            "description": "Voici ton tableau de bord personnel. Tu y trouves des accès rapides à toutes les fonctions importantes et un aperçu de tes activités."
+          },
+          "2": {
+            "title": "Téléverser un document",
+            "description": "Téléverse ton matériel de cours en PDF, Word ou Markdown. Fais simplement glisser le fichier dans la zone de dépôt ou clique dessus."
+          },
+          "3": {
+            "title": "Bibliothèque de documents",
+            "description": "Tu vois ici tous les documents téléversés. Sélectionne-en un ou plusieurs pour en générer des questions d'examen."
+          },
+          "4": {
+            "title": "Créer un examen",
+            "description": "Choisis le niveau de difficulté, le nombre de questions et le format — l'IA génère des questions adaptées à partir de tes documents."
+          },
+          "5": {
+            "title": "Relire et exporter les questions",
+            "description": "Vérifie les questions générées, évalue-les et exporte l'examen terminé en PDF ou en Moodle XML."
+          },
+          "6": {
+            "title": "Bibliothèque de prompts",
+            "description": "Tu gères ici les modèles avec lesquels l'IA formule les questions. Adapte-les au style d'enseignement de ton institution."
+          },
+          "7": {
+            "title": "C'est prêt !",
+            "description": "Tu connais maintenant le chemin du document à l'examen terminé. Dans le widget d'aide en bas à droite t'attendent de courts approfondissements sur les évaluations, la gestion des utilisateurs, la connexion Moodle et d'autres domaines — à démarrer quand tu veux, aucun n'est obligatoire."
+          }
+        },
+        "tracks": {
+          "auswertungen": {
+            "title": "Évaluations",
+            "description": "Analyser les résultats d'examen, les classes et chaque étudiant.",
+            "steps": {
+              "0": {
+                "title": "Évaluation des examens",
+                "description": "Tous les examens de ton institution figurent ici. Un examen apparaît dans cette liste dès que tu l'as créé dans le compositeur d'examen. Sur chaque ligne, tu importes ensuite les résultats via « Importer les résultats » — ce n'est qu'après que tu obtiens la moyenne, le taux d'échec et l'analyse question par question."
+              },
+              "1": {
+                "title": "Classes",
+                "description": "Les classes regroupent les étudiants sur plusieurs examens. Elles se créent lors de l'import d'un examen, ou tu les ajoutes ici à la main via « Créer une classe » — tu vois ensuite l'évolution des résultats de toute la classe."
+              },
+              "2": {
+                "title": "Étudiants",
+                "description": "La vue individuelle par étudiant : tous les résultats d'examen, les points forts et les lacunes en un coup d'œil. Les étudiants sont créés automatiquement dès que tu importes des résultats — tu n'as pas à les saisir à la main."
+              }
+            }
+          },
+          "exam-composer": {
+            "title": "Composer des examens",
+            "description": "Construire un examen sur mesure à partir de questions relues.",
+            "steps": {
+              "0": {
+                "title": "Compositeur d'examen",
+                "description": "Plutôt que de faire générer un examen complet, tu le composes ici toi-même à partir de questions déjà relues — c'est toi qui décides de l'ordre, des points et de la pondération."
+              }
+            }
+          },
+          "werkzeuge": {
+            "title": "Outils",
+            "description": "Chat de documents et journal d'activité.",
+            "steps": {
+              "0": {
+                "title": "Chat de documents",
+                "description": "Pose tes questions directement aux documents téléversés. Utile pour vérifier la matière avant d'en générer des questions."
+              },
+              "1": {
+                "title": "Activité",
+                "description": "Le journal de toutes les opérations — téléversements, générations, exports. Pratique pour retracer ce qui s'est passé et quand."
+              }
+            }
+          },
+          "admin-benutzer": {
+            "title": "Utilisateurs et droits",
+            "description": "Gestion des utilisateurs, institutions et rôles dans le panneau d'administration.",
+            "steps": {
+              "0": {
+                "title": "Gestion des utilisateurs",
+                "description": "Tu crées ici les comptes, attribues les rôles et désactives les utilisateurs qui ont quitté l'institution."
+              },
+              "1": {
+                "title": "Institutions",
+                "description": "Les institutions regroupent utilisateurs, documents et abonnement. Chaque utilisateur appartient à exactement une institution."
+              },
+              "2": {
+                "title": "Rôles et permissions",
+                "description": "Les rôles déterminent quelles fonctions une personne voit. Les permissions sont regroupées ici plutôt qu'attribuées personne par personne."
+              }
+            }
+          },
+          "admin-betrieb": {
+            "title": "Exploitation et intégrations",
+            "description": "Journaux d'audit, abonnement et connexion Moodle.",
+            "steps": {
+              "0": {
+                "title": "Journaux d'audit",
+                "description": "Chaque action touchant à la sécurité est consignée ici — qui a modifié quoi, et quand."
+              },
+              "1": {
+                "title": "Abonnement",
+                "description": "Le tarif, les quotas et les factures de ton institution. Le tarif détermine quelles fonctions sont débloquées."
+              },
+              "2": {
+                "title": "Connexion Moodle",
+                "description": "Relie ExamCraft à ton instance Moodle pour y transférer les examens directement au lieu de les exporter à la main."
+              }
+            }
+          }
+        }
+      },
+      "next": "Suivant →",
+      "finish": "Terminé ✓",
+      "navInstruction": "Clique sur l'élément de menu en surbrillance pour continuer.",
+      "tabInstruction": "Clique sur l'onglet en surbrillance pour continuer."
+    },
+    "title": "Aide",
+    "send": "Envoyer",
+    "newConversation": "Nouvelle conversation",
+    "chatPlaceholder": "Pose une question...",
+    "chatUnavailable": "Le chat d'aide n'est pas disponible pour le moment.",
+    "rateLimited": "Tu as atteint la limite de questions. Réessaie plus tard.",
+    "sessionExpired": "Ta session a expiré. Recharge la page.",
+    "feedback": {
+      "helpful": "Cela t'a-t-il aidé ?",
+      "thanks": "Merci pour ton retour !"
+    },
+    "context": {
+      "understood": "Compris",
+      "learnMore": "En savoir plus",
+      "dontShowAgain": "Ne plus afficher"
+    },
+    "hints": {
+      "documents": "Astuce : des PDF structurés avec des titres donnent de meilleures questions d'examen.",
+      "questionsGenerate": "Nouveau ici ? Sélectionne d'abord 3 à 5 documents pour une qualité optimale.",
+      "questionsReview": "Les filtres en haut te permettent de n'afficher que les questions en attente, approuvées ou refusées.",
+      "examsCompose": "Seules les questions relues apparaissent ici — si la sélection semble vide, la relecture reste à faire.",
+      "prompts": "L'aperçu en direct te montre à quoi ressemble le prompt avec de vraies variables."
+    }
   },
   "competencyFrameworks": {
     "title": "Competency Frameworks",

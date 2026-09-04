@@ -1759,7 +1759,8 @@
       "permissions": "Permessi",
       "settings": "Impostazioni",
       "language": "Lingua",
-      "languageHint": "Cambia la lingua dell'intera applicazione"
+      "languageHint": "Cambia la lingua dell'intera applicazione",
+      "languageSaveFailed": "La lingua vale per questo browser, ma non è stato possibile salvarla nel tuo account. Gli altri dispositivi non la applicano ancora."
     },
     "profileEdit": {
       "header": "Modifica profilo",
@@ -2173,7 +2174,282 @@
     }
   },
   "help": {
-    "thinking": "Sto pensando…"
+    "thinking": "Sto pensando…",
+    "catchUp": {
+      "message": "Sono state sbloccate nuove pagine — vuoi recuperare il tour relativo?",
+      "button": "Esplora ora"
+    },
+    "tracks": {
+      "title": "Approfondimenti",
+      "intro": "Brevi tour su singole aree — nessuno è obbligatorio.",
+      "start": "Avvia",
+      "resume": "Riprendi",
+      "restart": "Ripeti",
+      "done": "Completato",
+      "new": "Nuovo"
+    },
+    "tabs": {
+      "tours": "Tour",
+      "chat": "Chat"
+    },
+    "onboarding": {
+      "closeTour": "Esci dal tour",
+      "coreTourTitle": "Tour introduttivo",
+      "coreTourReplayHint": "Ripassa le basi ancora una volta.",
+      "skip": "Salta",
+      "next": "Avanti",
+      "finish": "Fatto",
+      "resume": "Riprendi più tardi",
+      "later": "Più tardi",
+      "startTour": "Avvia il tour",
+      "resumeButton": "Riprendi il tour",
+      "resumeText": "Non hai ancora completato il tour introduttivo.",
+      "confirmEndTitle": "Uscire dal tour?",
+      "confirmEndText": "Potrai riavviare il tour più tardi con il pulsante di aiuto in basso a destra.",
+      "confirmEndCancel": "Annulla",
+      "confirmEndConfirm": "Sì, esci",
+      "completedTitle": "🎉 Tour completato!",
+      "completedText": "Puoi aprire il widget di aiuto in qualsiasi momento con il pulsante in basso a destra."
+    },
+    "tour": {
+      "teacher": {
+        "core": {
+          "0": {
+            "title": "Benvenuto in ExamCraft AI!",
+            "description": "Ti mostro in pochi passi come creare il tuo primo esame. Fai clic su «Avvia il tour» per un'introduzione guidata."
+          },
+          "1": {
+            "title": "Dashboard",
+            "description": "Questa è la tua dashboard personale. Qui trovi le scorciatoie a tutte le funzioni importanti e una panoramica delle tue attività."
+          },
+          "2": {
+            "title": "Carica un documento",
+            "description": "Carica il tuo materiale didattico in PDF, Word o Markdown. Trascina semplicemente il file nell'area di caricamento oppure fai clic su di essa."
+          },
+          "3": {
+            "title": "Libreria documenti",
+            "description": "Qui vedi tutti i documenti caricati. Selezionane uno o più per generare domande d'esame."
+          },
+          "4": {
+            "title": "Crea un esame",
+            "description": "Scegli livello di difficoltà, numero di domande e formato — l'IA genera domande adatte a partire dai tuoi documenti."
+          },
+          "5": {
+            "title": "Rivedi ed esporta le domande",
+            "description": "Controlla le domande generate, valutale ed esporta l'esame finito come PDF o Moodle XML."
+          },
+          "6": {
+            "title": "Libreria prompt",
+            "description": "Qui gestisci i modelli con cui l'IA formula le domande. Adattali al tuo stile di insegnamento."
+          },
+          "7": {
+            "title": "Tutto pronto!",
+            "description": "Ora conosci il percorso dal documento all'esame finito. Nel widget di aiuto in basso a destra ti aspettano brevi approfondimenti su valutazioni, compositore esami e altre aree — puoi avviarli quando vuoi, nessuno è obbligatorio."
+          }
+        },
+        "tracks": {
+          "auswertungen": {
+            "title": "Valutazioni",
+            "description": "Analizza risultati d'esame, classi e singoli studenti.",
+            "steps": {
+              "0": {
+                "title": "Valutazione degli esami",
+                "description": "Qui trovi tutti gli esami della tua istituzione. Un esame compare in questo elenco non appena lo hai creato nel compositore esami. Per ogni riga importi poi i risultati tramite «Importa risultati» — solo dopo ottieni media dei voti, tasso di insuccesso e l'analisi domanda per domanda."
+              },
+              "1": {
+                "title": "Classi",
+                "description": "Le classi raggruppano gli studenti attraverso più esami. Si creano durante l'importazione di un esame, oppure le aggiungi qui manualmente tramite «Crea classe» — dopodiché vedi l'andamento dei risultati dell'intera classe."
+              },
+              "2": {
+                "title": "Studenti",
+                "description": "La vista individuale per studente: tutti i risultati d'esame, punti di forza e lacune a colpo d'occhio. Gli studenti vengono creati automaticamente non appena importi i risultati — non devi inserirli a mano."
+              }
+            }
+          },
+          "exam-composer": {
+            "title": "Comporre esami",
+            "description": "Crea un esame su misura a partire da domande già riviste.",
+            "steps": {
+              "0": {
+                "title": "Compositore esami",
+                "description": "Invece di far generare un esame completo, qui lo componi tu stesso a partire da domande già riviste — sei tu a decidere ordine, punti e ponderazione."
+              }
+            }
+          },
+          "werkzeuge": {
+            "title": "Strumenti",
+            "description": "Chat documenti e registro attività.",
+            "steps": {
+              "0": {
+                "title": "Chat documenti",
+                "description": "Fai domande direttamente ai documenti che hai caricato. Utile per verificare la materia prima di generarne domande."
+              },
+              "1": {
+                "title": "Attività",
+                "description": "Il registro di tutte le operazioni del tuo account — caricamenti, generazioni, esportazioni. Pratico per ricostruire che cosa è successo e quando."
+              }
+            }
+          },
+          "einstellungen": {
+            "title": "Impostazioni",
+            "description": "Tag e quadri di competenza per le tue domande.",
+            "steps": {
+              "0": {
+                "title": "Gestione dei tag",
+                "description": "Con i tag ordini le domande per tema, capitolo o obiettivo di apprendimento. Tag ben curati rendono il compositore esami molto più rapido."
+              },
+              "1": {
+                "title": "Quadri di competenza",
+                "description": "Registra il quadro di competenza del tuo piano di studi. L'IA allinea poi le domande generate ai livelli di obiettivo definiti."
+              }
+            }
+          }
+        }
+      },
+      "admin": {
+        "core": {
+          "0": {
+            "title": "Benvenuto, amministratore!",
+            "description": "Ti mostro in pochi passi il percorso dal documento all'esame finito. Le aree di amministrazione seguono poi come approfondimenti separati."
+          },
+          "1": {
+            "title": "Dashboard",
+            "description": "Questa è la tua dashboard personale. Qui trovi le scorciatoie a tutte le funzioni importanti e una panoramica delle tue attività."
+          },
+          "2": {
+            "title": "Carica un documento",
+            "description": "Carica il tuo materiale didattico in PDF, Word o Markdown. Trascina semplicemente il file nell'area di caricamento oppure fai clic su di essa."
+          },
+          "3": {
+            "title": "Libreria documenti",
+            "description": "Qui vedi tutti i documenti caricati. Selezionane uno o più per generare domande d'esame."
+          },
+          "4": {
+            "title": "Crea un esame",
+            "description": "Scegli livello di difficoltà, numero di domande e formato — l'IA genera domande adatte a partire dai tuoi documenti."
+          },
+          "5": {
+            "title": "Rivedi ed esporta le domande",
+            "description": "Controlla le domande generate, valutale ed esporta l'esame finito come PDF o Moodle XML."
+          },
+          "6": {
+            "title": "Libreria prompt",
+            "description": "Qui gestisci i modelli con cui l'IA formula le domande. Adattali allo stile di insegnamento della vostra istituzione."
+          },
+          "7": {
+            "title": "Tutto pronto!",
+            "description": "Ora conosci il percorso dal documento all'esame finito. Nel widget di aiuto in basso a destra ti aspettano brevi approfondimenti su valutazioni, gestione utenti, connessione Moodle e altre aree — puoi avviarli quando vuoi, nessuno è obbligatorio."
+          }
+        },
+        "tracks": {
+          "auswertungen": {
+            "title": "Valutazioni",
+            "description": "Analizza risultati d'esame, classi e singoli studenti.",
+            "steps": {
+              "0": {
+                "title": "Valutazione degli esami",
+                "description": "Qui trovi tutti gli esami della tua istituzione. Un esame compare in questo elenco non appena lo hai creato nel compositore esami. Per ogni riga importi poi i risultati tramite «Importa risultati» — solo dopo ottieni media dei voti, tasso di insuccesso e l'analisi domanda per domanda."
+              },
+              "1": {
+                "title": "Classi",
+                "description": "Le classi raggruppano gli studenti attraverso più esami. Si creano durante l'importazione di un esame, oppure le aggiungi qui manualmente tramite «Crea classe» — dopodiché vedi l'andamento dei risultati dell'intera classe."
+              },
+              "2": {
+                "title": "Studenti",
+                "description": "La vista individuale per studente: tutti i risultati d'esame, punti di forza e lacune a colpo d'occhio. Gli studenti vengono creati automaticamente non appena importi i risultati — non devi inserirli a mano."
+              }
+            }
+          },
+          "exam-composer": {
+            "title": "Comporre esami",
+            "description": "Crea un esame su misura a partire da domande già riviste.",
+            "steps": {
+              "0": {
+                "title": "Compositore esami",
+                "description": "Invece di far generare un esame completo, qui lo componi tu stesso a partire da domande già riviste — sei tu a decidere ordine, punti e ponderazione."
+              }
+            }
+          },
+          "werkzeuge": {
+            "title": "Strumenti",
+            "description": "Chat documenti e registro attività.",
+            "steps": {
+              "0": {
+                "title": "Chat documenti",
+                "description": "Fai domande direttamente ai documenti caricati. Utile per verificare la materia prima di generarne domande."
+              },
+              "1": {
+                "title": "Attività",
+                "description": "Il registro di tutte le operazioni — caricamenti, generazioni, esportazioni. Pratico per ricostruire che cosa è successo e quando."
+              }
+            }
+          },
+          "admin-benutzer": {
+            "title": "Utenti e permessi",
+            "description": "Gestione utenti, istituzioni e ruoli nel pannello di amministrazione.",
+            "steps": {
+              "0": {
+                "title": "Gestione utenti",
+                "description": "Qui crei gli account, assegni i ruoli e disattivi gli utenti che hanno lasciato l'istituzione."
+              },
+              "1": {
+                "title": "Istituzioni",
+                "description": "Le istituzioni raggruppano utenti, documenti e abbonamento. Ogni utente appartiene a esattamente un'istituzione."
+              },
+              "2": {
+                "title": "Ruoli e permessi",
+                "description": "I ruoli determinano quali funzioni vede una persona. I permessi vengono raggruppati qui invece di essere assegnati persona per persona."
+              }
+            }
+          },
+          "admin-betrieb": {
+            "title": "Gestione e integrazioni",
+            "description": "Log di audit, abbonamento e connessione Moodle.",
+            "steps": {
+              "0": {
+                "title": "Log di audit",
+                "description": "Ogni azione rilevante per la sicurezza viene registrata qui — chi ha modificato che cosa e quando."
+              },
+              "1": {
+                "title": "Abbonamento",
+                "description": "Tariffa, quote e fatture della tua istituzione. La tariffa determina quali funzioni sono sbloccate."
+              },
+              "2": {
+                "title": "Connessione Moodle",
+                "description": "Collega ExamCraft alla vostra istanza Moodle per trasferirvi gli esami direttamente invece di esportarli a mano."
+              }
+            }
+          }
+        }
+      },
+      "next": "Avanti →",
+      "finish": "Fatto ✓",
+      "navInstruction": "Fai clic sulla voce di menu evidenziata per continuare.",
+      "tabInstruction": "Fai clic sulla scheda evidenziata per continuare."
+    },
+    "title": "Aiuto",
+    "send": "Invia",
+    "newConversation": "Nuova conversazione",
+    "chatPlaceholder": "Fai una domanda...",
+    "chatUnavailable": "La chat di aiuto non è al momento disponibile.",
+    "rateLimited": "Hai raggiunto il limite di domande. Riprova più tardi.",
+    "sessionExpired": "La tua sessione è scaduta. Ricarica la pagina.",
+    "feedback": {
+      "helpful": "Ti è stato utile?",
+      "thanks": "Grazie per il tuo riscontro!"
+    },
+    "context": {
+      "understood": "Ho capito",
+      "learnMore": "Scopri di più",
+      "dontShowAgain": "Non mostrare più"
+    },
+    "hints": {
+      "documents": "Suggerimento: i PDF strutturati con titoli danno domande d'esame migliori.",
+      "questionsGenerate": "Nuovo qui? Seleziona prima 3–5 documenti per una qualità ottimale.",
+      "questionsReview": "I filtri in alto ti permettono di mostrare solo le domande in sospeso, approvate o rifiutate.",
+      "examsCompose": "Qui compaiono solo le domande già riviste — se la selezione sembra vuota, manca ancora la revisione.",
+      "prompts": "L'anteprima dal vivo ti mostra come appare il prompt con variabili reali."
+    }
   },
   "competencyFrameworks": {
     "title": "Competency Frameworks",

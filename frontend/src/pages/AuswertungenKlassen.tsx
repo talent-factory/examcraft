@@ -110,7 +110,8 @@ const AuswertungenKlassen: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    // TF-625: page-level anchor for the onboarding tour — see Auswertungen.tsx.
+    <Box sx={{ p: 3 }} data-testid="klassen-page">
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
         <ClassIcon color="primary" />
         <Typography variant="h4" component="h1">

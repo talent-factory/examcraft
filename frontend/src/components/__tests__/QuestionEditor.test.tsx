@@ -465,7 +465,7 @@ describe('QuestionEditor — TF-403 multiple_choice', () => {
 
   // German values from core/frontend/src/locales/de/translation.json
   const SAVE = 'Änderungen speichern';
-  const ERR_SELECT = 'Bitte wählen Sie eine korrekte Antwort';
+  const ERR_SELECT = 'Bitte wähle eine korrekte Antwort';
   const ERR_IN_OPTIONS = 'Die korrekte Antwort muss eine der Optionen sein';
 
   const multiQuestion: QuestionReview = {

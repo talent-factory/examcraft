@@ -1,8 +1,9 @@
 import logging
+import re
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 from database import get_db
 from utils.auth_utils import get_current_active_user
@@ -12,7 +13,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/help", tags=["Help"])
 
-ONBOARDING_MAX_STEPS = {"teacher": 8, "admin": 13}
+# Length of the core tour per role — must match the "core" array in
+# core/frontend/public/help-onboarding-steps.json. If the constant and the JSON
+# drift apart, the tour is marked complete too early or never; that is exactly
+# how TF-604 stayed invisible. `test_help_onboarding_steps.py` reads both
+# sources and holds them together — deliberately only in the test, so the
+# backend does not depend on a frontend asset at runtime.
+ONBOARDING_MAX_STEPS = {"teacher": 8, "admin": 8}
+
+# Deep-dive tracks (TF-625). Track ids live in the frontend JSON; the backend
+# only validates their shape and caps their number instead of keeping a
+# whitelist — a second list here would be the very drift source this ticket
+# sets out to remove. An unknown track inside a user's own progress is
+# harmless; unbounded growth of the JSON column would not be.
+TRACK_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+MAX_TRACKS_PER_USER = 20
+MAX_TRACK_STEPS = 50
 
 
 # === STATUS ===
@@ -42,6 +58,15 @@ async def get_help_status():
 # === ONBOARDING ===
 
 
+class TrackProgressEntry(BaseModel):
+    """Progress within a single deep-dive track."""
+
+    current_step: int = 0
+    completed_steps: List[int] = []
+    skipped_steps: List[int] = []
+    completed: bool = False
+
+
 class OnboardingStatusResponse(BaseModel):
     id: Optional[int] = None
     role: str
@@ -49,10 +74,56 @@ class OnboardingStatusResponse(BaseModel):
     completed_steps: List[int]
     skipped_steps: List[int] = []
     completed: bool
+    track_progress: Dict[str, TrackProgressEntry] = {}
 
 
 class OnboardingStepRequest(BaseModel):
     step: int = Field(..., ge=0)
+
+
+class TrackStepRequest(BaseModel):
+    step: int = Field(..., ge=0, lt=MAX_TRACK_STEPS)
+    # The client reports the track length because only it knows the frontend
+    # JSON. Deliberately not an authorization boundary — the value only drives
+    # the user's own progress state.
+    total_steps: int = Field(..., ge=1, le=MAX_TRACK_STEPS)
+    skipped: bool = False
+
+    @model_validator(mode="after")
+    def _step_within_track(self) -> "TrackStepRequest":
+        # A cross-field rule, so it cannot live in a single Field(...) bound —
+        # moved here rather than left as an `if` beside the route handler so
+        # that "step must be smaller than total_steps" is a property of the
+        # type itself: an invalid TrackStepRequest can no longer be
+        # constructed by any caller, not just the one route that used to
+        # check it.
+        if self.step >= self.total_steps:
+            raise ValueError("step must be smaller than total_steps")
+        return self
+
+
+def _track_entry_response(entry: Dict[str, Any]) -> TrackProgressEntry:
+    return TrackProgressEntry(
+        current_step=entry.get("current_step", 0),
+        completed_steps=entry.get("completed_steps") or [],
+        skipped_steps=entry.get("skipped_steps") or [],
+        completed=entry.get("completed_at") is not None,
+    )
+
+
+def _build_status_response(progress) -> OnboardingStatusResponse:
+    return OnboardingStatusResponse(
+        id=progress.id,
+        role=progress.role,
+        current_step=progress.current_step,
+        completed_steps=progress.completed_steps or [],
+        skipped_steps=progress.skipped_steps or [],
+        completed=progress.completed_at is not None,
+        track_progress={
+            track_id: _track_entry_response(entry)
+            for track_id, entry in (progress.track_progress or {}).items()
+        },
+    )
 
 
 def _get_user_role(user: User) -> str:
@@ -88,14 +159,7 @@ async def get_onboarding_status(
             skipped_steps=[],
             completed=False,
         )
-    return OnboardingStatusResponse(
-        id=progress.id,
-        role=progress.role,
-        current_step=progress.current_step,
-        completed_steps=progress.completed_steps or [],
-        skipped_steps=progress.skipped_steps or [],
-        completed=progress.completed_at is not None,
-    )
+    return _build_status_response(progress)
 
 
 @router.put("/onboarding/step", response_model=OnboardingStatusResponse)
@@ -139,14 +203,7 @@ async def complete_onboarding_step(
 
     db.commit()
     db.refresh(progress)
-    return OnboardingStatusResponse(
-        id=progress.id,
-        role=progress.role,
-        current_step=progress.current_step,
-        completed_steps=progress.completed_steps,
-        skipped_steps=progress.skipped_steps or [],
-        completed=progress.completed_at is not None,
-    )
+    return _build_status_response(progress)
 
 
 @router.put("/onboarding/skip", response_model=OnboardingStatusResponse)
@@ -186,44 +243,135 @@ async def skip_onboarding_step(
 
     db.commit()
     db.refresh(progress)
-    return OnboardingStatusResponse(
-        id=progress.id,
-        role=progress.role,
-        current_step=progress.current_step,
-        completed_steps=progress.completed_steps or [],
-        skipped_steps=progress.skipped_steps or [],
-        completed=progress.completed_at is not None,
+    return _build_status_response(progress)
+
+
+@router.put(
+    "/onboarding/track/{track_id}/step", response_model=OnboardingStatusResponse
+)
+async def update_track_step(
+    track_id: str,
+    request: TrackStepRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Record progress within an optional deep-dive track (TF-625).
+
+    Deliberately separate from ``/onboarding/step``: a deep dive must neither
+    advance the core tour's ``current_step`` nor mark it complete. A track
+    counts as finished once its own ``current_step`` reaches the length
+    reported by the client — shown and skipped steps count equally, because
+    both mean the user has moved past them.
+    """
+    from models.help import HelpOnboardingProgress
+    from datetime import datetime, timezone
+
+    if not TRACK_ID_PATTERN.match(track_id):
+        raise HTTPException(status_code=422, detail="Invalid track id")
+    # step < total_steps is enforced by TrackStepRequest itself (a
+    # model_validator), so an invalid combination never reaches this point —
+    # see the model for why that check lives there instead of here.
+
+    role = _get_user_role(current_user)
+    progress = (
+        db.query(HelpOnboardingProgress)
+        .filter(HelpOnboardingProgress.user_id == current_user.id)
+        .first()
     )
+    if not progress:
+        progress = HelpOnboardingProgress(
+            user_id=current_user.id,
+            role=role,
+            current_step=0,
+            completed_steps=[],
+            skipped_steps=[],
+            track_progress={},
+        )
+        db.add(progress)
+
+    tracks = dict(progress.track_progress or {})
+    if track_id not in tracks and len(tracks) >= MAX_TRACKS_PER_USER:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Too many onboarding tracks (max {MAX_TRACKS_PER_USER})",
+        )
+
+    entry = dict(tracks.get(track_id) or {})
+    completed = list(entry.get("completed_steps") or [])
+    skipped = list(entry.get("skipped_steps") or [])
+
+    if request.skipped:
+        if request.step not in skipped:
+            skipped.append(request.step)
+        if request.step in completed:
+            completed.remove(request.step)
+    else:
+        if request.step not in completed:
+            completed.append(request.step)
+        # Catch-up, mirroring the core tour: a step done later leaves the
+        # skip list.
+        if request.step in skipped:
+            skipped.remove(request.step)
+
+    entry["completed_steps"] = sorted(completed)
+    entry["skipped_steps"] = sorted(skipped)
+    # max(): replaying an earlier step must not rewind track progress.
+    entry["current_step"] = max(entry.get("current_step", 0), request.step + 1)
+    # A track in which *every* step fell through the skip path was never
+    # actually shown. Marking it complete would repeat the TF-604 lie one level
+    # down — a tick in the widget for a tour the user never saw. Leaving it
+    # open keeps it restartable and gives the frontend's console/Sentry warning
+    # something to correlate with. A partially skipped track still completes:
+    # the user did see the rest.
+    if (
+        entry["current_step"] >= request.total_steps
+        and entry["completed_steps"]
+        and not entry.get("completed_at")
+    ):
+        entry["completed_at"] = datetime.now(timezone.utc).isoformat()
+
+    tracks[track_id] = entry
+    # A new dict rather than mutating progress.track_progress in place: the
+    # column is MutableDict.as_mutable(JSON), which does flag a direct
+    # `progress.track_progress[track_id] = entry` as dirty — but a change to
+    # `entry` itself (one level deeper, e.g. `entry["current_step"] += 1` on
+    # the dict already inside the column) would not be, since MutableDict only
+    # instruments the outer dict's own __setitem__/__delitem__. Rebuilding and
+    # reassigning the whole `tracks` dict sidesteps that distinction entirely
+    # rather than relying on which level of nesting happened to change.
+    progress.track_progress = tracks
+
+    db.commit()
+    db.refresh(progress)
+    return _build_status_response(progress)
 
 
 # === CONTEXT HINTS ===
 
 
 class ContextHintResponse(BaseModel):
-    hint_text: Optional[str] = None
+    # An i18n key, not a text. The client resolves it against its own
+    # translation.json, so switching the language switches the hint with
+    # everything else instead of leaving it stale until a reload (TF-625).
+    i18n_key: Optional[str] = None
     hint_id: Optional[int] = None
 
 
 @router.get("/context/{route:path}", response_model=ContextHintResponse)
 async def get_context_hint(
     route: str,
-    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     from services.help_context_service import HelpContextService
-    from services.translation_service import get_request_locale
 
-    locale = get_request_locale(request, current_user)
     role = _get_user_role(current_user)
     tier = _get_user_tier(current_user)
 
     service = HelpContextService(db)
-    hint = service.get_hint_for_route(
-        route, role, tier, locale, user_id=current_user.id
-    )
+    hint = service.get_hint_for_route(route, role, tier, user_id=current_user.id)
     if hint:
-        return ContextHintResponse(hint_text=hint["hint_text"], hint_id=hint["id"])
+        return ContextHintResponse(i18n_key=hint["i18n_key"], hint_id=hint["id"])
     return ContextHintResponse()
 
 

@@ -126,7 +126,10 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
   };
 
   return (
-    <div className="space-y-6">
+    // TF-625: anchor for the "exam composer" onboarding step. It sits on the
+    // list view because that is where the tour lands via the sidebar — the
+    // ExamBuilderView only renders after an exam has been selected.
+    <div className="space-y-6" data-testid="exam-composer-content">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>

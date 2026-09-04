@@ -2065,7 +2065,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
           <Typography>
             {t(
               'components.documentLibrary.bulk.deleteConfirm',
-              `Möchten Sie ${selectedDocuments.length} Dokument(e) wirklich löschen?`,
+              `Möchtest du ${selectedDocuments.length} Dokument(e) wirklich löschen?`,
               { count: selectedDocuments.length },
             )}
           </Typography>

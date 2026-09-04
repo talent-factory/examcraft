@@ -102,7 +102,7 @@ const CompetencyFrameworkSettingsPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ maxWidth: 'lg', mx: 'auto', p: 3 }}>
+    <Box sx={{ maxWidth: 'lg', mx: 'auto', p: 3 }} data-testid="competency-frameworks-content">
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Typography variant="h4">{t('competencyFrameworks.title')}</Typography>
         <Button variant="contained" onClick={openCreate}>

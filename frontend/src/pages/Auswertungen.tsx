@@ -83,7 +83,10 @@ const Auswertungen: React.FC = () => {
   }, [t, page, rowsPerPage]);
 
   return (
-    <Box sx={{ p: 3 }}>
+    // TF-625: page-level anchor for the onboarding tour. The table below only
+    // renders once there is data, so it cannot carry the highlight — an empty
+    // account is exactly the first-login case the tour has to survive.
+    <Box sx={{ p: 3 }} data-testid="auswertungen-page">
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
         <AssessmentIcon color="primary" />
         <Typography variant="h4" component="h1">

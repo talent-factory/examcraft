@@ -1,237 +1,356 @@
 {
-  "teacher": [
-    {
-      "step": 0,
-      "title_de": "Willkommen bei ExamCraft AI!",
-      "title_en": "Welcome to ExamCraft AI!",
-      "description_de": "Ich zeige dir in wenigen Schritten, wie du deine erste Prüfung erstellst. Klicke auf «Tour starten» für eine geführte Einführung.",
-      "description_en": "I'll show you in a few steps how to create your first exam. Click 'Start tour' for a guided introduction.",
-      "route": null,
-      "highlight_selector": null,
-      "nav_selector": null,
-      "tab_selector": null
-    },
-    {
-      "step": 1,
-      "title_de": "Dashboard",
-      "title_en": "Dashboard",
-      "description_de": "Das ist dein persönliches Dashboard. Hier siehst du Schnellzugriffe auf alle wichtigen Funktionen und eine Übersicht deiner Aktivitäten.",
-      "description_en": "This is your personal dashboard. Here you'll find quick access to all key features and an overview of your activity.",
-      "route": "/dashboard",
-      "highlight_selector": "[data-testid='dashboard-content']",
-      "nav_selector": "[data-testid='nav-dashboard']",
-      "tab_selector": null
-    },
-    {
-      "step": 2,
-      "title_de": "Dokument hochladen",
-      "title_en": "Upload a Document",
-      "description_de": "Lade dein Kursmaterial als PDF, Word oder Markdown hoch. Ziehe die Datei einfach in den Upload-Bereich oder klicke darauf.",
-      "description_en": "Upload your course material as PDF, Word, or Markdown. Simply drag the file into the upload area or click on it.",
-      "route": "/documents",
-      "highlight_selector": "[data-testid='upload-area']",
-      "nav_selector": "[data-testid='nav-documents']",
-      "tab_selector": null
-    },
-    {
-      "step": 3,
-      "title_de": "Dokumentenbibliothek",
-      "title_en": "Document Library",
-      "description_de": "Hier siehst du alle hochgeladenen Dokumente. Wähle ein oder mehrere Dokumente aus, um daraus Prüfungsfragen zu generieren.",
-      "description_en": "Here you can see all uploaded documents. Select one or more to generate exam questions from them.",
-      "route": "/documents",
-      "highlight_selector": "[data-testid='document-list']",
-      "nav_selector": null,
-      "tab_selector": null
-    },
-    {
-      "step": 4,
-      "title_de": "Prüfung erstellen",
-      "title_en": "Create an Exam",
-      "description_de": "Wähle Schwierigkeitsgrad, Fragenanzahl und Prüfungsformat — die KI generiert passende Fragen aus deinen Dokumenten.",
-      "description_en": "Choose difficulty, number of questions, and format — the AI generates fitting questions from your documents.",
-      "route": "/questions/generate",
-      "highlight_selector": "[data-testid='exam-config']",
-      "nav_selector": "[data-testid='nav-questions-generate']",
-      "tab_selector": null
-    },
-    {
-      "step": 5,
-      "title_de": "Fragen reviewen und exportieren",
-      "title_en": "Review and Export Questions",
-      "description_de": "Überprüfe die generierten Fragen, bewerte sie mit Daumen hoch/runter und exportiere deine fertige Prüfung.",
-      "description_en": "Review the generated questions, rate them with thumbs up/down, and export your finished exam.",
-      "route": "/questions/review",
-      "highlight_selector": "[data-testid='review-queue']",
-      "nav_selector": "[data-testid='nav-questions-review']",
-      "tab_selector": null
-    },
-    {
-      "step": 6,
-      "title_de": "Prompt-Bibliothek",
-      "title_en": "Prompt Library",
-      "description_de": "Verwalte und passe die KI-Prompts für die Fragengenerierung an. Eigene Vorlagen steigern die Qualität der Ergebnisse.",
-      "description_en": "Manage and customize the AI prompts for question generation. Custom templates improve result quality.",
-      "route": "/prompts",
-      "highlight_selector": "[data-testid='prompts-content']",
-      "nav_selector": "[data-testid='nav-prompts']",
-      "tab_selector": null
-    },
-    {
-      "step": 7,
-      "title_de": "Fertig!",
-      "title_en": "All Done!",
-      "description_de": "Du bist startklar! Öffne dieses Hilfe-Widget jederzeit über den Button unten rechts.",
-      "description_en": "You're all set! Open this help widget anytime via the button at the bottom right.",
-      "route": null,
-      "highlight_selector": null,
-      "nav_selector": null,
-      "tab_selector": null
-    }
-  ],
-  "admin": [
-    {
-      "step": 0,
-      "title_de": "Willkommen, Administrator!",
-      "title_en": "Welcome, Administrator!",
-      "description_de": "Ich zeige dir alle Funktionen von ExamCraft AI — von der Dokumentenverwaltung bis zur Benutzerverwaltung. Klicke auf «Tour starten».",
-      "description_en": "I'll show you all features of ExamCraft AI — from document management to user administration. Click 'Start tour'.",
-      "route": null,
-      "highlight_selector": null,
-      "nav_selector": null,
-      "tab_selector": null
-    },
-    {
-      "step": 1,
-      "title_de": "Dashboard",
-      "title_en": "Dashboard",
-      "description_de": "Das ist dein persönliches Dashboard. Hier siehst du Schnellzugriffe auf alle wichtigen Funktionen und eine Übersicht deiner Aktivitäten.",
-      "description_en": "This is your personal dashboard. Here you'll find quick access to all key features and an overview of your activity.",
-      "route": "/dashboard",
-      "highlight_selector": "[data-testid='dashboard-content']",
-      "nav_selector": "[data-testid='nav-dashboard']",
-      "tab_selector": null
-    },
-    {
-      "step": 2,
-      "title_de": "Dokument hochladen",
-      "title_en": "Upload a Document",
-      "description_de": "Lade Kursmaterial als PDF, Word oder Markdown hoch. Als Admin kannst du Dokumente für alle Benutzer deiner Institution verwalten.",
-      "description_en": "Upload course material as PDF, Word, or Markdown. As an admin, you can manage documents for all users of your institution.",
-      "route": "/documents",
-      "highlight_selector": "[data-testid='upload-area']",
-      "nav_selector": "[data-testid='nav-documents']",
-      "tab_selector": null
-    },
-    {
-      "step": 3,
-      "title_de": "Dokumentenbibliothek",
-      "title_en": "Document Library",
-      "description_de": "Hier siehst du alle hochgeladenen Dokumente. Wähle Dokumente aus, um daraus Prüfungsfragen zu generieren.",
-      "description_en": "Here you can see all uploaded documents. Select documents to generate exam questions from them.",
-      "route": "/documents",
-      "highlight_selector": "[data-testid='document-list']",
-      "nav_selector": null,
-      "tab_selector": null
-    },
-    {
-      "step": 4,
-      "title_de": "Prüfung erstellen",
-      "title_en": "Create an Exam",
-      "description_de": "Wähle Schwierigkeitsgrad, Fragenanzahl und Prüfungsformat — die KI generiert passende Fragen aus deinen Dokumenten.",
-      "description_en": "Choose difficulty, number of questions, and format — the AI generates fitting questions from your documents.",
-      "route": "/questions/generate",
-      "highlight_selector": "[data-testid='exam-config']",
-      "nav_selector": "[data-testid='nav-questions-generate']",
-      "tab_selector": null
-    },
-    {
-      "step": 5,
-      "title_de": "Fragen reviewen und exportieren",
-      "title_en": "Review and Export Questions",
-      "description_de": "Überprüfe die generierten Fragen, bewerte sie mit Daumen hoch/runter und exportiere deine fertige Prüfung.",
-      "description_en": "Review the generated questions, rate them with thumbs up/down, and export your finished exam.",
-      "route": "/questions/review",
-      "highlight_selector": "[data-testid='review-queue']",
-      "nav_selector": "[data-testid='nav-questions-review']",
-      "tab_selector": null
-    },
-    {
-      "step": 6,
-      "title_de": "Benutzerverwaltung",
-      "title_en": "User Management",
-      "description_de": "Hier verwaltest du alle Benutzer deiner Institution, vergibst Rollen und setzt Berechtigungen.",
-      "description_en": "Here you manage all users of your institution, assign roles and set permissions.",
-      "route": "/admin",
-      "highlight_selector": "[data-testid='admin-tab-content-users']",
-      "nav_selector": "[data-testid='nav-admin']",
-      "tab_selector": null
-    },
-    {
-      "step": 7,
-      "title_de": "Institutionen",
-      "title_en": "Institutions",
-      "description_de": "Verwalte Institutionen und deren Einstellungen. Dieser Tab ist nur für Superadmins sichtbar.",
-      "description_en": "Manage institutions and their settings. This tab is only visible to superadmins.",
-      "route": "/admin",
-      "highlight_selector": "[data-testid='admin-tab-content-institutions']",
-      "nav_selector": null,
-      "tab_selector": "[data-testid='admin-tab-btn-institutions']"
-    },
-    {
-      "step": 8,
-      "title_de": "Rollen",
-      "title_en": "Roles",
-      "description_de": "Verwalte Benutzerrollen und deren Berechtigungen. Dieser Tab ist nur für Superadmins sichtbar.",
-      "description_en": "Manage user roles and permissions. This tab is only visible to superadmins.",
-      "route": "/admin",
-      "highlight_selector": "[data-testid='admin-tab-content-roles']",
-      "nav_selector": null,
-      "tab_selector": "[data-testid='admin-tab-btn-roles']"
-    },
-    {
-      "step": 9,
-      "title_de": "Audit-Log",
-      "title_en": "Audit Log",
-      "description_de": "Hier siehst du alle sicherheitsrelevanten Ereignisse deiner Institution — Logins, Rollenänderungen und mehr.",
-      "description_en": "Here you see all security-relevant events of your institution — logins, role changes, and more.",
-      "route": "/admin",
-      "highlight_selector": "[data-testid='admin-tab-content-audit']",
-      "nav_selector": null,
-      "tab_selector": "[data-testid='admin-tab-btn-audit']"
-    },
-    {
-      "step": 10,
-      "title_de": "Abonnement",
-      "title_en": "Subscription",
-      "description_de": "Hier siehst du den aktuellen Abonnementstatus deiner Institution, verfügbare Kontingente und Nutzungsstatistiken.",
-      "description_en": "Here you see your institution's current subscription status, available quotas, and usage statistics.",
-      "route": "/admin",
-      "highlight_selector": "[data-testid='admin-tab-content-subscription']",
-      "nav_selector": null,
-      "tab_selector": "[data-testid='admin-tab-btn-subscription']"
-    },
-    {
-      "step": 11,
-      "title_de": "Prompt-Bibliothek",
-      "title_en": "Prompt Library",
-      "description_de": "Verwalte und passe die KI-Prompts für die Fragengenerierung an. Eigene Vorlagen steigern die Qualität der Ergebnisse.",
-      "description_en": "Manage and customize the AI prompts for question generation. Custom templates improve result quality.",
-      "route": "/prompts",
-      "highlight_selector": "[data-testid='prompts-content']",
-      "nav_selector": "[data-testid='nav-prompts']",
-      "tab_selector": null
-    },
-    {
-      "step": 12,
-      "title_de": "Fertig!",
-      "title_en": "All Done!",
-      "description_de": "Dein System ist vollständig eingerichtet. Öffne das Hilfe-Widget jederzeit über den Button unten rechts.",
-      "description_en": "Your system is fully set up. Open the help widget anytime via the button at the bottom right.",
-      "route": null,
-      "highlight_selector": null,
-      "nav_selector": null,
-      "tab_selector": null
-    }
-  ]
+  "teacher": {
+    "core": [
+      {
+        "step": 0,
+        "route": null,
+        "highlight_selector": null,
+        "nav_selector": null,
+        "tab_selector": null,
+        "i18n_key": "help.tour.teacher.core.0"
+      },
+      {
+        "step": 1,
+        "route": "/dashboard",
+        "highlight_selector": "[data-testid='dashboard-content']",
+        "nav_selector": "[data-testid='nav-dashboard']",
+        "tab_selector": null,
+        "i18n_key": "help.tour.teacher.core.1"
+      },
+      {
+        "step": 2,
+        "route": "/documents",
+        "highlight_selector": "[data-testid='upload-area']",
+        "nav_selector": "[data-testid='nav-documents']",
+        "tab_selector": null,
+        "i18n_key": "help.tour.teacher.core.2"
+      },
+      {
+        "step": 3,
+        "route": "/documents",
+        "highlight_selector": "[data-testid='document-list']",
+        "nav_selector": null,
+        "tab_selector": null,
+        "i18n_key": "help.tour.teacher.core.3"
+      },
+      {
+        "step": 4,
+        "route": "/questions/generate",
+        "highlight_selector": "[data-testid='exam-config']",
+        "nav_selector": "[data-testid='nav-questions-generate']",
+        "tab_selector": null,
+        "i18n_key": "help.tour.teacher.core.4"
+      },
+      {
+        "step": 5,
+        "route": "/questions/review",
+        "highlight_selector": "[data-testid='review-queue']",
+        "nav_selector": "[data-testid='nav-questions-review']",
+        "tab_selector": null,
+        "i18n_key": "help.tour.teacher.core.5"
+      },
+      {
+        "step": 6,
+        "route": "/prompts",
+        "highlight_selector": "[data-testid='prompts-content']",
+        "nav_selector": "[data-testid='nav-prompts']",
+        "tab_selector": null,
+        "i18n_key": "help.tour.teacher.core.6"
+      },
+      {
+        "step": 7,
+        "route": null,
+        "highlight_selector": null,
+        "nav_selector": null,
+        "tab_selector": null,
+        "i18n_key": "help.tour.teacher.core.7"
+      }
+    ],
+    "tracks": [
+      {
+        "id": "auswertungen",
+        "steps": [
+          {
+            "step": 0,
+            "route": "/auswertungen",
+            "highlight_selector": "[data-testid='auswertungen-page']",
+            "nav_selector": "[data-testid='nav-auswertungen']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.teacher.tracks.auswertungen.steps.0"
+          },
+          {
+            "step": 1,
+            "route": "/auswertungen/klassen",
+            "highlight_selector": "[data-testid='klassen-page']",
+            "nav_selector": "[data-testid='nav-auswertungen-klassen']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.teacher.tracks.auswertungen.steps.1"
+          },
+          {
+            "step": 2,
+            "route": "/auswertungen/studierende",
+            "highlight_selector": "[data-testid='studierende-page']",
+            "nav_selector": "[data-testid='nav-auswertungen-studierende']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.teacher.tracks.auswertungen.steps.2"
+          }
+        ],
+        "i18n_key": "help.tour.teacher.tracks.auswertungen"
+      },
+      {
+        "id": "exam-composer",
+        "steps": [
+          {
+            "step": 0,
+            "route": "/exams/compose",
+            "highlight_selector": "[data-testid='exam-composer-content']",
+            "nav_selector": "[data-testid='nav-exams-compose']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.teacher.tracks.exam-composer.steps.0"
+          }
+        ],
+        "i18n_key": "help.tour.teacher.tracks.exam-composer"
+      },
+      {
+        "id": "werkzeuge",
+        "steps": [
+          {
+            "step": 0,
+            "route": "/chat",
+            "highlight_selector": "[data-testid='document-chat-content']",
+            "nav_selector": "[data-testid='nav-chat']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.teacher.tracks.werkzeuge.steps.0"
+          },
+          {
+            "step": 1,
+            "route": "/aktivitaeten",
+            "highlight_selector": "[data-testid='aktivitaeten-page']",
+            "nav_selector": "[data-testid='nav-aktivitaeten']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.teacher.tracks.werkzeuge.steps.1"
+          }
+        ],
+        "i18n_key": "help.tour.teacher.tracks.werkzeuge"
+      },
+      {
+        "id": "einstellungen",
+        "steps": [
+          {
+            "step": 0,
+            "route": "/settings/tags",
+            "highlight_selector": "[data-testid='tag-settings-content']",
+            "nav_selector": "[data-testid='nav-settings-tags']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.teacher.tracks.einstellungen.steps.0"
+          },
+          {
+            "step": 1,
+            "route": "/settings/competency-frameworks",
+            "highlight_selector": "[data-testid='competency-frameworks-content']",
+            "nav_selector": "[data-testid='nav-settings-competency-frameworks']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.teacher.tracks.einstellungen.steps.1"
+          }
+        ],
+        "i18n_key": "help.tour.teacher.tracks.einstellungen"
+      }
+    ]
+  },
+  "admin": {
+    "core": [
+      {
+        "step": 0,
+        "route": null,
+        "highlight_selector": null,
+        "nav_selector": null,
+        "tab_selector": null,
+        "i18n_key": "help.tour.admin.core.0"
+      },
+      {
+        "step": 1,
+        "route": "/dashboard",
+        "highlight_selector": "[data-testid='dashboard-content']",
+        "nav_selector": "[data-testid='nav-dashboard']",
+        "tab_selector": null,
+        "i18n_key": "help.tour.admin.core.1"
+      },
+      {
+        "step": 2,
+        "route": "/documents",
+        "highlight_selector": "[data-testid='upload-area']",
+        "nav_selector": "[data-testid='nav-documents']",
+        "tab_selector": null,
+        "i18n_key": "help.tour.admin.core.2"
+      },
+      {
+        "step": 3,
+        "route": "/documents",
+        "highlight_selector": "[data-testid='document-list']",
+        "nav_selector": null,
+        "tab_selector": null,
+        "i18n_key": "help.tour.admin.core.3"
+      },
+      {
+        "step": 4,
+        "route": "/questions/generate",
+        "highlight_selector": "[data-testid='exam-config']",
+        "nav_selector": "[data-testid='nav-questions-generate']",
+        "tab_selector": null,
+        "i18n_key": "help.tour.admin.core.4"
+      },
+      {
+        "step": 5,
+        "route": "/questions/review",
+        "highlight_selector": "[data-testid='review-queue']",
+        "nav_selector": "[data-testid='nav-questions-review']",
+        "tab_selector": null,
+        "i18n_key": "help.tour.admin.core.5"
+      },
+      {
+        "step": 6,
+        "route": "/prompts",
+        "highlight_selector": "[data-testid='prompts-content']",
+        "nav_selector": "[data-testid='nav-prompts']",
+        "tab_selector": null,
+        "i18n_key": "help.tour.admin.core.6"
+      },
+      {
+        "step": 7,
+        "route": null,
+        "highlight_selector": null,
+        "nav_selector": null,
+        "tab_selector": null,
+        "i18n_key": "help.tour.admin.core.7"
+      }
+    ],
+    "tracks": [
+      {
+        "id": "auswertungen",
+        "steps": [
+          {
+            "step": 0,
+            "route": "/auswertungen",
+            "highlight_selector": "[data-testid='auswertungen-page']",
+            "nav_selector": "[data-testid='nav-auswertungen']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.admin.tracks.auswertungen.steps.0"
+          },
+          {
+            "step": 1,
+            "route": "/auswertungen/klassen",
+            "highlight_selector": "[data-testid='klassen-page']",
+            "nav_selector": "[data-testid='nav-auswertungen-klassen']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.admin.tracks.auswertungen.steps.1"
+          },
+          {
+            "step": 2,
+            "route": "/auswertungen/studierende",
+            "highlight_selector": "[data-testid='studierende-page']",
+            "nav_selector": "[data-testid='nav-auswertungen-studierende']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.admin.tracks.auswertungen.steps.2"
+          }
+        ],
+        "i18n_key": "help.tour.admin.tracks.auswertungen"
+      },
+      {
+        "id": "exam-composer",
+        "steps": [
+          {
+            "step": 0,
+            "route": "/exams/compose",
+            "highlight_selector": "[data-testid='exam-composer-content']",
+            "nav_selector": "[data-testid='nav-exams-compose']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.admin.tracks.exam-composer.steps.0"
+          }
+        ],
+        "i18n_key": "help.tour.admin.tracks.exam-composer"
+      },
+      {
+        "id": "werkzeuge",
+        "steps": [
+          {
+            "step": 0,
+            "route": "/chat",
+            "highlight_selector": "[data-testid='document-chat-content']",
+            "nav_selector": "[data-testid='nav-chat']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.admin.tracks.werkzeuge.steps.0"
+          },
+          {
+            "step": 1,
+            "route": "/aktivitaeten",
+            "highlight_selector": "[data-testid='aktivitaeten-page']",
+            "nav_selector": "[data-testid='nav-aktivitaeten']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.admin.tracks.werkzeuge.steps.1"
+          }
+        ],
+        "i18n_key": "help.tour.admin.tracks.werkzeuge"
+      },
+      {
+        "id": "admin-benutzer",
+        "steps": [
+          {
+            "step": 0,
+            "route": "/admin",
+            "highlight_selector": "[data-testid='admin-tab-content-users']",
+            "nav_selector": "[data-testid='nav-admin']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.admin.tracks.admin-benutzer.steps.0"
+          },
+          {
+            "step": 1,
+            "route": "/admin",
+            "highlight_selector": "[data-testid='admin-tab-content-institutions']",
+            "nav_selector": null,
+            "tab_selector": "[data-testid='admin-tab-btn-institutions']",
+            "i18n_key": "help.tour.admin.tracks.admin-benutzer.steps.1"
+          },
+          {
+            "step": 2,
+            "route": "/admin",
+            "highlight_selector": "[data-testid='admin-tab-content-roles']",
+            "nav_selector": null,
+            "tab_selector": "[data-testid='admin-tab-btn-roles']",
+            "i18n_key": "help.tour.admin.tracks.admin-benutzer.steps.2"
+          }
+        ],
+        "i18n_key": "help.tour.admin.tracks.admin-benutzer"
+      },
+      {
+        "id": "admin-betrieb",
+        "steps": [
+          {
+            "step": 0,
+            "route": "/admin",
+            "highlight_selector": "[data-testid='admin-tab-content-audit']",
+            "nav_selector": "[data-testid='nav-admin']",
+            "tab_selector": "[data-testid='admin-tab-btn-audit']",
+            "i18n_key": "help.tour.admin.tracks.admin-betrieb.steps.0"
+          },
+          {
+            "step": 1,
+            "route": "/admin",
+            "highlight_selector": "[data-testid='admin-tab-content-subscription']",
+            "nav_selector": null,
+            "tab_selector": "[data-testid='admin-tab-btn-subscription']",
+            "i18n_key": "help.tour.admin.tracks.admin-betrieb.steps.1"
+          },
+          {
+            "step": 2,
+            "route": "/admin/integrations/moodle",
+            "highlight_selector": "[data-testid='moodle-connection-content']",
+            "nav_selector": "[data-testid='nav-admin-integrations-moodle']",
+            "tab_selector": null,
+            "i18n_key": "help.tour.admin.tracks.admin-betrieb.steps.2"
+          }
+        ],
+        "i18n_key": "help.tour.admin.tracks.admin-betrieb"
+      }
+    ]
+  }
 }

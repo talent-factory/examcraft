@@ -12,27 +12,26 @@ import { useTranslation } from 'react-i18next';
 
 interface OnboardingModalProps {
   open: boolean;
-  titleDe: string;
-  titleEn: string;
-  descriptionDe: string;
-  descriptionEn: string;
+  /**
+   * i18n key prefix of the welcome step; `.title` and `.description` are
+   * looked up from it. Previously the four German/English strings were passed
+   * in and picked apart here, which made the modal untranslatable beyond those
+   * two languages (TF-670).
+   */
+  i18nKey: string;
   onStart: () => void;
   onLater: () => void;
 }
 
 const OnboardingModal: React.FC<OnboardingModalProps> = ({
   open,
-  titleDe,
-  titleEn,
-  descriptionDe,
-  descriptionEn,
+  i18nKey,
   onStart,
   onLater,
 }) => {
-  const { i18n, t } = useTranslation();
-  const locale = i18n.language?.substring(0, 2) || 'de';
-  const title = locale === 'en' ? titleEn : titleDe;
-  const description = locale === 'en' ? descriptionEn : descriptionDe;
+  const { t } = useTranslation();
+  const title = t(`${i18nKey}.title`);
+  const description = t(`${i18nKey}.description`);
 
   return (
     <Dialog

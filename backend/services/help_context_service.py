@@ -15,7 +15,6 @@ class HelpContextService:
         route: str,
         user_role: str,
         user_tier: str,
-        locale: str = "de",
         user_id: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
         normalized = "/" + route.strip("/")
@@ -46,5 +45,5 @@ class HelpContextService:
                 continue
             if hint.tier and hint.tier != user_tier:
                 continue
-            return hint.to_dict(locale=locale)
+            return hint.to_dict()
         return None

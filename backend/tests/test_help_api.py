@@ -55,26 +55,51 @@ class TestContextHints:
         response = help_client.get("/api/v1/help/context/nonexistent/route")
         assert response.status_code == 200
         data = response.json()
-        assert data["hint_text"] is None
+        assert data["i18n_key"] is None
 
     def test_returns_hint_for_matching_route(self, help_client, help_db):
         from models.help import HelpContextHint
 
+        # Ein Muster, das mit keinem gesäten kollidiert: der Abgleich ist ein
+        # Präfix-Test, "/documents/upload" trifft also auch den echten
+        # "/documents"-Hinweis — je nach Reihenfolge gewann mal der, mal dieser.
         hint = HelpContextHint(
-            route_pattern="/documents/upload",
+            route_pattern="/zzz-test-route",
             role="teacher",
-            hint_text_de="Test-Hinweis",
-            hint_text_en="Test hint",
+            i18n_key="help.hints.test",
             priority=10,
             active=True,
         )
         help_db.add(hint)
         help_db.commit()
 
-        response = help_client.get("/api/v1/help/context/documents/upload")
+        response = help_client.get("/api/v1/help/context/zzz-test-route")
         assert response.status_code == 200
         data = response.json()
-        assert data["hint_text"] is not None
+        assert data["i18n_key"] == "help.hints.test"
+
+    def test_response_carries_no_text(self, help_client, help_db):
+        """The API must not ship hint prose in any language.
+
+        The four hint_text_* columns made this the only help surface whose
+        language the server decided, so it was the only one that did not
+        follow the language switcher (TF-625/TF-670).
+        """
+        from models.help import HelpContextHint
+
+        help_db.add(
+            HelpContextHint(
+                route_pattern="/exams/compose",
+                role="teacher",
+                i18n_key="help.hints.examsCompose",
+                priority=5,
+                active=True,
+            )
+        )
+        help_db.commit()
+
+        data = help_client.get("/api/v1/help/context/exams/compose").json()
+        assert set(data.keys()) == {"i18n_key", "hint_id"}
 
 
 class TestHelpMessage:
@@ -213,6 +238,204 @@ class TestSkipOnboardingStep:
         assert 2 not in data["skipped_steps"]
 
 
+class TestOnboardingTracks:
+    """Optional deep-dive tracks (TF-625)."""
+
+    TRACK = "/api/v1/help/onboarding/track/auswertungen/step"
+
+    @staticmethod
+    def _reset(help_db):
+        from models.help import HelpOnboardingProgress
+
+        help_db.query(HelpOnboardingProgress).filter_by(user_id=999).delete()
+        help_db.commit()
+
+    def test_status_exposes_empty_track_progress_for_new_user(self, help_client):
+        response = help_client.get("/api/v1/help/onboarding/status")
+        assert response.status_code == 200
+        assert response.json()["track_progress"] == {}
+
+    def test_track_step_records_progress(self, help_client, help_db):
+        self._reset(help_db)
+
+        response = help_client.put(self.TRACK, json={"step": 0, "total_steps": 3})
+        assert response.status_code == 200
+        track = response.json()["track_progress"]["auswertungen"]
+        assert track["completed_steps"] == [0]
+        assert track["current_step"] == 1
+        assert track["completed"] is False
+
+    def test_track_completes_at_last_step(self, help_client, help_db):
+        self._reset(help_db)
+
+        help_client.put(self.TRACK, json={"step": 0, "total_steps": 3})
+        help_client.put(self.TRACK, json={"step": 1, "total_steps": 3})
+        response = help_client.put(self.TRACK, json={"step": 2, "total_steps": 3})
+
+        track = response.json()["track_progress"]["auswertungen"]
+        assert track["current_step"] == 3
+        assert track["completed"] is True
+
+    def test_track_step_does_not_touch_core_tour(self, help_client, help_db):
+        """The heart of the chosen design: a deep dive must neither advance the
+        core tour nor mark it complete."""
+        self._reset(help_db)
+
+        # Core tour sits at step 1 of 8
+        help_client.put("/api/v1/help/onboarding/step", json={"step": 0})
+
+        # Run a whole deep dive end to end
+        for step in range(3):
+            help_client.put(self.TRACK, json={"step": step, "total_steps": 3})
+
+        data = help_client.get("/api/v1/help/onboarding/status").json()
+        assert data["current_step"] == 1
+        assert data["completed"] is False
+        assert data["completed_steps"] == [0]
+        assert data["track_progress"]["auswertungen"]["completed"] is True
+
+    def test_skipped_track_step_lands_in_skipped_not_completed(
+        self, help_client, help_db
+    ):
+        self._reset(help_db)
+
+        response = help_client.put(
+            self.TRACK, json={"step": 1, "total_steps": 3, "skipped": True}
+        )
+        track = response.json()["track_progress"]["auswertungen"]
+        assert track["skipped_steps"] == [1]
+        assert track["completed_steps"] == []
+        assert track["current_step"] == 2
+
+    def test_catch_up_moves_step_from_skipped_to_completed(self, help_client, help_db):
+        self._reset(help_db)
+
+        help_client.put(self.TRACK, json={"step": 1, "total_steps": 3, "skipped": True})
+        response = help_client.put(self.TRACK, json={"step": 1, "total_steps": 3})
+
+        track = response.json()["track_progress"]["auswertungen"]
+        assert track["completed_steps"] == [1]
+        assert track["skipped_steps"] == []
+
+    def test_replaying_earlier_step_does_not_rewind_track(self, help_client, help_db):
+        """Replaying an earlier step must not rewind progress."""
+        self._reset(help_db)
+
+        help_client.put(self.TRACK, json={"step": 2, "total_steps": 3})
+        response = help_client.put(self.TRACK, json={"step": 0, "total_steps": 3})
+
+        track = response.json()["track_progress"]["auswertungen"]
+        assert track["current_step"] == 3
+        assert track["completed"] is True
+
+    def test_tracks_are_independent(self, help_client, help_db):
+        self._reset(help_db)
+
+        help_client.put(self.TRACK, json={"step": 0, "total_steps": 3})
+        help_client.put(
+            "/api/v1/help/onboarding/track/exam-composer/step",
+            json={"step": 0, "total_steps": 1},
+        )
+
+        tracks = help_client.get("/api/v1/help/onboarding/status").json()[
+            "track_progress"
+        ]
+        assert tracks["auswertungen"]["completed"] is False
+        assert tracks["exam-composer"]["completed"] is True
+
+    def test_fully_skipped_track_is_not_marked_complete(self, help_client, help_db):
+        """A track nobody ever saw must not report itself as done.
+
+        Found manually: the three analytics steps anchored on table elements
+        that only render once data exists. On an empty account every step fell
+        through the skip path, yet the widget showed the track with a tick —
+        the TF-604 failure mode one level down.
+        """
+        self._reset(help_db)
+
+        for step in range(3):
+            help_client.put(
+                self.TRACK, json={"step": step, "total_steps": 3, "skipped": True}
+            )
+
+        track = help_client.get("/api/v1/help/onboarding/status").json()[
+            "track_progress"
+        ]["auswertungen"]
+        assert track["skipped_steps"] == [0, 1, 2]
+        assert track["completed"] is False
+
+    def test_partially_skipped_track_still_completes(self, help_client, help_db):
+        """One genuinely shown step is enough — the user did see something."""
+        self._reset(help_db)
+
+        help_client.put(self.TRACK, json={"step": 0, "total_steps": 3, "skipped": True})
+        help_client.put(self.TRACK, json={"step": 1, "total_steps": 3})
+        response = help_client.put(
+            self.TRACK, json={"step": 2, "total_steps": 3, "skipped": True}
+        )
+
+        track = response.json()["track_progress"]["auswertungen"]
+        assert track["completed"] is True
+
+    def test_catch_up_after_full_skip_completes_the_track(self, help_client, help_db):
+        """Re-running a fully skipped track once the anchors work marks it done."""
+        self._reset(help_db)
+
+        for step in range(3):
+            help_client.put(
+                self.TRACK, json={"step": step, "total_steps": 3, "skipped": True}
+            )
+        for step in range(3):
+            response = help_client.put(
+                self.TRACK, json={"step": step, "total_steps": 3}
+            )
+
+        track = response.json()["track_progress"]["auswertungen"]
+        assert track["skipped_steps"] == []
+        assert track["completed"] is True
+
+    def test_rejects_invalid_track_id(self, help_client, help_db):
+        self._reset(help_db)
+
+        response = help_client.put(
+            "/api/v1/help/onboarding/track/Not_A_Valid_ID/step",
+            json={"step": 0, "total_steps": 1},
+        )
+        assert response.status_code == 422
+
+    def test_rejects_step_beyond_total(self, help_client, help_db):
+        self._reset(help_db)
+
+        response = help_client.put(self.TRACK, json={"step": 3, "total_steps": 3})
+        assert response.status_code == 422
+
+    def test_caps_number_of_tracks(self, help_client, help_db):
+        """Prevent unbounded growth of the JSON column via invented track ids."""
+        from api.v1.help import MAX_TRACKS_PER_USER
+
+        self._reset(help_db)
+
+        for i in range(MAX_TRACKS_PER_USER):
+            response = help_client.put(
+                f"/api/v1/help/onboarding/track/track-{i}/step",
+                json={"step": 0, "total_steps": 1},
+            )
+            assert response.status_code == 200
+
+        response = help_client.put(
+            "/api/v1/help/onboarding/track/one-too-many/step",
+            json={"step": 0, "total_steps": 1},
+        )
+        assert response.status_code == 422
+
+        # A track already known stays writable even when the cap is reached
+        response = help_client.put(
+            "/api/v1/help/onboarding/track/track-0/step",
+            json={"step": 0, "total_steps": 1},
+        )
+        assert response.status_code == 200
+
+
 class TestSeedHints:
     def test_prompts_hint_visible_to_teacher_after_seed(self, help_client, help_db):
         """After seeding, teacher (role=teacher) gets a hint for /prompts."""
@@ -228,7 +451,7 @@ class TestSeedHints:
         response = help_client.get("/api/v1/help/context/prompts")
         assert response.status_code == 200
         data = response.json()
-        assert data["hint_text"] is not None
+        assert data["i18n_key"] == "help.hints.prompts"
 
     def test_seed_upserts_role_on_existing_hint(self, help_db):
         """seed_help_hints updates role=admin -> None on existing /prompts hint."""
@@ -239,8 +462,7 @@ class TestSeedHints:
         old = HelpContextHint(
             route_pattern="/prompts",
             role="admin",
-            hint_text_de="alt",
-            hint_text_en="old",
+            i18n_key="help.hints.stale",
             priority=10,
             active=True,
         )
@@ -269,6 +491,59 @@ class TestSeedHints:
         count = help_db.query(HelpContextHint).count()
         from utils.seed_help_hints import DEFAULT_HINTS
 
+        assert count == len(DEFAULT_HINTS)
+
+    def test_seed_commits_a_delete_only_run(self, help_db):
+        """A run that only removes obsolete rows (created==updated==0) still commits.
+
+        Regression guard for the exact bug the function's own comment warns
+        about: `removed` must be part of the `created > 0 or updated > 0 or
+        removed > 0` condition, or a delete-only run commits nothing and the
+        DELETE is rolled back when the session closes.
+        """
+        from utils.seed_help_hints import seed_help_hints, DEFAULT_HINTS
+        from models.help import HelpContextHint
+
+        help_db.query(HelpContextHint).delete()
+        help_db.commit()
+
+        # First run creates all current hints — nothing left to create/update
+        # on the run under test.
+        seed_help_hints(help_db)
+
+        # Insert a row for an obsolete pattern directly, bypassing the seed,
+        # so the next run's only work is the delete.
+        obsolete = HelpContextHint(
+            route_pattern="/documents/upload",
+            role="teacher",
+            i18n_key="help.hints.stale",
+            priority=1,
+            active=True,
+        )
+        help_db.add(obsolete)
+        help_db.commit()
+        obsolete_id = obsolete.id
+
+        result = seed_help_hints(help_db)
+
+        assert result == 0  # created + updated, i.e. neither fired
+
+        # A plain re-query here would pass even on the buggy version: the
+        # DELETE already ran against this transaction regardless of whether
+        # `db.commit()` was reached, so it's invisible to this session either
+        # way. The only thing that distinguishes "committed" from "rolled
+        # back at session close" is surviving an explicit rollback: on the
+        # bug, `db.commit()` is never called, `db.rollback()` reverts the
+        # DELETE, and the obsolete row reappears.
+        help_db.rollback()
+
+        remaining = help_db.get(HelpContextHint, obsolete_id)
+        assert remaining is None, (
+            "obsolete row reappeared after rollback — the delete-only run "
+            "did not commit"
+        )
+
+        count = help_db.query(HelpContextHint).count()
         assert count == len(DEFAULT_HINTS)
 
 

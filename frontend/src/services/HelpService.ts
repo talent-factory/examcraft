@@ -4,6 +4,14 @@ export interface HelpStatus {
   modes: { onboarding: boolean; context: boolean; chat: boolean };
 }
 
+/** Progress within an optional deep-dive track (TF-625). */
+export interface TrackProgressEntry {
+  current_step: number;
+  completed_steps: number[];
+  skipped_steps: number[];
+  completed: boolean;
+}
+
 export interface OnboardingStatus {
   id?: number;
   role: string;
@@ -11,10 +19,12 @@ export interface OnboardingStatus {
   completed_steps: number[];
   skipped_steps: number[];
   completed: boolean;
+  /** Keyed by track id; tracks without an entry were never started. */
+  track_progress: Record<string, TrackProgressEntry>;
 }
 
 export interface ContextHint {
-  hint_text: string | null;
+  i18n_key: string | null;
   hint_id: number | null;
 }
 
@@ -74,6 +84,32 @@ class HelpService {
       body: JSON.stringify({ step }),
     });
     if (!response.ok) throw new Error('Failed to skip onboarding step');
+    return response.json();
+  }
+
+  /**
+   * Record progress within a deep-dive track (TF-625).
+   *
+   * `totalSteps` is sent along because only the client knows the track length
+   * from help-onboarding-steps.json — the backend deliberately keeps no second
+   * list, to avoid drift like TF-604.
+   */
+  async updateTrackStep(
+    token: string,
+    trackId: string,
+    step: number,
+    totalSteps: number,
+    skipped = false
+  ): Promise<OnboardingStatus> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/help/onboarding/track/${encodeURIComponent(trackId)}/step`,
+      {
+        method: 'PUT',
+        headers: this.getHeaders(token),
+        body: JSON.stringify({ step, total_steps: totalSteps, skipped }),
+      }
+    );
+    if (!response.ok) throw new Error('Failed to update onboarding track step');
     return response.json();
   }
 

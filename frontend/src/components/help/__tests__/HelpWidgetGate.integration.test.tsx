@@ -37,7 +37,7 @@ jest.mock('../useHelpContext', () => ({
       skipped_steps: [],
       completed: true,
     },
-    contextHint: { hint_text: null, hint_id: null },
+    contextHint: { i18n_key: null, hint_id: null },
     loading: false,
     completeStep: jest.fn(),
     skipStep: jest.fn(),

@@ -55,6 +55,10 @@ import {
   setLogoutCallback,
   setAdoptStoredTokensCallback,
 } from '../../api/apiClient';
+// eslint-disable-next-line import/first
+import i18n from '../../i18n';
+// eslint-disable-next-line import/first
+import { setPendingLanguage } from '../../utils/languagePreference';
 
 const ACCESS_TOKEN_KEY = 'examcraft_access_token';
 const REFRESH_TOKEN_KEY = 'examcraft_refresh_token';
@@ -299,6 +303,77 @@ describe('AuthContext — token refresh', () => {
     );
 
     expect(capturedAuth!.isAuthenticated).toBe(false);
+  });
+});
+
+// resolveLanguageOnProfileLoad itself is unit-tested in
+// languagePreference.test.ts, and the write side (setPendingLanguage /
+// clearPendingLanguage on save success/failure) in
+// ProfileView.language.test.tsx. Neither proves the only production caller —
+// AuthContext, which routes every profile load through it instead of the raw
+// account value — actually applies the pending choice. A regression here
+// (e.g. "simplifying" back to `i18n.changeLanguage(profile.preferred_language)`)
+// would not be caught anywhere else.
+describe('AuthContext — pending language preference precedence', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('applies the pending browser choice instead of the account language on login', async () => {
+    const accessToken = makeToken(900);
+    (mockAuthService.login as jest.Mock).mockResolvedValue({
+      access_token: accessToken,
+      refresh_token: 'rt-1',
+      token_type: 'bearer',
+    });
+    (mockAuthService.getProfile as jest.Mock).mockResolvedValue({
+      ...mockUser,
+      preferred_language: 'en',
+    } as any);
+
+    // A choice made in this browser, not yet saved to the account.
+    setPendingLanguage('fr');
+
+    let capturedAuth: ReturnType<typeof useAuth> | null = null;
+    render(
+      <AuthProvider>
+        <AuthConsumer onContext={(a) => { capturedAuth = a; }} />
+      </AuthProvider>,
+    );
+
+    await act(async () => {
+      await capturedAuth!.login('user@test.com', 'password');
+    });
+
+    expect(i18n.changeLanguage).toHaveBeenCalledWith('fr');
+    expect(i18n.changeLanguage).not.toHaveBeenCalledWith('en');
+  });
+
+  it('falls back to the account language when there is no pending choice', async () => {
+    const accessToken = makeToken(900);
+    (mockAuthService.login as jest.Mock).mockResolvedValue({
+      access_token: accessToken,
+      refresh_token: 'rt-1',
+      token_type: 'bearer',
+    });
+    (mockAuthService.getProfile as jest.Mock).mockResolvedValue({
+      ...mockUser,
+      preferred_language: 'en',
+    } as any);
+
+    let capturedAuth: ReturnType<typeof useAuth> | null = null;
+    render(
+      <AuthProvider>
+        <AuthConsumer onContext={(a) => { capturedAuth = a; }} />
+      </AuthProvider>,
+    );
+
+    await act(async () => {
+      await capturedAuth!.login('user@test.com', 'password');
+    });
+
+    expect(i18n.changeLanguage).toHaveBeenCalledWith('en');
   });
 });
 

@@ -336,7 +336,7 @@
       "title": "Studierende",
       "subtitle": "Stammdaten und Cross-Exam-Verlauf einzelner Studierender.",
       "loadError": "Studierende konnten nicht geladen werden.",
-      "emptyHint": "Noch keine Studierenden vorhanden.",
+      "emptyHint": "Noch keine Studierenden vorhanden. Studierende entstehen automatisch, sobald du unter «Auswertungen» Prüfungsresultate importierst.",
       "searchLabel": "Suche nach E-Mail / Name",
       "filterClass": "Klassenfilter",
       "filterAllClasses": "Alle Klassen",
@@ -411,7 +411,7 @@
   "auth": {
     "login": {
       "title": "Willkommen zurück",
-      "subtitle": "Melden Sie sich bei Ihrem Konto an",
+      "subtitle": "Melde dich bei deinem Konto an",
       "email": "E-Mail-Adresse",
       "password": "Passwort",
       "rememberMe": "Angemeldet bleiben",
@@ -421,7 +421,7 @@
       "orContinueWith": "Oder weiter mit",
       "noAccount": "Noch kein Konto?",
       "signUp": "Registrieren",
-      "emailAndPasswordRequired": "Bitte geben Sie E-Mail und Passwort ein"
+      "emailAndPasswordRequired": "Bitte gib E-Mail und Passwort ein"
     },
     "register": {
       "title": "Konto erstellen",
@@ -429,7 +429,7 @@
       "lastName": "Nachname",
       "email": "E-Mail",
       "institutionCode": "Institutionscode (Optional)",
-      "institutionCodeHint": "Geben Sie Ihren Institutionscode ein, falls vorhanden",
+      "institutionCodeHint": "Gib deinen Institutionscode ein, falls vorhanden",
       "password": "Passwort",
       "passwordReqTitle": "Das Passwort muss enthalten:",
       "passwordReqMinLength": "8+ Zeichen",
@@ -451,11 +451,11 @@
     },
     "verification": {
       "bannerTitle": "E-Mail-Verifizierung erforderlich",
-      "bannerText": "Bitte verifizieren Sie Ihre E-Mail-Adresse, um auf alle Funktionen zugreifen zu können. Überprüfen Sie Ihren Posteingang auf den Verifizierungslink.",
+      "bannerText": "Bitte verifiziere deine E-Mail-Adresse, um auf alle Funktionen zugreifen zu können. Überprüfe deinen Posteingang auf den Verifizierungslink.",
       "resendButton": "Verifizierungs-E-Mail erneut senden",
       "sending": "Wird gesendet...",
       "emailSent": "E-Mail gesendet!",
-      "successMessage": "Verifizierungs-E-Mail gesendet! Bitte überprüfen Sie Ihren Posteingang."
+      "successMessage": "Verifizierungs-E-Mail gesendet! Bitte überprüfe deinen Posteingang."
     },
     "oauth": {
       "processing": "OAuth-Rückruf wird verarbeitet...",
@@ -466,20 +466,20 @@
     },
     "resetRequest": {
       "title": "Passwort zurücksetzen",
-      "subtitle": "Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum Zurücksetzen Ihres Passworts.",
+      "subtitle": "Gib deine E-Mail-Adresse ein und wir senden dir einen Link zum Zurücksetzen deines Passworts.",
       "email": "E-Mail-Adresse",
       "sending": "Wird gesendet...",
       "sendResetLink": "Link senden",
       "cancel": "Abbrechen",
-      "checkEmail": "Überprüfen Sie Ihre E-Mail",
-      "sentTo": "Wir haben einen Link zum Zurücksetzen des Passworts an <strong>{{email}}</strong> gesendet. Bitte überprüfen Sie Ihren Posteingang und folgen Sie den Anweisungen.",
-      "redirecting": "Sie werden weitergeleitet...",
-      "enterEmail": "Bitte geben Sie Ihre E-Mail-Adresse ein",
-      "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein"
+      "checkEmail": "Überprüfe deine E-Mail",
+      "sentTo": "Wir haben einen Link zum Zurücksetzen des Passworts an <strong>{{email}}</strong> gesendet. Bitte überprüfe deinen Posteingang und folge den Anweisungen.",
+      "redirecting": "Du wirst weitergeleitet...",
+      "enterEmail": "Bitte gib deine E-Mail-Adresse ein",
+      "invalidEmail": "Bitte gib eine gültige E-Mail-Adresse ein"
     },
     "resetConfirm": {
       "title": "Neues Passwort festlegen",
-      "subtitle": "Bitte geben Sie Ihr neues Passwort ein.",
+      "subtitle": "Bitte gib dein neues Passwort ein.",
       "newPassword": "Neues Passwort",
       "passwordHint": "Mindestens 8 Zeichen",
       "confirmPassword": "Neues Passwort bestätigen",
@@ -487,18 +487,18 @@
       "resetPassword": "Passwort zurücksetzen",
       "cancel": "Abbrechen",
       "successTitle": "Passwort erfolgreich zurückgesetzt",
-      "successMessage": "Ihr Passwort wurde erfolgreich zurückgesetzt. Sie können sich jetzt mit Ihrem neuen Passwort anmelden.",
+      "successMessage": "Dein Passwort wurde erfolgreich zurückgesetzt. Du kannst dich jetzt mit deinem neuen Passwort anmelden.",
       "redirectingToLogin": "Weiterleitung zur Anmeldung..."
     },
     "validation": {
-      "required": "Bitte füllen Sie alle Pflichtfelder aus",
+      "required": "Bitte fülle alle Pflichtfelder aus",
       "passwordMismatch": "Passwörter stimmen nicht überein",
       "passwordMinLength": "Das Passwort muss mindestens 8 Zeichen lang sein",
       "passwordUppercase": "Das Passwort muss mindestens einen Grossbuchstaben enthalten",
       "passwordLowercase": "Das Passwort muss mindestens einen Kleinbuchstaben enthalten",
       "passwordNumber": "Das Passwort muss mindestens eine Zahl enthalten",
-      "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
-      "fillAllFields": "Bitte füllen Sie alle Felder aus"
+      "invalidEmail": "Bitte gib eine gültige E-Mail-Adresse ein",
+      "fillAllFields": "Bitte fülle alle Felder aus"
     }
   },
   "footer": {
@@ -731,7 +731,7 @@
       "generatedQuestions": "Generierte Fragen",
       "validatedQuestions": "Validierte Fragen",
       "recentActivity": "Letzte Aktivitäten",
-      "noActivity": "Keine Aktivitäten vorhanden. Starten Sie mit dem Hochladen von Dokumenten!",
+      "noActivity": "Keine Aktivitäten vorhanden. Starte mit dem Hochladen von Dokumenten!",
       "activityTypes": {
         "document_uploaded": "Dokument hochgeladen",
         "questions_generated": "Fragen generiert",
@@ -799,7 +799,7 @@
     },
     "billing": {
       "title": "Preispläne",
-      "subtitle": "Wählen Sie den Plan, der zu Ihnen passt.",
+      "subtitle": "Wähle den Plan, der zu dir passt.",
       "perMonth": "/Monat",
       "freeDescription": "Perfekt zum Ausprobieren von ExamCraft.",
       "currentPlan": "Aktueller Plan",
@@ -813,35 +813,35 @@
       "requestQuote": "Offerte anfordern",
       "processing": "Verarbeitung...",
       "subscribe": "Abonnieren",
-      "subscriptionError": "Abonnementprozess konnte nicht gestartet werden. Bitte versuchen Sie es erneut."
+      "subscriptionError": "Abonnementprozess konnte nicht gestartet werden. Bitte versuch es erneut."
     },
     "registrationSuccess": {
       "title": "Registrierung erfolgreich! 🎉",
       "subtitle": "Willkommen bei ExamCraft AI! Wir haben eine Bestätigungs-E-Mail gesendet an:",
-      "checkInbox": "Bitte überprüfen Sie Ihren Posteingang und klicken Sie auf den Bestätigungslink, um Ihr Konto zu aktivieren. Der Link läuft in 24 Stunden ab.",
+      "checkInbox": "Bitte überprüfe deinen Posteingang und klicke auf den Bestätigungslink, um dein Konto zu aktivieren. Der Link läuft in 24 Stunden ab.",
       "didntReceive": "E-Mail nicht erhalten?",
       "continueToDashboard": "Weiter zum Dashboard",
-      "limitedAccess": "Sie können weiterhin auf das Dashboard zugreifen, aber einige Funktionen sind möglicherweise eingeschränkt, bis Sie Ihre E-Mail bestätigt haben."
+      "limitedAccess": "Du kannst weiterhin auf das Dashboard zugreifen, aber einige Funktionen sind möglicherweise eingeschränkt, bis du deine E-Mail bestätigt hast."
     },
     "verifyEmail": {
       "verifying": "E-Mail wird verifiziert...",
-      "pleaseWait": "Bitte warten Sie, während wir Ihre E-Mail-Adresse verifizieren.",
+      "pleaseWait": "Bitte warte, während wir deine E-Mail-Adresse verifizieren.",
       "success": "E-Mail verifiziert! 🎉",
-      "welcomeUser": "Willkommen, {{name}}! Ihre E-Mail wurde erfolgreich verifiziert.",
-      "fullAccess": "Sie können jetzt auf alle Funktionen von ExamCraft AI zugreifen.",
+      "welcomeUser": "Willkommen, {{name}}! Deine E-Mail wurde erfolgreich verifiziert.",
+      "fullAccess": "Du kannst jetzt auf alle Funktionen von ExamCraft AI zugreifen.",
       "goToDashboard": "Zum Dashboard",
       "failed": "Verifizierung fehlgeschlagen",
       "linkExpired": "Der Verifizierungslink ist möglicherweise abgelaufen oder ungültig.",
       "backToLogin": "Zurück zur Anmeldung",
       "noToken": "Ungültiger Verifizierungslink. Kein Token angegeben.",
       "verificationFailed": "Verifizierung fehlgeschlagen",
-      "verifyEmailError": "E-Mail konnte nicht verifiziert werden. Bitte versuchen Sie es erneut."
+      "verifyEmailError": "E-Mail konnte nicht verifiziert werden. Bitte versuch es erneut."
     },
     "paymentSuccess": {
       "title": "Zahlung erfolgreich!",
-      "subtitle": "Vielen Dank für Ihr Abonnement. Ihr Konto wurde aktualisiert.",
+      "subtitle": "Vielen Dank für dein Abonnement. Dein Konto wurde aktualisiert.",
       "syncing": "Abonnement wird synchronisiert...",
-      "syncError": "Synchronisierung verzögert. Bitte laden Sie die Seite in einem Moment neu.",
+      "syncError": "Synchronisierung verzögert. Bitte lade die Seite in einem Moment neu.",
       "redirecting": "Weiterleitung zum Abonnement...",
       "viewSubscription": "Abonnement anzeigen"
     },
@@ -856,8 +856,8 @@
       "currentPlan": "Aktueller Plan",
       "period": "Aktuelle Periode",
       "price": "Preis",
-      "cancelWarning": "Ihr Abonnement wird am Ende der aktuellen Periode gekündigt.",
-      "freePlanMessage": "Sie nutzen derzeit den Free-Plan. Upgraden Sie für mehr Funktionen!",
+      "cancelWarning": "Dein Abonnement wird am Ende der aktuellen Periode gekündigt.",
+      "freePlanMessage": "Du nutzt derzeit den Free-Plan. Upgrade für mehr Funktionen!",
       "upgradePlan": "Plan upgraden",
       "changePlan": "Plan wechseln",
       "manageSubscription": "Abonnement verwalten",
@@ -949,22 +949,22 @@
     },
     "impersonation": {
       "dialogTitle": "Als Nutzer anmelden",
-      "dialogTargetLabel": "Sie melden sich an als:",
+      "dialogTargetLabel": "Du meldest dich an als:",
       "dialogReasonLabel": "Grund (Pflichtfeld)",
       "dialogReasonPlaceholder": "z. B. Support-Anfrage TICKET-123 nachstellen",
-      "dialogPasswordLabel": "Ihr Passwort (Bestätigung)",
-      "dialogPasswordPlaceholder": "Ihr aktuelles Passwort",
+      "dialogPasswordLabel": "Dein Passwort (Bestätigung)",
+      "dialogPasswordPlaceholder": "Dein aktuelles Passwort",
       "dialogConfirm": "Anmelden",
       "dialogStarting": "Wird gestartet...",
       "dialogCancel": "Abbrechen",
       "dialogLoadFailed": "Benutzer konnte nicht geladen werden",
       "dialogError": "Anmeldung als Nutzer fehlgeschlagen",
-      "reasonTooShort": "Bitte geben Sie mindestens {{min}} Zeichen als Grund an",
-      "passwordRequired": "Bitte bestätigen Sie Ihr Passwort",
+      "reasonTooShort": "Bitte gib mindestens {{min}} Zeichen als Grund an",
+      "passwordRequired": "Bitte bestätige dein Passwort",
       "bannerLabel": "Angemeldet als:",
       "bannerTimeRemaining": "Verbleibend: {{time}}",
       "bannerReturnButton": "Zurück zu meinem Account",
-      "bannerServerEndFailed": "Zurück zu Ihrem Konto — die serverseitige Sitzung konnte nicht sicher beendet werden. Sie läuft automatisch aus."
+      "bannerServerEndFailed": "Zurück zu deinem Konto — die serverseitige Sitzung konnte nicht sicher beendet werden. Sie läuft automatisch aus."
     },
     "userEditDialog": {
       "title": "Benutzer bearbeiten",
@@ -999,7 +999,7 @@
       "submissions": "Submissions / Attempts",
       "orgUnitMembershipsWarning": "{{count}} Organisationseinheiten-Mitgliedschaft(en) werden dabei entfernt (institutsgebunden, keine Entsprechung in der Ziel-Institution).",
       "confirmTitle": "Transfer bestätigen",
-      "confirmIntro": "Sie sind im Begriff, {{user}} von {{source}} → {{target}} zu verschieben.",
+      "confirmIntro": "Du bist im Begriff, {{user}} von {{source}} → {{target}} zu verschieben.",
       "confirmTransferred": "Transferiert werden:",
       "confirmExcluded": "Nicht transferiert:",
       "confirmIrreversible": "Diese Aktion kann nicht rückgängig gemacht werden.",
@@ -1091,7 +1091,7 @@
     },
     "roleManagement": {
       "title": "Rollen & Berechtigungen",
-      "subtitle": "Verwalten Sie Rollen und deren Feature-Zuordnungen für Ihr Team."
+      "subtitle": "Verwalte Rollen und deren Feature-Zuordnungen für dein Team."
     },
     "roleList": {
       "title": "Rollen-Verwaltung",
@@ -1105,14 +1105,14 @@
       "active": "Aktiv",
       "inactive": "Inaktiv",
       "emptyTitle": "Keine Rollen gefunden",
-      "emptySubtitle": "Erstellen Sie eine neue Rolle, um zu beginnen.",
+      "emptySubtitle": "Erstelle eine neue Rolle, um zu beginnen.",
       "btnCreateFirst": "Erste Rolle erstellen",
       "failedLoad": "Rollen konnten nicht geladen werden"
     },
     "roleEditor": {
       "titleEdit": "Rolle bearbeiten: {{name}}",
       "titleCreate": "Neue Rolle erstellen",
-      "systemRoleWarning": "⚠️ Achtung: Sie bearbeiten eine System-Rolle. Änderungen können die Funktionalität der Anwendung beeinträchtigen. Bitte nur Features hinzufügen/entfernen, wenn Sie sicher sind, was Sie tun.",
+      "systemRoleWarning": "⚠️ Achtung: Du bearbeitest eine System-Rolle. Änderungen können die Funktionalität der Anwendung beeinträchtigen. Bitte nur Features hinzufügen/entfernen, wenn du sicher bist, was du tust.",
       "nameLabel": "Rollen-Name (technisch)",
       "namePlaceholder": "z.B. custom_reviewer",
       "nameHint": "Nur Kleinbuchstaben, Zahlen und Unterstriche",
@@ -1178,9 +1178,9 @@
       "enterpriseUsersFootnote": "Technisch unbegrenzt – kommerziell gestaffelt: 10 Benutzer inklusive, +CHF 10/Benutzer ab dem 11., individuelle Offerte ab 30 Benutzern.",
       "enterpriseUsersInfoNote": "Bei Enterprise ist die Nutzeranzahl kommerziell (nicht technisch) gestaffelt: 10 Benutzer im Basispreis inklusive, weitere Benutzer bis 29 gegen Aufpreis, ab 30 Benutzern eine individuelle Offerte.",
       "failedLoad": "Abonnement-Stufen konnten nicht geladen werden",
-      "yourCurrentTier": "Ihr aktueller Tarif",
-      "yourCurrentTierWithName": "Ihr aktueller Tarif: {{tier}}",
-      "highestTierNote": "Ihr Institut ist bereits im höchsten verfügbaren Tarif. Ein Preisvergleich mit anderen Stufen entfällt daher – bei Enterprise weicht der Listenpreis zudem oft vom individuell vereinbarten Vertragspreis ab."
+      "yourCurrentTier": "Dein aktueller Tarif",
+      "yourCurrentTierWithName": "Dein aktueller Tarif: {{tier}}",
+      "highestTierNote": "Dein Institut ist bereits im höchsten verfügbaren Tarif. Ein Preisvergleich mit anderen Stufen entfällt daher – bei Enterprise weicht der Listenpreis zudem oft vom individuell vereinbarten Vertragspreis ab."
     },
     "promptLibrary": {
       "title": "Prompt Knowledge Base",
@@ -1204,12 +1204,12 @@
       "btnVersions": "Versionen",
       "btnDelete": "Löschen",
       "emptyTitle": "Keine Prompts gefunden",
-      "emptySearch": "Versuchen Sie eine andere Suche",
-      "emptyCreate": "Erstellen Sie Ihren ersten Prompt",
+      "emptySearch": "Versuch es mit einer anderen Suche",
+      "emptyCreate": "Erstelle deinen ersten Prompt",
       "btnCreateFirst": "Ersten Prompt erstellen",
-      "confirmDelete": "Möchten Sie diesen Prompt wirklich löschen?",
-      "confirmDeactivate": "Möchten Sie diesen Prompt wirklich deaktivieren?",
-      "confirmActivate": "Möchten Sie diesen Prompt wirklich aktivieren?",
+      "confirmDelete": "Möchtest du diesen Prompt wirklich löschen?",
+      "confirmDeactivate": "Möchtest du diesen Prompt wirklich deaktivieren?",
+      "confirmActivate": "Möchtest du diesen Prompt wirklich aktivieren?",
       "failedLoad": "Fehler beim Laden der Prompts",
       "failedDelete": "Fehler beim Löschen",
       "failedToggle": "Fehler beim Ändern des Status",
@@ -1266,7 +1266,7 @@
       "orgUnitPickerPlaceholder": "Org-Unit auswählen…",
       "noOrgUnit": "Keiner Org-Unit zugeordnet",
       "orgUnitsLoadError": "Team-Liste konnte nicht geladen werden. Bitte später erneut versuchen.",
-      "teamOrgUnitRequired": "Bitte wählen Sie eine Org-Unit für die Team-Sichtbarkeit aus.",
+      "teamOrgUnitRequired": "Bitte wähle eine Org-Unit für die Team-Sichtbarkeit aus.",
       "tagsLabel": "Tags",
       "tagPlaceholder": "Neuer Tag",
       "activeLabel": "Aktiv",
@@ -1274,7 +1274,7 @@
       "currentVersion": "Aktuelle Version: v{{version}}",
       "btnShowVersions": "Versionen anzeigen",
       "validationRequired": "Name, Content, Category und Use Case sind Pflichtfelder",
-      "useCaseRequired": "Bitte wählen Sie einen Fragetyp (Use Case) aus.",
+      "useCaseRequired": "Bitte wähle einen Fragetyp (Use Case) aus.",
       "successUpdated": "Prompt erfolgreich aktualisiert",
       "successVersionCreated": "Neue Version v{{version}} erstellt",
       "successCreated": "Prompt erfolgreich erstellt",
@@ -1334,7 +1334,7 @@
     },
     "semanticSearch": {
       "title": "Semantic Search Tester",
-      "subtitle": "Testen Sie die semantische Suche in der Prompt Knowledge Base",
+      "subtitle": "Teste die semantische Suche in der Prompt Knowledge Base",
       "queryLabel": "Suchanfrage",
       "queryPlaceholder": "z.B. 'Generiere Multiple Choice Fragen für Informatik'",
       "categoryLabel": "Kategorie (optional)",
@@ -1351,8 +1351,8 @@
       "btnSearching": "Suche läuft...",
       "resultsTitle": "Suchergebnisse ({{count}})",
       "emptyTitle": "Keine Ergebnisse gefunden",
-      "emptySubtitle": "Versuchen Sie eine andere Suchanfrage oder passen Sie die Filter an",
-      "errorEmpty": "Bitte geben Sie eine Suchanfrage ein",
+      "emptySubtitle": "Versuch es mit einer anderen Suchanfrage oder passe die Filter an",
+      "errorEmpty": "Bitte gib eine Suchanfrage ein",
       "failedSearch": "Fehler bei der Suche"
     },
     "gradingSchemes": {
@@ -1511,7 +1511,7 @@
         "unknown_error": "Unerwarteter Fehler bei der Verarbeitung. Details siehe Vorschau."
       },
       "noDocuments": "Keine Dokumente vorhanden",
-      "noDocumentsHint": "Laden Sie Dokumente hoch, um mit der RAG-basierten Prüfungserstellung zu beginnen.",
+      "noDocumentsHint": "Lade Dokumente hoch, um mit der RAG-basierten Prüfungserstellung zu beginnen.",
       "vectorsAvailable": "Vector Embeddings verfügbar",
       "processingRunning": "Verarbeitung läuft...",
       "ocr": {
@@ -1542,7 +1542,7 @@
       "menuProcessing": "Verarbeitung läuft...",
       "menuDelete": "Löschen",
       "deleteTitle": "Dokument löschen",
-      "deleteConfirm": "Möchten Sie das Dokument \"{{title}}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteConfirm": "Möchtest du das Dokument \"{{title}}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
       "cancel": "Abbrechen",
       "delete": "Löschen",
       "close": "Schließen",
@@ -1669,7 +1669,7 @@
         "delete": "Löschen",
         "deleteConfirmButton": "Löschen",
         "deleteTitle": "Dokumente löschen",
-        "deleteConfirm": "Möchten Sie {{count}} Dokument(e) wirklich löschen?",
+        "deleteConfirm": "Möchtest du {{count}} Dokument(e) wirklich löschen?",
         "deleteSummary": "{{deleted}} Dokument(e) gelöscht",
         "deleteSummaryWithErrors": "{{deleted}} Dokument(e) gelöscht, {{failed}} fehlgeschlagen",
         "visibilitySummary": "{{changed}} von {{total}} geändert, {{skipped}} übersprungen",
@@ -1687,7 +1687,7 @@
     "documentUpload": {
       "dropActive": "Dateien hier ablegen...",
       "dropTitle": "Dokumente hochladen",
-      "dropHint": "Ziehen Sie Dateien hierher oder klicken Sie zum Auswählen",
+      "dropHint": "Zieh Dateien hierher oder klicke zum Auswählen",
       "dropFormats": "Unterstützte Formate: {{formats}} • Max. {{max}} Dateien",
       "queueTitle": "Upload-Warteschlange ({{count}})",
       "uploading": "Uploading...",
@@ -1767,7 +1767,7 @@
       "filterOpenEnded": "Offene Frage",
       "filterTrueFalse": "Wahr/Falsch",
       "refresh": "Aktualisieren",
-      "noQuestions": "Keine Fragen gefunden, die Ihren Filtern entsprechen.",
+      "noQuestions": "Keine Fragen gefunden, die deinen Filtern entsprechen.",
       "addComment": "Kommentar hinzufügen",
       "commentLabel": "Kommentar",
       "cancelBtn": "Abbrechen",
@@ -1810,7 +1810,7 @@
       "templateNotRecorded": "Vorlage nicht erfasst",
       "showComments": "Kommentare anzeigen",
       "hideComments": "Kommentare ausblenden",
-      "noComments": "Noch keine Kommentare. Klicken Sie auf das Kommentar-Symbol, um einen hinzuzufügen.",
+      "noComments": "Noch keine Kommentare. Klicke auf das Kommentar-Symbol, um einen hinzuzufügen.",
       "reviewedBy": "Überprüft von {{name}} am {{date}}",
       "startReview": "Review starten",
       "approveBtn": "Genehmigen",
@@ -1853,7 +1853,7 @@
       "singleChoice": "Einfachauswahl",
       "multipleResponse": "Mehrfachauswahl",
       "openQuestion": "Offene Frage",
-      "answerPlaceholder": "Ihre Antwort hier eingeben...",
+      "answerPlaceholder": "Deine Antwort hier eingeben...",
       "explanation": "Erklärung",
       "examId": "Prüfung ID: {{id}}",
       "created": "Erstellt: {{date}}",
@@ -1890,13 +1890,13 @@
       "bloomLevel": "Bloom-Taxonomiestufe",
       "bloomNotSpecified": "Nicht angegeben",
       "estimatedTime": "Geschätzte Zeit (Minuten)",
-      "unsavedChanges": "Sie haben ungespeicherte Änderungen",
-      "unsavedConfirm": "Sie haben ungespeicherte Änderungen. Möchten Sie wirklich abbrechen?",
+      "unsavedChanges": "Du hast ungespeicherte Änderungen",
+      "unsavedConfirm": "Du hast ungespeicherte Änderungen. Möchtest du wirklich abbrechen?",
       "cancel": "Abbrechen",
       "saveChanges": "Änderungen speichern",
       "validationQuestionLength": "Der Fragetext muss mindestens 10 Zeichen lang sein",
       "validationMinOptions": "Multiple-Choice-Fragen benötigen mindestens 2 Optionen",
-      "validationSelectAnswer": "Bitte wählen Sie eine korrekte Antwort",
+      "validationSelectAnswer": "Bitte wähle eine korrekte Antwort",
       "validationAnswerInOptions": "Die korrekte Antwort muss eine der Optionen sein",
       "tagCreateError": "Einige Tags konnten nicht erstellt werden: {{names}}",
       "saveError": "Speichern fehlgeschlagen. Bitte versuche es erneut."
@@ -1906,15 +1906,15 @@
       "message": "Entschuldigung, es ist ein unerwarteter Fehler aufgetreten. Wir wurden automatisch benachrichtigt und werden das Problem beheben.",
       "retry": "Erneut versuchen",
       "home": "Zur Startseite",
-      "support": "Wenn das Problem weiterhin besteht, kontaktieren Sie bitte den Support."
+      "support": "Wenn das Problem weiterhin besteht, kontaktiere bitte den Support."
     },
     "cards": {
       "open": "Öffnen →"
     },
     "basicExamCreator": {
       "title": "Prüfungsfragen generieren",
-      "subtitle": "Erstellen Sie Prüfungsfragen basierend auf einem Thema",
-      "topicRequired": "Bitte geben Sie ein Thema ein",
+      "subtitle": "Erstelle Prüfungsfragen basierend auf einem Thema",
+      "topicRequired": "Bitte gib ein Thema ein",
       "generationError": "Fehler bei der Generierung",
       "successMessage": "Prüfungsfragen erfolgreich generiert!",
       "topicLabel": "Thema",
@@ -1940,8 +1940,8 @@
     },
     "ragExamCreator": {
       "premiumTitle": "RAG Exam Creator - Premium Feature",
-      "premiumDescription": "Der RAG Exam Creator ist im Premium-Paket verfügbar. Diese Funktion ermöglicht die automatische Generierung von Prüfungsfragen aus Ihren Dokumenten mittels KI-gestützter RAG (Retrieval-Augmented Generation).",
-      "premiumUpgrade": "Um auf diese Funktion zuzugreifen, upgraden Sie bitte auf den Starter-, Professional- oder Enterprise-Plan.",
+      "premiumDescription": "Der RAG Exam Creator ist im Premium-Paket verfügbar. Diese Funktion ermöglicht die automatische Generierung von Prüfungsfragen aus deinen Dokumenten mittels KI-gestützter RAG (Retrieval-Augmented Generation).",
+      "premiumUpgrade": "Um auf diese Funktion zuzugreifen, upgrade bitte auf den Starter-, Professional- oder Enterprise-Plan.",
       "back": "Zurück",
       "viewPlans": "Premium-Pläne anzeigen"
     }
@@ -2131,7 +2131,7 @@
       "compositionFailed": "Komposition fehlgeschlagen.",
       "targetPointsRequired": "Zielpunkte muss eine positive Zahl sein.",
       "targetDurationRequired": "Zieldauer muss eine positive Zahl sein.",
-      "noConstraints": "Bitte geben Sie mindestens Zielpunkte, eine Zieldauer oder eine Verteilung an.",
+      "noConstraints": "Bitte gib mindestens Zielpunkte, eine Zieldauer oder eine Verteilung an.",
       "back": "Zurück",
       "accept": "Übernehmen",
       "accepting": "Füge hinzu...",
@@ -2180,7 +2180,7 @@
   "profile": {
     "profilePage": {
       "title": "Mein Profil",
-      "subtitle": "Verwalten Sie Ihre Kontoeinstellungen und Präferenzen",
+      "subtitle": "Verwalte deine Kontoeinstellungen und Präferenzen",
       "tabProfile": "Profil",
       "tabEdit": "Profil bearbeiten",
       "tabPassword": "Passwort ändern"
@@ -2203,7 +2203,8 @@
       "permissions": "Berechtigungen",
       "settings": "Einstellungen",
       "language": "Sprache",
-      "languageHint": "Ändert die Sprache der gesamten Anwendung"
+      "languageHint": "Ändert die Sprache der gesamten Anwendung",
+      "languageSaveFailed": "Die Sprache gilt für diesen Browser, konnte aber nicht im Konto gespeichert werden. Andere Geräte übernehmen sie noch nicht."
     },
     "profileEdit": {
       "header": "Profil bearbeiten",
@@ -2215,8 +2216,8 @@
       "institution": "Institution",
       "accountStatus": "Kontostatus",
       "na": "N/A",
-      "validationRequired": "Bitte füllen Sie alle Pflichtfelder aus",
-      "validationEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
+      "validationRequired": "Bitte fülle alle Pflichtfelder aus",
+      "validationEmail": "Bitte gib eine gültige E-Mail-Adresse ein",
       "cancel": "Abbrechen",
       "saving": "Speichern...",
       "saveChanges": "Änderungen speichern"
@@ -2224,15 +2225,15 @@
     "passwordChange": {
       "headerSet": "Passwort festlegen",
       "headerChange": "Passwort ändern",
-      "oauthInfo": "Sie sind derzeit über {{provider}} angemeldet. Legen Sie ein Passwort fest, um die E-Mail/Passwort-Anmeldung zu aktivieren.",
-      "validationFillAll": "Bitte füllen Sie alle Felder aus",
+      "oauthInfo": "Du bist derzeit über {{provider}} angemeldet. Lege ein Passwort fest, um die E-Mail/Passwort-Anmeldung zu aktivieren.",
+      "validationFillAll": "Bitte fülle alle Felder aus",
       "validationMismatch": "Die neuen Passwörter stimmen nicht überein",
       "validationMinLength": "Das neue Passwort muss mindestens 8 Zeichen lang sein",
       "validationSamePassword": "Das neue Passwort muss sich vom aktuellen Passwort unterscheiden",
       "successSetTitle": "Passwort erfolgreich festgelegt",
       "successChangeTitle": "Passwort erfolgreich geändert",
-      "successSetMessage": "Ihr Passwort wurde festgelegt. Sie können sich jetzt mit Ihrer E-Mail und Ihrem Passwort anmelden.",
-      "successChangeMessage": "Ihr Passwort wurde aktualisiert. Sie können sich jetzt mit Ihrem neuen Passwort anmelden.",
+      "successSetMessage": "Dein Passwort wurde festgelegt. Du kannst dich jetzt mit deiner E-Mail und deinem Passwort anmelden.",
+      "successChangeMessage": "Dein Passwort wurde aktualisiert. Du kannst dich jetzt mit deinem neuen Passwort anmelden.",
       "currentPassword": "Aktuelles Passwort *",
       "newPassword": "Neues Passwort *",
       "passwordHint": "Mindestens 8 Zeichen",
@@ -2285,13 +2286,13 @@
     "loading": "Laden...",
     "unauthorized": {
       "title": "Zugriff verweigert",
-      "message": "Sie haben keine Berechtigung, auf diese Seite zuzugreifen.",
+      "message": "Du hast keine Berechtigung, auf diese Seite zuzugreifen.",
       "attemptedAccess": "Zugriffsversuch auf:",
       "currentUser": "Aktueller Benutzer:",
       "roles": "Rollen:",
       "goBack": "Zurück",
       "goToDashboard": "Zum Dashboard",
-      "helpText": "Wenn Sie glauben, dass dies ein Fehler ist, wenden Sie sich bitte an Ihren Administrator."
+      "helpText": "Wenn du glaubst, dass dies ein Fehler ist, wende dich bitte an deinen Administrator."
     }
   },
   "layout": {
@@ -2362,7 +2363,7 @@
       "back": "Zurück",
       "next": "Weiter",
       "errorLoadingData": "Fehler beim Laden der Daten",
-      "errorTopicAndDocument": "Bitte geben Sie ein Thema ein und wählen Sie mindestens ein Dokument aus.",
+      "errorTopicAndDocument": "Bitte gib ein Thema ein und wähle mindestens ein Dokument aus.",
       "errorContextPreview": "Fehler bei der Kontextanalyse",
       "errorExamGeneration": "Fehler bei der Generierung der Prüfungsfragen",
       "runningGenerations": "Laufende Generierungen",
@@ -2375,8 +2376,8 @@
       "newGeneration": "Neue Generierung",
       "quickRepeat": "Schnelle Wiederholung",
       "step1Label": "Dokumente auswählen",
-      "step1Description": "Wählen Sie die Dokumente aus, aus denen Prüfungsfragen generiert werden sollen.",
-      "noDocuments": "Keine verarbeiteten Dokumente verfügbar. Laden Sie zuerst Dokumente hoch und lassen Sie sie verarbeiten.",
+      "step1Description": "Wähle die Dokumente aus, aus denen Prüfungsfragen generiert werden sollen.",
+      "noDocuments": "Keine verarbeiteten Dokumente verfügbar. Lade zuerst Dokumente hoch und lass sie verarbeiten.",
       "staleRestoredDocs": "{{count}} wiederhergestellte Dokumentauswahl(en) sind nicht mehr verfügbar (z. B. gelöscht) und wurden entfernt. Bitte Auswahl bei Bedarf ergänzen.",
       "textChunks": "{{count}} Textabschnitte",
       "step2Label": "Prüfungsparameter konfigurieren",
@@ -2388,9 +2389,9 @@
       "languageLabel": "Sprache",
       "questionTypeLabel": "Fragetyp:",
       "promptTemplatesLabel": "Prompt-Templates (Optional):",
-      "promptTemplatesDescription": "Wählen Sie ein spezifisches Prompt-Template aus der Library. Wenn kein Template ausgewählt wird, werden die Standard-Prompts verwendet.",
+      "promptTemplatesDescription": "Wähle ein spezifisches Prompt-Template aus der Library. Wenn kein Template ausgewählt wird, werden die Standard-Prompts verwendet.",
       "step3Label": "Kontextanalyse",
-      "step3Description": "Überprüfen Sie den gefundenen Kontext und die Empfehlungen vor der Generierung.",
+      "step3Description": "Überprüfe den gefundenen Kontext und die Empfehlungen vor der Generierung.",
       "loadingPreview": "Analysiere Kontext…",
       "loadContextPreview": "Kontext analysieren",
       "foundContext": "Gefundener Kontext",
@@ -2419,10 +2420,10 @@
       "frameworkRestoreFailed": "Der zuvor ausgewählte Kompetenzrahmen ist nicht mehr verfügbar (z. B. archiviert). Bitte bei Bedarf neu auswählen.",
       "competenciesOverrideLabel": "Kompetenzen (editierbar)",
       "competenciesOverrideHelper": "Wird wörtlich als {{ competencies }} in die Generierung übernommen.",
-      "restoredStateNotice": "Ihr letzter Konfigurationsstand wurde wiederhergestellt.",
+      "restoredStateNotice": "Dein letzter Konfigurationsstand wurde wiederhergestellt.",
       "discardRestoredState": "Neu beginnen",
       "dismissNotice": "Hinweis schliessen",
-      "reviewQueueHint": "Die generierten Fragen landen automatisch in der Prüf-Queue. Sie können die Seite während der Generierung verlassen — sie läuft im Hintergrund weiter.",
+      "reviewQueueHint": "Die generierten Fragen landen automatisch in der Prüf-Queue. Du kannst die Seite während der Generierung verlassen — sie läuft im Hintergrund weiter.",
       "restoredStateDocsReplaced": "Neue Dokumentauswahl übernommen — die übrige Konfiguration wurde zurückgesetzt.",
       "restorePreviousConfig": "Vorherige Konfiguration übernehmen",
       "stepGoTo": "Zu Schritt {{number}} wechseln: {{label}}",
@@ -2452,9 +2453,9 @@
     },
     "documentChat": {
       "title": "Dokument-ChatBot",
-      "subtitle": "Stellen Sie Fragen zu Ihren hochgeladenen Dokumenten",
-      "yourSessions": "Ihre Chat-Sessions",
-      "noSessions": "Noch keine Chat-Sessions. Erstellen Sie eine neue Session, um mit Ihren Dokumenten zu chatten.",
+      "subtitle": "Stell Fragen zu deinen hochgeladenen Dokumenten",
+      "yourSessions": "Deine Chat-Sessions",
+      "noSessions": "Noch keine Chat-Sessions. Erstelle eine neue Session, um mit deinen Dokumenten zu chatten.",
       "newSession": "Neue Session",
       "minutesAgo": "Vor {{count}} Min.",
       "hoursAgo": "Vor {{count}} Std.",
@@ -2462,24 +2463,24 @@
       "errorCreatingSession": "Fehler beim Erstellen der Session",
       "errorLoadingSession": "Fehler beim Laden der Session",
       "errorLoadingSessions": "Fehler beim Laden der Sessions",
-      "confirmDeleteSession": "Möchten Sie diese Chat-Session wirklich löschen?",
+      "confirmDeleteSession": "Möchtest du diese Chat-Session wirklich löschen?",
       "deleteChat": "Chat löschen",
       "errorDeletingSession": "Fehler beim Löschen der Session",
       "newChat": "Neuer Chat",
-      "noSessionsHint": "Starten Sie einen neuen Chat, um mit Ihren Dokumenten zu interagieren.",
-      "noProcessedDocuments": "Laden Sie zuerst ein Dokument hoch und warten Sie, bis es verarbeitet wurde. Danach können Sie hier aktualisieren.",
+      "noSessionsHint": "Starte einen neuen Chat, um mit deinen Dokumenten zu interagieren.",
+      "noProcessedDocuments": "Lade zuerst ein Dokument hoch und warte, bis es verarbeitet wurde. Danach kannst du hier aktualisieren.",
       "lastUpdated": "Zuletzt aktualisiert: {{date}}",
       "sessionInfo": "{{messages}} Nachrichten · {{documents}} Dokument(e)"
     },
     "chatInterface": {
-      "errorSending": "Fehler beim Senden der Nachricht. Bitte versuchen Sie es erneut.",
+      "errorSending": "Fehler beim Senden der Nachricht. Bitte versuch es erneut.",
       "errorExporting": "Fehler beim Exportieren",
       "exportChat": "Chat exportieren",
       "exportAsMarkdown": "Als Markdown exportieren",
       "exportAsJson": "Als JSON exportieren",
       "cancel": "Abbrechen",
       "thinking": "Denkt nach...",
-      "placeholder": "Stellen Sie eine Frage zu Ihren Dokumenten...",
+      "placeholder": "Stell eine Frage zu deinen Dokumenten...",
       "sources": "Quellen",
       "confidence": "Konfidenz",
       "errorNoToken": "Sitzung abgelaufen. Bitte melde dich erneut an.",
@@ -2509,7 +2510,7 @@
       "defaultTitle": "Unbenanntes Dokument",
       "startChat": "Chat starten",
       "chatTitleLabel": "Chat-Titel",
-      "chatTitlePlaceholder": "Geben Sie einen Titel für den Chat ein..."
+      "chatTitlePlaceholder": "Gib einen Titel für den Chat ein..."
     },
     "promptWizard": {
       "tab": {
@@ -2517,8 +2518,8 @@
         "errorLoadingSession": "Fehler beim Laden der Session",
         "errorCreatingSession": "Fehler beim Erstellen der Session",
         "errorDeleting": "Fehler beim Löschen",
-        "confirmDelete": "Möchten Sie diese Wizard-Session wirklich löschen?",
-        "selectOrCreateSession": "Wählen Sie eine Session aus oder erstellen Sie eine neue."
+        "confirmDelete": "Möchtest du diese Wizard-Session wirklich löschen?",
+        "selectOrCreateSession": "Wähle eine Session aus oder erstelle eine neue."
       },
       "chat": {
         "sessionExpired": "Sitzung abgelaufen. Bitte melde dich erneut an.",
@@ -2526,7 +2527,7 @@
         "errorGenerating": "Fehler beim Generieren des Templates",
         "generateTemplate": "Template generieren",
         "generating": "Generiere Template...",
-        "placeholder": "Beschreiben Sie, was Ihr Prompt tun soll...",
+        "placeholder": "Beschreibe, was dein Prompt tun soll...",
         "templateSaved": "Template wurde gespeichert"
       },
       "sessionList": {
@@ -2543,7 +2544,7 @@
       },
       "newSession": {
         "title": "Neue Wizard-Session",
-        "description": "Starten Sie eine neue KI-unterstützte Prompt-Erstellung. Optional können Sie ein bestehendes Template als Referenz auswählen.",
+        "description": "Starte eine neue KI-unterstützte Prompt-Erstellung. Optional kannst du ein bestehendes Template als Referenz auswählen.",
         "referenceLabel": "Referenz-Template (optional)",
         "noReference": "Ohne Referenz starten",
         "cancel": "Abbrechen",
@@ -2552,7 +2553,7 @@
       "templatePreview": {
         "generatedTemplate": "Generiertes Template",
         "templateName": "Template Name",
-        "enterName": "Bitte geben Sie einen Namen ein",
+        "enterName": "Bitte gib einen Namen ein",
         "generatedViaAI": "Generiert via KI-Assistent",
         "addTag": "Tag hinzufügen...",
         "editInEditor": "Im Editor bearbeiten",
@@ -2563,7 +2564,7 @@
     "prompts": {
       "library": {
         "title": "Prompt-Bibliothek",
-        "description": "Verwalten Sie Ihre Prompt-Vorlagen und laden Sie neue Prompts hoch.",
+        "description": "Verwalte deine Prompt-Vorlagen und lade neue Prompts hoch.",
         "tabPromptList": "Prompt-Liste",
         "tabFileUpload": "Datei-Upload",
         "tabAIAssistant": "KI-Assistent"
@@ -2582,7 +2583,7 @@
         "typeTrueFalse": "Richtig/Falsch",
         "loadingPrompts": "Lade Prompts für {{type}}...",
         "errorLoading": "Fehler beim Laden der Prompts: {{message}}",
-        "noPromptsAvailable": "Keine Prompts für {{type}} verfügbar. Bitte erstellen Sie zuerst einen Prompt in der Prompt Library.",
+        "noPromptsAvailable": "Keine Prompts für {{type}} verfügbar. Bitte erstelle zuerst einen Prompt in der Prompt Library.",
         "promptTemplateFor": "Prompt-Template für {{type}}",
         "useDefault": "Standard-Prompt verwenden",
         "errorRendering": "Fehler beim Rendern der Vorschau",
@@ -2593,7 +2594,7 @@
       },
       "uploadZone": {
         "title": "Prompt-Vorlagen hochladen",
-        "description": "Laden Sie Prompt-Dateien mit YAML-Frontmatter hoch (.md oder .txt). Mehrfachauswahl möglich (max. 50 Dateien).",
+        "description": "Lade Prompt-Dateien mit YAML-Frontmatter hoch (.md oder .txt). Mehrfachauswahl möglich (max. 50 Dateien).",
         "dropHere": "Dateien hier ablegen...",
         "dragOrClick": "Dateien hierher ziehen oder klicken zum Auswählen",
         "supportedFormats": "Unterstützte Formate: .md, .txt",
@@ -2607,13 +2608,13 @@
         "duplicateDialogTitle": "Vorlagen bereits vorhanden",
         "duplicateWarning": "Folgende Vorlagen existieren bereits:",
         "currentVersion": "Aktuelle Version: {{version}} — Datei: {{filename}}",
-        "duplicateQuestion": "Möchten Sie die bestehenden Vorlagen als neue Version aktualisieren?",
+        "duplicateQuestion": "Möchtest du die bestehenden Vorlagen als neue Version aktualisieren?",
         "cancel": "Abbrechen",
         "saveAsNewVersion": "Als neue Version speichern",
         "hideExample": "Beispiel ausblenden",
         "showExample": "Dateiformat-Beispiel anzeigen",
         "exampleTitle": "Beispiel: my_prompt.md",
-        "uploadFailed": "Upload fehlgeschlagen. Bitte versuchen Sie es erneut.",
+        "uploadFailed": "Upload fehlgeschlagen. Bitte versuch es erneut.",
         "maxFilesExceeded": "Maximal 50 Dateien erlaubt"
       },
       "variablesEditor": {
@@ -2631,7 +2632,21 @@
     "newConversation": "Neue Konversation",
     "thinking": "Denke nach…",
     "catchUp": {
+      "message": "Neue Seiten wurden freigeschaltet — möchtest du die Tour dafür nachholen?",
       "button": "Jetzt erkunden"
+    },
+    "tracks": {
+      "title": "Vertiefungen",
+      "intro": "Kurze Touren zu einzelnen Bereichen — keine davon ist Pflicht.",
+      "start": "Starten",
+      "resume": "Fortsetzen",
+      "restart": "Nochmal",
+      "done": "Abgeschlossen",
+      "new": "Neu"
+    },
+    "tabs": {
+      "tours": "Touren",
+      "chat": "Chat"
     },
     "onboarding": {
       "skip": "Überspringen",
@@ -2640,6 +2655,9 @@
       "resume": "Später fortsetzen",
       "later": "Später",
       "startTour": "Tour starten",
+      "closeTour": "Tour beenden",
+      "coreTourTitle": "Einführungstour",
+      "coreTourReplayHint": "Die Grundlagen noch einmal durchgehen.",
       "confirmEndTitle": "Tour beenden?",
       "confirmEndText": "Du kannst die Tour später über den Hilfe-Button unten rechts neu starten.",
       "confirmEndCancel": "Abbrechen",
@@ -2657,6 +2675,229 @@
     "feedback": {
       "helpful": "War das hilfreich?",
       "thanks": "Danke für dein Feedback!"
+    },
+    "tour": {
+      "teacher": {
+        "core": {
+          "0": {
+            "title": "Willkommen bei ExamCraft AI!",
+            "description": "Ich zeige dir in wenigen Schritten, wie du deine erste Prüfung erstellst. Klicke auf «Tour starten» für eine geführte Einführung."
+          },
+          "1": {
+            "title": "Dashboard",
+            "description": "Das ist dein persönliches Dashboard. Hier siehst du Schnellzugriffe auf alle wichtigen Funktionen und eine Übersicht deiner Aktivitäten."
+          },
+          "2": {
+            "title": "Dokument hochladen",
+            "description": "Lade dein Kursmaterial als PDF, Word oder Markdown hoch. Ziehe die Datei einfach in den Upload-Bereich oder klicke darauf."
+          },
+          "3": {
+            "title": "Dokumentenbibliothek",
+            "description": "Hier siehst du alle hochgeladenen Dokumente. Wähle ein oder mehrere Dokumente aus, um daraus Prüfungsfragen zu generieren."
+          },
+          "4": {
+            "title": "Prüfung erstellen",
+            "description": "Wähle Schwierigkeitsgrad, Fragenanzahl und Prüfungsformat — die KI generiert passende Fragen aus deinen Dokumenten."
+          },
+          "5": {
+            "title": "Fragen reviewen und exportieren",
+            "description": "Überprüfe die generierten Fragen, bewerte sie und exportiere die fertige Prüfung als PDF oder Moodle-XML."
+          },
+          "6": {
+            "title": "Prompt-Bibliothek",
+            "description": "Hier verwaltest du die Vorlagen, mit denen die KI Fragen formuliert. Passe sie an deinen Unterrichtsstil an."
+          },
+          "7": {
+            "title": "Fertig!",
+            "description": "Du kennst jetzt den Weg vom Dokument zur fertigen Prüfung. Im Hilfe-Widget unten rechts warten kurze Vertiefungen zu Auswertungen, Prüfungskomponist und weiteren Bereichen — jederzeit startbar, keine davon ist Pflicht."
+          }
+        },
+        "tracks": {
+          "auswertungen": {
+            "title": "Auswertungen",
+            "description": "Prüfungsergebnisse, Klassen und einzelne Studierende auswerten.",
+            "steps": {
+              "0": {
+                "title": "Prüfungsauswertung",
+                "description": "Hier stehen alle Prüfungen deiner Institution. Eine Prüfung erscheint in dieser Liste, sobald du sie im Prüfungskomponist erstellt hast. Pro Zeile liest du dann über «Resultate importieren» die Ergebnisse ein — erst danach gibt es Notenschnitt, Durchfallquote und die Auswertung Frage für Frage."
+              },
+              "1": {
+                "title": "Klassen",
+                "description": "Klassen bündeln Studierende über mehrere Prüfungen hinweg. Sie entstehen beim Import einer Prüfung oder du legst sie hier über «Klasse anlegen» von Hand an — danach siehst du die Leistungsentwicklung der ganzen Klasse."
+              },
+              "2": {
+                "title": "Studierende",
+                "description": "Die Einzelansicht pro Studierende: alle Prüfungsresultate, Stärken und Lücken auf einen Blick. Studierende werden automatisch angelegt, sobald du Prüfungsresultate importierst — du musst sie nicht von Hand erfassen."
+              }
+            }
+          },
+          "exam-composer": {
+            "title": "Prüfungen zusammenstellen",
+            "description": "Aus geprüften Fragen eine Prüfung nach Mass bauen.",
+            "steps": {
+              "0": {
+                "title": "Prüfungskomponist",
+                "description": "Statt eine Prüfung komplett generieren zu lassen, stellst du sie hier aus bereits geprüften Fragen selbst zusammen — Reihenfolge, Punkte und Gewichtung bestimmst du."
+              }
+            }
+          },
+          "werkzeuge": {
+            "title": "Werkzeuge",
+            "description": "Dokumenten-Chat und Aktivitätsprotokoll.",
+            "steps": {
+              "0": {
+                "title": "Dokumenten-Chat",
+                "description": "Stelle Fragen direkt an deine hochgeladenen Dokumente. Nützlich, um Stoff zu prüfen, bevor du Fragen daraus generierst."
+              },
+              "1": {
+                "title": "Aktivitäten",
+                "description": "Das Protokoll aller Vorgänge in deinem Konto — Uploads, Generierungen, Exporte. Praktisch, um nachzuvollziehen, was wann passiert ist."
+              }
+            }
+          },
+          "einstellungen": {
+            "title": "Einstellungen",
+            "description": "Tags und Kompetenzrahmen für deine Fragen.",
+            "steps": {
+              "0": {
+                "title": "Tag-Verwaltung",
+                "description": "Mit Tags ordnest du Fragen nach Thema, Kapitel oder Lernziel. Gut gepflegte Tags machen den Prüfungskomponist deutlich schneller."
+              },
+              "1": {
+                "title": "Kompetenzrahmen",
+                "description": "Hinterlege den Kompetenzrahmen deines Lehrplans. Die KI richtet generierte Fragen dann an den definierten Lernzielstufen aus."
+              }
+            }
+          }
+        }
+      },
+      "admin": {
+        "core": {
+          "0": {
+            "title": "Willkommen, Administrator!",
+            "description": "Ich zeige dir in wenigen Schritten den Weg vom Dokument zur fertigen Prüfung. Die Administrationsbereiche folgen danach als eigene Vertiefungen."
+          },
+          "1": {
+            "title": "Dashboard",
+            "description": "Das ist dein persönliches Dashboard. Hier siehst du Schnellzugriffe auf alle wichtigen Funktionen und eine Übersicht deiner Aktivitäten."
+          },
+          "2": {
+            "title": "Dokument hochladen",
+            "description": "Lade dein Kursmaterial als PDF, Word oder Markdown hoch. Ziehe die Datei einfach in den Upload-Bereich oder klicke darauf."
+          },
+          "3": {
+            "title": "Dokumentenbibliothek",
+            "description": "Hier siehst du alle hochgeladenen Dokumente. Wähle ein oder mehrere Dokumente aus, um daraus Prüfungsfragen zu generieren."
+          },
+          "4": {
+            "title": "Prüfung erstellen",
+            "description": "Wähle Schwierigkeitsgrad, Fragenanzahl und Prüfungsformat — die KI generiert passende Fragen aus deinen Dokumenten."
+          },
+          "5": {
+            "title": "Fragen reviewen und exportieren",
+            "description": "Überprüfe die generierten Fragen, bewerte sie und exportiere die fertige Prüfung als PDF oder Moodle-XML."
+          },
+          "6": {
+            "title": "Prompt-Bibliothek",
+            "description": "Hier verwaltest du die Vorlagen, mit denen die KI Fragen formuliert. Passe sie an den Unterrichtsstil eurer Institution an."
+          },
+          "7": {
+            "title": "Fertig!",
+            "description": "Du kennst jetzt den Weg vom Dokument zur fertigen Prüfung. Im Hilfe-Widget unten rechts warten kurze Vertiefungen zu Auswertungen, Benutzerverwaltung, Moodle-Anbindung und weiteren Bereichen — jederzeit startbar, keine davon ist Pflicht."
+          }
+        },
+        "tracks": {
+          "auswertungen": {
+            "title": "Auswertungen",
+            "description": "Prüfungsergebnisse, Klassen und einzelne Studierende auswerten.",
+            "steps": {
+              "0": {
+                "title": "Prüfungsauswertung",
+                "description": "Hier stehen alle Prüfungen deiner Institution. Eine Prüfung erscheint in dieser Liste, sobald du sie im Prüfungskomponist erstellt hast. Pro Zeile liest du dann über «Resultate importieren» die Ergebnisse ein — erst danach gibt es Notenschnitt, Durchfallquote und die Auswertung Frage für Frage."
+              },
+              "1": {
+                "title": "Klassen",
+                "description": "Klassen bündeln Studierende über mehrere Prüfungen hinweg. Sie entstehen beim Import einer Prüfung oder du legst sie hier über «Klasse anlegen» von Hand an — danach siehst du die Leistungsentwicklung der ganzen Klasse."
+              },
+              "2": {
+                "title": "Studierende",
+                "description": "Die Einzelansicht pro Studierende: alle Prüfungsresultate, Stärken und Lücken auf einen Blick. Studierende werden automatisch angelegt, sobald du Prüfungsresultate importierst — du musst sie nicht von Hand erfassen."
+              }
+            }
+          },
+          "exam-composer": {
+            "title": "Prüfungen zusammenstellen",
+            "description": "Aus geprüften Fragen eine Prüfung nach Mass bauen.",
+            "steps": {
+              "0": {
+                "title": "Prüfungskomponist",
+                "description": "Statt eine Prüfung komplett generieren zu lassen, stellst du sie hier aus bereits geprüften Fragen selbst zusammen — Reihenfolge, Punkte und Gewichtung bestimmst du."
+              }
+            }
+          },
+          "werkzeuge": {
+            "title": "Werkzeuge",
+            "description": "Dokumenten-Chat und Aktivitätsprotokoll.",
+            "steps": {
+              "0": {
+                "title": "Dokumenten-Chat",
+                "description": "Stelle Fragen direkt an die hochgeladenen Dokumente. Nützlich, um Stoff zu prüfen, bevor du Fragen daraus generierst."
+              },
+              "1": {
+                "title": "Aktivitäten",
+                "description": "Das Protokoll aller Vorgänge — Uploads, Generierungen, Exporte. Praktisch, um nachzuvollziehen, was wann passiert ist."
+              }
+            }
+          },
+          "admin-benutzer": {
+            "title": "Benutzer und Rechte",
+            "description": "Benutzerverwaltung, Institutionen und Rollen im Admin-Panel.",
+            "steps": {
+              "0": {
+                "title": "Benutzer-Verwaltung",
+                "description": "Hier legst du Konten an, weist Rollen zu und deaktivierst ausgeschiedene Nutzer."
+              },
+              "1": {
+                "title": "Institutionen",
+                "description": "Institutionen bündeln Nutzer, Dokumente und Abonnement. Jeder Nutzer gehört genau einer Institution an."
+              },
+              "2": {
+                "title": "Rollen & Berechtigungen",
+                "description": "Rollen bestimmen, welche Funktionen jemand sieht. Berechtigungen werden hier gebündelt statt pro Person vergeben."
+              }
+            }
+          },
+          "admin-betrieb": {
+            "title": "Betrieb und Integrationen",
+            "description": "Audit-Log, Abonnement und die Moodle-Anbindung.",
+            "steps": {
+              "0": {
+                "title": "Audit Logs",
+                "description": "Jede sicherheitsrelevante Aktion wird hier protokolliert — wer wann was geändert hat."
+              },
+              "1": {
+                "title": "Abonnement",
+                "description": "Tarif, Kontingente und Rechnungen deiner Institution. Der Tarif bestimmt, welche Funktionen freigeschaltet sind."
+              },
+              "2": {
+                "title": "Moodle-Verbindung",
+                "description": "Verbinde ExamCraft mit eurer Moodle-Instanz, um Prüfungen direkt dorthin zu übertragen statt sie von Hand zu exportieren."
+              }
+            }
+          }
+        }
+      },
+      "next": "Weiter →",
+      "finish": "Fertig ✓",
+      "navInstruction": "Klicke den markierten Menüpunkt an um fortzufahren.",
+      "tabInstruction": "Klicke den markierten Tab an um fortzufahren."
+    },
+    "hints": {
+      "documents": "Tipp: Strukturierte PDFs mit Überschriften liefern bessere Prüfungsfragen.",
+      "questionsGenerate": "Neu hier? Wähle zuerst 3–5 Dokumente für optimale Qualität.",
+      "questionsReview": "Über die Filter oben blendest du gezielt ausstehende, genehmigte oder abgelehnte Fragen ein.",
+      "examsCompose": "Hier erscheinen nur geprüfte Fragen — wirkt die Auswahl leer, fehlt noch das Review.",
+      "prompts": "Die Live-Vorschau zeigt dir, wie der Prompt mit echten Variablen aussieht."
     }
   },
   "competencyFrameworks": {

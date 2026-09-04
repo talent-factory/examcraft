@@ -4,57 +4,81 @@ from models.help import HelpContextHint
 
 logger = logging.getLogger(__name__)
 
+# Structure only — the texts live in the frontend's translation.json under
+# `help.hints.*`, like every other string in the product. They used to sit in
+# four hint_text_* columns here, which made this the one help surface whose
+# language the server picked; switching the language left the hint stale until
+# a reload. Same move e43b3ed made for the tour (TF-625/TF-670).
+#
+# The key is explicit rather than derived from route_pattern so that renaming a
+# route does not silently detach its text.
 DEFAULT_HINTS = [
+    # Route patterns are matched with `startswith` against the visited path
+    # (help_context_service). Two of these pointed at paths this app has never
+    # had — "/documents/upload" (upload lives on /documents) and "/exam/create"
+    # (it is /questions/generate) — so the two hints carrying the only
+    # genuinely non-obvious advice could never fire, while filler ones did.
     {
-        "route_pattern": "/documents/upload",
+        "route_pattern": "/documents",
         "role": "teacher",
-        "hint_text_de": "Tipp: Strukturierte PDFs mit Überschriften liefern bessere Prüfungsfragen.",
-        "hint_text_en": "Tip: Structured PDFs with headings produce better exam questions.",
+        "i18n_key": "help.hints.documents",
         "priority": 10,
     },
     {
-        "route_pattern": "/exam/create",
+        "route_pattern": "/questions/generate",
         "role": "teacher",
-        "hint_text_de": "Neu hier? Wähle zuerst 3–5 Dokumente für optimale Qualität.",
-        "hint_text_en": "New here? Select 3–5 documents first for optimal quality.",
-        "priority": 10,
-    },
-    {
-        "route_pattern": "/admin/users",
-        "role": "admin",
-        "hint_text_de": "Du kannst Benutzerrollen direkt in der Tabelle ändern.",
-        "hint_text_en": "You can change user roles directly in the table.",
+        "i18n_key": "help.hints.questionsGenerate",
         "priority": 10,
     },
     {
         "route_pattern": "/prompts",
         "role": None,  # Visible for all roles (teacher + admin)
-        "hint_text_de": "Die Live-Vorschau zeigt dir, wie der Prompt mit echten Variablen aussieht.",
-        "hint_text_en": "The live preview shows you how the prompt looks with real variables.",
+        "i18n_key": "help.hints.prompts",
         "priority": 10,
     },
+    # The next two used to restate their own page title ("review questions" on
+    # the review page). Rewritten to point at something the page does not say
+    # by itself — the filters, and where the composer's questions come from.
     {
         "route_pattern": "/questions/review",
         "role": "teacher",
-        "hint_text_de": "Überprüfe generierte Fragen und bewerte sie, um die Qualität zu verbessern.",
-        "hint_text_en": "Review generated questions and rate them to improve quality.",
+        "i18n_key": "help.hints.questionsReview",
         "priority": 5,
     },
     {
         "route_pattern": "/exams/compose",
         "role": "teacher",
-        "hint_text_de": "Wähle Fragen aus der Bibliothek und stelle deine Prüfung zusammen.",
-        "hint_text_en": "Select questions from the library and compose your exam.",
+        "i18n_key": "help.hints.examsCompose",
         "priority": 5,
     },
 ]
 
-_UPSERT_FIELDS = ("role", "hint_text_de", "hint_text_en", "priority")
+_UPSERT_FIELDS = ("role", "i18n_key", "priority")
+
+
+# Patterns that were corrected or dropped above. The upsert keys on
+# route_pattern, so fixing a pattern inserts a new row and leaves the old one
+# behind — dead but present, and it would reappear in every environment that
+# ran the old seed.
+#
+# "/admin/users" never existed as a route: the user management is a tab in
+# React state under "/admin" (Admin.tsx), and the path only appears in
+# routes/AppRoutes.example.tsx, which nothing imports. The hint therefore never
+# fired once. Dropped rather than re-pointed at "/admin": the admin tour walks
+# that page in two deep-dive tracks, so a hint there adds nothing.
+OBSOLETE_ROUTE_PATTERNS = ("/documents/upload", "/exam/create", "/admin/users")
 
 
 def seed_help_hints(db: Session) -> int:
     created = 0
     updated = 0
+    removed = (
+        db.query(HelpContextHint)
+        .filter(HelpContextHint.route_pattern.in_(OBSOLETE_ROUTE_PATTERNS))
+        .delete(synchronize_session=False)
+    )
+    if removed:
+        logger.info("Removed %d obsolete help hint(s)", removed)
     for hint_data in DEFAULT_HINTS:
         existing = (
             db.query(HelpContextHint)
@@ -74,9 +98,14 @@ def seed_help_hints(db: Session) -> int:
             if changed:
                 updated += 1
 
-    if created > 0 or updated > 0:
+    # `removed` belongs in this condition: without it a run that only deletes
+    # obsolete rows commits nothing and the delete is rolled back on close.
+    if created > 0 or updated > 0 or removed > 0:
         db.commit()
-        logger.info(f"Help context hints: {created} created, {updated} updated.")
+        logger.info(
+            f"Help context hints: {created} created, {updated} updated, "
+            f"{removed} removed."
+        )
     else:
         logger.info("Help context hints already up to date, skipping.")
 

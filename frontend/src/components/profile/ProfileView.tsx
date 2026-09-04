@@ -3,11 +3,16 @@
  * Display user profile information
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../../utils/dateLocale';
 import { useAuth } from '../../contexts/AuthContext';
 import AuthService from '../../services/AuthService';
+import {
+  getPendingLanguage,
+  setPendingLanguage,
+  clearPendingLanguage,
+} from '../../utils/languagePreference';
 
 interface ProfileViewProps {
   onEdit?: () => void;
@@ -17,6 +22,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [avatarError, setAvatarError] = useState(false);
+  const [languageSaveFailed, setLanguageSaveFailed] = useState(false);
+
+  // A choice that never reached the account gets one more try whenever this
+  // page is opened. Without it the browser and the account stay apart until
+  // the user happens to switch languages again.
+  useEffect(() => {
+    const pending = getPendingLanguage();
+    const token = localStorage.getItem('examcraft_access_token');
+    if (!pending || !user || !token) return;
+    AuthService.updateProfile(token, { preferred_language: pending })
+      .then(() => {
+        clearPendingLanguage();
+        setLanguageSaveFailed(false);
+      })
+      .catch((error) => {
+        // Still unreachable. The choice keeps applying here, which is the
+        // whole point of the marker — no need to bother the user again. But
+        // silent forever is too silent: if this keeps failing on every visit
+        // (an expired token, a backend regression), there should be at least
+        // a console trace, unlike the explicit save path just below, which
+        // also surfaces it in the UI.
+        console.warn('[ProfileView] Retrying the pending language preference failed:', error);
+      });
+  }, [user]);
 
   if (!user) {
     return (
@@ -45,20 +74,35 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
     { code: 'it', label: '🇮🇹 Italiano' },
   ];
 
+  /**
+   * Switching the language is a client-side operation and cannot fail on the
+   * network; saving the preference to the account can. They used to share one
+   * try/catch, so a failed SAVE undid a successful CHANGE — the user was put
+   * back into the language they had just left, with the error going only to
+   * the console. Anything that breaks the PATCH did it: a flaky connection, an
+   * expired token, the IP rate limiter.
+   *
+   * Now the change stands and only the sync is reported. The marker keeps the
+   * account value from overwriting the choice on the next profile load.
+   */
   const handleLanguageChange = async (lng: string) => {
-    const previousLanguage = i18n.language;
+    setLanguageSaveFailed(false);
+    setPendingLanguage(lng);
+    await i18n
+      .changeLanguage(lng)
+      .catch((e: unknown) => console.error('[ProfileView] Language change failed:', e));
+
+    const token = localStorage.getItem('examcraft_access_token');
+    if (!user || !token) return;
+
     try {
-      await i18n.changeLanguage(lng);
-      const token = localStorage.getItem('examcraft_access_token');
-      if (user && token) {
-        await AuthService.updateProfile(token, { preferred_language: lng });
-      }
+      await AuthService.updateProfile(token, { preferred_language: lng });
+      // Account and browser agree again — drop the marker so a language set on
+      // another device is not ignored here forever.
+      clearPendingLanguage();
     } catch (error) {
-      console.error('[ProfileView] Language change failed:', error);
-      await i18n.changeLanguage(previousLanguage).catch((e: unknown) =>
-        console.error('[ProfileView] Failed to revert language:', e)
-      );
-      localStorage.setItem('examcraft_language', previousLanguage);
+      console.error('[ProfileView] Saving the language preference failed:', error);
+      setLanguageSaveFailed(true);
     }
   };
 
@@ -255,6 +299,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
             <p className="mt-1 text-sm text-gray-500">
               {t('profile.profileView.languageHint')}
             </p>
+            {languageSaveFailed && (
+              <p role="status" className="mt-1 text-sm text-amber-700">
+                {t('profile.profileView.languageSaveFailed')}
+              </p>
+            )}
           </div>
         </div>
       </div>
