@@ -469,6 +469,17 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"❌ Error loading Premium Wizard API: {e}")
 
+        # Premium: Ops-Dashboard Health API (TF-785)
+        try:
+            from premium.api.v1 import ops as ops_api
+
+            app.include_router(ops_api.router)
+            print("✅ Premium Ops Health API loaded")
+        except ImportError as e:
+            print(f"⚠️  Premium Ops Health API not available: {e}")
+        except Exception as e:
+            print(f"❌ Error loading Premium Ops Health API: {e}")
+
         # Premium: MCP Facade Server (Fly.io Management Tools)
         try:
             from premium.mcp import create_mcp_app
