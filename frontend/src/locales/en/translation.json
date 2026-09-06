@@ -779,7 +779,37 @@
       "tabSubscription": "Subscription",
       "tabGradingSchemes": "Grading Schemes",
       "tabOrgUnits": "Organizational Units",
+      "tabSystemHealth": "System Health",
       "auditPlaceholder": "Audit Logs — Coming soon",
+      "systemHealth": {
+        "title": "System Health",
+        "subtitle": "Live status of ExamCraft's core components — refreshes automatically every 10 seconds.",
+        "lastUpdated": "Last updated: {{time}}",
+        "refreshing": "Refreshing…",
+        "loadError": "Could not load health status.",
+        "staleError": "Refresh failed — the data shown may be out of date.",
+        "retry": "Retry",
+        "openTool": "Open tool",
+        "component": {
+          "frontend": "Frontend",
+          "backend": "Backend",
+          "db": "Database",
+          "rabbitmq": "RabbitMQ",
+          "celery": "Celery"
+        },
+        "status": {
+          "green": "OK",
+          "yellow": "Warning",
+          "red": "Critical"
+        },
+        "metricLabel": {
+          "reachable_machines": "Reachable machines",
+          "latency_ms": "Latency (ms)",
+          "queued_messages": "Queued messages",
+          "online_workers": "Active workers",
+          "error": "Check failed"
+        }
+      },
       "audit": {
         "filterAll": "All",
         "filterCategory": "Category",

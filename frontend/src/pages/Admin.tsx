@@ -17,8 +17,10 @@ import { UserRole } from '../types/auth';
 import AdminGradingSchemes from './AdminGradingSchemes';
 import AdminOrgUnits from './AdminOrgUnits';
 import AuditLogView from '../components/admin/AuditLogView';
+import SystemHealthPanel from '../components/admin/SystemHealthPanel';
+import { isFullDeployment } from '../utils/deploymentMode';
 
-type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'competency-frameworks' | 'grading-schemes' | 'org-units';
+type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'competency-frameworks' | 'grading-schemes' | 'org-units' | 'system-health';
 
 interface TabConfig {
   key: AdminTab;
@@ -33,11 +35,16 @@ export const Admin: React.FC = () => {
   const isAdmin = isSuperuser || hasRole(UserRole.ADMIN);
   const canManageGradingSchemes = hasPermission('grading_schemes:manage');
   const canManageOrgUnits = hasPermission('manage_org_units');
+  // GET /api/v1/ops/health is only registered in Full deployment (it probes
+  // Fly/RabbitMQ/Celery, which don't exist in Core) — hide the tab in Core
+  // instead of showing a permanently-erroring, endlessly-polling panel.
+  const showSystemHealth = isSuperuser && isFullDeployment();
 
   const tabs: TabConfig[] = [
     { key: 'users', label: t('pages.admin.tabUsers'), visible: true },
     { key: 'institutions', label: t('pages.admin.tabInstitutions'), visible: isSuperuser },
     { key: 'roles', label: t('pages.admin.tabRoles'), visible: isSuperuser },
+    { key: 'system-health', label: t('pages.admin.tabSystemHealth'), visible: showSystemHealth },
     { key: 'audit', label: t('pages.admin.tabAudit'), visible: isAdmin },
     { key: 'subscription', label: t('pages.admin.tabSubscription'), visible: isAdmin },
     { key: 'tags', label: t('nav.sidebar.tagSettings', 'Tag-Verwaltung'), visible: isAdmin },
@@ -91,6 +98,11 @@ export const Admin: React.FC = () => {
         {effectiveTab === 'roles' && (
           <div data-testid="admin-tab-content-roles">
             <AdminRoles />
+          </div>
+        )}
+        {effectiveTab === 'system-health' && (
+          <div data-testid="admin-tab-content-system-health">
+            <SystemHealthPanel />
           </div>
         )}
         {effectiveTab === 'audit' && (

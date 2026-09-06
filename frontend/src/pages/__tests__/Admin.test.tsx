@@ -38,6 +38,10 @@ jest.mock('../../components/admin/AuditLogView', () => ({
   __esModule: true,
   default: () => <div data-testid="audit-log-view" />,
 }));
+jest.mock('../../components/admin/SystemHealthPanel', () => ({
+  __esModule: true,
+  default: () => <div data-testid="system-health-panel" />,
+}));
 
 // Mock useAuth
 const mockHasRole = jest.fn();
@@ -52,11 +56,21 @@ jest.mock('../../contexts/AuthContext', () => ({
   }),
 }));
 
+// GET /api/v1/ops/health only exists in Full deployment (see Admin.tsx's
+// isFullDeployment() gate on the System Health tab) — default to Full here
+// so the existing tab-switching tests don't need to know about it; the
+// dedicated 'System Health tab' tests below override this per case.
+const mockIsFullDeployment = jest.fn();
+jest.mock('../../utils/deploymentMode', () => ({
+  isFullDeployment: () => mockIsFullDeployment(),
+}));
+
 describe('Admin Page', () => {
   beforeEach(() => {
     mockUser.is_superuser = false;
     mockHasRole.mockReturnValue(false);
     mockHasPermission.mockReturnValue(false);
+    mockIsFullDeployment.mockReturnValue(true);
   });
 
   describe('RBAC tab visibility', () => {
@@ -183,6 +197,37 @@ describe('Admin Page', () => {
 
       expect(screen.getByText('Admin-Panel')).toBeInTheDocument();
       expect(screen.getByText('Verwalte Benutzer, Einstellungen und Systemkonfiguration')).toBeInTheDocument();
+    });
+  });
+
+  describe('System Health tab', () => {
+    it('hides the System Health tab for non-superusers', () => {
+      mockHasRole.mockReturnValue(true);
+
+      render(<Admin />);
+
+      expect(screen.queryByText('System Health')).not.toBeInTheDocument();
+    });
+
+    it('shows and switches to the System Health tab for superusers in Full deployment', () => {
+      mockUser.is_superuser = true;
+
+      render(<Admin />);
+
+      expect(screen.getByText('System Health')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('System Health'));
+
+      expect(screen.getByTestId('admin-tab-content-system-health')).toBeInTheDocument();
+      expect(screen.getByTestId('system-health-panel')).toBeInTheDocument();
+    });
+
+    it('hides the System Health tab for superusers in Core deployment (GET /api/v1/ops/health does not exist there)', () => {
+      mockUser.is_superuser = true;
+      mockIsFullDeployment.mockReturnValue(false);
+
+      render(<Admin />);
+
+      expect(screen.queryByText('System Health')).not.toBeInTheDocument();
     });
   });
 });

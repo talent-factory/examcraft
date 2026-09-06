@@ -779,7 +779,37 @@
       "tabSubscription": "Abonnement",
       "tabGradingSchemes": "Bewertungsschemata",
       "tabOrgUnits": "Organisationseinheiten",
+      "tabSystemHealth": "System Health",
       "auditPlaceholder": "Audit Logs — Demnächst verfügbar",
+      "systemHealth": {
+        "title": "System Health",
+        "subtitle": "Live-Status der ExamCraft-Kernkomponenten — aktualisiert automatisch alle 10 Sekunden.",
+        "lastUpdated": "Zuletzt aktualisiert: {{time}}",
+        "refreshing": "Aktualisiere…",
+        "loadError": "Health-Status konnte nicht geladen werden.",
+        "staleError": "Aktualisierung fehlgeschlagen — angezeigte Daten sind möglicherweise veraltet.",
+        "retry": "Erneut versuchen",
+        "openTool": "Tool öffnen",
+        "component": {
+          "frontend": "Frontend",
+          "backend": "Backend",
+          "db": "Datenbank",
+          "rabbitmq": "RabbitMQ",
+          "celery": "Celery"
+        },
+        "status": {
+          "green": "OK",
+          "yellow": "Warnung",
+          "red": "Kritisch"
+        },
+        "metricLabel": {
+          "reachable_machines": "Erreichbare Maschinen",
+          "latency_ms": "Latenz (ms)",
+          "queued_messages": "Wartende Nachrichten",
+          "online_workers": "Aktive Worker",
+          "error": "Fehler bei der Prüfung"
+        }
+      },
       "audit": {
         "filterAll": "Alle",
         "filterCategory": "Kategorie",

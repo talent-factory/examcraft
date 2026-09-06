@@ -779,7 +779,37 @@
       "tabSubscription": "Abonnement",
       "tabGradingSchemes": "Schèmes de notation",
       "tabOrgUnits": "Unités organisationnelles",
+      "tabSystemHealth": "État du système",
       "auditPlaceholder": "Journaux d'audit — Bientôt disponible",
+      "systemHealth": {
+        "title": "État du système",
+        "subtitle": "État en direct des composants principaux d'ExamCraft — actualisation automatique toutes les 10 secondes.",
+        "lastUpdated": "Dernière mise à jour : {{time}}",
+        "refreshing": "Actualisation…",
+        "loadError": "Impossible de charger l'état du système.",
+        "staleError": "Échec de l'actualisation — les données affichées peuvent être obsolètes.",
+        "retry": "Réessayer",
+        "openTool": "Ouvrir l'outil",
+        "component": {
+          "frontend": "Frontend",
+          "backend": "Backend",
+          "db": "Base de données",
+          "rabbitmq": "RabbitMQ",
+          "celery": "Celery"
+        },
+        "status": {
+          "green": "OK",
+          "yellow": "Avertissement",
+          "red": "Critique"
+        },
+        "metricLabel": {
+          "reachable_machines": "Machines joignables",
+          "latency_ms": "Latence (ms)",
+          "queued_messages": "Messages en attente",
+          "online_workers": "Workers actifs",
+          "error": "Échec de la vérification"
+        }
+      },
       "audit": {
         "filterAll": "Tous",
         "filterCategory": "Catégorie",
