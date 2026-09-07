@@ -809,6 +809,8 @@
           "online_workers": "Worker attivi",
           "error": "Controllo non riuscito"
         },
+        "sentryErrorCount_one": "{{count}} errore Sentry (5 min)",
+        "sentryErrorCount_other": "{{count}} errori Sentry (5 min)",
         "chat": {
           "title": "Assistente chat AI",
           "subtitle": "Sola lettura — poni domande sullo stato del sistema, non vengono eseguite azioni.",

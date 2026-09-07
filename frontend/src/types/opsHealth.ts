@@ -25,6 +25,13 @@ export type OpsMetricLabel =
 
 export interface OpsHealthSentry {
   configured: boolean;
+  // Backend-only in practice: only `get_backend_health()` in
+  // `ops_health_service.py` populates this when `configured` is `true`
+  // (`null` when the Sentry API call failed). `get_frontend_health()` always
+  // returns just `{ configured }` for the `frontend` component's `sentry`
+  // object — this field is `undefined` there regardless of `configured`,
+  // since the frontend's own Sentry error-rate integration is still a stub.
+  error_count_5m?: number | null;
 }
 
 export interface OpsComponentHealth {

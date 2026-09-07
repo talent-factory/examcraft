@@ -46,4 +46,60 @@ describe('SystemHealthCard', () => {
 
     expect(screen.getByText('—')).toBeInTheDocument();
   });
+
+  // TF-788: get_backend_health() adds sentry.error_count_5m, but until now no
+  // component rendered it — a wasted Sentry API call on every 10s poll (see
+  // PR #248 review). Only the backend card, and only once configured with an
+  // actual count, should show it.
+  describe('Sentry error count (backend only)', () => {
+    it('renders the Sentry error count for the backend card when configured', () => {
+      render(
+        <SystemHealthCard
+          componentKey="backend"
+          health={{ ...baseHealth, sentry: { configured: true, error_count_5m: 3 } }}
+        />
+      );
+
+      expect(screen.getByText('pages.admin.systemHealth.sentryErrorCount')).toBeInTheDocument();
+    });
+
+    it('does not render the caption when Sentry is not configured', () => {
+      render(
+        <SystemHealthCard
+          componentKey="backend"
+          health={{ ...baseHealth, sentry: { configured: false } }}
+        />
+      );
+
+      expect(
+        screen.queryByText('pages.admin.systemHealth.sentryErrorCount')
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not render the caption when error_count_5m is null (Sentry call failed)', () => {
+      render(
+        <SystemHealthCard
+          componentKey="backend"
+          health={{ ...baseHealth, sentry: { configured: true, error_count_5m: null } }}
+        />
+      );
+
+      expect(
+        screen.queryByText('pages.admin.systemHealth.sentryErrorCount')
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not render the caption for non-backend components even if sentry is present', () => {
+      render(
+        <SystemHealthCard
+          componentKey="frontend"
+          health={{ ...baseHealth, sentry: { configured: true, error_count_5m: 3 } }}
+        />
+      );
+
+      expect(
+        screen.queryByText('pages.admin.systemHealth.sentryErrorCount')
+      ).not.toBeInTheDocument();
+    });
+  });
 });

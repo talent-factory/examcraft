@@ -809,6 +809,8 @@
           "online_workers": "Workers actifs",
           "error": "Échec de la vérification"
         },
+        "sentryErrorCount_one": "{{count}} erreur Sentry (5 min)",
+        "sentryErrorCount_other": "{{count}} erreurs Sentry (5 min)",
         "chat": {
           "title": "Assistant de chat IA",
           "subtitle": "Lecture seule — pose des questions sur l'état du système, ne déclenche aucune action.",

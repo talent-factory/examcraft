@@ -58,6 +58,71 @@ def _validate_claude_model(**_kwargs):
         )
 
 
+def _resolve_premium_ops_alert_registration(deployment_mode: str) -> tuple[dict, dict]:
+    """Bedingte Celery-Registrierung für den Premium-Ops-Alert-Task (TF-788).
+
+    Core-only-Deployments mounten ``premium/`` gar nicht — ein unbedingter
+    Import von ``premium.tasks.ops_alert_tasks`` würde den
+    Celery-Worker-Start dort crashen lassen. Reine Funktion (kein
+    Seiteneffekt auf ``celery_app`` selbst ausser dem Import), damit sie
+    ohne Neuaufbau/Reload der echten Celery-App unit-testbar ist — siehe
+    ``test_celery_config.py::test_premium_ops_alert_registration_*``.
+
+    MUSS erst aufgerufen werden, nachdem ``celery_app = Celery(...)`` unten
+    in dieser Datei vollständig konstruiert ist (siehe Aufrufstelle am
+    Dateiende) — ``premium.tasks.ops_alert_tasks`` importiert seinerseits
+    ``from celery_app import celery_app``, was auf das noch nicht fertig
+    initialisierte Modul träfe, wenn dieser Import früher liefe. Der Aufruf
+    MUSS ausserdem NACH den literalen Zuweisungen ``celery_app.conf.beat_schedule
+    = {...}`` und ``celery_app.conf.task_routes = {...}`` weiter unten in
+    dieser Datei stehen — sonst würden diese Zuweisungen die per
+    ``.update(...)`` hier ergänzten Einträge wieder überschreiben und die
+    Ops-Alert-Registrierung stumm deaktivieren.
+
+    Analog dem in ``main.py`` etablierten Try/Except-Muster für
+    Premium-API-Router (``if is_full_deployment: try: from premium.X import
+    Y ... except ImportError: ...``). Fängt bewusst nicht nur ``ImportError``,
+    sondern jede Exception beim Import ab: ``premium.tasks.ops_alert_tasks``
+    importiert seinerseits ``ops_alert_service``/``telegram_notifier`` — ein
+    Bug dort (z. B. ein ``AttributeError`` durch einen Tippfehler) wäre keine
+    ``ImportError`` und würde sonst ungefangen den Import von ``celery_app``
+    selbst crashen lassen. Da ``celery_app`` auch von ``main.py`` importiert
+    wird, würde das nicht nur den Celery-Worker, sondern das gesamte
+    FastAPI-Backend lahmlegen — genau das, was diese Funktion verhindern soll.
+    """
+    if deployment_mode != "full":
+        return {}, {}
+    try:
+        import premium.tasks.ops_alert_tasks  # noqa: F401 — registriert die Task via @celery_app.task
+    except ImportError as e:
+        logger.warning("Premium ops-alert task not available: %s", e)
+        return {}, {}
+    except Exception as e:
+        logger.error(
+            "Premium ops-alert task import failed unexpectedly — degrading "
+            "to no-op instead of crashing celery_app import: %s",
+            e,
+            exc_info=True,
+        )
+        return {}, {}
+
+    task_name = "premium.tasks.ops_alert_tasks.check_ops_alert_thresholds"
+    return (
+        {
+            "check-ops-alert-thresholds": {
+                "task": task_name,
+                "schedule": float(os.getenv("OPS_ALERT_CHECK_INTERVAL_SECONDS", "120")),
+            }
+        },
+        {
+            task_name: {
+                "queue": "maintenance_processing",
+                "routing_key": "maintenance.process",
+            }
+        },
+    )
+
+
 # Celery App Initialization
 celery_app = Celery(
     "examcraft",
@@ -286,3 +351,12 @@ celery_app.conf.task_routes = {
 }
 
 logger.info("Celery app initialized with RabbitMQ broker")
+
+# TF-788: bedingte Premium-Ops-Alert-Registrierung. Muss NACH der
+# vollständigen celery_app-Konstruktion + beat_schedule/task_routes stehen
+# (siehe Docstring von _resolve_premium_ops_alert_registration).
+_premium_ops_alert_beat, _premium_ops_alert_routes = (
+    _resolve_premium_ops_alert_registration(os.getenv("DEPLOYMENT_MODE", "core"))
+)
+celery_app.conf.beat_schedule.update(_premium_ops_alert_beat)
+celery_app.conf.task_routes.update(_premium_ops_alert_routes)

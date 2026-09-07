@@ -44,6 +44,15 @@ const SystemHealthCard: React.FC<SystemHealthCardProps> = ({ componentKey, healt
             {health.detail}
           </Typography>
         )}
+        {componentKey === 'backend' &&
+          health.sentry?.configured &&
+          health.sentry.error_count_5m != null && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              {t('pages.admin.systemHealth.sentryErrorCount', {
+                count: health.sentry.error_count_5m,
+              })}
+            </Typography>
+          )}
         {health.deep_link && (
           <Box sx={{ mt: 1 }}>
             <a

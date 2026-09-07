@@ -19,6 +19,7 @@ REDIS_DB_RATELIMIT = 2  # Database 2 for rate limiting
 REDIS_DB_MCP_OAUTH = (
     3  # Database 3 for MCP OAuth store (clients, tokens, auth codes, state) — TF-726
 )
+REDIS_DB_OPS_ALERTS = 4  # Database 4 for Ops-Dashboard alert debounce state (TF-788)
 
 
 class RedisService:
@@ -28,6 +29,7 @@ class RedisService:
     _blacklist_client: Optional[redis.Redis] = None
     _ratelimit_client: Optional[redis.Redis] = None
     _mcp_oauth_client: Optional[redis.Redis] = None
+    _ops_alert_client: Optional[redis.Redis] = None
 
     @classmethod
     def get_session_client(cls) -> redis.Redis:
@@ -78,6 +80,22 @@ class RedisService:
         return cls._mcp_oauth_client
 
     @classmethod
+    def get_ops_alert_client(cls) -> redis.Redis:
+        """Get Redis client for the Ops-Dashboard alert debounce state.
+
+        Holds per-check-type state (last known status + last alert time) used
+        by ``premium/backend/services/ops_alert_service.py`` to avoid
+        re-sending a Telegram alert on every Beat tick while a threshold
+        breach persists (TF-788).
+        """
+        if cls._ops_alert_client is None:
+            cls._ops_alert_client = redis.from_url(
+                REDIS_URL, db=REDIS_DB_OPS_ALERTS, decode_responses=True
+            )
+            logger.info("Redis ops-alert client initialized")
+        return cls._ops_alert_client
+
+    @classmethod
     def close_all(cls):
         """Close all Redis connections"""
         if cls._session_client:
@@ -92,6 +110,9 @@ class RedisService:
         if cls._mcp_oauth_client:
             cls._mcp_oauth_client.close()
             cls._mcp_oauth_client = None
+        if cls._ops_alert_client:
+            cls._ops_alert_client.close()
+            cls._ops_alert_client = None
         logger.info("All Redis clients closed")
 
 

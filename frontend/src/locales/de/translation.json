@@ -809,6 +809,8 @@
           "online_workers": "Aktive Worker",
           "error": "Fehler bei der Prüfung"
         },
+        "sentryErrorCount_one": "{{count}} Sentry-Fehler (5 Min.)",
+        "sentryErrorCount_other": "{{count}} Sentry-Fehler (5 Min.)",
         "chat": {
           "title": "KI-Chat-Assistent",
           "subtitle": "Rein lesend — stellt Fragen zum Systemzustand, löst keine Aktionen aus.",
