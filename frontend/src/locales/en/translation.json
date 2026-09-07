@@ -808,6 +808,15 @@
           "queued_messages": "Queued messages",
           "online_workers": "Active workers",
           "error": "Check failed"
+        },
+        "chat": {
+          "title": "AI Chat Assistant",
+          "subtitle": "Read-only — ask questions about system status, no actions are taken.",
+          "empty": "No messages yet. Ask something, e.g. \"How many questions are in the review queue right now?\"",
+          "placeholder": "Ask about system status…",
+          "inputLabel": "Message to the Ops-Chat assistant",
+          "send": "Send",
+          "error": "Request failed — please try again."
         }
       },
       "audit": {

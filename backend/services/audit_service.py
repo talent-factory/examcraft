@@ -95,6 +95,12 @@ class AuditService:
     ACTION_ADMIN_CROSS_OWNER = "admin_cross_owner"
     ACTION_VIEW_AUDIT_LOG = "view_audit_log"
 
+    # Ops-Dashboard KI-Chat-Widget (TF-787) — tool-call trail, never the
+    # chat wording itself. Explicitly categorized as "security" (not left
+    # to the fail-closed default) so it remains visible when a SuperAdmin
+    # filters the Audit tab by that category.
+    ACTION_OPS_CHAT_TOOL_CALL = "ops_chat_tool_call"
+
     # Status Types
     STATUS_SUCCESS = "success"
     STATUS_FAILURE = "failure"
@@ -552,14 +558,19 @@ class AuditService:
         request: Optional[Request] = None,
         impersonator_user_id: Optional[int] = None,
     ) -> None:
-        """Best-effort audit write for an already-committed mutation.
+        """Best-effort audit write whose failure must never propagate.
 
-        For mutations where the audit entry IS the primary trail but the change
-        itself is already durably committed (admin / RBAC / grading writes): a
-        failing audit write is logged and swallowed, never propagated.
-        ``log_action`` already rolls back and returns ``None`` on a persistence
-        failure; the extra guard only covers an unexpected raise. Use
-        ``log_superuser_bypass`` instead when the action must be fail-closed.
+        Two intended use cases: (1) mutations where the audit entry IS the
+        primary trail but the change itself is already durably committed
+        (admin / RBAC / grading writes), and (2) a trail for an operation
+        that has already been decided/executed elsewhere and must not be
+        undone by an audit hiccup — e.g. TF-787's ops-chat read-only tool
+        calls, where the tool result is already on its way back to the
+        caller. In both cases a failing audit write is logged and swallowed,
+        never propagated. ``log_action`` already rolls back and returns
+        ``None`` on a persistence failure; the extra guard only covers an
+        unexpected raise. Use ``log_superuser_bypass`` instead when the
+        action must be fail-closed.
         """
         try:
             AuditService.log_action(
@@ -698,6 +709,7 @@ ACTIONS_BY_CATEGORY: dict[str, frozenset[str]] = {
             AuditService.ACTION_SUPERUSER_BYPASS,
             AuditService.ACTION_ADMIN_CROSS_OWNER,
             AuditService.ACTION_VIEW_AUDIT_LOG,
+            AuditService.ACTION_OPS_CHAT_TOOL_CALL,
         }
     ),
 }

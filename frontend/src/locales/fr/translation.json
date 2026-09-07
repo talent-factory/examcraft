@@ -808,6 +808,15 @@
           "queued_messages": "Messages en attente",
           "online_workers": "Workers actifs",
           "error": "Échec de la vérification"
+        },
+        "chat": {
+          "title": "Assistant de chat IA",
+          "subtitle": "Lecture seule — pose des questions sur l'état du système, ne déclenche aucune action.",
+          "empty": "Aucun message pour l'instant. Pose une question, p. ex. « Combien de questions sont actuellement dans la file de révision ? »",
+          "placeholder": "Poser une question sur l'état du système…",
+          "inputLabel": "Message à l'assistant Ops-Chat",
+          "send": "Envoyer",
+          "error": "Échec de la requête — veuillez réessayer."
         }
       },
       "audit": {

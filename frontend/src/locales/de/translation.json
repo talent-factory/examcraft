@@ -808,6 +808,15 @@
           "queued_messages": "Wartende Nachrichten",
           "online_workers": "Aktive Worker",
           "error": "Fehler bei der Prüfung"
+        },
+        "chat": {
+          "title": "KI-Chat-Assistent",
+          "subtitle": "Rein lesend — stellt Fragen zum Systemzustand, löst keine Aktionen aus.",
+          "empty": "Noch keine Nachrichten. Stelle eine Frage, z. B. \"Wie viele Fragen sind aktuell in der Review-Queue?\"",
+          "placeholder": "Frage zum Systemzustand stellen…",
+          "inputLabel": "Nachricht an den Ops-Chat-Assistenten",
+          "send": "Senden",
+          "error": "Anfrage fehlgeschlagen — bitte erneut versuchen."
         }
       },
       "audit": {

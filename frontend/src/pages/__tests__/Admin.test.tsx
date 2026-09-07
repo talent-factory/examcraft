@@ -42,6 +42,10 @@ jest.mock('../../components/admin/SystemHealthPanel', () => ({
   __esModule: true,
   default: () => <div data-testid="system-health-panel" />,
 }));
+jest.mock('../../components/admin/OpsChatWidget', () => ({
+  __esModule: true,
+  default: () => <div data-testid="ops-chat-widget" />,
+}));
 
 // Mock useAuth
 const mockHasRole = jest.fn();
@@ -219,6 +223,7 @@ describe('Admin Page', () => {
 
       expect(screen.getByTestId('admin-tab-content-system-health')).toBeInTheDocument();
       expect(screen.getByTestId('system-health-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('ops-chat-widget')).toBeInTheDocument();
     });
 
     it('hides the System Health tab for superusers in Core deployment (GET /api/v1/ops/health does not exist there)', () => {

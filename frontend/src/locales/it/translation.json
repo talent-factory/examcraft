@@ -808,6 +808,15 @@
           "queued_messages": "Messaggi in coda",
           "online_workers": "Worker attivi",
           "error": "Controllo non riuscito"
+        },
+        "chat": {
+          "title": "Assistente chat AI",
+          "subtitle": "Sola lettura — poni domande sullo stato del sistema, non vengono eseguite azioni.",
+          "empty": "Nessun messaggio finora. Fai una domanda, ad es. \"Quante domande sono attualmente nella coda di revisione?\"",
+          "placeholder": "Fai una domanda sullo stato del sistema…",
+          "inputLabel": "Messaggio all'assistente Ops-Chat",
+          "send": "Invia",
+          "error": "Richiesta non riuscita — riprova."
         }
       },
       "audit": {

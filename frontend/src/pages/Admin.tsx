@@ -18,6 +18,7 @@ import AdminGradingSchemes from './AdminGradingSchemes';
 import AdminOrgUnits from './AdminOrgUnits';
 import AuditLogView from '../components/admin/AuditLogView';
 import SystemHealthPanel from '../components/admin/SystemHealthPanel';
+import OpsChatWidget from '../components/admin/OpsChatWidget';
 import { isFullDeployment } from '../utils/deploymentMode';
 
 type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'competency-frameworks' | 'grading-schemes' | 'org-units' | 'system-health';
@@ -103,6 +104,7 @@ export const Admin: React.FC = () => {
         {effectiveTab === 'system-health' && (
           <div data-testid="admin-tab-content-system-health">
             <SystemHealthPanel />
+            <OpsChatWidget />
           </div>
         )}
         {effectiveTab === 'audit' && (
