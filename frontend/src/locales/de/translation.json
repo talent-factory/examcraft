@@ -523,7 +523,7 @@
     "backToLogin": "Zurück zur Anmeldung",
     "privacy": {
       "title": "Datenschutzerklärung",
-      "lastUpdated": "Stand: August 2026",
+      "lastUpdated": "Stand: September 2026",
       "controller": {
         "title": "Verantwortlicher",
         "email": "E-Mail"
@@ -558,10 +558,6 @@
             "description": "Zahlungsabwicklung; Anbieter: Stripe, Inc., USA/Irland (SCC/DPF)"
           },
           {
-            "name": "Resend",
-            "description": "Transaktions-E-Mails, befristet bis Abschluss der Migration auf SubscribeFlow (siehe unten); Anbieter: Resend, USA (SCC/DPF)"
-          },
-          {
             "name": "Sentry",
             "description": "Fehleranalyse (DE-Ingest, PII-maskiert); Anbieter: Functional Software, Inc., USA (SCC/DPF)"
           },
@@ -571,11 +567,11 @@
           },
           {
             "name": "SubscribeFlow",
-            "description": "Newsletter-Anmeldung und Versand-Automatisierung (selbst betrieben, Region Frankfurt, DE); Teil unseres Fly.io-Hostings"
+            "description": "Newsletter-Anmeldung sowie Versand sämtlicher E-Mails (Newsletter und Transaktions-Mails wie Verifizierung und Benachrichtigungen, selbst betrieben, Region Frankfurt, DE); Teil unseres Fly.io-Hostings"
           },
           {
             "name": "Brevo",
-            "description": "E-Mail-Versand für Newsletter-Anmeldungen (Transport-Anbieter von SubscribeFlow); Anbieter: Sendinblue SA (Brevo), Frankreich — Sitz/Transfermechanismus in Abklärung mit Rechtsabteilung/DPO"
+            "description": "E-Mail-Versand für Newsletter- und Transaktions-Mails (Transport-Anbieter von SubscribeFlow); Anbieter: Sendinblue SA (Brevo), Frankreich — Sitz/Transfermechanismus in Abklärung mit Rechtsabteilung/DPO"
           },
           {
             "name": "Google/Microsoft (OAuth)",

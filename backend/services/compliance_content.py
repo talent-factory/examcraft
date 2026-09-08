@@ -29,7 +29,7 @@ DRAFT_NOTICE = (
     "geprüft oder freigegeben. Es ist nicht rechtsverbindlich."
 )
 
-_LAST_UPDATED = "Stand: August 2026"
+_LAST_UPDATED = "Stand: September 2026"
 
 
 @dataclass(frozen=True)
@@ -407,18 +407,6 @@ def _build_subprocessors() -> tuple[Subprocessor, ...]:
             change_notice=_CHANGE_NOTICE_STANDARD,
         ),
         Subprocessor(
-            name="Resend (Resend, Inc.)",
-            purpose="Versand transaktionaler E-Mails (Verifizierung, "
-            "Benachrichtigungen) — Geltungsbereich aktuell auf "
-            "Transaktions-E-Mails beschränkt; Newsletter-Anmeldungen "
-            "laufen bereits über SubscribeFlow/Brevo (siehe unten). "
-            "Dieser Eintrag entfällt nach Abschluss der Migration der "
-            "Transaktions-Mails auf SubscribeFlow (TF-764)",
-            location="USA/EU je nach Versanderegion",
-            transfer_mechanism="EU-Standardvertragsklauseln (SCC)",
-            change_notice=_CHANGE_NOTICE_STANDARD,
-        ),
-        Subprocessor(
             name="Sentry (Functional Software, Inc.)",
             purpose="Fehler- und Performance-Überwachung",
             location="EU (Sentry-Projektregion; genaue Ingest-Subdomain "
@@ -439,8 +427,9 @@ def _build_subprocessors() -> tuple[Subprocessor, ...]:
         ),
         Subprocessor(
             name="SubscribeFlow (selbst betrieben)",
-            purpose="Newsletter-Anmeldung (Double-Opt-in) und "
-            "Versand-Automatisierung für Newsletter-Abonnenten",
+            purpose="Newsletter-Anmeldung (Double-Opt-in) und Versand "
+            "sämtlicher E-Mails (Newsletter sowie Transaktions-Mails "
+            "wie Verifizierung und Benachrichtigungen, seit TF-764)",
             location="Frankfurt am Main, Deutschland (EU) — als Fly.io-"
             "App im gleichen Rechenzentrum wie die Applikation betrieben",
             transfer_mechanism="Kein Drittlandtransfer (Selbstbetrieb "
@@ -449,8 +438,8 @@ def _build_subprocessors() -> tuple[Subprocessor, ...]:
         ),
         Subprocessor(
             name="Brevo (Sendinblue SA)",
-            purpose="E-Mail-Versand für Newsletter-Anmeldungen als "
-            "Transport-Anbieter von SubscribeFlow",
+            purpose="E-Mail-Versand für Newsletter- und "
+            "Transaktions-Mails als Transport-Anbieter von SubscribeFlow",
             location="Frankreich (EU)",
             transfer_mechanism="Sitz und Transfermechanismus mit "
             "Rechtsabteilung/DPO in Abklärung — als EU-Anbieter "

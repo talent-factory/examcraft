@@ -18,7 +18,6 @@ REQUIRED_SUBPROCESSORS = {
     "Fly.io",
     "Tigris",
     "Stripe",
-    "Resend",
     "Sentry",
     "PostgreSQL",
     "Redis",
