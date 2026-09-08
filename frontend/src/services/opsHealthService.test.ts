@@ -22,7 +22,7 @@ describe('fetchOpsHealth', () => {
           metric_value: '1/1',
           timestamp: '2026-09-05T08:00:00+00:00',
           detail: null,
-          deep_link: 'https://talent-factory.sentry.io/projects/talent-factory/examcraft-frontend/',
+          deep_link: 'https://talent-factory.sentry.io/projects/examcraft-frontend/',
           sentry: { configured: false },
         },
         backend: {
