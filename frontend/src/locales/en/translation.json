@@ -2904,7 +2904,9 @@
     "oauth": {
       "providerError": "Sign-in with the provider failed.",
       "callbackFailed": "The sign-in could not be completed."
-    }
+    },
+    "internal_error": "An unexpected error occurred. Please try again later.",
+    "validation_error": "The request is invalid. Please check your input."
   },
   "help": {
     "title": "Help",

@@ -2904,7 +2904,9 @@
     "oauth": {
       "providerError": "Die Anmeldung beim Anbieter ist fehlgeschlagen.",
       "callbackFailed": "Die Anmeldung konnte nicht abgeschlossen werden."
-    }
+    },
+    "internal_error": "Es ist ein unerwarteter Fehler aufgetreten. Bitte versuch es später erneut.",
+    "validation_error": "Die Anfrage ist ungültig. Bitte prüf deine Eingaben."
   },
   "help": {
     "title": "Hilfe",

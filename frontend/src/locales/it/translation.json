@@ -2904,7 +2904,9 @@
     "oauth": {
       "providerError": "L'accesso presso il provider non è riuscito.",
       "callbackFailed": "Non è stato possibile completare l'accesso."
-    }
+    },
+    "internal_error": "Si è verificato un errore imprevisto. Riprova più tardi.",
+    "validation_error": "La richiesta non è valida. Controlla i dati inseriti."
   },
   "help": {
     "title": "Aiuto",

@@ -1,183 +1,113 @@
 /**
- * Ratchet guard against hardcoded user-facing strings (TF-671).
+ * Ratchet guard against hardcoded user-facing strings (TF-671, TF-772).
  *
  * Why a ratchet and not a clean gate: TF-671 fixed the foundation and the most
- * visible components, but ~45 call sites remain. A test that only fails on NEW
- * violations can land now instead of waiting for the whole cleanup — and the
- * allowlist doubles as the machine-readable remainder list. Entries are only
- * ever removed, never added: that is the whole point.
+ * visible components, but the bulk of the service layer remains. A test that
+ * only fails on NEW violations can land now instead of waiting for the whole
+ * cleanup — and the allowlist doubles as the machine-readable remainder list.
+ * Entries are only ever removed, never added: that is the whole point.
  *
  * When this test fails on your change, translate the string. Do not add it to
- * the allowlist.
+ * the allowlist, and do not regenerate the allowlist to make it go away.
  *
- * Permanent exception: seven allowlist entries from BillingPage.tsx (the CHF
- * amounts and the Free/Starter/Professional/Enterprise plan names) are not
- * remaining cleanup work. They are identical across all four locales on
- * purpose and are meant to stay in the allowlist indefinitely — do not try to
- * "finish" them by translating "CHF 0" or "Starter".
+ * The allowlist is GENERATED. Never edit it by hand, never merge it by hand:
  *
- * First blind spot: the scan reads JSX text nodes and a fixed whitelist of
- * visible props (label, placeholder, title, aria-label, helperText, alt). It
- * does not see props outside that whitelist, nor string arguments passed to
- * function calls. `core/frontend/src/utils/componentLoader.tsx` used to be a
- * real example — it passed English prose straight into `withFeatureGate(...)`,
- * which `UpgradePrompt.tsx` then rendered verbatim; that specific case was
- * fixed by routing i18n keys through instead (`UpgradePrompt` now resolves
- * `featureNameKey`/`featureDescriptionKey` via `t()` itself). The blind spot
- * itself is not fixed, though — the scan still cannot see any other string
- * argument passed to any other function call. A proper fix needs an
- * AST-based scan, which is out of scope here; this comment exists so nobody
- * mistakes the ratchet's current reach for full coverage.
+ *     git checkout --ours src/__tests__/i18n-hardcoded-strings.allowlist.json
+ *     bun run scripts/regenerate-i18n-allowlist.ts
+ *     git add src/__tests__/i18n-hardcoded-strings.allowlist.json
  *
- * Second blind spot, specific to `literal-error`: LITERAL_ERROR only matches
- * a string literal that sits directly inside `throw new Error(...)`. The
- * dominant form in this codebase's services is
- * `throw new Error(error.detail || 'English fallback text')` — the literal is
- * the right-hand side of a `||`, not the sole argument — and the regex does
- * not see it at all. Of the 94 `throw new Error(` call sites across the
- * service directories (measured against the current tree — recompute rather
- * than trust this number, it drifts with every service edit), this pattern
- * accounts for the majority; the regex catches only 14. Do not read the
- * absence of `literal-error` findings in services as evidence that class B
- * is covered there — it mostly is not.
+ * The scan lives in `scripts/i18n-hardcoded-strings-scan.ts` so this guard and
+ * the regenerator cannot drift apart; the "tier absence tolerance" and "path
+ * anchoring" notes that used to sit here are documented there, next to the
+ * code they constrain.
  *
- * Third blind spot: the UI-facing sibling of the same class. Dozens of
- * components still do `setError(err instanceof Error ? err.message : ...)`
- * or a bare `setError(err.message)` / `alert(err.message)` — exactly the
- * pattern `translateError()` exists to replace — outside the `services`/`api`
- * directories this scan's `literal-error` kind is restricted to, and with no
- * string literal for JSX_TEXT/VISIBLE_PROP to catch (the message is a runtime
- * value, not a literal). This scan does not see it at all, in either
- * direction. Do not read a clean `i18n hardcoded-string ratchet` run as
- * evidence that no raw error text reaches the UI — see TF-772 for the actual
- * remaining scope.
+ * Permanent exceptions: seven allowlist entries from BillingPage.tsx (the CHF
+ * amounts and the Free/Starter/Professional/Enterprise tier names) are not
+ * remaining cleanup work and stay indefinitely. They are listed with their
+ * rationale as `PERMANENT_EXCEPTIONS` in the scan module, and asserted below so
+ * a regeneration cannot quietly drop them.
  *
- * Tier absence tolerance: `core/` is mirrored standalone to the public repo
- * via `git subtree split --prefix=core` (see `.github/workflows/mirror.yml`),
- * where `premium/` and `enterprise/` do not exist and `core/.github/workflows/ci.yml`
- * runs this suite without `continue-on-error`. A missing tier root is
- * therefore an expected Core-only checkout, not a broken scan — the sanity
- * checks below skip absent roots instead of failing, and the stale-allowlist
- * check only considers entries whose root is present in the current checkout.
+ * ---------------------------------------------------------------------------
+ * Error-key convention (TF-772/TF-773) — read this before adding an error key
+ * ---------------------------------------------------------------------------
  *
- * Path anchoring: each scan root carries its own fixed logical `prefix`
- * (`core/frontend/src`, `premium/frontend/src`, `enterprise/frontend/src`)
- * instead of a `path.relative()` against a computed repo root. That
- * distinction matters because `core/` becomes the checkout root in the
- * public mirror — a single shared root anchor silently shifts by one path
- * segment there, and every finding's `rel` key stops matching the allowlist
- * (all fresh, none stale), breaking the mirror's `test-frontend` CI job on
- * every push to `develop`/`main`. Fixed prefixes are immune to that: they
- * describe what a path *means*, not where this file happens to sit.
+ * The backend answers with a machine-readable code alongside the human text
+ * (ADR 0005, `core/backend/errors.py`):
+ *
+ *     { "detail": "Ein Tag mit diesem Namen existiert bereits.",
+ *       "error_code": "documents_tag_exists",
+ *       "error_params": { "name": "Mathematik" } }
+ *
+ * `error_code` is verbatim the key in `core/backend/locales/t.{de,en,fr,it}
+ * .json` — flat snake_case with a domain prefix. The frontend adopts that
+ * identity rather than inventing a parallel space:
+ *
+ *     frontend key = "errors." + error_code      e.g. errors.documents_tag_exists
+ *
+ * No mapping table, no rewrite into dot notation. Rules that follow from it:
+ *
+ * 1. Sort new keys alphabetically into the `errors` block of all four locales.
+ *    Because the backend prefixes (`auth_`, `documents_`, `rbac_`, …) cluster
+ *    alphabetically, work split across branches lands in disjoint line ranges
+ *    and merges without conflicts.
+ * 2. Every key exists in de, en, fr AND it. Not optional.
+ * 3. Interpolation differs between the two systems: the backend writes
+ *    `%{name}`, i18next writes `{{name}}`. Rewrite when copying a text over.
+ * 4. Existing NESTED keys (`errors.help.*`, `errors.rag.*`, …) are NOT migrated
+ *    to the flat form here. Their fate belongs to TF-775.
+ *
+ * ---------------------------------------------------------------------------
+ * Reach of this scan — what it does not see, and why
+ * ---------------------------------------------------------------------------
+ *
+ * FIXED in TF-772: `literal-error` used to match only a literal sitting
+ * directly inside `new Error(...)`, which saw 15 of 95 throw sites in the
+ * service directories. It now reads the balanced argument and reports every
+ * string literal inside it, covering the two dominant shapes
+ * (`new Error(detail || 'text')` and `new Error(helper(detail, 'text'))`) plus
+ * `reject(new Error('text'))`. `i18n-hardcoded-strings.regex.test.ts` pins one
+ * example per form.
+ *
+ * DELIBERATE GAP 1 — string arguments to arbitrary function calls. The scan
+ * reads JSX text nodes and a fixed whitelist of visible props (label,
+ * placeholder, title, aria-label, helperText, alt). Prose passed as an argument
+ * to some other function is invisible unless that function is `Error`.
+ * `componentLoader.tsx` used to be the live example — it passed English prose
+ * into `withFeatureGate(...)`, which `UpgradePrompt.tsx` rendered verbatim;
+ * that case was fixed by routing i18n keys through instead. Closing the gap
+ * itself needs an AST-based scan, which is out of proportion to what it would
+ * catch today. Left open knowingly.
+ *
+ * DELIBERATE GAP 2 — `setError(err.message)`. Components still do
+ * `setError(err instanceof Error ? err.message : …)` or `alert(err.message)`,
+ * which is exactly what `translateError()` exists to replace. There is no
+ * string literal involved: the message is a runtime value. A literal scanner
+ * structurally cannot see this class, so no regex change will help. It is
+ * tracked as TF-772 Teil A instead. Do not read a green run here as evidence
+ * that no raw error text reaches the UI.
+ *
+ * DELIBERATE GAP 3 — `literal-error` is restricted to `services/` and `api/`.
+ * Throws elsewhere are overwhelmingly developer errors that stay English by the
+ * TF-295 boundary (`useAuth must be used within an AuthProvider`,
+ * `Not authenticated`, `Upload cancelled`). Scanning components would park ~15
+ * of those in the allowlist permanently and destroy the number TF-772 measures
+ * progress by. The cost is three user-facing literals the scan cannot see:
+ * `DocumentLibrary.tsx` (`Document processing failed: …`, `Document processing
+ * timeout after …`) and `ResendVerificationButton.tsx` (`Failed to resend
+ * verification email`). They are real TF-772 work; they are just tracked by the
+ * ticket rather than by this guard.
  */
+import {
+  PERMANENT_EXCEPTIONS,
+  SCAN_ROOTS,
+  collect,
+  keyOf,
+  walk,
+} from '../../scripts/i18n-hardcoded-strings-scan';
+
 import * as fs from 'fs';
-import * as path from 'path';
 
 import allowlist from './i18n-hardcoded-strings.allowlist.json';
-
-// `core/frontend/src` in both layouts: the private monorepo (core/ nested
-// under the repo root) and the public mirror (core/ IS the checkout root).
-const CORE_SRC_DIR = path.resolve(__dirname, '..');
-// Only used to locate premium/enterprise, which live outside core/ and are
-// therefore absent in the mirror by construction — see "Tier absence
-// tolerance" above. Never used to compute a finding's `rel` path.
-const MONOREPO_ROOT = path.resolve(CORE_SRC_DIR, '../../..');
-
-interface ScanRoot { dir: string; prefix: string; }
-
-const SCAN_ROOTS: ScanRoot[] = [
-  { dir: CORE_SRC_DIR, prefix: 'core/frontend/src' },
-  { dir: path.resolve(MONOREPO_ROOT, 'premium/frontend/src'), prefix: 'premium/frontend/src' },
-  { dir: path.resolve(MONOREPO_ROOT, 'enterprise/frontend/src'), prefix: 'enterprise/frontend/src' },
-];
-
-const SOURCE_EXT = /\.(ts|tsx)$/;
-const SKIP_DIRS = new Set([
-  'node_modules', '__tests__', '__mocks__', 'build', 'dist', 'coverage', 'locales', 'types',
-]);
-const SKIP_FILE = /\.(test|spec)\.(ts|tsx)$|\.d\.ts$/;
-
-// Multi-line aware: the single-line scan in the TF-671 ticket missed
-// UpgradePrompt entirely, because its copy sits in multi-line <Typography>.
-//
-// The lookbehind rules out `=>`: an arrow function's `>` was read as a
-// closing tag, and everything up to the next TypeScript generic `<` as its
-// text — which flagged two brace-free stretches of ordinary code
-// (apiClient.ts, RAGExamCreator.tsx) as untranslated copy. A real JSX `>`
-// is never preceded by `=`; it closes on an identifier, a quote, `/` or `}`.
-const JSX_TEXT = /(?<==?[^=])>(\s*[A-Za-zÄÖÜäöüÉÈÀÇéèàç][^<>{}]*)</g;
-// Second false-positive class, same root cause as the lookbehind above: a
-// relational `>` (`r.width > window.innerWidth`) opens a match that a later
-// relational `<` closes, and everything between reads as prose. The lookbehind
-// cannot see this one — nothing distinguishes `a > b` from a multi-line JSX tag
-// whose `>` sits alone on its own line, which is exactly the shape this guard
-// was built to catch (UpgradePrompt).
-//
-// So the capture is filtered instead of the delimiter. A JSX text node is
-// prose: it does not carry a semicolon or an assignment. Code does. This is a
-// heuristic, not a proof — but the alternative is parking scanner artefacts in
-// the allowlist, which corrupts the very number TF-772 tracks progress by.
-//
-// Its one blind spot: a JSX text node containing an HTML entity (`&nbsp;`)
-// carries a semicolon and would be skipped. There is none in any of the three
-// src trees today; if one appears, narrow the semicolon branch rather than
-// dropping the filter.
-const CODE_FRAGMENT = /[;=]|&&|\|\||\?\?/;
-
-const VISIBLE_PROP =
-  /\b(label|placeholder|title|aria-label|helperText|alt)\s*=\s*(['"])([^'"]{2,})\2/g;
-const LITERAL_ERROR = /throw new Error\(\s*(['"`])([^'"`]{3,})\1/g;
-
-interface Finding { file: string; line: number; kind: string; text: string; }
-
-function walk(dir: string, out: string[] = []): string[] {
-  if (!fs.existsSync(dir)) return out;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (SKIP_DIRS.has(entry.name)) continue;
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) walk(full, out);
-    else if (SOURCE_EXT.test(entry.name) && !SKIP_FILE.test(entry.name)) out.push(full);
-  }
-  return out;
-}
-
-function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-}
-
-function lineOf(src: string, index: number): number {
-  return src.slice(0, index).split('\n').length;
-}
-
-function collect(): Finding[] {
-  const findings: Finding[] = [];
-  for (const { dir, prefix } of SCAN_ROOTS) {
-    for (const file of walk(dir)) {
-      const rel = `${prefix}/${path.relative(dir, file).split(path.sep).join('/')}`;
-      const src = stripComments(fs.readFileSync(file, 'utf8'));
-      const isService = /\/(services|api)\//.test(rel);
-
-      for (const m of src.matchAll(JSX_TEXT)) {
-        const text = m[1].trim().replace(/\s+/g, ' ');
-        if (text.length < 3 || !/[A-Za-zÄÖÜäöü]{3}/.test(text)) continue;
-        if (CODE_FRAGMENT.test(text)) continue;
-        findings.push({ file: rel, line: lineOf(src, m.index ?? 0), kind: 'jsx-text', text });
-      }
-      for (const m of src.matchAll(VISIBLE_PROP)) {
-        findings.push({ file: rel, line: lineOf(src, m.index ?? 0), kind: m[1], text: m[3] });
-      }
-      if (isService) {
-        for (const m of src.matchAll(LITERAL_ERROR)) {
-          findings.push({ file: rel, line: lineOf(src, m.index ?? 0), kind: 'literal-error', text: m[2] });
-        }
-      }
-    }
-  }
-  return findings;
-}
-
-// Line numbers shift constantly; the allowlist keys on file + kind + text.
-const keyOf = (f: Finding): string => `${f.file}::${f.kind}::${f.text}`;
 
 describe('i18n hardcoded-string ratchet', () => {
   const findings = collect();
@@ -245,6 +175,21 @@ describe('i18n hardcoded-string ratchet', () => {
       throw new Error(
         `${stale.length} Allowlist-Eintrag/Einträge sind erledigt und müssen ` +
         `aus i18n-hardcoded-strings.allowlist.json entfernt werden:\n  ${stale.join('\n  ')}`,
+      );
+    }
+  });
+
+  // TF-772 measures progress by allowlist size, and its target value is these
+  // seven entries — not zero. Without this assertion, "shrink the allowlist"
+  // reads as an invitation to translate "CHF 0" into four identical strings.
+  it('die sieben Dauerausnahmen stehen noch in der Allowlist', () => {
+    const missing = PERMANENT_EXCEPTIONS.filter((k) => !allowed.has(k));
+    if (missing.length > 0) {
+      throw new Error(
+        `${missing.length} Dauerausnahme(n) fehlen in der Allowlist. Sie sind ` +
+        `bewusste Ausnahmen (Preise und Tarifnamen, siehe PERMANENT_EXCEPTIONS ` +
+        `in scripts/i18n-hardcoded-strings-scan.ts) und dürfen nicht übersetzt ` +
+        `werden:\n  ${missing.join('\n  ')}`,
       );
     }
   });

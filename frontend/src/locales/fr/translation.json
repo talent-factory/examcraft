@@ -2904,7 +2904,9 @@
     "oauth": {
       "providerError": "La connexion auprès du fournisseur a échoué.",
       "callbackFailed": "La connexion n'a pas pu être finalisée."
-    }
+    },
+    "internal_error": "Une erreur inattendue s'est produite. Réessaie plus tard.",
+    "validation_error": "La requête n'est pas valide. Vérifie tes saisies."
   },
   "help": {
     "title": "Aide",
