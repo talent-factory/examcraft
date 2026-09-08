@@ -373,6 +373,12 @@ def test_import_returns_402_for_free_at_4th_exam(test_db: Session) -> None:
     assert resp.status_code == 402, resp.text
     body = resp.json()
     assert body["detail"]["error_code"] == ("auswertung_exam_monthly_quota_exceeded")
+    # TF-773 review: auswertung_quotas._http_402 keeps its dict-shaped
+    # `detail` (QuotaBanner.tsx reads it there), but main.py's generic
+    # HTTPException-Handler additionally hoists error_code to the top level
+    # for the new envelope. This branch had zero coverage — deleting it
+    # would leave the whole suite green.
+    assert body["error_code"] == body["detail"]["error_code"]
 
 
 def test_api_driver_returns_402_for_free(test_db: Session) -> None:

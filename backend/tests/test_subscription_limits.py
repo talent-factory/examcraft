@@ -72,8 +72,9 @@ class TestSubscriptionLimits:
             SubscriptionLimits.check_user_limit(test_institution, test_db)
 
         assert exc_info.value.status_code == 403
-        assert "User limit reached" in exc_info.value.detail
-        assert "3 users" in exc_info.value.detail
+        # Code statt Text (TF-773): die Assertion überlebt jede Übersetzung.
+        assert exc_info.value.error_code == "tenant_user_limit_reached"
+        assert exc_info.value.error_params == {"limit": 3}
 
     def test_check_user_limit_not_exceeded(
         self, test_db: Session, test_institution: Institution
@@ -199,8 +200,8 @@ class TestSubscriptionLimits:
             SubscriptionLimits.check_document_limit(test_institution, test_db)
 
         assert exc_info.value.status_code == 403
-        assert "Document limit reached" in exc_info.value.detail
-        assert "5 documents" in exc_info.value.detail
+        assert exc_info.value.error_code == "tenant_document_limit_reached"
+        assert exc_info.value.error_params == {"limit": 5}
 
     def test_check_document_limit_not_exceeded(
         self, test_db: Session, test_institution: Institution
@@ -294,7 +295,8 @@ class TestSubscriptionLimits:
             )
 
         assert exc_info.value.status_code == 403
-        assert "question limit" in exc_info.value.detail.lower()
+        assert exc_info.value.error_code == "tenant_question_limit_reached"
+        assert exc_info.value.error_params["limit"] == 20
 
     def test_check_question_limit_not_exceeded(
         self, test_db: Session, test_institution: Institution

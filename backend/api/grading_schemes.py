@@ -28,7 +28,7 @@ import logging
 from datetime import datetime
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -40,6 +40,8 @@ from models.exam import Exam
 from models.grading_scheme import GradingScheme, GradingSchemeConfig
 from utils.auth_utils import require_permission, get_current_active_user
 from services.audit_service import AuditService
+from errors import api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +116,12 @@ def _to_out(scheme: GradingScheme) -> GradingSchemeOut:
 
 
 def _load_scheme_for_user(
-    *, db: Session, user: User, scheme_id: int, for_write: bool = False
+    *,
+    db: Session,
+    user: User,
+    scheme_id: int,
+    for_write: bool = False,
+    locale: str = DEFAULT_LOCALE,
 ) -> GradingScheme:
     """Load a scheme accessible to the user.
 
@@ -125,20 +132,17 @@ def _load_scheme_for_user(
     """
     scheme = db.query(GradingScheme).filter(GradingScheme.id == scheme_id).one_or_none()
     if scheme is None:
-        raise HTTPException(status_code=404, detail="Grading-Scheme nicht gefunden")
+        raise api_error(404, "grading_schemes_not_found", locale)
 
     is_system = scheme.institution_id is None
     is_own = scheme.institution_id == user.institution_id
 
     if not (is_system or is_own):
         # Don't leak existence across tenants.
-        raise HTTPException(status_code=404, detail="Grading-Scheme nicht gefunden")
+        raise api_error(404, "grading_schemes_not_found", locale)
 
     if for_write and is_system:
-        raise HTTPException(
-            status_code=403,
-            detail="System-Grading-Schemes sind nicht editierbar",
-        )
+        raise api_error(403, "grading_schemes_system_not_editable", locale)
 
     return scheme
 
@@ -170,6 +174,7 @@ def _clear_other_defaults(
 
 @router.get("", response_model=GradingSchemeListOut)
 async def list_grading_schemes(
+    request: Request,
     include_system: bool = Query(default=True),
     institution_id: Optional[int] = Query(
         default=None,
@@ -196,15 +201,15 @@ async def list_grading_schemes(
     default scheme and must see that tenant's schemes, not their own.
     A non-SuperAdmin passing a foreign ``institution_id`` gets 403.
     """
+    locale = get_request_locale(request, current_user)
     target_institution_id = current_user.institution_id
     if institution_id is not None:
         if (
             not current_user.is_superuser
             and institution_id != current_user.institution_id
         ):
-            raise HTTPException(
-                status_code=403,
-                detail="Nur SuperAdmins dürfen Schemata anderer Institutionen abrufen",
+            raise api_error(
+                403, "grading_schemes_cross_institution_superadmin_only", locale
             )
         target_institution_id = institution_id
 
@@ -232,11 +237,15 @@ async def list_grading_schemes(
 
 @router.get("/{scheme_id}", response_model=GradingSchemeOut)
 async def get_grading_scheme(
+    request: Request,
     scheme_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> GradingSchemeOut:
-    scheme = _load_scheme_for_user(db=db, user=current_user, scheme_id=scheme_id)
+    locale = get_request_locale(request, current_user)
+    scheme = _load_scheme_for_user(
+        db=db, user=current_user, scheme_id=scheme_id, locale=locale
+    )
     return _to_out(scheme)
 
 
@@ -247,11 +256,9 @@ async def create_grading_scheme(
     current_user: User = Depends(require_permission("grading_schemes:manage")),
     db: Session = Depends(get_db),
 ) -> GradingSchemeOut:
+    locale = get_request_locale(request, current_user)
     if current_user.institution_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Benutzer muss einer Institution zugeordnet sein",
-        )
+        raise api_error(400, "grading_schemes_institution_required", locale)
 
     if payload.is_default_for_institution:
         _clear_other_defaults(db, current_user.institution_id, keep_id=None)
@@ -273,14 +280,11 @@ async def create_grading_scheme(
     except IntegrityError as exc:
         db.rollback()
         logger.warning("grading_schemes create conflict: %s", exc)
-        raise HTTPException(
-            status_code=409,
-            detail="Grading-Scheme mit diesem Namen existiert bereits",
-        )
+        raise api_error(409, "grading_schemes_name_exists", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("grading_schemes create db error: %s", exc)
-        raise HTTPException(status_code=500, detail="Datenbankfehler")
+        raise api_error(500, "grading_schemes_database_error", locale)
 
     AuditService.log_event_best_effort(
         db=db,
@@ -307,8 +311,9 @@ async def update_grading_scheme(
     current_user: User = Depends(require_permission("grading_schemes:manage")),
     db: Session = Depends(get_db),
 ) -> GradingSchemeOut:
+    locale = get_request_locale(request, current_user)
     scheme = _load_scheme_for_user(
-        db=db, user=current_user, scheme_id=scheme_id, for_write=True
+        db=db, user=current_user, scheme_id=scheme_id, for_write=True, locale=locale
     )
 
     # model_dump serialises the discriminated union back to a plain
@@ -334,14 +339,11 @@ async def update_grading_scheme(
     except IntegrityError as exc:
         db.rollback()
         logger.warning("grading_schemes update conflict: %s", exc)
-        raise HTTPException(
-            status_code=409,
-            detail="Grading-Scheme-Update verletzt eine Eindeutigkeit",
-        )
+        raise api_error(409, "grading_schemes_uniqueness_violated", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("grading_schemes update db error: %s", exc)
-        raise HTTPException(status_code=500, detail="Datenbankfehler")
+        raise api_error(500, "grading_schemes_database_error", locale)
 
     AuditService.log_event_best_effort(
         db=db,
@@ -363,8 +365,9 @@ async def delete_grading_scheme(
     current_user: User = Depends(require_permission("grading_schemes:manage")),
     db: Session = Depends(get_db),
 ) -> None:
+    locale = get_request_locale(request, current_user)
     scheme = _load_scheme_for_user(
-        db=db, user=current_user, scheme_id=scheme_id, for_write=True
+        db=db, user=current_user, scheme_id=scheme_id, for_write=True, locale=locale
     )
 
     # Pre-flight friendly check: surface a 409 with a useful message
@@ -380,13 +383,7 @@ async def delete_grading_scheme(
         .one_or_none()
     )
     if exam_in_use is not None:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "Grading-Scheme wird von mindestens einer Prüfung referenziert "
-                "und kann nicht gelöscht werden"
-            ),
-        )
+        raise api_error(409, "grading_schemes_referenced_by_exam", locale)
 
     institution_default = (
         db.query(Institution.id)
@@ -395,14 +392,7 @@ async def delete_grading_scheme(
         .one_or_none()
     )
     if institution_default is not None:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "Grading-Scheme ist als Institution-Default gesetzt und "
-                "kann nicht gelöscht werden — bitte zuerst einen anderen "
-                "Default wählen"
-            ),
-        )
+        raise api_error(409, "grading_schemes_is_institution_default", locale)
 
     # Capture identifying fields before the row is gone — needed for the audit
     # entry after a successful delete.
@@ -419,14 +409,11 @@ async def delete_grading_scheme(
         # surface as 409 with the same shape.
         db.rollback()
         logger.warning("grading_schemes delete race: %s", exc)
-        raise HTTPException(
-            status_code=409,
-            detail=("Grading-Scheme wird referenziert und kann nicht gelöscht werden"),
-        )
+        raise api_error(409, "grading_schemes_referenced", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("grading_schemes delete db error: %s", exc)
-        raise HTTPException(status_code=500, detail="Datenbankfehler")
+        raise api_error(500, "grading_schemes_database_error", locale)
 
     AuditService.log_event_best_effort(
         db=db,

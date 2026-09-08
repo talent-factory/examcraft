@@ -146,6 +146,34 @@ class TestHelpMessage:
         assert data["confidence"] > 0
 
 
+class TestHelpMessageRateLimit:
+    def test_ueber_limit_liefert_codierten_429(self, help_client):
+        """TF-773 review: ``locale`` wird jetzt VOR dem Rate-Limit-Check
+        aufgelöst (``help.py::send_help_message``) — vorher ein
+        UnboundLocalError auf genau diesem Pfad, den kein Test anfasste
+        (Autoren-Commit-Message nennt ihn selbst als ungetestet). Regression:
+        ein 429 muss den Code tragen statt eines 500 aus einer nicht
+        zugewiesenen Variablen."""
+        from unittest.mock import MagicMock
+
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [21]  # über dem Limit von 20/Stunde
+        mock_client = MagicMock()
+        mock_client.pipeline.return_value = mock_pipe
+
+        with patch(
+            "services.redis_service.RedisService.get_ratelimit_client",
+            return_value=mock_client,
+        ):
+            response = help_client.post(
+                "/api/v1/help/message",
+                json={"question": "Wie exportiere ich?", "route": "/exam/export"},
+            )
+
+        assert response.status_code == 429, response.text
+        assert response.json()["error_code"] == "help_rate_limit_exceeded"
+
+
 class TestFeedback:
     def test_submit_feedback(self, help_client):
         response = help_client.post(

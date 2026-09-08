@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session, joinedload
 
@@ -26,6 +26,8 @@ from services.org_unit_service import (
     validate_sibling_name_unique,
 )
 from utils.auth_utils import get_current_active_user, require_permission
+from errors import AppHTTPException, api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
 
 _STRICT_OUT = ConfigDict(extra="forbid")
@@ -104,7 +106,9 @@ class MembershipCreateIn(BaseModel):
     role: str | None = Field(default=None, max_length=50)
 
 
-def _load_org_unit_for_user(*, db: Session, user: User, org_unit_id: int) -> OrgUnit:
+def _load_org_unit_for_user(
+    *, db: Session, user: User, org_unit_id: int, locale: str = DEFAULT_LOCALE
+) -> OrgUnit:
     """Load an OrgUnit for the current institution; 404 otherwise.
 
     404 (not 403) is intentional: revealing existence-but-no-access leaks
@@ -119,7 +123,7 @@ def _load_org_unit_for_user(*, db: Session, user: User, org_unit_id: int) -> Org
         .one_or_none()
     )
     if org_unit is None:
-        raise HTTPException(status_code=404, detail="OrgUnit nicht gefunden")
+        raise api_error(404, "org_units_not_found", locale)
     return org_unit
 
 
@@ -133,7 +137,7 @@ def _is_admin_role(user: User) -> bool:
 
 
 def _load_role_for_institution(
-    *, db: Session, role_id: int, current_user: User
+    *, db: Session, role_id: int, current_user: User, locale: str = DEFAULT_LOCALE
 ) -> Role:
     """Load a Role by id; 403 if the caller may not grant it, 404 if unknown.
 
@@ -153,13 +157,10 @@ def _load_role_for_institution(
     reaches this function, since it can't escalate anything.
     """
     if not (current_user.is_superuser or _is_admin_role(current_user)):
-        raise HTTPException(
-            status_code=403,
-            detail="Nur Admins duerfen einer Org-Unit eine Rolle verleihen",
-        )
+        raise api_error(403, "org_units_grant_role_admin_only", locale)
     role = db.query(Role).filter(Role.id == role_id).one_or_none()
     if role is None:
-        raise HTTPException(status_code=404, detail="Role nicht gefunden")
+        raise api_error(404, "org_units_role_not_found", locale)
     return role
 
 
@@ -240,13 +241,14 @@ async def create_org_unit_endpoint(
     current_user: User = Depends(require_permission("manage_org_units")),
     db: Session = Depends(get_db),
 ) -> OrgUnitOut:
+    locale = get_request_locale(http_request, current_user)
     if body.parent_org_unit_id is not None:
         _load_org_unit_for_user(
-            db=db, user=current_user, org_unit_id=body.parent_org_unit_id
+            db=db, user=current_user, org_unit_id=body.parent_org_unit_id, locale=locale
         )
     if body.role_id is not None:
         _load_role_for_institution(
-            db=db, role_id=body.role_id, current_user=current_user
+            db=db, role_id=body.role_id, current_user=current_user, locale=locale
         )
     try:
         org_unit = create_org_unit(
@@ -258,7 +260,9 @@ async def create_org_unit_endpoint(
             role_id=body.role_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise AppHTTPException(
+            409, str(exc), error_code="org_units_create_conflict"
+        ) from exc
 
     if body.role_id is not None:
         AuditService.log_event_best_effort(
@@ -282,8 +286,9 @@ async def update_org_unit_endpoint(
     current_user: User = Depends(require_permission("manage_org_units")),
     db: Session = Depends(get_db),
 ) -> OrgUnitOut:
+    locale = get_request_locale(http_request, current_user)
     org_unit = _load_org_unit_for_user(
-        db=db, user=current_user, org_unit_id=org_unit_id
+        db=db, user=current_user, org_unit_id=org_unit_id, locale=locale
     )
 
     if body.name is not None:
@@ -301,7 +306,7 @@ async def update_org_unit_endpoint(
     if "role_id" in fields_set:
         if body.role_id is not None:
             _load_role_for_institution(
-                db=db, role_id=body.role_id, current_user=current_user
+                db=db, role_id=body.role_id, current_user=current_user, locale=locale
             )
         if body.role_id != old_role_id:
             org_unit.role_id = body.role_id
@@ -317,39 +322,29 @@ async def update_org_unit_endpoint(
         # parent_org_unit_id is contradictory. Silently dropping the parent
         # value (the previous behaviour) is exactly the kind of silent
         # no-op / API-contract footgun that ambiguity is rejected for.
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "move_to_root: true zusammen mit einem nicht-null "
-                "parent_org_unit_id ist mehrdeutig -- sende nur eines von "
-                "beiden."
-            ),
-        )
+        raise api_error(422, "org_units_move_to_root_ambiguous", locale)
     elif body.move_to_root:
         try:
             move_org_unit(db, org_unit, None)
         except ValueError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
+            raise AppHTTPException(
+                409, str(exc), error_code="org_units_move_conflict"
+            ) from exc
     elif "parent_org_unit_id" in fields_set and body.parent_org_unit_id is not None:
         _load_org_unit_for_user(
-            db=db, user=current_user, org_unit_id=body.parent_org_unit_id
+            db=db, user=current_user, org_unit_id=body.parent_org_unit_id, locale=locale
         )
         try:
             move_org_unit(db, org_unit, body.parent_org_unit_id)
         except ValueError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
+            raise AppHTTPException(
+                409, str(exc), error_code="org_units_move_conflict"
+            ) from exc
     elif "parent_org_unit_id" in fields_set and body.parent_org_unit_id is None:
         # Explicitly sent null without move_to_root is ambiguous -- rather
         # than silently having no effect, reject it (a silent no-op instead
         # of a detach would be an API-contract footgun).
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "parent_org_unit_id: null ist mehrdeutig -- verwende "
-                "move_to_root: true, um eine OrgUnit auf oberste Ebene zu "
-                "verschieben."
-            ),
-        )
+        raise api_error(422, "org_units_null_parent_ambiguous", locale)
     else:
         if body.name is not None:
             try:
@@ -361,7 +356,9 @@ async def update_org_unit_endpoint(
                     exclude_id=org_unit.id,
                 )
             except ValueError as exc:
-                raise HTTPException(status_code=409, detail=str(exc)) from exc
+                raise AppHTTPException(
+                    409, str(exc), error_code="org_units_update_conflict"
+                ) from exc
         db.commit()
         db.refresh(org_unit)
 
@@ -388,6 +385,7 @@ async def update_org_unit_endpoint(
 
 @router.delete("/{org_unit_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_org_unit_endpoint(
+    request: Request,
     org_unit_id: int,
     current_user: User = Depends(require_permission("manage_org_units")),
     db: Session = Depends(get_db),
@@ -400,13 +398,16 @@ async def delete_org_unit_endpoint(
     guarantee. A direct API call without the UI can therefore delete an
     entire sub-hierarchy without warning.
     """
+    locale = get_request_locale(request, current_user)
     org_unit = _load_org_unit_for_user(
-        db=db, user=current_user, org_unit_id=org_unit_id
+        db=db, user=current_user, org_unit_id=org_unit_id, locale=locale
     )
     try:
         delete_org_unit(db, org_unit)
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise AppHTTPException(
+            409, str(exc), error_code="org_units_delete_conflict"
+        ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -418,8 +419,9 @@ async def assign_member_endpoint(
     current_user: User = Depends(require_permission("manage_org_units")),
     db: Session = Depends(get_db),
 ) -> dict:
+    locale = get_request_locale(http_request, current_user)
     org_unit = _load_org_unit_for_user(
-        db=db, user=current_user, org_unit_id=org_unit_id
+        db=db, user=current_user, org_unit_id=org_unit_id, locale=locale
     )
     target_user = (
         db.query(User)
@@ -430,13 +432,15 @@ async def assign_member_endpoint(
         .one_or_none()
     )
     if target_user is None:
-        raise HTTPException(status_code=404, detail="User nicht gefunden")
+        raise api_error(404, "org_units_user_not_found", locale)
     try:
         assign_user_to_org_unit(
             db, user_id=body.user_id, org_unit_id=org_unit_id, role=body.role
         )
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise AppHTTPException(
+            409, str(exc), error_code="org_units_assign_conflict"
+        ) from exc
 
     # TF-637 review fix: audited unconditionally (not only when
     # org_unit.role_id is set) -- a Granted Role can be attached to this
@@ -465,13 +469,16 @@ async def remove_member_endpoint(
     current_user: User = Depends(require_permission("manage_org_units")),
     db: Session = Depends(get_db),
 ) -> Response:
+    locale = get_request_locale(http_request, current_user)
     org_unit = _load_org_unit_for_user(
-        db=db, user=current_user, org_unit_id=org_unit_id
+        db=db, user=current_user, org_unit_id=org_unit_id, locale=locale
     )
     try:
         remove_user_from_org_unit(db, user_id=user_id, org_unit_id=org_unit_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise AppHTTPException(
+            404, str(exc), error_code="org_units_membership_not_found"
+        ) from exc
 
     AuditService.log_event_best_effort(
         db=db,

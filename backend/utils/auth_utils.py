@@ -5,7 +5,7 @@ Dependencies für Token Validation und User Authentication
 
 import logging
 from typing import Optional
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -13,12 +13,13 @@ from database import get_db
 from models.auth import User, UserStatus
 from models.org_unit import OrgUnit, UserOrgUnit
 from services.auth_service import AuthService
-from services.translation_service import get_request_locale, t
+from services.translation_service import get_request_locale
 from utils.impersonation_context import (
     ImpersonationContext,
     get_impersonation_context,
     set_impersonation_context,
 )
+from errors import api_error
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ security = HTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
+    request: Request = None,
 ) -> User:
     """
     FastAPI Dependency: Get current authenticated user from JWT token
@@ -45,32 +47,31 @@ async def get_current_user(
     """
     token = credentials.credentials
 
+    # No user is known yet on this path, so the locale can only come from
+    # Accept-Language — get_request_locale falls back to "de" without one.
+    locale = get_request_locale(request)
+    bearer = {"WWW-Authenticate": "Bearer"}
+
     # Decode token
     payload = AuthService.decode_token(token)
 
     if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise api_error(
+            status.HTTP_401_UNAUTHORIZED, "auth_token_invalid", locale, bearer
         )
 
     # Get user ID from token
     user_id: str = payload.get("sub")
     if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise api_error(
+            status.HTTP_401_UNAUTHORIZED, "auth_token_invalid", locale, bearer
         )
 
     # Check if token is revoked
     token_jti = payload.get("jti")
     if token_jti and AuthService.is_token_revoked(token_jti, db):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has been revoked",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise api_error(
+            status.HTTP_401_UNAUTHORIZED, "auth_token_revoked", locale, bearer
         )
 
     # Get user from database with roles (needed for permission checks).
@@ -96,10 +97,14 @@ async def get_current_user(
     )
 
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
+        # TF-773 review: deliberately a distinct code from the 404
+        # auth_user_not_found used by admin/user-lookup endpoints (auth.py).
+        # This path means "a valid JWT no longer resolves to a user" (e.g.
+        # deleted after the token was issued) — an authentication failure,
+        # not a REST resource lookup, so it stays 401 with its own code
+        # rather than reusing a 404 code under a different status.
+        raise api_error(
+            status.HTTP_401_UNAUTHORIZED, "auth_token_user_not_found", locale, bearer
         )
 
     # TF-741: recognize impersonation claims minted by
@@ -129,9 +134,13 @@ async def get_current_user(
     # works end-to-end if this check doesn't then 403 every subsequent
     # request made with that token.
     if not is_impersonating and user.status != UserStatus.ACTIVE.value:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"User account is {user.status}",
+        # The user is known from here on, so their preferred_language wins
+        # over Accept-Language.
+        raise api_error(
+            status.HTTP_403_FORBIDDEN,
+            "auth_account_status_invalid",
+            get_request_locale(request, user),
+            status=user.status,
         )
 
     return user
@@ -139,6 +148,7 @@ async def get_current_user(
 
 async def get_current_active_user(
     current_user: User = Depends(get_current_user),
+    request: Request = None,
 ) -> User:
     """
     FastAPI Dependency: Get current active user
@@ -160,8 +170,10 @@ async def get_current_active_user(
         get_impersonation_context() is None
         and current_user.status != UserStatus.ACTIVE.value
     ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="User account is not active"
+        raise api_error(
+            status.HTTP_403_FORBIDDEN,
+            "auth_account_not_active",
+            get_request_locale(request, current_user),
         )
 
     return current_user
@@ -186,9 +198,8 @@ def block_during_impersonation(
     """
     if get_impersonation_context() is not None:
         locale = get_request_locale(request, current_user)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=t("impersonation_action_locked", locale=locale),
+        raise api_error(
+            status.HTTP_403_FORBIDDEN, "impersonation_action_locked", locale
         )
 
 
@@ -210,9 +221,8 @@ async def get_current_superuser(
     """
     if not current_user.is_superuser:
         locale = get_request_locale(request, current_user)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=t("admin_insufficient_permissions", locale=locale),
+        raise api_error(
+            status.HTTP_403_FORBIDDEN, "admin_insufficient_permissions", locale
         )
 
     return current_user
@@ -234,11 +244,16 @@ def require_role(required_role: str):
             ...
     """
 
-    async def role_checker(current_user: User = Depends(get_current_user)) -> User:
+    async def role_checker(
+        current_user: User = Depends(get_current_user),
+        request: Request = None,
+    ) -> User:
         if not current_user.has_role(required_role):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{required_role}' required",
+            raise api_error(
+                status.HTTP_403_FORBIDDEN,
+                "auth_role_required",
+                get_request_locale(request, current_user),
+                role=required_role,
             )
         return current_user
 
@@ -262,7 +277,9 @@ def require_permission(required_permission: str):
     """
 
     async def permission_checker(
-        current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+        request: Request = None,
     ) -> User:
         # Check permission
         has_perm = current_user.has_permission(required_permission)
@@ -278,9 +295,11 @@ def require_permission(required_permission: str):
                 required_permission=required_permission,
             )
 
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission '{required_permission}' required",
+            raise api_error(
+                status.HTTP_403_FORBIDDEN,
+                "auth_permission_required",
+                get_request_locale(request, current_user),
+                permission=required_permission,
             )
         return current_user
 
@@ -346,15 +365,17 @@ def enforce_resource_access(
             require_same_institution=True and the resource belongs to a
             different institution.
     """
+    locale = get_request_locale(request, user)
+
     if obj is None:
-        raise HTTPException(status_code=404, detail="Resource not found")
+        raise api_error(404, "auth_resource_not_found", locale)
 
     if not hasattr(obj, owner_field):
         logger.error(
             f"enforce_resource_access: {type(obj).__name__} has no attribute "
             f"{owner_field!r} — programmer error or schema drift"
         )
-        raise HTTPException(status_code=500, detail="Internal authorization error")
+        raise api_error(500, "auth_authorization_error", locale)
 
     # Tenant boundary check FIRST — before owner check, so an orphan resource
     # in a different institution still rejects a non-superuser regardless of
@@ -372,7 +393,7 @@ def enforce_resource_access(
                     user_institution_id,
                     obj_institution_id,
                 )
-                raise HTTPException(status_code=403, detail="Access denied")
+                raise api_error(403, "auth_access_denied", locale)
             # Superuser cross-institution access is allowed but audited
             # below in the bypass branch — fall through.
 
@@ -401,7 +422,7 @@ def enforce_resource_access(
         )
         return
 
-    raise HTTPException(status_code=403, detail="Access denied")
+    raise api_error(403, "auth_access_denied", locale)
 
 
 async def get_optional_user(

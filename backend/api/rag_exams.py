@@ -41,6 +41,7 @@ from utils.document_visibility import (
 )
 from utils.competency_visibility import is_framework_visible_for
 import logging
+from errors import api_error
 
 logger = logging.getLogger(__name__)
 
@@ -239,27 +240,18 @@ async def generate_rag_exam(
                     db,
                     accessible_org_unit_ids=accessible_org_unit_ids,
                 ):
-                    raise HTTPException(
-                        status_code=404,
-                        detail=t("rag_document_not_found", locale=locale),
-                    )
+                    raise api_error(404, "rag_document_not_found", locale)
 
                 # Check whether the document is processed
                 if document.status != DocumentStatus.PROCESSED:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=t("rag_document_not_processed", locale=locale),
-                    )
+                    raise api_error(400, "rag_document_not_processed", locale)
 
         # Validate question types
         valid_types = ["single_choice", "multiple_choice", "open_ended", "true_false"]
         if request.question_types:
             for qtype in request.question_types:
                 if qtype not in valid_types:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=t("rag_invalid_question_type", locale=locale),
-                    )
+                    raise api_error(400, "rag_invalid_question_type", locale)
 
         if request.tag_ids:
             from models.tag import Tag as TagModel
@@ -299,16 +291,14 @@ async def generate_rag_exam(
         from utils.tenant_utils import SubscriptionLimits
 
         if not current_user.institution:
-            raise HTTPException(
-                status_code=403,
-                detail=t("rag_no_institution", locale=locale),
-            )
+            raise api_error(403, "rag_no_institution", locale)
         SubscriptionLimits.check_question_limit(
             current_user.institution,
             db,
             additional_count=request.question_count,
             user=current_user,
             request=http_request,
+            locale=locale,
         )
 
         competencies_text = resolve_competencies_text(
@@ -366,10 +356,7 @@ async def generate_rag_exam(
             db.delete(job)
             db.commit()
             logger.error(f"Celery Broker nicht erreichbar: {broker_error}")
-            raise HTTPException(
-                status_code=503,
-                detail=t("rag_task_queue_unavailable", locale=locale),
-            )
+            raise api_error(503, "rag_task_queue_unavailable", locale)
 
         logger.info(
             f"Fragengenerierung gestartet: task_id={task_id}, "
@@ -403,10 +390,7 @@ async def generate_rag_exam(
     except Exception as e:
         db.rollback()
         logger.error(f"RAG exam generation failed: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=t("rag_generation_failed", locale=locale),
-        )
+        raise api_error(500, "rag_generation_failed", locale)
 
 
 @router.post("/retry-generation/{task_id}", response_model=GenerateExamTaskResponse)
@@ -429,9 +413,7 @@ async def retry_generation(
         )
 
         if not original_job:
-            raise HTTPException(
-                status_code=404, detail=t("rag_task_not_found", locale=locale)
-            )
+            raise api_error(404, "rag_task_not_found", locale)
 
         # Owner check (superuser bypass with audit log)
         from utils.auth_utils import enforce_resource_access
@@ -446,18 +428,12 @@ async def retry_generation(
         )
 
         if original_job.status not in ("FAILURE", "REVOKED"):
-            raise HTTPException(
-                status_code=400,
-                detail=t("rag_retry_only_failed", locale=locale),
-            )
+            raise api_error(400, "rag_retry_only_failed", locale)
 
         if not original_job.request_data or not isinstance(
             original_job.request_data, dict
         ):
-            raise HTTPException(
-                status_code=400,
-                detail=t("rag_retry_no_request_data", locale=locale),
-            )
+            raise api_error(400, "rag_retry_no_request_data", locale)
 
         from utils.tenant_utils import SubscriptionLimits
 
@@ -473,15 +449,10 @@ async def retry_generation(
         else:
             owner_user = db.query(User).filter(User.id == original_job.user_id).first()
             if owner_user is None or owner_user.institution is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail=t("rag_retry_owner_unavailable", locale=locale),
-                )
+                raise api_error(400, "rag_retry_owner_unavailable", locale)
 
         if not owner_user.institution:
-            raise HTTPException(
-                status_code=403, detail=t("rag_no_institution", locale=locale)
-            )
+            raise api_error(403, "rag_no_institution", locale)
 
         question_count = original_job.request_data.get("question_count", 5)
         SubscriptionLimits.check_question_limit(
@@ -490,6 +461,7 @@ async def retry_generation(
             additional_count=question_count,
             user=owner_user,
             request=http_request,
+            locale=locale,
         )
 
         new_task_id = str(uuid.uuid4())
@@ -521,10 +493,7 @@ async def retry_generation(
                 broker_error,
                 exc_info=True,
             )
-            raise HTTPException(
-                status_code=503,
-                detail=t("rag_task_queue_unavailable", locale=locale),
-            )
+            raise api_error(503, "rag_task_queue_unavailable", locale)
 
         # Audit-log the retry trigger so it appears in the dashboard
         # widget and ``/aktivitaeten``. ``user_id`` stays the job owner
@@ -584,10 +553,7 @@ async def retry_generation(
     except Exception as e:
         db.rollback()
         logger.error(f"Retry generation failed: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=t("rag_generation_failed", locale=locale),
-        )
+        raise api_error(500, "rag_generation_failed", locale)
 
 
 @router.post("/retrieve-context", response_model=RAGContextResponse)
@@ -624,10 +590,7 @@ async def retrieve_context(
                     db,
                     accessible_org_unit_ids=accessible_org_unit_ids,
                 ):
-                    raise HTTPException(
-                        status_code=404,
-                        detail=t("rag_document_not_found", locale=locale),
-                    )
+                    raise api_error(404, "rag_document_not_found", locale)
 
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
         context = await rag_service_module.rag_service.retrieve_context(
@@ -655,9 +618,7 @@ async def retrieve_context(
         raise
     except Exception as e:
         logger.error(f"Context retrieval failed: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=t("rag_context_retrieval_failed", locale=locale)
-        )
+        raise api_error(500, "rag_context_retrieval_failed", locale)
 
 
 @router.get("/available-documents")
@@ -677,10 +638,7 @@ async def get_available_documents(
     locale = get_request_locale(request, current_user)
     try:
         if not current_user.institution:
-            raise HTTPException(
-                status_code=403,
-                detail=t("rag_no_institution", locale=locale),
-            )
+            raise api_error(403, "rag_no_institution", locale)
 
         # Visibility-aware (TF-354): consistent with list_documents — own
         # docs + institution-shared docs of the caller's own institution.
@@ -743,9 +701,7 @@ async def get_available_documents(
         raise
     except Exception as e:
         logger.error(f"Failed to get available documents: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=t("rag_get_documents_failed", locale=locale)
-        )
+        raise api_error(500, "rag_get_documents_failed", locale)
 
 
 @router.get("/question-types")
@@ -1052,9 +1008,7 @@ async def get_task_result(
         .first()
     )
     if not job:
-        raise HTTPException(
-            status_code=404, detail=t("rag_task_not_found", locale=locale)
-        )
+        raise api_error(404, "rag_task_not_found", locale)
 
     from utils.auth_utils import enforce_resource_access
 

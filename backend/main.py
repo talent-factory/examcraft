@@ -689,6 +689,115 @@ app.add_middleware(
 )
 
 
+# ---------------------------------------------------------------------------
+# Error envelope (TF-773)
+#
+# These three handlers are the only place the wire format for errors is
+# decided. They are deliberately *additive*: an endpoint that has not been
+# migrated yet produces byte-identical output to FastAPI's defaults, so the
+# migration can proceed module by module without a flag day. See
+# docs/adr/0005-backend-fehlercodes-als-geschwisterfeld.md and errors.py.
+# ---------------------------------------------------------------------------
+from fastapi.encoders import jsonable_encoder  # noqa: E402
+from fastapi.exceptions import RequestValidationError  # noqa: E402
+from fastapi.responses import JSONResponse, Response  # noqa: E402
+from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
+
+from errors import AppHTTPException  # noqa: E402
+from services.translation_service import DEFAULT_LOCALE, t  # noqa: E402
+
+
+def _request_locale(request: Request) -> str:
+    """Locale for framework-level handlers.
+
+    ``request.state.locale`` is set by I18nMiddleware, but the 500 handler runs
+    in ServerErrorMiddleware — *outside* the user middleware stack — where the
+    attribute may not exist. getattr keeps that path from raising a second
+    exception while handling the first.
+    """
+    return getattr(request.state, "locale", DEFAULT_LOCALE)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def app_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Serialise HTTPException, adding ``error_code`` when one is present.
+
+    Registered for Starlette's class so it also covers router-raised 404s and
+    every plain ``fastapi.HTTPException`` still in the codebase. The 204/304
+    branch mirrors Starlette's default handler — those statuses must not carry
+    a body.
+    """
+    headers = getattr(exc, "headers", None)
+    if exc.status_code in {204, 304}:
+        return Response(status_code=exc.status_code, headers=headers)
+
+    body: dict = {"detail": exc.detail}
+
+    error_code = getattr(exc, "error_code", None)
+    if error_code is None and isinstance(exc.detail, dict):
+        # Pre-existing structured details (auswertung_quotas._http_402) already
+        # carry the code one level down, and QuotaBanner.tsx reads it there.
+        # Hoisting it to the top level gives new clients the same field as
+        # everywhere else without moving it out from under the old one.
+        nested = exc.detail.get("error_code")
+        if isinstance(nested, str):
+            error_code = nested
+
+    if error_code is not None:
+        body["error_code"] = error_code
+
+    error_params = getattr(exc, "error_params", None)
+    if error_params:
+        body["error_params"] = jsonable_encoder(error_params)
+
+    return JSONResponse(body, status_code=exc.status_code, headers=headers)
+
+
+@app.exception_handler(RequestValidationError)
+async def app_validation_exception_handler(
+    request: Request, exc: RequestValidationError
+):
+    """422 from Pydantic. ``detail`` keeps FastAPI's error list unchanged.
+
+    FastAPI produces these itself, so they never pass through ``api_error()``.
+    The reserved code gives clients a single branch for "the request body was
+    wrong" instead of matching on the status code alone.
+    """
+    return JSONResponse(
+        {
+            "detail": jsonable_encoder(exc.errors()),
+            "error_code": "validation_error",
+        },
+        status_code=422,
+    )
+
+
+@app.exception_handler(Exception)
+async def app_unhandled_exception_handler(request: Request, exc: Exception):
+    """Last resort: an uncaught exception must not leak a stack trace.
+
+    Sentry's Starlette integration captures in ServerErrorMiddleware before
+    dispatching here, so registering this handler does not cost reporting; the
+    explicit ``logger.exception`` keeps the trace in the container logs, which
+    is where it is looked for locally.
+    """
+    logger.exception(
+        "Unhandled exception on %s %s", request.method, request.url.path, exc_info=exc
+    )
+    return JSONResponse(
+        {
+            "detail": t("internal_error", _request_locale(request)),
+            "error_code": "internal_error",
+        },
+        status_code=500,
+    )
+
+
+# Re-exported so endpoint modules can `from main import AppHTTPException` in a
+# pinch; the canonical import is `from errors import api_error`.
+__all__ = ["app", "AppHTTPException"]
+
+
 # Pydantic models
 class ExamRequest(BaseModel):
     topic: str

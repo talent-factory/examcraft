@@ -3,16 +3,18 @@
 import logging
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
+from errors import api_error
 from models.auth import User
 from models.tag import Tag, QuestionTag, TagKind
 from models.tag_merge_log import TagMergeLog
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 from utils.auth_utils import get_current_active_user, require_permission
 
 logger = logging.getLogger(__name__)
@@ -70,21 +72,25 @@ def _visible_tags_query(db: Session, current_user: User):
     )
 
 
-def _get_tag_for_write(tag_id: int, current_user: User, db: Session) -> Tag:
-    """Returns the tag if it belongs to the user's institution (or global + superuser)."""
+def _get_tag_for_write(
+    tag_id: int, current_user: User, db: Session, locale: str = DEFAULT_LOCALE
+) -> Tag:
+    """Returns the tag if it belongs to the user's institution (or global + superuser).
+
+    ``locale`` is passed in rather than resolved here: this helper has no
+    Request of its own, and every caller already resolved one (TF-773).
+    """
     tag = db.query(Tag).filter(Tag.id == tag_id).first()
     if not tag:
-        raise HTTPException(status_code=404, detail="Tag nicht gefunden.")
+        raise api_error(404, "tags_not_found", locale)
     if tag.scope == "institution" and tag.institution_id != current_user.institution_id:
-        raise HTTPException(status_code=403, detail="Zugriff verweigert.")
+        raise api_error(403, "tags_access_denied", locale)
     if tag.scope == "global" and not current_user.is_superuser:
         # TF-397: a prompt-kind global tag may be managed by its creator,
         # mirroring the relaxed create rule (prompt editors don't need
         # superuser for their own prompt tags). Content global tags unchanged.
         if not (tag.kind == "prompt" and tag.created_by == current_user.id):
-            raise HTTPException(
-                status_code=403, detail="Nur superuser darf globale Tags bearbeiten."
-            )
+            raise api_error(403, "tags_global_edit_superuser_only", locale)
     return tag
 
 
@@ -138,6 +144,7 @@ async def list_tags(
 
 @router.post("", response_model=TagOut, status_code=200)
 async def create_tag(
+    request: Request,
     body: TagCreate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -152,22 +159,15 @@ async def create_tag(
       prompts are effectively global (no institution_id), so the superuser
       rule would otherwise be a blocker for regular prompt editors.
     """
+    locale = get_request_locale(request, current_user)
     if body.kind == "prompt":
         if not current_user.has_permission("prompt:create"):
-            raise HTTPException(
-                status_code=403,
-                detail="Berechtigung 'prompt:create' für Prompt-Tags erforderlich.",
-            )
+            raise api_error(403, "tags_prompt_create_permission_required", locale)
     else:
         if not current_user.has_permission("create_questions"):
-            raise HTTPException(
-                status_code=403,
-                detail="Berechtigung 'create_questions' erforderlich.",
-            )
+            raise api_error(403, "tags_create_questions_permission_required", locale)
         if body.scope == "global" and not current_user.is_superuser:
-            raise HTTPException(
-                status_code=403, detail="Nur superuser darf globale Tags erstellen."
-            )
+            raise api_error(403, "tags_global_create_superuser_only", locale)
 
     name = body.name.strip()
     name_lower = name.lower()
@@ -196,9 +196,7 @@ async def create_tag(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=409, detail="Tag mit diesem Namen existiert bereits."
-        )
+        raise api_error(409, "tags_name_exists", locale)
     db.refresh(tag)
     logger.info(
         "Tag %r (scope=%s, kind=%s) created by user_id=%s",
@@ -212,17 +210,19 @@ async def create_tag(
 
 @router.patch("/{tag_id}", response_model=TagOut)
 async def rename_tag(
+    request: Request,
     tag_id: int,
     body: TagRename,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> Tag:
     """Rename a tag. Admin may rename all tags; others only their own."""
-    tag = _get_tag_for_write(tag_id, current_user, db)
+    locale = get_request_locale(request, current_user)
+    tag = _get_tag_for_write(tag_id, current_user, db, locale)
 
     is_admin = current_user.has_permission("manage_settings")
     if not is_admin and tag.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail="Zugriff verweigert.")
+        raise api_error(403, "tags_access_denied", locale)
 
     new_name = body.name.strip()
     new_name_lower = new_name.lower()
@@ -242,34 +242,32 @@ async def rename_tag(
         .first()
     )
     if duplicate:
-        raise HTTPException(
-            status_code=409, detail="Ein Tag mit diesem Namen existiert bereits."
-        )
+        raise api_error(409, "tags_name_exists_on_rename", locale)
 
     tag.name = new_name
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=409, detail="Tag mit diesem Namen existiert bereits."
-        )
+        raise api_error(409, "tags_name_exists", locale)
     db.refresh(tag)
     return tag
 
 
 @router.post("/{tag_id}/archive", response_model=TagOut)
 async def archive_tag(
+    request: Request,
     tag_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> Tag:
     """Archive a tag. Admin may archive all tags; others only their own."""
-    tag = _get_tag_for_write(tag_id, current_user, db)
+    locale = get_request_locale(request, current_user)
+    tag = _get_tag_for_write(tag_id, current_user, db, locale)
 
     is_admin = current_user.has_permission("manage_settings")
     if not is_admin and tag.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail="Zugriff verweigert.")
+        raise api_error(403, "tags_access_denied", locale)
 
     tag.is_archived = True
     db.commit()
@@ -280,16 +278,18 @@ async def archive_tag(
 
 @router.post("/{tag_id}/unarchive", response_model=TagOut)
 async def unarchive_tag(
+    request: Request,
     tag_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> Tag:
     """Restore an archived tag. Admin may restore all tags; others only their own."""
-    tag = _get_tag_for_write(tag_id, current_user, db)
+    locale = get_request_locale(request, current_user)
+    tag = _get_tag_for_write(tag_id, current_user, db, locale)
 
     is_admin = current_user.has_permission("manage_settings")
     if not is_admin and tag.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail="Zugriff verweigert.")
+        raise api_error(403, "tags_access_denied", locale)
 
     tag.is_archived = False
     db.commit()
@@ -300,6 +300,7 @@ async def unarchive_tag(
 
 @router.delete("/{tag_id}", status_code=204)
 async def delete_tag(
+    request: Request,
     tag_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -307,25 +308,21 @@ async def delete_tag(
     """Permanently delete a tag. Only archived tags with usage_count == 0.
     Admin may delete all such tags; others only their own.
     """
-    tag = _get_tag_for_write(tag_id, current_user, db)
+    locale = get_request_locale(request, current_user)
+    tag = _get_tag_for_write(tag_id, current_user, db, locale)
 
     # TF-397: prompt-kind tags are linked to Prompts via the premium `prompt_tags`
     # table, which this core endpoint cannot inspect. Permanent deletion would
     # cascade and silently strip the tag from active prompts — block it here and
     # let prompt-tag cleanup happen through the prompt-management surface.
     if tag.kind == "prompt":
-        raise HTTPException(
-            status_code=422,
-            detail="Prompt-Tags können über diesen Endpunkt nicht gelöscht werden.",
-        )
+        raise api_error(422, "tags_prompt_delete_not_allowed", locale)
 
     is_admin = current_user.has_permission("manage_settings")
     if not is_admin and tag.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail="Zugriff verweigert.")
+        raise api_error(403, "tags_access_denied", locale)
     if not tag.is_archived:
-        raise HTTPException(
-            status_code=422, detail="Nur archivierte Tags können gelöscht werden."
-        )
+        raise api_error(422, "tags_delete_archived_only", locale)
 
     live_count = (
         db.query(func.count(QuestionTag.question_id))
@@ -333,9 +330,7 @@ async def delete_tag(
         .scalar()
     )
     if live_count > 0:
-        raise HTTPException(
-            status_code=422, detail="Tag wird noch von Fragen verwendet."
-        )
+        raise api_error(422, "tags_still_in_use", locale)
 
     db.delete(tag)
     db.commit()
@@ -346,6 +341,7 @@ async def delete_tag(
 
 @router.post("/merge", response_model=List[TagOut])
 async def merge_tags(
+    request: Request,
     body: MergeRequest,
     current_user: User = Depends(require_permission("manage_settings")),
     db: Session = Depends(get_db),
@@ -356,17 +352,18 @@ async def merge_tags(
     - All question assignments are migrated to the target tag
     - A TagMergeLog entry is created per source tag
     """
+    locale = get_request_locale(request, current_user)
     if body.target_id in body.source_ids:
-        raise HTTPException(
-            status_code=422, detail="Ziel-Tag darf nicht unter den Quell-Tags sein."
-        )
+        raise api_error(422, "tags_merge_target_in_sources", locale)
 
-    target = _get_tag_for_write(body.target_id, current_user, db)
+    target = _get_tag_for_write(body.target_id, current_user, db, locale)
 
     # Pre-validate all sources before any mutation — failure mid-merge would
     # otherwise leave the merge log half-written and partial reassignments
     # committed via the rollback boundary that's only at the endpoint level.
-    sources = [_get_tag_for_write(sid, current_user, db) for sid in body.source_ids]
+    sources = [
+        _get_tag_for_write(sid, current_user, db, locale) for sid in body.source_ids
+    ]
 
     # TF-397: this endpoint only reassigns QuestionTag links — it has no knowledge
     # of the premium prompt_tags join. Merging a 'prompt'-kind tag would archive
@@ -376,13 +373,7 @@ async def merge_tags(
     # Prompt-Editor surface.
     involved_kinds = {t.kind for t in (target, *sources)}
     if "prompt" in involved_kinds:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Prompt-Tags können nicht über diesen Endpunkt zusammengeführt "
-                "werden. Verwalte Prompt-Tags im Prompt-Editor."
-            ),
-        )
+        raise api_error(422, "tags_prompt_merge_not_allowed", locale)
 
     for source in sources:
         source_qt = db.query(QuestionTag).filter(QuestionTag.tag_id == source.id).all()

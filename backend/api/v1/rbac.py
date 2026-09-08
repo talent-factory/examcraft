@@ -3,7 +3,7 @@ RBAC API Endpoints for ExamCraft AI
 REST API for RBAC Management (Roles, Features, Permissions, Quotas)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
@@ -11,10 +11,11 @@ from datetime import datetime
 
 from database import get_db
 from services.rbac_service import RBACService
-from services.translation_service import t, get_request_locale
+from services.translation_service import get_request_locale
 from utils.auth_utils import get_current_user, get_current_active_user
 from models.auth import User
 from models.rbac import Feature, RBACRole, SubscriptionTier, TierQuota
+from errors import api_error
 
 router = APIRouter(prefix="/api/v1/rbac", tags=["RBAC"])
 
@@ -141,9 +142,7 @@ async def get_feature(
     locale = get_request_locale(request, current_user)
     feature = db.query(Feature).filter(Feature.id == feature_id).first()
     if not feature:
-        raise HTTPException(
-            status_code=404, detail=t("rbac_feature_not_found", locale=locale)
-        )
+        raise api_error(404, "rbac_feature_not_found", locale)
     return feature
 
 
@@ -191,9 +190,7 @@ async def get_role(
     locale = get_request_locale(request, current_user)
     role = db.query(RBACRole).filter(RBACRole.id == role_id).first()
     if not role:
-        raise HTTPException(
-            status_code=404, detail=t("rbac_role_not_found", locale=locale)
-        )
+        raise api_error(404, "rbac_role_not_found", locale)
 
     rbac_service = RBACService(db)
     features = rbac_service.get_role_features(role.id)
@@ -252,10 +249,7 @@ async def get_current_tier(request: Request, db: Session = Depends(get_db)):
         )
 
     if not tier:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("rbac_tier_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "rbac_tier_not_found", locale)
 
     return tier
 
@@ -284,10 +278,7 @@ async def get_my_tier(
     )
 
     if not institution:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("rbac_institution_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "rbac_institution_not_found", locale)
 
     # Get subscription tier
     tier = (
@@ -303,10 +294,7 @@ async def get_my_tier(
         )
 
     if not tier:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("rbac_tier_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "rbac_tier_not_found", locale)
 
     return tier
 
@@ -356,9 +344,7 @@ async def check_resource_quota(
     """
     locale = get_request_locale(request, current_user)
     if not current_user.institution_id:
-        raise HTTPException(
-            status_code=400, detail=t("rbac_no_institution", locale=locale)
-        )
+        raise api_error(400, "rbac_no_institution", locale)
 
     rbac_service = RBACService(db)
     quota_check = rbac_service.check_resource_quota(

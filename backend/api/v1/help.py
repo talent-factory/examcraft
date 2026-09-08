@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from utils.auth_utils import get_current_active_user
 from models.auth import User
+from errors import AppHTTPException, api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
 logger = logging.getLogger(__name__)
 
@@ -250,6 +252,7 @@ async def skip_onboarding_step(
     "/onboarding/track/{track_id}/step", response_model=OnboardingStatusResponse
 )
 async def update_track_step(
+    http_request: Request,
     track_id: str,
     request: TrackStepRequest,
     current_user: User = Depends(get_current_active_user),
@@ -263,11 +266,12 @@ async def update_track_step(
     reported by the client — shown and skipped steps count equally, because
     both mean the user has moved past them.
     """
+    locale = get_request_locale(http_request, current_user)
     from models.help import HelpOnboardingProgress
     from datetime import datetime, timezone
 
     if not TRACK_ID_PATTERN.match(track_id):
-        raise HTTPException(status_code=422, detail="Invalid track id")
+        raise api_error(422, "help_track_id_invalid", locale)
     # step < total_steps is enforced by TrackStepRequest itself (a
     # model_validator), so an invalid combination never reaches this point —
     # see the model for why that check lives there instead of here.
@@ -291,10 +295,7 @@ async def update_track_step(
 
     tracks = dict(progress.track_progress or {})
     if track_id not in tracks and len(tracks) >= MAX_TRACKS_PER_USER:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Too many onboarding tracks (max {MAX_TRACKS_PER_USER})",
-        )
+        raise api_error(422, "help_too_many_tracks", locale, max=MAX_TRACKS_PER_USER)
 
     entry = dict(tracks.get(track_id) or {})
     completed = list(entry.get("completed_steps") or [])
@@ -430,6 +431,8 @@ async def send_help_message(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
+    locale = get_request_locale(request, current_user)
+
     # Rate limiting: max 20 requests/hour per user
     try:
         from services.redis_service import RedisService
@@ -442,19 +445,14 @@ async def send_help_message(
         results = pipe.execute()
         current_count = results[0]
         if current_count > 20:
-            raise HTTPException(
-                status_code=429,
-                detail="Rate limit exceeded: max 20 help questions per hour",
-            )
+            raise api_error(429, "help_rate_limit_exceeded", locale)
     except HTTPException:
         raise
     except Exception as e:
         logger.warning(f"Redis rate limiting unavailable, allowing request: {e}")
 
     from services.help_service import HelpService
-    from services.translation_service import get_request_locale
 
-    locale = get_request_locale(request, current_user)
     role = _get_user_role(current_user)
     tier = _get_user_tier(current_user)
 
@@ -614,13 +612,14 @@ class FaqApproveRequest(BaseModel):
     answer_en: Optional[str] = None
 
 
-def _require_admin(user: User):
+def _require_admin(user: User, locale: str = DEFAULT_LOCALE):
     if not getattr(user, "is_superuser", False):
-        raise HTTPException(status_code=403, detail="Superadmin access required")
+        raise api_error(403, "help_superadmin_required", locale)
 
 
 @router.get("/admin/feedback-queue", response_model=FeedbackQueueResponse)
 async def get_feedback_queue(
+    request: Request,
     status: Optional[str] = Query(
         default=None, pattern="^(offen|in_bearbeitung|dokumentiert)$"
     ),
@@ -629,7 +628,8 @@ async def get_feedback_queue(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    _require_admin(current_user)
+    locale = get_request_locale(request, current_user)
+    _require_admin(current_user, locale=locale)
     from services.help_feedback_service import HelpFeedbackService
 
     service = HelpFeedbackService(db)
@@ -640,40 +640,41 @@ async def get_feedback_queue(
 
 @router.put("/admin/feedback/{feedback_id}", response_model=FeedbackResponse)
 async def update_feedback_status(
+    request: Request,
     feedback_id: int,
     request_body: FeedbackUpdateRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    _require_admin(current_user)
+    locale = get_request_locale(request, current_user)
+    _require_admin(current_user, locale=locale)
     from services.help_feedback_service import HelpFeedbackService
 
     service = HelpFeedbackService(db)
     feedback = service.update_feedback_status(feedback_id, request_body.status)
     if not feedback:
-        raise HTTPException(status_code=404, detail="Feedback not found")
+        raise api_error(404, "help_feedback_not_found", locale)
     return FeedbackResponse(id=feedback.id, status=feedback.status)
 
 
 @router.post("/admin/reindex")
 async def trigger_reindex(
+    request: Request,
     full_scan: bool = Query(
         default=False, description="Force full re-scan instead of git-diff"
     ),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    _require_admin(current_user)
+    locale = get_request_locale(request, current_user)
+    _require_admin(current_user, locale=locale)
     from services.vector_service_factory import vector_service
 
     qdrant_enabled = (
         hasattr(vector_service, "client") and vector_service.client is not None
     )
     if not qdrant_enabled:
-        raise HTTPException(
-            status_code=400,
-            detail="Re-indexing is only available in Full mode (Qdrant required)",
-        )
+        raise api_error(400, "help_reindex_full_mode_only", locale)
 
     from services.docs_indexer_service import (
         DocsIndexerService,
@@ -687,17 +688,18 @@ async def trigger_reindex(
     except IndexingInProgressError as e:
         # 409 Conflict: another indexing run holds the lock (startup task or
         # a prior /admin/reindex call). Caller can retry once the lock expires.
-        raise HTTPException(status_code=409, detail=str(e))
+        raise AppHTTPException(409, str(e), error_code="help_reindex_conflict")
     except IndexingLockUnavailableError as e:
         # 503 Service Unavailable: Redis is down so we can't safely serialize
         # against concurrent indexing. Refuse rather than risk a Qdrant-clear
         # race; operator should retry once Redis is healthy.
-        raise HTTPException(status_code=503, detail=str(e))
+        raise AppHTTPException(503, str(e), error_code="help_reindex_unavailable")
     return {"status": "completed", **result}
 
 
 @router.get("/admin/index-state", response_model=IndexStateResponse)
 async def get_index_state(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -707,7 +709,8 @@ async def get_index_state(
     the last transition — `in_progress` if a run is active, `completed` or
     `failed` (with `last_error` populated) for terminal states.
     """
-    _require_admin(current_user)
+    locale = get_request_locale(request, current_user)
+    _require_admin(current_user, locale=locale)
     from models.help import HelpIndexState
 
     state = db.query(HelpIndexState).first()
@@ -725,10 +728,12 @@ async def get_index_state(
 
 @router.get("/admin/metrics", response_model=MetricsResponse)
 async def get_metrics(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    _require_admin(current_user)
+    locale = get_request_locale(request, current_user)
+    _require_admin(current_user, locale=locale)
     from services.help_feedback_service import HelpFeedbackService
 
     service = HelpFeedbackService(db)
@@ -737,12 +742,14 @@ async def get_metrics(
 
 @router.get("/admin/clusters", response_model=ClusterListResponse)
 async def get_clusters(
+    request: Request,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    _require_admin(current_user)
+    locale = get_request_locale(request, current_user)
+    _require_admin(current_user, locale=locale)
     from models.feedback_cluster import FeedbackCluster
 
     query = db.query(FeedbackCluster).filter(FeedbackCluster.status == "aktiv")
@@ -761,10 +768,12 @@ async def get_clusters(
 
 @router.get("/admin/faq-candidates", response_model=FaqCandidateListResponse)
 async def get_faq_candidates(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    _require_admin(current_user)
+    locale = get_request_locale(request, current_user)
+    _require_admin(current_user, locale=locale)
     from models.help import HelpFaqCache
 
     items = (
@@ -789,17 +798,19 @@ async def get_faq_candidates(
 
 @router.post("/admin/faq-candidates/{faq_id}/approve")
 async def approve_faq_candidate(
+    request: Request,
     faq_id: int,
     request_body: FaqApproveRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    _require_admin(current_user)
+    locale = get_request_locale(request, current_user)
+    _require_admin(current_user, locale=locale)
     from models.help import HelpFaqCache
 
     faq = db.query(HelpFaqCache).filter(HelpFaqCache.id == faq_id).first()
     if not faq:
-        raise HTTPException(status_code=404, detail="FAQ candidate not found")
+        raise api_error(404, "help_faq_candidate_not_found", locale)
 
     if request_body.answer_de:
         faq.answer_de = request_body.answer_de
@@ -842,16 +853,18 @@ async def approve_faq_candidate(
 
 @router.post("/admin/faq-candidates/{faq_id}/reject")
 async def reject_faq_candidate(
+    request: Request,
     faq_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    _require_admin(current_user)
+    locale = get_request_locale(request, current_user)
+    _require_admin(current_user, locale=locale)
     from models.help import HelpFaqCache
 
     faq = db.query(HelpFaqCache).filter(HelpFaqCache.id == faq_id).first()
     if not faq:
-        raise HTTPException(status_code=404, detail="FAQ candidate not found")
+        raise api_error(404, "help_faq_candidate_not_found", locale)
 
     faq.faq_status = "verworfen"
     db.commit()
@@ -860,16 +873,18 @@ async def reject_faq_candidate(
 
 @router.post("/admin/clusters/{cluster_id}/mark-docs-gap")
 async def mark_docs_gap(
+    request: Request,
     cluster_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
-    _require_admin(current_user)
+    locale = get_request_locale(request, current_user)
+    _require_admin(current_user, locale=locale)
     from models.feedback_cluster import FeedbackCluster
 
     cluster = db.query(FeedbackCluster).filter(FeedbackCluster.id == cluster_id).first()
     if not cluster:
-        raise HTTPException(status_code=404, detail="Cluster not found")
+        raise api_error(404, "help_cluster_not_found", locale)
 
     cluster.docs_gap = True
     db.commit()

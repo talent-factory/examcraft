@@ -26,7 +26,7 @@ OpenAPI schema generation and body parsing.
 import logging
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func as sa_func
 from sqlalchemy.exc import IntegrityError
@@ -38,6 +38,8 @@ from models.student import Student, StudentClass, StudentClassMembership
 from services.auswertung_quotas import assert_class_history_allowed
 from services.statistics_service import StatisticsService
 from utils.auth_utils import require_permission
+from errors import api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
 
 logger = logging.getLogger(__name__)
@@ -113,7 +115,9 @@ class MemberAddIn(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _load_class_for_user(*, db: Session, user: User, class_id: int) -> StudentClass:
+def _load_class_for_user(
+    *, db: Session, user: User, class_id: int, locale: str = DEFAULT_LOCALE
+) -> StudentClass:
     """Load a StudentClass for the current institution; 404 otherwise.
 
     404 (not 403) is intentional: revealing existence-but-no-access leaks
@@ -128,11 +132,13 @@ def _load_class_for_user(*, db: Session, user: User, class_id: int) -> StudentCl
         .one_or_none()
     )
     if student_class is None:
-        raise HTTPException(status_code=404, detail="Klasse nicht gefunden")
+        raise api_error(404, "student_classes_not_found", locale)
     return student_class
 
 
-def _load_student_for_user(*, db: Session, user: User, student_id: int) -> Student:
+def _load_student_for_user(
+    *, db: Session, user: User, student_id: int, locale: str = DEFAULT_LOCALE
+) -> Student:
     student = (
         db.query(Student)
         .filter(
@@ -142,7 +148,7 @@ def _load_student_for_user(*, db: Session, user: User, student_id: int) -> Stude
         .one_or_none()
     )
     if student is None:
-        raise HTTPException(status_code=404, detail="Studi nicht gefunden")
+        raise api_error(404, "student_classes_student_not_found", locale)
     return student
 
 
@@ -201,11 +207,13 @@ async def list_student_classes(
 
 @router.post("", response_model=StudentClassOut, status_code=status.HTTP_201_CREATED)
 async def create_student_class(
+    request: Request,
     body: StudentClassCreateIn,
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> StudentClassOut:
     """Create a class. 409 on a name conflict within the same institution."""
+    locale = get_request_locale(request, current_user)
     student_class = StudentClass(
         institution_id=current_user.institution_id,
         name=body.name,
@@ -215,9 +223,8 @@ async def create_student_class(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail=f"Klasse mit Namen '{body.name}' existiert bereits",
+        raise api_error(
+            409, "student_classes_name_exists", locale, name=body.name
         ) from exc
     db.refresh(student_class)
     return _to_summary_out(student_class, member_count=0)
@@ -225,11 +232,13 @@ async def create_student_class(
 
 @router.get("/{class_id}", response_model=StudentClassDetailOut)
 async def get_student_class(
+    request: Request,
     class_id: int,
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> StudentClassDetailOut:
     """Class detail with the member list."""
+    locale = get_request_locale(request, current_user)
     student_class = (
         db.query(StudentClass)
         .options(
@@ -244,7 +253,7 @@ async def get_student_class(
         .one_or_none()
     )
     if student_class is None:
-        raise HTTPException(status_code=404, detail="Klasse nicht gefunden")
+        raise api_error(404, "student_classes_not_found", locale)
 
     members = sorted(
         (
@@ -270,21 +279,24 @@ async def get_student_class(
 
 @router.patch("/{class_id}", response_model=StudentClassOut)
 async def update_student_class(
+    request: Request,
     class_id: int,
     body: StudentClassUpdateIn,
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> StudentClassOut:
     """Rename a class. 409 on a name collision."""
-    student_class = _load_class_for_user(db=db, user=current_user, class_id=class_id)
+    locale = get_request_locale(request, current_user)
+    student_class = _load_class_for_user(
+        db=db, user=current_user, class_id=class_id, locale=locale
+    )
     student_class.name = body.name
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail=f"Klasse mit Namen '{body.name}' existiert bereits",
+        raise api_error(
+            409, "student_classes_name_exists", locale, name=body.name
         ) from exc
     db.refresh(student_class)
     member_count = (
@@ -298,6 +310,7 @@ async def update_student_class(
 
 @router.delete("/{class_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_student_class(
+    request: Request,
     class_id: int,
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
@@ -307,7 +320,10 @@ async def delete_student_class(
     Students themselves are retained (they may be enrolled in other
     classes and also reference submissions).
     """
-    student_class = _load_class_for_user(db=db, user=current_user, class_id=class_id)
+    locale = get_request_locale(request, current_user)
+    student_class = _load_class_for_user(
+        db=db, user=current_user, class_id=class_id, locale=locale
+    )
     db.delete(student_class)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -324,6 +340,7 @@ async def delete_student_class(
     status_code=status.HTTP_201_CREATED,
 )
 async def add_member(
+    request: Request,
     class_id: int,
     body: MemberAddIn,
     current_user: User = Depends(require_permission("students:manage")),
@@ -335,9 +352,12 @@ async def add_member(
     member, return 200 instead of 201 — we instead respond with 409, so
     the frontend can explicitly surface the conflict.
     """
-    student_class = _load_class_for_user(db=db, user=current_user, class_id=class_id)
+    locale = get_request_locale(request, current_user)
+    student_class = _load_class_for_user(
+        db=db, user=current_user, class_id=class_id, locale=locale
+    )
     student = _load_student_for_user(
-        db=db, user=current_user, student_id=body.student_id
+        db=db, user=current_user, student_id=body.student_id, locale=locale
     )
 
     membership = StudentClassMembership(
@@ -348,10 +368,7 @@ async def add_member(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Studi ist bereits Mitglied dieser Klasse",
-        ) from exc
+        raise api_error(409, "student_classes_already_member", locale) from exc
     return StudentRefOut(
         id=student.id,
         external_id=student.external_id,
@@ -364,13 +381,17 @@ async def add_member(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def remove_member(
+    request: Request,
     class_id: int,
     student_id: int,
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> Response:
     """Remove a membership. 404 if not present."""
-    student_class = _load_class_for_user(db=db, user=current_user, class_id=class_id)
+    locale = get_request_locale(request, current_user)
+    student_class = _load_class_for_user(
+        db=db, user=current_user, class_id=class_id, locale=locale
+    )
     membership = (
         db.query(StudentClassMembership)
         .filter(
@@ -380,7 +401,7 @@ async def remove_member(
         .one_or_none()
     )
     if membership is None:
-        raise HTTPException(status_code=404, detail="Mitgliedschaft nicht gefunden")
+        raise api_error(404, "student_classes_membership_not_found", locale)
     db.delete(membership)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -446,6 +467,7 @@ class ClassHistoryStatsOut(BaseModel):
 
 @router.get("/{class_id}/stats", response_model=ClassHistoryStatsOut)
 async def get_class_history(
+    request: Request,
     class_id: int,
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
@@ -458,17 +480,18 @@ async def get_class_history(
 
     Tier gate: Enterprise only. 402 with ``error_code`` for the i18n banner.
     """
+    locale = get_request_locale(request, current_user)
     assert_class_history_allowed(current_user)
     # 404 before we bother the service — again no 403, so as not to
     # leak cross-tenant existence.
-    _load_class_for_user(db=db, user=current_user, class_id=class_id)
+    _load_class_for_user(db=db, user=current_user, class_id=class_id, locale=locale)
 
     stats = StatisticsService(db).class_history(
         class_id=class_id, institution_id=current_user.institution_id
     )
     if stats is None:
         # Should not happen — _load_class_for_user already verified.
-        raise HTTPException(status_code=404, detail="Klasse nicht gefunden")
+        raise api_error(404, "student_classes_not_found", locale)
 
     return ClassHistoryStatsOut(
         class_id=stats.class_id,

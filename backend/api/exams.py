@@ -20,7 +20,7 @@ from models.tag import QuestionTag
 from api.tags import TagOut
 from api.question_review import _serialize_competency
 from utils.question_options import normalize_options
-from services.translation_service import t, get_request_locale
+from services.translation_service import DEFAULT_LOCALE, get_request_locale, t
 from utils.auth_utils import require_permission
 from utils.download_filename import content_disposition, filename_stem
 from utils.tenant_utils import TenantFilter, get_tenant_context
@@ -39,6 +39,8 @@ from services.exam_export_service import (
     PdfExporter,
 )
 import logging
+from errors import api_error
+from errors import AppHTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +225,7 @@ def _get_exam_or_404(
         .first()
     )
     if not exam:
-        raise HTTPException(status_code=404, detail=t("exams_not_found", locale=locale))
+        raise api_error(404, "exams_not_found", locale)
     assert_exam_visible_for(
         current_user,
         exam,
@@ -237,10 +239,7 @@ def _get_exam_or_404(
 
 def _require_draft(exam: Exam, locale: str = "de"):
     if exam.status != ExamStatus.DRAFT.value:
-        raise HTTPException(
-            status_code=400,
-            detail=t("exams_must_be_draft", locale=locale),
-        )
+        raise api_error(400, "exams_must_be_draft", locale)
 
 
 def _exam_to_out(exam: Exam, has_submissions: Optional[bool] = None) -> dict:
@@ -308,6 +307,7 @@ def _resolve_grading_scheme_id(
     user: User,
     explicit_id: Optional[int],
     fall_back_to_institution_default: bool,
+    locale: str = DEFAULT_LOCALE,
 ) -> Optional[int]:
     """Validate an explicit ``grading_scheme_id`` or inherit the
     institution default. Returns the id to persist on the exam.
@@ -328,10 +328,7 @@ def _resolve_grading_scheme_id(
             scheme.institution_id is not None
             and scheme.institution_id != user.institution_id
         ):
-            raise HTTPException(
-                status_code=422,
-                detail="Ungültige grading_scheme_id für diese Institution",
-            )
+            raise api_error(422, "exams_grading_scheme_invalid", locale)
         return explicit_id
 
     if not fall_back_to_institution_default or user.institution_id is None:
@@ -372,7 +369,7 @@ def _exam_detail_to_out(exam: Exam) -> dict:
 
 
 def _resolve_exam_visibility_for_create(
-    request: "ExamCreate", user: User, db: Session
+    request: "ExamCreate", user: User, db: Session, locale: str = DEFAULT_LOCALE
 ) -> tuple:
     """TF-643: validate visibility/org_unit_id at exam creation time.
 
@@ -393,10 +390,7 @@ def _resolve_exam_visibility_for_create(
 
     if visibility == ExamVisibility.TEAM:
         if org_unit_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Team-Sichtbarkeit erfordert eine Org-Unit (org_unit_id).",
-            )
+            raise api_error(400, "visibility_org_unit_required", locale)
         # SuperUser bugfix (mirrors question_review._resolve_question_visibility_update,
         # TF-642): validating against the ACTING user's own membership would
         # reject a superuser, who typically belongs to no Org-Unit and often
@@ -409,13 +403,7 @@ def _resolve_exam_visibility_for_create(
                 else set()
             )
             if org_unit_id not in accessible:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Team-Sichtbarkeit erfordert eine eigene Org-Unit "
-                        "(org_unit_id), der du selbst angehörst."
-                    ),
-                )
+                raise api_error(400, "visibility_own_org_unit_required", locale)
     else:
         org_unit_id = None
 
@@ -439,9 +427,10 @@ async def create_exam(
         user=current_user,
         explicit_id=request.grading_scheme_id,
         fall_back_to_institution_default=True,
+        locale=locale,
     )
     visibility, org_unit_id = _resolve_exam_visibility_for_create(
-        request, current_user, db
+        request, current_user, db, locale=locale
     )
     exam = Exam(
         title=request.title,
@@ -466,11 +455,11 @@ async def create_exam(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in create_exam: %s", exc)
-        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
+        raise api_error(409, "exams_conflict", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in create_exam: %s", exc)
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
     logger.info(f"Created exam {exam.id} by user {current_user.id}")
 
     from services.audit_service import AuditService
@@ -678,6 +667,7 @@ async def list_documents_with_questions(
 
 @router.get("/approved-questions", response_model=ApprovedQuestionsListOut)
 async def list_approved_questions(
+    request: Request,
     topic: Optional[str] = None,
     difficulty: Optional[str] = Query(None, pattern="^(easy|medium|hard)$"),
     bloom_level: Optional[int] = Query(None, ge=1, le=6),
@@ -711,6 +701,7 @@ async def list_approved_questions(
     db: Session = Depends(get_db),
 ):
     """Browse approved questions for exam composition."""
+    locale = get_request_locale(request, current_user)
     query = db.query(QuestionReview).filter(
         QuestionReview.review_status == ReviewStatus.APPROVED.value,
         # TF-396: don't offer archived questions for reuse
@@ -739,10 +730,7 @@ async def list_approved_questions(
     if tag_ids:
         parsed_tag_ids = [int(i) for i in tag_ids.split(",") if i.strip().isdigit()]
         if not parsed_tag_ids:
-            raise HTTPException(
-                status_code=422,
-                detail="tag_ids enthält keine gültigen ganzzahligen Werte.",
-            )
+            raise api_error(422, "exams_tag_ids_invalid", locale)
         query = query.filter(
             QuestionReview.id.in_(
                 db.query(QuestionTag.question_id).filter(
@@ -884,10 +872,7 @@ async def get_approved_question(
     query = TenantFilter.filter_by_tenant(query, QuestionReview, tenant_context)
     question = query.first()
     if question is None:
-        raise HTTPException(
-            status_code=404,
-            detail=t("approved_question_not_found", locale=locale),
-        )
+        raise api_error(404, "approved_question_not_found", locale)
 
     # usage_count counts — like the list endpoint — cross-institution how
     # often the question is used in exams (global reuse, no leak, since no
@@ -968,6 +953,7 @@ def _resolve_exam_visibility_update(
     fields: dict,
     user: User,
     db: Session,
+    locale: str = DEFAULT_LOCALE,
 ) -> Optional[dict]:
     """TF-643: validate a visibility/org_unit_id change on ``PUT /{exam_id}``.
 
@@ -1013,17 +999,11 @@ def _resolve_exam_visibility_update(
 
     is_owner = exam.created_by is not None and exam.created_by == user.id
     if not is_owner and not user.is_superuser:
-        raise HTTPException(
-            status_code=403,
-            detail="Nur der Ersteller oder ein SuperUser darf die Sichtbarkeit ändern.",
-        )
+        raise api_error(403, "visibility_owner_or_superuser_only", locale)
 
     if new_visibility == ExamVisibility.TEAM:
         if new_org_unit_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Team-Sichtbarkeit erfordert eine Org-Unit (org_unit_id).",
-            )
+            raise api_error(400, "visibility_org_unit_required", locale)
         if not user.is_superuser:
             accessible = (
                 get_user_accessible_org_unit_ids(db, user.id, user.institution_id)
@@ -1031,13 +1011,7 @@ def _resolve_exam_visibility_update(
                 else set()
             )
             if new_org_unit_id not in accessible:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Team-Sichtbarkeit erfordert eine eigene Org-Unit "
-                        "(org_unit_id), der du selbst angehörst."
-                    ),
-                )
+                raise api_error(400, "visibility_own_org_unit_required", locale)
     else:
         new_org_unit_id = None
 
@@ -1062,10 +1036,7 @@ async def update_exam(
     # Optimistic locking — compare at microsecond precision with UTC normalisation
     if exam.updated_at and request.updated_at:
         if _to_utc(exam.updated_at) != _to_utc(request.updated_at):
-            raise HTTPException(
-                status_code=409,
-                detail=t("exams_conflict", locale=locale),
-            )
+            raise api_error(409, "exams_conflict", locale)
 
     update_data = request.model_dump(exclude_unset=True, exclude={"updated_at"})
     # TF-643: pulled out of the generic setattr loop below — needs
@@ -1082,13 +1053,14 @@ async def update_exam(
             user=current_user,
             explicit_id=update_data["grading_scheme_id"],
             fall_back_to_institution_default=False,
+            locale=locale,
         )
     for field, value in update_data.items():
         setattr(exam, field, value)
 
     old_visibility, old_org_unit_id = exam.visibility, exam.org_unit_id
     visibility_update = _resolve_exam_visibility_update(
-        exam, visibility_fields, current_user, db
+        exam, visibility_fields, current_user, db, locale=locale
     )
     if visibility_update is not None:
         exam.visibility = visibility_update["visibility"]
@@ -1104,11 +1076,11 @@ async def update_exam(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in update_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
+        raise api_error(409, "exams_conflict", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in update_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
     # TF-504: metadata updates were silent while create/delete/grading-scheme
     # were audited — close the asymmetry.
     from services.audit_service import AuditService
@@ -1152,10 +1124,7 @@ async def update_exam_grading_scheme(
     # overwrite each other.
     if exam.updated_at and request.updated_at:
         if _to_utc(exam.updated_at) != _to_utc(request.updated_at):
-            raise HTTPException(
-                status_code=409,
-                detail=t("exams_conflict", locale=locale),
-            )
+            raise api_error(409, "exams_conflict", locale)
 
     previous_id = exam.grading_scheme_id
     new_id = _resolve_grading_scheme_id(
@@ -1163,6 +1132,7 @@ async def update_exam_grading_scheme(
         user=current_user,
         explicit_id=request.grading_scheme_id,
         fall_back_to_institution_default=False,
+        locale=locale,
     )
     exam.grading_scheme_id = new_id
 
@@ -1176,7 +1146,7 @@ async def update_exam_grading_scheme(
             exam_id,
             exc,
         )
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
 
     # Audit trail mirrors create/finalize/delete on this resource. The
     # grading scheme is the load-bearing input for export, so any change
@@ -1225,7 +1195,7 @@ async def delete_exam(
 
     block = _exam_delete_block_reason(db, exam, locale)
     if block is not None:
-        raise HTTPException(status_code=409, detail=block)
+        raise AppHTTPException(409, block, error_code="exams_delete_blocked")
 
     # Snapshot BEFORE deletion (forensic recoverability in the audit log).
     snapshot = {
@@ -1250,11 +1220,11 @@ async def delete_exam(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in delete_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
+        raise api_error(409, "exams_conflict", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in delete_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
 
     # log_action commits the delete + audit atomically; on an audit failure
     # it also rolls back the staged delete and returns None (fail loud).
@@ -1269,9 +1239,7 @@ async def delete_exam(
         additional_data=snapshot,
     )
     if audit is None:
-        raise HTTPException(
-            status_code=500, detail=t("delete_exam_failed", locale=locale)
-        )
+        raise api_error(500, "delete_exam_failed", locale)
     logger.info(f"Deleted exam {exam_id} by user {current_user.id}")
 
 
@@ -1294,10 +1262,7 @@ async def archive_exam(
         exam_id, db, current_user, locale, allow_read_all_bypass=False
     )
     if exam.archived_at is not None:
-        raise HTTPException(
-            status_code=409,
-            detail=t("exam_archive_already_archived", locale=locale),
-        )
+        raise api_error(409, "exam_archive_already_archived", locale)
 
     exam.archived_at = datetime.utcnow()
     exam.archived_by = current_user.id
@@ -1316,9 +1281,7 @@ async def archive_exam(
         additional_data={"reason": request.reason},
     )
     if audit is None:
-        raise HTTPException(
-            status_code=500, detail=t("exam_archive_failed", locale=locale)
-        )
+        raise api_error(500, "exam_archive_failed", locale)
     db.refresh(exam)
     logger.info(f"Archived exam {exam_id} by user {current_user.id}")
     return _exam_to_out(exam)
@@ -1340,10 +1303,7 @@ async def restore_exam(
         exam_id, db, current_user, locale, allow_read_all_bypass=False
     )
     if exam.archived_at is None:
-        raise HTTPException(
-            status_code=409,
-            detail=t("exam_archive_not_archived", locale=locale),
-        )
+        raise api_error(409, "exam_archive_not_archived", locale)
 
     exam.archived_at = None
     exam.archived_by = None
@@ -1362,9 +1322,7 @@ async def restore_exam(
         additional_data={},
     )
     if audit is None:
-        raise HTTPException(
-            status_code=500, detail=t("exam_restore_failed", locale=locale)
-        )
+        raise api_error(500, "exam_restore_failed", locale)
     db.refresh(exam)
     logger.info(f"Restored exam {exam_id} by user {current_user.id}")
     return _exam_to_out(exam)
@@ -1418,9 +1376,7 @@ async def add_questions(
 
         question = db.query(QuestionReview).filter(QuestionReview.id == qid).first()
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("exams_question_not_found", locale=locale)
-            )
+            raise api_error(404, "exams_question_not_found", locale)
 
         # TF-642 bugfix: this previously checked only institution membership
         # (TenantFilter.verify_tenant_access), letting any create_exams
@@ -1437,10 +1393,7 @@ async def add_questions(
         )
 
         if question.review_status != ReviewStatus.APPROVED.value:
-            raise HTTPException(
-                status_code=400,
-                detail=t("exams_question_not_approved", locale=locale),
-            )
+            raise api_error(400, "exams_question_not_approved", locale)
 
         max_pos += 1
         points = suggest_points(question.question_type, question.difficulty)
@@ -1462,11 +1415,11 @@ async def add_questions(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in add_questions for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
+        raise api_error(409, "exams_conflict", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in add_questions for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
 
     return _exam_detail_to_out(exam)
 
@@ -1493,9 +1446,7 @@ async def update_exam_question(
         .first()
     )
     if not eq:
-        raise HTTPException(
-            status_code=404, detail=t("exams_exam_question_not_found", locale=locale)
-        )
+        raise api_error(404, "exams_exam_question_not_found", locale)
 
     if request.points is not None:
         eq.points = request.points
@@ -1513,13 +1464,13 @@ async def update_exam_question(
         logger.error(
             "IntegrityError in update_exam_question for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
+        raise api_error(409, "exams_conflict", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error(
             "Database error in update_exam_question for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
 
     from services.audit_service import AuditService
 
@@ -1562,9 +1513,7 @@ async def remove_exam_question(
         .first()
     )
     if not eq:
-        raise HTTPException(
-            status_code=404, detail=t("exams_exam_question_not_found", locale=locale)
-        )
+        raise api_error(404, "exams_exam_question_not_found", locale)
 
     db.delete(eq)
 
@@ -1589,13 +1538,13 @@ async def remove_exam_question(
         logger.error(
             "IntegrityError in remove_exam_question for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
+        raise api_error(409, "exams_conflict", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error(
             "Database error in remove_exam_question for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
 
     from services.audit_service import AuditService
 
@@ -1633,10 +1582,7 @@ async def reorder_questions(
     # Validate all IDs first before any mutations
     for item in request.order:
         if item.id not in eq_map:
-            raise HTTPException(
-                status_code=404,
-                detail=t("exams_exam_question_not_found", locale=locale),
-            )
+            raise api_error(404, "exams_exam_question_not_found", locale)
 
     # Temporarily set positions negative to avoid unique constraint violations
     for eq in exam.questions:
@@ -1654,13 +1600,13 @@ async def reorder_questions(
         logger.error(
             "IntegrityError in reorder_questions for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
+        raise api_error(409, "exams_conflict", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error(
             "Database error in reorder_questions for exam %s: %s", exam_id, exc
         )
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
     return _exam_detail_to_out(exam)
 
 
@@ -1763,23 +1709,18 @@ def _validate_distribution(
     """Validate that distribution percentage values sum to ~100 (+/-1) and optionally check keys against a valid set."""
     total = sum(dist.values())
     if abs(total - 100) > 1.0:
-        raise HTTPException(
-            status_code=422,
-            detail=t(
-                "exams_distribution_sum_invalid", locale=locale, name=name, total=total
-            ),
+        raise api_error(
+            422, "exams_distribution_sum_invalid", locale, name=name, total=total
         )
     if valid_keys:
         invalid = set(dist.keys()) - valid_keys
         if invalid:
-            raise HTTPException(
-                status_code=422,
-                detail=t(
-                    "exams_distribution_invalid_keys",
-                    locale=locale,
-                    name=name,
-                    keys=str(invalid),
-                ),
+            raise api_error(
+                422,
+                "exams_distribution_invalid_keys",
+                locale,
+                name=name,
+                keys=str(invalid),
             )
 
 
@@ -1837,13 +1778,13 @@ def _commit_exam_changes(
         logger.error(
             "IntegrityError in %s for exam %s: %s", operation_name, exam.id, exc
         )
-        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
+        raise api_error(409, "exams_conflict", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error(
             "Database error in %s for exam %s: %s", operation_name, exam.id, exc
         )
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
 
 
 def _auto_compose(
@@ -1886,9 +1827,7 @@ def _auto_compose(
 
     all_candidates = query.all()
     if not all_candidates:
-        raise HTTPException(
-            status_code=404, detail=t("exams_no_matching_questions", locale=locale)
-        )
+        raise api_error(404, "exams_no_matching_questions", locale)
 
     candidates = [
         QuestionCandidate(
@@ -1914,16 +1853,10 @@ def _auto_compose(
         result = compose_questions(candidates, constraints)
     except ValueError as exc:
         logger.warning("Composition constraint error for exam %s: %s", exam.id, exc)
-        raise HTTPException(
-            status_code=422,
-            detail=t("exams_composition_constraint_error", locale=locale),
-        )
+        raise api_error(422, "exams_composition_constraint_error", locale)
 
     if not result.questions:
-        raise HTTPException(
-            status_code=404,
-            detail=t("exams_no_questions_fit_constraints", locale=locale),
-        )
+        raise api_error(404, "exams_no_questions_fit_constraints", locale)
 
     # Preview mode: return proposal without modifying exam
     if request.preview:
@@ -1980,9 +1913,7 @@ def _auto_fill_simple(
     query = _build_candidate_query(exam, request, current_user, db)
     candidates = query.order_by(sa_func.random()).limit(count).all()
     if not candidates:
-        raise HTTPException(
-            status_code=404, detail=t("exams_no_matching_questions", locale=locale)
-        )
+        raise api_error(404, "exams_no_matching_questions", locale)
 
     max_pos = max((eq.position for eq in exam.questions), default=0)
     for q in candidates:
@@ -2017,9 +1948,7 @@ async def finalize_exam(
     _require_draft(exam, locale)
 
     if not exam.questions:
-        raise HTTPException(
-            status_code=400, detail=t("exams_cannot_finalize_empty", locale=locale)
-        )
+        raise api_error(400, "exams_cannot_finalize_empty", locale)
 
     # Check all questions are still approved
     non_approved = [
@@ -2028,10 +1957,7 @@ async def finalize_exam(
         if eq.question.review_status != ReviewStatus.APPROVED.value
     ]
     if non_approved:
-        raise HTTPException(
-            status_code=400,
-            detail=t("exams_questions_not_approved", locale=locale),
-        )
+        raise api_error(400, "exams_questions_not_approved", locale)
 
     exam.status = ExamStatus.FINALIZED.value
     try:
@@ -2040,11 +1966,11 @@ async def finalize_exam(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in finalize_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
+        raise api_error(409, "exams_conflict", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in finalize_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
     return _exam_to_out(exam)
 
 
@@ -2061,9 +1987,7 @@ async def unfinalize_exam(
         exam_id, db, current_user, locale, allow_read_all_bypass=False
     )
     if exam.status not in (ExamStatus.FINALIZED.value, ExamStatus.EXPORTED.value):
-        raise HTTPException(
-            status_code=400, detail=t("exams_already_draft", locale=locale)
-        )
+        raise api_error(400, "exams_already_draft", locale)
 
     exam.status = ExamStatus.DRAFT.value
     try:
@@ -2072,11 +1996,11 @@ async def unfinalize_exam(
     except IntegrityError as exc:
         db.rollback()
         logger.error("IntegrityError in unfinalize_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=409, detail=t("exams_conflict", locale=locale))
+        raise api_error(409, "exams_conflict", locale)
     except SQLAlchemyError as exc:
         db.rollback()
         logger.error("Database error in unfinalize_exam for exam %s: %s", exam_id, exc)
-        raise HTTPException(status_code=500, detail=t("exams_db_error", locale=locale))
+        raise api_error(500, "exams_db_error", locale)
     return _exam_to_out(exam)
 
 
@@ -2099,15 +2023,10 @@ async def export_exam(
     )
 
     if exam.status == ExamStatus.DRAFT.value:
-        raise HTTPException(
-            status_code=400,
-            detail=t("exams_must_finalize_before_export", locale=locale),
-        )
+        raise api_error(400, "exams_must_finalize_before_export", locale)
 
     if not exam.questions:
-        raise HTTPException(
-            status_code=400, detail=t("exams_cannot_export_empty", locale=locale)
-        )
+        raise api_error(400, "exams_cannot_export_empty", locale)
 
     exam_data = _exam_detail_to_out(exam)
     # Convert date to string for export
@@ -2143,19 +2062,13 @@ async def export_exam(
             media_type = "application/xml"
             filename = f"{safe_title}_moodle.xml"
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=t("exams_unsupported_format", locale=locale),
-            )
+            raise api_error(400, "exams_unsupported_format", locale)
     except HTTPException:
         raise
     except Exception:
         # Unhandled exporter exceptions are otherwise logless 500s.
         logger.exception("Exam export failed: format=%s exam_id=%d", format, exam_id)
-        raise HTTPException(
-            status_code=500,
-            detail=t("exams_export_internal_error", locale=locale),
-        )
+        raise api_error(500, "exams_export_internal_error", locale)
 
     # Update status to exported if currently finalized
     if exam.status == ExamStatus.FINALIZED.value:

@@ -34,7 +34,7 @@ from services.storage_service import (
     StorageThrottledError,
     StorageUnavailableError,
 )
-from services.translation_service import t, get_request_locale
+from services.translation_service import get_request_locale
 from services.quality_assessor import EscalationState
 from services.vector_service_factory import vector_service
 from models.document import Document, DocumentStatus, DocumentVisibility
@@ -58,6 +58,7 @@ from utils.document_visibility import (
 from services.org_unit_service import get_user_accessible_org_unit_ids
 from tasks.document_tasks import process_document as celery_process_document
 import logging
+from errors import api_error
 
 logger = logging.getLogger(__name__)
 
@@ -253,10 +254,7 @@ async def upload_document(
             visibility == DocumentVisibility.INSTITUTION
             and not current_user.institution_id
         ):
-            raise HTTPException(
-                status_code=400,
-                detail=t("documents_visibility_no_institution", locale=locale),
-            )
+            raise api_error(400, "documents_visibility_no_institution", locale)
 
         # Visibility (TF-620): 'team' requires org_unit_id, and it must be
         # one of the uploader's own OrgUnit memberships (not any OrgUnit in
@@ -270,10 +268,7 @@ async def upload_document(
                 else set()
             )
             if org_unit_id is None or org_unit_id not in accessible:
-                raise HTTPException(
-                    status_code=400,
-                    detail=t("documents_visibility_invalid_org_unit", locale=locale),
-                )
+                raise api_error(400, "documents_visibility_invalid_org_unit", locale)
 
         # Check document limit for institution
         from utils.tenant_utils import SubscriptionLimits
@@ -283,6 +278,7 @@ async def upload_document(
             db,
             user=current_user,
             request=http_request,
+            locale=locale,
         )
 
         # Check storage limit (if file size is known)
@@ -293,6 +289,7 @@ async def upload_document(
                 file.size,
                 user=current_user,
                 request=http_request,
+                locale=locale,
             )
 
         # Save document file and create DB entry
@@ -348,9 +345,7 @@ async def upload_document(
         raise
     except Exception as e:
         logger.error(f"Upload failed for user {current_user.id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=t("documents_upload_failed", locale=locale)
-        )
+        raise api_error(500, "documents_upload_failed", locale)
 
 
 def _apply_sort(query, sort: str):
@@ -444,10 +439,7 @@ async def list_documents(
             statuses = []
             for group in status:
                 if group not in STATUS_GROUPS:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=t("documents_invalid_status", locale=locale),
-                    )
+                    raise api_error(400, "documents_invalid_status", locale)
                 statuses.extend(STATUS_GROUPS[group])
             query = query.filter(Document.status.in_(statuses))
         if mime_family:
@@ -472,10 +464,7 @@ async def list_documents(
                 elif fam in MIME_FAMILIES:
                     clauses.append(Document.mime_type.in_(MIME_FAMILIES[fam]))
                 else:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=t("documents_invalid_filter", locale=locale),
-                    )
+                    raise api_error(400, "documents_invalid_filter", locale)
             query = query.filter(or_(*clauses))
         if tag_ids:
             unique_tag_ids = list(dict.fromkeys(tag_ids))
@@ -536,9 +525,7 @@ async def list_documents(
         logger.error(
             f"Failed to list documents for user {current_user.id}: {e}", exc_info=True
         )
-        raise HTTPException(
-            status_code=500, detail=t("documents_list_failed", locale=locale)
-        )
+        raise api_error(500, "documents_list_failed", locale)
 
 
 # Health check endpoint (must come before parameterized routes)
@@ -586,10 +573,7 @@ async def create_document_tag(
     if body.scope == "institution" and not current_user.has_permission(
         "manage_settings"
     ):
-        raise HTTPException(
-            status_code=403,
-            detail=t("documents_tag_institution_admin_only", locale=locale),
-        )
+        raise api_error(403, "documents_tag_institution_admin_only", locale)
 
     name = body.name.strip()
     name_lower = name.lower()
@@ -635,9 +619,7 @@ async def create_document_tag(
         db.commit()
     except SQLAlchemyError:
         db.rollback()
-        raise HTTPException(
-            status_code=409, detail=t("documents_tag_exists", locale=locale)
-        )
+        raise api_error(409, "documents_tag_exists", locale)
     db.refresh(tag)
     return DocumentTagOut(id=tag.id, name=tag.name, scope=tag.scope, is_own=True)
 
@@ -664,9 +646,7 @@ async def get_document(
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(
-                status_code=404, detail=t("documents_not_found", locale=locale)
-            )
+            raise api_error(404, "documents_not_found", locale)
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, db, locale=locale)
@@ -680,10 +660,7 @@ async def get_document(
             f"Failed to get document {document_id} for user {current_user.id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_load_failed", locale=locale),
-        )
+        raise api_error(500, "documents_load_failed", locale)
 
 
 @router.patch("/{document_id}", response_model=DocumentResponse)
@@ -724,9 +701,7 @@ async def update_document(
     try:
         document = document_service.get_document_by_id(document_id, db)
         if not document:
-            raise HTTPException(
-                status_code=404, detail=t("documents_not_found", locale=locale)
-            )
+            raise api_error(404, "documents_not_found", locale)
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, db, locale=locale)
@@ -745,10 +720,7 @@ async def update_document(
                 document.user_id is not None and document.user_id == current_user.id
             )
             if not is_owner and not current_user.is_superuser:
-                raise HTTPException(
-                    status_code=403,
-                    detail=t("documents_rename_owner_only", locale=locale),
-                )
+                raise api_error(403, "documents_rename_owner_only", locale)
             old_display_name = document.display_name
             if old_display_name != payload.display_name:
                 document.display_name = payload.display_name
@@ -768,18 +740,12 @@ async def update_document(
                 document.user_id is not None and document.user_id == current_user.id
             )
             if not is_owner and not current_user.is_superuser:
-                raise HTTPException(
-                    status_code=403,
-                    detail=t("documents_visibility_owner_only", locale=locale),
-                )
+                raise api_error(403, "documents_visibility_owner_only", locale)
             if (
                 new_visibility == DocumentVisibility.INSTITUTION
                 and document.institution_id is None
             ):
-                raise HTTPException(
-                    status_code=400,
-                    detail=t("documents_visibility_no_institution", locale=locale),
-                )
+                raise api_error(400, "documents_visibility_no_institution", locale)
             if document.visibility != new_visibility:
                 old_visibility = document.visibility
                 document.visibility = new_visibility
@@ -813,10 +779,7 @@ async def update_document(
                 document.user_id is not None and document.user_id == current_user.id
             )
             if not is_owner and not current_user.is_superuser:
-                raise HTTPException(
-                    status_code=403,
-                    detail=t("documents_visibility_owner_only", locale=locale),
-                )
+                raise api_error(403, "documents_visibility_owner_only", locale)
 
         effective_visibility = document.visibility  # reflects any change above
         # Whether THIS request actually touches the team scope. A patch that
@@ -843,11 +806,8 @@ async def update_document(
                     else set()
                 )
                 if new_org_unit_id is None or new_org_unit_id not in accessible:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=t(
-                            "documents_visibility_invalid_org_unit", locale=locale
-                        ),
+                    raise api_error(
+                        400, "documents_visibility_invalid_org_unit", locale
                     )
             elif new_org_unit_id is None:
                 # Defensive/normally unreachable: the DB constraint requires
@@ -856,10 +816,7 @@ async def update_document(
                 # persisting team visibility with no scope (e.g. a SuperUser
                 # flipping visibility to 'team' without supplying
                 # org_unit_id) if that invariant is ever violated upstream.
-                raise HTTPException(
-                    status_code=400,
-                    detail=t("documents_visibility_invalid_org_unit", locale=locale),
-                )
+                raise api_error(400, "documents_visibility_invalid_org_unit", locale)
             if document.org_unit_id != new_org_unit_id:
                 old_org_unit_id = document.org_unit_id
                 document.org_unit_id = new_org_unit_id
@@ -877,10 +834,7 @@ async def update_document(
             # simultaneous {visibility: <non-team>, org_unit_id: X} patch
             # would silently clear org_unit_id instead of rejecting it
             # (TF-620 fix).
-            raise HTTPException(
-                status_code=400,
-                detail=t("documents_visibility_invalid_org_unit", locale=locale),
-            )
+            raise api_error(400, "documents_visibility_invalid_org_unit", locale)
         elif visibility_changed and document.org_unit_id is not None:
             # Left 'team' visibility — clear the now-meaningless scope so no
             # row keeps a stale org_unit_id under private/institution.
@@ -925,10 +879,7 @@ async def update_document(
                     commit=False,
                 )
                 if audit_log is None:
-                    raise HTTPException(
-                        status_code=500,
-                        detail=t("documents_rename_failed", locale=locale),
-                    )
+                    raise api_error(500, "documents_rename_failed", locale)
             db.commit()
         else:
             # No effective change (e.g. rename to the current value): persist any
@@ -948,10 +899,7 @@ async def update_document(
             f"DB error updating document {document_id} for user {current_user.id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_rename_failed", locale=locale),
-        )
+        raise api_error(500, "documents_rename_failed", locale)
     except Exception as e:
         # Programming errors / unexpected bugs — log with stack, surface as 500.
         # We deliberately do NOT swallow these as a generic "load failed".
@@ -960,25 +908,18 @@ async def update_document(
             f"Unexpected error updating document {document_id} for user {current_user.id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_rename_failed", locale=locale),
-        )
+        raise api_error(500, "documents_rename_failed", locale)
 
 
 def _load_owned_document(document_id: int, current_user: User, db: Session, locale):
     """Load a doc the caller can see; require ownership (SuperUser bypass)."""
     document = document_service.get_document_by_id(document_id, db)
     if not document:
-        raise HTTPException(
-            status_code=404, detail=t("documents_not_found", locale=locale)
-        )
+        raise api_error(404, "documents_not_found", locale)
     assert_document_visible_for(current_user, document, db, locale=locale)
     is_owner = document.user_id is not None and document.user_id == current_user.id
     if not is_owner and not current_user.is_superuser:
-        raise HTTPException(
-            status_code=403, detail=t("documents_tag_owner_only", locale=locale)
-        )
+        raise api_error(403, "documents_tag_owner_only", locale)
     return document
 
 
@@ -1000,9 +941,7 @@ def _load_visible_document(document_id: int, current_user: User, db: Session, lo
     """
     document = document_service.get_document_by_id(document_id, db)
     if not document:
-        raise HTTPException(
-            status_code=404, detail=t("documents_not_found", locale=locale)
-        )
+        raise api_error(404, "documents_not_found", locale)
     assert_document_visible_for(
         current_user, document, db, locale=locale, allow_read_all_bypass=False
     )
@@ -1187,9 +1126,7 @@ def _audit_shared_tag_change(
         commit=False,
     )
     if audit_log is None:
-        raise HTTPException(
-            status_code=500, detail=t("documents_tag_failed", locale=locale)
-        )
+        raise api_error(500, "documents_tag_failed", locale)
 
 
 @router.post("/{document_id}/tags", response_model=DocumentResponse)
@@ -1228,9 +1165,7 @@ async def attach_document_tags(
             f"for user {current_user.id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500, detail=t("documents_tag_failed", locale=locale)
-        )
+        raise api_error(500, "documents_tag_failed", locale)
     except Exception as e:
         db.rollback()
         logger.error(
@@ -1238,9 +1173,7 @@ async def attach_document_tags(
             f"for user {current_user.id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500, detail=t("documents_tag_failed", locale=locale)
-        )
+        raise api_error(500, "documents_tag_failed", locale)
     db.refresh(document)
     return _document_response_with_tags(document, current_user, db)
 
@@ -1280,9 +1213,7 @@ async def detach_document_tag(
             f"for user {current_user.id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500, detail=t("documents_tag_failed", locale=locale)
-        )
+        raise api_error(500, "documents_tag_failed", locale)
     except Exception as e:
         db.rollback()
         logger.error(
@@ -1290,9 +1221,7 @@ async def detach_document_tag(
             f"for user {current_user.id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500, detail=t("documents_tag_failed", locale=locale)
-        )
+        raise api_error(500, "documents_tag_failed", locale)
     return Response(status_code=204)
 
 
@@ -1388,10 +1317,7 @@ async def _build_document_file_response(
     if document.doc_metadata and document.doc_metadata.get("source") == "chat_export":
         content = document.doc_metadata.get("full_content", "")
         if not content:
-            raise HTTPException(
-                status_code=404,
-                detail=t("documents_content_not_available", locale=locale),
-            )
+            raise api_error(404, "documents_content_not_available", locale)
         return Response(
             content=content.encode("utf-8"),
             media_type=media_type,
@@ -1406,27 +1332,22 @@ async def _build_document_file_response(
                 storage_service.download_file, document.file_path
             )
         except FileNotFoundError:
-            raise HTTPException(
-                status_code=404,
-                detail=t("documents_file_not_found_storage", locale=locale),
-            )
+            raise api_error(404, "documents_file_not_found_storage", locale)
         except StorageAccessDeniedError:
             logger.error(
                 f"S3 access denied while serving {log_ctx} path={document.file_path}",
                 exc_info=True,
             )
-            raise HTTPException(
-                status_code=403,
-                detail=t("documents_access_denied", locale=locale),
-            )
+            raise api_error(403, "documents_access_denied", locale)
         except StorageThrottledError:
             logger.warning(
                 f"S3 throttled while serving {log_ctx} path={document.file_path}"
             )
-            raise HTTPException(
-                status_code=503,
-                detail=t("documents_storage_unavailable", locale=locale),
-                headers={"Retry-After": "5"},
+            raise api_error(
+                503,
+                "documents_storage_unavailable",
+                locale,
+                {"Retry-After": "5"},
             )
         except (StorageUnavailableError, StorageConfigurationError):
             logger.error(
@@ -1434,20 +1355,14 @@ async def _build_document_file_response(
                 f"path={document.file_path}",
                 exc_info=True,
             )
-            raise HTTPException(
-                status_code=503,
-                detail=t("documents_storage_unavailable", locale=locale),
-            )
+            raise api_error(503, "documents_storage_unavailable", locale)
         except Exception as e:
             logger.error(
                 f"Unexpected S3 failure while serving {log_ctx} "
                 f"path={document.file_path}: {e}",
                 exc_info=True,
             )
-            raise HTTPException(
-                status_code=500,
-                detail=t("documents_download_storage_failed", locale=locale),
-            )
+            raise api_error(500, "documents_download_storage_failed", locale)
         # Response(content=...), NOT StreamingResponse(io.BytesIO(...)) (TF-596):
         # file_data is already fully in memory at this point (downloaded
         # above). io.BytesIO is not an AsyncIterable, so StreamingResponse
@@ -1476,10 +1391,7 @@ async def _build_document_file_response(
         logger.warning(
             f"Local file missing while serving {log_ctx} path={document.file_path}"
         )
-        raise HTTPException(
-            status_code=404,
-            detail=t("documents_file_not_found_disk", locale=locale),
-        )
+        raise api_error(404, "documents_file_not_found_disk", locale)
     return FileResponse(
         path=document.file_path,
         filename=document.original_filename,
@@ -1509,9 +1421,7 @@ async def download_document(
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(
-                status_code=404, detail=t("documents_not_found", locale=locale)
-            )
+            raise api_error(404, "documents_not_found", locale)
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, db, locale=locale)
@@ -1527,10 +1437,7 @@ async def download_document(
             f"Failed to download document {document_id} for user {current_user.id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_download_failed", locale=locale),
-        )
+        raise api_error(500, "documents_download_failed", locale)
 
 
 @router.get("/{document_id}/raw")
@@ -1555,9 +1462,7 @@ async def get_document_raw(
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(
-                status_code=404, detail=t("documents_not_found", locale=locale)
-            )
+            raise api_error(404, "documents_not_found", locale)
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, db, locale=locale)
@@ -1573,10 +1478,7 @@ async def get_document_raw(
             f"Failed to fetch raw document {document_id} for user {current_user.id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_preview_failed", locale=locale),
-        )
+        raise api_error(500, "documents_preview_failed", locale)
 
 
 @router.get("/{document_id}/status")
@@ -1601,9 +1503,7 @@ async def get_document_status(
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(
-                status_code=404, detail=t("documents_not_found", locale=locale)
-            )
+            raise api_error(404, "documents_not_found", locale)
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, db, locale=locale)
@@ -1646,10 +1546,7 @@ async def get_document_status(
             f"Failed to get document status for document {document_id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_status_failed", locale=locale),
-        )
+        raise api_error(500, "documents_status_failed", locale)
 
 
 @router.delete("/{document_id}")
@@ -1674,9 +1571,7 @@ async def delete_document(
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(
-                status_code=404, detail=t("documents_not_found", locale=locale)
-            )
+            raise api_error(404, "documents_not_found", locale)
 
         # Access policy (in evaluation order):
         #   1. Same-institution admin → allowed + audit (admin_cross_owner if foreign)
@@ -1721,9 +1616,7 @@ async def delete_document(
         success = document_service.delete_document(document_id, db)
 
         if not success:
-            raise HTTPException(
-                status_code=500, detail=t("documents_delete_failed", locale=locale)
-            )
+            raise api_error(500, "documents_delete_failed", locale)
 
         # Audit log: Document deleted
         from services.audit_service import AuditService
@@ -1752,10 +1645,7 @@ async def delete_document(
             f"Failed to delete document {document_id} for user {current_user.id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_delete_failed", locale=locale),
-        )
+        raise api_error(500, "documents_delete_failed", locale)
 
 
 @router.post("/{document_id}/process")
@@ -1782,9 +1672,7 @@ async def process_document(
     # Check whether the document exists
     document = document_service.get_document_by_id(document_id, db)
     if not document:
-        raise HTTPException(
-            status_code=404, detail=t("documents_not_found", locale=locale)
-        )
+        raise api_error(404, "documents_not_found", locale)
 
     # Check user permission (superuser bypass with audit log)
     from utils.auth_utils import enforce_resource_access
@@ -1822,10 +1710,7 @@ async def process_document(
         logger.error(
             f"Document processing failed for document {document_id}: {e}", exc_info=True
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_processing_failed", locale=locale),
-        )
+        raise api_error(500, "documents_processing_failed", locale)
 
 
 @router.get("/{document_id}/content")
@@ -1850,9 +1735,7 @@ async def get_document_content(
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(
-                status_code=404, detail=t("documents_not_found", locale=locale)
-            )
+            raise api_error(404, "documents_not_found", locale)
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, db, locale=locale)
@@ -1865,10 +1748,7 @@ async def get_document_content(
             if document.content_preview:
                 content = document.content_preview
             else:
-                raise HTTPException(
-                    status_code=404,
-                    detail=t("documents_content_not_available", locale=locale),
-                )
+                raise api_error(404, "documents_content_not_available", locale)
 
         return {
             "document_id": document_id,
@@ -1884,10 +1764,7 @@ async def get_document_content(
         logger.error(
             f"Failed to get content for document {document_id}: {e}", exc_info=True
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_content_load_failed", locale=locale),
-        )
+        raise api_error(500, "documents_content_load_failed", locale)
 
 
 @router.get("/{document_id}/chunks")
@@ -1912,27 +1789,19 @@ async def get_document_chunks(
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(
-                status_code=404, detail=t("documents_not_found", locale=locale)
-            )
+            raise api_error(404, "documents_not_found", locale)
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, db, locale=locale)
 
         if document.status != DocumentStatus.PROCESSED:
-            raise HTTPException(
-                status_code=400,
-                detail=t("documents_not_processed", locale=locale),
-            )
+            raise api_error(400, "documents_not_processed", locale)
 
         # Fetch chunks
         chunks = await document_service.get_document_chunks(document_id, db)
 
         if chunks is None:
-            raise HTTPException(
-                status_code=500,
-                detail=t("documents_chunks_load_failed", locale=locale),
-            )
+            raise api_error(500, "documents_chunks_load_failed", locale)
 
         return {
             "document_id": document_id,
@@ -1946,10 +1815,7 @@ async def get_document_chunks(
         logger.error(
             f"Failed to get chunks for document {document_id}: {e}", exc_info=True
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_chunks_load_failed", locale=locale),
-        )
+        raise api_error(500, "documents_chunks_load_failed", locale)
 
 
 @router.get("/{document_id}/chunks-paginated")
@@ -1978,27 +1844,19 @@ async def get_document_chunks_paginated(
         document = document_service.get_document_by_id(document_id, db)
 
         if not document:
-            raise HTTPException(
-                status_code=404, detail=t("documents_not_found", locale=locale)
-            )
+            raise api_error(404, "documents_not_found", locale)
 
         # 404 (not 403) on a hidden doc — rationale on assert_document_visible_for.
         assert_document_visible_for(current_user, document, db, locale=locale)
 
         if document.status != DocumentStatus.PROCESSED:
-            raise HTTPException(
-                status_code=400,
-                detail=t("documents_not_processed", locale=locale),
-            )
+            raise api_error(400, "documents_not_processed", locale)
 
         # Fetch chunks from the vector database (faster than reprocessing!)
         search_results = await vector_service.get_document_chunks(document_id)
 
         if not search_results:
-            raise HTTPException(
-                status_code=500,
-                detail=t("documents_chunks_load_failed", locale=locale),
-            )
+            raise api_error(500, "documents_chunks_load_failed", locale)
 
         # Convert SearchResult to dictionary format
         chunks = []
@@ -2020,10 +1878,7 @@ async def get_document_chunks_paginated(
 
         # Validate page
         if page > total_pages and total_chunks > 0:
-            raise HTTPException(
-                status_code=400,
-                detail=t("documents_page_out_of_range", locale=locale),
-            )
+            raise api_error(400, "documents_page_out_of_range", locale)
 
         # Compute start and end index
         start_idx = (page - 1) * page_size
@@ -2048,7 +1903,4 @@ async def get_document_chunks_paginated(
             f"Failed to get paginated chunks for document {document_id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("documents_chunks_load_failed", locale=locale),
-        )
+        raise api_error(500, "documents_chunks_load_failed", locale)

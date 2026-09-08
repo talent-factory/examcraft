@@ -3,7 +3,7 @@ Admin API Endpoints
 User Management, Role Assignment, Institution Management
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -15,7 +15,7 @@ import os
 from database import get_db
 from middleware.rate_limit import ImpersonationRateLimiter
 from models.auth import User, Role, Institution, UserStatus, ImpersonationSession
-from services.translation_service import t, get_request_locale
+from services.translation_service import get_request_locale
 from utils.auth_utils import (
     get_current_superuser,
     get_current_user,
@@ -26,6 +26,7 @@ from services.audit_service import AuditService
 from services.auth_service import AuthService
 from utils.permissions import KNOWN_PERMISSIONS, parse_role_permissions
 from utils.impersonation_context import get_impersonation_context
+from errors import api_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
@@ -77,9 +78,8 @@ def _require_same_institution(
         not current_user.is_superuser
         and current_user.institution_id != target_user.institution_id
     ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=t("admin_cross_institution_access_denied", locale=locale),
+        raise api_error(
+            status.HTTP_403_FORBIDDEN, "admin_cross_institution_access_denied", locale
         )
 
 
@@ -96,10 +96,7 @@ def _require_write_access(
         and current_user.institution_id == target_user.institution_id
     ):
         return
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail=t("admin_insufficient_permissions", locale=locale),
-    )
+    raise api_error(status.HTTP_403_FORBIDDEN, "admin_insufficient_permissions", locale)
 
 
 def _build_org_unit_responses(user: User) -> List["OrgUnitMembershipOut"]:
@@ -144,10 +141,7 @@ def _require_admin_or_superuser(current_user: User, locale: str = "de") -> None:
     """
     if current_user.is_superuser or _is_admin_role(current_user):
         return
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail=t("admin_insufficient_permissions", locale=locale),
-    )
+    raise api_error(status.HTTP_403_FORBIDDEN, "admin_insufficient_permissions", locale)
 
 
 # ============================================================================
@@ -452,10 +446,7 @@ async def get_user(
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("admin_user_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "admin_user_not_found", locale)
 
     _require_same_institution(current_user, user, locale)
 
@@ -513,10 +504,7 @@ async def update_user(
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("admin_user_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "admin_user_not_found", locale)
 
     _require_write_access(current_user, user, locale)
 
@@ -535,9 +523,8 @@ async def update_user(
             .first()
         )
         if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=t("admin_email_already_in_use", locale=locale),
+            raise api_error(
+                status.HTTP_400_BAD_REQUEST, "admin_email_already_in_use", locale
             )
         user.email = request.email
 
@@ -617,18 +604,14 @@ async def update_user_status(
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("admin_user_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "admin_user_not_found", locale)
 
     _require_write_access(current_user, user, locale)
 
     # Prevent admin from deactivating themselves
     if user.id == current_user.id and request.status != UserStatus.ACTIVE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("admin_cannot_deactivate_self", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "admin_cannot_deactivate_self", locale
         )
 
     user.status = request.status.value
@@ -698,26 +681,19 @@ async def assign_role_to_user(
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("admin_user_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "admin_user_not_found", locale)
 
     _require_write_access(current_user, user, locale)
 
     role = db.query(Role).filter(Role.id == request.role_id).first()
 
     if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("admin_role_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "admin_role_not_found", locale)
 
     # Check if user already has this role
     if role in user.roles:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("admin_user_already_has_role", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "admin_user_already_has_role", locale
         )
 
     user.roles.append(role)
@@ -787,33 +763,25 @@ async def remove_role_from_user(
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("admin_user_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "admin_user_not_found", locale)
 
     _require_write_access(current_user, user, locale)
 
     role = db.query(Role).filter(Role.id == role_id).first()
 
     if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("admin_role_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "admin_role_not_found", locale)
 
     # Check if user has this role
     if role not in user.roles:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("admin_user_does_not_have_role", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "admin_user_does_not_have_role", locale
         )
 
     # Prevent removing last role
     if len(user.roles) == 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("admin_cannot_remove_last_role", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "admin_cannot_remove_last_role", locale
         )
 
     user.roles.remove(role)
@@ -917,10 +885,11 @@ async def start_impersonation(
             request=http_request,
             limit_type="impersonation",
         )
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=t("impersonation_rate_limit_exceeded", locale=locale),
-            headers={"Retry-After": str(retry_after)},
+        raise api_error(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "impersonation_rate_limit_exceeded",
+            locale,
+            {"Retry-After": str(retry_after)},
         )
 
     # TF-758: step-up re-authentication happens next, before anything about
@@ -954,9 +923,8 @@ async def start_impersonation(
             error_message="Impersonation step-up unavailable: admin has no password set",
             request=http_request,
         )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=t("impersonation_no_password_set", locale=locale),
+        raise api_error(
+            status.HTTP_403_FORBIDDEN, "impersonation_no_password_set", locale
         )
 
     if AuthService.is_locked_out(current_user):
@@ -970,9 +938,8 @@ async def start_impersonation(
             error_message="Impersonation step-up blocked: account locked after too many failed password attempts",
             request=http_request,
         )
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=t("auth_account_locked", locale=locale),
+        raise api_error(
+            status.HTTP_429_TOO_MANY_REQUESTS, "auth_account_locked", locale
         )
 
     if not AuthService.verify_password(
@@ -992,36 +959,29 @@ async def start_impersonation(
             error_message="Incorrect admin password on impersonation step-up",
             request=http_request,
         )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_password_incorrect", locale=locale),
-        )
+        raise api_error(status.HTTP_400_BAD_REQUEST, "auth_password_incorrect", locale)
 
     AuthService.reset_failed_own_password_attempts(current_user, db)
 
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("admin_user_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "admin_user_not_found", locale)
 
     if target.id == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("impersonation_self_not_allowed", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "impersonation_self_not_allowed", locale
         )
 
     if not current_user.is_superuser:
         if current_user.institution_id != target.institution_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=t("admin_cross_institution_access_denied", locale=locale),
+            raise api_error(
+                status.HTTP_403_FORBIDDEN,
+                "admin_cross_institution_access_denied",
+                locale,
             )
         if _is_impersonation_privileged(target) or target.is_superuser:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=t("admin_insufficient_permissions", locale=locale),
+            raise api_error(
+                status.HTTP_403_FORBIDDEN, "admin_insufficient_permissions", locale
             )
 
     # No nesting: reject if this very request is itself already running
@@ -1038,9 +998,8 @@ async def start_impersonation(
         is not None
     )
     if already_nested or already_active_own_session:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=t("impersonation_already_active", locale=locale),
+        raise api_error(
+            status.HTTP_409_CONFLICT, "impersonation_already_active", locale
         )
 
     session = ImpersonationSession(
@@ -1062,9 +1021,8 @@ async def start_impersonation(
         db.flush()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=t("impersonation_already_active", locale=locale),
+        raise api_error(
+            status.HTTP_409_CONFLICT, "impersonation_already_active", locale
         )
 
     # Minting the token and persisting the session are one transaction:
@@ -1090,9 +1048,8 @@ async def start_impersonation(
             current_user.id,
             target.id,
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=t("impersonation_start_failed", locale=locale),
+        raise api_error(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, "impersonation_start_failed", locale
         )
 
     logger.info(
@@ -1152,9 +1109,8 @@ async def end_impersonation(
             admin_user_id=current_user.id, db=db, request=http_request
         )
         if closed_session_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=t("impersonation_not_active", locale=locale),
+            raise api_error(
+                status.HTTP_400_BAD_REQUEST, "impersonation_not_active", locale
             )
         logger.info(
             f"Impersonation session {closed_session_id} ended by admin "
@@ -1219,13 +1175,11 @@ async def list_permissions(
 def _validate_known_permissions(permissions: List[str], locale: str = "de") -> None:
     unknown = set(permissions) - set(KNOWN_PERMISSIONS.keys())
     if unknown:
-        raise HTTPException(
-            status_code=422,
-            detail=t(
-                "admin_unknown_permissions",
-                locale=locale,
-                permissions=", ".join(sorted(unknown)),
-            ),
+        raise api_error(
+            422,
+            "admin_unknown_permissions",
+            locale,
+            permissions=", ".join(sorted(unknown)),
         )
 
 
@@ -1281,10 +1235,7 @@ async def create_role(
 
     existing = db.query(Role).filter(Role.name == role_data.name).first()
     if existing:
-        raise HTTPException(
-            status_code=409,
-            detail=t("admin_role_already_exists", locale=locale, name=role_data.name),
-        )
+        raise api_error(409, "admin_role_already_exists", locale, name=role_data.name)
 
     role = Role(
         name=role_data.name,
@@ -1333,10 +1284,7 @@ async def update_role(
     role = db.query(Role).filter(Role.id == role_id).first()
 
     if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("admin_role_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "admin_role_not_found", locale)
 
     if role_data.permissions is not None:
         _validate_known_permissions(role_data.permissions, locale)
@@ -1393,18 +1341,11 @@ async def delete_role(
     locale = get_request_locale(request, current_user)
     role = db.query(Role).filter(Role.id == role_id).first()
     if not role:
-        raise HTTPException(
-            status_code=404, detail=t("admin_role_not_found", locale=locale)
-        )
+        raise api_error(404, "admin_role_not_found", locale)
     if role.is_system_role:
-        raise HTTPException(
-            status_code=409, detail=t("admin_role_is_system", locale=locale)
-        )
+        raise api_error(409, "admin_role_is_system", locale)
     if role.users:
-        raise HTTPException(
-            status_code=409,
-            detail=t("admin_role_has_users", locale=locale, count=len(role.users)),
-        )
+        raise api_error(409, "admin_role_has_users", locale, count=len(role.users))
 
     # Capture attributes before delete/commit: SQLAlchemy expires the
     # instance by default after the commit, and accessing role.name
@@ -1485,10 +1426,7 @@ def _validate_default_grading_scheme_id(
     if scheme is None or (
         scheme.institution_id is not None and scheme.institution_id != institution_id
     ):
-        raise HTTPException(
-            status_code=422,
-            detail=t("admin_invalid_grading_scheme", locale=locale),
-        )
+        raise api_error(422, "admin_invalid_grading_scheme", locale)
     return scheme_id
 
 
@@ -1524,9 +1462,7 @@ async def update_institution(
     # Get institution
     institution = db.query(Institution).filter(Institution.id == institution_id).first()
     if not institution:
-        raise HTTPException(
-            status_code=404, detail=t("admin_institution_not_found", locale=locale)
-        )
+        raise api_error(404, "admin_institution_not_found", locale)
 
     # Update fields. ``changed_fields`` tracks only guards that actually
     # fired, so the audit entry reflects what was applied — not merely what
@@ -1570,10 +1506,7 @@ async def update_institution(
         try:
             tier = SubscriptionTier(update_data.subscription_tier)
         except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=t("admin_invalid_subscription_tier", locale=locale),
-            )
+            raise api_error(400, "admin_invalid_subscription_tier", locale)
 
         institution.subscription_tier = tier.value
         changed_fields.append("subscription_tier")
@@ -1645,10 +1578,7 @@ async def create_institution(
     try:
         tier = SubscriptionTier(institution_data.subscription_tier)
     except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=t("admin_invalid_subscription_tier", locale=locale),
-        )
+        raise api_error(400, "admin_invalid_subscription_tier", locale)
 
     # Check if domain already exists
     existing = (
@@ -1657,10 +1587,7 @@ async def create_institution(
         .first()
     )
     if existing:
-        raise HTTPException(
-            status_code=400,
-            detail=t("admin_institution_domain_exists", locale=locale),
-        )
+        raise api_error(400, "admin_institution_domain_exists", locale)
 
     # Get quotas for tier
     quotas = TIER_QUOTAS[tier]
@@ -1750,7 +1677,7 @@ async def preview_user_transfer(
     try:
         preview = preview_transfer(db, user_id, target_institution_id)
     except TransferError as e:
-        raise HTTPException(status_code=e.http_status, detail=t(e.code, locale=locale))
+        raise api_error(e.http_status, e.code, locale)
 
     return TransferPreviewResponse(
         source_institution_id=preview.source_institution_id,
@@ -1816,7 +1743,7 @@ async def transfer_user_to_institution(
             actor=current_user,
         )
     except TransferError as e:
-        raise HTTPException(status_code=e.http_status, detail=t(e.code, locale=locale))
+        raise api_error(e.http_status, e.code, locale)
 
     # Dispatch Qdrant re-index tasks AFTER commit. Service already committed.
     # If dispatch itself fails (broker outage, etc.), `documents.pending_reindex`
@@ -1840,9 +1767,7 @@ async def transfer_user_to_institution(
         # anyway so a future refactor that weakens that transactional guarantee
         # fails loud with a 404 instead of an opaque AttributeError on
         # `user.roles` / `user.institution` below.
-        raise HTTPException(
-            status_code=404, detail=t("admin_user_not_found", locale=locale)
-        )
+        raise api_error(404, "admin_user_not_found", locale)
 
     role_responses = []
     for role in user.roles:

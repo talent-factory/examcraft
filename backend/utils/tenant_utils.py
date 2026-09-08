@@ -6,12 +6,14 @@ Multi-Tenant Data Isolation und Access Control
 from typing import Optional, Type, TypeVar
 from sqlalchemy.orm import Session, Query
 from sqlalchemy import and_
-from fastapi import HTTPException, status
+from fastapi import status
 import logging
 
 from models.auth import User, Institution
 from models.document import Document
 from models.question_review import QuestionReview
+from errors import api_error
+from services.translation_service import DEFAULT_LOCALE
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +76,10 @@ class TenantFilter:
 
     @staticmethod
     def verify_tenant_access(
-        obj: T, tenant_context: TenantContext, allow_superuser_access: bool = True
+        obj: T,
+        tenant_context: TenantContext,
+        allow_superuser_access: bool = True,
+        locale: str = DEFAULT_LOCALE,
     ) -> None:
         """
         Verify that user has access to object based on tenant
@@ -103,10 +108,7 @@ class TenantFilter:
                 f"(institution {tenant_context.institution_id}) "
                 f"tried to access object with institution {obj.institution_id}"
             )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: Resource belongs to different institution",
-            )
+            raise api_error(status.HTTP_403_FORBIDDEN, "tenant_access_denied", locale)
 
 
 class SubscriptionLimits:
@@ -121,6 +123,7 @@ class SubscriptionLimits:
         db: Session,
         user: Optional[User] = None,
         request=None,
+        locale: str = DEFAULT_LOCALE,
     ) -> None:
         """
         Check if institution has reached user limit.
@@ -166,9 +169,11 @@ class SubscriptionLimits:
         )
 
         if active_users >= institution.max_users:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User limit reached ({institution.max_users} users). Please upgrade your subscription.",
+            raise api_error(
+                status.HTTP_403_FORBIDDEN,
+                "tenant_user_limit_reached",
+                locale,
+                limit=institution.max_users,
             )
 
     @staticmethod
@@ -177,6 +182,7 @@ class SubscriptionLimits:
         db: Session,
         user: Optional[User] = None,
         request=None,
+        locale: str = DEFAULT_LOCALE,
     ) -> None:
         """
         Check if institution has reached document limit.
@@ -210,9 +216,11 @@ class SubscriptionLimits:
         )
 
         if document_count >= institution.max_documents:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Document limit reached ({institution.max_documents} documents). Please upgrade your subscription.",
+            raise api_error(
+                status.HTTP_403_FORBIDDEN,
+                "tenant_document_limit_reached",
+                locale,
+                limit=institution.max_documents,
             )
 
     @staticmethod
@@ -222,6 +230,7 @@ class SubscriptionLimits:
         additional_count: int = 0,
         user: Optional[User] = None,
         request=None,
+        locale: str = DEFAULT_LOCALE,
     ) -> None:
         """
         Check if institution would exceed monthly question limit.
@@ -280,9 +289,13 @@ class SubscriptionLimits:
             questions_this_month + additional_count
             > institution.max_questions_per_month
         ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Monthly question limit would be exceeded ({questions_this_month} existing + {additional_count} requested > {institution.max_questions_per_month} limit). Please upgrade your subscription.",
+            raise api_error(
+                status.HTTP_403_FORBIDDEN,
+                "tenant_question_limit_reached",
+                locale,
+                existing=questions_this_month,
+                requested=additional_count,
+                limit=institution.max_questions_per_month,
             )
 
     @staticmethod
@@ -365,6 +378,7 @@ class SubscriptionLimits:
         file_size_bytes: int,
         user: Optional[User] = None,
         request=None,
+        locale: str = DEFAULT_LOCALE,
     ) -> None:
         """
         Check if institution would exceed storage quota with new file.
@@ -423,9 +437,12 @@ class SubscriptionLimits:
         limit_bytes = storage_quota.quota_limit * 1024 * 1024
         if current_bytes + file_size_bytes > limit_bytes:
             current_mb = round(current_bytes / (1024 * 1024), 1)
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Storage limit exceeded ({current_mb}MB used of {storage_quota.quota_limit}MB). Please upgrade your subscription.",
+            raise api_error(
+                status.HTTP_403_FORBIDDEN,
+                "tenant_storage_limit_reached",
+                locale,
+                used=current_mb,
+                limit=storage_quota.quota_limit,
             )
 
 

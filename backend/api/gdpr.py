@@ -14,9 +14,10 @@ from database import get_db
 from models.auth import User
 from services.auth_service import AuthService
 from services.audit_service import AuditService
-from services.translation_service import t, get_request_locale
+from services.translation_service import get_request_locale
 from utils.auth_utils import get_current_user, block_during_impersonation
 from services.gdpr_deletion_service import delete_user_and_gdpr_data
+from errors import api_error
 
 logger = logging.getLogger(__name__)
 
@@ -143,10 +144,7 @@ async def export_user_data(
         logger.error(
             f"Data export failed for user {current_user.id}: {e}", exc_info=True
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("gdpr_export_failed", locale=locale),
-        )
+        raise api_error(500, "gdpr_export_failed", locale)
 
 
 @router.post("/request-deletion")
@@ -176,10 +174,7 @@ async def request_account_deletion(
             hasattr(current_user, "deletion_requested_at")
             and current_user.deletion_requested_at
         ):
-            raise HTTPException(
-                status_code=400,
-                detail=t("gdpr_deletion_already_pending", locale=locale),
-            )
+            raise api_error(400, "gdpr_deletion_already_pending", locale)
 
         # Mark account for deletion (30-day grace period)
         from datetime import timedelta
@@ -220,10 +215,7 @@ async def request_account_deletion(
             f"Deletion request failed for user {current_user.id}: {e}", exc_info=True
         )
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=t("gdpr_deletion_request_failed", locale=locale),
-        )
+        raise api_error(500, "gdpr_deletion_request_failed", locale)
 
 
 @router.post("/cancel-deletion")
@@ -250,10 +242,7 @@ async def cancel_account_deletion(
             not hasattr(current_user, "deletion_requested_at")
             or not current_user.deletion_requested_at
         ):
-            raise HTTPException(
-                status_code=400,
-                detail=t("gdpr_no_pending_deletion", locale=locale),
-            )
+            raise api_error(400, "gdpr_no_pending_deletion", locale)
 
         # Cancel deletion
         current_user.deletion_requested_at = None
@@ -278,10 +267,7 @@ async def cancel_account_deletion(
             exc_info=True,
         )
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=t("gdpr_cancellation_failed", locale=locale),
-        )
+        raise api_error(500, "gdpr_cancellation_failed", locale)
 
 
 @router.delete("/delete-account-now")
@@ -312,9 +298,7 @@ async def delete_account_immediately(
 
         # Verify password
         if not auth_service.verify_password(password, current_user.password_hash):
-            raise HTTPException(
-                status_code=401, detail=t("gdpr_invalid_password", locale=locale)
-            )
+            raise api_error(401, "gdpr_invalid_password", locale)
 
         email = current_user.email
         delete_user_and_gdpr_data(
@@ -344,16 +328,10 @@ async def delete_account_immediately(
             exc_info=True,
         )
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=t("gdpr_deletion_failed", locale=locale),
-        )
+        raise api_error(500, "gdpr_deletion_failed", locale)
     except Exception as e:
         logger.error(
             f"Account deletion failed for user {current_user.id}: {e}", exc_info=True
         )
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=t("gdpr_deletion_failed", locale=locale),
-        )
+        raise api_error(500, "gdpr_deletion_failed", locale)

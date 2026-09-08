@@ -24,7 +24,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.orm import Session
 
@@ -45,6 +45,8 @@ from services.grading_service import (
     GradingService,
 )
 from utils.auth_utils import require_permission
+from errors import AppHTTPException, api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
 
 logger = logging.getLogger(__name__)
@@ -152,7 +154,9 @@ class BulkApproveOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _ensure_exam_for_user(*, db: Session, user: User, exam_id: int) -> Exam:
+def _ensure_exam_for_user(
+    *, db: Session, user: User, exam_id: int, locale: str = DEFAULT_LOCALE
+) -> Exam:
     """Multi-Tenancy-Check; 404 statt 403, damit Tenant A nicht
     erfahren kann, ob exam_id von Tenant B existiert.
     """
@@ -165,11 +169,13 @@ def _ensure_exam_for_user(*, db: Session, user: User, exam_id: int) -> Exam:
         .one_or_none()
     )
     if exam is None:
-        raise HTTPException(status_code=404, detail="Prüfung nicht gefunden")
+        raise api_error(404, "grades_exam_not_found", locale)
     return exam
 
 
-def _load_grade_for_user(*, db: Session, user: User, grade_id: int) -> Grade:
+def _load_grade_for_user(
+    *, db: Session, user: User, grade_id: int, locale: str = DEFAULT_LOCALE
+) -> Grade:
     """Lädt einen Grade und prüft, dass er zur Institution des Users
     gehört. Walk: Grade -> AttemptAnswer -> Attempt -> institution_id."""
     row = (
@@ -183,7 +189,7 @@ def _load_grade_for_user(*, db: Session, user: User, grade_id: int) -> Grade:
         .one_or_none()
     )
     if row is None:
-        raise HTTPException(status_code=404, detail="Grade nicht gefunden")
+        raise api_error(404, "grades_not_found", locale)
     return row
 
 
@@ -210,6 +216,7 @@ router_exams_review_queue = APIRouter(prefix="/api/v1/exams", tags=["Grades"])
 
 @router_exams_review_queue.get("/{exam_id}/review-queue", response_model=ReviewQueueOut)
 async def get_review_queue(
+    request: Request,
     exam_id: int,
     confidence_min: float | None = Query(default=None, ge=0, le=1),
     confidence_max: float | None = Query(default=None, ge=0, le=1),
@@ -228,16 +235,14 @@ async def get_review_queue(
     NULL bedeutet "niemand hat sich Gedanken gemacht", also vorne.
     Postgres ``NULLS FIRST`` mit Default-ASC liefert genau das.
     """
-    _ensure_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    locale = get_request_locale(request, current_user)
+    _ensure_exam_for_user(db=db, user=current_user, exam_id=exam_id, locale=locale)
     if (
         confidence_min is not None
         and confidence_max is not None
         and confidence_min > confidence_max
     ):
-        raise HTTPException(
-            status_code=400,
-            detail="confidence_min darf nicht grösser als confidence_max sein",
-        )
+        raise api_error(400, "grades_confidence_range_invalid", locale)
 
     query = (
         db.query(
@@ -313,18 +318,22 @@ async def get_review_queue(
 
 @router_grades.post("/{grade_id}/approve", response_model=GradeActionOut)
 async def approve_grade(
+    request: Request,
     grade_id: int,
     current_user: User = Depends(require_permission("submissions:grade")),
     db: Session = Depends(get_db),
 ) -> GradeActionOut:
     """Lehrperson übernimmt LLM-Vorschlag → ``status=approved``."""
-    _load_grade_for_user(db=db, user=current_user, grade_id=grade_id)
+    locale = get_request_locale(request, current_user)
+    _load_grade_for_user(db=db, user=current_user, grade_id=grade_id, locale=locale)
     try:
         grade = GradingService(db).approve_grade(
             grade_id=grade_id, reviewer_id=current_user.id
         )
     except GradeNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise AppHTTPException(
+            404, str(exc), error_code="grades_approve_failed"
+        ) from exc
     db.commit()
     db.refresh(grade)
     return _grade_to_action_out(grade)
@@ -332,6 +341,7 @@ async def approve_grade(
 
 @router_grades.post("/{grade_id}/override", response_model=GradeActionOut)
 async def override_grade(
+    request: Request,
     grade_id: int,
     payload: OverrideGradeIn,
     current_user: User = Depends(require_permission("submissions:grade")),
@@ -342,7 +352,8 @@ async def override_grade(
     Funktioniert auf jedem Grade-Typ (auch MC/W-F), siehe Spec 7.3 —
     "MC/W-F-Antworten haben einen 'Manuell überstimmen'-Button".
     """
-    _load_grade_for_user(db=db, user=current_user, grade_id=grade_id)
+    locale = get_request_locale(request, current_user)
+    _load_grade_for_user(db=db, user=current_user, grade_id=grade_id, locale=locale)
     try:
         grade = GradingService(db).override_grade(
             grade_id=grade_id,
@@ -351,9 +362,13 @@ async def override_grade(
             reviewer_note=payload.reviewer_note,
         )
     except GradeNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise AppHTTPException(
+            404, str(exc), error_code="grades_override_not_found"
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise AppHTTPException(
+            422, str(exc), error_code="grades_override_invalid"
+        ) from exc
     db.commit()
     db.refresh(grade)
     return _grade_to_action_out(grade)
@@ -361,6 +376,7 @@ async def override_grade(
 
 @router_grades.post("/bulk-approve", response_model=BulkApproveOut)
 async def bulk_approve(
+    request: Request,
     payload: BulkApproveIn,
     current_user: User = Depends(require_permission("submissions:grade")),
     db: Session = Depends(get_db),
@@ -371,7 +387,10 @@ async def bulk_approve(
     Pflicht-Filter im Service — Tenant A kann selbst mit gefälschten
     Grade-IDs keine Grades von Tenant B approven.
     """
-    _ensure_exam_for_user(db=db, user=current_user, exam_id=payload.exam_id)
+    locale = get_request_locale(request, current_user)
+    _ensure_exam_for_user(
+        db=db, user=current_user, exam_id=payload.exam_id, locale=locale
+    )
     try:
         approved = GradingService(db).bulk_approve(
             reviewer_id=current_user.id,
@@ -381,7 +400,9 @@ async def bulk_approve(
             grade_ids=payload.grade_ids,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise AppHTTPException(
+            422, str(exc), error_code="grades_bulk_approve_invalid"
+        ) from exc
     db.commit()
     return BulkApproveOut(
         approved_count=len(approved),
@@ -406,6 +427,7 @@ class RegradeQuestionOut(BaseModel):
     response_model=RegradeQuestionOut,
 )
 async def regrade_question(
+    request: Request,
     exam_id: int,
     exam_question_id: int,
     current_user: User = Depends(require_permission("submissions:grade")),
@@ -417,7 +439,8 @@ async def regrade_question(
     via Exam-Lookup, der die institution_id prüft, plus Verify, dass
     die ExamQuestion zu diesem Exam gehört.
     """
-    _ensure_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    locale = get_request_locale(request, current_user)
+    _ensure_exam_for_user(db=db, user=current_user, exam_id=exam_id, locale=locale)
 
     eq_row: tuple[Any, ...] | None = (
         db.query(ExamQuestion.id)
@@ -425,7 +448,7 @@ async def regrade_question(
         .one_or_none()
     )
     if eq_row is None:
-        raise HTTPException(status_code=404, detail="Frage nicht gefunden")
+        raise api_error(404, "grades_question_not_found", locale)
 
     try:
         count = GradingService(db).regrade_after_correct_answer_update(
@@ -439,8 +462,5 @@ async def regrade_question(
             exam_id,
             exam_question_id,
         )
-        raise HTTPException(
-            status_code=500,
-            detail="Re-Grading fehlgeschlagen — siehe Server-Logs.",
-        )
+        raise api_error(500, "grades_regrade_failed", locale)
     return RegradeQuestionOut(exam_question_id=exam_question_id, regraded_count=count)

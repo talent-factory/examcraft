@@ -25,10 +25,12 @@ from models.tag import Tag, QuestionTag
 from api.tags import TagOut
 from schemas.generation_metadata import GenerationMetadata
 from services.org_unit_service import get_user_accessible_org_unit_ids
-from services.translation_service import t, get_request_locale
+from services.translation_service import DEFAULT_LOCALE, get_request_locale, t
 from utils.auth_utils import get_current_active_user, require_permission
 from utils.tenant_utils import TenantFilter, get_tenant_context
 import logging
+from errors import api_error
+from errors import AppHTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -487,9 +489,7 @@ async def get_review_queue(
 
     except Exception as e:
         logger.error(f"Error fetching review queue: {e}")
-        raise HTTPException(
-            status_code=500, detail=t("review_fetch_queue_failed", locale=locale)
-        )
+        raise api_error(500, "review_fetch_queue_failed", locale)
 
 
 @router.get("/{question_id}/review", response_model=QuestionReviewDetailResponse)
@@ -509,9 +509,7 @@ async def get_question_review(
         question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("review_question_not_found", locale=locale)
-            )
+            raise api_error(404, "review_question_not_found", locale)
 
         data = _attach_reviewer_info(question, db)
         data["comments"] = question.comments
@@ -522,9 +520,7 @@ async def get_question_review(
         raise
     except Exception as e:
         logger.error(f"Error fetching question review {question_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=t("review_fetch_question_failed", locale=locale)
-        )
+        raise api_error(500, "review_fetch_question_failed", locale)
 
 
 @router.post("/review", response_model=QuestionReviewResponse, status_code=201)
@@ -549,6 +545,7 @@ async def create_question_review(
             db,
             user=current_user,
             request=http_request,
+            locale=locale,
         )
 
         # Create Question Review
@@ -577,7 +574,9 @@ async def create_question_review(
         db.flush()
 
         if request.tag_ids:
-            _assign_tags_to_question(db, question.id, request.tag_ids, current_user)
+            _assign_tags_to_question(
+                db, question.id, request.tag_ids, current_user, locale=locale
+            )
 
         history = ReviewHistory(
             question_id=question.id,
@@ -617,9 +616,7 @@ async def create_question_review(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating question review: {e}")
-        raise HTTPException(
-            status_code=500, detail=t("review_create_failed", locale=locale)
-        )
+        raise api_error(500, "review_create_failed", locale)
 
 
 def _resolve_question_visibility_update(
@@ -627,6 +624,7 @@ def _resolve_question_visibility_update(
     request: QuestionReviewUpdate,
     user: User,
     db: Session,
+    locale: str = DEFAULT_LOCALE,
 ) -> Optional[tuple]:
     """TF-642: validate a visibility/org_unit_id change on ``PUT .../edit``.
 
@@ -650,10 +648,7 @@ def _resolve_question_visibility_update(
 
     is_owner = question.created_by is not None and question.created_by == user.id
     if not is_owner and not user.is_superuser:
-        raise HTTPException(
-            status_code=403,
-            detail="Nur der Ersteller oder ein SuperUser darf die Sichtbarkeit ändern.",
-        )
+        raise api_error(403, "visibility_owner_or_superuser_only", locale)
 
     new_visibility = (
         QuestionReviewVisibility(request.visibility)
@@ -666,10 +661,7 @@ def _resolve_question_visibility_update(
 
     if new_visibility == QuestionReviewVisibility.TEAM:
         if new_org_unit_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail=("Team-Sichtbarkeit erfordert eine Org-Unit (org_unit_id)."),
-            )
+            raise api_error(400, "visibility_org_unit_required", locale)
         # SuperUser bugfix: validating against the ACTING user's own
         # membership would reject a superuser re-tiering someone else's
         # question, since a superuser typically isn't a member of the
@@ -683,13 +675,7 @@ def _resolve_question_visibility_update(
                 else set()
             )
             if new_org_unit_id not in accessible:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Team-Sichtbarkeit erfordert eine eigene Org-Unit "
-                        "(org_unit_id), der du selbst angehörst."
-                    ),
-                )
+                raise api_error(400, "visibility_own_org_unit_required", locale)
     elif new_visibility == QuestionReviewVisibility.INSTITUTION:
         # Bugfix: an orphaned question (institution_id IS NULL — reachable by
         # a superuser via _get_scoped_question's tenant-filter bypass) would
@@ -699,10 +685,7 @@ def _resolve_question_visibility_update(
         # except-Exception handler instead of this clear 400. Mirrors
         # documents.py's identical guard (documents_visibility_no_institution).
         if question.institution_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Institutions-Sichtbarkeit erfordert eine Institution.",
-            )
+            raise api_error(400, "visibility_institution_required", locale)
         new_org_unit_id = None
     else:
         new_org_unit_id = None
@@ -734,9 +717,7 @@ async def edit_question(
         question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("review_question_not_found", locale=locale)
-            )
+            raise api_error(404, "review_question_not_found", locale)
 
         # Track changes
         changed_fields = {}
@@ -808,7 +789,7 @@ async def edit_question(
             question.estimated_time_minutes = request.estimated_time_minutes
 
         visibility_update = _resolve_question_visibility_update(
-            question, request, current_user, db
+            question, request, current_user, db, locale=locale
         )
         if visibility_update is not None:
             new_visibility, new_org_unit_id = visibility_update
@@ -882,9 +863,7 @@ async def edit_question(
     except Exception as e:
         db.rollback()
         logger.error(f"Error editing question {question_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=t("review_edit_failed", locale=locale)
-        )
+        raise api_error(500, "review_edit_failed", locale)
 
 
 @router.post("/{question_id}/start-review", response_model=QuestionReviewResponse)
@@ -906,18 +885,13 @@ async def start_review(
         question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("review_question_not_found", locale=locale)
-            )
+            raise api_error(404, "review_question_not_found", locale)
 
         if question.review_status not in (
             ReviewStatus.PENDING.value,
             ReviewStatus.EDITED.value,
         ):
-            raise HTTPException(
-                status_code=400,
-                detail=t("review_invalid_status_for_review", locale=locale),
-            )
+            raise api_error(400, "review_invalid_status_for_review", locale)
 
         old_status = question.review_status
 
@@ -949,10 +923,7 @@ async def start_review(
         logger.error(
             f"Error starting review for question {question_id}: {e}", exc_info=True
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("review_start_failed", locale=locale),
-        )
+        raise api_error(500, "review_start_failed", locale)
 
 
 @router.post("/{question_id}/approve", response_model=QuestionReviewResponse)
@@ -973,9 +944,7 @@ async def approve_question(
         question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("review_question_not_found", locale=locale)
-            )
+            raise api_error(404, "review_question_not_found", locale)
 
         # Four-eyes principle check
         if question.institution_id:
@@ -994,10 +963,7 @@ async def approve_question(
                     question.created_by and current_user.id == question.created_by
                 )
                 if is_reviewer or is_creator:
-                    raise HTTPException(
-                        status_code=403,
-                        detail=t("review_four_eyes_principle", locale=locale),
-                    )
+                    raise api_error(403, "review_four_eyes_principle", locale)
 
         old_status = question.review_status
 
@@ -1054,10 +1020,7 @@ async def approve_question(
     except Exception as e:
         db.rollback()
         logger.error(f"Error approving question {question_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=t("review_approve_failed", locale=locale),
-        )
+        raise api_error(500, "review_approve_failed", locale)
 
 
 @router.post("/{question_id}/reject", response_model=QuestionReviewResponse)
@@ -1078,9 +1041,7 @@ async def reject_question(
         question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("review_question_not_found", locale=locale)
-            )
+            raise api_error(404, "review_question_not_found", locale)
 
         old_status = question.review_status
 
@@ -1135,10 +1096,7 @@ async def reject_question(
     except Exception as e:
         db.rollback()
         logger.error(f"Error rejecting question {question_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=t("review_reject_failed", locale=locale),
-        )
+        raise api_error(500, "review_reject_failed", locale)
 
 
 # ---------------------------------------------------------------------------
@@ -1211,13 +1169,9 @@ async def archive_question(
     try:
         question = _get_scoped_question(db, question_id, current_user)
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("review_question_not_found", locale=locale)
-            )
+            raise api_error(404, "review_question_not_found", locale)
         if question.archived_at is not None:
-            raise HTTPException(
-                status_code=409, detail=t("archive_already_archived", locale=locale)
-            )
+            raise api_error(409, "archive_already_archived", locale)
 
         question.archived_at = datetime.utcnow()
         question.archived_by = current_user.id
@@ -1241,7 +1195,7 @@ async def archive_question(
     except Exception as e:
         db.rollback()
         logger.error(f"Error archiving question {question_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=t("archive_failed", locale=locale))
+        raise api_error(500, "archive_failed", locale)
 
 
 @router.post("/{question_id}/restore", response_model=QuestionReviewResponse)
@@ -1259,13 +1213,9 @@ async def restore_question(
     try:
         question = _get_scoped_question(db, question_id, current_user)
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("review_question_not_found", locale=locale)
-            )
+            raise api_error(404, "review_question_not_found", locale)
         if question.archived_at is None:
-            raise HTTPException(
-                status_code=409, detail=t("archive_not_archived", locale=locale)
-            )
+            raise api_error(409, "archive_not_archived", locale)
 
         question.archived_at = None
         question.archived_by = None
@@ -1289,7 +1239,7 @@ async def restore_question(
     except Exception as e:
         db.rollback()
         logger.error(f"Error restoring question {question_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=t("restore_failed", locale=locale))
+        raise api_error(500, "restore_failed", locale)
 
 
 @router.delete("/{question_id}", status_code=200)
@@ -1313,13 +1263,13 @@ async def delete_question(
     try:
         question = _get_scoped_question(db, question_id, current_user)
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("review_question_not_found", locale=locale)
-            )
+            raise api_error(404, "review_question_not_found", locale)
 
         block = _question_delete_block_reason(db, question, locale)
         if block:
-            raise HTTPException(status_code=409, detail=block)
+            raise AppHTTPException(
+                409, block, error_code="question_review_delete_blocked"
+            )
 
         # Capture a snapshot for the audit log BEFORE deletion (review_history
         # dies along with it via cascade). The delete is staged first and then
@@ -1345,9 +1295,7 @@ async def delete_question(
             additional_data=snapshot,
         )
         if audit is None:
-            raise HTTPException(
-                status_code=500, detail=t("delete_failed", locale=locale)
-            )
+            raise api_error(500, "delete_failed", locale)
         logger.info(f"Hard-deleted question {question_id} by {current_user.email}")
         return {"deleted": True, "id": question_id}
     except HTTPException:
@@ -1355,7 +1303,7 @@ async def delete_question(
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting question {question_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=t("delete_failed", locale=locale))
+        raise api_error(500, "delete_failed", locale)
 
 
 @router.post("/bulk-delete", response_model=BulkDeleteResult, status_code=200)
@@ -1419,7 +1367,7 @@ async def bulk_delete_questions(
     except Exception as e:
         db.rollback()
         logger.error(f"Error in bulk delete: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=t("delete_failed", locale=locale))
+        raise api_error(500, "delete_failed", locale)
 
 
 @router.get("/{question_id}/comments", response_model=List[CommentResponse])
@@ -1440,9 +1388,7 @@ async def get_comments(
         question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("review_question_not_found", locale=locale)
-            )
+            raise api_error(404, "review_question_not_found", locale)
 
         # Get Comments
         comments = (
@@ -1458,9 +1404,7 @@ async def get_comments(
         raise
     except Exception as e:
         logger.error(f"Error fetching comments for question {question_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=t("review_fetch_comments_failed", locale=locale)
-        )
+        raise api_error(500, "review_fetch_comments_failed", locale)
 
 
 @router.post("/{question_id}/comments", response_model=CommentResponse, status_code=201)
@@ -1482,9 +1426,7 @@ async def add_comment(
         question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
-            raise HTTPException(
-                status_code=404, detail=t("review_question_not_found", locale=locale)
-            )
+            raise api_error(404, "review_question_not_found", locale)
 
         # Create Comment
         comment = ReviewComment(
@@ -1509,9 +1451,7 @@ async def add_comment(
     except Exception as e:
         db.rollback()
         logger.error(f"Error adding comment to question {question_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=t("review_add_comment_failed", locale=locale)
-        )
+        raise api_error(500, "review_add_comment_failed", locale)
 
 
 @router.get("/{question_id}/history", response_model=List[HistoryResponse])
@@ -1532,10 +1472,7 @@ async def get_question_history(
         question = _get_scoped_question(db, question_id, current_user)
 
         if not question:
-            raise HTTPException(
-                status_code=404,
-                detail=t("review_question_not_found", locale=locale),
-            )
+            raise api_error(404, "review_question_not_found", locale)
 
         # Get History
         history = (
@@ -1551,10 +1488,7 @@ async def get_question_history(
         raise
     except Exception as e:
         logger.error(f"Error fetching history for question {question_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=t("review_fetch_history_failed", locale=locale),
-        )
+        raise api_error(500, "review_fetch_history_failed", locale)
 
 
 # --- Tag Endpoints ---
@@ -1573,6 +1507,7 @@ def _assign_tags_to_question(
     question_id: int,
     tag_ids: list[int],
     current_user: User,
+    locale: str = DEFAULT_LOCALE,
 ) -> None:
     """Assigns tags to a question (fully replaces existing ones).
 
@@ -1591,14 +1526,10 @@ def _assign_tags_to_question(
         .all()
     )
     if len(visible) != len(set(tag_ids)):
-        raise HTTPException(status_code=422, detail="Ungültige Tag-IDs.")
-
+        raise api_error(422, "question_review_tag_ids_invalid", locale)
     for tag in visible:
         if tag.is_archived:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Tag '{tag.name}' ist archiviert.",
-            )
+            raise api_error(422, "question_review_tag_archived", locale, name=tag.name)
 
     db.query(QuestionTag).filter(QuestionTag.question_id == question_id).delete()
     for tag_id in tag_ids:
@@ -1609,17 +1540,19 @@ def _assign_tags_to_question(
 
 @router.post("/{question_id}/tags", response_model=_QuestionTagsOut)
 async def set_question_tags(
+    request: Request,
     question_id: int,
     body: _SetTagsRequest,
     current_user: User = Depends(require_permission("edit_questions")),
     db: Session = Depends(get_db),
 ):
     """Set tags on a question (fully replaces existing tags)."""
+    locale = get_request_locale(request, current_user)
     question = _get_scoped_question(db, question_id, current_user)
     if not question:
-        raise HTTPException(status_code=404, detail="Frage nicht gefunden.")
+        raise api_error(404, "question_review_question_not_found", locale)
 
-    _assign_tags_to_question(db, question_id, body.tag_ids, current_user)
+    _assign_tags_to_question(db, question_id, body.tag_ids, current_user, locale=locale)
     db.commit()
     db.refresh(question)
     return _QuestionTagsOut(tags=question.tags)
@@ -1627,15 +1560,17 @@ async def set_question_tags(
 
 @router.delete("/{question_id}/tags/{tag_id}", response_model=_QuestionTagsOut)
 async def remove_question_tag(
+    request: Request,
     question_id: int,
     tag_id: int,
     current_user: User = Depends(require_permission("edit_questions")),
     db: Session = Depends(get_db),
 ):
     """Remove a single tag from a question."""
+    locale = get_request_locale(request, current_user)
     question = _get_scoped_question(db, question_id, current_user)
     if not question:
-        raise HTTPException(status_code=404, detail="Frage nicht gefunden.")
+        raise api_error(404, "question_review_question_not_found", locale)
 
     db.query(QuestionTag).filter(
         QuestionTag.question_id == question_id,

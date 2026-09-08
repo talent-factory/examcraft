@@ -8,7 +8,7 @@ since TF-644 — see ``models.competency.CompetencyFrameworkVisibility`` and
 import logging
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -28,6 +28,8 @@ from utils.competency_visibility import (
     assert_framework_visible_for,
     filter_frameworks_for_user,
 )
+from errors import api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +125,9 @@ class FrameworkOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-def _get_for_write(fw_id: int, user: User, db: Session) -> CompetencyFramework:
+def _get_for_write(
+    fw_id: int, user: User, db: Session, locale: str = DEFAULT_LOCALE
+) -> CompetencyFramework:
     """TF-644: fetch a framework for a mutation endpoint (update/archive/
     unarchive).
 
@@ -139,13 +143,13 @@ def _get_for_write(fw_id: int, user: User, db: Session) -> CompetencyFramework:
     """
     fw = db.query(CompetencyFramework).filter(CompetencyFramework.id == fw_id).first()
     if not fw:
-        raise HTTPException(status_code=404, detail="Kompetenzrahmen nicht gefunden.")
+        raise api_error(404, "competency_frameworks_not_found", locale)
     assert_framework_visible_for(
         user, fw, db, allow_read_all_bypass=False, require_same_institution=True
     )
     is_admin = user.has_permission("manage_settings")
     if not is_admin and fw.created_by != user.id:
-        raise HTTPException(status_code=403, detail="Zugriff verweigert.")
+        raise api_error(403, "competency_frameworks_access_denied", locale)
     return fw
 
 
@@ -204,7 +208,9 @@ def _sync_competencies_from_text(fw: CompetencyFramework) -> int:
     return len(seen)
 
 
-def _commit_or_conflict(db: Session, user_id: int) -> None:
+def _commit_or_conflict(
+    db: Session, user_id: int, locale: str = DEFAULT_LOCALE
+) -> None:
     """Commit; an IntegrityError (e.g. a duplicate competency code from a
     race/parallel edit) is reported as a clean 400 instead of a raw 500,
     and the session is rolled back."""
@@ -217,15 +223,11 @@ def _commit_or_conflict(db: Session, user_id: int) -> None:
             user_id,
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=400,
-            detail="Kompetenzrahmen konnte nicht gespeichert werden "
-            "(Integritätskonflikt, z. B. doppelter Kompetenz-Code).",
-        )
+        raise api_error(400, "competency_frameworks_integrity_conflict", locale)
 
 
 def _resolve_framework_visibility_for_create(
-    body: "FrameworkCreate", user: User, db: Session
+    body: "FrameworkCreate", user: User, db: Session, locale: str = DEFAULT_LOCALE
 ) -> tuple:
     """TF-644: validate visibility/org_unit_id at framework creation time.
 
@@ -245,17 +247,11 @@ def _resolve_framework_visibility_for_create(
         visibility == CompetencyFrameworkVisibility.INSTITUTION
         and user.institution_id is None
     ):
-        raise HTTPException(
-            status_code=400,
-            detail="Institutions-Sichtbarkeit erfordert eine Institution.",
-        )
+        raise api_error(400, "visibility_institution_required", locale)
 
     if visibility == CompetencyFrameworkVisibility.TEAM:
         if org_unit_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Team-Sichtbarkeit erfordert eine Org-Unit (org_unit_id).",
-            )
+            raise api_error(400, "visibility_org_unit_required", locale)
         # SuperUser bugfix (mirrors question_review/exam): validating against
         # the ACTING user's own membership would reject a superuser, who
         # typically belongs to no Org-Unit and often has institution_id=None
@@ -267,13 +263,7 @@ def _resolve_framework_visibility_for_create(
                 else set()
             )
             if org_unit_id not in accessible:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Team-Sichtbarkeit erfordert eine eigene Org-Unit "
-                        "(org_unit_id), der du selbst angehörst."
-                    ),
-                )
+                raise api_error(400, "visibility_own_org_unit_required", locale)
     else:
         org_unit_id = None
 
@@ -282,12 +272,14 @@ def _resolve_framework_visibility_for_create(
 
 @router.post("", response_model=FrameworkOut, status_code=201)
 async def create_framework(
+    request: Request,
     body: FrameworkCreate,
     current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db),
 ):
+    locale = get_request_locale(request, current_user)
     visibility, org_unit_id = _resolve_framework_visibility_for_create(
-        body, current_user, db
+        body, current_user, db, locale=locale
     )
     fw = CompetencyFramework(
         name=body.name.strip(),
@@ -305,10 +297,8 @@ async def create_framework(
         seen: set[str] = set()
         for c in body.competencies:
             if c.code in seen:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Doppelter Kompetenz-Code {c.code!r}: Codes müssen je "
-                    "Kompetenzrahmen eindeutig sein.",
+                raise api_error(
+                    400, "competency_frameworks_duplicate_code", locale, code=c.code
                 )
             seen.add(c.code)
             fw.competencies.append(
@@ -326,7 +316,7 @@ async def create_framework(
         # frameworks captured via the GUI also get structured tagging.
         _sync_competencies_from_text(fw)
     db.add(fw)
-    _commit_or_conflict(db, current_user.id)
+    _commit_or_conflict(db, current_user.id, locale=locale)
     db.refresh(fw)
     logger.info(
         "Kompetenzrahmen erstellt: id=%s name=%r user=%s",
@@ -339,17 +329,19 @@ async def create_framework(
 
 @router.get("/{fw_id}", response_model=FrameworkOut)
 async def get_framework(
+    request: Request,
     fw_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
+    locale = get_request_locale(request, current_user)
     fw = (
         filter_frameworks_for_user(db.query(CompetencyFramework), current_user, db)
         .filter(CompetencyFramework.id == fw_id)
         .first()
     )
     if not fw:
-        raise HTTPException(status_code=404, detail="Kompetenzrahmen nicht gefunden.")
+        raise api_error(404, "competency_frameworks_not_found", locale)
     return fw
 
 
@@ -358,6 +350,7 @@ def _resolve_framework_visibility_update(
     fields: dict,
     user: User,
     db: Session,
+    locale: str = DEFAULT_LOCALE,
 ) -> Optional[dict]:
     """TF-644: validate a visibility/org_unit_id change on ``PUT /{fw_id}``.
 
@@ -404,17 +397,11 @@ def _resolve_framework_visibility_update(
         # on commit, surfacing as an opaque 500 via _commit_or_conflict
         # instead of this clear 400. Mirrors question_review's identical
         # guard.
-        raise HTTPException(
-            status_code=400,
-            detail="Institutions-Sichtbarkeit erfordert eine Institution.",
-        )
+        raise api_error(400, "visibility_institution_required", locale)
 
     if new_visibility == CompetencyFrameworkVisibility.TEAM:
         if new_org_unit_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Team-Sichtbarkeit erfordert eine Org-Unit (org_unit_id).",
-            )
+            raise api_error(400, "visibility_org_unit_required", locale)
         if not user.is_superuser:
             accessible = (
                 get_user_accessible_org_unit_ids(db, user.id, user.institution_id)
@@ -422,13 +409,7 @@ def _resolve_framework_visibility_update(
                 else set()
             )
             if new_org_unit_id not in accessible:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Team-Sichtbarkeit erfordert eine eigene Org-Unit "
-                        "(org_unit_id), der du selbst angehörst."
-                    ),
-                )
+                raise api_error(400, "visibility_own_org_unit_required", locale)
     else:
         new_org_unit_id = None
 
@@ -437,12 +418,14 @@ def _resolve_framework_visibility_update(
 
 @router.put("/{fw_id}", response_model=FrameworkOut)
 async def update_framework(
+    request: Request,
     fw_id: int,
     body: FrameworkUpdate,
     current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db),
 ):
-    fw = _get_for_write(fw_id, current_user, db)
+    locale = get_request_locale(request, current_user)
+    fw = _get_for_write(fw_id, current_user, db, locale=locale)
     fields = body.model_dump(exclude_unset=True)
     # TF-644: visibility/org_unit_id are validated together (team requires a
     # membership-checked org_unit_id) — pop them out of the generic
@@ -451,7 +434,7 @@ async def update_framework(
         k: fields.pop(k) for k in ("visibility", "org_unit_id") if k in fields
     }
     visibility_update = _resolve_framework_visibility_update(
-        fw, visibility_fields, current_user, db
+        fw, visibility_fields, current_user, db, locale=locale
     )
     if visibility_update is not None:
         fw.visibility = visibility_update["visibility"]
@@ -462,7 +445,7 @@ async def update_framework(
     # (upsert by code), so the tagging stays consistent with the source.
     if "rendered_text" in fields:
         _sync_competencies_from_text(fw)
-    _commit_or_conflict(db, current_user.id)
+    _commit_or_conflict(db, current_user.id, locale=locale)
     db.refresh(fw)
     logger.info(
         "Kompetenzrahmen aktualisiert: id=%s name=%r user=%s",
@@ -475,11 +458,13 @@ async def update_framework(
 
 @router.post("/{fw_id}/archive", response_model=FrameworkOut)
 async def archive_framework(
+    request: Request,
     fw_id: int,
     current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db),
 ):
-    fw = _get_for_write(fw_id, current_user, db)
+    locale = get_request_locale(request, current_user)
+    fw = _get_for_write(fw_id, current_user, db, locale=locale)
     fw.is_archived = True
     db.commit()
     db.refresh(fw)
@@ -494,11 +479,13 @@ async def archive_framework(
 
 @router.post("/{fw_id}/unarchive", response_model=FrameworkOut)
 async def unarchive_framework(
+    request: Request,
     fw_id: int,
     current_user: User = Depends(require_permission("create_questions")),
     db: Session = Depends(get_db),
 ):
-    fw = _get_for_write(fw_id, current_user, db)
+    locale = get_request_locale(request, current_user)
+    fw = _get_for_write(fw_id, current_user, db, locale=locale)
     fw.is_archived = False
     db.commit()
     db.refresh(fw)

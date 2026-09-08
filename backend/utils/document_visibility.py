@@ -30,7 +30,7 @@ of truth keeps the privacy guarantee from drifting between call sites.
 
 from typing import Optional, Set
 
-from fastapi import HTTPException, status
+from fastapi import status
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Query, Session
 
@@ -176,11 +176,8 @@ def assert_document_visible_for(
         return
 
     # Imported lazily (not at module top) to keep this low-level helper free of a
-    # module-load dependency on the services layer; t() is only needed here, on
-    # the error path.
-    from services.translation_service import t
+    # module-load dependency on the services layer; errors.api_error pulls in
+    # translation_service, and it is only needed here, on the error path.
+    from errors import api_error
 
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=t(detail_key, locale=locale),
-    )
+    raise api_error(status.HTTP_404_NOT_FOUND, detail_key, locale)

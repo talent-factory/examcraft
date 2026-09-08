@@ -7,12 +7,13 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from services.payment_service import PaymentService
-from services.translation_service import t, get_request_locale
+from services.translation_service import get_request_locale
 from utils.auth_utils import get_current_active_user, block_during_impersonation
 from utils.billing_utils import get_allowed_price_ids, get_tier_from_price_id
 from models.auth import User, Institution
 from models.subscription import Subscription, SubscriptionStatus
 from database import get_db
+from errors import api_error
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,7 @@ async def get_subscription(
 
 @router.get("/invoices", response_model=List[InvoiceResponse])
 async def get_invoices(
+    request: Request,
     limit: int = Query(default=10, le=100),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
@@ -214,10 +216,11 @@ async def get_invoices(
     Get billing history (invoices) for the user's institution.
     Only the billing owner can view invoices.
     """
+    locale = get_request_locale(request, current_user)
     payment_service = PaymentService()
 
     if not payment_service.is_available():
-        raise HTTPException(status_code=503, detail="Payment service is not configured")
+        raise api_error(503, "billing_service_not_configured", locale)
 
     if not current_user.institution_id:
         return []
@@ -246,9 +249,7 @@ async def get_invoices(
             "User %s denied access to invoices - not billing owner",
             current_user.id,
         )
-        raise HTTPException(
-            status_code=403, detail="Only the billing owner can view invoices."
-        )
+        raise api_error(403, "billing_invoices_owner_only", locale)
 
     try:
         invoices = await payment_service.get_invoices(
@@ -259,14 +260,12 @@ async def get_invoices(
         raise
     except Exception as e:
         logger.error(f"Error fetching invoices: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while fetching invoices. Please try again.",
-        )
+        raise api_error(500, "billing_invoices_fetch_failed", locale)
 
 
 @router.get("/payment-methods", response_model=List[PaymentMethodResponse])
 async def get_payment_methods(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -274,10 +273,11 @@ async def get_payment_methods(
     Get payment methods for the user's institution.
     Only the billing owner can view payment methods.
     """
+    locale = get_request_locale(request, current_user)
     payment_service = PaymentService()
 
     if not payment_service.is_available():
-        raise HTTPException(status_code=503, detail="Payment service is not configured")
+        raise api_error(503, "billing_service_not_configured", locale)
 
     if not current_user.institution_id:
         return []
@@ -306,10 +306,7 @@ async def get_payment_methods(
             "User %s denied access to payment methods - not billing owner",
             current_user.id,
         )
-        raise HTTPException(
-            status_code=403,
-            detail="Only the billing owner can view payment methods.",
-        )
+        raise api_error(403, "billing_payment_methods_owner_only", locale)
 
     try:
         payment_methods = await payment_service.get_payment_methods(
@@ -320,14 +317,12 @@ async def get_payment_methods(
         raise
     except Exception as e:
         logger.error(f"Error fetching payment methods: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while fetching payment methods. Please try again.",
-        )
+        raise api_error(500, "billing_payment_methods_fetch_failed", locale)
 
 
 @router.post("/customer-portal")
 async def create_customer_portal(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
     _guard: None = Depends(block_during_impersonation),
@@ -336,15 +331,14 @@ async def create_customer_portal(
     Create a Stripe Customer Portal session for managing subscription and payment methods.
     Only the billing owner can access the customer portal.
     """
+    locale = get_request_locale(request, current_user)
     payment_service = PaymentService()
 
     if not payment_service.is_available():
-        raise HTTPException(status_code=503, detail="Payment service is not configured")
+        raise api_error(503, "billing_service_not_configured", locale)
 
     if not current_user.institution_id:
-        raise HTTPException(
-            status_code=400, detail="User must be associated with an institution"
-        )
+        raise api_error(400, "billing_no_institution", locale)
 
     subscription = (
         db.query(Subscription)
@@ -363,18 +357,13 @@ async def create_customer_portal(
     )
 
     if not subscription or not subscription.stripe_customer_id:
-        raise HTTPException(
-            status_code=404, detail="No subscription found for this institution"
-        )
+        raise api_error(404, "billing_subscription_not_found", locale)
 
     if not _is_billing_owner(current_user, subscription):
         logger.warning(
             f"User {current_user.id} denied access to customer portal - not billing owner"
         )
-        raise HTTPException(
-            status_code=403,
-            detail="Only the billing owner can manage subscription settings",
-        )
+        raise api_error(403, "billing_portal_owner_only", locale)
 
     try:
         return_url = f"{FRONTEND_URL}/subscription"
@@ -387,10 +376,7 @@ async def create_customer_portal(
         raise
     except Exception as e:
         logger.error(f"Error creating customer portal session: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while creating the portal session. Please try again.",
-        )
+        raise api_error(500, "billing_portal_failed", locale)
 
 
 @router.post("/create-checkout-session")
@@ -411,16 +397,10 @@ async def create_checkout_session(
     payment_service = PaymentService()
 
     if not payment_service.is_available():
-        raise HTTPException(
-            status_code=503,
-            detail=t("billing_service_not_configured", locale=locale),
-        )
+        raise api_error(503, "billing_service_not_configured", locale)
 
     if not current_user.institution_id:
-        raise HTTPException(
-            status_code=400,
-            detail=t("billing_no_institution", locale=locale),
-        )
+        raise api_error(400, "billing_no_institution", locale)
 
     # Prevent duplicate subscriptions
     existing_active = (
@@ -434,10 +414,7 @@ async def create_checkout_session(
         .first()
     )
     if existing_active:
-        raise HTTPException(
-            status_code=409,
-            detail=t("billing_already_subscribed", locale=locale),
-        )
+        raise api_error(409, "billing_already_subscribed", locale)
 
     # Validate price_id against allowed prices (fail-closed)
     allowed_prices = get_allowed_price_ids()
@@ -445,15 +422,9 @@ async def create_checkout_session(
         logger.error(
             "No allowed Stripe price IDs configured - STRIPE_PRICE_* env vars missing"
         )
-        raise HTTPException(
-            status_code=503,
-            detail=t("billing_plans_not_configured", locale=locale),
-        )
+        raise api_error(503, "billing_plans_not_configured", locale)
     if request.price_id not in allowed_prices:
-        raise HTTPException(
-            status_code=400,
-            detail=t("billing_invalid_price", locale=locale),
-        )
+        raise api_error(400, "billing_invalid_price", locale)
 
     success_url = f"{FRONTEND_URL}/billing/success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{FRONTEND_URL}/billing/cancel"
@@ -475,26 +446,23 @@ async def create_checkout_session(
         raise
     except stripe.error.InvalidRequestError as e:
         logger.error(f"Stripe configuration error in checkout: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=502,
-            detail=t("billing_provider_misconfigured", locale=locale),
-        )
+        # TF-773 review: 503, not 502 — matches the other
+        # billing_provider_misconfigured site below (line ~489) and
+        # billing_plans_not_configured/billing_sync_failed's sibling codes.
+        # error_code is now a machine-readable client contract, so the same
+        # code must not map to two different status families.
+        raise api_error(503, "billing_provider_misconfigured", locale)
     except stripe.error.StripeError as e:
         logger.error(f"Stripe error in checkout: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=502,
-            detail=t("billing_provider_unavailable", locale=locale),
-        )
+        raise api_error(502, "billing_provider_unavailable", locale)
     except Exception as e:
         logger.error(f"Unexpected error creating checkout session: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=t("billing_unexpected_error", locale=locale),
-        )
+        raise api_error(500, "billing_unexpected_error", locale)
 
 
 @router.post("/sync-subscription")
 async def sync_subscription_from_stripe(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
@@ -503,15 +471,14 @@ async def sync_subscription_from_stripe(
 
     Useful when webhooks fail or for local development.
     """
+    locale = get_request_locale(request, current_user)
     payment_service = PaymentService()
 
     if not payment_service.is_available():
-        raise HTTPException(status_code=503, detail="Payment service is not configured")
+        raise api_error(503, "billing_service_not_configured", locale)
 
     if not current_user.institution_id:
-        raise HTTPException(
-            status_code=400, detail="User must be associated with an institution"
-        )
+        raise api_error(400, "billing_no_institution", locale)
 
     institution = (
         db.query(Institution)
@@ -520,11 +487,11 @@ async def sync_subscription_from_stripe(
     )
 
     if not institution:
-        raise HTTPException(status_code=404, detail="Institution not found")
+        raise api_error(404, "billing_institution_not_found", locale)
 
     try:
         if not payment_service.is_available():
-            raise HTTPException(status_code=503, detail="Stripe API key not configured")
+            raise api_error(503, "billing_provider_misconfigured", locale)
 
         customers = stripe.Customer.list(email=current_user.email, limit=1)
 
@@ -639,19 +606,14 @@ async def sync_subscription_from_stripe(
         logger.error(
             "Tier mapping failed during subscription sync: %s", e, exc_info=True
         )
-        raise HTTPException(
-            status_code=503,
-            detail="Subscription plan configuration error. Please contact support.",
-        )
+        raise api_error(503, "billing_plans_not_configured", locale)
     except stripe.error.StripeError as e:
         logger.error("Stripe error during sync: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=400,
-            detail="A payment provider error occurred. Please try again.",
-        )
+        # TF-773 review: 502, not 400 — matches the checkout-session site
+        # above. A Stripe-side failure is an upstream problem, not a bad
+        # client request, and error_code is now a client contract shared
+        # across both sites.
+        raise api_error(502, "billing_provider_unavailable", locale)
     except Exception as e:
         logger.error("Error syncing subscription: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while syncing subscription data. Please try again.",
-        )
+        raise api_error(500, "billing_sync_failed", locale)

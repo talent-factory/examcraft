@@ -24,13 +24,14 @@ from services.avatar_service import AvatarService
 from services.audit_service import AuditService
 from services.oauth_service import OAuthService
 from services.redis_service import RedisService
-from services.translation_service import t, get_request_locale
+from services.translation_service import get_request_locale
 from utils.auth_utils import (
     get_current_user,
     get_current_active_user,
     block_during_impersonation,
 )
 from utils.impersonation_context import get_impersonation_context
+from errors import api_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -211,10 +212,7 @@ async def register(
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == request.email).first()
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_email_taken", locale=locale),
-        )
+        raise api_error(status.HTTP_400_BAD_REQUEST, "auth_email_taken", locale)
 
     # Get or create institution
     institution = None
@@ -226,9 +224,8 @@ async def register(
             .first()
         )
         if not institution:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=t("auth_institution_not_found", locale=locale),
+            raise api_error(
+                status.HTTP_404_NOT_FOUND, "auth_institution_not_found", locale
             )
     else:
         # Try to find institution by email domain (Auto-Assignment)
@@ -264,7 +261,7 @@ async def register(
     # new personal institutions start empty, so the first user always passes)
     from utils.tenant_utils import SubscriptionLimits
 
-    SubscriptionLimits.check_user_limit(institution, db)
+    SubscriptionLimits.check_user_limit(institution, db, locale=locale)
 
     # Create user (email not verified yet)
     user = User(
@@ -420,9 +417,8 @@ async def login(
             request=http_request,
             error_message="User not found",
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=t("auth_invalid_credentials", locale=locale),
+        raise api_error(
+            status.HTTP_401_UNAUTHORIZED, "auth_invalid_credentials", locale
         )
 
     # Account lockout check
@@ -443,9 +439,8 @@ async def login(
                 request=http_request,
                 error_message="Account locked due to too many failed attempts",
             )
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=t("auth_account_locked", locale=locale),
+            raise api_error(
+                status.HTTP_429_TOO_MANY_REQUESTS, "auth_account_locked", locale
             )
         else:
             # Lockout period expired, reset counter
@@ -458,9 +453,10 @@ async def login(
                     exc_info=True,
                 )
                 db.rollback()
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=t("auth_login_service_unavailable", locale=locale),
+                raise api_error(
+                    status.HTTP_503_SERVICE_UNAVAILABLE,
+                    "auth_login_service_unavailable",
+                    locale,
                 )
 
     # Verify password
@@ -485,22 +481,15 @@ async def login(
             error_message="Incorrect password",
         )
 
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=t("auth_invalid_credentials", locale=locale),
+        raise api_error(
+            status.HTTP_401_UNAUTHORIZED, "auth_invalid_credentials", locale
         )
 
     # Check if user is active
     if user.status == UserStatus.PENDING.value:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=t("auth_account_pending", locale=locale),
-        )
+        raise api_error(status.HTTP_403_FORBIDDEN, "auth_account_pending", locale)
     if user.status != UserStatus.ACTIVE.value:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=t("auth_account_disabled", locale=locale),
-        )
+        raise api_error(status.HTTP_403_FORBIDDEN, "auth_account_disabled", locale)
 
     # Reset failed login attempts
     user.failed_login_attempts = 0
@@ -551,9 +540,10 @@ async def refresh_token(
     )
 
     if not tokens:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=t("auth_token_invalid", locale=get_request_locale(http_request)),
+        raise api_error(
+            status.HTTP_401_UNAUTHORIZED,
+            "auth_token_invalid",
+            get_request_locale(http_request),
         )
 
     return tokens
@@ -824,9 +814,8 @@ async def set_password(
     locale = get_request_locale(http_request, current_user)
     # Check if user already has a password
     if current_user.password_hash is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_password_already_set", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_password_already_set", locale
         )
 
     # Set password
@@ -876,10 +865,7 @@ async def change_password(
             request=http_request,
             error_message="Current password is incorrect",
         )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_password_incorrect", locale=locale),
-        )
+        raise api_error(status.HTTP_400_BAD_REQUEST, "auth_password_incorrect", locale)
 
     # Update password
     current_user.password_hash = AuthService.get_password_hash(request.new_password)
@@ -940,9 +926,8 @@ async def confirm_password_reset(
     locale = get_request_locale(http_request)
     # TODO: Implement token validation
     # For now, just return error
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail=t("auth_password_reset_not_implemented", locale=locale),
+    raise api_error(
+        status.HTTP_501_NOT_IMPLEMENTED, "auth_password_reset_not_implemented", locale
     )
 
     return None
@@ -971,32 +956,26 @@ async def verify_email(token: str, request: Request, db: Session = Depends(get_d
     )
 
     if not email_token:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_verification_token_invalid", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_verification_token_invalid", locale
         )
 
     # Check if already used
     if email_token.is_used:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_verification_token_used", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_verification_token_used", locale
         )
 
     # Check if expired
     if email_token.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_verification_token_expired", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_verification_token_expired", locale
         )
 
     # Get user
     user = db.query(User).filter(User.id == email_token.user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("auth_user_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "auth_user_not_found", locale)
 
     # Mark email as verified
     user.is_email_verified = True
@@ -1080,9 +1059,8 @@ async def resend_verification_email(
 
     # Check if already verified
     if user.is_email_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_email_already_verified", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_email_already_verified", locale
         )
 
     # Invalidate old tokens
@@ -1128,9 +1106,10 @@ async def resend_verification_email(
             logger.info(f"Verification email resent to {user.email}")
     except Exception as e:
         logger.error(f"Failed to resend verification email to {user.email}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=t("auth_verification_email_failed", locale=locale),
+        raise api_error(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "auth_verification_email_failed",
+            locale,
         )
 
     return {"success": True, "message": "Verification email sent"}
@@ -1159,9 +1138,8 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
     """
     locale = get_request_locale(request)
     if provider not in ["google", "microsoft"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_oauth_provider_unsupported", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_oauth_provider_unsupported", locale
         )
 
     oauth_service = OAuthService(db)
@@ -1182,9 +1160,8 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
             redis_client.setex(f"oauth_state:{state}", 600, "valid")  # 10 min TTL
         except Exception as redis_err:
             logger.error(f"Redis unavailable for OAuth state storage: {redis_err}")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=t("auth_service_unavailable", locale=locale),
+            raise api_error(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "auth_service_unavailable", locale
             )
 
         authorization_url = oauth_service.get_authorization_url(
@@ -1196,9 +1173,8 @@ async def oauth_login(provider: str, request: Request, db: Session = Depends(get
         raise
     except Exception as e:
         logger.error(f"OAuth login failed for {provider}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=t("auth_oauth_login_failed", locale=locale),
+        raise api_error(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, "auth_oauth_login_failed", locale
         )
 
 
@@ -1215,18 +1191,14 @@ async def oauth_callback(
     """
     locale = get_request_locale(request)
     if provider not in ["google", "microsoft"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_oauth_provider_unsupported", locale=locale),
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_oauth_provider_unsupported", locale
         )
 
     # Verify CSRF state parameter (required)
     state = request.query_params.get("state", "")
     if not state:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_oauth_state_missing", locale=locale),
-        )
+        raise api_error(status.HTTP_400_BAD_REQUEST, "auth_oauth_state_missing", locale)
     try:
         redis_client = RedisService.get_session_client()
         # Atomic get-and-delete to prevent TOCTOU race on single-use state token
@@ -1238,17 +1210,15 @@ async def oauth_callback(
             if stored:
                 redis_client.delete(f"oauth_state:{state}")
         if not stored:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=t("auth_oauth_state_invalid", locale=locale),
+            raise api_error(
+                status.HTTP_400_BAD_REQUEST, "auth_oauth_state_invalid", locale
             )
     except HTTPException:
         raise
     except Exception as redis_err:
         logger.error(f"Redis unavailable for OAuth state verification: {redis_err}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=t("auth_service_unavailable", locale=locale),
+        raise api_error(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "auth_service_unavailable", locale
         )
 
     oauth_service = OAuthService(db)
@@ -1311,23 +1281,18 @@ async def oauth_callback(
                 f"Redis unavailable when storing OAuth code for user {user.id}: {redis_err}",
                 exc_info=True,
             )
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=t("auth_service_unavailable", locale=locale),
+            raise api_error(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "auth_service_unavailable", locale
             )
         return RedirectResponse(url=redirect_url)
 
     except ValueError as e:
         logger.error(f"OAuth callback failed for {provider}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_oauth_login_failed", locale=locale),
-        )
+        raise api_error(status.HTTP_400_BAD_REQUEST, "auth_oauth_login_failed", locale)
     except Exception as e:
         logger.error(f"OAuth callback error for {provider}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=t("auth_oauth_login_failed", locale=locale),
+        raise api_error(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, "auth_oauth_login_failed", locale
         )
 
 
@@ -1345,9 +1310,8 @@ async def exchange_oauth_code(request: OAuthCodeExchangeRequest, http_request: R
         redis_client = RedisService.get_session_client()
     except Exception as e:
         logger.error(f"Redis unavailable for OAuth code exchange: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=t("auth_service_unavailable", locale=locale),
+        raise api_error(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "auth_service_unavailable", locale
         )
 
     key = f"oauth_code:{request.code}"
@@ -1365,21 +1329,16 @@ async def exchange_oauth_code(request: OAuthCodeExchangeRequest, http_request: R
                 f"Redis error in getdel fallback for OAuth code exchange: {fallback_err}",
                 exc_info=True,
             )
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=t("auth_service_unavailable", locale=locale),
+            raise api_error(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "auth_service_unavailable", locale
             )
     except Exception as e:
         logger.error(f"Redis error during OAuth code exchange: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=t("auth_service_unavailable", locale=locale),
+        raise api_error(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "auth_service_unavailable", locale
         )
     if not token_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=t("auth_oauth_code_invalid", locale=locale),
-        )
+        raise api_error(status.HTTP_400_BAD_REQUEST, "auth_oauth_code_invalid", locale)
 
     try:
         tokens = json.loads(token_data)
@@ -1388,9 +1347,10 @@ async def exchange_oauth_code(request: OAuthCodeExchangeRequest, http_request: R
             f"Failed to deserialize OAuth token data from Redis key {key!r}: {decode_err}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=t("auth_oauth_token_read_failed", locale=locale),
+        raise api_error(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "auth_oauth_token_read_failed",
+            locale,
         )
 
     return tokens
@@ -1427,25 +1387,18 @@ async def get_user_avatar(
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("auth_user_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "auth_user_not_found", locale)
 
     if not user.avatar_url:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=t("auth_avatar_not_found", locale=locale),
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "auth_avatar_not_found", locale)
 
     # Download and cache avatar
     avatar_service = AvatarService()
     avatar_bytes = avatar_service.get_avatar(user_id, user.avatar_url)
 
     if not avatar_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=t("auth_avatar_download_failed", locale=locale),
+        raise api_error(
+            status.HTTP_502_BAD_GATEWAY, "auth_avatar_download_failed", locale
         )
 
     # Return image with appropriate content type

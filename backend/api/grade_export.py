@@ -33,9 +33,10 @@ from services.grade_export_service import (
 from services.grading_scheme_resolver import (
     resolve_scheme_config as _resolve_scheme_config,
 )
-from services.translation_service import get_request_locale, t
+from services.translation_service import get_request_locale
 from utils.auth_utils import require_permission
 from utils.download_filename import content_disposition, filename_stem
+from errors import api_error
 
 logger = logging.getLogger(__name__)
 
@@ -118,10 +119,7 @@ def _ensure_exportable(db: Session, exam: Exam, locale: str) -> None:
     * Any pending review means at least one grade is unverbindlich.
     """
     if exam.status == ExamStatus.DRAFT.value:
-        raise HTTPException(
-            status_code=409,
-            detail=t("submissions_grade_export_blocked_draft", locale=locale),
-        )
+        raise api_error(409, "submissions_grade_export_blocked_draft", locale)
 
     blockers = (
         db.query(Submission.id)
@@ -133,10 +131,7 @@ def _ensure_exportable(db: Session, exam: Exam, locale: str) -> None:
         .one_or_none()
     )
     if blockers is not None:
-        raise HTTPException(
-            status_code=409,
-            detail=t("submissions_grade_export_blocked_pending_review", locale=locale),
-        )
+        raise api_error(409, "submissions_grade_export_blocked_pending_review", locale)
 
 
 # ---------------------------------------------------------------------------
@@ -186,10 +181,7 @@ async def export_grades(
         logger.exception(
             "Notenexport failed: format=%s exam_id=%d", export_format, exam_id
         )
-        raise HTTPException(
-            status_code=500,
-            detail=t("submissions_grade_export_internal_error", locale=locale),
-        )
+        raise api_error(500, "submissions_grade_export_internal_error", locale)
 
     filename = _download_filename(exam.title, prefix, ext)
     return Response(

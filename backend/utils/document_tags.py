@@ -8,13 +8,14 @@ untouched (decision §10.1).
 
 from typing import List, Optional
 
-from fastapi import HTTPException
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Query, Session
 
 from models.auth import User
 from models.document import Document, DocumentStatus, DocumentVisibility
 from models.tag import DocumentPersonalTag, DocumentTag, Tag
+from errors import api_error
+from services.translation_service import get_request_locale
 
 # Status-group → enum-set mapping (DocumentStatus carries new + legacy values).
 STATUS_GROUPS = {
@@ -61,9 +62,9 @@ def _visible_tag_for_attach(db: Session, tag_id: int, user: User) -> Tag:
     """Return a tag the user may attach, else raise 404 (don't leak existence)."""
     tag = visible_tags_for_user(db, user).filter(Tag.id == tag_id).first()
     if tag is None:
-        from services.translation_service import t
-
-        raise HTTPException(status_code=404, detail=t("documents_tag_not_found"))
+        # No Request available at this layer, but `user` is — honour
+        # preferred_language instead of hardcoding "de" (TF-773 review).
+        raise api_error(404, "documents_tag_not_found", get_request_locale(user=user))
     return tag
 
 
@@ -77,6 +78,7 @@ def attach_tags_to_document(
     Returns the tag ids that were **actually** newly attached (already-present
     links are skipped), so the caller can audit only the effective change.
     """
+    locale = get_request_locale(user=user)
     existing = {
         r.tag_id
         for r in db.query(DocumentTag).filter(DocumentTag.document_id == document.id)
@@ -88,12 +90,7 @@ def attach_tags_to_document(
             tag.scope == "institution"
             and document.visibility != DocumentVisibility.INSTITUTION
         ):
-            from services.translation_service import t
-
-            raise HTTPException(
-                status_code=400,
-                detail=t("documents_tag_institution_requires_shared"),
-            )
+            raise api_error(400, "documents_tag_institution_requires_shared", locale)
         if tag_id not in existing:
             db.add(DocumentTag(document_id=document.id, tag_id=tag_id))
             existing.add(tag_id)
@@ -136,6 +133,7 @@ def attach_tags_for_user(
     private to the user and deliberately excluded — the caller audits only the
     shared, institution-visible change.
     """
+    locale = get_request_locale(user=user)
     existing_personal = {
         r.tag_id
         for r in db.query(DocumentPersonalTag).filter(
@@ -156,11 +154,7 @@ def attach_tags_for_user(
                 existing_personal.add(tag_id)
         else:
             if not is_owner:
-                from services.translation_service import t
-
-                raise HTTPException(
-                    status_code=403, detail=t("documents_tag_owner_only")
-                )
+                raise api_error(403, "documents_tag_owner_only", locale)
             shared_ids.append(tag_id)
     if shared_ids:
         # Reuse the shared path (keeps the institution-requires-shared block).
@@ -197,9 +191,7 @@ def detach_tag_for_user(
         ).delete(synchronize_session=False)
         return None
     if not is_owner:
-        from services.translation_service import t
-
-        raise HTTPException(status_code=403, detail=t("documents_tag_owner_only"))
+        raise api_error(403, "documents_tag_owner_only", get_request_locale(user=user))
     removed = detach_tag_from_document(db, document, tag_id)
     return tag_id if removed else None
 

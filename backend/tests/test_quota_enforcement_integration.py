@@ -203,7 +203,7 @@ class TestUserLimitEnforcement:
         with pytest.raises(HTTPException) as exc_info:
             SubscriptionLimits.check_user_limit(institution, db_with_quotas)
         assert exc_info.value.status_code == 403
-        assert "User limit" in exc_info.value.detail
+        assert exc_info.value.error_code == "tenant_user_limit_reached"
 
     def test_pending_users_dont_count_toward_limit(self, db_with_quotas, institution):
         """
@@ -263,7 +263,7 @@ class TestStorageLimitEnforcement:
                 institution, db_with_quotas, 200 * 1024
             )
         assert exc_info.value.status_code == 403
-        assert "Storage limit" in exc_info.value.detail
+        assert exc_info.value.error_code == "tenant_storage_limit_reached"
 
     def test_storage_limit_not_exceeded(self, db_with_quotas, institution, active_user):
         """Upload should succeed when under storage limit."""

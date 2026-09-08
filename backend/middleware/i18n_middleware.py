@@ -3,12 +3,13 @@
 Resolves the request locale and stores it in request.state.locale.
 Sets the Content-Language response header.
 
-NOTE: As of Phase 1, no endpoint reads request.state.locale yet.
-The intended Phase 2 pattern is for authenticated endpoints to use
-current_user.preferred_language (if set) when calling t(), falling
-back to request.state.locale otherwise.
+Endpoints do not read request.state.locale directly — they call
+``get_request_locale(request, current_user)`` from services.translation_service,
+which prefers the user's ``preferred_language`` and falls back to the value set
+here. (An earlier version of this docstring claimed no endpoint read the locale
+yet; that stopped being true well before TF-773 corrected it.)
 
-Resolution order:
+Resolution order in this middleware:
 1. Accept-Language header (best match against supported locales)
 2. Default locale ("de")
 """
