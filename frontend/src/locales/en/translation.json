@@ -1007,6 +1007,7 @@
       "colActions": "Actions",
       "superuser": "Superuser",
       "never": "Never",
+      "actionsMenuLabel": "Actions for {{name}}",
       "btnEdit": "Edit",
       "btnRoles": "Roles",
       "btnOrgUnits": "Org Units",

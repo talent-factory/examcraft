@@ -3,8 +3,10 @@
  * Displays all users in a table with pagination, search, and filters
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { Building2, MoreVertical, Pencil, Power, LogIn, Shield } from 'lucide-react';
 import { getDateLocale } from '../../utils/dateLocale';
 import AdminService, { UserListItem, ListUsersParams } from '../../services/AdminService';
 import { UserStatus } from '../../types/auth';
@@ -66,6 +68,18 @@ export const UserList: React.FC<UserListProps> = ({
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
+  // Actions kebab menu (TF-801): at most one row's menu is open at a time.
+  // The menu itself is rendered in a portal (see the JSX below) at a fixed,
+  // viewport-clamped position computed by the layout effect further down —
+  // it would otherwise be clipped by the table's overflow-hidden /
+  // overflow-x-auto ancestors (needed for the card's rounded corners and
+  // for horizontal scrolling on narrow viewports) whenever it opened from
+  // one of the last rows on a page.
+  const [openActionsUserId, setOpenActionsUserId] = useState<number | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const actionsTriggerRef = useRef<HTMLButtonElement>(null);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -73,6 +87,105 @@ export const UserList: React.FC<UserListProps> = ({
 
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Close the open actions menu on an outside click, Escape, or
+  // scroll/resize (the portaled menu's position is computed once at open
+  // time — see the layout effect below — and would otherwise drift out of
+  // place) — mirrors the institution/platform scope-switcher pattern in
+  // pages/Admin.tsx, extended for the portal + viewport-relative
+  // positioning this menu needs that the scope switcher doesn't.
+  useEffect(() => {
+    if (openActionsUserId === null) return undefined;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const insideTrigger = actionsTriggerRef.current?.contains(target);
+      const insideMenu = actionsMenuRef.current?.contains(target);
+      if (!insideTrigger && !insideMenu) {
+        setOpenActionsUserId(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpenActionsUserId(null);
+        actionsTriggerRef.current?.focus();
+      }
+    };
+    const handleScrollOrResize = () => setOpenActionsUserId(null);
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [openActionsUserId]);
+
+  // Position the portaled menu against its trigger, flipping upward when
+  // there isn't room below the viewport and clamping horizontally so it
+  // never renders off-screen. Runs as a layout effect (before paint) so the
+  // menu's real, just-rendered dimensions (not an estimate) are available
+  // and no positioned-at-(0,0) frame is ever visible.
+  useLayoutEffect(() => {
+    if (openActionsUserId === null) {
+      setMenuPosition(null);
+      return;
+    }
+    const trigger = actionsTriggerRef.current;
+    if (!trigger) return;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const menuHeight = actionsMenuRef.current?.offsetHeight || 0;
+    const menuWidth = actionsMenuRef.current?.offsetWidth || 208; // w-52
+    const gap = 4;
+
+    const openUpward = window.innerHeight - triggerRect.bottom < menuHeight + gap
+      && triggerRect.top > menuHeight + gap;
+    const top = openUpward ? triggerRect.top - menuHeight - gap : triggerRect.bottom + gap;
+    const left = Math.min(
+      Math.max(8, triggerRect.right - menuWidth),
+      window.innerWidth - menuWidth - 8,
+    );
+
+    setMenuPosition({ top, left });
+
+    // Move focus into the menu when it opens (WAI-ARIA menu-button
+    // pattern) — keeps keyboard users from having to tab back in.
+    actionsMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, [openActionsUserId]);
+
+  /** Arrow-key/Home/End roving focus within the open menu (Escape is handled globally above). */
+  const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(
+      actionsMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    );
+    if (items.length === 0) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      items[(currentIndex + 1 + items.length) % items.length].focus();
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      items[(currentIndex - 1 + items.length) % items.length].focus();
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      items[0].focus();
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      items[items.length - 1].focus();
+    }
+  };
+
+  /** Closes the menu and returns focus to its trigger — used by every menu-item action. */
+  const closeActionsMenu = () => {
+    setOpenActionsUserId(null);
+    actionsTriggerRef.current?.focus();
+  };
 
   useEffect(() => {
     loadUsers();
@@ -290,52 +403,132 @@ export const UserList: React.FC<UserListProps> = ({
                   </td>
                   {(canEdit || canImpersonateUser(user)) && (
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end gap-2">
-                        {canEdit && (
-                          <>
-                            <button
-                              onClick={() => onEditUser(user.id)}
-                              className="text-blue-600 hover:text-blue-900"
-                            >
-                              {t('admin.userList.btnEdit')}
-                            </button>
-                            <button
-                              onClick={() => onManageRoles(user.id)}
-                              className="text-indigo-600 hover:text-indigo-900"
-                            >
-                              {t('admin.userList.btnRoles')}
-                            </button>
-                            {canManageOrgUnits && (
+                      {/* TF-801: all row actions collapsed behind a single
+                          kebab trigger + dropdown — these are used rarely,
+                          and four-to-five always-visible, differently
+                          colored text links made the table noisy. The
+                          dropdown itself is rendered in a portal (below)
+                          at a fixed, viewport-clamped position — see the
+                          positioning layout effect above — instead of
+                          absolutely inside this cell, so it isn't clipped
+                          by the table's overflow-hidden/overflow-x-auto
+                          ancestors for rows near the bottom of a page. */}
+                      <button
+                        type="button"
+                        ref={openActionsUserId === user.id ? actionsTriggerRef : undefined}
+                        onClick={() => setOpenActionsUserId((prev) => (prev === user.id ? null : user.id))}
+                        aria-haspopup="menu"
+                        aria-expanded={openActionsUserId === user.id}
+                        aria-controls={openActionsUserId === user.id ? `ul-actions-menu-${user.id}` : undefined}
+                        aria-label={t('admin.userList.actionsMenuLabel', { name: `${user.first_name} ${user.last_name}` })}
+                        data-testid={`ul-actions-menu-trigger-${user.id}`}
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 ${
+                          openActionsUserId === user.id ? 'bg-gray-100 text-gray-700' : ''
+                        }`}
+                      >
+                        <MoreVertical className="w-[18px] h-[18px]" aria-hidden="true" />
+                      </button>
+
+                      {openActionsUserId === user.id && createPortal(
+                        <div
+                          id={`ul-actions-menu-${user.id}`}
+                          role="menu"
+                          aria-label={t('admin.userList.actionsMenuLabel', { name: `${user.first_name} ${user.last_name}` })}
+                          ref={actionsMenuRef}
+                          onKeyDown={handleMenuKeyDown}
+                          style={{
+                            position: 'fixed',
+                            top: menuPosition?.top ?? 0,
+                            left: menuPosition?.left ?? 0,
+                            visibility: menuPosition ? 'visible' : 'hidden',
+                          }}
+                          className="z-20 w-52 bg-white border border-gray-200 rounded-lg shadow-lg p-1.5 text-left"
+                        >
+                          {canEdit && (
+                            <>
                               <button
-                                onClick={() => onManageOrgUnits(user.id)}
-                                className="text-teal-600 hover:text-teal-900"
-                                data-testid={`ul-btn-org-units-${user.id}`}
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  closeActionsMenu();
+                                  onEditUser(user.id);
+                                }}
+                                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50"
                               >
-                                {t('admin.userList.btnOrgUnits')}
+                                <Pencil className="w-4 h-4" aria-hidden="true" />
+                                {t('admin.userList.btnEdit')}
                               </button>
-                            )}
-                            <button
-                              onClick={() => handleStatusToggle(user.id, user.status)}
-                              className={user.status === UserStatus.ACTIVE ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}
-                            >
-                              {user.status === UserStatus.ACTIVE ? t('admin.userList.btnDeactivate') : t('admin.userList.btnActivate')}
-                            </button>
-                          </>
-                        )}
-                        {/* TF-743: impersonation is its own permission
-                            (users:impersonate), deliberately not folded into
-                            the coarse canEdit prop — a support role granted
-                            only this permission must still see the button. */}
-                        {canImpersonateUser(user) && (
-                          <button
-                            onClick={() => onImpersonateUser(user.id)}
-                            className="text-orange-600 hover:text-orange-900"
-                            data-testid={`ul-btn-impersonate-${user.id}`}
-                          >
-                            {t('admin.userList.btnImpersonate')}
-                          </button>
-                        )}
-                      </div>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  closeActionsMenu();
+                                  onManageRoles(user.id);
+                                }}
+                                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                <Shield className="w-4 h-4" aria-hidden="true" />
+                                {t('admin.userList.btnRoles')}
+                              </button>
+                              {canManageOrgUnits && (
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() => {
+                                    closeActionsMenu();
+                                    onManageOrgUnits(user.id);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+                                  data-testid={`ul-btn-org-units-${user.id}`}
+                                >
+                                  <Building2 className="w-4 h-4" aria-hidden="true" />
+                                  {t('admin.userList.btnOrgUnits')}
+                                </button>
+                              )}
+                              <div className="h-px bg-gray-100 my-1" />
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  closeActionsMenu();
+                                  handleStatusToggle(user.id, user.status);
+                                }}
+                                className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-sm hover:bg-gray-50 ${
+                                  user.status === UserStatus.ACTIVE ? 'text-red-600' : 'text-green-600'
+                                }`}
+                                data-testid={`ul-btn-toggle-status-${user.id}`}
+                              >
+                                <Power className="w-4 h-4" aria-hidden="true" />
+                                {user.status === UserStatus.ACTIVE ? t('admin.userList.btnDeactivate') : t('admin.userList.btnActivate')}
+                              </button>
+                            </>
+                          )}
+                          {/* TF-743: impersonation is its own permission
+                              (users:impersonate), deliberately not folded
+                              into the coarse canEdit prop — a support role
+                              granted only this permission must still see
+                              the button. */}
+                          {canImpersonateUser(user) && (
+                            <>
+                              {canEdit && <div className="h-px bg-gray-100 my-1" />}
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  closeActionsMenu();
+                                  onImpersonateUser(user.id);
+                                }}
+                                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-sm text-orange-600 hover:bg-orange-50"
+                                data-testid={`ul-btn-impersonate-${user.id}`}
+                              >
+                                <LogIn className="w-4 h-4" aria-hidden="true" />
+                                {t('admin.userList.btnImpersonate')}
+                              </button>
+                            </>
+                          )}
+                        </div>,
+                        document.body,
+                      )}
                     </td>
                   )}
                 </tr>
