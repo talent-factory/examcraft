@@ -9,6 +9,14 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ops-Dashboard: RabbitMQ/Flower-Tool-Links lokal auf localhost statt
+  Fly.io (TF-800, #259):** Deep-Links auf den System-Health-Karten
+  zeigten im lokalen Full-Mode-Dev fälschlich auf die
+  Fly.io-Produktions-URLs statt auf die lokal laufenden Docker-Services
+  (RabbitMQ-Management-UI, Flower).
+
 ## [1.4.0] - 2026-05-02
 
 ### Added
