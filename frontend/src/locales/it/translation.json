@@ -772,6 +772,7 @@
     "admin": {
       "title": "Pannello di amministrazione",
       "subtitle": "Gestisci utenti, impostazioni e configurazione di sistema",
+      "subtitlePlatform": "Impostazioni valide per tutte le istituzioni della piattaforma",
       "tabUsers": "Gestione utenti",
       "tabInstitutions": "Istituzioni",
       "tabRoles": "Ruoli e permessi",
@@ -781,6 +782,28 @@
       "tabOrgUnits": "Unità organizzative",
       "tabSystemHealth": "Stato del sistema",
       "auditPlaceholder": "Log di audit — Prossimamente disponibile",
+      "categories": {
+        "userAccess": "Utenti e accesso",
+        "organization": "Organizzazione",
+        "contentEvaluation": "Contenuti e valutazione",
+        "billingCompliance": "Fatturazione e conformità",
+        "tenants": "Tenant",
+        "security": "Sicurezza",
+        "system": "Sistema",
+        "support": "Supporto"
+      },
+      "scopeSwitcher": {
+        "myInstitutionGroup": "La mia istituzione",
+        "myInstitutionFallback": "La mia istituzione",
+        "superAdminLabel": "Super-admin",
+        "platform": "Piattaforma (tutte le istituzioni)",
+        "ariaLabel": "Cambia ambito di amministrazione"
+      },
+      "platformBanner": {
+        "text": "Modalità piattaforma attiva — le modifiche riguardano tutte le istituzioni",
+        "exit": "Torna a {{institution}}",
+        "exitFallback": "Torna alla tua istituzione"
+      },
       "systemHealth": {
         "title": "Stato del sistema",
         "subtitle": "Stato in tempo reale dei componenti principali di ExamCraft — aggiornamento automatico ogni 10 secondi.",
@@ -3114,10 +3137,14 @@
                 "description": "Qui crei gli account, assegni i ruoli e disattivi gli utenti che hanno lasciato l'istituzione."
               },
               "1": {
+                "title": "Cambia ambito di amministrazione",
+                "description": "Come super-admin, usa questo selettore per passare dalla tua istituzione alla piattaforma (tutte le istituzioni)."
+              },
+              "2": {
                 "title": "Istituzioni",
                 "description": "Le istituzioni raggruppano utenti, documenti e abbonamento. Ogni utente appartiene a esattamente un'istituzione."
               },
-              "2": {
+              "3": {
                 "title": "Ruoli e permessi",
                 "description": "I ruoli determinano quali funzioni vede una persona. I permessi vengono raggruppati qui invece di essere assegnati persona per persona."
               }

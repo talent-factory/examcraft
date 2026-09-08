@@ -772,6 +772,7 @@
     "admin": {
       "title": "Panneau d'administration",
       "subtitle": "Gérez les utilisateurs, les paramètres et la configuration système",
+      "subtitlePlatform": "Paramètres valables pour toutes les institutions de la plateforme",
       "tabUsers": "Gestion des utilisateurs",
       "tabInstitutions": "Institutions",
       "tabRoles": "Rôles et permissions",
@@ -781,6 +782,28 @@
       "tabOrgUnits": "Unités organisationnelles",
       "tabSystemHealth": "État du système",
       "auditPlaceholder": "Journaux d'audit — Bientôt disponible",
+      "categories": {
+        "userAccess": "Utilisateurs et accès",
+        "organization": "Organisation",
+        "contentEvaluation": "Contenu et évaluation",
+        "billingCompliance": "Facturation et conformité",
+        "tenants": "Tenants",
+        "security": "Sécurité",
+        "system": "Système",
+        "support": "Assistance"
+      },
+      "scopeSwitcher": {
+        "myInstitutionGroup": "Mon institution",
+        "myInstitutionFallback": "Mon institution",
+        "superAdminLabel": "Super-admin",
+        "platform": "Plateforme (toutes les institutions)",
+        "ariaLabel": "Changer de périmètre d'administration"
+      },
+      "platformBanner": {
+        "text": "Mode plateforme actif — les modifications concernent toutes les institutions",
+        "exit": "Retour à {{institution}}",
+        "exitFallback": "Retour à votre institution"
+      },
       "systemHealth": {
         "title": "État du système",
         "subtitle": "État en direct des composants principaux d'ExamCraft — actualisation automatique toutes les 10 secondes.",
@@ -3114,10 +3137,14 @@
                 "description": "Tu crées ici les comptes, attribues les rôles et désactives les utilisateurs qui ont quitté l'institution."
               },
               "1": {
+                "title": "Changer de périmètre d'administration",
+                "description": "En tant que super-admin, utilise ce sélecteur pour passer de ton institution à la plateforme (toutes les institutions)."
+              },
+              "2": {
                 "title": "Institutions",
                 "description": "Les institutions regroupent utilisateurs, documents et abonnement. Chaque utilisateur appartient à exactement une institution."
               },
-              "2": {
+              "3": {
                 "title": "Rôles et permissions",
                 "description": "Les rôles déterminent quelles fonctions une personne voit. Les permissions sont regroupées ici plutôt qu'attribuées personne par personne."
               }

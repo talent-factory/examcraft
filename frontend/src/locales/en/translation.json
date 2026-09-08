@@ -772,6 +772,7 @@
     "admin": {
       "title": "Admin Panel",
       "subtitle": "Manage users, settings and system configuration",
+      "subtitlePlatform": "Platform-wide settings for all institutions",
       "tabUsers": "User Management",
       "tabInstitutions": "Institutions",
       "tabRoles": "Roles & Permissions",
@@ -781,6 +782,28 @@
       "tabOrgUnits": "Organizational Units",
       "tabSystemHealth": "System Health",
       "auditPlaceholder": "Audit Logs — Coming soon",
+      "categories": {
+        "userAccess": "Users & Access",
+        "organization": "Organization",
+        "contentEvaluation": "Content & Evaluation",
+        "billingCompliance": "Billing & Compliance",
+        "tenants": "Tenants",
+        "security": "Security",
+        "system": "System",
+        "support": "Support"
+      },
+      "scopeSwitcher": {
+        "myInstitutionGroup": "My Institution",
+        "myInstitutionFallback": "My Institution",
+        "superAdminLabel": "Super Admin",
+        "platform": "Platform (all institutions)",
+        "ariaLabel": "Switch administration scope"
+      },
+      "platformBanner": {
+        "text": "Platform mode active — changes affect all institutions",
+        "exit": "Back to {{institution}}",
+        "exitFallback": "Back to your institution"
+      },
       "systemHealth": {
         "title": "System Health",
         "subtitle": "Live status of ExamCraft's core components — refreshes automatically every 10 seconds.",
@@ -3123,10 +3146,14 @@
                 "description": "Here you create accounts, assign roles, and deactivate departed users."
               },
               "1": {
+                "title": "Switch administration scope",
+                "description": "As a super-admin, use this switch to move between your institution and the platform (all institutions)."
+              },
+              "2": {
                 "title": "Institutions",
                 "description": "Institutions bundle users, documents, and subscription. Every user belongs to exactly one institution."
               },
-              "2": {
+              "3": {
                 "title": "Roles & Permissions",
                 "description": "Roles determine which features someone sees. Permissions are bundled here rather than granted per person."
               }

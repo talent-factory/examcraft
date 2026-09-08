@@ -772,6 +772,7 @@
     "admin": {
       "title": "Admin-Panel",
       "subtitle": "Verwalte Benutzer, Einstellungen und Systemkonfiguration",
+      "subtitlePlatform": "Plattformweite Einstellungen für alle Institutionen",
       "tabUsers": "Benutzer-Verwaltung",
       "tabInstitutions": "Institutionen",
       "tabRoles": "Rollen & Berechtigungen",
@@ -781,6 +782,28 @@
       "tabOrgUnits": "Organisationseinheiten",
       "tabSystemHealth": "System Health",
       "auditPlaceholder": "Audit Logs — Demnächst verfügbar",
+      "categories": {
+        "userAccess": "Benutzer & Zugriff",
+        "organization": "Organisation",
+        "contentEvaluation": "Inhalte & Bewertung",
+        "billingCompliance": "Abrechnung & Compliance",
+        "tenants": "Mandanten",
+        "security": "Sicherheit",
+        "system": "System",
+        "support": "Support"
+      },
+      "scopeSwitcher": {
+        "myInstitutionGroup": "Meine Institution",
+        "myInstitutionFallback": "Meine Institution",
+        "superAdminLabel": "Super-Admin",
+        "platform": "Plattform (alle Institutionen)",
+        "ariaLabel": "Verwaltungsbereich wechseln"
+      },
+      "platformBanner": {
+        "text": "Plattform-Modus aktiv — Änderungen betreffen alle Institutionen",
+        "exit": "Zurück zu {{institution}}",
+        "exitFallback": "Zurück zur eigenen Institution"
+      },
       "systemHealth": {
         "title": "System Health",
         "subtitle": "Live-Status der ExamCraft-Kernkomponenten — aktualisiert automatisch alle 10 Sekunden.",
@@ -3123,10 +3146,14 @@
                 "description": "Hier legst du Konten an, weist Rollen zu und deaktivierst ausgeschiedene Nutzer."
               },
               "1": {
+                "title": "Verwaltungsbereich wechseln",
+                "description": "Als Super-Admin wechselst du hier zwischen deiner Institution und der Plattform (alle Institutionen)."
+              },
+              "2": {
                 "title": "Institutionen",
                 "description": "Institutionen bündeln Nutzer, Dokumente und Abonnement. Jeder Nutzer gehört genau einer Institution an."
               },
-              "2": {
+              "3": {
                 "title": "Rollen & Berechtigungen",
                 "description": "Rollen bestimmen, welche Funktionen jemand sieht. Berechtigungen werden hier gebündelt statt pro Person vergeben."
               }

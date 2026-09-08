@@ -305,18 +305,26 @@
           {
             "step": 1,
             "route": "/admin",
-            "highlight_selector": "[data-testid='admin-tab-content-institutions']",
+            "highlight_selector": "[data-testid='admin-scope-switcher-menu']",
             "nav_selector": null,
-            "tab_selector": "[data-testid='admin-tab-btn-institutions']",
+            "tab_selector": "[data-testid='admin-scope-switcher-toggle']",
             "i18n_key": "help.tour.admin.tracks.admin-benutzer.steps.1"
           },
           {
             "step": 2,
             "route": "/admin",
+            "highlight_selector": "[data-testid='admin-tab-content-institutions']",
+            "nav_selector": null,
+            "tab_selector": "[data-testid='admin-scope-option-platform']",
+            "i18n_key": "help.tour.admin.tracks.admin-benutzer.steps.2"
+          },
+          {
+            "step": 3,
+            "route": "/admin",
             "highlight_selector": "[data-testid='admin-tab-content-roles']",
             "nav_selector": null,
             "tab_selector": "[data-testid='admin-tab-btn-roles']",
-            "i18n_key": "help.tour.admin.tracks.admin-benutzer.steps.2"
+            "i18n_key": "help.tour.admin.tracks.admin-benutzer.steps.3"
           }
         ],
         "i18n_key": "help.tour.admin.tracks.admin-benutzer"
