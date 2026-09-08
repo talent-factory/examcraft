@@ -103,6 +103,29 @@ describe('OpsChatWidget', () => {
     expect(textbox).not.toBeDisabled();
   });
 
+  it('renders the assistant reply as Markdown while the user turn stays plain text', async () => {
+    jest
+      .spyOn(opsChatService, 'sendOpsChatMessage')
+      .mockResolvedValue('### Status\n\n| App | Status |\n|---|---|\n| celery | **suspended** |');
+
+    render(<OpsChatWidget />);
+    typeAndSend('**Wie viele Celery-Worker laufen?**');
+
+    // The user turn is intentionally NOT Markdown-rendered — it must show up
+    // as plain text, asterisks included.
+    expect(await screen.findByText('**Wie viele Celery-Worker laufen?**')).toBeInTheDocument();
+
+    // Exactly one message (the assistant reply) is routed through
+    // MarkdownRenderer/react-markdown; the mock renders children verbatim
+    // under this testid, proving the raw Markdown reached the renderer
+    // instead of being dumped into a plain <Typography>.
+    const markdownNodes = await screen.findAllByTestId('react-markdown');
+    expect(markdownNodes).toHaveLength(1);
+    expect(markdownNodes[0]).toHaveTextContent(
+      '### Status | App | Status | |---|---| | celery | **suspended** |'
+    );
+  });
+
   it('sends on Enter and inserts a newline instead of sending on Shift+Enter', async () => {
     const sendSpy = jest
       .spyOn(opsChatService, 'sendOpsChatMessage')

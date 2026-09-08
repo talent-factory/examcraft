@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { sendOpsChatMessage } from '../../services/opsChatService';
 import { OpsChatTurn } from '../../types/opsChat';
+import MarkdownRenderer from '../MarkdownRenderer';
 
 /**
  * Read-only Ops-Chat widget (TF-787), rendered inside the `system-health`
@@ -76,21 +77,25 @@ const OpsChatWidget: React.FC = () => {
             data-testid={`ops-chat-message-${msg.role}`}
             sx={{ mb: 1, textAlign: msg.role === 'user' ? 'right' : 'left' }}
           >
-            <Typography
-              variant="body2"
-              component="span"
+            <Box
               sx={{
                 display: 'inline-block',
+                textAlign: 'left',
                 bgcolor: msg.role === 'user' ? 'primary.main' : 'grey.200',
                 color: msg.role === 'user' ? 'primary.contrastText' : 'text.primary',
                 borderRadius: 1,
                 px: 1.5,
                 py: 0.75,
-                whiteSpace: 'pre-wrap',
               }}
             >
-              {msg.content}
-            </Typography>
+              {msg.role === 'user' ? (
+                <Typography variant="body2" component="span" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {msg.content}
+                </Typography>
+              ) : (
+                <MarkdownRenderer content={msg.content} variant="compact" />
+              )}
+            </Box>
           </Box>
         ))}
         <div ref={bottomRef} />
