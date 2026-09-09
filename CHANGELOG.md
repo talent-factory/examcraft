@@ -9,6 +9,37 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-09-09
+
+### Added
+
+- **Admin-Panel: kategorisierte Navigation + Institution/Plattform-Scope-
+  Switcher (TF-799, #257):** Die elf Tabs des Admin-Panels waren für
+  Super-Admins in einer einzelnen horizontalen Reihe nicht mehr
+  überblickbar. Neu: kategorisierte Unternavigation in einer linken
+  Sidebar sowie ein expliziter Institution/Plattform-Scope-Switcher für
+  Super-Admins.
+- **Admin-Panel Benutzerverwaltung: Aktionen-Spalte zu Kebab-Menü
+  zusammengefasst (TF-801, #261):** Die bis zu fünf gleichzeitig
+  sichtbaren Text-Links pro Zeile (Bearbeiten, Rollen, Org-Units,
+  Deaktivieren/Aktivieren, Impersonieren) sind jetzt in einem einzigen
+  Kebab-Menü (⋮) zusammengefasst.
+
+### Changed
+
+- **Fehlerpfad-Vereinheitlichung Backend + Frontend (TF-772/TF-773,
+  #249/#251/#253/#254/#255):** Backend und Frontend sprechen jetzt
+  dieselbe Fehler-Sprache. Das Backend liefert zu vielen Fehlern
+  zusätzlich einen maschinenlesbaren `error_code` (additiv, `detail`
+  bleibt wie bisher). Das Frontend übersetzt einen erkannten Code über
+  eine typisierte Registry in eine Schweizer-Hochdeutsch-Meldung —
+  bislang liess sich roher englischer Fehlertext (z. B. bei einem
+  Netzwerkfehler oder einer nicht abgefangenen Backend-Exception) nicht
+  zuverlässig von echten, bereits übersetzten Meldungen unterscheiden.
+  Betroffen: Authentifizierung, Admin-Verwaltung, RBAC, Dokumente,
+  Fragen-Review, Bewertungen, Organisationseinheiten sowie (Premium)
+  Prompts, Chat und der Prompt-Wizard.
+
 ### Fixed
 
 - **Ops-Dashboard: RabbitMQ/Flower-Tool-Links lokal auf localhost statt
@@ -16,6 +47,23 @@ and this project adheres to
   zeigten im lokalen Full-Mode-Dev fälschlich auf die
   Fly.io-Produktions-URLs statt auf die lokal laufenden Docker-Services
   (RabbitMQ-Management-UI, Flower).
+- **Ops-Dashboard: Sentry-Deep-Link auf System-Health-Karte führte zu
+  404 (TF-798, #256):** Die Backend-/Frontend-Sentry-Links wiederholten
+  die Org-Slug im Pfad; Sentrys Web-UI erwartet sie dort nicht.
+- **Ops-Dashboard KI-Chat: Markdown-Antworten wurden als Rohtext
+  angezeigt (TF-794, #252):** Assistant-Nachrichten werden jetzt über
+  den bestehenden `MarkdownRenderer` gerendert statt als Plain-Text.
+- **RabbitMQ-Crash-Loop bei Celery-Reply-Queues: `rabbitmq.conf` war
+  committet, aber nie gemountet (TF-796):** Die Konfigurationszeile
+  `deprecated_features.permit.transient_nonexcl_queues=true` lag im
+  Repo, war aber nie als `[[files]]`-Mount in `fly.rabbitmq.toml`
+  verdrahtet.
+- **Compliance-Subprozessoren-Liste: Resend fälschlich noch als aktiv
+  gelistet (TF-763, #258):** Seit dem SubscribeFlow/Brevo-Rollout
+  (TF-764, TF-776/TF-779) laufen alle Transaktions-E-Mails über
+  SubscribeFlow/Brevo; der Resend-Eintrag in den
+  Subprozessoren-Listen (Backend + alle vier Frontend-Locales) war
+  seither veraltet.
 
 ## [1.4.0] - 2026-05-02
 
