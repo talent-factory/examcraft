@@ -91,6 +91,19 @@ describe('appErrorFromResponse', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('fällt still auf den Fallback-Code zurück, wenn error_code explizit null ist', async () => {
+    const err = await appErrorFromResponse(
+      response({ detail: 'Internal Server Error', error_code: null }, 500),
+      'documents_upload_failed',
+    );
+
+    // `error_code: null` is the same "backend sent none" case as an absent
+    // key, not an unrecognised code — it must not trigger the mismatch
+    // warning (`!= null`, not `!== undefined`, in appErrorFromResponse).
+    expect(err.code).toBe('documents_upload_failed');
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('verwirft einen unbekannten error_code und warnt', async () => {
     const err = await appErrorFromResponse(
       response({ error_code: 'documents_teleported_away' }, 500),

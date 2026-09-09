@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService from '../../services/AdminService';
+import { translateError } from '../../errors';
 import { GradingSchemesService } from '../../services/gradingSchemesService';
 import { Institution } from '../../types/auth';
 import { GradingSchemeOut } from '../../types/gradingScheme';
@@ -90,7 +91,7 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
         setError(t('admin.institutionEdit.notFound'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.institutionEdit.failedLoad'));
+      setError(translateError(err, t, 'admin.institutionEdit.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -113,7 +114,7 @@ export const InstitutionEditDialog: React.FC<InstitutionEditDialogProps> = ({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.institutionEdit.failedUpdate'));
+      setError(translateError(err, t, 'admin.institutionEdit.failedUpdate'));
     } finally {
       setSaving(false);
     }

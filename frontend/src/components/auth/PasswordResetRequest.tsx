@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import AuthService from '../../services/AuthService';
+import { translateError } from '../../errors';
 
 interface PasswordResetRequestProps {
   onSuccess?: () => void;
@@ -45,7 +46,7 @@ export const PasswordResetRequest: React.FC<PasswordResetRequestProps> = ({
         onSuccess?.();
       }, 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send reset email');
+      setError(translateError(err, t, 'errors.auth_password_reset_request_failed'));
     } finally {
       setIsLoading(false);
     }

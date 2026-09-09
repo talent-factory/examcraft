@@ -1,5 +1,8 @@
+import { ADMIN_ERROR_CODES } from './codes/admin';
+import { AUTH_ERROR_CODES } from './codes/auth';
 import { DOCUMENT_ERROR_CODES } from './codes/documents';
 import { LEGACY_ERROR_CODES } from './codes/legacy';
+import { RBAC_ERROR_CODES } from './codes/rbac';
 import { RESERVED_ERROR_CODES } from './codes/reserved';
 import { REVIEW_ERROR_CODES } from './codes/review';
 
@@ -30,7 +33,10 @@ import { REVIEW_ERROR_CODES } from './codes/review';
 export const APP_ERROR_CODES = [
   ...LEGACY_ERROR_CODES,
   ...RESERVED_ERROR_CODES,
+  ...ADMIN_ERROR_CODES,
+  ...AUTH_ERROR_CODES,
   ...DOCUMENT_ERROR_CODES,
+  ...RBAC_ERROR_CODES,
   ...REVIEW_ERROR_CODES,
 ] as const;
 

@@ -17,6 +17,8 @@ import AuthService from '../services/AuthService';
 import AdminService from '../services/AdminService';
 import { resolveLanguageOnProfileLoad } from '../utils/languagePreference';
 import i18n from '../i18n';
+import { AppError, translateError } from '../errors';
+import type { ErrorParams } from '../errors';
 import { SubscriptionTier, hasFeature as tierHasFeature, isFeatureName } from '../config/features';
 import {
   setTokenRefreshCallback,
@@ -42,6 +44,22 @@ import {
 // ============================================================================
 // Context Creation
 // ============================================================================
+
+/**
+ * `translateError` needs a `t`; a context provider has no `useTranslation()`
+ * to call. The i18n singleton this file already imports for `changeLanguage`
+ * supplies one. Wrapped rather than passed as `i18n.t`, so the call keeps its
+ * receiver and so the overloaded i18next signature narrows to the plain
+ * `(key, params) => string` that `Translate` asks for.
+ *
+ * The consequence is that `state.error` holds a sentence frozen in the
+ * language that was active when the call failed, where a component would
+ * re-translate on every render. That is acceptable here and not a regression:
+ * the field has always held a plain string, and all four consumers
+ * (LoginForm, RegisterForm, ProfileEdit, PasswordChange) clear it via
+ * `clearError()` on the next input.
+ */
+const translate = (key: string, params?: ErrorParams): string => i18n.t(key, params);
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -451,7 +469,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       scheduleTokenRefresh(tokens.access_token);
     } catch (error) {
       console.error('[AuthContext] Login error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      const errorMessage = translateError(error, translate, 'errors.auth_login_failed');
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -494,7 +512,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       scheduleTokenRefresh(accessToken);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Token login failed';
+      const errorMessage = translateError(error, translate, 'errors.auth_login_failed');
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -538,7 +556,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       scheduleTokenRefresh(tokens.access_token);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Registration failed';
+      const errorMessage = translateError(error, translate, 'errors.auth_registration_failed');
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -765,10 +783,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // "active admin session" guard below: while impersonating,
       // state.refreshToken is legitimately null by design, which would
       // otherwise be misreported as "no active admin session".
-      throw new Error('Already impersonating another user; end the current impersonation first');
+      throw new AppError('impersonation_already_active');
     }
     if (!state.accessToken || !state.refreshToken || !state.user) {
-      throw new Error('Cannot start impersonation without an active admin session');
+      throw new AppError('impersonation_no_admin_session');
     }
 
     // TF-743 fix: verify the recovery snapshot actually persisted before
@@ -783,9 +801,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       { accessToken: state.accessToken, refreshToken: state.refreshToken, user: state.user },
     );
     if (!snapshotSaved) {
-      throw new Error(
-        'Impersonation session snapshot could not be saved; browser storage may be full or restricted',
-      );
+      throw new AppError('impersonation_snapshot_failed');
     }
 
     // Stop the admin's own proactive timer before it can fire a refresh
@@ -1008,7 +1024,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = useCallback(async (data: UpdateProfileRequest) => {
     try {
       if (!state.accessToken) {
-        throw new Error('Not authenticated');
+        throw new AppError('auth_token_invalid');
       }
 
       setState(prev => ({ ...prev, isLoading: true, error: null }));
@@ -1023,7 +1039,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: false,
       }));
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Profile update failed';
+      const errorMessage = translateError(error, translate, 'errors.auth_profile_update_failed');
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -1039,7 +1055,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setPassword = useCallback(async (password: string) => {
     try {
       if (!state.accessToken) {
-        throw new Error('Not authenticated');
+        throw new AppError('auth_token_invalid');
       }
 
       setState(prev => ({ ...prev, isLoading: true, error: null }));
@@ -1051,7 +1067,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: false,
       }));
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to set password';
+      const errorMessage = translateError(error, translate, 'errors.auth_password_set_failed');
       setState(prev => ({
         ...prev,
         isLoading: false,
@@ -1067,7 +1083,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const changePassword = useCallback(async (data: ChangePasswordRequest) => {
     try {
       if (!state.accessToken) {
-        throw new Error('Not authenticated');
+        throw new AppError('auth_token_invalid');
       }
 
       setState(prev => ({ ...prev, isLoading: true, error: null }));
@@ -1079,7 +1095,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: false,
       }));
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Password change failed';
+      const errorMessage = translateError(error, translate, 'errors.auth_password_change_failed');
       setState(prev => ({
         ...prev,
         isLoading: false,

@@ -20,6 +20,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { RoleAssignmentDialog } from '../RoleAssignmentDialog';
 import AdminService from '../../../services/AdminService';
+import { AppError } from '../../../errors';
 
 jest.mock('../../../services/AdminService', () => ({
   __esModule: true,
@@ -31,9 +32,22 @@ jest.mock('../../../services/AdminService', () => ({
   },
 }));
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
+jest.mock('react-i18next', () => {
+  // `t(key) === key` is how translateError detects a missing translation, so a
+  // mock that echoes every key sends every AppError down the fallback branch
+  // and makes the assertions below vacuous. Resolve the real errors.* block;
+  // everything else keeps echoing, which is what the existing assertions on
+  // `admin.*` keys expect.
+  const de = require('../../../locales/de/translation.json');
+  return {
+    useTranslation: () => ({
+      t: (key: string) =>
+        key.startsWith('errors.')
+          ? (de.errors[key.slice('errors.'.length)] ?? key)
+          : key,
+    }),
+  };
+});
 
 const mockUser = {
   id: 42,
@@ -109,8 +123,11 @@ describe('RoleAssignmentDialog', () => {
 
   it('TF-621: on a roles-catalog fetch failure, shows only the error banner — not the contradictory empty-state text', async () => {
     (AdminService.getUser as jest.Mock).mockResolvedValue(mockUser);
+    // The pre-fix 403 from GET /api/admin/roles, as it arrives since TF-772:
+    // `admin_insufficient_permissions` is the code admin.py answers with, and
+    // it resolves to the same sentence this test always asserted.
     (AdminService.listRoles as jest.Mock).mockRejectedValue(
-      new Error('Unzureichende Berechtigungen für diese Aktion'),
+      new AppError('admin_insufficient_permissions', 'Insufficient permissions', 403),
     );
 
     render(
@@ -136,7 +153,9 @@ describe('RoleAssignmentDialog', () => {
   });
 
   it('TF-621: getUser failing alongside listRoles also suppresses the empty-state text', async () => {
-    (AdminService.getUser as jest.Mock).mockRejectedValue(new Error('boom'));
+    (AdminService.getUser as jest.Mock).mockRejectedValue(
+      new AppError('admin_user_not_found', 'User not found', 404),
+    );
     (AdminService.listRoles as jest.Mock).mockResolvedValue(mockRoles);
 
     render(
@@ -149,7 +168,7 @@ describe('RoleAssignmentDialog', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('boom')).toBeInTheDocument();
+      expect(screen.getByText('Benutzer nicht gefunden')).toBeInTheDocument();
     });
     expect(screen.queryByText('admin.roleAssignment.allRolesAssigned')).toBeNull();
   });
@@ -158,7 +177,7 @@ describe('RoleAssignmentDialog', () => {
     (AdminService.getUser as jest.Mock).mockResolvedValue(mockUser);
     (AdminService.listRoles as jest.Mock).mockResolvedValue(mockRoles);
     (AdminService.assignRole as jest.Mock).mockRejectedValue(
-      new Error('Rolle bereits zugewiesen'),
+      new AppError('admin_user_already_has_role', 'User already has this role', 409),
     );
 
     render(
@@ -173,7 +192,7 @@ describe('RoleAssignmentDialog', () => {
     const assignButton = await screen.findByText('admin.roleAssignment.btnAssign');
     fireEvent.click(assignButton);
 
-    expect(await screen.findByText('Rolle bereits zugewiesen')).toBeInTheDocument();
+    expect(await screen.findByText('Benutzer hat diese Rolle bereits')).toBeInTheDocument();
 
     // Unlike an initial-load failure, an action failure must NOT hide the
     // already-loaded role lists — the admin still needs to see current
@@ -189,7 +208,7 @@ describe('RoleAssignmentDialog', () => {
     (AdminService.getUser as jest.Mock).mockResolvedValue(twoRoleUser);
     (AdminService.listRoles as jest.Mock).mockResolvedValue(mockRoles);
     (AdminService.removeRole as jest.Mock).mockRejectedValue(
-      new Error('Entfernen fehlgeschlagen'),
+      new AppError('admin_cannot_remove_last_role', 'Cannot remove the last role', 409),
     );
 
     render(
@@ -204,7 +223,9 @@ describe('RoleAssignmentDialog', () => {
     const removeButtons = await screen.findAllByText('admin.roleAssignment.btnRemove');
     fireEvent.click(removeButtons[0]);
 
-    expect(await screen.findByText('Entfernen fehlgeschlagen')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Letzte Rolle kann nicht entfernt werden'),
+    ).toBeInTheDocument();
 
     expect(screen.getByText('admin.roleAssignment.currentRoles')).toBeInTheDocument();
     expect(screen.getByText('admin.roleAssignment.availableRoles')).toBeInTheDocument();

@@ -63,7 +63,19 @@ export function translateError(err: unknown, t: Translate, fallbackKey: string):
       console.debug('[i18n] AppError surfaced:', err.code, '- raw:', raw);
       return translated;
     }
-    console.warn('[i18n] AppError without translation key:', key, '- raw:', raw);
+    // The UI only ever gets the generic fallback sentence here — no code, no
+    // detail, nothing language-specific to show. `status` is the one piece of
+    // the original response still worth a breadcrumb: a bodyless 502 and a
+    // bodyless 500 both land on this line, and without the status logged
+    // there is no way to tell them apart after the fact.
+    console.warn(
+      '[i18n] AppError without translation key:',
+      key,
+      '- raw:',
+      raw,
+      '- status:',
+      err.status,
+    );
     return t(fallbackKey);
   }
 

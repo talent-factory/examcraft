@@ -89,16 +89,17 @@
  * DELIBERATE GAP 3 — `literal-error` is restricted to `services/` and `api/`.
  * Throws elsewhere are overwhelmingly developer errors that stay English by the
  * TF-295 boundary (`useAuth must be used within an AuthProvider`,
- * `Not authenticated`). Scanning components would park ~15 of those in the
- * allowlist permanently and destroy the number TF-772 measures progress by.
- * The cost is one user-facing literal the scan cannot see:
- * `ResendVerificationButton.tsx` (`Failed to resend verification email`). It
- * is real TF-772 work; it is just tracked by the ticket rather than by this
- * guard. (This PR's own `DocumentUpload.tsx`/`DocumentLibrary.tsx` changes
- * removed the two other literals that used to be listed here — `Upload
- * cancelled` became the `UploadCancelled` sentinel, and the
+ * `Not authenticated`, `Upload cancelled`). Scanning components would park ~15
+ * of those in the allowlist permanently and destroy the number TF-772 measures
+ * progress by. As of TF-772 PR 3 the gap costs nothing currently outstanding:
+ * `DocumentUpload.tsx`/`DocumentLibrary.tsx` already had their two literals
+ * removed (`Upload cancelled` became the `UploadCancelled` sentinel, and the
  * `Document processing failed…`/`…timeout after…` strings went with the
- * deleted dead `waitForDocumentProcessing` function.)
+ * deleted dead `waitForDocumentProcessing` function), and this PR migrates
+ * the third — `ResendVerificationButton.tsx`'s `Failed to resend verification
+ * email`. The gap itself is not closed, though: it is structural (the scan
+ * still cannot see a component-level throw), so a future PR reintroducing a
+ * raw literal there would again go undetected by this guard.
  */
 import {
   PERMANENT_EXCEPTIONS,

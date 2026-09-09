@@ -13,6 +13,7 @@ import AdminService, {
   TransferUserRequest,
   UserDetailResponse,
 } from '../../services/AdminService';
+import { translateError } from '../../errors';
 import { Institution } from '../../types/auth';
 
 interface InstitutionTransferDialogProps {
@@ -87,7 +88,7 @@ export const InstitutionTransferDialog: React.FC<InstitutionTransferDialogProps>
         setPreview(p);
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : t('admin.institutionTransfer.previewError'));
+        setError(translateError(err, t, 'admin.institutionTransfer.previewError'));
         setPreview(null);
       } finally {
         if (!cancelled) setPreviewLoading(false);
@@ -121,7 +122,7 @@ export const InstitutionTransferDialog: React.FC<InstitutionTransferDialogProps>
       );
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.institutionTransfer.transferError'));
+      setError(translateError(err, t, 'admin.institutionTransfer.transferError'));
     } finally {
       setSubmitting(false);
     }

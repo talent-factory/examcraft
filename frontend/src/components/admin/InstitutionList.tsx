@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService from '../../services/AdminService';
+import { translateError } from '../../errors';
 import { Institution } from '../../types/auth';
 
 interface InstitutionListProps {
@@ -35,7 +36,7 @@ export const InstitutionList: React.FC<InstitutionListProps> = ({
       const data = await AdminService.listInstitutions();
       setInstitutions(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.institutionList.failedLoad'));
+      setError(translateError(err, t, 'admin.institutionList.failedLoad'));
     } finally {
       setLoading(false);
     }

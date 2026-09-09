@@ -1,5 +1,8 @@
 /**
  * InstitutionTransferDialog tests (TF-352 Task 17).
+ *
+ * TF-772 PR 3: `previewTransfer`/`transferUser` migrated to
+ * `translateError`. The tests below pin that behaviour.
  */
 
 import React from 'react';
@@ -7,6 +10,7 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import '@testing-library/jest-dom';
 import { InstitutionTransferDialog } from '../InstitutionTransferDialog';
 import AdminService from '../../../services/AdminService';
+import { AppError } from '../../../errors';
 
 jest.mock('../../../services/AdminService', () => ({
   __esModule: true,
@@ -18,9 +22,22 @@ jest.mock('../../../services/AdminService', () => ({
   },
 }));
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
+jest.mock('react-i18next', () => {
+  // `t(key) === key` is how translateError detects a missing translation, so a
+  // mock that echoes every key sends every AppError down the fallback branch
+  // and makes an error-path assertion silently vacuous. Resolve the real
+  // errors.* block; everything else keeps echoing, which is what the
+  // existing assertions on `admin.*` keys expect.
+  const de = require('../../../locales/de/translation.json');
+  return {
+    useTranslation: () => ({
+      t: (key: string) =>
+        key.startsWith('errors.')
+          ? (de.errors[key.slice('errors.'.length)] ?? key)
+          : key,
+    }),
+  };
+});
 
 const mockUser = {
   id: 7,
@@ -257,5 +274,61 @@ describe('InstitutionTransferDialog', () => {
     await waitFor(() => {
       expect(AdminService.previewTransfer).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('shows the translated message when previewTransfer rejects with a specific code', async () => {
+    (AdminService.previewTransfer as jest.Mock).mockRejectedValue(
+      new AppError('admin_transfer_same_institution', 'User is already in this institution', 409),
+    );
+    render(
+      <InstitutionTransferDialog
+        user={mockUser as any}
+        institutions={mockInstitutions as any}
+        isOpen={true}
+        onClose={jest.fn()}
+        onSuccess={jest.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '2' } });
+
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+    });
+
+    expect(
+      await screen.findByText('Benutzer ist bereits in dieser Institution'),
+    ).toBeInTheDocument();
+    // The dropdown and its selection stay usable so the admin can retry.
+    expect(screen.getByRole('combobox')).toBeEnabled();
+  });
+
+  it('shows the fallback banner when transferUser rejects without a specific code', async () => {
+    (AdminService.previewTransfer as jest.Mock).mockResolvedValue(mockPreview);
+    (AdminService.transferUser as jest.Mock).mockRejectedValue(new Error('network blip'));
+    render(
+      <InstitutionTransferDialog
+        user={mockUser as any}
+        institutions={mockInstitutions as any}
+        isOpen={true}
+        onClose={jest.fn()}
+        onSuccess={jest.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '2' } });
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+    });
+    await screen.findByText('admin.institutionTransfer.documents');
+    fireEvent.click(
+      screen.getByRole('button', { name: /admin\.institutionTransfer\.next/ }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: /admin\.institutionTransfer\.execute/ }),
+    );
+
+    expect(
+      await screen.findByText('admin.institutionTransfer.transferError'),
+    ).toBeInTheDocument();
   });
 });

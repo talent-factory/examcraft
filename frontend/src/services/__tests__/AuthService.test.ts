@@ -57,19 +57,22 @@ describe('AuthService', () => {
       expect(result.refresh_token).toBe('mock-refresh-token');
     });
 
-    it('throws error with detail message on 400 response', async () => {
+    it('trägt den Backend-Code einer 400-Antwort', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
         statusText: 'Bad Request',
-        json: async () => ({ detail: 'Invalid or expired OAuth code' }),
+        json: async () => ({
+          detail: 'Ungültiger OAuth-Code',
+          error_code: 'auth_oauth_code_invalid',
+        }),
       } as Response);
 
       await expect(authService.exchangeOAuthCode('expired-code'))
-        .rejects.toThrow('Invalid or expired OAuth code');
+        .rejects.toMatchObject({ code: 'auth_oauth_code_invalid', status: 400 });
     });
 
-    it('throws error on 503 service unavailable', async () => {
+    it('fällt bei 503 ohne error_code auf den Endpunkt-Code zurück', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 503,
@@ -78,10 +81,10 @@ describe('AuthService', () => {
       } as Response);
 
       await expect(authService.exchangeOAuthCode('some-code'))
-        .rejects.toThrow('OAuth service unavailable');
+        .rejects.toMatchObject({ code: 'auth_oauth_exchange_failed', status: 503 });
     });
 
-    it('throws default error message when detail is missing', async () => {
+    it('nutzt den Endpunkt-Code, wenn der Body leer ist', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -90,10 +93,12 @@ describe('AuthService', () => {
       } as Response);
 
       await expect(authService.exchangeOAuthCode('some-code'))
-        .rejects.toThrow('OAuth code exchange failed');
+        .rejects.toMatchObject({ code: 'auth_oauth_exchange_failed' });
     });
 
-    it('handles network errors', async () => {
+    it('reicht einen Netzwerkfehler unverändert durch (kein AppError)', async () => {
+      // No response, so nothing to read an error_code from. The value stays a
+      // plain Error; translateError maps it to the consumer's fallback key.
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       await expect(authService.exchangeOAuthCode('some-code'))
@@ -159,19 +164,22 @@ describe('AuthService', () => {
       expect(result.first_name).toBe('Updated');
     });
 
-    it('throws error on failure', async () => {
+    it('trägt den Backend-Code einer 401-Antwort', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
         statusText: 'Unauthorized',
-        json: async () => ({ detail: 'Not authenticated' }),
+        json: async () => ({
+          detail: 'Ungültiger oder abgelaufener Token',
+          error_code: 'auth_token_invalid',
+        }),
       } as Response);
 
       await expect(authService.updateProfile('invalid-token', { first_name: 'Test' }))
-        .rejects.toThrow('Not authenticated');
+        .rejects.toMatchObject({ code: 'auth_token_invalid', status: 401 });
     });
 
-    it('throws default error message when detail is missing', async () => {
+    it('nutzt den Endpunkt-Code, wenn der Body leer ist', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -180,7 +188,7 @@ describe('AuthService', () => {
       } as Response);
 
       await expect(authService.updateProfile('test-token', { first_name: 'Test' }))
-        .rejects.toThrow('Failed to update profile');
+        .rejects.toMatchObject({ code: 'auth_profile_update_failed' });
     });
   });
 });

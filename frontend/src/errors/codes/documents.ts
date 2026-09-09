@@ -58,7 +58,7 @@
  * `documents_rename_invalid_chars` and `documents_rename_too_long` exist in the
  * backend locale files but are raised nowhere in the backend — dead keys, and
  * registering them here would put three permanently-unreachable codes under the
- * i18n test. Reported to TF-772 rather than fixed here (backend scope).
+ * i18n test. Reported to TF-775 rather than fixed here (backend scope).
  */
 export const DOCUMENT_ERROR_CODES = [
   'documents_access_denied',

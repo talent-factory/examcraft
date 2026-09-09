@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import AuthService from '../../services/AuthService';
+import { translateError } from '../../errors';
 
 export const PasswordResetConfirm: React.FC = () => {
   const { t } = useTranslation();
@@ -37,6 +38,21 @@ export const PasswordResetConfirm: React.FC = () => {
       return false;
     }
 
+    if (!/[A-Z]/.test(newPassword)) {
+      setError(t('auth.validation.passwordUppercase'));
+      return false;
+    }
+
+    if (!/[a-z]/.test(newPassword)) {
+      setError(t('auth.validation.passwordLowercase'));
+      return false;
+    }
+
+    if (!/\d/.test(newPassword)) {
+      setError(t('auth.validation.passwordNumber'));
+      return false;
+    }
+
     return true;
   };
 
@@ -56,7 +72,7 @@ export const PasswordResetConfirm: React.FC = () => {
         navigate('/login');
       }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password');
+      setError(translateError(err, t, 'errors.auth_password_reset_failed'));
     } finally {
       setIsLoading(false);
     }

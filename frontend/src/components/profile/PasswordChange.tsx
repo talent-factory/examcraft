@@ -63,6 +63,21 @@ export const PasswordChange: React.FC<PasswordChangeProps> = ({ onCancel, onSucc
       return false;
     }
 
+    if (!/[A-Z]/.test(formData.new_password)) {
+      setLocalError(t('profile.passwordChange.validationUppercase'));
+      return false;
+    }
+
+    if (!/[a-z]/.test(formData.new_password)) {
+      setLocalError(t('profile.passwordChange.validationLowercase'));
+      return false;
+    }
+
+    if (!/\d/.test(formData.new_password)) {
+      setLocalError(t('profile.passwordChange.validationNumber'));
+      return false;
+    }
+
     if (!isOAuthOnly && formData.current_password === formData.new_password) {
       setLocalError(t('profile.passwordChange.validationSamePassword'));
       return false;

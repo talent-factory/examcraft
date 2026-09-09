@@ -12,6 +12,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { InstitutionEditDialog } from '../InstitutionEditDialog';
 import AdminService from '../../../services/AdminService';
+import { AppError } from '../../../errors';
 import { GradingSchemesService } from '../../../services/gradingSchemesService';
 
 jest.mock('../../../services/AdminService', () => ({
@@ -26,9 +27,22 @@ jest.mock('../../../services/gradingSchemesService', () => ({
   GradingSchemesService: { list: jest.fn() },
 }));
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
+jest.mock('react-i18next', () => {
+  // `t(key) === key` is how translateError detects a missing translation, so a
+  // mock that echoes every key sends every AppError down the fallback branch
+  // and makes the assertions below vacuous. Resolve the real errors.* block;
+  // everything else keeps echoing, which is what the existing assertions on
+  // `admin.*` keys expect.
+  const de = require('../../../locales/de/translation.json');
+  return {
+    useTranslation: () => ({
+      t: (key: string) =>
+        key.startsWith('errors.')
+          ? (de.errors[key.slice('errors.'.length)] ?? key)
+          : key,
+    }),
+  };
+});
 
 const institution = {
   id: 4,
@@ -175,11 +189,13 @@ test('submits null when the default is cleared', async () => {
 });
 
 test('surfaces the backend error when the update is rejected (e.g. 422)', async () => {
-  // AdminService.updateInstitution throws the parsed `detail` (see the
-  // service's defensive error handling); the dialog must show it, not
-  // swallow it — the whole feature hinges on a validation that 422s.
+  // AdminService.updateInstitution carries the backend's error_code (TF-772);
+  // the dialog must show that code's translation, not swallow it — the whole
+  // feature hinges on a validation that 422s. The rendered sentence is the
+  // same as before, but it now comes from the frontend locale and follows the
+  // UI language rather than the language the request happened to carry.
   mockedAdmin.updateInstitution.mockRejectedValue(
-    new Error('Ungültiges Notenschema für diese Institution'),
+    new AppError('admin_invalid_grading_scheme', 'Invalid grading scheme', 422),
   );
 
   render(

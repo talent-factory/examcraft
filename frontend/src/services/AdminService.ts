@@ -5,6 +5,7 @@
 
 import { Role, Institution, UserStatus } from '../types/auth';
 import { OrgUnitMember } from '../types/orgUnit';
+import { appErrorFromResponse } from '../errors';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -150,8 +151,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch users');
+      throw await appErrorFromResponse(response, 'admin_users_load_failed');
     }
 
     return response.json();
@@ -170,8 +170,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch user');
+      throw await appErrorFromResponse(response, 'admin_user_load_failed');
     }
 
     return response.json();
@@ -191,8 +190,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to update user');
+      throw await appErrorFromResponse(response, 'admin_user_update_failed');
     }
 
     return response.json();
@@ -212,8 +210,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to update user status');
+      throw await appErrorFromResponse(response, 'admin_user_status_update_failed');
     }
 
     return response.json();
@@ -239,8 +236,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.detail || 'Failed to start impersonation');
+      throw await appErrorFromResponse(response, 'impersonation_start_failed');
     }
 
     return response.json();
@@ -274,8 +270,7 @@ class AdminService {
     );
 
     if (!response.ok && response.status !== 204) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.detail || 'Failed to end impersonation');
+      throw await appErrorFromResponse(response, 'impersonation_end_failed');
     }
   }
 
@@ -296,8 +291,7 @@ class AdminService {
       },
     );
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch transfer preview');
+      throw await appErrorFromResponse(response, 'admin_transfer_preview_failed');
     }
     return response.json();
   }
@@ -318,8 +312,7 @@ class AdminService {
       },
     );
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to transfer user');
+      throw await appErrorFromResponse(response, 'admin_transfer_failed');
     }
     return response.json();
   }
@@ -338,8 +331,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to assign role');
+      throw await appErrorFromResponse(response, 'admin_role_assign_failed');
     }
 
     return response.json();
@@ -358,8 +350,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to remove role');
+      throw await appErrorFromResponse(response, 'admin_role_remove_failed');
     }
 
     return response.json();
@@ -378,8 +369,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch roles');
+      throw await appErrorFromResponse(response, 'admin_roles_load_failed');
     }
 
     return response.json();
@@ -398,8 +388,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch institutions');
+      throw await appErrorFromResponse(response, 'admin_institutions_load_failed');
     }
 
     return response.json();
@@ -428,13 +417,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      // Parse defensively — a gateway 502/empty-body error has no JSON to
-      // decode, and letting response.json() throw would mask the real
-      // backend detail (e.g. the 422 from an invalid grading scheme).
-      const error = await response.json().catch(() => ({}));
-      throw new Error(
-        error.detail || `Failed to update institution (HTTP ${response.status})`
-      );
+      throw await appErrorFromResponse(response, 'admin_institution_update_failed');
     }
 
     return response.json();
@@ -459,10 +442,7 @@ class AdminService {
     );
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(
-        error.detail || `Failed to create institution (HTTP ${response.status})`
-      );
+      throw await appErrorFromResponse(response, 'admin_institution_create_failed');
     }
 
     return response.json();

@@ -12,6 +12,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { OrgUnitAssignmentDialog } from '../OrgUnitAssignmentDialog';
 import AdminService, { UserDetailResponse } from '../../../services/AdminService';
+import { AppError } from '../../../errors';
 import { OrgUnitsService } from '../../../services/orgUnitsService';
 import { OrgUnitOut } from '../../../types/orgUnit';
 
@@ -191,15 +192,38 @@ describe('OrgUnitAssignmentDialog', () => {
   });
 
   it('shows an error message when loading fails', async () => {
-    mockedAdminService.getUser.mockRejectedValue(new Error('Netzwerkfehler'));
+    mockedAdminService.getUser.mockRejectedValue(
+      new AppError('admin_user_not_found', 'User not found', 404),
+    );
     mockedOrgUnitsService.list.mockResolvedValue({ items: [] });
 
     render(<OrgUnitAssignmentDialog userId={7} isOpen onClose={jest.fn()} onSuccess={jest.fn()} />);
 
-    expect(await screen.findByTestId('ouad-error')).toHaveTextContent('Netzwerkfehler');
+    expect(await screen.findByTestId('ouad-error')).toHaveTextContent(
+      'Benutzer nicht gefunden',
+    );
   });
 
-  it('shows an error message and re-enables the button when assigning fails', async () => {
+  it('zeigt beim OrgUnits-Zweig desselben catch den generischen Fallback', async () => {
+    // `loadData` awaits AdminService.getUser and OrgUnitsService.list under
+    // one catch. Converting it was not optional — an AppError without
+    // `detail` would otherwise have rendered its bare code — but
+    // OrgUnitsService still throws plain Errors, so its specific text is
+    // replaced by the generic fallback here until that service itself is
+    // migrated (PR 4 territory). The two tests below pin the same behaviour
+    // for the other two catches (assign/remove), migrated in the TF-772 PR 3
+    // review-fixes round for consistency within this one dialog.
+    mockedAdminService.getUser.mockResolvedValue(makeUser());
+    mockedOrgUnitsService.list.mockRejectedValue(new Error('OrgUnits-Dienst nicht erreichbar'));
+
+    render(<OrgUnitAssignmentDialog userId={7} isOpen onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    const banner = await screen.findByTestId('ouad-error');
+    expect(banner).toHaveTextContent('Daten konnten nicht geladen werden');
+    expect(banner).not.toHaveTextContent('OrgUnits-Dienst nicht erreichbar');
+  });
+
+  it('shows the translated fallback (not the raw message) and re-enables the button when assigning fails', async () => {
     mockedAdminService.getUser.mockResolvedValue(makeUser());
     mockedOrgUnitsService.list.mockResolvedValue({ items: [makeUnit({ id: 2, name: 'Backend-Team' })] });
     mockedOrgUnitsService.addMember.mockRejectedValue(new Error('Bereits zugeordnet'));
@@ -209,12 +233,14 @@ describe('OrgUnitAssignmentDialog', () => {
 
     fireEvent.click(await screen.findByTestId('ouad-btn-assign-2'));
 
-    expect(await screen.findByTestId('ouad-error')).toHaveTextContent('Bereits zugeordnet');
+    const banner = await screen.findByTestId('ouad-error');
+    expect(banner).toHaveTextContent('Zuweisung fehlgeschlagen');
+    expect(banner).not.toHaveTextContent('Bereits zugeordnet');
     expect(onSuccess).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId('ouad-btn-assign-2')).not.toBeDisabled());
   });
 
-  it('shows an error message and re-enables the button when removing fails', async () => {
+  it('shows the translated fallback (not the raw message) and re-enables the button when removing fails', async () => {
     mockedAdminService.getUser.mockResolvedValue(
       makeUser({
         org_units: [
@@ -230,7 +256,9 @@ describe('OrgUnitAssignmentDialog', () => {
 
     fireEvent.click(await screen.findByTestId('ouad-btn-remove-1'));
 
-    expect(await screen.findByTestId('ouad-error')).toHaveTextContent('OrgUnit nicht gefunden');
+    const banner = await screen.findByTestId('ouad-error');
+    expect(banner).toHaveTextContent('Entfernen fehlgeschlagen');
+    expect(banner).not.toHaveTextContent('OrgUnit nicht gefunden');
     expect(onSuccess).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId('ouad-btn-remove-1')).not.toBeDisabled());
   });

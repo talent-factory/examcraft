@@ -12,6 +12,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ImpersonationReasonDialog } from '../ImpersonationReasonDialog';
 import AdminService from '../../../services/AdminService';
+import { AppError } from '../../../errors';
 
 // The global react-i18next mock (setupTests.ts) recreates `t` on every call
 // to useTranslation(), which is fine for most components but breaks this
@@ -34,6 +35,15 @@ const DE_STRINGS: Record<string, string> = {
   'admin.impersonation.dialogError': 'Anmeldung als Nutzer fehlgeschlagen',
   'admin.impersonation.reasonTooShort': 'Bitte geben Sie mindestens {{min}} Zeichen als Grund an',
   'admin.impersonation.passwordRequired': 'Bitte bestätigen Sie Ihr Passwort',
+  // TF-772: the dialog renders translated error codes now, so the stable `t`
+  // has to resolve the errors.* keys these tests exercise. Echoing them back
+  // instead would push translateError into its fallback branch and make the
+  // assertions pass without proving the code survived the trip.
+  'errors.admin_user_not_found': 'Benutzer nicht gefunden',
+  'errors.impersonation_rate_limit_exceeded':
+    'Zu viele Impersonation-Sitzungen gestartet. Bitte versuchen Sie es später erneut.',
+  'errors.impersonation_snapshot_failed':
+    'Impersonation nicht gestartet: Der Browser-Speicher ist voll oder eingeschränkt, die Rückkehr zum Admin-Konto wäre nicht gesichert.',
 };
 const mockStableT = (key: string, params?: Record<string, unknown>) => {
   let value = DE_STRINGS[key] ?? key;
@@ -125,12 +135,14 @@ describe('ImpersonationReasonDialog', () => {
   });
 
   it('shows an error and no target when loading the target fails', async () => {
-    mockedAdminService.getUser.mockRejectedValueOnce(new Error('user not found'));
+    mockedAdminService.getUser.mockRejectedValueOnce(
+      new AppError('admin_user_not_found', 'User not found', 404),
+    );
 
     renderDialog();
 
     await waitFor(() => {
-      expect(screen.getByText('user not found')).toBeInTheDocument();
+      expect(screen.getByText('Benutzer nicht gefunden')).toBeInTheDocument();
     });
     expect(screen.queryByText(/Max Muster/)).not.toBeInTheDocument();
   });
@@ -187,7 +199,9 @@ describe('ImpersonationReasonDialog', () => {
   });
 
   it('shows an error and stays open when AdminService.impersonateUser fails', async () => {
-    mockedAdminService.impersonateUser.mockRejectedValueOnce(new Error('quota exceeded'));
+    mockedAdminService.impersonateUser.mockRejectedValueOnce(
+      new AppError('impersonation_rate_limit_exceeded', 'Too many sessions', 429),
+    );
     const { onClose, onSuccess } = renderDialog();
     await screen.findByText(/Max Muster/);
 
@@ -195,7 +209,11 @@ describe('ImpersonationReasonDialog', () => {
     fireEvent.change(screen.getByLabelText(/Ihr Passwort/), { target: { value: 'MyOwnPassword1!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
-    expect(await screen.findByText('quota exceeded')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Zu viele Impersonation-Sitzungen gestartet. Bitte versuchen Sie es später erneut.',
+      ),
+    ).toBeInTheDocument();
     expect(mockStartImpersonation).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
@@ -205,7 +223,12 @@ describe('ImpersonationReasonDialog', () => {
   });
 
   it('shows an error and stays open when startImpersonation fails after the backend already created the session', async () => {
-    mockStartImpersonation.mockRejectedValueOnce(new Error('storage restricted'));
+    // Not a service error: AuthContext.startImpersonation refuses when the
+    // recovery snapshot cannot be persisted. It reaches the same catch, so it
+    // carries a code too (TF-772) instead of an English developer sentence.
+    mockStartImpersonation.mockRejectedValueOnce(
+      new AppError('impersonation_snapshot_failed'),
+    );
     const { onClose, onSuccess } = renderDialog();
     await screen.findByText(/Max Muster/);
 
@@ -213,16 +236,22 @@ describe('ImpersonationReasonDialog', () => {
     fireEvent.change(screen.getByLabelText(/Ihr Passwort/), { target: { value: 'MyOwnPassword1!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
-    expect(await screen.findByText('storage restricted')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Impersonation nicht gestartet: Der Browser-Speicher ist voll oder eingeschränkt, die Rückkehr zum Admin-Konto wäre nicht gesichert.',
+      ),
+    ).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect((screen.getByLabelText(/Ihr Passwort/) as HTMLInputElement).value).toBe('');
   });
 
   it('resets target, reason, and error when closed, so reopening for a different user starts clean', async () => {
-    mockedAdminService.getUser.mockRejectedValueOnce(new Error('boom'));
+    mockedAdminService.getUser.mockRejectedValueOnce(
+      new AppError('admin_user_not_found', 'User not found', 404),
+    );
     const { rerender } = renderDialog();
-    await screen.findByText('boom');
+    await screen.findByText('Benutzer nicht gefunden');
     fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'some leftover text' } });
     fireEvent.change(screen.getByLabelText(/Ihr Passwort/), { target: { value: 'leftover-pw' } });
 
@@ -236,7 +265,7 @@ describe('ImpersonationReasonDialog', () => {
     );
 
     await screen.findByText(/Erika/);
-    expect(screen.queryByText('boom')).not.toBeInTheDocument();
+    expect(screen.queryByText('Benutzer nicht gefunden')).not.toBeInTheDocument();
     expect((screen.getByLabelText(/Grund/) as HTMLTextAreaElement).value).toBe('');
     expect((screen.getByLabelText(/Ihr Passwort/) as HTMLInputElement).value).toBe('');
   });

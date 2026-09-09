@@ -29,9 +29,18 @@ jest.mock('../../api/apiClient', () => ({
   executeTokenRefresh: jest.fn().mockResolvedValue(undefined),
 }));
 
+// `t` is not decoration: since TF-772 the provider translates its error
+// messages through this singleton, so a mock without it turns any test that
+// reaches a catch block into "i18n.t is not a function". Echoing the key back
+// is fine here — no test in this file asserts on a message — but see
+// AuthContext.errors.test.tsx, which needs the real bundle for exactly the
+// reason an echoing mock is wrong there.
 jest.mock('../../i18n', () => ({
   __esModule: true,
-  default: { changeLanguage: jest.fn().mockResolvedValue(undefined) },
+  default: {
+    changeLanguage: jest.fn().mockResolvedValue(undefined),
+    t: (key: string) => key,
+  },
 }));
 
 jest.mock('../../config/features', () => ({
@@ -936,9 +945,12 @@ describe('AuthContext impersonation (TF-743)', () => {
     });
     expect(holder.auth!.isImpersonating).toBe(true);
 
+    // Asserts the code, not the sentence: the refusal is rendered by
+    // ImpersonationReasonDialog, so since TF-772 it carries an AppError code
+    // instead of an English developer message.
     await expect(
       holder.auth!.startImpersonation({ accessToken: makeToken(1800), expiresIn: 1800 }),
-    ).rejects.toThrow(/already impersonating/i);
+    ).rejects.toMatchObject({ code: 'impersonation_already_active' });
 
     // The original impersonation session is untouched by the rejected attempt.
     expect(holder.auth!.isImpersonating).toBe(true);

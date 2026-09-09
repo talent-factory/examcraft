@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService, { UserDetailResponse } from '../../services/AdminService';
+import { translateError } from '../../errors';
 import { useAuth } from '../../contexts/AuthContext';
 
 const REASON_MIN_LENGTH = 3;
@@ -45,7 +46,7 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
       setError(null);
       setTarget(await AdminService.getUser(userId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.impersonation.dialogLoadFailed'));
+      setError(translateError(err, t, 'admin.impersonation.dialogLoadFailed'));
     } finally {
       setLoading(false);
     }
@@ -93,7 +94,7 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.impersonation.dialogError'));
+      setError(translateError(err, t, 'admin.impersonation.dialogError'));
       // TF-758 review fix: don't leave the (possibly wrong) password sitting
       // in state/DOM after a failed attempt -- the admin re-enters it either
       // way, and this keeps its lifetime in memory as short as possible.

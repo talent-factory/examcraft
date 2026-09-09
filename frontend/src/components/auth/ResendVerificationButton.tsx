@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Button, Alert, CircularProgress, Box } from '@mui/material';
 import EmailIcon from '@mui/icons-material/Email';
 
+import { appErrorFromResponse, translateError } from '../../errors';
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 interface ResendVerificationButtonProps {
@@ -36,8 +38,7 @@ const ResendVerificationButton: React.FC<ResendVerificationButtonProps> = ({
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to resend verification email');
+        throw await appErrorFromResponse(response, 'auth_verification_resend_failed');
       }
 
       setSuccess(true);
@@ -46,8 +47,8 @@ const ResendVerificationButton: React.FC<ResendVerificationButtonProps> = ({
       setTimeout(() => {
         setSuccess(false);
       }, 5000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to resend verification email');
+    } catch (err) {
+      setError(translateError(err, t, 'errors.auth_verification_resend_failed'));
     } finally {
       setLoading(false);
     }

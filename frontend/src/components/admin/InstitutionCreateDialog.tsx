@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService from '../../services/AdminService';
+import { translateError } from '../../errors';
 
 interface InstitutionCreateDialogProps {
   isOpen: boolean;
@@ -56,7 +57,7 @@ export const InstitutionCreateDialog: React.FC<InstitutionCreateDialogProps> = (
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.institutionCreate.failedCreate'));
+      setError(translateError(err, t, 'admin.institutionCreate.failedCreate'));
     } finally {
       setLoading(false);
     }

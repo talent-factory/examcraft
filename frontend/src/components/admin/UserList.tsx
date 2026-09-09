@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Building2, MoreVertical, Pencil, Power, LogIn, Shield } from 'lucide-react';
 import { getDateLocale } from '../../utils/dateLocale';
 import AdminService, { UserListItem, ListUsersParams } from '../../services/AdminService';
+import { translateError } from '../../errors';
 import { UserStatus } from '../../types/auth';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -212,7 +213,7 @@ export const UserList: React.FC<UserListProps> = ({
       setTotal(response.total);
       setTotalPages(response.total_pages);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.userList.failedLoad'));
+      setError(translateError(err, t, 'admin.userList.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -228,7 +229,7 @@ export const UserList: React.FC<UserListProps> = ({
       await loadUsers();
       if (onRefresh) onRefresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('admin.userList.failedStatus'));
+      alert(translateError(err, t, 'admin.userList.failedStatus'));
     }
   };
 

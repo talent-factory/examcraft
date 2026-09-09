@@ -314,9 +314,14 @@ describe.skip('DocumentUpload', () => {
       });
     });
 
+    // NOTE: this whole suite is `describe.skip` (see the top of the file) and
+    // was not run when TF-772 migrated `DocumentUpload` to `translateError`.
+    // Updated anyway so that whoever un-skips it does not first have to work
+    // out why an assertion on a raw error message fails: a plain `Error`
+    // (no `AppError`) now renders the translated fallback key, not
+    // `err.message` verbatim.
     it('handles upload errors', async () => {
-      const errorMessage = 'Upload failed';
-      mockDocumentService.uploadDocument.mockRejectedValue(new Error(errorMessage));
+      mockDocumentService.uploadDocument.mockRejectedValue(new Error('Upload failed'));
 
       const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
 
@@ -334,7 +339,7 @@ describe.skip('DocumentUpload', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Fehler')).toBeInTheDocument();
-        expect(screen.getByText(errorMessage)).toBeInTheDocument();
+        expect(screen.getByText('Upload fehlgeschlagen')).toBeInTheDocument();
       });
     });
   });
@@ -535,11 +540,13 @@ describe.skip('DocumentUpload', () => {
       });
     });
 
+    // NOTE: same TF-772 caveat as 'handles upload errors' above —
+    // `onUploadError` now receives the translated fallback text for a plain
+    // `Error`, not `err.message` verbatim.
     it('calls onUploadError callback', async () => {
       const mockOnUploadError = jest.fn();
-      const errorMessage = 'Upload failed';
 
-      mockDocumentService.uploadDocument.mockRejectedValue(new Error(errorMessage));
+      mockDocumentService.uploadDocument.mockRejectedValue(new Error('Upload failed'));
 
       const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
 
@@ -556,7 +563,7 @@ describe.skip('DocumentUpload', () => {
       fireEvent.click(uploadButton);
 
       await waitFor(() => {
-        expect(mockOnUploadError).toHaveBeenCalledWith('test.pdf', errorMessage);
+        expect(mockOnUploadError).toHaveBeenCalledWith('test.pdf', 'Upload fehlgeschlagen');
       });
     });
   });

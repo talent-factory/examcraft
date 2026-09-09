@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService, { UserDetailResponse } from '../../services/AdminService';
+import { translateError } from '../../errors';
 import { OrgUnitsService } from '../../services/orgUnitsService';
 import { OrgUnitOut } from '../../types/orgUnit';
 import { useAuth } from '../../contexts/AuthContext';
@@ -63,7 +64,7 @@ export const OrgUnitAssignmentDialog: React.FC<OrgUnitAssignmentDialogProps> = (
       setAllOrgUnits(orgUnitsData.items);
     } catch (err) {
       console.error('[OrgUnitAssignmentDialog] loadData failed:', err);
-      setError(err instanceof Error ? err.message : t('admin.orgUnitAssignment.failedLoad'));
+      setError(translateError(err, t, 'admin.orgUnitAssignment.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,7 @@ export const OrgUnitAssignmentDialog: React.FC<OrgUnitAssignmentDialogProps> = (
       onSuccess();
     } catch (err) {
       console.error('[OrgUnitAssignmentDialog] handleAssign failed:', { orgUnitId, userId, err });
-      setError(err instanceof Error ? err.message : t('admin.orgUnitAssignment.failedAssign'));
+      setError(translateError(err, t, 'admin.orgUnitAssignment.failedAssign'));
     } finally {
       setProcessing(false);
     }
@@ -105,7 +106,7 @@ export const OrgUnitAssignmentDialog: React.FC<OrgUnitAssignmentDialogProps> = (
       onSuccess();
     } catch (err) {
       console.error('[OrgUnitAssignmentDialog] handleRemove failed:', { orgUnitId, userId, err });
-      setError(err instanceof Error ? err.message : t('admin.orgUnitAssignment.failedRemove'));
+      setError(translateError(err, t, 'admin.orgUnitAssignment.failedRemove'));
     } finally {
       setProcessing(false);
     }

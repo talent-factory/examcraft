@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { OAuthProvider } from '../../types/auth';
+import { translateError } from '../../errors';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -60,7 +61,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       console.log('[LoginForm] Redirecting to OAuth provider:', provider, redirectUrl);
       window.location.href = redirectUrl;
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'OAuth login failed');
+      setLocalError(translateError(err, t, 'errors.auth_oauth_login_failed'));
     }
   };
 

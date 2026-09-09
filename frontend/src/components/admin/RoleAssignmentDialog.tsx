@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService, { UserDetailResponse } from '../../services/AdminService';
+import { translateError } from '../../errors';
 import { Role } from '../../types/auth';
 
 interface RoleAssignmentDialogProps {
@@ -51,7 +52,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
       setUser(userData);
       setAllRoles(rolesData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.roleAssignment.failedLoad'));
+      setError(translateError(err, t, 'admin.roleAssignment.failedLoad'));
       setLoadFailed(true);
     } finally {
       setLoading(false);
@@ -74,7 +75,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
       await loadData();
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.roleAssignment.failedAssign'));
+      setError(translateError(err, t, 'admin.roleAssignment.failedAssign'));
     } finally {
       setProcessing(false);
     }
@@ -90,7 +91,7 @@ export const RoleAssignmentDialog: React.FC<RoleAssignmentDialogProps> = ({
       await loadData();
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.roleAssignment.failedRemove'));
+      setError(translateError(err, t, 'admin.roleAssignment.failedRemove'));
     } finally {
       setProcessing(false);
     }

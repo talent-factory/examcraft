@@ -8,9 +8,9 @@
  * `archive_failed`, `archive_already_archived`, `archive_not_archived`,
  * `delete_failed`, `delete_in_exam`, `delete_requires_archive` and
  * `restore_failed` carry no `review_` prefix. That is not a transcription
- * slip: the review router really emits them unprefixed
- * (question_review.py:1187, :1192, :1219, :1244, :1267, :1292, :1349), and
- * the identity rule says the frontend key is the backend's `error_code`
+ * slip: the review router really emits them unprefixed — respectively
+ * question_review.py:1198, :1174, :1218, :1298, :1150, :1145 and :1242 —
+ * and the identity rule says the frontend key is the backend's `error_code`
  * verbatim. Renaming them here to look tidier would break the one property the
  * rule buys — that a code seen in a backend log can be grepped for in the
  * frontend locales. The `exam_archive_*` / `exam_restore_failed` keys in the

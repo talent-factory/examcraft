@@ -26,6 +26,7 @@ import {
 } from '@mui/icons-material';
 import { Role, Feature, FEATURE_CATEGORIES } from '../../types/rbac';
 import RBACService from '../../services/RBACService';
+import { translateError } from '../../errors';
 
 const FeaturePermissionsMatrix: React.FC = () => {
   const { t } = useTranslation();
@@ -51,7 +52,7 @@ const FeaturePermissionsMatrix: React.FC = () => {
       setRoles(rolesData);
       setFeatures(featuresData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.featureMatrix.failedLoad'));
+      setError(translateError(err, t, 'admin.featureMatrix.failedLoad'));
     } finally {
       setLoading(false);
     }

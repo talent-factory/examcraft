@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import { SubscriptionTier, TierQuota, TIER_COLORS, RESOURCE_TYPE_LABELS } from '../../types/rbac';
 import RBACService from '../../services/RBACService';
+import { translateError } from '../../errors';
 
 const SubscriptionTierOverview: React.FC = () => {
   const { t } = useTranslation();
@@ -74,7 +75,7 @@ const SubscriptionTierOverview: React.FC = () => {
       );
       setQuotas(quotasData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.subscriptionTier.failedLoad'));
+      setError(translateError(err, t, 'admin.subscriptionTier.failedLoad'));
     } finally {
       setLoading(false);
     }

@@ -90,4 +90,51 @@ describe('translateError', () => {
     expect(warn).toHaveBeenCalled();
     expect(JSON.stringify(warn.mock.calls)).toContain('ECONNREFUSED');
   });
+
+  it('protokolliert den HTTP-Status bei einem AppError ohne Übersetzungsschlüssel', () => {
+    // A bodyless 502 and a bodyless 500 both fall through to the same generic
+    // sentence in the UI — status is the only thing in this log line that
+    // still tells them apart.
+    translateError(
+      new AppError('rag.somethingNobodyTranslated' as AppErrorCode, undefined, 502),
+      t,
+      'premium.ragExamCreator.errorContextPreview',
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      '- status:',
+      502,
+    );
+  });
+
+  it('reicht err.params an t() zur Interpolation weiter', () => {
+    // No registered code currently ships a `{{placeholder}}` in its locale
+    // text (see AppError.ts's own note on that reachability gap), so this
+    // exercises the `t(key, err.params)` call itself rather than a real
+    // end-to-end string — a minimal, real-i18next-style interpolating fake
+    // stands in for `t`.
+    const templates: Record<string, string> = {
+      'errors.rag.contextPreviewFailed': 'Fehler bei Dokument {{documentId}}.',
+    };
+    const interpolating = (key: string, params?: Record<string, string | number>): string => {
+      const template = templates[key] ?? key;
+      return params
+        ? Object.entries(params).reduce(
+            (acc, [name, value]) => acc.replaceAll(`{{${name}}}`, String(value)),
+            template,
+          )
+        : template;
+    };
+
+    const result = translateError(
+      new AppError('rag.contextPreviewFailed', 'boom', 500, { documentId: 42 }),
+      interpolating,
+      'premium.ragExamCreator.errorContextPreview',
+    );
+
+    expect(result).toBe('Fehler bei Dokument 42.');
+  });
 });

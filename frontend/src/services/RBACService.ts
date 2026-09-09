@@ -10,9 +10,8 @@ import {
   TierQuota,
   PermissionCheckResponse,
   QuotaCheckResponse,
-  CreateRoleRequest,
-  UpdateRoleFeaturesRequest
 } from '../types/rbac';
+import { appErrorFromResponse } from '../errors';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -56,8 +55,7 @@ class RBACService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch features');
+      throw await appErrorFromResponse(response, 'rbac_features_load_failed');
     }
 
     return response.json();
@@ -76,8 +74,7 @@ class RBACService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch feature');
+      throw await appErrorFromResponse(response, 'rbac_feature_load_failed');
     }
 
     return response.json();
@@ -107,8 +104,7 @@ class RBACService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch roles');
+      throw await appErrorFromResponse(response, 'rbac_roles_load_failed');
     }
 
     return response.json();
@@ -127,53 +123,7 @@ class RBACService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch role');
-    }
-
-    return response.json();
-  }
-
-  /**
-   * Create a new custom role
-   */
-  async createRole(data: CreateRoleRequest): Promise<Role> {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/rbac/roles`,
-      {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data)
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to create role');
-    }
-
-    return response.json();
-  }
-
-  /**
-   * Update role features
-   */
-  async updateRoleFeatures(
-    roleId: string,
-    data: UpdateRoleFeaturesRequest
-  ): Promise<Role> {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/rbac/roles/${roleId}/features`,
-      {
-        method: 'PUT',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data)
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to update role features');
+      throw await appErrorFromResponse(response, 'rbac_role_load_failed');
     }
 
     return response.json();
@@ -199,8 +149,7 @@ class RBACService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch subscription tiers');
+      throw await appErrorFromResponse(response, 'rbac_tiers_load_failed');
     }
 
     return response.json();
@@ -219,8 +168,7 @@ class RBACService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch tier quotas');
+      throw await appErrorFromResponse(response, 'rbac_tier_quotas_load_failed');
     }
 
     return response.json();
@@ -239,8 +187,7 @@ class RBACService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to fetch own subscription tier');
+      throw await appErrorFromResponse(response, 'rbac_my_tier_load_failed');
     }
 
     return response.json();
@@ -263,8 +210,7 @@ class RBACService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to check permission');
+      throw await appErrorFromResponse(response, 'rbac_permission_check_failed');
     }
 
     return response.json();
@@ -289,8 +235,7 @@ class RBACService {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to check quota');
+      throw await appErrorFromResponse(response, 'rbac_quota_check_failed');
     }
 
     return response.json();

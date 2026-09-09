@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService, { UserDetailResponse, UpdateUserRequest } from '../../services/AdminService';
+import { translateError } from '../../errors';
 import { Institution } from '../../types/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { InstitutionTransferDialog } from './InstitutionTransferDialog';
@@ -53,7 +54,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
         email: userData.email,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.userEditDialog.failedLoad'));
+      setError(translateError(err, t, 'admin.userEditDialog.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -71,12 +72,19 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
       setInstitutions(list);
       setInstitutionsError(null);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load institutions';
+      // Component-scoped fallback key, like every other translateError() call
+      // site in this file — not the `errors.*` key directly. It also happens
+      // to be the exact sentence already shown next to the disabled transfer
+      // button (line ~241), so reusing it keeps both places in sync.
+      const msg = translateError(err, t, 'admin.institutionTransfer.institutionsLoadFailed');
       console.error('[UserEditDialog] loadInstitutions failed:', err);
       setInstitutionsError(msg);
       setInstitutions([]);
     }
-  }, []);
+    // `t` joins the deps because the fallback is translated here now; the
+    // effect below re-runs on a language switch as a result, which only
+    // re-fetches a list this dialog already refetches on every open.
+  }, [t]);
 
   useEffect(() => {
     if (isOpen && currentUser?.is_superuser) {
@@ -114,7 +122,7 @@ export const UserEditDialog: React.FC<UserEditDialogProps> = ({
       onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.userEditDialog.failedUpdate'));
+      setError(translateError(err, t, 'admin.userEditDialog.failedUpdate'));
     } finally {
       setSaving(false);
     }
