@@ -14,6 +14,7 @@ import { ArrowBack, Save, CheckCircle, Cancel, Send } from '@mui/icons-material'
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../utils/dateLocale';
 import { ReviewService } from '../services/ReviewService';
+import { translateError } from '../errors';
 import { useAuth } from '../contexts/AuthContext';
 import MarkdownRenderer from './MarkdownRenderer';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
@@ -69,7 +70,7 @@ const QuestionReviewDetail: React.FC = () => {
         // Comments may not be available
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('components.questionReviewDetail.errorLoad'));
+      setError(translateError(err, t, 'components.questionReviewDetail.errorLoad'));
     } finally {
       setLoading(false);
     }
@@ -89,7 +90,7 @@ const QuestionReviewDetail: React.FC = () => {
       setQuestion(updated);
       setSuccess(t('components.questionDetail.changesSaved'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('components.questionReviewDetail.errorSave'));
+      setError(translateError(err, t, 'components.questionReviewDetail.errorSave'));
     } finally {
       setSaving(false);
     }
@@ -105,7 +106,7 @@ const QuestionReviewDetail: React.FC = () => {
       setQuestion(updated);
       setSuccess(t('components.questionDetail.approved'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('components.questionReviewDetail.errorApprove'));
+      setError(translateError(err, t, 'components.questionReviewDetail.errorApprove'));
     } finally {
       setSaving(false);
     }
@@ -121,7 +122,7 @@ const QuestionReviewDetail: React.FC = () => {
       setQuestion(updated);
       setSuccess(t('components.questionDetail.rejected'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('components.questionReviewDetail.errorReject'));
+      setError(translateError(err, t, 'components.questionReviewDetail.errorReject'));
     } finally {
       setSaving(false);
     }
@@ -139,7 +140,7 @@ const QuestionReviewDetail: React.FC = () => {
       setComments(prev => [...prev, newComment]);
       setCommentText('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('components.questionReviewDetail.errorComment'));
+      setError(translateError(err, t, 'components.questionReviewDetail.errorComment'));
     } finally {
       setSaving(false);
     }

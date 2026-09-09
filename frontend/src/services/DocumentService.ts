@@ -8,6 +8,7 @@ import {
   DocumentListResponse,
   DocumentTag,
 } from '../types/document';
+import { AppError, AppErrorCode, ErrorParams, appErrorFromResponse } from '../errors';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -17,13 +18,71 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
  * raw `status` so callers can map to a localized message instead of
  * showing a stack-trace string. `status === 0` means the network call
  * itself failed (offline, DNS, CORS) — no HTTP response was received.
+ *
+ * An `AppError` subclass since TF-772, which is what lets `translateError()`
+ * handle it like any other service error while the two call sites that branch
+ * on `.status` (DocumentLibrary's preview and rename paths) keep working
+ * unchanged. `status` is redeclared non-optional here (every construction
+ * site below supplies a real HTTP status, or `0` for a network failure) so a
+ * future `instanceof DocumentFetchError` caller gets that guarantee from the
+ * type instead of re-deriving it with its own runtime check. `detail` stays
+ * optional like the base class — the backend does not always send response
+ * text, and forwarding `undefined` rather than defaulting to `''` lets
+ * `AppError`'s constructor fall back to a message built from `code` instead
+ * of an empty string. Kept as a distinct class rather than folded into
+ * AppError because those call sites duck-type on
+ * `name === 'DocumentFetchError'` — deliberately, because jest's automocking
+ * can give the component and the test different class identities and break
+ * `instanceof`.
  */
-export class DocumentFetchError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
+export class DocumentFetchError extends AppError {
+  constructor(
+    code: AppErrorCode,
+    readonly detail: string | undefined,
+    readonly status: number,
+    params?: ErrorParams,
+  ) {
+    super(code, detail, status, params);
     this.name = 'DocumentFetchError';
-    this.status = status;
+  }
+}
+
+/**
+ * A `fetch()` that rejects means no HTTP response existed at all — offline,
+ * DNS, CORS. There is no `error_code` to read, so the caller's operation code
+ * is all we have; `status === 0` is what tells the UI to say "check your
+ * connection" rather than name the operation.
+ */
+function networkError(e: unknown, code: AppErrorCode): DocumentFetchError {
+  const detail =
+    e && typeof e === 'object' && 'message' in e ? String((e as Error).message) : '';
+  return new DocumentFetchError(code, detail, 0);
+}
+
+/**
+ * Log a snippet of a non-JSON error body so a developer reproducing the bug
+ * can recover it — an HTML error page from a proxy tells you something a
+ * status code does not. Reads a clone, leaving the original body for
+ * `appErrorFromResponse`. Diagnostics only: the user-facing message stays the
+ * translated fallback either way, so a failure to read the body is ignored.
+ */
+async function logNonJsonBody(response: Response, documentId: number): Promise<void> {
+  let body: string;
+  try {
+    body = await response.clone().text();
+  } catch {
+    return; // Body unavailable or Response is a test double without clone().
+  }
+  if (!body) return;
+
+  try {
+    JSON.parse(body);
+  } catch {
+    // eslint-disable-next-line no-console
+    console.error(
+      `getDocumentRaw(${documentId}): non-JSON ${response.status} body`,
+      body.slice(0, 200),
+    );
   }
 }
 
@@ -78,8 +137,7 @@ export class DocumentService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Upload failed: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_upload_failed');
     }
 
     return response.json();
@@ -101,8 +159,7 @@ export class DocumentService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Processing failed: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_processing_failed');
     }
 
     return response.json();
@@ -118,8 +175,7 @@ export class DocumentService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch documents: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_list_failed');
     }
 
     const data = await response.json();
@@ -139,8 +195,7 @@ export class DocumentService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch available documents: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'rag_get_documents_failed');
     }
 
     return response.json();
@@ -156,8 +211,7 @@ export class DocumentService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch document: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_load_failed');
     }
 
     return response.json();
@@ -172,9 +226,10 @@ export class DocumentService {
    * (owner-only, never retryable) from a transient failure (TF-606).
    * `status === 0` means the network call itself failed (offline, DNS,
    * CORS) — no HTTP response was received — same convention as
-   * {@link getDocumentRaw}. The message is the backend's `detail` when
-   * present; otherwise it's left blank so the caller's localized fallback
-   * is used instead of an English statusText-derived string.
+   * {@link getDocumentRaw}. `code` carries the backend's `error_code` when it
+   * sent one — for a 403 that is `documents_rename_owner_only`, which is what
+   * lets the caller explain the restriction instead of saying "rename failed"
+   * (TF-606, now via the code rather than via the raw `detail` text).
    */
   static async renameDocument(
     documentId: number,
@@ -188,16 +243,15 @@ export class DocumentService {
         body: JSON.stringify({ display_name: displayName }),
       });
     } catch (e) {
-      throw new DocumentFetchError(
-        e && typeof e === 'object' && 'message' in e ? (e as Error).message : 'Network error',
-        0,
-      );
+      throw networkError(e, 'documents_rename_failed');
     }
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const detail = typeof errorData.detail === 'string' ? errorData.detail.trim() : '';
-      throw new DocumentFetchError(detail, response.status);
+      const { code, detail, status, params } = await appErrorFromResponse(
+        response,
+        'documents_rename_failed',
+      );
+      throw new DocumentFetchError(code, detail?.trim() || undefined, status ?? response.status, params);
     }
 
     return response.json();
@@ -225,8 +279,7 @@ export class DocumentService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to update visibility: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_visibility_update_failed');
     }
 
     return response.json();
@@ -242,8 +295,7 @@ export class DocumentService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to delete document: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_delete_failed');
     }
   }
 
@@ -257,8 +309,7 @@ export class DocumentService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to download document: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_download_failed');
     }
 
     // Create blob and download
@@ -288,40 +339,16 @@ export class DocumentService {
         headers: this.getAuthHeaders(),
       });
     } catch (e) {
-      throw new DocumentFetchError(
-        e && typeof e === 'object' && 'message' in e ? (e as Error).message : 'Network error',
-        0,
-      );
+      throw networkError(e, 'documents_preview_failed');
     }
 
     if (!response.ok) {
-      let detail: string | undefined;
-      try {
-        const body = await response.clone().text();
-        try {
-          const parsed = JSON.parse(body);
-          if (parsed && typeof parsed.detail === 'string') {
-            detail = parsed.detail;
-          }
-        } catch {
-          // Backend returned non-JSON (HTML error page from a proxy, etc.).
-          // Surface a snippet to console so a developer reproducing the bug
-          // can recover the body — the user-facing message stays generic.
-          if (body) {
-            // eslint-disable-next-line no-console
-            console.error(
-              `getDocumentRaw: non-JSON ${response.status} body`,
-              body.slice(0, 200),
-            );
-          }
-        }
-      } catch {
-        // Body unavailable — fall through to statusText.
-      }
-      throw new DocumentFetchError(
-        detail || response.statusText || 'Request failed',
-        response.status,
+      await logNonJsonBody(response, documentId);
+      const { code, detail, status, params } = await appErrorFromResponse(
+        response,
+        'documents_preview_failed',
       );
+      throw new DocumentFetchError(code, detail?.trim() || undefined, status ?? response.status, params);
     }
 
     return response;
@@ -343,8 +370,7 @@ export class DocumentService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch document content: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_content_load_failed');
     }
 
     return response.json();
@@ -360,8 +386,7 @@ export class DocumentService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch document chunks: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_chunks_load_failed');
     }
 
     return response.json();
@@ -391,8 +416,7 @@ export class DocumentService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch document chunks: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_chunks_load_failed');
     }
 
     return response.json();
@@ -408,8 +432,7 @@ export class DocumentService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to reindex document: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_reindex_failed');
     }
 
     return response.json();
@@ -425,8 +448,7 @@ export class DocumentService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to get processing status: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_status_failed');
     }
 
     return response.json();
@@ -439,7 +461,7 @@ export class DocumentService {
     files: File[],
     onProgress?: (filename: string, progress: number) => void,
     onComplete?: (filename: string, result: DocumentUploadResponse) => void,
-    onError?: (filename: string, error: string) => void
+    onError?: (filename: string, error: unknown) => void
   ): Promise<DocumentUploadResponse[]> {
     const results: DocumentUploadResponse[] = [];
 
@@ -461,8 +483,10 @@ export class DocumentService {
         }
 
       } catch (error) {
-        const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Unknown error';
-        onError?.(file.name, errorMessage);
+        // The error itself, not `error.message`: the caller renders this, and
+        // a raw message string is exactly what translateError() exists to keep
+        // out of the UI. The AppError arrives intact and carries its code.
+        onError?.(file.name, error);
       }
     }
 
@@ -487,8 +511,7 @@ export class DocumentService {
       method: 'GET', headers: this.getAuthHeaders(),
     });
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch documents: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_list_failed');
     }
     return response.json();
   }
@@ -501,8 +524,7 @@ export class DocumentService {
       method: 'GET', headers: this.getAuthHeaders(),
     });
     if (!response.ok) {
-      const e = await response.json().catch(() => ({}));
-      throw new Error(e.detail || `Failed to fetch tags: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_tags_load_failed');
     }
     return response.json();
   }
@@ -515,8 +537,7 @@ export class DocumentService {
       method: 'POST', headers: this.getAuthHeaders(), body: JSON.stringify({ name, scope }),
     });
     if (!response.ok) {
-      const e = await response.json().catch(() => ({}));
-      throw new Error(e.detail || `Failed to create tag: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_tag_failed');
     }
     return response.json();
   }
@@ -529,8 +550,7 @@ export class DocumentService {
       method: 'POST', headers: this.getAuthHeaders(), body: JSON.stringify({ tag_ids: tagIds }),
     });
     if (!response.ok) {
-      const e = await response.json().catch(() => ({}));
-      throw new Error(e.detail || `Failed to attach tags: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_tag_failed');
     }
     return response.json();
   }
@@ -543,8 +563,7 @@ export class DocumentService {
       method: 'DELETE', headers: this.getAuthHeaders(),
     });
     if (!response.ok) {
-      const e = await response.json().catch(() => ({}));
-      throw new Error(e.detail || `Failed to detach tag: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'documents_tag_failed');
     }
   }
 
@@ -556,7 +575,7 @@ export class DocumentService {
     createVectors: boolean = true,
     onProgress?: (documentId: number, progress: number) => void,
     onComplete?: (documentId: number, result: DocumentProcessingResponse) => void,
-    onError?: (documentId: number, error: string) => void
+    onError?: (documentId: number, error: unknown) => void
   ): Promise<DocumentProcessingResponse[]> {
     const results: DocumentProcessingResponse[] = [];
 
@@ -571,8 +590,8 @@ export class DocumentService {
         onComplete?.(documentId, result);
 
       } catch (error) {
-        const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Unknown error';
-        onError?.(documentId, errorMessage);
+        // See uploadMultipleDocuments: the error travels, not its text.
+        onError?.(documentId, error);
       }
     }
 

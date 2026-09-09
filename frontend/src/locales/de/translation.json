@@ -144,8 +144,11 @@
           "confirmThreshold_one": "{{count}} Vorschlag mit Konfidenz ≥ {{threshold}}% übernehmen?",
           "confirmThreshold_other": "{{count}} Vorschläge mit Konfidenz ≥ {{threshold}}% übernehmen?",
           "success_one": "{{count}} Bewertung übernommen.",
-          "success_other": "{{count}} Bewertungen übernommen."
-        }
+          "success_other": "{{count}} Bewertungen übernommen.",
+          "thresholdAria": "Schwellwert für Bulk-Übernahme"
+        },
+        "confidenceRangeAria": "Konfidenzbereich",
+        "selectGradeAria": "Bewertung auswählen"
       }
     },
     "deleteImportDialog": {
@@ -1676,7 +1679,7 @@
       "tabOriginal": "Original",
       "tabChunks": "Chunks",
       "originalLoading": "Original wird geladen…",
-      "originalError": "Original konnte nicht geladen werden: {{error}}",
+      "originalError": "Original konnte nicht geladen werden.",
       "originalErrorNetwork": "Netzwerkfehler — bitte Verbindung prüfen und erneut versuchen.",
       "originalErrorAuth": "Sitzung abgelaufen — bitte neu anmelden.",
       "originalErrorPermission": "Keine Berechtigung, dieses Dokument anzuzeigen.",
@@ -1687,7 +1690,7 @@
       "originalOpenInNewTab": "PDF in neuem Tab öffnen",
       "originalDocxPending": "Eine eingebettete Vorschau für DOCX-Dateien folgt in einem späteren Release. Den extrahierten Text findest du im Tab Chunks.",
       "originalUnsupported": "Für diesen Dateityp ist keine direkte Vorschau verfügbar. Inhalt siehe Tab Chunks.",
-      "chunksLoadError": "Chunks konnten nicht geladen werden: {{error}}",
+      "chunksLoadError": "Chunks konnten nicht geladen werden.",
       "docInfo": "Dokument-Informationen",
       "originalFile": "Originaldatei:",
       "fileSize": "Dateigröße:",
@@ -1777,7 +1780,8 @@
         "heading": "Tags",
         "createHint": "Neuen Tag erstellen: einfach tippen und mit Enter bestätigen.",
         "institutionTagDisabled": "Nur für institutionsweit geteilte Dokumente",
-        "ownerOnlyTagDisabled": "Geteilte Tags kann nur der Eigentümer ändern"
+        "ownerOnlyTagDisabled": "Geteilte Tags kann nur der Eigentümer ändern",
+        "saveError": "Tags konnten nicht gespeichert werden."
       },
       "list": {
         "colVisibility": "Sichtbarkeit",
@@ -1812,7 +1816,8 @@
         "tagsApply": "Anwenden",
         "tagsSummary": "Tags aktualisiert für {{changed}} Dokumente, {{skipped}} übersprungen",
         "tagsSummaryWithErrors": "Tags aktualisiert für {{changed}} Dokumente, {{skipped}} übersprungen, {{failed}} Fehler"
-      }
+      },
+      "chatExportChip": "Chat"
     },
     "documentChatPage": {
       "title": "Dokument-Chat – Premium-Funktion",
@@ -1861,7 +1866,9 @@
       "orgUnitsLoadError": "Team-Liste konnte nicht geladen werden. Bitte später erneut versuchen.",
       "orgUnitPickerPlaceholder": "Org-Unit auswählen…",
       "visibilityInstitution": "Institution — alle Mitglieder von {{institution}} sehen dieses Dokument",
-      "visibilityNoInstitution": "Keine Institution zugeordnet"
+      "visibilityNoInstitution": "Keine Institution zugeordnet",
+      "cancelledByUser": "Vom Benutzer abgebrochen",
+      "uploadFailed": "Upload fehlgeschlagen"
     },
     "documentVisibility": {
       "title": "Sichtbarkeit ändern",
@@ -1923,7 +1930,11 @@
       "deleteConfirmBtn": "Löschen",
       "errorArchive": "Archivieren fehlgeschlagen",
       "errorRestore": "Wiederherstellen fehlgeschlagen",
-      "errorDelete": "Löschen fehlgeschlagen"
+      "errorDelete": "Löschen fehlgeschlagen",
+      "errorLoad": "Fragen konnten nicht geladen werden",
+      "errorAction": "Aktion fehlgeschlagen",
+      "errorSave": "Änderungen konnten nicht gespeichert werden",
+      "errorComment": "Kommentar konnte nicht hinzugefügt werden"
     },
     "questionCard": {
       "competencyTooltip": "Handlungskompetenz: {{title}}",
@@ -2868,7 +2879,6 @@
     }
   },
   "errors": {
-    "network": "Der Server ist nicht erreichbar. Bitte prüfe deine Verbindung.",
     "compliance": {
       "loadFailed": "Die Compliance-Unterlagen konnten nicht geladen werden."
     },
@@ -2906,7 +2916,64 @@
       "providerError": "Die Anmeldung beim Anbieter ist fehlgeschlagen.",
       "callbackFailed": "Die Anmeldung konnte nicht abgeschlossen werden."
     },
+    "archive_already_archived": "Frage ist bereits archiviert",
+    "archive_failed": "Archivieren fehlgeschlagen",
+    "archive_not_archived": "Frage ist nicht archiviert",
+    "delete_failed": "Löschen fehlgeschlagen",
+    "delete_in_exam": "Frage wird in einer Prüfung verwendet und kann nicht gelöscht werden",
+    "delete_requires_archive": "Frage muss zuerst archiviert werden, bevor sie gelöscht werden kann",
+    "documents_access_denied": "Zugriff auf dieses Dokument verweigert",
+    "documents_chunks_load_failed": "Dokumentabschnitte konnten nicht geladen werden",
+    "documents_content_load_failed": "Dokumentinhalt konnte nicht geladen werden",
+    "documents_content_not_available": "Dokumentinhalt nicht verfügbar",
+    "documents_delete_failed": "Dokument konnte nicht gelöscht werden",
+    "documents_download_failed": "Dokument-Download fehlgeschlagen",
+    "documents_download_storage_failed": "Download aus Speicher fehlgeschlagen",
+    "documents_file_not_found_disk": "Datei auf Datenträger nicht gefunden",
+    "documents_file_not_found_storage": "Datei im Speicher nicht gefunden",
+    "documents_invalid_filter": "Ungültiger Filterwert.",
+    "documents_invalid_status": "Ungültiger Statusfilter",
+    "documents_list_failed": "Dokumentliste konnte nicht geladen werden",
+    "documents_load_failed": "Dokument konnte nicht geladen werden",
+    "documents_not_found": "Dokument nicht gefunden",
+    "documents_not_processed": "Dokument wurde noch nicht verarbeitet",
+    "documents_page_out_of_range": "Seitenzahl außerhalb des gültigen Bereichs",
+    "documents_preview_failed": "Vorschau konnte nicht geladen werden — bitte herunterladen oder später erneut versuchen.",
+    "documents_processing_failed": "Dokumentverarbeitung fehlgeschlagen",
+    "documents_reindex_failed": "Dokument konnte nicht neu indexiert werden",
+    "documents_rename_failed": "Dokument konnte nicht umbenannt werden",
+    "documents_rename_owner_only": "Nur der Eigentümer darf dieses Dokument umbenennen",
+    "documents_status_failed": "Dokumentstatus konnte nicht abgerufen werden",
+    "documents_storage_unavailable": "Speicherdienst vorübergehend nicht erreichbar — bitte in wenigen Sekunden erneut versuchen.",
+    "documents_tag_exists": "Ein Tag mit diesem Namen existiert bereits.",
+    "documents_tag_failed": "Tags konnten nicht gespeichert werden.",
+    "documents_tag_institution_admin_only": "Nur Administratoren dürfen Institutions-Tags erstellen.",
+    "documents_tag_institution_requires_shared": "Ein Institutions-Tag kann nur an institutionsweit geteilte Dokumente angehängt werden.",
+    "documents_tag_not_found": "Tag nicht gefunden.",
+    "documents_tag_owner_only": "Nur der Besitzer darf die Tags dieses Dokuments ändern.",
+    "documents_tags_load_failed": "Tags konnten nicht geladen werden.",
+    "documents_upload_failed": "Dokument-Upload fehlgeschlagen",
+    "documents_visibility_invalid_org_unit": "Team-Freigabe nicht möglich: keine gültige eigene Org-Unit angegeben",
+    "documents_visibility_no_institution": "Freigabe an die Institution nicht möglich: keine Institution zugeordnet",
+    "documents_visibility_owner_only": "Nur der Eigentümer darf die Sichtbarkeit ändern",
+    "documents_visibility_update_failed": "Sichtbarkeit konnte nicht geändert werden",
     "internal_error": "Es ist ein unerwarteter Fehler aufgetreten. Bitte versuch es später erneut.",
+    "network": "Der Server ist nicht erreichbar. Bitte prüfe deine Verbindung.",
+    "rag_get_documents_failed": "Dokumente konnten nicht abgerufen werden",
+    "restore_failed": "Wiederherstellen fehlgeschlagen",
+    "review_add_comment_failed": "Kommentar konnte nicht hinzugefügt werden",
+    "review_approve_failed": "Frage konnte nicht genehmigt werden",
+    "review_create_failed": "Frage konnte nicht erstellt werden",
+    "review_edit_failed": "Frage konnte nicht bearbeitet werden",
+    "review_fetch_comments_failed": "Kommentare konnten nicht geladen werden",
+    "review_fetch_history_failed": "Verlauf konnte nicht geladen werden",
+    "review_fetch_question_failed": "Frage konnte nicht geladen werden",
+    "review_fetch_queue_failed": "Überprüfungswarteschlange konnte nicht geladen werden",
+    "review_four_eyes_principle": "Vier-Augen-Prinzip: Ersteller kann eigene Frage nicht genehmigen",
+    "review_invalid_status_for_review": "Ungültiger Status für Überprüfung",
+    "review_question_not_found": "Frage nicht gefunden",
+    "review_reject_failed": "Frage konnte nicht abgelehnt werden",
+    "review_start_failed": "Überprüfung konnte nicht gestartet werden",
     "validation_error": "Die Anfrage ist ungültig. Bitte prüf deine Eingaben."
   },
   "help": {

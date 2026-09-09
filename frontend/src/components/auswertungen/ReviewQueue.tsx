@@ -273,7 +273,7 @@ const ReviewQueue: React.FC<Props> = ({
                 }}
                 valueLabelDisplay="auto"
                 valueLabelFormat={(v) => `${v}%`}
-                aria-label="confidence range"
+                aria-label={t('auswertungen.exam.review.confidenceRangeAria')}
                 data-testid="filter-confidence"
               />
             </Box>
@@ -366,7 +366,7 @@ const ReviewQueue: React.FC<Props> = ({
                 min={MIN_BULK_THRESHOLD}
                 max={100}
                 valueLabelDisplay="auto"
-                aria-label="bulk threshold"
+                aria-label={t('auswertungen.exam.review.bulk.thresholdAria')}
                 data-testid="bulk-threshold"
               />
             </Box>
@@ -446,7 +446,7 @@ const ReviewQueue: React.FC<Props> = ({
                     checked={selected.has(item.grade_id)}
                     onChange={() => toggleSelect(item.grade_id)}
                     inputProps={{
-                      'aria-label': 'select grade',
+                      'aria-label': t('auswertungen.exam.review.selectGradeAria'),
                       'data-testid': `select-${item.grade_id}`,
                     }}
                   />

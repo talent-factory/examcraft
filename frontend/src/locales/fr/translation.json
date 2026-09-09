@@ -144,8 +144,11 @@
           "confirmThreshold_one": "Valider {{count}} proposition avec une confiance ≥ {{threshold}} % ?",
           "confirmThreshold_other": "Valider {{count}} propositions avec une confiance ≥ {{threshold}} % ?",
           "success_one": "{{count}} évaluation validée.",
-          "success_other": "{{count}} évaluations validées."
-        }
+          "success_other": "{{count}} évaluations validées.",
+          "thresholdAria": "Seuil de reprise groupée"
+        },
+        "confidenceRangeAria": "Plage de confiance",
+        "selectGradeAria": "Sélectionner la note"
       }
     },
     "deleteImportDialog": {
@@ -1676,7 +1679,7 @@
       "tabOriginal": "Original",
       "tabChunks": "Chunks",
       "originalLoading": "Chargement de l'original…",
-      "originalError": "Impossible de charger l'original : {{error}}",
+      "originalError": "L'original n'a pas pu être chargé.",
       "originalErrorNetwork": "Erreur réseau — vérifie ta connexion et réessaie.",
       "originalErrorAuth": "Session expirée — reconnecte-toi.",
       "originalErrorPermission": "Tu n'as pas l'autorisation de consulter ce document.",
@@ -1687,7 +1690,7 @@
       "originalOpenInNewTab": "Ouvrir le PDF dans un nouvel onglet",
       "originalDocxPending": "Un aperçu intégré pour les fichiers DOCX arrive dans une version ultérieure. Le texte extrait se trouve dans l'onglet Chunks.",
       "originalUnsupported": "Aucun aperçu direct n'est disponible pour ce type de fichier. Voir l'onglet Chunks pour le contenu.",
-      "chunksLoadError": "Échec du chargement des chunks : {{error}}",
+      "chunksLoadError": "Les segments n'ont pas pu être chargés.",
       "docInfo": "Informations sur le document",
       "originalFile": "Fichier original :",
       "fileSize": "Taille du fichier :",
@@ -1777,7 +1780,8 @@
         "heading": "Tags",
         "createHint": "Créer une nouvelle étiquette : saisissez-la et appuyez sur Entrée.",
         "institutionTagDisabled": "Uniquement pour les documents partagés avec l'institution",
-        "ownerOnlyTagDisabled": "Seul le propriétaire peut modifier les tags partagés"
+        "ownerOnlyTagDisabled": "Seul le propriétaire peut modifier les tags partagés",
+        "saveError": "Les tags n'ont pas pu être enregistrés."
       },
       "list": {
         "colVisibility": "Visibilité",
@@ -1812,7 +1816,8 @@
         "tagsApply": "Appliquer",
         "tagsSummary": "Tags mis à jour pour {{changed}} document(s), {{skipped}} ignoré(s)",
         "tagsSummaryWithErrors": "Tags mis à jour pour {{changed}} document(s), {{skipped}} ignoré(s), {{failed}} erreur(s)"
-      }
+      },
+      "chatExportChip": "Chat"
     },
     "documentChatPage": {
       "title": "Chat de documents – Fonctionnalité Premium",
@@ -1861,7 +1866,9 @@
       "orgUnitsLoadError": "Impossible de charger tes équipes. Réessaie plus tard.",
       "orgUnitPickerPlaceholder": "Sélectionner une Org-Unit…",
       "visibilityInstitution": "Institution — tous les membres de {{institution}} peuvent voir ce document",
-      "visibilityNoInstitution": "Aucune institution attribuée"
+      "visibilityNoInstitution": "Aucune institution attribuée",
+      "cancelledByUser": "Annulé par l'utilisateur",
+      "uploadFailed": "Échec du téléversement"
     },
     "documentVisibility": {
       "title": "Modifier la visibilité",
@@ -1874,7 +1881,7 @@
       "noInstitution": "Aucune institution attribuée",
       "cancel": "Annuler",
       "save": "Enregistrer",
-      "saveError": "Impossible de modifier la visibilité"
+      "saveError": "La visibilité n'a pas pu être modifiée"
     },
     "documentPrivacyBanner": {
       "message": "ExamCraft a amélioré son modèle de visibilité : les documents que tu as téléchargés jusqu'à présent ne sont désormais visibles que par toi. Si tu souhaites partager des documents avec ton institution, tu peux les modifier individuellement dans la bibliothèque."
@@ -1923,7 +1930,11 @@
       "deleteConfirmBtn": "Supprimer",
       "errorArchive": "Échec de l'archivage",
       "errorRestore": "Échec de la restauration",
-      "errorDelete": "Échec de la suppression"
+      "errorDelete": "Échec de la suppression",
+      "errorLoad": "Les questions n'ont pas pu être chargées",
+      "errorAction": "Échec de l'action",
+      "errorSave": "Les modifications n'ont pas pu être enregistrées",
+      "errorComment": "Le commentaire n'a pas pu être ajouté"
     },
     "questionCard": {
       "competencyTooltip": "Compétence opérationnelle : {{title}}",
@@ -2868,7 +2879,6 @@
     }
   },
   "errors": {
-    "network": "Le serveur est injoignable. Vérifie ta connexion.",
     "compliance": {
       "loadFailed": "Les documents de conformité n'ont pas pu être chargés."
     },
@@ -2906,7 +2916,64 @@
       "providerError": "La connexion auprès du fournisseur a échoué.",
       "callbackFailed": "La connexion n'a pas pu être finalisée."
     },
+    "archive_already_archived": "La question est déjà archivée",
+    "archive_failed": "Échec de l'archivage",
+    "archive_not_archived": "La question n'est pas archivée",
+    "delete_failed": "Échec de la suppression",
+    "delete_in_exam": "La question est utilisée dans un examen et ne peut pas être supprimée",
+    "delete_requires_archive": "La question doit d'abord être archivée avant de pouvoir être supprimée",
+    "documents_access_denied": "Accès à ce document refusé",
+    "documents_chunks_load_failed": "Échec du chargement des sections du document",
+    "documents_content_load_failed": "Échec du chargement du contenu du document",
+    "documents_content_not_available": "Le contenu du document n'est pas disponible",
+    "documents_delete_failed": "Échec de la suppression du document",
+    "documents_download_failed": "Échec du téléchargement du document",
+    "documents_download_storage_failed": "Échec du téléchargement depuis le stockage",
+    "documents_file_not_found_disk": "Fichier introuvable sur le disque",
+    "documents_file_not_found_storage": "Fichier introuvable dans le stockage",
+    "documents_invalid_filter": "Valeur de filtre invalide.",
+    "documents_invalid_status": "Filtre de statut invalide",
+    "documents_list_failed": "Échec du chargement de la liste des documents",
+    "documents_load_failed": "Échec du chargement du document",
+    "documents_not_found": "Document introuvable",
+    "documents_not_processed": "Le document n'a pas encore été traité",
+    "documents_page_out_of_range": "Numéro de page hors plage",
+    "documents_preview_failed": "Impossible de charger l'aperçu — essayez de télécharger ou réessayez plus tard.",
+    "documents_processing_failed": "Échec du traitement du document",
+    "documents_reindex_failed": "Le document n'a pas pu être réindexé",
+    "documents_rename_failed": "Échec du renommage du document",
+    "documents_rename_owner_only": "Seul le propriétaire peut renommer ce document",
+    "documents_status_failed": "Échec de la récupération du statut du document",
+    "documents_storage_unavailable": "Service de stockage temporairement indisponible — réessayez dans quelques secondes.",
+    "documents_tag_exists": "Une étiquette portant ce nom existe déjà.",
+    "documents_tag_failed": "Impossible d'enregistrer les étiquettes du document.",
+    "documents_tag_institution_admin_only": "Seuls les administrateurs peuvent créer des étiquettes d'institution.",
+    "documents_tag_institution_requires_shared": "Une étiquette d'institution ne peut être attachée qu'à des documents partagés avec l'institution.",
+    "documents_tag_not_found": "Étiquette introuvable.",
+    "documents_tag_owner_only": "Seul le propriétaire peut modifier les étiquettes de ce document.",
+    "documents_tags_load_failed": "Les tags n'ont pas pu être chargés.",
+    "documents_upload_failed": "Échec du téléchargement du document",
+    "documents_visibility_invalid_org_unit": "Partage avec l'équipe impossible : aucune unité organisationnelle propre valide indiquée",
+    "documents_visibility_no_institution": "Partage avec l'institution impossible : aucune institution attribuée",
+    "documents_visibility_owner_only": "Seul le propriétaire peut modifier la visibilité",
+    "documents_visibility_update_failed": "La visibilité n'a pas pu être modifiée",
     "internal_error": "Une erreur inattendue s'est produite. Réessaie plus tard.",
+    "network": "Le serveur est injoignable. Vérifie ta connexion.",
+    "rag_get_documents_failed": "Échec de la récupération des documents",
+    "restore_failed": "Échec de la restauration",
+    "review_add_comment_failed": "Échec de l'ajout du commentaire",
+    "review_approve_failed": "Échec de l'approbation de la question",
+    "review_create_failed": "Échec de la création de la question",
+    "review_edit_failed": "Échec de la modification de la question",
+    "review_fetch_comments_failed": "Échec du chargement des commentaires",
+    "review_fetch_history_failed": "Échec du chargement de l'historique",
+    "review_fetch_question_failed": "Échec du chargement de la question",
+    "review_fetch_queue_failed": "Échec du chargement de la file de révision",
+    "review_four_eyes_principle": "Principe des quatre yeux : le créateur ne peut pas approuver sa propre question",
+    "review_invalid_status_for_review": "Statut invalide pour la révision",
+    "review_question_not_found": "Question introuvable",
+    "review_reject_failed": "Échec du rejet de la question",
+    "review_start_failed": "Échec du démarrage de la révision",
     "validation_error": "La requête n'est pas valide. Vérifie tes saisies."
   },
   "help": {

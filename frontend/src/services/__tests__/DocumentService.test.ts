@@ -1,4 +1,7 @@
 import { DocumentService } from '../DocumentService';
+// DocumentFetchError is pulled in per-describe via jest.requireActual (see the
+// getDocumentRaw block); AppError comes from the un-mocked errors module.
+import { AppError } from '../../errors';
 import { Document, DocumentStatus, DocumentUploadResponse, DocumentProcessingResponse, DocumentVisibility } from '../../types/document';
 
 jest.mock('../../api/apiClient');
@@ -100,7 +103,28 @@ describe('DocumentService', () => {
       } as Response);
 
       await expect(DocumentService.uploadDocument(mockFile))
-        .rejects.toThrow('Invalid file format');
+        .rejects.toMatchObject({ code: 'documents_upload_failed' });
+    });
+
+    // TF-772: a response carrying `error_code` (ADR 0005) wins over the
+    // service's own fallback — that is the whole point of reading the field.
+    it('übernimmt den error_code der Antwort statt des Fallback-Codes', async () => {
+      const mockFile = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 413,
+        statusText: 'Payload Too Large',
+        json: async () => ({
+          detail: 'Dokument-Upload fehlgeschlagen',
+          error_code: 'documents_storage_unavailable',
+        }),
+      } as Response);
+
+      await expect(DocumentService.uploadDocument(mockFile)).rejects.toMatchObject({
+        code: 'documents_storage_unavailable',
+        status: 413,
+      });
     });
 
     it('handles network errors', async () => {
@@ -190,11 +214,19 @@ describe('DocumentService', () => {
         ok: false,
         status: 400,
         statusText: 'Bad Request',
-        json: async () => ({ detail: 'Cannot share with team: no valid Org-Unit' }),
+        json: async () => ({
+          detail: 'Cannot share with team: no valid Org-Unit',
+          error_code: 'documents_visibility_invalid_org_unit',
+        }),
       } as Response);
 
       await expect(DocumentService.updateVisibility(1, DocumentVisibility.TEAM, 42))
-        .rejects.toThrow('Cannot share with team: no valid Org-Unit');
+        .rejects.toMatchObject({
+          code: 'documents_visibility_invalid_org_unit',
+          // The raw text survives on `detail` for the log line; translateError
+          // never renders it.
+          detail: 'Cannot share with team: no valid Org-Unit',
+        });
     });
   });
 
@@ -235,9 +267,13 @@ describe('DocumentService', () => {
     });
 
     // A blank/missing `detail` must not leak an English statusText-derived
-    // message — callers (DocumentLibrary.renameErrorMessage) fall back to a
-    // localized default only when the message is empty.
-    it('leaves the message blank when the backend omits detail', async () => {
+    // message. Callers don't read `.message` for display (`renameErrorMessage`
+    // goes through `translateError`, which reads `.code`), but `AppError`'s
+    // own fallback-to-code behavior (`super(detail ?? code)`) still needs an
+    // absent detail to actually be `undefined`, not `''` — an empty string is
+    // not nullish, so `?? code` would never fire and the message would stay
+    // silently blank instead of at least carrying the error code.
+    it('falls back to the error code when the backend omits detail', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -248,7 +284,7 @@ describe('DocumentService', () => {
       await expect(DocumentService.renameDocument(1, 'Neuer Titel')).rejects.toMatchObject({
         name: 'DocumentFetchError',
         status: 500,
-        message: '',
+        message: 'documents_rename_failed',
       });
     });
 
@@ -309,7 +345,7 @@ describe('DocumentService', () => {
       } as Response);
 
       await expect(DocumentService.processDocument(1, true))
-        .rejects.toThrow('Processing failed');
+        .rejects.toMatchObject({ code: 'documents_processing_failed' });
     });
   });
 
@@ -357,7 +393,7 @@ describe('DocumentService', () => {
       } as Response);
 
       await expect(DocumentService.getDocuments())
-        .rejects.toThrow('Server error');
+        .rejects.toMatchObject({ code: 'documents_list_failed' });
     });
   });
 
@@ -436,7 +472,7 @@ describe('DocumentService', () => {
       } as Response);
 
       await expect(DocumentService.getDocument(999))
-        .rejects.toThrow('Document not found');
+        .rejects.toMatchObject({ code: 'documents_load_failed' });
     });
   });
 
@@ -469,7 +505,7 @@ describe('DocumentService', () => {
       } as Response);
 
       await expect(DocumentService.deleteDocument(1))
-        .rejects.toThrow('Access denied');
+        .rejects.toMatchObject({ code: 'documents_delete_failed' });
     });
   });
 
@@ -508,7 +544,7 @@ describe('DocumentService', () => {
       } as Response);
 
       await expect(DocumentService.downloadDocument(1, 'test.pdf'))
-        .rejects.toThrow('File not found');
+        .rejects.toMatchObject({ code: 'documents_download_failed' });
     });
   });
 
@@ -662,7 +698,8 @@ describe('DocumentService', () => {
       );
 
       expect(results).toHaveLength(1); // Only first file succeeded
-      expect(mockOnError).toHaveBeenCalledWith('file2.txt', 'Upload failed');
+      // The error object, not its text: the caller translates it.
+      expect(mockOnError).toHaveBeenCalledWith('file2.txt', expect.any(Error));
     });
   });
 
@@ -716,7 +753,7 @@ describe('DocumentService', () => {
       );
 
       expect(results).toHaveLength(1); // Only first document succeeded
-      expect(mockOnError).toHaveBeenCalledWith(2, 'Processing failed');
+      expect(mockOnError).toHaveBeenCalledWith(2, expect.any(Error));
     });
   });
 
@@ -768,7 +805,7 @@ describe('DocumentService', () => {
       } as Response);
 
       await expect(DocumentService.getDocuments())
-        .rejects.toThrow('Failed to fetch documents: Internal Server Error');
+        .rejects.toMatchObject({ code: 'documents_list_failed' });
     });
 
     it('handles network timeouts', async () => {
@@ -810,17 +847,27 @@ describe('DocumentService', () => {
         status: 404,
         statusText: 'Not Found',
         clone: function () { return this; },
-        text: async () => JSON.stringify({ detail: 'Datei im Speicher nicht gefunden' }),
+        text: async () => JSON.stringify({
+          detail: 'Datei im Speicher nicht gefunden',
+          error_code: 'documents_file_not_found_storage',
+        }),
+        json: async () => ({
+          detail: 'Datei im Speicher nicht gefunden',
+          error_code: 'documents_file_not_found_storage',
+        }),
       } as unknown as Response);
 
       await expect(DocumentService.getDocumentRaw(42)).rejects.toMatchObject({
         name: 'DocumentFetchError',
+        code: 'documents_file_not_found_storage',
         status: 404,
-        message: 'Datei im Speicher nicht gefunden',
       });
     });
 
-    it('falls back to statusText when the body is not JSON', async () => {
+    // Before TF-772 this fell back to `statusText` ("Bad Gateway") and put
+    // that in the message. There is no localized text to derive from an HTML
+    // error page, so it falls back to the operation's code instead.
+    it('fällt auf den Operations-Code zurück, wenn der Body kein JSON ist', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -828,11 +875,12 @@ describe('DocumentService', () => {
         statusText: 'Bad Gateway',
         clone: function () { return this; },
         text: async () => '<html><body>nginx</body></html>',
+        json: async () => { throw new SyntaxError('Unexpected token <'); },
       } as unknown as Response);
 
       await expect(DocumentService.getDocumentRaw(42)).rejects.toMatchObject({
+        code: 'documents_preview_failed',
         status: 502,
-        message: 'Bad Gateway',
       });
       // Diagnostic snippet logged for the developer.
       expect(consoleSpy).toHaveBeenCalled();
@@ -849,8 +897,14 @@ describe('DocumentService', () => {
     });
 
     it('exports DocumentFetchError as a real Error subclass', () => {
-      const err = new DocumentFetchError('boom', 503);
+      const err = new DocumentFetchError('documents_preview_failed', 'boom', 503);
       expect(err).toBeInstanceOf(Error);
+      // TF-772: also an AppError, which is what lets translateError() resolve
+      // it. `new.target.prototype` in AppError's constructor is what keeps the
+      // subclass identity intact — assert both directions.
+      expect(err).toBeInstanceOf(AppError);
+      expect(err).toBeInstanceOf(DocumentFetchError);
+      expect(err.code).toBe('documents_preview_failed');
       expect(err.status).toBe(503);
       expect(err.name).toBe('DocumentFetchError');
     });

@@ -37,6 +37,7 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { ReviewService } from '../services/ReviewService';
+import { translateError } from '../errors';
 import { useAuth } from '../contexts/AuthContext';
 import {
   QuestionReview,
@@ -54,7 +55,12 @@ const ReviewQueue: React.FC = () => {
   const navigate = useNavigate();
   const [questions, setQuestions] = useState<QuestionReview[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The failure itself plus the key to fall back to — not the rendered
+  // sentence. translateError() needs `t`, and calling it inside the
+  // loadQuestions useCallback below would put `t` in its dependency array and
+  // reload the queue on every language switch. Resolved at render instead.
+  type Failure = { error: unknown; fallbackKey: string };
+  const [failure, setFailure] = useState<Failure | null>(null);
 
   // Statistics
   const [stats, setStats] = useState({
@@ -98,12 +104,12 @@ const ReviewQueue: React.FC = () => {
   const canDelete = hasPermission('delete_questions');
   const [deleteQuestionId, setDeleteQuestionId] = useState<number | null>(null);
   // TF-408: Show delete error inline in the dialog (instead of a banner above, outside the viewport)
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteFailure, setDeleteFailure] = useState<Failure | null>(null);
 
   // Load questions
   const loadQuestions = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setFailure(null);
 
     try {
       const response = await ReviewService.getReviewQueue(filters);
@@ -116,7 +122,7 @@ const ReviewQueue: React.FC = () => {
         in_review: response.in_review,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load questions');
+      setFailure({ error: err, fallbackKey: 'components.reviewQueue.errorLoad' });
     } finally {
       setLoading(false);
     }
@@ -142,7 +148,7 @@ const ReviewQueue: React.FC = () => {
       await ReviewService.startReview(questionId);
       navigate(`/questions/review/${questionId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('components.reviewQueue.errorStartReview'));
+      setFailure({ error: err, fallbackKey: 'components.reviewQueue.errorStartReview' });
     } finally {
       setLoading(false);
     }
@@ -192,7 +198,7 @@ const ReviewQueue: React.FC = () => {
       setActionReason('');
       await loadQuestions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Action failed');
+      setFailure({ error: err, fallbackKey: 'components.reviewQueue.errorAction' });
     } finally {
       setLoading(false);
     }
@@ -205,7 +211,7 @@ const ReviewQueue: React.FC = () => {
       await ReviewService.archiveQuestion(questionId);
       await loadQuestions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('components.reviewQueue.errorArchive'));
+      setFailure({ error: err, fallbackKey: 'components.reviewQueue.errorArchive' });
     } finally {
       setLoading(false);
     }
@@ -217,27 +223,27 @@ const ReviewQueue: React.FC = () => {
       await ReviewService.restoreQuestion(questionId);
       await loadQuestions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('components.reviewQueue.errorRestore'));
+      setFailure({ error: err, fallbackKey: 'components.reviewQueue.errorRestore' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = (questionId: number) => {
-    setDeleteError(null);
+    setDeleteFailure(null);
     setDeleteQuestionId(questionId);
   };
 
   // TF-408: Close dialog and reset delete error
   const closeDeleteDialog = () => {
     setDeleteQuestionId(null);
-    setDeleteError(null);
+    setDeleteFailure(null);
   };
 
   const executeDelete = async () => {
     if (!deleteQuestionId) return;
     setLoading(true);
-    setDeleteError(null);
+    setDeleteFailure(null);
     try {
       await ReviewService.deleteQuestion(deleteQuestionId);
       closeDeleteDialog();
@@ -246,7 +252,7 @@ const ReviewQueue: React.FC = () => {
       // TF-408: Show the error inline in the open dialog — the dialog stays
       // open (deleteQuestionId unchanged) so the message always stays in the
       // user's focus, instead of as a banner above, outside the viewport.
-      setDeleteError(err instanceof Error ? err.message : t('components.reviewQueue.errorDelete'));
+      setDeleteFailure({ error: err, fallbackKey: 'components.reviewQueue.errorDelete' });
     } finally {
       setLoading(false);
     }
@@ -259,7 +265,7 @@ const ReviewQueue: React.FC = () => {
       // Closing the modal and reloading data happen once in onClose,
       // after the tags have also been saved.
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save changes');
+      setFailure({ error: err, fallbackKey: 'components.reviewQueue.errorSave' });
       throw err;
     } finally {
       setLoading(false);
@@ -281,7 +287,7 @@ const ReviewQueue: React.FC = () => {
       setCommentText('');
       await loadQuestions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add comment');
+      setFailure({ error: err, fallbackKey: 'components.reviewQueue.errorComment' });
     } finally {
       setLoading(false);
     }
@@ -419,9 +425,9 @@ const ReviewQueue: React.FC = () => {
       </Paper>
 
       {/* Error Alert */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
+      {failure && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setFailure(null)}>
+          {translateError(failure.error, t, failure.fallbackKey)}
         </Alert>
       )}
 
@@ -544,9 +550,9 @@ const ReviewQueue: React.FC = () => {
         <DialogContent>
           <Typography>{t('components.reviewQueue.deleteConfirm')}</Typography>
           {/* TF-408: Delete error inline in the dialog — always in the viewport, right where the user is interacting */}
-          {deleteError && (
+          {deleteFailure && (
             <Alert severity="error" sx={{ mt: 2 }}>
-              {deleteError}
+              {translateError(deleteFailure.error, t, deleteFailure.fallbackKey)}
             </Alert>
           )}
         </DialogContent>

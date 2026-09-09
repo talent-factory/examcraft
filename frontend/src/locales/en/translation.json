@@ -144,8 +144,11 @@
           "confirmThreshold_one": "Approve {{count}} suggestion with confidence ≥ {{threshold}}%?",
           "confirmThreshold_other": "Approve {{count}} suggestions with confidence ≥ {{threshold}}%?",
           "success_one": "{{count}} grade approved.",
-          "success_other": "{{count}} grades approved."
-        }
+          "success_other": "{{count}} grades approved.",
+          "thresholdAria": "Bulk approval threshold"
+        },
+        "confidenceRangeAria": "Confidence range",
+        "selectGradeAria": "Select grade"
       }
     },
     "deleteImportDialog": {
@@ -1676,7 +1679,7 @@
       "tabOriginal": "Original",
       "tabChunks": "Chunks",
       "originalLoading": "Loading original…",
-      "originalError": "Could not load original: {{error}}",
+      "originalError": "The original could not be loaded.",
       "originalErrorNetwork": "Network error — please check your connection and retry.",
       "originalErrorAuth": "Session expired — please sign in again.",
       "originalErrorPermission": "You don't have permission to view this document.",
@@ -1687,7 +1690,7 @@
       "originalOpenInNewTab": "Open PDF in new tab",
       "originalDocxPending": "An embedded preview for DOCX files is coming in a later release. You can find the extracted text under the Chunks tab.",
       "originalUnsupported": "No direct preview is available for this file type. See the Chunks tab for content.",
-      "chunksLoadError": "Failed to load chunks: {{error}}",
+      "chunksLoadError": "Chunks could not be loaded.",
       "docInfo": "Document Information",
       "originalFile": "Original File:",
       "fileSize": "File Size:",
@@ -1777,7 +1780,8 @@
         "heading": "Tags",
         "createHint": "Create a new tag: just type and press Enter.",
         "institutionTagDisabled": "Only for institution-shared documents",
-        "ownerOnlyTagDisabled": "Only the owner can change shared tags"
+        "ownerOnlyTagDisabled": "Only the owner can change shared tags",
+        "saveError": "Tags could not be saved."
       },
       "list": {
         "colVisibility": "Visibility",
@@ -1812,7 +1816,8 @@
         "tagsApply": "Apply",
         "tagsSummary": "Tags updated for {{changed}} documents, {{skipped}} skipped",
         "tagsSummaryWithErrors": "Tags updated for {{changed}} documents, {{skipped}} skipped, {{failed}} errors"
-      }
+      },
+      "chatExportChip": "Chat"
     },
     "documentChatPage": {
       "title": "Document Chat - Premium Feature",
@@ -1861,7 +1866,9 @@
       "orgUnitsLoadError": "Couldn't load your teams. Please try again later.",
       "orgUnitPickerPlaceholder": "Select Org-Unit…",
       "visibilityInstitution": "Institution — all members of {{institution}} can see this document",
-      "visibilityNoInstitution": "No institution assigned"
+      "visibilityNoInstitution": "No institution assigned",
+      "cancelledByUser": "Cancelled by user",
+      "uploadFailed": "Upload failed"
     },
     "documentVisibility": {
       "title": "Change visibility",
@@ -1874,7 +1881,7 @@
       "noInstitution": "No institution assigned",
       "cancel": "Cancel",
       "save": "Save",
-      "saveError": "Could not change visibility"
+      "saveError": "Visibility could not be changed"
     },
     "documentPrivacyBanner": {
       "message": "ExamCraft has improved its visibility model: the documents you've uploaded so far are now visible only to you. If you'd like to share documents with your institution, you can switch them individually in the library."
@@ -1923,7 +1930,11 @@
       "deleteConfirmBtn": "Delete",
       "errorArchive": "Archiving failed",
       "errorRestore": "Restore failed",
-      "errorDelete": "Deletion failed"
+      "errorDelete": "Deletion failed",
+      "errorLoad": "Questions could not be loaded",
+      "errorAction": "Action failed",
+      "errorSave": "Changes could not be saved",
+      "errorComment": "Comment could not be added"
     },
     "questionCard": {
       "competencyTooltip": "Competency: {{title}}",
@@ -2868,7 +2879,6 @@
     }
   },
   "errors": {
-    "network": "The server is unreachable. Please check your connection.",
     "compliance": {
       "loadFailed": "The compliance documents could not be loaded."
     },
@@ -2906,7 +2916,64 @@
       "providerError": "Sign-in with the provider failed.",
       "callbackFailed": "The sign-in could not be completed."
     },
+    "archive_already_archived": "Question is already archived",
+    "archive_failed": "Archiving failed",
+    "archive_not_archived": "Question is not archived",
+    "delete_failed": "Deletion failed",
+    "delete_in_exam": "Question is used in an exam and cannot be deleted",
+    "delete_requires_archive": "Question must be archived before it can be deleted",
+    "documents_access_denied": "Access to this document is denied",
+    "documents_chunks_load_failed": "Failed to load document chunks",
+    "documents_content_load_failed": "Failed to load document content",
+    "documents_content_not_available": "Document content is not available",
+    "documents_delete_failed": "Failed to delete document",
+    "documents_download_failed": "Document download failed",
+    "documents_download_storage_failed": "Download from storage failed",
+    "documents_file_not_found_disk": "File not found on disk",
+    "documents_file_not_found_storage": "File not found in storage",
+    "documents_invalid_filter": "Invalid filter value.",
+    "documents_invalid_status": "Invalid status filter",
+    "documents_list_failed": "Failed to load document list",
+    "documents_load_failed": "Failed to load document",
+    "documents_not_found": "Document not found",
+    "documents_not_processed": "Document has not been processed yet",
+    "documents_page_out_of_range": "Page number is out of range",
+    "documents_preview_failed": "Preview could not be loaded — try downloading or retry shortly.",
+    "documents_processing_failed": "Document processing failed",
+    "documents_reindex_failed": "Document could not be reindexed",
+    "documents_rename_failed": "Failed to rename document",
+    "documents_rename_owner_only": "Only the owner can rename this document",
+    "documents_status_failed": "Failed to retrieve document status",
+    "documents_storage_unavailable": "Storage service temporarily unavailable — please try again in a few seconds.",
+    "documents_tag_exists": "A tag with this name already exists.",
+    "documents_tag_failed": "Could not save the document tags.",
+    "documents_tag_institution_admin_only": "Only administrators may create institution tags.",
+    "documents_tag_institution_requires_shared": "An institution tag can only be attached to institution-shared documents.",
+    "documents_tag_not_found": "Tag not found.",
+    "documents_tag_owner_only": "Only the owner may change this document's tags.",
+    "documents_tags_load_failed": "Tags could not be loaded.",
+    "documents_upload_failed": "Document upload failed",
+    "documents_visibility_invalid_org_unit": "Cannot share with team: no valid Org-Unit of your own provided",
+    "documents_visibility_no_institution": "Cannot share with institution: no institution assigned",
+    "documents_visibility_owner_only": "Only the owner can change visibility",
+    "documents_visibility_update_failed": "Visibility could not be changed",
     "internal_error": "An unexpected error occurred. Please try again later.",
+    "network": "The server is unreachable. Please check your connection.",
+    "rag_get_documents_failed": "Failed to retrieve documents",
+    "restore_failed": "Restore failed",
+    "review_add_comment_failed": "Failed to add comment",
+    "review_approve_failed": "Failed to approve question",
+    "review_create_failed": "Failed to create question",
+    "review_edit_failed": "Failed to edit question",
+    "review_fetch_comments_failed": "Failed to load comments",
+    "review_fetch_history_failed": "Failed to load history",
+    "review_fetch_question_failed": "Failed to load question",
+    "review_fetch_queue_failed": "Failed to load review queue",
+    "review_four_eyes_principle": "Four-eyes principle: creator cannot approve their own question",
+    "review_invalid_status_for_review": "Invalid status for review",
+    "review_question_not_found": "Question not found",
+    "review_reject_failed": "Failed to reject question",
+    "review_start_failed": "Failed to start review",
     "validation_error": "The request is invalid. Please check your input."
   },
   "help": {

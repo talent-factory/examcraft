@@ -18,10 +18,26 @@ import DocumentLibrary from '../DocumentLibrary';
 import { DocumentService } from '../../services/DocumentService';
 import { OrgUnitsService } from '../../services/orgUnitsService';
 import { Document, DocumentStatus, DocumentVisibility } from '../../types/document';
+// Not from DocumentService — that module is automocked below, so its
+// DocumentFetchError export would be a mock constructor. The real AppError
+// plus the duck-typed `name`/`status` is what both branches actually read.
+import { AppError } from '../../errors';
+
+// `t` echoes the key, as the shared setupTests mock does — with one
+// exception. translateError() detects a missing translation by comparing
+// t(key) to the key itself, so an echoing mock makes EVERY error key look
+// untranslated and sends every assertion down the fallback branch. The two
+// codes exercised here therefore resolve to a marker string; the fallback key
+// still echoes, which is what keeps the two branches distinguishable.
+const TRANSLATED_ERROR_KEYS = [
+  'errors.documents_rename_owner_only',
+  'errors.documents_rename_failed',
+];
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string) =>
+      TRANSLATED_ERROR_KEYS.includes(key) ? `übersetzt:${key}` : key,
     i18n: { language: 'de' },
   }),
 }));
@@ -104,10 +120,10 @@ describe('DocumentLibrary card view — rename owner guard (TF-606)', () => {
     // invites a retry loop.
     mockDocumentService.listDocuments.mockResolvedValue(paged([makeDoc()]));
     mockDocumentService.renameDocument.mockRejectedValue(
-      Object.assign(new Error('Nur der Eigentümer darf dieses Dokument umbenennen'), {
-        name: 'DocumentFetchError',
-        status: 403,
-      }),
+      Object.assign(
+        new AppError('documents_rename_owner_only', 'owner only', 403),
+        { name: 'DocumentFetchError' },
+      ),
     );
     render(wrap(<DocumentLibrary />));
     await screen.findByText('My Document');
@@ -117,8 +133,12 @@ describe('DocumentLibrary card view — rename owner guard (TF-606)', () => {
     fireEvent.change(field, { target: { value: 'Neuer Name' } });
     fireEvent.keyDown(field, { key: 'Enter' });
 
+    // TF-772: the message comes from the error's CODE, not from the backend's
+    // prose. `t` is mocked to echo the key, so the rendered key is the proof
+    // that `documents_rename_owner_only` — and not the generic renameError
+    // fallback — drove the message.
     expect(
-      await screen.findByText('Nur der Eigentümer darf dieses Dokument umbenennen'),
+      await screen.findByText('übersetzt:errors.documents_rename_owner_only'),
     ).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByDisplayValue('Neuer Name')).not.toBeInTheDocument();
@@ -128,7 +148,7 @@ describe('DocumentLibrary card view — rename owner guard (TF-606)', () => {
   it('keeps the editor open on a non-permission failure so the input is not lost', async () => {
     mockDocumentService.listDocuments.mockResolvedValue(paged([makeDoc()]));
     mockDocumentService.renameDocument.mockRejectedValue(
-      Object.assign(new Error('Serverfehler'), { status: 500 }),
+      new AppError('documents_rename_failed', 'Serverfehler', 500),
     );
     render(wrap(<DocumentLibrary />));
     await screen.findByText('My Document');
@@ -138,7 +158,7 @@ describe('DocumentLibrary card view — rename owner guard (TF-606)', () => {
     fireEvent.change(field, { target: { value: 'Neuer Name' } });
     fireEvent.keyDown(field, { key: 'Enter' });
 
-    expect(await screen.findByText('Serverfehler')).toBeInTheDocument();
+    expect(await screen.findByText('übersetzt:errors.documents_rename_failed')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Neuer Name')).toBeInTheDocument();
   });
 });

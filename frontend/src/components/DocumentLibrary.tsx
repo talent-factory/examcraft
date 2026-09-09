@@ -58,6 +58,7 @@ import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../utils/dateLocale';
 import { useAuth } from '../contexts/AuthContext';
 import { DocumentService } from '../services/DocumentService';
+import { translateError } from '../errors';
 import { OrgUnitsService } from '../services/orgUnitsService';
 import { OrgUnitOut } from '../types/orgUnit';
 import { Document, DocumentStatus, DocumentVisibility, DocumentStats, DocumentTag, DocumentListParams } from '../types/document';
@@ -77,9 +78,15 @@ const isDocumentReady = (status: string | undefined | null): boolean =>
 
 /**
  * Pick a localized error key for the ORIGINAL preview based on the HTTP
- * status of a `DocumentFetchError`. Falls back to the generic
- * `originalError` key (which interpolates the raw message) for unmapped
- * statuses so the user still sees something actionable.
+ * status of a `DocumentFetchError`, falling back to the generic
+ * `originalError` key for unmapped statuses.
+ *
+ * Kept in preference to the error's own `code` (TF-772) because these six
+ * sentences are written for this one surface and say more than the backend's
+ * generic equivalents: a 401 becomes "session expired — please sign in again",
+ * where `documents_preview_failed` could only say the preview failed. The
+ * statuses it maps are also mostly ones the backend cannot attach a code to at
+ * all — 0 (no HTTP response), 401 (the auth layer), 429/503 (a proxy).
  */
 const errorKeyForStatus = (status: number): string => {
   if (status === 0) return 'components.documentLibrary.originalErrorNetwork';
@@ -116,8 +123,11 @@ const OriginalDocumentContent: React.FC<OriginalDocumentContentProps> = ({ doc }
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [errorKey, setErrorKey] = useState<string | null>(null);
-  const [errorDetail, setErrorDetail] = useState<string>('');
+  // The error itself, not a rendered message: translating inside the effect
+  // would put `t` in its dependency array and re-fetch the document on every
+  // language switch. Resolved at render instead, which also means the message
+  // follows a language change without a refetch.
+  const [failure, setFailure] = useState<{ error: unknown } | null>(null);
 
   const mime = doc.mime_type || '';
   const isChatExport = doc.metadata?.source === 'chat_export';
@@ -142,8 +152,7 @@ const OriginalDocumentContent: React.FC<OriginalDocumentContentProps> = ({ doc }
     }
 
     setLoading(true);
-    setErrorKey(null);
-    setErrorDetail('');
+    setFailure(null);
 
     (async () => {
       try {
@@ -166,24 +175,7 @@ const OriginalDocumentContent: React.FC<OriginalDocumentContentProps> = ({ doc }
         // AbortError is the expected outcome of unmount/document switch —
         // never surface it as an error to the user.
         if (e instanceof DOMException && e.name === 'AbortError') return;
-        // Duck-type DocumentFetchError so the check survives jest auto-mocks
-        // (where the module-scope class identity may diverge between
-        // component and test imports).
-        const maybeFetchErr = e as { name?: string; status?: number; message?: string };
-        if (
-          maybeFetchErr?.name === 'DocumentFetchError' &&
-          typeof maybeFetchErr.status === 'number'
-        ) {
-          setErrorKey(errorKeyForStatus(maybeFetchErr.status));
-          setErrorDetail(maybeFetchErr.message ?? '');
-        } else {
-          setErrorKey('components.documentLibrary.originalError');
-          setErrorDetail(
-            e && typeof e === 'object' && 'message' in e
-              ? (e as Error).message
-              : 'Unknown error',
-          );
-        }
+        setFailure({ error: e });
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -219,12 +211,16 @@ const OriginalDocumentContent: React.FC<OriginalDocumentContentProps> = ({ doc }
     );
   }
 
-  if (errorKey) {
-    return (
-      <Alert severity="error">
-        {t(errorKey, { error: errorDetail })}
-      </Alert>
-    );
+  if (failure) {
+    // Duck-type DocumentFetchError so the check survives jest auto-mocks
+    // (where the module-scope class identity may diverge between component
+    // and test imports).
+    const maybeFetchErr = failure.error as { name?: string; status?: number };
+    const message =
+      maybeFetchErr?.name === 'DocumentFetchError' && typeof maybeFetchErr.status === 'number'
+        ? t(errorKeyForStatus(maybeFetchErr.status))
+        : translateError(failure.error, t, 'components.documentLibrary.originalError');
+    return <Alert severity="error">{message}</Alert>;
   }
 
   if (isPdf && blobUrl) {
@@ -471,7 +467,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       if (requestId !== requestIdRef.current) {
         return;
       }
-      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.loadError'));
+      setError(translateError(err, t, 'components.documentLibrary.loadError'));
     } finally {
       // Only the most recent request controls the loading / initial-load flags.
       if (requestId === requestIdRef.current) {
@@ -604,19 +600,15 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
     );
   };
 
-  // Prefer the backend detail — for a 403 that is the localized
-  // `documents_rename_owner_only` text, which explains the restriction the
-  // generic fallback cannot (TF-606). A blank/whitespace-only message (e.g.
-  // the backend omitted `detail`) is treated as no message at all, so the
-  // localized default below is used instead of an empty or English
-  // statusText-derived string leaking through.
-  const renameErrorMessage = (err: unknown): string => {
-    const message =
-      err && typeof err === 'object' && 'message' in err ? (err as Error).message : '';
-    return typeof message === 'string' && message.trim().length > 0
-      ? message
-      : t('components.documentLibrary.renameError', 'Umbenennen fehlgeschlagen');
-  };
+  // Prefer the backend's error code — for a 403 that is
+  // `documents_rename_owner_only`, which explains the restriction the generic
+  // fallback cannot (TF-606). Until TF-772 this read the backend's `detail`
+  // text directly; the code resolves to the same sentence from the frontend
+  // locales, but in the UI language rather than the request's, and an
+  // unrecognised or missing code falls through to the localized default
+  // instead of leaking an empty string.
+  const renameErrorMessage = (err: unknown): string =>
+    translateError(err, t, 'components.documentLibrary.renameError');
 
   // TF-355 Phase 3: rename handler for list view (independent of card-view state).
   //
@@ -730,11 +722,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       // eslint-disable-next-line no-console
       console.error('Failed to load document chunks:', err);
       setDocumentChunks([]);
-      setChunksError(
-        err && typeof err === 'object' && 'message' in err
-          ? (err as Error).message
-          : 'Unknown error',
-      );
+      setChunksError(translateError(err, t, 'components.documentLibrary.chunksLoadError'));
     } finally {
       setChunksLoading(false);
     }
@@ -754,7 +742,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       setSelectedDocuments(prev => prev.filter(id => id !== deleteDialog.document!.id));
       setDeleteDialog({ open: false, document: null });
     } catch (err) {
-      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.deleteError'));
+      setError(translateError(err, t, 'components.documentLibrary.deleteError'));
     }
   };
 
@@ -764,7 +752,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       await DocumentService.downloadDocument(document.id, document.original_filename);
       handleMenuClose();
     } catch (err) {
-      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.downloadError'));
+      setError(translateError(err, t, 'components.documentLibrary.downloadError'));
     }
   };
 
@@ -837,9 +825,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       setVisibilityDialog({ open: false, document: null });
     } catch (err) {
       setVisibilityError(
-        err && typeof err === 'object' && 'message' in err
-          ? (err as Error).message
-          : t('components.documentVisibility.saveError', 'Sichtbarkeit konnte nicht geändert werden'),
+        translateError(err, t, 'components.documentVisibility.saveError'),
       );
     } finally {
       setSavingVisibility(false);
@@ -860,49 +846,10 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
       setError(null);
 
     } catch (err) {
-      setError(err && typeof err === 'object' && 'message' in err ? (err as Error).message : t('components.documentLibrary.processError'));
+      setError(translateError(err, t, 'components.documentLibrary.processError'));
     } finally {
       setProcessingDocumentId(null);
     }
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const waitForDocumentProcessing = async (
-    documentId: number,
-    maxWaitTime: number = 1800000 // 30 minutes for large documents
-  ) => {
-    const startTime = Date.now();
-    const pollInterval = 3000; // Poll every 3 seconds
-    let pollCount = 0;
-
-    while (Date.now() - startTime < maxWaitTime) {
-      try {
-        const status = await DocumentService.getProcessingStatus(documentId);
-
-        // Reload document list every 5 polls (15 seconds) to show progress
-        pollCount++;
-        if (pollCount % 5 === 0) {
-          await loadDocuments();
-        }
-
-        if (status.status === 'Verarbeitet' || status.status === 'processed') {
-          return; // Processing complete
-        }
-
-        if (status.status === 'Fehler' || status.status === 'error') {
-          throw new Error(`Document processing failed: ${status.status}`);
-        }
-
-        // Wait before next poll
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
-      } catch (error) {
-        console.error('Error checking document status:', error);
-        // Keep retrying
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
-      }
-    }
-
-    throw new Error(`Document processing timeout after ${maxWaitTime / 60000} minutes. Please try again or contact support for large documents.`);
   };
 
   const handleCreateRAGExam = () => {
@@ -1367,7 +1314,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                       )}
                       {document.metadata?.source === 'chat_export' && (
                         <Chip
-                          label="Chat"
+                          label={t('components.documentLibrary.chatExportChip')}
                           size="small"
                           color="info"
                           sx={{ height: 20, fontSize: '0.7rem' }}
@@ -1860,7 +1807,7 @@ const DocumentLibrary: React.FC<DocumentLibraryProps> = ({
                   <Box>
                     {chunksError && (
                       <Alert severity="error" sx={{ mb: 2 }} onClose={() => setChunksError(null)}>
-                        {t('components.documentLibrary.chunksLoadError', { error: chunksError })}
+                        {chunksError}
                       </Alert>
                     )}
                     {/* Fallback for non-chat-export documents that happen to

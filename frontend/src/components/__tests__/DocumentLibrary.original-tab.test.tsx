@@ -223,7 +223,7 @@ describe('OriginalDocumentContent (TF-332)', () => {
   it('maps DocumentFetchError(401) to the auth-error i18n key', async () => {
     const doc = baseDoc();
     mockDocumentService.getDocumentRaw.mockRejectedValue(
-      new DocumentFetchError('Could not validate credentials', 401),
+      new DocumentFetchError('documents_preview_failed', 'Could not validate credentials', 401),
     );
 
     await openPreview(doc);
@@ -239,7 +239,7 @@ describe('OriginalDocumentContent (TF-332)', () => {
   it('maps DocumentFetchError(404) to the missing-file i18n key', async () => {
     const doc = baseDoc();
     mockDocumentService.getDocumentRaw.mockRejectedValue(
-      new DocumentFetchError('not found', 404),
+      new DocumentFetchError('documents_not_found', 'not found', 404),
     );
 
     await openPreview(doc);
@@ -254,7 +254,7 @@ describe('OriginalDocumentContent (TF-332)', () => {
   it('treats status === 0 as a network error', async () => {
     const doc = baseDoc();
     mockDocumentService.getDocumentRaw.mockRejectedValue(
-      new DocumentFetchError('Failed to fetch', 0),
+      new DocumentFetchError('documents_preview_failed', 'Failed to fetch', 0),
     );
 
     await openPreview(doc);

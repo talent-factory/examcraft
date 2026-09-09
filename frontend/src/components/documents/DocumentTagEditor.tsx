@@ -8,6 +8,7 @@ import Chip from '@mui/material/Chip';
 import { useTranslation } from 'react-i18next';
 import { Document, DocumentTag, DocumentVisibility } from '../../types/document';
 import { DocumentService } from '../../services/DocumentService';
+import { translateError } from '../../errors';
 
 interface DocumentTagEditorProps {
   document: Document;
@@ -118,11 +119,9 @@ const DocumentTagEditor: React.FC<DocumentTagEditorProps> = ({
 
       if (mutated) onChanged(latest);
     } catch (err) {
-      setError(
-        err && typeof err === 'object' && 'message' in err
-          ? (err as Error).message
-          : String(err),
-      );
+      // `documents_tag_exists` / `documents_tag_institution_admin_only` say
+      // why the save was refused; the generic fallback only says that it was.
+      setError(translateError(err, t, 'components.documentLibrary.tagEditor.saveError'));
     } finally {
       setSaving(false);
     }

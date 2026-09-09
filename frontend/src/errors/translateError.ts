@@ -1,11 +1,16 @@
-import { isAppError } from './AppError';
+import { ErrorParams, isAppError } from './AppError';
 
 /**
  * Minimal structural type for i18next's `t`. Deliberately not `TFunction`:
  * i18next v25's overloaded signature is awkward to satisfy from call sites,
  * and all we need is key -> string.
+ *
+ * The optional second argument carries `AppError.params` (the backend's
+ * `error_params`, ADR 0005) into i18next's interpolation. It is optional so
+ * that the one-argument `t` stubs in component tests stay assignable — a
+ * function that ignores an argument satisfies a signature that offers one.
  */
-export type Translate = (key: string) => string;
+export type Translate = (key: string, params?: ErrorParams) => string;
 
 const ERROR_KEY_PREFIX = 'errors.';
 
@@ -15,6 +20,12 @@ const ERROR_KEY_PREFIX = 'errors.';
  * Order: `errors.<code>` for an AppError whose key exists, otherwise the
  * caller's `fallbackKey`. The raw message/detail is logged, never returned —
  * that invariant is what keeps untranslated text out of the UI.
+ *
+ * `err.params` is handed to i18next for interpolation, so a code whose text
+ * contains `{{name}}` renders with the value the backend sent. The fallback
+ * deliberately gets no params: it is a different sentence, written without
+ * placeholders, and passing them there would only invite a fallback text that
+ * silently depends on a value it may not receive.
  *
  * Missing-key detection relies on i18next (and the react-i18next mock in
  * setupTests.ts) returning the key itself when it cannot resolve it. Using
@@ -44,7 +55,7 @@ export function translateError(err: unknown, t: Translate, fallbackKey: string):
 
   if (isAppError(err)) {
     const key = `${ERROR_KEY_PREFIX}${err.code}`;
-    const translated = t(key);
+    const translated = t(key, err.params);
     if (translated !== key) {
       // Expected, fully-handled path — code resolved to a translation. Not a
       // problem to warn about; debug-level keeps it out of normal noise while

@@ -448,6 +448,14 @@ describe.skip('ReviewQueue', () => {
   });
 
   describe('Error Handling', () => {
+    // NOTE: this whole suite is `describe.skip` (see the top of the file) and
+    // was not run when TF-772 changed the component. Updated anyway so that
+    // whoever un-skips it does not first have to work out why an assertion on
+    // a raw error message fails: the queue no longer renders `err.message`,
+    // it renders `translateError()`'s resolved `components.reviewQueue.errorLoad`
+    // text for an untyped error — the setupTests `t` mock resolves real keys
+    // to their real translation (see `mockResolveKey`), so asserting on the
+    // literal key string here would itself fail once un-skipped.
     it('displays error message when loading fails', async () => {
       mockReviewService.getReviewQueue.mockRejectedValue(new Error('Failed to load'));
 
@@ -458,9 +466,10 @@ describe.skip('ReviewQueue', () => {
       );
 
       await waitFor(() => {
-        // Check for error alert with specific error message
         const alerts = screen.getAllByRole('alert');
-        const errorAlert = alerts.find(alert => alert.textContent?.includes('Failed to load'));
+        const errorAlert = alerts.find(alert =>
+          alert.textContent?.includes('Fragen konnten nicht geladen werden'),
+        );
         expect(errorAlert).toBeInTheDocument();
       }, { timeout: 3000 });
     });

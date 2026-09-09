@@ -42,9 +42,21 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { DocumentService } from '../services/DocumentService';
+import { translateError } from '../errors';
 import { OrgUnitsService } from '../services/orgUnitsService';
 import { OrgUnitOut } from '../types/orgUnit';
 import { DocumentUploadResponse, DocumentProcessingResponse, DocumentVisibility } from '../types/document';
+
+/**
+ * Control-flow sentinel for an upload the user aborted mid-flight. Never
+ * rendered — the catch below replaces it with a translated message.
+ *
+ * A dedicated class rather than the `message.includes('cancel')` check this
+ * replaces: since TF-772 an error's `message` is the backend's `detail`, so
+ * matching prose for the word "cancel" would misclassify a real failure as a
+ * cancellation and silently drop it.
+ */
+class UploadCancelled extends Error {}
 
 interface UploadFile {
   file: File;
@@ -197,7 +209,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       file.abortController.abort();
       setUploadFiles(prev => prev.map(f =>
         f.id === fileId
-          ? { ...f, status: 'cancelled', error: 'Upload cancelled by user' }
+          ? { ...f, status: 'cancelled', error: t('components.documentUpload.cancelledByUser') }
           : f
       ));
     }
@@ -236,7 +248,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
       // Check if cancelled
       if (abortController.signal.aborted) {
-        throw new Error('Upload cancelled');
+        throw new UploadCancelled();
       }
 
       // Update with upload result
@@ -258,7 +270,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
       // Check if cancelled
       if (abortController.signal.aborted) {
-        throw new Error('Processing cancelled');
+        throw new UploadCancelled();
       }
 
       // Mark as "completed" IMMEDIATELY - processing runs in the background!
@@ -282,17 +294,26 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       onUploadComplete?.(uploadResult.document_id, file.name);
 
     } catch (error) {
-      // Check if it was a cancellation
-      if (abortController.signal.aborted || (error && typeof error === 'object' && 'message' in error && (error as Error).message.includes('cancel'))) {
+      // Check if it was a cancellation. Deliberately `instanceof
+      // UploadCancelled` only, not `|| abortController.signal.aborted`: both
+      // throw sites above already gate on `signal.aborted` before throwing
+      // the sentinel, so the sentinel alone is sufficient. Also OR-ing the
+      // live flag here would reopen the exact bug the sentinel exists to
+      // close — a genuine error from uploadDocument()/processDocument()
+      // that lands after the user clicks Cancel (a real race, since the
+      // signal is not actually wired into the underlying fetch) would be
+      // silently reclassified as "cancelled by user" and dropped instead of
+      // reported.
+      if (error instanceof UploadCancelled) {
         setUploadFiles(prev => prev.map(f =>
           f.id === fileId
-            ? { ...f, status: 'cancelled', error: 'Upload cancelled by user', abortController: undefined }
+            ? { ...f, status: 'cancelled', error: t('components.documentUpload.cancelledByUser'), abortController: undefined }
             : f
         ));
         return;
       }
 
-      const errorMessage = error && typeof error === 'object' && 'message' in error ? (error as Error).message : 'Upload failed';
+      const errorMessage = translateError(error, t, 'components.documentUpload.uploadFailed');
 
       setUploadFiles(prev => prev.map(f =>
         f.id === fileId

@@ -16,6 +16,7 @@ import {
   ReviewComment,
   ReviewHistory,
 } from '../types/review';
+import { appErrorFromResponse } from '../errors';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -56,8 +57,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch review queue: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_fetch_queue_failed');
     }
 
     return response.json();
@@ -75,8 +75,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to load question: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_fetch_question_failed');
     }
 
     return response.json();
@@ -95,8 +94,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch question review: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_fetch_question_failed');
     }
 
     return response.json();
@@ -118,8 +116,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to create question review: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_create_failed');
     }
 
     return response.json();
@@ -142,8 +139,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to approve question: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_approve_failed');
     }
 
     return response.json();
@@ -166,8 +162,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to reject question: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_reject_failed');
     }
 
     return response.json();
@@ -190,8 +185,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to archive question: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'archive_failed');
     }
 
     return response.json();
@@ -210,8 +204,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to restore question: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'restore_failed');
     }
 
     return response.json();
@@ -230,8 +223,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to delete question: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'delete_failed');
     }
   }
 
@@ -251,8 +243,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to bulk-delete questions: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'delete_failed');
     }
 
     return response.json();
@@ -271,8 +262,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to start review: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_start_failed');
     }
 
     return response.json();
@@ -295,8 +285,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to edit question: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_edit_failed');
     }
 
     return response.json();
@@ -315,8 +304,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch comments: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_fetch_comments_failed');
     }
 
     return response.json();
@@ -339,8 +327,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to add comment: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_add_comment_failed');
     }
 
     return response.json();
@@ -359,8 +346,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch question history: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_fetch_history_failed');
     }
 
     return response.json();
@@ -379,8 +365,7 @@ export class ReviewService {
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Failed to fetch review statistics: ${response.statusText}`);
+      throw await appErrorFromResponse(response, 'review_fetch_queue_failed');
     }
 
     const data: ReviewQueueResponse = await response.json();
