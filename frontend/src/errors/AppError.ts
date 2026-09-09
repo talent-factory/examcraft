@@ -1,10 +1,17 @@
 import { ADMIN_ERROR_CODES } from './codes/admin';
 import { AUTH_ERROR_CODES } from './codes/auth';
+import { CHAT_ERROR_CODES } from './codes/chat';
+import { DASHBOARD_ERROR_CODES } from './codes/dashboard';
 import { DOCUMENT_ERROR_CODES } from './codes/documents';
+import { GRADES_ERROR_CODES } from './codes/grades';
+import { HELP_ERROR_CODES } from './codes/help';
 import { LEGACY_ERROR_CODES } from './codes/legacy';
+import { ORG_UNITS_ERROR_CODES } from './codes/orgUnits';
+import { PROMPTS_ERROR_CODES } from './codes/prompts';
 import { RBAC_ERROR_CODES } from './codes/rbac';
 import { RESERVED_ERROR_CODES } from './codes/reserved';
 import { REVIEW_ERROR_CODES } from './codes/review';
+import { WIZARD_ERROR_CODES } from './codes/wizard';
 
 /**
  * Closed registry of valid AppError codes.
@@ -35,9 +42,16 @@ export const APP_ERROR_CODES = [
   ...RESERVED_ERROR_CODES,
   ...ADMIN_ERROR_CODES,
   ...AUTH_ERROR_CODES,
+  ...CHAT_ERROR_CODES,
+  ...DASHBOARD_ERROR_CODES,
   ...DOCUMENT_ERROR_CODES,
+  ...GRADES_ERROR_CODES,
+  ...HELP_ERROR_CODES,
+  ...ORG_UNITS_ERROR_CODES,
+  ...PROMPTS_ERROR_CODES,
   ...RBAC_ERROR_CODES,
   ...REVIEW_ERROR_CODES,
+  ...WIZARD_ERROR_CODES,
 ] as const;
 
 export type AppErrorCode = (typeof APP_ERROR_CODES)[number];

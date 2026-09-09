@@ -29,7 +29,7 @@ import {
 
 import { OrgUnitOut } from '../../types/orgUnit';
 import { OrgUnitsService } from '../../services/orgUnitsService';
-import { ApiError } from '../../services/submissionsService';
+import { translateError } from '../../errors';
 import AdminService from '../../services/AdminService';
 import { Role } from '../../types/auth';
 
@@ -160,10 +160,13 @@ const OrgUnitEditor: React.FC<OrgUnitEditorProps> = ({
       onSaved();
       onClose();
     } catch (err) {
+      // Two call sites rather than one with a conditional key: the guard in
+      // `i18n-fallback-keys.test.ts` only sees a literal third argument, and a
+      // key it cannot see is a key nobody checks for FR/IT.
       setError(
-        err instanceof ApiError
-          ? err.message
-          : t(isEdit ? 'admin.orgUnits.failedUpdate' : 'admin.orgUnits.failedCreate'),
+        isEdit
+          ? translateError(err, t, 'admin.orgUnits.failedUpdate')
+          : translateError(err, t, 'admin.orgUnits.failedCreate'),
       );
     } finally {
       setSaving(false);

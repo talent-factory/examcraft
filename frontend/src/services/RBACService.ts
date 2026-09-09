@@ -275,6 +275,10 @@ class RBACService {
           const response = await this.checkPermission(featureName);
           results[featureName] = response.has_access;
         } catch (error) {
+          // A network failure or 500 here is not the same thing as "no
+          // access" — treating it identically would hide the real cause.
+          // Still resolve to `false` (the safe default), but leave a trace.
+          console.error(`checkMultiplePermissions: failed to check "${featureName}"`, error);
           results[featureName] = false;
         }
       })

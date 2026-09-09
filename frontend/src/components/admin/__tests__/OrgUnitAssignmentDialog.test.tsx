@@ -204,29 +204,46 @@ describe('OrgUnitAssignmentDialog', () => {
     );
   });
 
-  it('zeigt beim OrgUnits-Zweig desselben catch den generischen Fallback', async () => {
-    // `loadData` awaits AdminService.getUser and OrgUnitsService.list under
-    // one catch. Converting it was not optional — an AppError without
-    // `detail` would otherwise have rendered its bare code — but
-    // OrgUnitsService still throws plain Errors, so its specific text is
-    // replaced by the generic fallback here until that service itself is
-    // migrated (PR 4 territory). The two tests below pin the same behaviour
-    // for the other two catches (assign/remove), migrated in the TF-772 PR 3
-    // review-fixes round for consistency within this one dialog.
+  it('zeigt den Satz des OrgUnits-Codes aus demselben catch (TF-772 PR 4)', async () => {
+    // Successor to PR 3's regression test. `loadData` awaits
+    // AdminService.getUser and OrgUnitsService.list under one catch. PR 3
+    // converted the first and left the second throwing plain Errors, so every
+    // OrgUnits failure here collapsed to the generic fallback — deliberate,
+    // documented, and handed to PR 4. Now that OrgUnitsService throws AppError
+    // too, the banner says which of the two calls failed.
     mockedAdminService.getUser.mockResolvedValue(makeUser());
-    mockedOrgUnitsService.list.mockRejectedValue(new Error('OrgUnits-Dienst nicht erreichbar'));
+    mockedOrgUnitsService.list.mockRejectedValue(
+      new AppError('org_units_list_failed', 'OrgUnits-Dienst nicht erreichbar', 503),
+    );
+
+    render(<OrgUnitAssignmentDialog userId={7} isOpen onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    const banner = await screen.findByTestId('ouad-error');
+    expect(banner).toHaveTextContent('Organisationseinheiten konnten nicht geladen werden');
+    expect(banner).not.toHaveTextContent('Daten konnten nicht geladen werden');
+    // `detail` bleibt für die Log-Zeile und darf nie gerendert werden.
+    expect(banner).not.toHaveTextContent('OrgUnits-Dienst nicht erreichbar');
+  });
+
+  it('fällt auf den Schlüssel des Aufrufers zurück, wenn der Fehler untypisiert ist', async () => {
+    // Gegenprobe zum Test darüber: ohne Code bleibt es beim Fallback, und die
+    // rohe Meldung erreicht die Oberfläche trotzdem nicht.
+    mockedAdminService.getUser.mockResolvedValue(makeUser());
+    mockedOrgUnitsService.list.mockRejectedValue(new Error('Boom'));
 
     render(<OrgUnitAssignmentDialog userId={7} isOpen onClose={jest.fn()} onSuccess={jest.fn()} />);
 
     const banner = await screen.findByTestId('ouad-error');
     expect(banner).toHaveTextContent('Daten konnten nicht geladen werden');
-    expect(banner).not.toHaveTextContent('OrgUnits-Dienst nicht erreichbar');
+    expect(banner).not.toHaveTextContent('Boom');
   });
 
-  it('shows the translated fallback (not the raw message) and re-enables the button when assigning fails', async () => {
+  it('shows the registered org_units code sentence (not the raw message) and re-enables the button when assigning fails', async () => {
     mockedAdminService.getUser.mockResolvedValue(makeUser());
     mockedOrgUnitsService.list.mockResolvedValue({ items: [makeUnit({ id: 2, name: 'Backend-Team' })] });
-    mockedOrgUnitsService.addMember.mockRejectedValue(new Error('Bereits zugeordnet'));
+    mockedOrgUnitsService.addMember.mockRejectedValue(
+      new AppError('org_units_add_member_failed', 'Bereits zugeordnet', 409),
+    );
     const onSuccess = jest.fn();
 
     render(<OrgUnitAssignmentDialog userId={7} isOpen onClose={jest.fn()} onSuccess={onSuccess} />);
@@ -234,13 +251,13 @@ describe('OrgUnitAssignmentDialog', () => {
     fireEvent.click(await screen.findByTestId('ouad-btn-assign-2'));
 
     const banner = await screen.findByTestId('ouad-error');
-    expect(banner).toHaveTextContent('Zuweisung fehlgeschlagen');
+    expect(banner).toHaveTextContent('Zuordnung fehlgeschlagen');
     expect(banner).not.toHaveTextContent('Bereits zugeordnet');
     expect(onSuccess).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId('ouad-btn-assign-2')).not.toBeDisabled());
   });
 
-  it('shows the translated fallback (not the raw message) and re-enables the button when removing fails', async () => {
+  it('shows the registered org_units code sentence (not the raw message) and re-enables the button when removing fails', async () => {
     mockedAdminService.getUser.mockResolvedValue(
       makeUser({
         org_units: [
@@ -249,7 +266,9 @@ describe('OrgUnitAssignmentDialog', () => {
       }),
     );
     mockedOrgUnitsService.list.mockResolvedValue({ items: [makeUnit({ id: 1, name: 'Informatik' })] });
-    mockedOrgUnitsService.removeMember.mockRejectedValue(new Error('OrgUnit nicht gefunden'));
+    mockedOrgUnitsService.removeMember.mockRejectedValue(
+      new AppError('org_units_remove_member_failed', 'OrgUnit nicht gefunden', 404),
+    );
     const onSuccess = jest.fn();
 
     render(<OrgUnitAssignmentDialog userId={7} isOpen onClose={jest.fn()} onSuccess={onSuccess} />);
@@ -257,7 +276,7 @@ describe('OrgUnitAssignmentDialog', () => {
     fireEvent.click(await screen.findByTestId('ouad-btn-remove-1'));
 
     const banner = await screen.findByTestId('ouad-error');
-    expect(banner).toHaveTextContent('Entfernen fehlgeschlagen');
+    expect(banner).toHaveTextContent('Zuordnung konnte nicht entfernt werden');
     expect(banner).not.toHaveTextContent('OrgUnit nicht gefunden');
     expect(onSuccess).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId('ouad-btn-remove-1')).not.toBeDisabled());

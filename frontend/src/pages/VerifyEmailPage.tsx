@@ -13,6 +13,8 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 
+import { appErrorFromResponse, translateError } from '../errors';
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 interface VerificationResponse {
@@ -65,8 +67,7 @@ const VerifyEmailPage: React.FC = () => {
         );
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || t('pages.verifyEmail.verificationFailed'));
+          throw await appErrorFromResponse(response, 'auth_verification_failed');
         }
 
         const data: VerificationResponse = await response.json();
@@ -84,9 +85,9 @@ const VerifyEmailPage: React.FC = () => {
           setSuccess(false); // Clear success state
           setError(data.message || t('pages.verifyEmail.verificationFailed'));
         }
-      } catch (err: any) {
+      } catch (err) {
         setSuccess(false); // Clear success state
-        setError(err.message || t('pages.verifyEmail.verifyEmailError'));
+        setError(translateError(err, t, 'pages.verifyEmail.verifyEmailError'));
       } finally {
         setLoading(false);
       }

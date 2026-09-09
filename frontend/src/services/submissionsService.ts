@@ -27,6 +27,22 @@ export class ApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
   readonly issues: string[];
+  /**
+   * The backend's `error_code` / `error_params` (ADR 0005), when the body
+   * carried them (TF-772).
+   *
+   * Additive and optional: every existing consumer reads `message`, and none
+   * of them changes behaviour because these are set. They exist so a service
+   * built on `httpClient` can hand the code on to an `AppError` instead of
+   * discarding it while parsing — `httpClient.ensureOk` already reads the
+   * body, so the alternative was to parse it a second time somewhere else.
+   *
+   * Only `orgUnitsService` uses them today. The rest of the ApiError family
+   * (submissions, studentClasses, statistics, …) is a separate package; this
+   * is the seam it will need, not a migration of it.
+   */
+  readonly errorCode?: string;
+  readonly errorParams?: unknown;
 
   constructor(params: {
     kind: ApiErrorKind;
@@ -34,6 +50,8 @@ export class ApiError extends Error {
     message: string;
     detail?: unknown;
     issues?: string[];
+    errorCode?: string;
+    errorParams?: unknown;
   }) {
     super(params.message);
     this.name = 'ApiError';
@@ -41,6 +59,8 @@ export class ApiError extends Error {
     this.status = params.status;
     this.detail = params.detail;
     this.issues = params.issues ?? [];
+    this.errorCode = params.errorCode;
+    this.errorParams = params.errorParams;
   }
 }
 
@@ -54,13 +74,17 @@ export class ApiError extends Error {
  * `409 → 'conflict'`, even though `gradingSchemesService`/
  * `gradeExportService` already threw exactly that at runtime. This file
  * is the natural shared place for it: `ApiError` itself is already
- * defined here and imported by every other service (see
+ * defined here and imported by the services that still throw it (see
  * `import { ApiError } from './submissionsService'` there).
  *
  * Exported so other services import it instead of keeping their own
- * copy — see httpClient.ts, activityService.ts, gradesService.ts,
- * gradingSchemesService.ts, gradeExportService.ts,
- * moodleFeedbackPushService.ts.
+ * copy — see httpClient.ts, activityService.ts, gradingSchemesService.ts,
+ * gradeExportService.ts, moodleFeedbackPushService.ts.
+ *
+ * `gradesService.ts` dropped off that list in TF-772: it throws `AppError`
+ * with a code per operation now and has no use for an `ApiErrorKind`. The
+ * paragraph above keeps naming it, because the history of the divergent
+ * copies is what explains why this function exists at all.
  */
 export function statusToKind(status: number): ApiErrorKind {
   if (status === 401) return 'auth';

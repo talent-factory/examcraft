@@ -1,4 +1,5 @@
-import { AppError, AppErrorCode, ErrorParams, isAppErrorCode } from './AppError';
+import { AppError, AppErrorCode } from './AppError';
+import { ErrorBody, readDetail, readParams, selectCode } from './errorBody';
 
 /**
  * Turn a failed `fetch` Response into an `AppError` carrying the backend's
@@ -38,6 +39,9 @@ import { AppError, AppErrorCode, ErrorParams, isAppErrorCode } from './AppError'
  *     if (!response.ok) {
  *       throw await appErrorFromResponse(response, 'documents_upload_failed');
  *     }
+ *
+ * The axios services use `appErrorFromAxios` instead; the two share their body
+ * interpretation through `errorBody.ts`.
  */
 export async function appErrorFromResponse(
   response: Response,
@@ -45,32 +49,12 @@ export async function appErrorFromResponse(
 ): Promise<AppError> {
   const body = await readJsonBody(response);
 
-  const code = isAppErrorCode(body.error_code) ? body.error_code : fallbackCode;
-  if (body.error_code != null && !isAppErrorCode(body.error_code)) {
-    // Not console.error: an unrecognised code is a survivable mismatch (the
-    // user still gets the fallback sentence), but it means the backend knows
-    // something this build does not — worth a breadcrumb when someone asks why
-    // the message is vague.
-    console.warn(
-      '[i18n] Unknown error_code from backend, using fallback:',
-      body.error_code,
-      '->',
-      fallbackCode,
-    );
-  }
-
   return new AppError(
-    code,
-    typeof body.detail === 'string' ? body.detail : undefined,
+    selectCode(body, fallbackCode),
+    readDetail(body),
     response.status,
     readParams(body.error_params),
   );
-}
-
-interface ErrorBody {
-  detail?: unknown;
-  error_code?: unknown;
-  error_params?: unknown;
 }
 
 /**
@@ -85,22 +69,4 @@ async function readJsonBody(response: Response): Promise<ErrorBody> {
   } catch {
     return {};
   }
-}
-
-/**
- * i18next interpolates whatever it is handed. A nested object or an array
- * would reach the UI as "[object Object]", so only the scalar entries survive;
- * a missing one leaves its `{{placeholder}}` visible, which is a far more
- * legible failure than a rendered object.
- */
-function readParams(raw: unknown): ErrorParams | undefined {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
-
-  const params: ErrorParams = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof value === 'string' || typeof value === 'number') {
-      params[key] = value;
-    }
-  }
-  return Object.keys(params).length > 0 ? params : undefined;
 }

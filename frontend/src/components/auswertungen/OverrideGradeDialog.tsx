@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 
 import { GradesService } from '../../services/gradesService';
-import { ApiError } from '../../services/submissionsService';
+import { translateError } from '../../errors';
 
 interface Props {
   open: boolean;
@@ -85,11 +85,7 @@ const OverrideGradeDialog: React.FC<Props> = ({
       onClose();
     } catch (err) {
       setSubmitting(false);
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : t('auswertungen.exam.review.actionFailure'),
-      );
+      setError(translateError(err, t, 'auswertungen.exam.review.actionFailure'));
     }
   };
 

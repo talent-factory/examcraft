@@ -18,6 +18,7 @@ import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 import ReviewQueue from '../ReviewQueue';
+import { AppError } from '../../../errors';
 import { GradesService } from '../../../services/gradesService';
 import { ReviewQueue as ReviewQueueData } from '../../../types/submission';
 
@@ -259,5 +260,39 @@ describe('ReviewQueue', () => {
         screen.getByText(/Review-Queue konnte nicht|Could not load/i),
       ).toBeInTheDocument();
     });
+  });
+
+  /**
+   * TF-772. These two are the pair that makes the conversion observable: the
+   * old code read `err.message` and would have shown "Boom" in both cases, and
+   * a test that only asserts the fallback text cannot tell the two paths apart.
+   * `grades_approve_failed` was chosen over the queue's load error because its
+   * sentence and the fallback's ("Aktion fehlgeschlagen.") share no words.
+   */
+  it('zeigt den Satz des spezifischen Codes statt des Fallbacks (TF-772)', async () => {
+    mockGradesService.approve.mockRejectedValue(
+      new AppError('grades_approve_failed', 'Grade nicht gefunden', 404),
+    );
+    renderQueue();
+
+    fireEvent.click(await screen.findByTestId('approve-11'));
+
+    expect(
+      await screen.findByText('Bewertung konnte nicht übernommen werden'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Aktion fehlgeschlagen.')).not.toBeInTheDocument();
+    // Das Backend-`detail` ist nur für die Log-Zeile und darf nie gerendert
+    // werden — genau die Zusicherung, die vor TF-772 nicht galt.
+    expect(screen.queryByText(/Grade nicht gefunden/)).not.toBeInTheDocument();
+  });
+
+  it('fällt auf den Schlüssel des Aufrufers zurück, wenn der Fehler untypisiert ist', async () => {
+    mockGradesService.approve.mockRejectedValue(new Error('Boom'));
+    renderQueue();
+
+    fireEvent.click(await screen.findByTestId('approve-11'));
+
+    expect(await screen.findByText('Aktion fehlgeschlagen.')).toBeInTheDocument();
+    expect(screen.queryByText(/Boom/)).not.toBeInTheDocument();
   });
 });

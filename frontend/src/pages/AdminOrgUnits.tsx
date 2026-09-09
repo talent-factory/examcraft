@@ -36,7 +36,7 @@ import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 
 import { OrgUnitOut } from '../types/orgUnit';
 import { OrgUnitsService } from '../services/orgUnitsService';
-import { ApiError } from '../services/submissionsService';
+import { translateError } from '../errors';
 import OrgUnitEditor from '../components/admin/OrgUnitEditor';
 
 const AdminOrgUnits: React.FC = () => {
@@ -59,7 +59,7 @@ const AdminOrgUnits: React.FC = () => {
       const result = await OrgUnitsService.list();
       setUnits(result.items);
     } catch (err) {
-      setLoadError(err instanceof ApiError ? err.message : t('admin.orgUnits.failedLoad'));
+      setLoadError(translateError(err, t, 'admin.orgUnits.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -98,9 +98,7 @@ const AdminOrgUnits: React.FC = () => {
       setDeleteTarget(null);
       await load();
     } catch (err) {
-      setActionError(
-        err instanceof ApiError ? err.message : t('admin.orgUnits.failedDelete'),
-      );
+      setActionError(translateError(err, t, 'admin.orgUnits.failedDelete'));
     } finally {
       setDeleting(false);
     }

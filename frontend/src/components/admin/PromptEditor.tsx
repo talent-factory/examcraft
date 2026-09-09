@@ -22,8 +22,8 @@ import {
   FormControlLabel
 } from '@mui/material';
 import { Save, Cancel, Preview, Code, History } from '@mui/icons-material';
-import axios from 'axios';
 import { promptsApi, Prompt } from '../../api/promptsApi';
+import { translateError } from '../../errors';
 import { PromptCategory, PromptVisibility } from '../../types/prompt';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/auth';
@@ -57,38 +57,6 @@ const toInitialTagValue = (t: string | { id?: number; name: string }): TagValue 
   return { __pending: true as const, name: t.name };
 };
 
-/** Extract a user-friendly error message from Axios/FastAPI errors. */
-function extractErrorMessage(
-  err: unknown,
-  fallback: string,
-  labels: { validationError: string; fieldDefault: string; invalidDefault: string; useCaseRequired: string }
-): string {
-  if (axios.isAxiosError(err)) {
-    const detail = err.response?.data?.detail;
-    if (err.response?.status === 422 && detail) {
-      const details = Array.isArray(detail) ? detail : [detail];
-      const messages = details.map((d: unknown) => {
-        if (typeof d === 'object' && d !== null && 'msg' in d) {
-          const entry = d as { loc?: unknown; msg?: unknown; message?: unknown };
-          const loc = Array.isArray(entry.loc) ? entry.loc : [];
-          const field = (loc.slice(1).join('.')) || labels.fieldDefault;
-          const msg = String(entry.msg || entry.message || labels.invalidDefault);
-          if (field === 'use_case' && msg.includes('match pattern')) {
-            return labels.useCaseRequired;
-          }
-          return `${field}: ${msg}`;
-        }
-        return String(d);
-      });
-      return `${labels.validationError}: ${messages.join(', ')}`;
-    }
-    if (detail) {
-      return String(detail);
-    }
-  }
-  return err instanceof Error ? err.message : fallback;
-}
-
 interface PromptEditorProps {
   promptId?: string;
   initialData?: Partial<Prompt>;
@@ -115,13 +83,6 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     'question_generation_true_false': t('admin.promptEditor.useCaseTrueFalse'),
     'chatbot': t('admin.promptEditor.useCaseChatbot'),
     'evaluation': t('admin.promptEditor.useCaseEvaluation'),
-  };
-
-  const errorLabels = {
-    validationError: t('admin.promptEditor.validationError'),
-    fieldDefault: t('admin.promptEditor.fieldDefault'),
-    invalidDefault: t('admin.promptEditor.invalidDefault'),
-    useCaseRequired: t('admin.promptEditor.useCaseRequired'),
   };
 
   const [loading, setLoading] = useState(false);
@@ -171,7 +132,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       setFormData(data);
       setSelectedTags((data.tags ?? []).map(toTagValue));
     } catch (err: unknown) {
-      setError(extractErrorMessage(err, t('admin.promptEditor.failedLoad'), errorLabels));
+      setError(translateError(err, t, 'admin.promptEditor.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -264,7 +225,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
         onSave?.();
       }, 1500);
     } catch (err: unknown) {
-      setError(extractErrorMessage(err, t('admin.promptEditor.failedSave'), errorLabels));
+      setError(translateError(err, t, 'admin.promptEditor.failedSave'));
     } finally {
       setSaving(false);
     }

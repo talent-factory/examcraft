@@ -4,9 +4,6 @@
   "core/frontend/src/App.tsx::jsx-text::This component is deprecated. Please use the new dashboard navigation instead.",
   "core/frontend/src/api/apiClient.ts::literal-error::No adopt-stored-tokens callback registered",
   "core/frontend/src/api/apiClient.ts::literal-error::No token refresh callback registered",
-  "core/frontend/src/api/dashboard.ts::literal-error::Dashboard activity failed: ${resp.status}",
-  "core/frontend/src/api/dashboard.ts::literal-error::Dashboard stats failed: ${resp.status}",
-  "core/frontend/src/api/promptsApi.ts::literal-error::Prompts API is only available in the Premium package",
   "core/frontend/src/components/QuestionEditor.tsx::jsx-text::Easy",
   "core/frontend/src/components/QuestionEditor.tsx::jsx-text::Hard",
   "core/frontend/src/components/QuestionEditor.tsx::jsx-text::Medium",
@@ -49,15 +46,5 @@
   "core/frontend/src/pages/legal/ImprintPage.tsx::jsx-text::support@talent-factory.ch",
   "core/frontend/src/pages/legal/ImprintPage.tsx::jsx-text::talent-factory.xyz",
   "core/frontend/src/pages/legal/LegalPageLayout.tsx::jsx-text::ExamCraft AI",
-  "core/frontend/src/pages/legal/PrivacyPage.tsx::jsx-text::support@talent-factory.ch",
-  "core/frontend/src/services/HelpService.ts::literal-error::Failed to update onboarding track step",
-  "premium/frontend/src/services/ChatService.ts::literal-error::Failed to create chat session",
-  "premium/frontend/src/services/ChatService.ts::literal-error::Failed to delete chat session",
-  "premium/frontend/src/services/ChatService.ts::literal-error::Failed to download chat",
-  "premium/frontend/src/services/ChatService.ts::literal-error::Failed to export chat to document",
-  "premium/frontend/src/services/ChatService.ts::literal-error::Failed to load chat history",
-  "premium/frontend/src/services/ChatService.ts::literal-error::Failed to load chat session",
-  "premium/frontend/src/services/ChatService.ts::literal-error::Failed to load chat sessions",
-  "premium/frontend/src/services/ChatService.ts::literal-error::Failed to send message",
-  "premium/frontend/src/services/WizardService.ts::literal-error::Request failed with status ${response.status}"
+  "core/frontend/src/pages/legal/PrivacyPage.tsx::jsx-text::support@talent-factory.ch"
 ]

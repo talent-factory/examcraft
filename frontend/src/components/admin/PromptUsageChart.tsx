@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { TrendingUp, CheckCircle, AccessTime, Token } from '@mui/icons-material';
 import { promptsApi, PromptUsageLog } from '../../api/promptsApi';
+import { translateError } from '../../errors';
 
 interface PromptUsageChartProps {
   promptId: string;
@@ -31,7 +32,7 @@ export const PromptUsageChart: React.FC<PromptUsageChartProps> = ({ promptId }) 
       const data = await promptsApi.getUsageLogs(promptId, 100);
       setUsageLogs(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.promptUsageChart.failedLoad'));
+      setError(translateError(err, t, 'admin.promptUsageChart.failedLoad'));
     } finally {
       setLoading(false);
     }

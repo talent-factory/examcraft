@@ -1,4 +1,4 @@
-import { AppError } from '../errors';
+import { AppError, AppErrorCode, appErrorFromResponse } from '../errors';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -55,38 +55,52 @@ class HelpService {
     };
   }
 
-  async getStatus(): Promise<HelpStatus> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/help/status`);
-    if (!response.ok) throw new AppError('help.statusFailed', undefined, response.status);
+  /**
+   * One help request, with the failing operation's code (TF-772).
+   *
+   * `fetch` itself rejecting (offline, DNS failure, CORS) is a separate
+   * failure mode from a non-ok `Response` — there is no body for
+   * `appErrorFromResponse` to read, so it is caught here and given the same
+   * operation code directly, the same pattern `gradesService`'s `request()`
+   * uses.
+   */
+  private async request<T>(url: string, init: RequestInit = {}, code: AppErrorCode): Promise<T> {
+    let response: Response;
+    try {
+      response = await fetch(url, init);
+    } catch (err) {
+      throw new AppError(code, err instanceof Error ? err.message : undefined);
+    }
+    if (!response.ok) throw await appErrorFromResponse(response, code);
     return response.json();
+  }
+
+  async getStatus(): Promise<HelpStatus> {
+    return this.request(`${API_BASE_URL}/api/v1/help/status`, {}, 'help.statusFailed');
   }
 
   async getOnboardingStatus(token: string): Promise<OnboardingStatus> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/help/onboarding/status`, {
-      headers: this.getHeaders(token),
-    });
-    if (!response.ok) throw new AppError('help.onboardingStatusFailed', undefined, response.status);
-    return response.json();
+    return this.request(
+      `${API_BASE_URL}/api/v1/help/onboarding/status`,
+      { headers: this.getHeaders(token) },
+      'help.onboardingStatusFailed',
+    );
   }
 
   async completeOnboardingStep(token: string, step: number): Promise<OnboardingStatus> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/help/onboarding/step`, {
-      method: 'PUT',
-      headers: this.getHeaders(token),
-      body: JSON.stringify({ step }),
-    });
-    if (!response.ok) throw new AppError('help.onboardingStepFailed', undefined, response.status);
-    return response.json();
+    return this.request(
+      `${API_BASE_URL}/api/v1/help/onboarding/step`,
+      { method: 'PUT', headers: this.getHeaders(token), body: JSON.stringify({ step }) },
+      'help.onboardingStepFailed',
+    );
   }
 
   async skipOnboardingStep(token: string, step: number): Promise<OnboardingStatus> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/help/onboarding/skip`, {
-      method: 'PUT',
-      headers: this.getHeaders(token),
-      body: JSON.stringify({ step }),
-    });
-    if (!response.ok) throw new AppError('help.onboardingSkipFailed', undefined, response.status);
-    return response.json();
+    return this.request(
+      `${API_BASE_URL}/api/v1/help/onboarding/skip`,
+      { method: 'PUT', headers: this.getHeaders(token), body: JSON.stringify({ step }) },
+      'help.onboardingSkipFailed',
+    );
   }
 
   /**
@@ -103,34 +117,36 @@ class HelpService {
     totalSteps: number,
     skipped = false
   ): Promise<OnboardingStatus> {
-    const response = await fetch(
+    return this.request(
       `${API_BASE_URL}/api/v1/help/onboarding/track/${encodeURIComponent(trackId)}/step`,
       {
         method: 'PUT',
         headers: this.getHeaders(token),
         body: JSON.stringify({ step, total_steps: totalSteps, skipped }),
-      }
+      },
+      'help_onboarding_track_step_failed',
     );
-    if (!response.ok) throw new Error('Failed to update onboarding track step');
-    return response.json();
   }
 
   async getContextHint(token: string, route: string): Promise<ContextHint> {
     const path = route.replace(/^\//, '');
-    const response = await fetch(`${API_BASE_URL}/api/v1/help/context/${path}`, {
-      headers: this.getHeaders(token),
-    });
-    if (!response.ok) throw new AppError('help.contextHintFailed', undefined, response.status);
-    return response.json();
+    return this.request(
+      `${API_BASE_URL}/api/v1/help/context/${path}`,
+      { headers: this.getHeaders(token) },
+      'help.contextHintFailed',
+    );
   }
 
   async dismissHint(token: string, hintId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/help/context/dismiss`, {
-      method: 'POST',
-      headers: this.getHeaders(token),
-      body: JSON.stringify({ hint_id: hintId }),
-    });
-    if (!response.ok) throw new AppError('help.hintDismissFailed', undefined, response.status);
+    await this.request(
+      `${API_BASE_URL}/api/v1/help/context/dismiss`,
+      {
+        method: 'POST',
+        headers: this.getHeaders(token),
+        body: JSON.stringify({ hint_id: hintId }),
+      },
+      'help.hintDismissFailed',
+    );
   }
 
   async sendMessage(
@@ -139,24 +155,23 @@ class HelpService {
     route: string,
     conversationHistory?: Array<{ role: string; content: string }>
   ): Promise<HelpMessage> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/help/message`, {
-      method: 'POST',
-      headers: this.getHeaders(token),
-      body: JSON.stringify({ question, route, conversation_history: conversationHistory }),
-    });
-    if (!response.ok) {
-      throw new AppError('help.messageFailed', undefined, response.status);
-    }
-    return response.json();
+    return this.request(
+      `${API_BASE_URL}/api/v1/help/message`,
+      {
+        method: 'POST',
+        headers: this.getHeaders(token),
+        body: JSON.stringify({ question, route, conversation_history: conversationHistory }),
+      },
+      'help.messageFailed',
+    );
   }
 
   async submitFeedback(token: string, feedback: FeedbackRequest): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/help/feedback`, {
-      method: 'POST',
-      headers: this.getHeaders(token),
-      body: JSON.stringify(feedback),
-    });
-    if (!response.ok) throw new AppError('help.feedbackFailed', undefined, response.status);
+    await this.request(
+      `${API_BASE_URL}/api/v1/help/feedback`,
+      { method: 'POST', headers: this.getHeaders(token), body: JSON.stringify(feedback) },
+      'help.feedbackFailed',
+    );
   }
 }
 

@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import { Add, Search, Edit, Delete, History } from '@mui/icons-material';
 import { promptsApi, Prompt } from '../../api/promptsApi';
+import { translateError } from '../../errors';
 import { PromptVisibility } from '../../types/prompt';
 import type { TFunction } from 'i18next';
 
@@ -118,7 +119,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
 
       setPrompts(filteredData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.promptLibrary.failedLoad'));
+      setError(translateError(err, t, 'admin.promptLibrary.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -137,7 +138,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
       await promptsApi.deletePrompt(id);
       await loadPrompts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.promptLibrary.failedDelete'));
+      setError(translateError(err, t, 'admin.promptLibrary.failedDelete'));
     }
   };
 
@@ -153,7 +154,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({
       await promptsApi.toggleActive(id, !currentStatus);
       await loadPrompts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.promptLibrary.failedToggle'));
+      setError(translateError(err, t, 'admin.promptLibrary.failedToggle'));
     }
   };
 

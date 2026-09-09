@@ -1,5 +1,6 @@
 // core/frontend/src/api/dashboard.ts
 
+import { appErrorFromResponse } from '../errors';
 import { ActivityType } from '../types/activity';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -35,7 +36,7 @@ export async function fetchDashboardStats(): Promise<DashboardStatsResponse> {
   const resp = await fetch(`${API_BASE_URL}/api/dashboard/stats`, {
     headers: getAuthHeaders(),
   });
-  if (!resp.ok) throw new Error(`Dashboard stats failed: ${resp.status}`);
+  if (!resp.ok) throw await appErrorFromResponse(resp, 'dashboard_stats_load_failed');
   return resp.json();
 }
 
@@ -43,6 +44,6 @@ export async function fetchDashboardActivity(): Promise<DashboardActivityRespons
   const resp = await fetch(`${API_BASE_URL}/api/dashboard/activity`, {
     headers: getAuthHeaders(),
   });
-  if (!resp.ok) throw new Error(`Dashboard activity failed: ${resp.status}`);
+  if (!resp.ok) throw await appErrorFromResponse(resp, 'dashboard_activity_load_failed');
   return resp.json();
 }

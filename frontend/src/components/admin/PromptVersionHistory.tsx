@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import { ArrowBack, CheckCircle, Visibility, Restore } from '@mui/icons-material';
 import { promptsApi, Prompt } from '../../api/promptsApi';
+import { translateError } from '../../errors';
 import MarkdownRenderer from '../MarkdownRenderer';
 
 interface PromptVersionHistoryProps {
@@ -47,7 +48,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
       const data = await promptsApi.getVersionHistory(promptName);
       setVersions(data.sort((a, b) => b.version - a.version));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.promptVersionHistory.failedLoad'));
+      setError(translateError(err, t, 'admin.promptVersionHistory.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -62,7 +63,7 @@ export const PromptVersionHistory: React.FC<PromptVersionHistoryProps> = ({
       await promptsApi.toggleActive(version.id, true);
       await loadVersions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.promptVersionHistory.failedActivate'));
+      setError(translateError(err, t, 'admin.promptVersionHistory.failedActivate'));
     }
   };
 

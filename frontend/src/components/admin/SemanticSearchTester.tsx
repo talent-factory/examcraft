@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import { Search, TrendingUp } from '@mui/icons-material';
 import { promptsApi, PromptSearchRequest, PromptSearchResult } from '../../api/promptsApi';
+import { translateError } from '../../errors';
 
 export const SemanticSearchTester: React.FC = () => {
   const { t } = useTranslation();
@@ -60,7 +61,7 @@ export const SemanticSearchTester: React.FC = () => {
       const data = await promptsApi.searchPrompts(searchRequest);
       setResults(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('admin.semanticSearch.failedSearch'));
+      setError(translateError(err, t, 'admin.semanticSearch.failedSearch'));
     } finally {
       setLoading(false);
     }

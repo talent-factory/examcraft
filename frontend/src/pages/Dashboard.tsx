@@ -12,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { QuickActionCard } from '../components/cards/QuickActionCard';
 import { StatsCard } from '../components/cards/StatsCard';
 import EmailVerificationBanner from '../components/auth/EmailVerificationBanner';
+import { translateError } from '../errors';
 import {
   fetchDashboardStats,
   fetchDashboardActivity,
@@ -37,26 +38,32 @@ export const Dashboard: React.FC = () => {
 
   const [stats, setStats] = useState<DashboardStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [statsError, setStatsError] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   const [activities, setActivities] = useState<DashboardActivityItem[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
-  const [activitiesError, setActivitiesError] = useState(false);
+  const [activitiesError, setActivitiesError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     fetchDashboardStats()
       .then((data) => { if (!cancelled) setStats(data); })
-      .catch(() => { if (!cancelled) setStatsError(true); })
+      .catch((err) => { if (!cancelled) setStatsError(translateError(err, t, 'pages.dashboard.statsError')); })
       .finally(() => { if (!cancelled) setStatsLoading(false); });
 
     fetchDashboardActivity()
       .then((data) => { if (!cancelled) setActivities(data.activities); })
-      .catch(() => { if (!cancelled) setActivitiesError(true); })
+      .catch((err) => { if (!cancelled) setActivitiesError(translateError(err, t, 'pages.dashboard.activityError')); })
       .finally(() => { if (!cancelled) setActivitiesLoading(false); });
 
     return () => { cancelled = true; };
+    // `t` left out of the deps deliberately: it changes identity on every
+    // language switch, and listing it would re-fire both requests each time
+    // someone changes the UI language. The cost is that an error message
+    // already on screen keeps the language it was rendered in until the next
+    // load — the same trade AuswertungenExam.tsx documents.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const locale = DATE_FNS_LOCALES[i18n.language?.substring(0, 2)] ?? de;
@@ -97,7 +104,7 @@ export const Dashboard: React.FC = () => {
           {t('pages.dashboard.statistics')}
         </h2>
         {statsError && (
-          <p className="text-sm text-red-500 mb-2">{t('pages.dashboard.statsError')}</p>
+          <p className="text-sm text-red-500 mb-2">{statsError}</p>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard icon="📊" label={t('pages.dashboard.generatedQuestions')} value={statsLoading ? '…' : String(stats?.generated_questions ?? 0)} color="primary" />
@@ -119,7 +126,7 @@ export const Dashboard: React.FC = () => {
             </div>
           ) : activitiesError ? (
             <p className="text-sm text-red-500 text-center py-4">
-              {t('pages.dashboard.activityError')}
+              {activitiesError}
             </p>
           ) : activities.length === 0 ? (
             <div className="text-center py-12">

@@ -22,12 +22,18 @@
  *                          GET /api/auth/oauth/{provider}/callback — a browser
  *                          redirect the backend answers directly, never a
  *                          fetch() from here.
- *   auth_verification_token_*  POST /api/auth/verify-email — called inline by
- *                          `pages/VerifyEmailPage.tsx`, which is not part of
- *                          this package (reported, not migrated).
  *   auth_avatar_*          GET /api/auth/avatar/{id} — used as an <img> src,
  *                          so its failures never become an AppError.
- *   auth_user_not_found    only reachable through those last two.
+ *
+ * TF-772 PR 4 added the verify-email set. `pages/VerifyEmailPage.tsx` fetches
+ * POST /api/auth/verify-email itself rather than going through `AuthService`,
+ * which is why PR 3 left it out and listed it here as reported-not-migrated.
+ * That endpoint raises exactly four codes — `auth_verification_token_invalid`,
+ * `_used`, `_expired` and `auth_user_not_found` — and they are worth every one
+ * of the four keys: "the link has already been used" and "the link has expired"
+ * lead to different next steps, and a single "verification failed" would send
+ * a user to support for something they could fix by requesting a new mail.
+ * `auth_verification_failed` is the frontend fallback for that one endpoint.
  *
  * FRONTEND-ONLY FALLBACKS. Unlike `documents.py`, `auth.py` has no generic
  * per-operation failure code — it raises only specific ones. So twelve of the
@@ -80,6 +86,11 @@ export const AUTH_ERROR_CODES = [
   'auth_service_unavailable',
   'auth_token_invalid',
   'auth_token_refresh_failed',
+  'auth_user_not_found',
   'auth_verification_email_failed',
+  'auth_verification_failed',
   'auth_verification_resend_failed',
+  'auth_verification_token_expired',
+  'auth_verification_token_invalid',
+  'auth_verification_token_used',
 ] as const;

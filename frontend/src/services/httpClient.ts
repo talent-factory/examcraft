@@ -35,9 +35,16 @@ export function authHeaders(extra: HeadersInit = {}): HeadersInit {
 }
 
 
-async function readErrorBody(
-  response: Response,
-): Promise<{ message: string; detail: unknown; issues: string[] }> {
+interface ErrorBodyParts {
+  message: string;
+  detail: unknown;
+  issues: string[];
+  /** ADR 0005, when the body carried them (TF-772). Undefined otherwise. */
+  errorCode?: string;
+  errorParams?: unknown;
+}
+
+async function readErrorBody(response: Response): Promise<ErrorBodyParts> {
   let bodyText = '';
   try {
     bodyText = await response.text();
@@ -60,6 +67,11 @@ async function readErrorBody(
       };
     }
   }
+  const envelope = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const errorCode =
+    typeof envelope.error_code === 'string' ? envelope.error_code : undefined;
+  const errorParams = envelope.error_params;
+
   if (raw && typeof raw === 'object' && 'detail' in raw) {
     const detail = (raw as { detail: unknown }).detail;
     // Tier-Quota 402 + Validation 422 carry structured detail objects.
@@ -74,27 +86,31 @@ async function readErrorBody(
             (i): i is string => typeof i === 'string',
           ) as string[])
         : [];
-      return { message, detail, issues };
+      return { message, detail, issues, errorCode, errorParams };
     }
-    return { message: String(detail), detail, issues: [] };
+    return { message: String(detail), detail, issues: [], errorCode, errorParams };
   }
   return {
     message: `${response.status} ${response.statusText}`,
     detail: raw,
     issues: [],
+    errorCode,
+    errorParams,
   };
 }
 
 
 export async function ensureOk(response: Response): Promise<Response> {
   if (response.ok) return response;
-  const { message, detail, issues } = await readErrorBody(response);
+  const { message, detail, issues, errorCode, errorParams } = await readErrorBody(response);
   throw new ApiError({
     kind: statusToKind(response.status),
     status: response.status,
     message,
     detail,
     issues,
+    errorCode,
+    errorParams,
   });
 }
 

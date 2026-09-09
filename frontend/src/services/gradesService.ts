@@ -1,13 +1,19 @@
 /**
  * GradesService — API client for /api/v1/grades/* + review-queue.
  *
- * Mirrors `core/backend/api/grades.py`. Reuses the ApiError shape and
- * fetch helpers from SubmissionsService, but lives in a separate
- * module so the bundle splits cleanly between import-flow and
- * review-flow code paths.
+ * Mirrors `core/backend/api/grades.py`.
+ *
+ * TF-772: this module used to share `ApiError` and the fetch helpers with
+ * `submissionsService`, and its two consumers rendered `err.message` — which
+ * is the backend's `detail`, hardcoded German in `grades.py` regardless of the
+ * user's locale. It now throws `AppError` with a code per operation instead;
+ * see `errors/codes/grades.ts` for what that costs and why the fix belongs in
+ * the backend. The shared helpers stayed behind with the services that still
+ * use them: nothing here needs `ApiErrorKind` any more, because the consumers
+ * distinguish failures by code, not by kind.
  */
 
-import { ApiError, statusToKind } from './submissionsService';
+import { AppError, AppErrorCode, appErrorFromResponse } from '../errors';
 import {
   BulkApproveResult,
   GradeAction,
@@ -17,53 +23,6 @@ import {
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-// TF-626-Review: `statusToKind` used to be documented here as a local
-// copy ("trivial and stable enough to copy") — that exact copy therefore
-// didn't know about `409 → 'conflict'`, even though `gradingSchemesService`
-// already threw it at runtime. `ApiError` is already imported from
-// `submissionsService` anyway (see above), so the cross-import already
-// exists; `statusToKind` now follows that same path instead of keeping
-// its own copy.
-
-async function readErrorBody(response: Response): Promise<{ message: string }> {
-  try {
-    const text = await response.text();
-    if (!text) {
-      return { message: `${response.status} ${response.statusText}` };
-    }
-    try {
-      const raw = JSON.parse(text);
-      if (raw && typeof raw === 'object' && 'detail' in raw) {
-        const detail = (raw as { detail: unknown }).detail;
-        if (typeof detail === 'string') return { message: detail };
-        if (
-          detail &&
-          typeof detail === 'object' &&
-          'message' in detail &&
-          typeof (detail as { message?: unknown }).message === 'string'
-        ) {
-          return { message: (detail as { message: string }).message };
-        }
-      }
-    } catch {
-      // fall through
-    }
-    return { message: text || `${response.status} ${response.statusText}` };
-  } catch {
-    return { message: `${response.status} ${response.statusText}` };
-  }
-}
-
-async function ensureOk(response: Response): Promise<Response> {
-  if (response.ok) return response;
-  const { message } = await readErrorBody(response);
-  throw new ApiError({
-    kind: statusToKind(response.status),
-    status: response.status,
-    message,
-  });
-}
-
 function authHeaders(extra: HeadersInit = {}): HeadersInit {
   const token = localStorage.getItem('examcraft_access_token');
   return {
@@ -72,22 +31,31 @@ function authHeaders(extra: HeadersInit = {}): HeadersInit {
   };
 }
 
-async function safeFetch(
-  input: RequestInfo,
-  init?: RequestInit,
+/**
+ * One grades request, with the failing operation's code.
+ *
+ * `fetch` rejects only on a network-level failure — no response, so no body and
+ * no status. That is the one branch `appErrorFromResponse` cannot serve, and it
+ * still has to end as an `AppError`: an untyped rejection would reach
+ * `translateError` and be answered with the caller's fallback key rather than
+ * this code's sentence.
+ */
+async function request(
+  code: AppErrorCode,
+  url: string,
+  init: RequestInit,
 ): Promise<Response> {
+  let response: Response;
   try {
-    return await fetch(input, init);
+    response = await fetch(url, init);
   } catch (err) {
-    throw new ApiError({
-      kind: 'network',
-      status: 0,
-      message:
-        err instanceof Error
-          ? `Netzwerkfehler: ${err.message}`
-          : 'Netzwerkfehler',
-    });
+    throw new AppError(code, err instanceof Error ? err.message : undefined);
   }
+
+  if (!response.ok) {
+    throw await appErrorFromResponse(response, code);
+  }
+  return response;
 }
 
 function buildQuery(filter: ReviewQueueFilter): string {
@@ -118,20 +86,19 @@ export class GradesService {
     const url = `${API_BASE_URL}/api/v1/exams/${examId}/review-queue${buildQuery(
       filter,
     )}`;
-    const response = await safeFetch(url, {
+    const response = await request('grades_review_queue_load_failed', url, {
       method: 'GET',
       headers: authHeaders(),
     });
-    await ensureOk(response);
     return (await response.json()) as ReviewQueue;
   }
 
   static async approve(gradeId: number): Promise<GradeAction> {
-    const response = await safeFetch(
+    const response = await request(
+      'grades_approve_failed',
       `${API_BASE_URL}/api/v1/grades/${gradeId}/approve`,
       { method: 'POST', headers: authHeaders() },
     );
-    await ensureOk(response);
     return (await response.json()) as GradeAction;
   }
 
@@ -139,7 +106,8 @@ export class GradesService {
     gradeId: number,
     body: { points_awarded: number; reviewer_note?: string | null },
   ): Promise<GradeAction> {
-    const response = await safeFetch(
+    const response = await request(
+      'grades_override_failed',
       `${API_BASE_URL}/api/v1/grades/${gradeId}/override`,
       {
         method: 'POST',
@@ -147,7 +115,6 @@ export class GradesService {
         body: JSON.stringify(body),
       },
     );
-    await ensureOk(response);
     return (await response.json()) as GradeAction;
   }
 
@@ -161,7 +128,8 @@ export class GradesService {
       body.confidence_min = params.confidenceMin;
     if (params.gradeIds !== undefined) body.grade_ids = params.gradeIds;
 
-    const response = await safeFetch(
+    const response = await request(
+      'grades_bulk_approve_failed',
       `${API_BASE_URL}/api/v1/grades/bulk-approve`,
       {
         method: 'POST',
@@ -169,7 +137,6 @@ export class GradesService {
         body: JSON.stringify(body),
       },
     );
-    await ensureOk(response);
     return (await response.json()) as BulkApproveResult;
   }
 }

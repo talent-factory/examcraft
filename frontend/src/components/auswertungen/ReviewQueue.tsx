@@ -42,7 +42,7 @@ import {
 } from '@mui/icons-material';
 
 import { GradesService } from '../../services/gradesService';
-import { ApiError } from '../../services/submissionsService';
+import { translateError } from '../../errors';
 import { ReviewQueueItem } from '../../types/submission';
 import OverrideGradeDialog from './OverrideGradeDialog';
 import MarkdownRenderer from '../MarkdownRenderer';
@@ -107,11 +107,7 @@ const ReviewQueue: React.FC<Props> = ({
         return next;
       });
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : t('auswertungen.exam.review.loadError'),
-      );
+      setError(translateError(err, t, 'auswertungen.exam.review.loadError'));
     } finally {
       setLoading(false);
     }
@@ -160,11 +156,7 @@ const ReviewQueue: React.FC<Props> = ({
       setSnack(t('auswertungen.exam.review.actionApproveSuccess'));
       await reload();
     } catch (err) {
-      setSnackErr(
-        err instanceof ApiError
-          ? err.message
-          : t('auswertungen.exam.review.actionFailure'),
-      );
+      setSnackErr(translateError(err, t, 'auswertungen.exam.review.actionFailure'));
     }
   };
 
@@ -213,11 +205,7 @@ const ReviewQueue: React.FC<Props> = ({
       );
       await reload();
     } catch (err) {
-      setSnackErr(
-        err instanceof ApiError
-          ? err.message
-          : t('auswertungen.exam.review.actionFailure'),
-      );
+      setSnackErr(translateError(err, t, 'auswertungen.exam.review.actionFailure'));
     } finally {
       setBulkBusy(false);
     }
@@ -239,11 +227,7 @@ const ReviewQueue: React.FC<Props> = ({
       );
       await reload();
     } catch (err) {
-      setSnackErr(
-        err instanceof ApiError
-          ? err.message
-          : t('auswertungen.exam.review.actionFailure'),
-      );
+      setSnackErr(translateError(err, t, 'auswertungen.exam.review.actionFailure'));
     } finally {
       setBulkBusy(false);
     }
