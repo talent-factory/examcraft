@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Sidebar } from '../Sidebar';
 import { requestSidebarNavReveal } from '../sidebarNavReveal';
@@ -317,6 +317,34 @@ describe('Sidebar Component — item rendering', () => {
 
       expect(screen.getByRole('link', { name: /Reports/ })).toHaveClass(ACTIVE_CLASS);
     });
+  });
+});
+
+describe('Sidebar Component — version footer / release notes dialog (TF-802)', () => {
+  // Review fix: the footer button's swap from an external <a> link to a
+  // stateful dialog trigger had no coverage anywhere — ReleaseNotesDialog's
+  // own tests render it directly with `open` passed as a prop, never
+  // through this wiring.
+  it('opens the release notes dialog when the version footer button is clicked', () => {
+    renderAt('/dashboard');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Was ist neu' }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Was ist neu in ExamCraft AI')).toBeInTheDocument();
+  });
+
+  it('closes the dialog again via its own close button', async () => {
+    renderAt('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: 'Was ist neu' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Schliessen' }));
+
+    // MUI's Dialog, like Collapse elsewhere in this suite, only unmounts its
+    // content once the exit transition finishes.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });
 

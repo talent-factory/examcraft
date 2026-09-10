@@ -3454,5 +3454,28 @@
     "errorCreate": "Kompetenzrahmen konnte nicht erstellt werden.",
     "errorUpdate": "Kompetenzrahmen konnte nicht gespeichert werden.",
     "errorArchive": "Aktion fehlgeschlagen."
+  },
+  "releaseNotes": {
+    "dialog": {
+      "title": "Was ist neu in ExamCraft AI",
+      "currentVersionLabel": "Aktuelle Version",
+      "newBadge": "Neu",
+      "githubLink": "Alle Versionen auf GitHub ansehen",
+      "close": "Schliessen",
+      "trigger": "Was ist neu"
+    },
+    "groups": {
+      "new": "Neue Funktionen",
+      "improvements": "Verbesserungen",
+      "fixes": "Fehlerbehebungen",
+      "security": "Sicherheit & Zuverlässigkeit"
+    },
+    "entries": {
+      "v1_11_0_admin_kebab_menu": "Benutzerverwaltung im Admin-Panel: Aktionen jetzt übersichtlich in einem Kebab-Menü zusammengefasst",
+      "v1_11_0_error_messages": "Konsistentere, verständlichere Fehlermeldungen in Anmeldung und Administration",
+      "v1_11_0_stability": "Zahlreiche kleinere Fehlerbehebungen und Stabilitätsverbesserungen",
+      "v1_8_4_result_import": "Resultatimport mit Freitextfragen läuft jetzt zuverlässig im Hintergrund, mit sichtbarem Fortschritt",
+      "v1_8_4_reasoning_formatting": "Begründungen in der Bewertungs-Ansicht werden jetzt sauber formatiert dargestellt"
+    }
   }
 }

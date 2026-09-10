@@ -3454,5 +3454,28 @@
       "save": "Save",
       "cancel": "Cancel"
     }
+  },
+  "releaseNotes": {
+    "dialog": {
+      "title": "What's new in ExamCraft AI",
+      "currentVersionLabel": "Current version",
+      "newBadge": "New",
+      "githubLink": "View all releases on GitHub",
+      "close": "Close",
+      "trigger": "What's new"
+    },
+    "groups": {
+      "new": "New",
+      "improvements": "Improvements",
+      "fixes": "Fixes",
+      "security": "Security & Reliability"
+    },
+    "entries": {
+      "v1_11_0_admin_kebab_menu": "User management in the admin panel: actions are now grouped in a tidy menu",
+      "v1_11_0_error_messages": "More consistent, clearer error messages during sign-in and administration",
+      "v1_11_0_stability": "Numerous small bug fixes and stability improvements",
+      "v1_8_4_result_import": "Result import with free-text questions now runs reliably in the background, with visible progress",
+      "v1_8_4_reasoning_formatting": "Reasoning text in the grading view is now displayed cleanly formatted"
+    }
   }
 }

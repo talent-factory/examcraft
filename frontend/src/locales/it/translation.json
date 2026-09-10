@@ -3454,5 +3454,28 @@
     "errorCreate": "Impossibile creare il framework.",
     "errorUpdate": "Impossibile salvare il framework.",
     "errorArchive": "Azione non riuscita."
+  },
+  "releaseNotes": {
+    "dialog": {
+      "title": "Novità in ExamCraft AI",
+      "currentVersionLabel": "Versione attuale",
+      "newBadge": "Nuovo",
+      "githubLink": "Vedi tutte le versioni su GitHub",
+      "close": "Chiudi",
+      "trigger": "Novità"
+    },
+    "groups": {
+      "new": "Novità",
+      "improvements": "Miglioramenti",
+      "fixes": "Correzioni",
+      "security": "Sicurezza e affidabilità"
+    },
+    "entries": {
+      "v1_11_0_admin_kebab_menu": "Gestione utenti nel pannello di amministrazione: azioni ora raggruppate in un menu chiaro",
+      "v1_11_0_error_messages": "Messaggi di errore più coerenti e chiari durante l'accesso e l'amministrazione",
+      "v1_11_0_stability": "Numerose piccole correzioni di bug e miglioramenti della stabilità",
+      "v1_8_4_result_import": "L'importazione dei risultati con domande a risposta libera ora funziona in modo affidabile in background, con progresso visibile",
+      "v1_8_4_reasoning_formatting": "Le motivazioni nella vista di valutazione ora vengono visualizzate correttamente formattate"
+    }
   }
 }

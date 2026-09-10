@@ -19,6 +19,7 @@ import {
   NavigationGroup,
 } from '../../hooks/useRoleBasedNavigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ReleaseNotesDialog } from './ReleaseNotesDialog';
 import { SIDEBAR_REVEAL_NAV_EVENT, SidebarRevealNavDetail } from './sidebarNavReveal';
 
 interface SidebarProps {
@@ -60,6 +61,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, offsetForImpers
 
   // Expansion state of items that carry children (independent of groups).
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+
+  // TF-802: the version footer opens the in-app "What's new" dialog instead
+  // of linking out to GitHub.
+  const [showReleaseNotes, setShowReleaseNotes] = useState(false);
 
   const isActivePath = (path: string, hasChildren: boolean) => {
     if (location.pathname === path) return true;
@@ -357,27 +362,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, offsetForImpers
           )}
         </div>
 
-        {/* Version Footer */}
+        {/* Version Footer — TF-802: opens the "What's new" dialog instead of
+            linking out to GitHub. */}
         {isOpen && (() => {
           const version = process.env.REACT_APP_VERSION;
-          // If the version build arg is missing → fall back to the list view;
-          // otherwise link directly to the specific release tag.
-          const releasesBase = 'https://github.com/talent-factory/examcraft/releases';
-          const href = version ? `${releasesBase}/tag/v${version}` : releasesBase;
           return (
             <div className="px-4 py-3 border-t border-gray-200">
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => setShowReleaseNotes(true)}
+                // Review fix: this used to be an <a> linking straight to GitHub, so
+                // "v1.2.3" as its only text was already the full affordance. Now it
+                // opens an in-app dialog instead — same visible label, but nothing
+                // signalled the changed behaviour to assistive tech, and the
+                // `releaseNotes.dialog.trigger` key added for exactly this was
+                // sitting unused in every locale.
+                aria-label={t('releaseNotes.dialog.trigger')}
                 className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
               >
                 v{version || 'dev'}
-              </a>
+              </button>
             </div>
           );
         })()}
       </div>
+
+      <ReleaseNotesDialog
+        open={showReleaseNotes}
+        onClose={() => setShowReleaseNotes(false)}
+      />
     </aside>
   );
 };

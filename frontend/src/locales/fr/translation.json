@@ -3454,5 +3454,28 @@
     "errorCreate": "Impossible de créer le référentiel.",
     "errorUpdate": "Impossible d'enregistrer le référentiel.",
     "errorArchive": "L'action a échoué."
+  },
+  "releaseNotes": {
+    "dialog": {
+      "title": "Nouveautés dans ExamCraft AI",
+      "currentVersionLabel": "Version actuelle",
+      "newBadge": "Nouveau",
+      "githubLink": "Voir toutes les versions sur GitHub",
+      "close": "Fermer",
+      "trigger": "Nouveautés"
+    },
+    "groups": {
+      "new": "Nouveautés",
+      "improvements": "Améliorations",
+      "fixes": "Corrections",
+      "security": "Sécurité et fiabilité"
+    },
+    "entries": {
+      "v1_11_0_admin_kebab_menu": "Gestion des utilisateurs dans le panneau d'administration : actions regroupées dans un menu clair",
+      "v1_11_0_error_messages": "Messages d'erreur plus cohérents et plus clairs lors de la connexion et de l'administration",
+      "v1_11_0_stability": "Nombreuses petites corrections de bugs et améliorations de stabilité",
+      "v1_8_4_result_import": "L'import des résultats avec questions à réponse libre fonctionne désormais de manière fiable en arrière-plan, avec une progression visible",
+      "v1_8_4_reasoning_formatting": "Les justifications dans la vue d'évaluation s'affichent désormais correctement mises en forme"
+    }
   }
 }

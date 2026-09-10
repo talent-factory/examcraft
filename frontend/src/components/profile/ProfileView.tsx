@@ -8,11 +8,9 @@ import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../../utils/dateLocale';
 import { useAuth } from '../../contexts/AuthContext';
 import AuthService from '../../services/AuthService';
-import {
-  getPendingLanguage,
-  setPendingLanguage,
-  clearPendingLanguage,
-} from '../../utils/languagePreference';
+import { useLanguageChange } from '../../hooks/useLanguageChange';
+import { getPendingLanguage, clearPendingLanguage } from '../../utils/languagePreference';
+import { SupportedLanguage } from '../../types/auth';
 
 interface ProfileViewProps {
   onEdit?: () => void;
@@ -21,6 +19,7 @@ interface ProfileViewProps {
 export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const { changeLanguage } = useLanguageChange();
   const [avatarError, setAvatarError] = useState(false);
   const [languageSaveFailed, setLanguageSaveFailed] = useState(false);
 
@@ -74,34 +73,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
     { code: 'it', label: '🇮🇹 Italiano' },
   ];
 
-  /**
-   * Switching the language is a client-side operation and cannot fail on the
-   * network; saving the preference to the account can. They used to share one
-   * try/catch, so a failed SAVE undid a successful CHANGE — the user was put
-   * back into the language they had just left, with the error going only to
-   * the console. Anything that breaks the PATCH did it: a flaky connection, an
-   * expired token, the IP rate limiter.
-   *
-   * Now the change stands and only the sync is reported. The marker keeps the
-   * account value from overwriting the choice on the next profile load.
-   */
+  // Shared with ReleaseNotesDialog's language pills — see
+  // `useLanguageChange` for why a plain `i18n.changeLanguage()` call is not
+  // enough (a failed save must not revert the change, and the account must
+  // not silently overwrite it again on the next profile load).
   const handleLanguageChange = async (lng: string) => {
     setLanguageSaveFailed(false);
-    setPendingLanguage(lng);
-    await i18n
-      .changeLanguage(lng)
-      .catch((e: unknown) => console.error('[ProfileView] Language change failed:', e));
-
-    const token = localStorage.getItem('examcraft_access_token');
-    if (!user || !token) return;
-
-    try {
-      await AuthService.updateProfile(token, { preferred_language: lng });
-      // Account and browser agree again — drop the marker so a language set on
-      // another device is not ignored here forever.
-      clearPendingLanguage();
-    } catch (error) {
-      console.error('[ProfileView] Saving the language preference failed:', error);
+    // lng always comes from LANGUAGE_OPTIONS above, whose codes are exactly
+    // SupportedLanguage — the <select>'s native onChange just doesn't carry
+    // that narrower type itself.
+    const outcome = await changeLanguage(lng as SupportedLanguage);
+    if (outcome === 'failed') {
       setLanguageSaveFailed(true);
     }
   };
