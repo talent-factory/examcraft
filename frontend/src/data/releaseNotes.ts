@@ -15,11 +15,14 @@
  * that every `screenshot` resolves to a real file.
  *
  * Screenshots are optional and origin-agnostic: `screenshot` is just a
- * filename resolved under `/release-notes/<version>/`. It makes no
- * difference whether that file was placed there manually or produced by an
- * automated capture step in the future — the renderer only checks whether
- * the field is set.
+ * filename (or, since TF-810, a per-language map of filenames — see
+ * `resolveScreenshotSrc`) resolved under `/release-notes/<version>/`. It
+ * makes no difference whether a file was placed there manually or produced
+ * by an automated capture step in the future — the renderer only checks
+ * whether the field is set.
  */
+
+import { SupportedLanguage } from '../types/auth';
 
 export type ReleaseNoteGroupKind = 'new' | 'improvements' | 'fixes' | 'security';
 
@@ -35,11 +38,18 @@ export interface ReleaseNoteItem {
   /** Stable id, translated at `releaseNotes.entries.<id>` in each locale. */
   readonly id: string;
   /**
-   * Filename of an optional screenshot, resolved as
-   * `/release-notes/<version>/<screenshot>`. Omit when the entry has no
-   * screenshot — no placeholder is rendered in that case.
+   * Optional screenshot, resolved via `resolveScreenshotSrc` (TF-810) as
+   * `/release-notes/<version>/<filename>`. Omit entirely when the entry has
+   * no screenshot — no placeholder is rendered in that case.
+   *
+   * - `string`: a single filename shown for every language (unchanged
+   *   pre-TF-810 behaviour — use this until per-language crops exist).
+   * - Partial map keyed by `SupportedLanguage`: a different filename per UI
+   *   language, e.g. `{ de: 'foo-de.png', en: 'foo-en.png' }`. A language
+   *   missing from the map falls back to `de`, then to whichever entry is
+   *   present — see `resolveScreenshotSrc`.
    */
-  readonly screenshot?: string;
+  readonly screenshot?: string | Partial<Record<SupportedLanguage, string>>;
 }
 
 export interface ReleaseNoteGroup {
@@ -54,6 +64,26 @@ export interface ReleaseNoteEntry {
   readonly date: string;
   readonly groups: readonly ReleaseNoteGroup[];
 }
+
+/**
+ * Resolves a `ReleaseNoteItem.screenshot` to the filename to render for
+ * `lang` (TF-810). A plain string is returned unchanged for every language.
+ * A per-language map prefers `lang`, then falls back to `de` (the project's
+ * primary language — see `CLAUDE.md`, "Language"), then to whichever
+ * entry the map actually has — so a language missing a dedicated crop never
+ * renders a broken/empty image instead of *some* screenshot. Returns
+ * `undefined` only when `screenshot` itself is `undefined` or an empty map.
+ */
+export const resolveScreenshotSrc = (
+  screenshot: ReleaseNoteItem['screenshot'],
+  lang: string
+): string | undefined => {
+  if (screenshot === undefined) return undefined;
+  if (typeof screenshot === 'string') return screenshot;
+  return (
+    screenshot[lang as SupportedLanguage] ?? screenshot.de ?? Object.values(screenshot)[0]
+  );
+};
 
 /**
  * Newest first — `ReleaseNotesDialog` trusts index 0 for the "current
@@ -71,7 +101,11 @@ export const RELEASE_NOTES: readonly ReleaseNoteEntry[] = [
     groups: [
       {
         kind: 'new',
-        items: [{ id: 'v1_11_0_admin_kebab_menu', screenshot: 'admin-kebab-menu.png' }],
+        // Map form (TF-810): only `de` populated for now — falls back to it
+        // for en/fr/it via resolveScreenshotSrc until real localized crops
+        // exist. Template for adding e.g. `en: 'admin-kebab-menu-en.png'`
+        // once one is captured.
+        items: [{ id: 'v1_11_0_admin_kebab_menu', screenshot: { de: 'admin-kebab-menu.png' } }],
       },
       {
         kind: 'security',

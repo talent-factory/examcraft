@@ -1,6 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { RELEASE_NOTES, RELEASE_NOTE_GROUP_EMOJI, ReleaseNoteGroupKind } from '../releaseNotes';
+import {
+  RELEASE_NOTES,
+  RELEASE_NOTE_GROUP_EMOJI,
+  ReleaseNoteGroupKind,
+  resolveScreenshotSrc,
+} from '../releaseNotes';
 
 // Review fix: the existing "translation completeness" test in
 // ReleaseNotesDialog.test.tsx only compares the de/en/fr/it translation.json
@@ -37,16 +42,41 @@ describe('RELEASE_NOTES manifest integrity', () => {
     });
   });
 
-  it('only declares screenshots that actually exist under public/release-notes/<version>/', () => {
+  // Review fix (TF-810): assert isFile() rather than existsSync() alone — an
+  // empty-string or '.'/'..'-containing filename can resolve to a directory
+  // (or escape the version folder entirely) and still pass a bare existsSync
+  // check, silently defeating this test's "resolves to a real file under
+  // this version's folder" guarantee. A plain basename check also rejects
+  // any path-separator characters, so a value can't resolve outside
+  // `<version>/` no matter how existsSync would treat the result.
+  const expectResolvesToRealFile = (release: { version: string }, filename: string) => {
+    expect(filename).not.toBe('');
+    expect(path.basename(filename)).toBe(filename);
+    const filePath = path.resolve(
+      __dirname,
+      '../../../public/release-notes',
+      release.version,
+      filename
+    );
+    expect(fs.existsSync(filePath) && fs.statSync(filePath).isFile()).toBe(true);
+  };
+
+  it('only declares screenshots that actually exist under public/release-notes/<version>/ — string form', () => {
     allItems.forEach(({ release, item }) => {
-      if (!item.screenshot) return;
-      const filePath = path.resolve(
-        __dirname,
-        '../../../public/release-notes',
-        release.version,
-        item.screenshot
-      );
-      expect(fs.existsSync(filePath)).toBe(true);
+      if (typeof item.screenshot !== 'string') return;
+      expectResolvesToRealFile(release, item.screenshot);
+    });
+  });
+
+  // TF-810: a per-language screenshot map must have every referenced
+  // filename actually present — same invariant as the string form, just
+  // checked across all of the map's values instead of a single filename.
+  it('only declares screenshots that actually exist under public/release-notes/<version>/ — per-language map form', () => {
+    allItems.forEach(({ release, item }) => {
+      if (typeof item.screenshot !== 'object' || item.screenshot === undefined) return;
+      Object.values(item.screenshot).forEach((filename) => {
+        expectResolvesToRealFile(release, filename as string);
+      });
     });
   });
 
@@ -82,5 +112,41 @@ describe('RELEASE_NOTES manifest integrity', () => {
         expect(new Set(ids).size).toBe(ids.length);
       });
     });
+  });
+});
+
+describe('resolveScreenshotSrc (TF-810)', () => {
+  it('returns undefined when screenshot is undefined', () => {
+    expect(resolveScreenshotSrc(undefined, 'en')).toBeUndefined();
+  });
+
+  it('returns the filename unchanged for the string form, regardless of language', () => {
+    expect(resolveScreenshotSrc('foo.png', 'en')).toBe('foo.png');
+    expect(resolveScreenshotSrc('foo.png', 'fr')).toBe('foo.png');
+  });
+
+  it('picks the entry matching the requested language from a map', () => {
+    const screenshot = { de: 'foo-de.png', en: 'foo-en.png' };
+    expect(resolveScreenshotSrc(screenshot, 'en')).toBe('foo-en.png');
+    expect(resolveScreenshotSrc(screenshot, 'de')).toBe('foo-de.png');
+  });
+
+  it('falls back to de when the requested language is missing from the map', () => {
+    const screenshot = { de: 'foo-de.png', en: 'foo-en.png' };
+    expect(resolveScreenshotSrc(screenshot, 'fr')).toBe('foo-de.png');
+    expect(resolveScreenshotSrc(screenshot, 'it')).toBe('foo-de.png');
+  });
+
+  it('falls back to whichever entry is present when de itself is missing', () => {
+    const screenshot = { fr: 'foo-fr.png' };
+    expect(resolveScreenshotSrc(screenshot, 'en')).toBe('foo-fr.png');
+  });
+
+  // Review fix (TF-810): the doc comment explicitly calls out "an empty map"
+  // as a case that returns undefined — assert it, since Object.values({})[0]
+  // being undefined is exactly the kind of thing a future refactor could
+  // silently break.
+  it('returns undefined when the map is empty', () => {
+    expect(resolveScreenshotSrc({}, 'en')).toBeUndefined();
   });
 });

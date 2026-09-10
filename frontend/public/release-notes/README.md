@@ -15,6 +15,22 @@ public/release-notes/<version>/<filename>
 `ReleaseNoteItem` — any common raster/vector format works (`.png`, `.jpg`,
 `.webp`, `.svg`); the dialog just renders it as an `<img>`.
 
+## Per-language screenshots (TF-810)
+
+`screenshot` can be either a single filename (shown for every UI language —
+the original TF-802 form) or a map keyed by language:
+
+```ts
+screenshot: { de: 'foo-de.png', en: 'foo-en.png' }
+```
+
+A language missing from the map falls back to `de`, then to whichever entry
+the map has (`resolveScreenshotSrc` in `src/data/releaseNotes.ts`) — so an
+item never renders a broken/empty image just because e.g. the FR crop
+hasn't been captured yet. Every filename referenced anywhere in the map
+still has to exist under this same `<version>/` folder; add languages to the
+map incrementally as real crops for that language become available.
+
 ## Where the file comes from does not matter
 
 The dialog only checks whether `screenshot` is set — it does not care how
@@ -36,3 +52,8 @@ Cropped to exclude the Benutzer/Institution columns so no real user name or
 email address ends up in a screenshot shipped to every end user (review fix,
 TF-802: an earlier version of this entry briefly shipped with a labelled
 placeholder image instead).
+
+Its `releaseNotes.ts` entry uses the map form with only `de` populated
+(`{ de: 'admin-kebab-menu.png' }`, TF-810) — falls back to this same crop for
+en/fr/it until real localized crops exist; it's the template for adding
+those once captured.

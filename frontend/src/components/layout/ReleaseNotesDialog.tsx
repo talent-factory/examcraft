@@ -28,6 +28,7 @@ import {
   RELEASE_NOTES,
   RELEASE_NOTE_GROUP_EMOJI,
   ReleaseNoteEntry,
+  resolveScreenshotSrc,
 } from '../../data/releaseNotes';
 
 interface ReleaseNotesDialogProps {
@@ -285,24 +286,32 @@ const ReleaseSection: React.FC<ReleaseSectionProps> = ({ release, isNew, expande
                         {t(`releaseNotes.entries.${item.id}`)}
                       </Typography>
                     </Box>
-                    {item.screenshot && (
-                      <Box
-                        component="img"
-                        src={`/release-notes/${release.version}/${item.screenshot}`}
-                        // Review fix: the raw filename is not a description and isn't
-                        // translated. The entry's own (already localized) text is the
-                        // best description we have without adding a dedicated alt key
-                        // per screenshot.
-                        alt={t(`releaseNotes.entries.${item.id}`)}
-                        sx={{
-                          ml: 2.1,
-                          maxWidth: '100%',
-                          borderRadius: 1,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                        }}
-                      />
-                    )}
+                    {(() => {
+                      // TF-810: `item.screenshot` may be a single filename or a
+                      // per-language map — resolveScreenshotSrc picks the file
+                      // for `lang`, falling back to `de` (see releaseNotes.ts).
+                      const screenshotFile = resolveScreenshotSrc(item.screenshot, lang);
+                      return (
+                        screenshotFile && (
+                          <Box
+                            component="img"
+                            src={`/release-notes/${release.version}/${screenshotFile}`}
+                            // Review fix: the raw filename is not a description and isn't
+                            // translated. The entry's own (already localized) text is the
+                            // best description we have without adding a dedicated alt key
+                            // per screenshot.
+                            alt={t(`releaseNotes.entries.${item.id}`)}
+                            sx={{
+                              ml: 2.1,
+                              maxWidth: '100%',
+                              borderRadius: 1,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                            }}
+                          />
+                        )
+                      );
+                    })()}
                   </Box>
                 ))}
               </Box>
