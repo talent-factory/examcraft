@@ -14,28 +14,31 @@ logger = logging.getLogger(__name__)
 # Redis Configuration
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 REDIS_DB_SESSIONS = 0  # Database 0 for sessions
-REDIS_DB_BLACKLIST = 1  # Database 1 for token blacklist
-REDIS_DB_RATELIMIT = 2  # Database 2 for rate limiting
-REDIS_DB_MCP_OAUTH = (
-    3  # Database 3 for MCP OAuth store (clients, tokens, auth codes, state) — TF-726
-)
-# TF-815: prod's Upstash Redis instance rejects SELECT on any non-zero
-# index ("ERR Only 0th database is supported!") — NOT just index 4 as
-# first suspected. A same-day fix that pointed ``REDIS_DB_OPS_ALERTS`` at
-# DB 3 (shared with MCP OAuth) still failed in prod with the identical
-# error, just "Selected DB: 3" instead of "Selected DB: 4" — proving this
-# Upstash instance only ever supports DB 0, full stop. ``REDIS_DB_BLACKLIST``
-# (1), ``REDIS_DB_RATELIMIT`` (2) and ``REDIS_DB_MCP_OAUTH`` (3) are
-# therefore suspected to have the exact same problem on any *fresh*
-# connection — they just haven't visibly failed yet, plausibly because
-# their client singletons hold long-lived pooled connections from process
-# boot that never needed to re-``SELECT``. That is a separate, wider
-# incident to investigate (not fixed here) — see TF-815 follow-up notes.
-# For ops-alerts specifically: share DB 0 with sessions instead of any
-# other index. Key-prefix isolation (``oauth_state:*``/``avatar:*`` there
-# vs. ``ops_alert:state:*`` in ops_alert_service.py) keeps the keyspaces
-# apart.
-REDIS_DB_OPS_ALERTS = REDIS_DB_SESSIONS
+# TF-815 proved prod's Upstash Redis instance (`examcraft-redis`) rejects
+# SELECT on ANY non-zero index ("ERR Only 0th database is supported!") — not
+# just the specific index first suspected. A same-day fix that pointed
+# ``REDIS_DB_OPS_ALERTS`` at DB 3 (shared with MCP OAuth at the time) still
+# failed in prod with the identical error, just "Selected DB: 3" instead of
+# "Selected DB: 4" — proving this Upstash instance only ever supports DB 0,
+# full stop. TF-816 (audit) confirmed the same restriction necessarily
+# applies to ``REDIS_DB_BLACKLIST``, ``REDIS_DB_RATELIMIT`` and
+# ``REDIS_DB_MCP_OAUTH`` too — it's a server-level restriction, not something
+# specific to the ops-alerts index, so there is nothing feature-specific left
+# to verify. They had simply not visibly failed *yet* because their client
+# singletons hold long-lived pooled connections from process boot that never
+# needed to re-``SELECT``; a Redis restart/failover/pool exhaustion would
+# have surfaced the identical error on any of them. Fail modes if left
+# unfixed until that happened: rate limiting fails open silently (a Redis
+# blip would disable it with no error to the client), and a blacklisted
+# token (post logout/password-change) could be accepted again after a
+# reconnect. All four non-session databases below therefore now share DB 0
+# with sessions — isolation is via key prefix only (``session:*``/
+# ``user_sessions:*``, ``blacklist:*``, ``ratelimit:*``, ``mcp:*``,
+# ``ops_alert:state:*`` — all disjoint, verified in TF-816).
+REDIS_DB_BLACKLIST = REDIS_DB_SESSIONS  # was DB 1 pre-TF-816
+REDIS_DB_RATELIMIT = REDIS_DB_SESSIONS  # was DB 2 pre-TF-816
+REDIS_DB_MCP_OAUTH = REDIS_DB_SESSIONS  # was DB 3 pre-TF-816 (TF-726)
+REDIS_DB_OPS_ALERTS = REDIS_DB_SESSIONS  # was DB 3/4 pre-TF-815-follow-up
 
 
 class RedisService:
@@ -59,7 +62,12 @@ class RedisService:
 
     @classmethod
     def get_blacklist_client(cls) -> redis.Redis:
-        """Get Redis client for token blacklist"""
+        """Get Redis client for token blacklist.
+
+        Shares physical DB 0 with sessions/rate-limiting/MCP-OAuth/ops-alerts
+        (TF-816) — prod's Upstash instance only supports DB 0. Isolated from
+        them purely by key prefix (``blacklist:*``).
+        """
         if cls._blacklist_client is None:
             cls._blacklist_client = redis.from_url(
                 REDIS_URL, db=REDIS_DB_BLACKLIST, decode_responses=True
@@ -69,7 +77,12 @@ class RedisService:
 
     @classmethod
     def get_ratelimit_client(cls) -> redis.Redis:
-        """Get Redis client for rate limiting"""
+        """Get Redis client for rate limiting.
+
+        Shares physical DB 0 with sessions/blacklist/MCP-OAuth/ops-alerts
+        (TF-816) — prod's Upstash instance only supports DB 0. Isolated from
+        them purely by key prefix (``ratelimit:*``).
+        """
         if cls._ratelimit_client is None:
             cls._ratelimit_client = redis.from_url(
                 REDIS_URL, db=REDIS_DB_RATELIMIT, decode_responses=True
@@ -87,6 +100,10 @@ class RedisService:
         the previous per-machine JSON file on a Fly volume, which caused a
         registered client to be invisible to requests routed to a different
         machine (TF-726).
+
+        Shares physical DB 0 with sessions/blacklist/rate-limiting/ops-alerts
+        (TF-816) — prod's Upstash instance only supports DB 0. Isolated from
+        them purely by key prefix (``mcp:*``).
         """
         if cls._mcp_oauth_client is None:
             cls._mcp_oauth_client = redis.from_url(
