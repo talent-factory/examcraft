@@ -19,7 +19,18 @@ REDIS_DB_RATELIMIT = 2  # Database 2 for rate limiting
 REDIS_DB_MCP_OAUTH = (
     3  # Database 3 for MCP OAuth store (clients, tokens, auth codes, state) — TF-726
 )
-REDIS_DB_OPS_ALERTS = 4  # Database 4 for Ops-Dashboard alert debounce state (TF-788)
+# TF-815: prod's Upstash Redis instance rejects ``SELECT 4`` ("ERR Only 0th
+# database is supported! Selected DB: 4") — logical DBs 0-3 are this
+# instance's practical ceiling, not the Redis-standard 16. DB 4
+# (introduced by TF-788) never worked, silently: the ops-alert debounce
+# read always failed and was (by design, see ops_alert_service.py) treated
+# as "skip this cycle" rather than a fresh breach, so no Telegram alert
+# could ever fire. Fix: share DB 3 with the MCP OAuth store instead of
+# claiming a new index — key-prefix isolation (``mcp:*`` here vs.
+# ``ops_alert:state:*`` in ops_alert_service.py) keeps the two keyspaces
+# apart, same technique either store would need if a *future* addition
+# also can't get its own DB index.
+REDIS_DB_OPS_ALERTS = REDIS_DB_MCP_OAUTH
 
 
 class RedisService:
@@ -86,7 +97,9 @@ class RedisService:
         Holds per-check-type state (last known status + last alert time) used
         by ``premium/backend/services/ops_alert_service.py`` to avoid
         re-sending a Telegram alert on every Beat tick while a threshold
-        breach persists (TF-788).
+        breach persists (TF-788). Own connection pool, but shares physical
+        DB 3 with ``get_mcp_oauth_client`` (TF-815, see ``REDIS_DB_OPS_ALERTS``)
+        — isolated from it purely by key prefix, not by DB index.
         """
         if cls._ops_alert_client is None:
             cls._ops_alert_client = redis.from_url(
