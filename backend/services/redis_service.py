@@ -19,18 +19,23 @@ REDIS_DB_RATELIMIT = 2  # Database 2 for rate limiting
 REDIS_DB_MCP_OAUTH = (
     3  # Database 3 for MCP OAuth store (clients, tokens, auth codes, state) — TF-726
 )
-# TF-815: prod's Upstash Redis instance rejects ``SELECT 4`` ("ERR Only 0th
-# database is supported! Selected DB: 4") — logical DBs 0-3 are this
-# instance's practical ceiling, not the Redis-standard 16. DB 4
-# (introduced by TF-788) never worked, silently: the ops-alert debounce
-# read always failed and was (by design, see ops_alert_service.py) treated
-# as "skip this cycle" rather than a fresh breach, so no Telegram alert
-# could ever fire. Fix: share DB 3 with the MCP OAuth store instead of
-# claiming a new index — key-prefix isolation (``mcp:*`` here vs.
-# ``ops_alert:state:*`` in ops_alert_service.py) keeps the two keyspaces
-# apart, same technique either store would need if a *future* addition
-# also can't get its own DB index.
-REDIS_DB_OPS_ALERTS = REDIS_DB_MCP_OAUTH
+# TF-815: prod's Upstash Redis instance rejects SELECT on any non-zero
+# index ("ERR Only 0th database is supported!") — NOT just index 4 as
+# first suspected. A same-day fix that pointed ``REDIS_DB_OPS_ALERTS`` at
+# DB 3 (shared with MCP OAuth) still failed in prod with the identical
+# error, just "Selected DB: 3" instead of "Selected DB: 4" — proving this
+# Upstash instance only ever supports DB 0, full stop. ``REDIS_DB_BLACKLIST``
+# (1), ``REDIS_DB_RATELIMIT`` (2) and ``REDIS_DB_MCP_OAUTH`` (3) are
+# therefore suspected to have the exact same problem on any *fresh*
+# connection — they just haven't visibly failed yet, plausibly because
+# their client singletons hold long-lived pooled connections from process
+# boot that never needed to re-``SELECT``. That is a separate, wider
+# incident to investigate (not fixed here) — see TF-815 follow-up notes.
+# For ops-alerts specifically: share DB 0 with sessions instead of any
+# other index. Key-prefix isolation (``oauth_state:*``/``avatar:*`` there
+# vs. ``ops_alert:state:*`` in ops_alert_service.py) keeps the keyspaces
+# apart.
+REDIS_DB_OPS_ALERTS = REDIS_DB_SESSIONS
 
 
 class RedisService:
@@ -98,8 +103,10 @@ class RedisService:
         by ``premium/backend/services/ops_alert_service.py`` to avoid
         re-sending a Telegram alert on every Beat tick while a threshold
         breach persists (TF-788). Own connection pool, but shares physical
-        DB 3 with ``get_mcp_oauth_client`` (TF-815, see ``REDIS_DB_OPS_ALERTS``)
-        — isolated from it purely by key prefix, not by DB index.
+        DB 0 with ``get_session_client`` (TF-815, see ``REDIS_DB_OPS_ALERTS``)
+        — isolated from it purely by key prefix, not by DB index. Prod's
+        Upstash instance only supports DB 0 at all (see the constant's
+        comment), so this is not a stylistic choice.
         """
         if cls._ops_alert_client is None:
             cls._ops_alert_client = redis.from_url(

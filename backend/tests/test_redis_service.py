@@ -1,19 +1,21 @@
 """Tests für services.redis_service — neuer Ops-Alert-Client (TF-788)."""
 
 from services.redis_service import (
-    REDIS_DB_MCP_OAUTH,
     REDIS_DB_OPS_ALERTS,
+    REDIS_DB_SESSIONS,
     RedisService,
 )
 
 
-def test_ops_alert_db_shares_mcp_oauth_db():
-    """TF-815: Prod-Redis (Upstash) lehnt ``SELECT 4`` ab ("Only 0th database
-    is supported! Selected DB: 4") — 0-3 sind die praktische Obergrenze.
-    Ops-Alerts teilen sich deshalb DB 3 mit dem MCP-OAuth-Store statt einen
-    eigenen Index zu bekommen; Key-Präfixe (``mcp:*`` vs. ``ops_alert:state:*``)
+def test_ops_alert_db_shares_sessions_db():
+    """TF-815: Prod-Redis (Upstash) lehnt ``SELECT`` auf jeden Nicht-0-Index
+    ab ("Only 0th database is supported!") — ein erster Fix-Versuch auf DB 3
+    (geteilt mit MCP-OAuth) scheiterte live mit demselben Fehler ("Selected
+    DB: 3"), was zeigt: diese Instanz unterstützt wirklich nur DB 0. Ops-Alerts
+    teilen sich deshalb DB 0 mit Sessions statt irgendeinen anderen Index;
+    Key-Präfixe (``oauth_state:*``/``avatar:*`` vs. ``ops_alert:state:*``)
     halten die Keyspaces getrennt."""
-    assert REDIS_DB_OPS_ALERTS == REDIS_DB_MCP_OAUTH
+    assert REDIS_DB_OPS_ALERTS == REDIS_DB_SESSIONS
 
 
 def test_get_ops_alert_client_uses_correct_db_and_caches_instance():
