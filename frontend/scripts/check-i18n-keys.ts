@@ -10,6 +10,13 @@
  * text to a French or Italian user. TF-670 found 410 such keys in fr and it
  * that had accumulated unnoticed since the initial extraction (TF-295).
  *
+ * Frontend locales only. The backend's `core/backend/locales/t.<lang>.json`
+ * are gated by `core/backend/tests/test_locale_parity.py` in the backend
+ * pytest run (TF-773 Part C). This script used to check them too, which kept
+ * the same key-parity claim in two gates — and the copy here was the weaker
+ * one: its `{{…}}` placeholder pattern never matches the backend's `%{…}`,
+ * it did not notice a deleted locale file, and it let empty values through.
+ *
  * Usage:
  *   bun run i18n:check
  *
@@ -84,7 +91,7 @@ export function diffLocale(reference: Flat, target: Flat): LocaleDiff {
 }
 
 export interface LocaleSet {
-  /** Label used in log output, e.g. "frontend" or "backend". */
+  /** Label used in log output, e.g. "frontend". */
   label: string;
   /** Directory containing one subdirectory/file per language. */
   dir: string;
@@ -94,14 +101,6 @@ export interface LocaleSet {
   resolveFile: (dir: string, lang: string) => string;
   /** Given `dir`, list the language codes to check (reference included). */
   listLanguages: (dir: string) => string[];
-  /**
-   * Applied to the parsed file before flattening. The frontend's
-   * translation.json is already the flat root object; the backend's
-   * `t.<lang>.json` wraps it one level deeper under the language code itself
-   * (`{"de": {...}}`), so every file needs unwrapping to compare like with
-   * like regardless of which language it is.
-   */
-  unwrap?: (parsed: unknown, lang: string) => unknown;
 }
 
 function sample(keys: string[]): string {
@@ -122,10 +121,8 @@ function checkLocaleSet(set: LocaleSet): string[] {
     return [`${set.label}: reference locale "${set.reference}" not found`];
   }
 
-  const load = (lang: string): Flat => {
-    const parsed = JSON.parse(fs.readFileSync(set.resolveFile(set.dir, lang), 'utf-8'));
-    return flatten(set.unwrap ? set.unwrap(parsed, lang) : parsed);
-  };
+  const load = (lang: string): Flat =>
+    flatten(JSON.parse(fs.readFileSync(set.resolveFile(set.dir, lang), 'utf-8')));
 
   const reference = load(set.reference);
   console.log(
@@ -171,12 +168,6 @@ const listSubdirs = (dir: string): string[] =>
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
 
-const listTFiles = (dir: string): string[] =>
-  fs
-    .readdirSync(dir)
-    .filter((name) => /^t\.[a-z]+\.json$/.test(name))
-    .map((name) => name.slice('t.'.length, -'.json'.length));
-
 const FRONTEND: LocaleSet = {
   label: 'frontend',
   dir: path.resolve(import.meta.dir, '../src/locales'),
@@ -185,24 +176,8 @@ const FRONTEND: LocaleSet = {
   resolveFile: (dir, lang) => path.join(dir, lang, 'translation.json'),
 };
 
-/**
- * The backend's own `t.<lang>.json` files (help-hint fallback text, server-
- * rendered notification copy) are a separate translation surface with a
- * different on-disk shape — not gated by the frontend check above, and
- * silently divergent otherwise. 216 keys × 4 languages as of TF-670; verified
- * by hand at the time, now enforced.
- */
-const BACKEND: LocaleSet = {
-  label: 'backend',
-  dir: path.resolve(import.meta.dir, '../../backend/locales'),
-  reference: 'de',
-  listLanguages: listTFiles,
-  resolveFile: (dir, lang) => path.join(dir, `t.${lang}.json`),
-  unwrap: (parsed, lang) => (parsed as Record<string, unknown>)[lang],
-};
-
 if (import.meta.main) {
-  const failures = [...checkLocaleSet(FRONTEND), ...checkLocaleSet(BACKEND)];
+  const failures = checkLocaleSet(FRONTEND);
 
   if (failures.length) {
     console.error('\nFAIL — locale files are out of sync:');
