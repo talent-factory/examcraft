@@ -66,6 +66,21 @@ describe('useRoleBasedNavigation - grouping', () => {
     ]);
   });
 
+  it('never assigns the same icon to two different nav items', () => {
+    // TF-819: two items silently shared 💬 until it became visible/confusing
+    // in the icon-only collapsed rail. Guards against that class of bug
+    // recurring as items are added or edited.
+    mockUser = { is_superuser: true };
+    mockHasPermission.mockReturnValue(true);
+
+    const { result } = renderHook(() => useRoleBasedNavigation());
+    const icons = result.current.navigationItems
+      .map((item) => item.icon)
+      .filter((icon): icon is string => !!icon);
+
+    expect(new Set(icons).size).toBe(icons.length);
+  });
+
   it('keeps the active RBAC fields on each grouped item', () => {
     mockUser = { is_superuser: true };
     mockHasPermission.mockReturnValue(true);

@@ -47,11 +47,15 @@ beforeEach(() => {
   setNavigation(defaultGroups);
 });
 
-const renderAt = (pathname: string, isOpen = true) =>
+const renderAt = (
+  pathname: string,
+  isOpen = true,
+  onToggle?: (isOpen: boolean) => void
+) =>
   render(
     <MemoryRouter initialEntries={[pathname]}>
       <AuthProvider>
-        <Sidebar isOpen={isOpen} />
+        <Sidebar isOpen={isOpen} onToggle={onToggle} />
       </AuthProvider>
     </MemoryRouter>
   );
@@ -221,6 +225,73 @@ describe('Sidebar Component — groups', () => {
       expect(screen.getByText('📊')).toBeInTheDocument();
       expect(screen.getByText('⚙️')).toBeInTheDocument();
     });
+
+    it('exposes the item label via title and aria-label so the icon-only link stays identifiable', () => {
+      renderAt('/dashboard', false);
+
+      const link = screen.getByRole('link', { name: 'Dashboard' });
+      expect(link).toHaveAttribute('title', 'Dashboard');
+    });
+
+    it('does not set a title on links when expanded (label is already visible)', () => {
+      renderAt('/dashboard', true);
+
+      const link = screen.getByRole('link', { name: 'Dashboard' });
+      expect(link).not.toHaveAttribute('title');
+    });
+  });
+});
+
+describe('Sidebar Component — collapse/expand toggle', () => {
+  it('does not render a toggle button when onToggle is not provided', () => {
+    renderAt('/dashboard');
+
+    expect(screen.queryByTestId('sidebar-toggle')).not.toBeInTheDocument();
+  });
+
+  it('calls onToggle with the inverted isOpen value when expanded', () => {
+    const onToggle = jest.fn();
+    renderAt('/dashboard', true, onToggle);
+
+    fireEvent.click(screen.getByTestId('sidebar-toggle'));
+
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledWith(false);
+  });
+
+  it('calls onToggle with the inverted isOpen value when collapsed', () => {
+    const onToggle = jest.fn();
+    renderAt('/dashboard', false, onToggle);
+
+    fireEvent.click(screen.getByTestId('sidebar-toggle'));
+
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledWith(true);
+  });
+
+  it('reflects the current state via aria-expanded and an accessible name', () => {
+    const onToggle = jest.fn();
+    const { rerender } = render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <AuthProvider>
+          <Sidebar isOpen onToggle={onToggle} />
+        </AuthProvider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Sidebar einklappen' })).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <AuthProvider>
+          <Sidebar isOpen={false} onToggle={onToggle} />
+        </AuthProvider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Sidebar ausklappen' })).toBeInTheDocument();
   });
 });
 

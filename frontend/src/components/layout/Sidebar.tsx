@@ -18,7 +18,7 @@ import {
   NavigationItem,
   NavigationGroup,
 } from '../../hooks/useRoleBasedNavigation';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ReleaseNotesDialog } from './ReleaseNotesDialog';
 import { SIDEBAR_REVEAL_NAV_EVENT, SidebarRevealNavDetail } from './sidebarNavReveal';
 
@@ -54,7 +54,11 @@ const writeStoredGroups = (ids: string[]): void => {
   }
 };
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, offsetForImpersonationBanner = false }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  isOpen = true,
+  onToggle,
+  offsetForImpersonationBanner = false,
+}) => {
   const { t } = useTranslation();
   const { navigationGroups, navigationItems } = useRoleBasedNavigation();
   const location = useLocation();
@@ -233,7 +237,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, offsetForImpers
 
   const renderIcon = (icon?: string) => {
     if (!icon) return null;
-    return <span className="text-lg">{icon}</span>;
+    return (
+      <span className="text-lg" aria-hidden="true">
+        {icon}
+      </span>
+    );
   };
 
   const renderNavItem = (item: NavigationItem, isChild = false) => {
@@ -247,6 +255,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, offsetForImpers
           <Link
             to={item.path}
             data-testid={`nav-${item.path.slice(1).replace(/\//g, '-')}`}
+            title={!isOpen ? item.label : undefined}
+            aria-label={item.label}
             className={`flex-1 flex items-center px-4 py-3 rounded-lg transition-colors duration-250 ${
               isActive
                 ? 'bg-primary-100 text-primary-700 font-medium'
@@ -330,10 +340,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, offsetForImpers
         offsetForImpersonationBanner ? 'top-[104px] h-[calc(100vh_-_104px)]' : 'top-16 h-[calc(100vh_-_64px)]'
       } ${isOpen ? 'w-sidebar' : 'w-sidebar-collapsed'}`}
     >
+      {/* Only rendered when the caller wires collapse state via `onToggle` —
+          callers that don't (tests, standalone renders) simply get a
+          non-collapsible sidebar. */}
+      {onToggle && (
+        <button
+          type="button"
+          onClick={() => onToggle(!isOpen)}
+          data-testid="sidebar-toggle"
+          aria-label={isOpen ? t('layout.sidebar.collapseSidebar') : t('layout.sidebar.expandSidebar')}
+          aria-expanded={isOpen}
+          aria-controls="sidebar-nav"
+          title={isOpen ? t('layout.sidebar.collapseSidebar') : t('layout.sidebar.expandSidebar')}
+          className="absolute -right-3 top-20 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors hover:text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          {isOpen ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        </button>
+      )}
+
       {/* Sidebar Content */}
       <div className="h-full flex flex-col">
         <div className="relative flex-1 min-h-0">
           <nav
+            id="sidebar-nav"
             ref={navRef}
             onScroll={updateScrollFade}
             // pb-24: bottom breathing room so the last entry stays clear of the

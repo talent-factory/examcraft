@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { DashboardLayout } from '../DashboardLayout';
 import { AuthProvider } from '../../../contexts/AuthContext';
@@ -18,10 +18,25 @@ jest.mock('../../../api/apiClient', () => ({
 }));
 
 // NavigationBar deliberately not mocked: the real <nav> must render so the fixed/top-0 test can check it
-// Mock Sidebar
+// Mock Sidebar — exposes isOpen/onToggle so the collapse-persistence tests
+// below can drive DashboardLayout's real state without rendering the full
+// Sidebar tree.
 jest.mock('../Sidebar', () => ({
-  Sidebar: () => <div data-testid="sidebar">Sidebar</div>,
+  Sidebar: ({ isOpen, onToggle }: { isOpen?: boolean; onToggle?: (isOpen: boolean) => void }) => (
+    <div data-testid="sidebar">
+      Sidebar
+      {onToggle && (
+        <button type="button" data-testid="mock-sidebar-toggle" onClick={() => onToggle(!isOpen)}>
+          toggle
+        </button>
+      )}
+    </div>
+  ),
 }));
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 const renderWithRouter = (component: React.ReactElement) => {
   return render(
@@ -111,5 +126,45 @@ describe('DashboardLayout Component', () => {
     const nav = screen.getByTestId('navigation-bar');
     expect(nav).toHaveClass('fixed');
     expect(nav).toHaveClass('top-0');
+  });
+
+  describe('sidebar collapse persistence (TF-819)', () => {
+    it('restores a collapsed state from localStorage instead of always starting open', () => {
+      window.localStorage.setItem('examcraft.sidebar.isOpen', 'false');
+
+      renderWithRouter(
+        <DashboardLayout>
+          <div>Test Content</div>
+        </DashboardLayout>
+      );
+
+      expect(screen.getByRole('main')).toHaveClass('ml-sidebar-collapsed');
+    });
+
+    it('persists a collapse toggle and survives a remount at a different route depth', () => {
+      // Regression: some routes wrap DashboardLayout at a different component
+      // depth (e.g. behind an extra guard), which unmounts/remounts it on
+      // navigation. Before TF-819's fix, a plain useState(true) would reset
+      // to expanded on every such remount, undoing the user's toggle.
+      const { unmount } = renderWithRouter(
+        <DashboardLayout>
+          <div>Test Content</div>
+        </DashboardLayout>
+      );
+
+      expect(screen.getByRole('main')).toHaveClass('ml-sidebar');
+      fireEvent.click(screen.getByTestId('mock-sidebar-toggle'));
+      expect(screen.getByRole('main')).toHaveClass('ml-sidebar-collapsed');
+
+      unmount();
+
+      renderWithRouter(
+        <DashboardLayout>
+          <div>Test Content</div>
+        </DashboardLayout>
+      );
+
+      expect(screen.getByRole('main')).toHaveClass('ml-sidebar-collapsed');
+    });
   });
 });

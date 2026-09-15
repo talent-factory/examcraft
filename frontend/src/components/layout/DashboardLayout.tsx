@@ -3,7 +3,7 @@
  * Main layout wrapper with NavigationBar and Sidebar for authenticated pages
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationBar } from './NavigationBar';
 import { Sidebar } from './Sidebar';
 import { Footer } from './Footer';
@@ -14,9 +14,33 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
+const SIDEBAR_OPEN_STORAGE_KEY = 'examcraft.sidebar.isOpen';
+
+// TF-819: some routes wrap AppLayout at a different depth (e.g. behind an
+// extra PermissionGuard), so React remounts DashboardLayout on navigation
+// between them — a plain useState(true) would silently reset the collapse
+// state on every such navigation. Lazy-initializing from localStorage (same
+// try/catch pattern as Sidebar.tsx's GROUPS_STORAGE_KEY) survives remounts.
+const readStoredSidebarOpen = (): boolean => {
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY);
+    return raw === null ? true : raw === 'true';
+  } catch {
+    return true;
+  }
+};
+
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(readStoredSidebarOpen);
   const { isImpersonating } = useAuth();
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, String(sidebarOpen));
+    } catch {
+      /* localStorage unavailable (private mode / quota) — non-fatal. */
+    }
+  }, [sidebarOpen]);
 
   return (
     <div data-testid="dashboard-layout" className="min-h-screen bg-gray-50">

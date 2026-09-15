@@ -2545,7 +2545,9 @@
   "layout": {
     "sidebar": {
       "collapse": "Collapse",
-      "expand": "Expand"
+      "expand": "Expand",
+      "collapseSidebar": "Collapse sidebar",
+      "expandSidebar": "Expand sidebar"
     },
     "navigationBar": {
       "userFallback": "User"
