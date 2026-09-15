@@ -812,6 +812,10 @@
         "staleError": "Refresh failed — the data shown may be out of date.",
         "retry": "Retry",
         "openTool": "Open tool",
+        "cliHintLabel": "No browser access available — access via the Fly CLI:",
+        "copyCommand": "Copy command",
+        "copied": "Copied!",
+        "copyFailed": "Copy failed — select and copy the command manually",
         "component": {
           "frontend": "Frontend",
           "backend": "Backend",

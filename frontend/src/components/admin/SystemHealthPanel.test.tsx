@@ -23,6 +23,7 @@ const baseSnapshot: OpsHealthSnapshot = {
       timestamp: '2026-09-05T08:00:00+00:00',
       detail: null,
       deep_link: 'https://talent-factory.sentry.io/projects/examcraft-frontend/',
+      cli_hint: null,
       sentry: { configured: false },
     },
     backend: {
@@ -32,6 +33,7 @@ const baseSnapshot: OpsHealthSnapshot = {
       timestamp: '2026-09-05T08:00:00+00:00',
       detail: null,
       deep_link: null,
+      cli_hint: null,
       sentry: { configured: false },
     },
     db: {
@@ -41,6 +43,7 @@ const baseSnapshot: OpsHealthSnapshot = {
       timestamp: '2026-09-05T08:00:00+00:00',
       detail: null,
       deep_link: null,
+      cli_hint: null,
     },
     rabbitmq: {
       status: 'green',
@@ -48,7 +51,8 @@ const baseSnapshot: OpsHealthSnapshot = {
       metric_value: 0,
       timestamp: '2026-09-05T08:00:00+00:00',
       detail: null,
-      deep_link: 'https://examcraft-rabbitmq.fly.dev',
+      deep_link: null,
+      cli_hint: 'fly proxy 15672 -a examcraft-rabbitmq',
     },
     celery: {
       status: 'red',
@@ -57,6 +61,7 @@ const baseSnapshot: OpsHealthSnapshot = {
       timestamp: '2026-09-05T08:00:00+00:00',
       detail: 'no workers registered',
       deep_link: 'https://examcraft-flower.fly.dev',
+      cli_hint: null,
     },
   },
 };
@@ -89,9 +94,16 @@ describe('SystemHealthPanel', () => {
     render(<SystemHealthPanel />);
     expect(await screen.findByTestId('system-health-card-db')).toBeInTheDocument();
 
-    const rabbitmqLink = screen.getByTestId('system-health-card-link-rabbitmq');
-    expect(rabbitmqLink).toHaveAttribute('href', 'https://examcraft-rabbitmq.fly.dev');
+    const celeryLink = screen.getByTestId('system-health-card-link-celery');
+    expect(celeryLink).toHaveAttribute('href', 'https://examcraft-flower.fly.dev');
     expect(screen.queryByTestId('system-health-card-link-db')).not.toBeInTheDocument();
+    // TF-817: rabbitmq has no working public deep-link (no public IP on
+    // examcraft-rabbitmq) — the panel must show the cli_hint fallback, not a
+    // (dead) link.
+    expect(screen.queryByTestId('system-health-card-link-rabbitmq')).not.toBeInTheDocument();
+    expect(screen.getByTestId('system-health-card-cli-hint-rabbitmq')).toHaveTextContent(
+      'fly proxy 15672 -a examcraft-rabbitmq'
+    );
   });
 
   it('shows a page-level error and a retry button when the fetch fails', async () => {

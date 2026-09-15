@@ -41,6 +41,14 @@ export interface OpsComponentHealth {
   timestamp: string;
   detail: string | null;
   deep_link: string | null;
+  // CLI fallback for components without a (working) browser deep-link —
+  // currently only `rabbitmq` in prod (TF-817: no public IP, a fly.dev URL
+  // would be dead; locally TF-800 gives `rabbitmq` a real `deep_link`
+  // instead, see `docker-compose.full.yml`). Always present on the wire
+  // (unconditional key in `ComponentHealth.to_dict()`, unlike the truly
+  // optional `sentry` below) — non-null only when `deep_link` is `null`;
+  // the card renders one or the other, never both.
+  cli_hint: string | null;
   // Optional on the wire for db/rabbitmq/celery, but when the key is
   // present its value is `null` rather than omitted (Pydantic serializes
   // `Optional[dict] = None` as `null`, not as an absent field) — `frontend`

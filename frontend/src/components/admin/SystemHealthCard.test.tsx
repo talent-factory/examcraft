@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import SystemHealthCard from './SystemHealthCard';
 import { OpsComponentHealth } from '../../types/opsHealth';
@@ -17,6 +17,7 @@ const baseHealth: OpsComponentHealth = {
   timestamp: '2026-09-05T08:00:00+00:00',
   detail: null,
   deep_link: null,
+  cli_hint: null,
 };
 
 describe('SystemHealthCard', () => {
@@ -100,6 +101,63 @@ describe('SystemHealthCard', () => {
       expect(
         screen.queryByText('pages.admin.systemHealth.sentryErrorCount')
       ).not.toBeInTheDocument();
+    });
+  });
+
+  // TF-817: rabbitmq has no working public deep-link (no public IP on
+  // examcraft-rabbitmq), so the backend sends `cli_hint` instead — the card
+  // must render a copyable fly-proxy command, not a dead/absent link.
+  describe('CLI hint fallback (no working deep_link)', () => {
+    const cliHintHealth: OpsComponentHealth = {
+      ...baseHealth,
+      deep_link: null,
+      cli_hint: 'fly proxy 15672 -a examcraft-rabbitmq',
+    };
+
+    it('renders the cli_hint command when deep_link is null but cli_hint is set', () => {
+      render(<SystemHealthCard componentKey="rabbitmq" health={cliHintHealth} />);
+
+      expect(screen.getByTestId('system-health-card-cli-hint-rabbitmq')).toHaveTextContent(
+        'fly proxy 15672 -a examcraft-rabbitmq'
+      );
+      expect(screen.queryByTestId('system-health-card-link-rabbitmq')).not.toBeInTheDocument();
+    });
+
+    it('does not render the cli_hint when a deep_link is present', () => {
+      render(
+        <SystemHealthCard
+          componentKey="celery"
+          health={{ ...cliHintHealth, deep_link: 'https://examcraft-flower.fly.dev' }}
+        />
+      );
+
+      expect(screen.queryByTestId('system-health-card-cli-hint-celery')).not.toBeInTheDocument();
+    });
+
+    it('copies the command to the clipboard when the copy button is clicked', async () => {
+      const writeText = jest.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<SystemHealthCard componentKey="rabbitmq" health={cliHintHealth} />);
+      fireEvent.click(screen.getByTestId('system-health-card-copy-rabbitmq'));
+
+      expect(writeText).toHaveBeenCalledWith('fly proxy 15672 -a examcraft-rabbitmq');
+      expect(await screen.findByText('pages.admin.systemHealth.copied')).toBeInTheDocument();
+    });
+
+    it('shows a failure message instead of "copied" when the clipboard write is rejected', async () => {
+      const writeText = jest.fn().mockRejectedValue(new Error('denied'));
+      Object.assign(navigator, { clipboard: { writeText } });
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      render(<SystemHealthCard componentKey="rabbitmq" health={cliHintHealth} />);
+      fireEvent.click(screen.getByTestId('system-health-card-copy-rabbitmq'));
+
+      expect(await screen.findByText('pages.admin.systemHealth.copyFailed')).toBeInTheDocument();
+      expect(screen.queryByText('pages.admin.systemHealth.copied')).not.toBeInTheDocument();
+      expect(warnSpy).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
     });
   });
 });

@@ -812,6 +812,10 @@
         "staleError": "Aggiornamento non riuscito — i dati mostrati potrebbero non essere aggiornati.",
         "retry": "Riprova",
         "openTool": "Apri strumento",
+        "cliHintLabel": "Nessun accesso da browser disponibile — accesso tramite la CLI Fly:",
+        "copyCommand": "Copia comando",
+        "copied": "Copiato!",
+        "copyFailed": "Copia non riuscita — selezionare e copiare il comando manualmente",
         "component": {
           "frontend": "Frontend",
           "backend": "Backend",

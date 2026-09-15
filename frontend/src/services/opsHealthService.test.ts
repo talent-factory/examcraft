@@ -23,6 +23,7 @@ describe('fetchOpsHealth', () => {
           timestamp: '2026-09-05T08:00:00+00:00',
           detail: null,
           deep_link: 'https://talent-factory.sentry.io/projects/examcraft-frontend/',
+          cli_hint: null,
           sentry: { configured: false },
         },
         backend: {
@@ -32,6 +33,7 @@ describe('fetchOpsHealth', () => {
           timestamp: '2026-09-05T08:00:00+00:00',
           detail: null,
           deep_link: null,
+          cli_hint: null,
           sentry: { configured: false },
         },
         db: {
@@ -41,6 +43,7 @@ describe('fetchOpsHealth', () => {
           timestamp: '2026-09-05T08:00:00+00:00',
           detail: null,
           deep_link: null,
+          cli_hint: null,
         },
         rabbitmq: {
           status: 'green',
@@ -48,7 +51,10 @@ describe('fetchOpsHealth', () => {
           metric_value: 0,
           timestamp: '2026-09-05T08:00:00+00:00',
           detail: null,
-          deep_link: 'https://examcraft-rabbitmq.fly.dev',
+          // TF-817: RabbitMQ never has a working deep_link in prod (no
+          // public IP) — the real backend sends cli_hint instead.
+          deep_link: null,
+          cli_hint: 'fly proxy 15672 -a examcraft-rabbitmq',
         },
         celery: {
           status: 'red',
@@ -57,6 +63,7 @@ describe('fetchOpsHealth', () => {
           timestamp: '2026-09-05T08:00:00+00:00',
           detail: 'no workers registered',
           deep_link: 'https://examcraft-flower.fly.dev',
+          cli_hint: null,
         },
       },
     };

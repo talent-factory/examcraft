@@ -812,6 +812,10 @@
         "staleError": "Aktualisierung fehlgeschlagen — angezeigte Daten sind möglicherweise veraltet.",
         "retry": "Erneut versuchen",
         "openTool": "Tool öffnen",
+        "cliHintLabel": "Kein Browser-Zugriff möglich — Zugriff via Fly-CLI:",
+        "copyCommand": "Befehl kopieren",
+        "copied": "Kopiert!",
+        "copyFailed": "Kopieren fehlgeschlagen — Befehl manuell markieren und kopieren",
         "component": {
           "frontend": "Frontend",
           "backend": "Backend",

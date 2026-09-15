@@ -812,6 +812,10 @@
         "staleError": "Échec de l'actualisation — les données affichées peuvent être obsolètes.",
         "retry": "Réessayer",
         "openTool": "Ouvrir l'outil",
+        "cliHintLabel": "Aucun accès navigateur possible — accès via la CLI Fly :",
+        "copyCommand": "Copier la commande",
+        "copied": "Copié !",
+        "copyFailed": "Échec de la copie — sélectionnez et copiez la commande manuellement",
         "component": {
           "frontend": "Frontend",
           "backend": "Backend",
