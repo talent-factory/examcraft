@@ -7,6 +7,7 @@
  */
 
 import { ApiError, statusToKind } from './submissionsService';
+import { ErrorEnvelope, readErrorEnvelope } from './apiErrorBody';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -34,11 +35,28 @@ function authHeaders(): Record<string, string> {
 async function parseJob(response: Response, action: string): Promise<PushJob> {
   if (!response.ok) {
     let detail: unknown;
+    let envelope: ErrorEnvelope = {};
     try {
       const body = await response.json();
+      envelope = readErrorEnvelope(body);
       detail = body.detail;
     } catch {
-      /* non-JSON error body */
+      // Non-JSON error body — keep raw text so an HTML error page
+      // (CDN/nginx/fly health check) leaves a debuggable trace instead
+      // of disappearing into a generic "Push fehlgeschlagen (502)".
+      try {
+        const text = await response.text();
+        if (text) {
+          detail = text.slice(0, 500);
+          console.warn(
+            '[MoodleFeedbackPushService] non-JSON error body for status',
+            response.status,
+            text.slice(0, 200),
+          );
+        }
+      } catch {
+        /* body fully unavailable */
+      }
     }
     throw new ApiError({
       kind: statusToKind(response.status),
@@ -48,6 +66,7 @@ async function parseJob(response: Response, action: string): Promise<PushJob> {
           ? detail
           : `${action} fehlgeschlagen (${response.status})`,
       detail,
+      ...envelope,
     });
   }
   return (await response.json()) as PushJob;

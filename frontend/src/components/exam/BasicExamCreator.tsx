@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import TagAutocomplete from '../shared/TagAutocomplete';
 import { type Tag } from '../../api/tagsApi';
+import { appErrorFromResponse, translateError } from '../../errors';
 
 interface BasicExamCreatorProps {
   selectedDocuments?: any[];
@@ -72,8 +73,7 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || t('components.basicExamCreator.generationError'));
+        throw await appErrorFromResponse(response, 'exams_question_generation_failed');
       }
 
       const data = await response.json();
@@ -82,8 +82,8 @@ export const BasicExamCreator: React.FC<BasicExamCreatorProps> = ({
       if (onExamGenerated) {
         onExamGenerated(data);
       }
-    } catch (err: any) {
-      setError(err.message || t('components.basicExamCreator.generationError'));
+    } catch (err) {
+      setError(translateError(err, t, 'components.basicExamCreator.generationError'));
     } finally {
       setLoading(false);
     }

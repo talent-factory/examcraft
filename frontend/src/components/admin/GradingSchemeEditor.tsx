@@ -57,7 +57,7 @@ import {
   SteppedConfig,
 } from '../../types/gradingScheme';
 import { GradingSchemesService } from '../../services/gradingSchemesService';
-import { ApiError } from '../../services/submissionsService';
+import { appErrorFromApiError, translateError } from '../../errors';
 
 // ---------------------------------------------------------------------------
 // Local grade evaluator (mirrors backend grading_evaluator.py logic)
@@ -530,15 +530,19 @@ const GradingSchemeEditor: React.FC<GradingSchemeEditorProps> = ({
       onSaved();
       onClose();
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError(
-          isEdit
-            ? t('admin.gradingSchemes.failedUpdate')
-            : t('admin.gradingSchemes.failedCreate'),
-        );
-      }
+      setError(
+        isEdit
+          ? translateError(
+              appErrorFromApiError(err, 'grading_schemes_update_failed'),
+              t,
+              'admin.gradingSchemes.failedUpdate',
+            )
+          : translateError(
+              appErrorFromApiError(err, 'grading_schemes_create_failed'),
+              t,
+              'admin.gradingSchemes.failedCreate',
+            ),
+      );
     } finally {
       setSaving(false);
     }

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ComposerService, getErrorMessage } from '../../services/ComposerService';
+import { appErrorFromAxios, translateError } from '../../errors';
+import { ComposerService } from '../../services/ComposerService';
 import { ExamStatus } from '../../types/composer';
 import ExamMetadataBar from './ExamMetadataBar';
 import QuestionPoolPanel from './QuestionPoolPanel';
@@ -36,7 +37,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
     mutationFn: (qIds: number[]) => ComposerService.addQuestions(examId, qIds),
     onSuccess: invalidateExam,
     onError: (err) => {
-      setBuilderError(getErrorMessage(err, t('composer.examBuilder.errorAddQuestions')));
+      setBuilderError(translateError(appErrorFromAxios(err, 'exams_question_add_failed'), t, 'composer.examBuilder.errorAddQuestions'));
     },
   });
 
@@ -44,7 +45,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
     mutationFn: (eqId: number) => ComposerService.removeExamQuestion(examId, eqId),
     onSuccess: invalidateExam,
     onError: (err) => {
-      setBuilderError(getErrorMessage(err, t('composer.examBuilder.errorRemoveQuestion')));
+      setBuilderError(translateError(appErrorFromAxios(err, 'exams_question_remove_failed'), t, 'composer.examBuilder.errorRemoveQuestion'));
     },
   });
 
@@ -53,7 +54,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
       ComposerService.updateExamQuestion(examId, eqId, { points }),
     onSuccess: invalidateExam,
     onError: (err) => {
-      setBuilderError(getErrorMessage(err, t('composer.examBuilder.errorUpdatePoints')));
+      setBuilderError(translateError(appErrorFromAxios(err, 'exams_question_points_update_failed'), t, 'composer.examBuilder.errorUpdatePoints'));
     },
   });
 
@@ -62,7 +63,7 @@ const ExamBuilderView: React.FC<ExamBuilderViewProps> = ({ examId, onBack }) => 
       ComposerService.reorderQuestions(examId, order),
     onSuccess: invalidateExam,
     onError: (err) => {
-      setBuilderError(getErrorMessage(err, t('composer.examBuilder.errorReorder')));
+      setBuilderError(translateError(appErrorFromAxios(err, 'exams_questions_reorder_failed'), t, 'composer.examBuilder.errorReorder'));
     },
   });
 

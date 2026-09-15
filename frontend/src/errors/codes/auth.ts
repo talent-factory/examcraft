@@ -55,11 +55,34 @@
  * auth_token_missing and auth_username_taken). Reusing the name rather than
  * inventing `auth_register_failed` keeps the identity rule intact for the day
  * TF-773 wires it up.
+ *
+ * AUTH DEPENDENCIES (TF-772 PR 7). Five codes below come not from `auth.py` but
+ * from the FastAPI dependencies in `core/backend/utils/auth_utils.py`, which
+ * every protected endpoint runs before its own body:
+ *
+ *   auth_permission_required     403, `require_permission(...)`, %{permission}
+ *   auth_account_status_invalid  403, `get_current_user`, %{status}
+ *   auth_account_not_active      403, `get_current_active_user`
+ *   auth_token_revoked           401, `get_current_user`
+ *   auth_token_user_not_found    401, `get_current_user`
+ *
+ * They became reachable once the ApiError family started carrying
+ * `error_code`: every endpoint it calls sits behind `require_permission`,
+ * `get_current_active_user`, `get_current_superuser` (role CRUD) or plain
+ * `get_current_user` (audit, role list) — all four build on
+ * `get_current_user`. Before, a teacher without
+ * `students:manage` read «Berechtigung «students:manage» erforderlich» off
+ * `err.message`; without these registered the same 403 would collapse to the
+ * operation's generic fallback. The 401s normally end in a token refresh and a
+ * retry, but a refresh that succeeds and still meets a revoked token surfaces
+ * them to the caller.
  */
 export const AUTH_ERROR_CODES = [
   'auth_account_disabled',
   'auth_account_locked',
+  'auth_account_not_active',
   'auth_account_pending',
+  'auth_account_status_invalid',
   'auth_email_already_verified',
   'auth_email_taken',
   'auth_institution_not_found',
@@ -80,12 +103,15 @@ export const AUTH_ERROR_CODES = [
   'auth_password_reset_not_implemented',
   'auth_password_reset_request_failed',
   'auth_password_set_failed',
+  'auth_permission_required',
   'auth_profile_load_failed',
   'auth_profile_update_failed',
   'auth_registration_failed',
   'auth_service_unavailable',
   'auth_token_invalid',
   'auth_token_refresh_failed',
+  'auth_token_revoked',
+  'auth_token_user_not_found',
   'auth_user_not_found',
   'auth_verification_email_failed',
   'auth_verification_failed',

@@ -9,7 +9,7 @@
  * `DELETE /import`. A 403 (missing `submissions:delete`) surfaces as an error.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Dialog,
@@ -26,7 +26,8 @@ import {
 } from '@mui/material';
 import { DeleteForever as DeleteForeverIcon } from '@mui/icons-material';
 
-import { ApiError, SubmissionsService } from '../../services/submissionsService';
+import { appErrorFromApiError, translateError } from '../../errors';
+import { SubmissionsService } from '../../services/submissionsService';
 import { ImportDeletionSummary } from '../../types/submission';
 
 interface DeleteImportDialogProps {
@@ -52,24 +53,11 @@ const DeleteImportDialog: React.FC<DeleteImportDialogProps> = ({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleApiError = useCallback(
-    (err: unknown, fallbackKey: string) => {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : t(fallbackKey),
-      );
-    },
-    [t],
-  );
-
   // Load the deletion summary whenever the dialog opens, so the confirmation
   // shows accurate affected counts. Deps are intentionally limited to
   // open/examId — the summary does not depend on the active language, and
-  // including the (possibly unstable) `t`/handleApiError identity would
-  // re-fire the fetch on every render.
+  // including the (possibly unstable) `t` identity would re-fire the fetch
+  // on every render.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -82,7 +70,13 @@ const DeleteImportDialog: React.FC<DeleteImportDialogProps> = ({
       })
       .catch((err) => {
         if (!cancelled)
-          handleApiError(err, 'auswertungen.deleteImportDialog.errorLoad');
+          setError(
+            translateError(
+              appErrorFromApiError(err, 'submissions_import_summary_load_failed'),
+              t,
+              'auswertungen.deleteImportDialog.errorLoad',
+            ),
+          );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -101,7 +95,13 @@ const DeleteImportDialog: React.FC<DeleteImportDialogProps> = ({
       onDeleted?.(result);
       onClose();
     } catch (err) {
-      handleApiError(err, 'auswertungen.deleteImportDialog.errorDelete');
+      setError(
+        translateError(
+          appErrorFromApiError(err, 'submissions_import_delete_failed'),
+          t,
+          'auswertungen.deleteImportDialog.errorDelete',
+        ),
+      );
     } finally {
       setDeleting(false);
     }

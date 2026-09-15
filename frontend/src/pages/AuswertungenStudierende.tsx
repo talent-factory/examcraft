@@ -30,6 +30,7 @@ import {
 } from '@mui/material';
 import { People as PeopleIcon } from '@mui/icons-material';
 
+import { appErrorFromApiError, translateError } from '../errors';
 import { ApiError } from '../services/submissionsService';
 import { StudentClassesService } from '../services/studentClassesService';
 import { StudentsService } from '../services/studentsService';
@@ -84,16 +85,14 @@ const AuswertungenStudierende: React.FC = () => {
         })
         .catch((err) => {
           if (cancelled) return;
-          if (err instanceof ApiError) {
-            setError(err);
-            setErrorText(err.message);
-          } else {
-            setErrorText(
-              err instanceof Error
-                ? err.message
-                : t('auswertungen.studierende.loadError'),
-            );
-          }
+          if (err instanceof ApiError) setError(err);
+          setErrorText(
+            translateError(
+              appErrorFromApiError(err, 'students_list_failed'),
+              t,
+              'auswertungen.studierende.loadError',
+            ),
+          );
         })
         .finally(() => {
           if (!cancelled) setLoading(false);

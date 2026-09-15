@@ -18,6 +18,7 @@ import {
   SubmissionDetail,
   SubmissionList,
 } from '../types/submission';
+import { readErrorBody } from './apiErrorBody';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const ROOT = '/api/v1/submissions';
@@ -31,15 +32,15 @@ export class ApiError extends Error {
    * The backend's `error_code` / `error_params` (ADR 0005), when the body
    * carried them (TF-772).
    *
-   * Additive and optional: every existing consumer reads `message`, and none
-   * of them changes behaviour because these are set. They exist so a service
-   * built on `httpClient` can hand the code on to an `AppError` instead of
-   * discarding it while parsing — `httpClient.ensureOk` already reads the
-   * body, so the alternative was to parse it a second time somewhere else.
+   * Optional, because a network failure or a non-JSON body carries neither.
+   * They exist so a consumer can hand the code on to an `AppError` instead of
+   * the parser discarding it — every parser already reads the body, so the
+   * alternative was to parse it a second time somewhere else.
    *
-   * Only `orgUnitsService` uses them today. The rest of the ApiError family
-   * (submissions, studentClasses, statistics, …) is a separate package; this
-   * is the seam it will need, not a migration of it.
+   * Every parser of the family fills them since TF-772 PR 7, through the one
+   * shared reader in `apiErrorBody.ts`; the consumers hand the error to
+   * `appErrorFromApiError()` instead of rendering `message`, which is
+   * log-only from then on.
    */
   readonly errorCode?: string;
   readonly errorParams?: unknown;
@@ -101,71 +102,33 @@ export function statusToKind(status: number): ApiErrorKind {
   return 'unknown';
 }
 
-async function readErrorBody(
+/**
+ * Throw an `ApiError` for a failed response. Shared with `httpClient`, which
+ * re-exports it — the two modules used to carry identical copies, and only
+ * one of them learned to keep `error_code` (TF-772 PR 7).
+ *
+ * `source` only prefixes the console warning `readErrorBody` logs for a
+ * non-JSON body, so `httpClient`'s eight consumers (orgUnits, studentClasses,
+ * students, audit, roles, moodleConnections, both ops services) don't show up
+ * in the log as "SubmissionsService" — see `httpClient.ts`.
+ */
+export async function ensureOk(
   response: Response,
-): Promise<{ message: string; detail: unknown; issues: string[] }> {
-  // Read once as text so a non-JSON body (HTML proxy error page, plain
-  // 502, empty 401) is observable to the developer rather than getting
-  // swallowed by an opaque `${status} ${statusText}` message.
-  let bodyText = '';
-  try {
-    bodyText = await response.text();
-  } catch {
-    return {
-      message: `${response.status} ${response.statusText}`,
-      detail: null,
-      issues: [],
-    };
-  }
-
-  let raw: unknown = null;
-  if (bodyText) {
-    try {
-      raw = JSON.parse(bodyText);
-    } catch {
-      console.warn(
-        `SubmissionsService: non-JSON ${response.status} response`,
-        bodyText.slice(0, 500),
-      );
-      return {
-        message: `${response.status} ${response.statusText}`,
-        detail: bodyText,
-        issues: [],
-      };
-    }
-  }
-
-  if (raw && typeof raw === 'object' && 'detail' in raw) {
-    const detail = (raw as { detail: unknown }).detail;
-    if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
-      const obj = detail as { message?: unknown; issues?: unknown };
-      const message =
-        typeof obj.message === 'string'
-          ? obj.message
-          : `${response.status} ${response.statusText}`;
-      const issues = Array.isArray(obj.issues)
-        ? (obj.issues.filter((i): i is string => typeof i === 'string') as string[])
-        : [];
-      return { message, detail, issues };
-    }
-    return { message: String(detail), detail, issues: [] };
-  }
-  return {
-    message: `${response.status} ${response.statusText}`,
-    detail: raw,
-    issues: [],
-  };
-}
-
-async function ensureOk(response: Response): Promise<Response> {
+  source = 'SubmissionsService',
+): Promise<Response> {
   if (response.ok) return response;
-  const { message, detail, issues } = await readErrorBody(response);
+  const { message, detail, issues, errorCode, errorParams } = await readErrorBody(
+    response,
+    source,
+  );
   throw new ApiError({
     kind: statusToKind(response.status),
     status: response.status,
     message,
     detail,
     issues,
+    errorCode,
+    errorParams,
   });
 }
 
@@ -177,7 +140,7 @@ function authHeaders(extra: HeadersInit = {}): HeadersInit {
   };
 }
 
-async function safeFetch(
+export async function safeFetch(
   input: RequestInfo,
   init?: RequestInit,
 ): Promise<Response> {

@@ -5,6 +5,7 @@ import {
   TableCell, TableContainer, TableHead, TableRow, TablePagination,
   Paper, TextField, CircularProgress, Alert, Chip, Checkbox, FormControlLabel,
 } from '@mui/material';
+import { appErrorFromApiError, translateError } from '../../errors';
 import { fetchAuditLogs } from '../../services/auditService';
 import { AuditCategory, AuditLogItem, AuditQueryParams } from '../../types/audit';
 
@@ -62,7 +63,13 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
       setRows(data.items);
       setTotal(data.total);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('pages.admin.audit.loadError'));
+      setError(
+        translateError(
+          appErrorFromApiError(e, 'audit_logs_load_failed'),
+          t,
+          'pages.admin.audit.loadError',
+        ),
+      );
     } finally {
       setLoading(false);
     }

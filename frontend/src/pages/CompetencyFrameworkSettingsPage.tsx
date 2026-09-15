@@ -12,7 +12,7 @@ import {
   DialogContent,
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import { appErrorFromAxios, translateError } from '../errors';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { competencyFrameworksApi } from '../api/competencyFrameworksApi';
@@ -26,14 +26,6 @@ import CompetencyFrameworkForm from '../components/competencyFrameworks/Competen
 type FilterMode = 'all' | 'active' | 'archived';
 const FILTER_KEY = 'competencyFrameworks.filter';
 const QUERY_KEY = 'competency-frameworks';
-
-const extractApiDetail = (err: unknown, fallback: string): string => {
-  if (axios.isAxiosError(err)) {
-    const detail = err.response?.data?.detail;
-    if (typeof detail === 'string' && detail.trim()) return detail;
-  }
-  return fallback;
-};
 
 const loadFilter = (): FilterMode => {
   const stored = localStorage.getItem(FILTER_KEY) as FilterMode | null;
@@ -71,14 +63,28 @@ const CompetencyFrameworkSettingsPage: React.FC = () => {
     mutationFn: (payload: FrameworkCreatePayload) =>
       competencyFrameworksApi.createFramework(payload),
     onSuccess: () => { invalidate(); setDialogOpen(false); },
-    onError: (e) => setActionError(extractApiDetail(e, t('competencyFrameworks.errorCreate'))),
+    onError: (e) =>
+      setActionError(
+        translateError(
+          appErrorFromAxios(e, 'competency_frameworks_create_failed'),
+          t,
+          'competencyFrameworks.errorCreate',
+        ),
+      ),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: FrameworkCreatePayload }) =>
       competencyFrameworksApi.updateFramework(id, payload),
     onSuccess: () => { invalidate(); setDialogOpen(false); setEditing(null); },
-    onError: (e) => setActionError(extractApiDetail(e, t('competencyFrameworks.errorUpdate'))),
+    onError: (e) =>
+      setActionError(
+        translateError(
+          appErrorFromAxios(e, 'competency_frameworks_update_failed'),
+          t,
+          'competencyFrameworks.errorUpdate',
+        ),
+      ),
   });
 
   const archiveMutation = useMutation({
@@ -87,7 +93,14 @@ const CompetencyFrameworkSettingsPage: React.FC = () => {
         ? competencyFrameworksApi.unarchiveFramework(fw.id)
         : competencyFrameworksApi.archiveFramework(fw.id),
     onSuccess: () => { setActionError(null); invalidate(); },
-    onError: (e) => setActionError(extractApiDetail(e, t('competencyFrameworks.errorArchive'))),
+    onError: (e) =>
+      setActionError(
+        translateError(
+          appErrorFromAxios(e, 'competency_frameworks_archive_failed'),
+          t,
+          'competencyFrameworks.errorArchive',
+        ),
+      ),
   });
 
   const canManage = (fw: CompetencyFramework) =>
@@ -137,7 +150,11 @@ const CompetencyFrameworkSettingsPage: React.FC = () => {
         </Box>
       ) : query.isError ? (
         <Alert severity="error">
-          {extractApiDetail(query.error, t('competencyFrameworks.errorLoad'))}
+          {translateError(
+            appErrorFromAxios(query.error, 'competency_frameworks_list_failed'),
+            t,
+            'competencyFrameworks.errorLoad',
+          )}
         </Alert>
       ) : frameworks.length === 0 ? (
         <Alert severity="info">{t('competencyFrameworks.empty')}</Alert>

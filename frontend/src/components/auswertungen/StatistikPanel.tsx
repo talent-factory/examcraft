@@ -41,6 +41,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { StatisticsService } from '../../services/statisticsService';
+import { translateError } from '../../errors';
 import { ApiError } from '../../services/submissionsService';
 import {
   OverviewStats,
@@ -131,10 +132,10 @@ const StatistikPanel: React.FC<StatistikPanelProps> = ({ examId }) => {
             default:
               setError(t('auswertungen.statistik.errorServer'));
           }
-        } else if (first instanceof Error) {
-          setError(first.message);
         } else {
-          setError(t('auswertungen.statistik.errorServer'));
+          // Not an ApiError: a parse or programming error. Its message is
+          // logged by translateError, never shown.
+          setError(translateError(first, t, 'auswertungen.statistik.errorServer'));
         }
       })
       .finally(() => {

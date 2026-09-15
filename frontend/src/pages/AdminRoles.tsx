@@ -34,7 +34,7 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { RolesService } from '../services/rolesService';
-import { ApiError } from '../services/httpClient';
+import { appErrorFromApiError, translateError } from '../errors';
 import { RoleOut } from '../types/role';
 import RolePermissionsEditor from '../components/admin/RolePermissionsEditor';
 
@@ -57,11 +57,13 @@ const AdminRoles: React.FC = () => {
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('Failed to load roles', e);
-      if (e instanceof ApiError && typeof e.detail === 'string' && e.detail) {
-        setError(e.detail);
-      } else {
-        setError(t('admin.roles.failedLoad'));
-      }
+      setError(
+        translateError(
+          appErrorFromApiError(e, 'admin_roles_load_failed'),
+          t,
+          'admin.roles.failedLoad',
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -104,15 +106,16 @@ const AdminRoles: React.FC = () => {
       setDeleteTarget(null);
       load();
     } catch (e) {
-      // On 409 (system role / users still assigned) the backend returns a
-      // meaningful detail message — we show that instead of the generic
-      // fallback. Network errors (no `.detail`) still fall back to the
-      // generic i18n string (TF-603 Finding 4).
-      if (e instanceof ApiError && typeof e.detail === 'string' && e.detail) {
-        setDeleteError(e.detail);
-      } else {
-        setDeleteError(t('admin.roles.failedDelete'));
-      }
+      // On 409 (system role / users still assigned) the backend sends a
+      // specific error_code (admin_role_is_system, admin_role_has_users) —
+      // rendered translated, never as ApiError.detail (TF-772 PR 7).
+      setDeleteError(
+        translateError(
+          appErrorFromApiError(e, 'admin_role_delete_failed'),
+          t,
+          'admin.roles.failedDelete',
+        ),
+      );
     }
   };
 

@@ -9,6 +9,7 @@ import {
 } from '../types/activity';
 import { ApiErrorKind } from '../types/submission';
 import { statusToKind } from './submissionsService';
+import { readErrorBody } from './apiErrorBody';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const ROOT = '/api/v1/activity';
@@ -18,6 +19,14 @@ export class ApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
   readonly issues: string[];
+  /**
+   * The backend's `error_code` / `error_params` (ADR 0005), same meaning as on
+   * `submissionsService.ApiError`. This class stays separate for its extra
+   * `aborted` kind, but `appErrorFromApiError()` identifies both by
+   * `name === 'ApiError'`, so it needs the same two fields to hand a code on.
+   */
+  readonly errorCode?: string;
+  readonly errorParams?: unknown;
 
   constructor(params: {
     kind: ApiErrorKind;
@@ -25,6 +34,8 @@ export class ApiError extends Error {
     message: string;
     detail?: unknown;
     issues?: string[];
+    errorCode?: string;
+    errorParams?: unknown;
   }) {
     super(params.message);
     this.name = 'ApiError';
@@ -32,74 +43,25 @@ export class ApiError extends Error {
     this.status = params.status;
     this.detail = params.detail;
     this.issues = params.issues ?? [];
+    this.errorCode = params.errorCode;
+    this.errorParams = params.errorParams;
   }
-}
-
-async function readErrorBody(
-  response: Response,
-): Promise<{ message: string; detail: unknown; issues: string[] }> {
-  // Read once as text so a non-JSON body (HTML proxy error page,
-  // empty 401) is observable to the developer rather than getting
-  // swallowed by an opaque `${status} ${statusText}` message.
-  let bodyText = '';
-  try {
-    bodyText = await response.text();
-  } catch {
-    return {
-      message: `${response.status} ${response.statusText}`,
-      detail: null,
-      issues: [],
-    };
-  }
-
-  let raw: unknown = null;
-  if (bodyText) {
-    try {
-      raw = JSON.parse(bodyText);
-    } catch {
-      console.warn(
-        `ActivityService: non-JSON ${response.status} response`,
-        bodyText.slice(0, 500),
-      );
-      return {
-        message: `${response.status} ${response.statusText}`,
-        detail: bodyText,
-        issues: [],
-      };
-    }
-  }
-
-  if (raw && typeof raw === 'object' && 'detail' in raw) {
-    const detail = (raw as { detail: unknown }).detail;
-    if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
-      const obj = detail as { message?: unknown; issues?: unknown };
-      const message =
-        typeof obj.message === 'string'
-          ? obj.message
-          : `${response.status} ${response.statusText}`;
-      const issues = Array.isArray(obj.issues)
-        ? (obj.issues.filter((i): i is string => typeof i === 'string') as string[])
-        : [];
-      return { message, detail, issues };
-    }
-    return { message: String(detail), detail, issues: [] };
-  }
-  return {
-    message: `${response.status} ${response.statusText}`,
-    detail: raw,
-    issues: [],
-  };
 }
 
 async function ensureOk(response: Response): Promise<Response> {
   if (response.ok) return response;
-  const { message, detail, issues } = await readErrorBody(response);
+  const { message, detail, issues, errorCode, errorParams } = await readErrorBody(
+    response,
+    'ActivityService',
+  );
   throw new ApiError({
     kind: statusToKind(response.status),
     status: response.status,
     message,
     detail,
     issues,
+    errorCode,
+    errorParams,
   });
 }
 

@@ -37,6 +37,7 @@ import {
 
 import { GradingSchemeOut } from '../types/gradingScheme';
 import { GradingSchemesService } from '../services/gradingSchemesService';
+import { appErrorFromApiError, isAppErrorCode, translateError } from '../errors';
 import { ApiError } from '../services/submissionsService';
 import GradingSchemeEditor from '../components/admin/GradingSchemeEditor';
 
@@ -59,7 +60,11 @@ const AdminGradingSchemes: React.FC = () => {
       setSchemes(result.schemes);
     } catch (err) {
       setLoadError(
-        err instanceof ApiError ? err.message : t('admin.gradingSchemes.failedLoad'),
+        translateError(
+          appErrorFromApiError(err, 'grading_schemes_list_failed'),
+          t,
+          'admin.gradingSchemes.failedLoad',
+        ),
       );
     } finally {
       setLoading(false);
@@ -95,11 +100,19 @@ const AdminGradingSchemes: React.FC = () => {
       await GradingSchemesService.delete(scheme.id);
       setSchemes(prev => prev.filter(s => s.id !== scheme.id));
     } catch (err) {
-      if (err instanceof ApiError && err.kind === 'conflict') {
+      // The router has three distinct 409s (referenced_by_exam,
+      // is_institution_default, referenced); «in use by an exam» is wrong for
+      // the second. A registered code wins; deleteInUse only covers a 409
+      // that carries none.
+      if (err instanceof ApiError && err.kind === 'conflict' && !isAppErrorCode(err.errorCode)) {
         setDeleteError(t('admin.gradingSchemes.deleteInUse'));
       } else {
         setDeleteError(
-          err instanceof ApiError ? err.message : t('admin.gradingSchemes.failedDelete'),
+          translateError(
+            appErrorFromApiError(err, 'grading_schemes_delete_failed'),
+            t,
+            'admin.gradingSchemes.failedDelete',
+          ),
         );
       }
     }

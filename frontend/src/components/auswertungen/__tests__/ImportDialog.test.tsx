@@ -273,7 +273,7 @@ describe('ImportDialog', () => {
     expect(onImported).not.toHaveBeenCalled();
   });
 
-  test('shows error message when preview fails', async () => {
+  test('shows the operation fallback, not the raw text, when preview fails', async () => {
     mockSubmissionsService.preview.mockRejectedValueOnce(
       new Error('CSV ist leer'),
     );
@@ -286,11 +286,15 @@ describe('ImportDialog', () => {
     fireEvent.change(input, { target: { files: [jsonFile] } });
     fireEvent.click(screen.getByTestId('import-run-preview'));
 
+    // TF-772: an untyped rejection carries no error_code, so the operation
+    // sentence renders. The specific import reasons arrive as codes with
+    // TF-773 PR 2c — see ImportDialog.errorCode.test.tsx for that path.
     await waitFor(() => {
       expect(screen.getByTestId('import-error')).toHaveTextContent(
-        'CSV ist leer',
+        'Vorschau fehlgeschlagen.',
       );
     });
+    expect(screen.getByTestId('import-error')).not.toHaveTextContent('CSV ist leer');
     expect(mockSubmissionsService.commit).not.toHaveBeenCalled();
   });
 

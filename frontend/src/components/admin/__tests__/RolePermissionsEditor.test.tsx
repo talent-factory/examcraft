@@ -99,13 +99,17 @@ describe('RolePermissionsEditor', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
   });
 
-  it('shows the backend detail message when save fails with a 409', async () => {
+  // TF-772 PR 7: the backend's error_code renders translated, with its
+  // params; `detail` is deliberately different so rendering it would fail.
+  it('renders the backend error_code when save fails with a 409', async () => {
     mockedService.create.mockRejectedValueOnce(
       new ApiError({
         kind: 'validation',
         status: 409,
-        message: "Rolle 'fachbereichsleiter' existiert bereits",
-        detail: "Rolle 'fachbereichsleiter' existiert bereits",
+        message: 'ROHER BACKEND-TEXT',
+        detail: 'ROHER BACKEND-TEXT',
+        errorCode: 'admin_role_already_exists',
+        errorParams: { name: 'fachbereichsleiter' },
       }),
     );
     renderEditor();
@@ -121,6 +125,7 @@ describe('RolePermissionsEditor', () => {
     expect(
       screen.queryByText('Rolle konnte nicht erstellt werden.'),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText('ROHER BACKEND-TEXT')).not.toBeInTheDocument();
   });
 
   it('create mode: save button is disabled while name or display name is empty', async () => {

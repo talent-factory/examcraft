@@ -18,11 +18,15 @@
  * after their prefix — the registry is flat, so where a code is declared has
  * no effect on whether it is accepted.
  *
- * REGISTER, NOT A WISHLIST. `admin.py` also raises `admin_role_already_exists`,
- * `admin_role_has_users`, `admin_role_is_system` and `admin_unknown_permissions`
- * — all four from the role CRUD endpoints (POST/PATCH/DELETE `/roles`), which
- * `AdminService` does not call. It only reads `/roles`. They are left out until
- * something in the frontend can actually receive them.
+ * ROLE CRUD (TF-772 PR 7). `admin.py` also raises `admin_role_already_exists`
+ * ({{name}}), `admin_role_has_users` ({{count}}), `admin_role_is_system` and
+ * `admin_unknown_permissions` ({{permissions}}) from POST/PATCH/DELETE `/roles`.
+ * PR 3 left them out because `AdminService` only reads `/roles` — true, but
+ * `rolesService` (on `httpClient`, the ApiError family) calls exactly those
+ * endpoints, and `AdminRoles` / `RolePermissionsEditor` rendered their
+ * `ApiError.detail`. PR 7 registers the four and adds three fallbacks for the
+ * role operations: `admin_role_create_failed`, `admin_role_update_failed`,
+ * `admin_role_delete_failed`. The role list reuses `admin_roles_load_failed`.
  *
  * FRONTEND-ONLY FALLBACKS — thirteen of the codes below have no backend
  * counterpart, because `admin.py` (like `auth.py`, unlike `documents.py`)
@@ -68,15 +72,22 @@ export const ADMIN_ERROR_CODES = [
   'admin_insufficient_permissions',
   'admin_invalid_grading_scheme',
   'admin_invalid_subscription_tier',
+  'admin_role_already_exists',
   'admin_role_assign_failed',
+  'admin_role_create_failed',
+  'admin_role_delete_failed',
+  'admin_role_has_users',
+  'admin_role_is_system',
   'admin_role_not_found',
   'admin_role_remove_failed',
+  'admin_role_update_failed',
   'admin_roles_load_failed',
   'admin_transfer_audit_failed',
   'admin_transfer_failed',
   'admin_transfer_preview_failed',
   'admin_transfer_same_institution',
   'admin_transfer_self_forbidden',
+  'admin_unknown_permissions',
   'admin_user_already_has_role',
   'admin_user_does_not_have_role',
   'admin_user_load_failed',

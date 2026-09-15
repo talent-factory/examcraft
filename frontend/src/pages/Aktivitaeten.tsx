@@ -28,6 +28,7 @@ import {
 } from '@mui/material';
 import { Notifications as NotificationsIcon } from '@mui/icons-material';
 
+import { appErrorFromApiError, translateError } from '../errors';
 import { ApiError, ActivityService } from '../services/activityService';
 import {
   ACTIVITY_TYPES,
@@ -114,7 +115,6 @@ const Aktivitaeten: React.FC = () => {
             tags: { feature: 'aktivitaeten', kind: err.kind },
             extra: { status: err.status, detail: err.detail },
           });
-          setError(err.message);
         } else {
           console.error('ActivityService.list failed (non-ApiError)', err);
           // Non-ApiError throwables are programming bugs (TypeError
@@ -122,10 +122,14 @@ const Aktivitaeten: React.FC = () => {
           Sentry.captureException(err, {
             tags: { feature: 'aktivitaeten', kind: 'non-api-error' },
           });
-          setError(
-            err instanceof Error ? err.message : t('aktivitaeten.errorLoad'),
-          );
         }
+        setError(
+          translateError(
+            appErrorFromApiError(err, 'activity_list_failed'),
+            t,
+            'aktivitaeten.errorLoad',
+          ),
+        );
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);

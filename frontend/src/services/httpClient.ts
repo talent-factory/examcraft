@@ -12,13 +12,26 @@
  *
  * ``ApiError`` is intentionally re-exported so existing code that
  * imports from ``submissionsService`` keeps working — the two modules
- * share the same identity.
+ * share the same identity. ``safeFetch`` is re-exported from there too:
+ * this module used to carry identical copies of it and of ``ensureOk``,
+ * and the copies drifted (only one learned to keep ``error_code``,
+ * TF-772).
+ *
+ * ``ensureOk`` is wrapped, not re-exported as-is: ``submissionsService``'s
+ * version labels a non-JSON error body with its own name in the console
+ * warning. Eight services hang off this module (orgUnits, studentClasses,
+ * students, audit, roles, moodleConnections, both ops services), and a
+ * broken body from any of them should say ``httpClient``, not
+ * ``SubmissionsService``, so an incident log points at the right module.
  */
 
-import { ApiError, statusToKind } from './submissionsService';
+import { ApiError, ensureOk as ensureOkWith, safeFetch } from './submissionsService';
 import { executeTokenRefresh, triggerAuthLogout } from '../api/apiClient';
 
-export { ApiError };
+export { ApiError, safeFetch };
+
+export const ensureOk = (response: Response): Promise<Response> =>
+  ensureOkWith(response, 'httpClient');
 
 
 export const API_BASE_URL =
@@ -32,110 +45,6 @@ export function authHeaders(extra: HeadersInit = {}): HeadersInit {
     ...extra,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
-}
-
-
-interface ErrorBodyParts {
-  message: string;
-  detail: unknown;
-  issues: string[];
-  /** ADR 0005, when the body carried them (TF-772). Undefined otherwise. */
-  errorCode?: string;
-  errorParams?: unknown;
-}
-
-async function readErrorBody(response: Response): Promise<ErrorBodyParts> {
-  let bodyText = '';
-  try {
-    bodyText = await response.text();
-  } catch {
-    return {
-      message: `${response.status} ${response.statusText}`,
-      detail: null,
-      issues: [],
-    };
-  }
-  let raw: unknown = null;
-  if (bodyText) {
-    try {
-      raw = JSON.parse(bodyText);
-    } catch {
-      return {
-        message: `${response.status} ${response.statusText}`,
-        detail: bodyText,
-        issues: [],
-      };
-    }
-  }
-  const envelope = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  const errorCode =
-    typeof envelope.error_code === 'string' ? envelope.error_code : undefined;
-  const errorParams = envelope.error_params;
-
-  if (raw && typeof raw === 'object' && 'detail' in raw) {
-    const detail = (raw as { detail: unknown }).detail;
-    // Tier-Quota 402 + Validation 422 carry structured detail objects.
-    if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
-      const obj = detail as { message?: unknown; issues?: unknown };
-      const message =
-        typeof obj.message === 'string'
-          ? obj.message
-          : `${response.status} ${response.statusText}`;
-      const issues = Array.isArray(obj.issues)
-        ? (obj.issues.filter(
-            (i): i is string => typeof i === 'string',
-          ) as string[])
-        : [];
-      return { message, detail, issues, errorCode, errorParams };
-    }
-    return { message: String(detail), detail, issues: [], errorCode, errorParams };
-  }
-  return {
-    message: `${response.status} ${response.statusText}`,
-    detail: raw,
-    issues: [],
-    errorCode,
-    errorParams,
-  };
-}
-
-
-export async function ensureOk(response: Response): Promise<Response> {
-  if (response.ok) return response;
-  const { message, detail, issues, errorCode, errorParams } = await readErrorBody(response);
-  throw new ApiError({
-    kind: statusToKind(response.status),
-    status: response.status,
-    message,
-    detail,
-    issues,
-    errorCode,
-    errorParams,
-  });
-}
-
-
-export async function safeFetch(
-  input: RequestInfo,
-  init?: RequestInit,
-): Promise<Response> {
-  try {
-    return await fetch(input, init);
-  } catch (err) {
-    if ((err as { name?: string })?.name === 'AbortError') {
-      throw new ApiError({
-        kind: 'network',
-        status: 0,
-        message: 'Anfrage abgebrochen',
-      });
-    }
-    throw new ApiError({
-      kind: 'network',
-      status: 0,
-      message:
-        err instanceof Error ? `Netzwerkfehler: ${err.message}` : 'Netzwerkfehler',
-    });
-  }
 }
 
 

@@ -24,6 +24,7 @@ import {
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 
+import { appErrorFromApiError, translateError } from '../../errors';
 import { ApiError } from '../../services/submissionsService';
 import { StudentClassesService } from '../../services/studentClassesService';
 import { StudentsService } from '../../services/studentsService';
@@ -66,13 +67,15 @@ const AssignStudentDialog: React.FC<Props> = ({
           if (cancelled) return;
           // Surface the failure: a silent fallback to "no results" lets
           // the user think the student doesn't exist and create a
-          // duplicate. 4xx (incl. 403/permissions) carries a message
-          // worth showing; everything else gets a generic retry hint.
+          // duplicate. A coded response (e.g. 403 auth_permission_required)
+          // renders its own sentence; everything else the list fallback.
           setItems([]);
           setError(
-            err instanceof ApiError
-              ? err.message
-              : t('auswertungen.klassen.assignDialog.searchError'),
+            translateError(
+              appErrorFromApiError(err, 'students_list_failed'),
+              t,
+              'auswertungen.klassen.assignDialog.searchError',
+            ),
           );
         })
         .finally(() => {
@@ -95,13 +98,17 @@ const AssignStudentDialog: React.FC<Props> = ({
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError(t('auswertungen.klassen.assignDialog.duplicate'));
-      } else if (err instanceof ApiError) {
-        setError(err.message);
       } else {
-        // Non-ApiError = network / parse failure. Showing the duplicate
-        // text here would mislead the user into thinking the assignment
-        // was rejected by the server.
-        setError(t('auswertungen.klassen.assignDialog.assignError'));
+        // Not the duplicate text for anything but a 409: on a network or
+        // parse failure it would mislead the user into thinking the
+        // assignment was rejected by the server.
+        setError(
+          translateError(
+            appErrorFromApiError(err, 'student_classes_add_member_failed'),
+            t,
+            'auswertungen.klassen.assignDialog.assignError',
+          ),
+        );
       }
     } finally {
       setSubmitting(false);

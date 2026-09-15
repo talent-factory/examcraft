@@ -6,8 +6,10 @@
  *   - ``moodle_api``: only visible when the institution has a
  *     ``moodle_connections`` entry. Instead of a file upload, the
  *     Moodle quiz ID is captured; preview/commit go to
- *     `/import/api-preview` resp. `/import/api-commit`. Tier-quota
- *     402 propagates via `ApiError.message`.
+ *     `/import/api-preview` resp. `/import/api-commit`. A tier-quota
+ *     402 renders the `auswertungen.tierBanner.*` sentence (see
+ *     `translateQuotaError`), every other failure its `error_code` or the
+ *     operation fallback — never `ApiError.message` (TF-772 PR 7).
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -44,8 +46,10 @@ import {
 } from '@mui/material';
 import { CloudUpload as CloudUploadIcon } from '@mui/icons-material';
 
+import { appErrorFromApiError, translateError } from '../../errors';
 import { ApiError, SubmissionsService } from '../../services/submissionsService';
 import { MoodleConnectionsService } from '../../services/moodleConnectionsService';
+import { isQuotaError, translateQuotaError } from './QuotaBanner';
 import {
   DriverName,
   ImportJob,
@@ -184,9 +188,11 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           return;
         }
         setMoodleProbeError(
-          err instanceof ApiError
-            ? err.message
-            : t('auswertungen.importDialog.moodleProbeError'),
+          translateError(
+            appErrorFromApiError(err, 'moodle_connections_list_failed'),
+            t,
+            'auswertungen.importDialog.moodleProbeError',
+          ),
         );
       });
     return () => {
@@ -231,14 +237,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setErrorIssues([]);
   };
 
-  const handleApiError = (err: unknown, fallbackKey: string) => {
-    if (err instanceof ApiError) {
-      setError(err.message);
-      setErrorIssues(err.issues);
-      return;
-    }
-    setError(err instanceof Error ? err.message : t(fallbackKey));
-    setErrorIssues([]);
+  // `message` is the caller's translateError(...) result, written out at the
+  // call site so the fallback key stays a literal the i18n guard can see.
+  const handleApiError = (err: unknown, message: string) => {
+    // The 402 carries its code nested in `detail`, not as the ADR 0005
+    // sibling field, so `appErrorFromApiError` cannot see it.
+    setError(isQuotaError(err) ? translateQuotaError(err, t) : message);
+    setErrorIssues(err instanceof ApiError ? err.issues : []);
   };
 
   const runPreview = async () => {
@@ -270,7 +275,14 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       setPreview(result);
       setStep('preview');
     } catch (err) {
-      handleApiError(err, 'auswertungen.importDialog.errorPreview');
+      handleApiError(
+        err,
+        translateError(
+          appErrorFromApiError(err, 'submissions_import_preview_failed'),
+          t,
+          'auswertungen.importDialog.errorPreview',
+        ),
+      );
     } finally {
       setBusy(false);
       abortRef.current = null;
@@ -360,7 +372,14 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         }
         return;
       }
-      handleApiError(err, 'auswertungen.importDialog.errorCommit');
+      handleApiError(
+        err,
+        translateError(
+          appErrorFromApiError(err, 'submissions_import_commit_failed'),
+          t,
+          'auswertungen.importDialog.errorCommit',
+        ),
+      );
       setStep('preview'); // allow retry without re-uploading
     } finally {
       setBusy(false);

@@ -34,6 +34,7 @@ import {
   Edit as EditIcon,
 } from '@mui/icons-material';
 
+import { appErrorFromApiError, translateError } from '../errors';
 import { ApiError } from '../services/submissionsService';
 import { StudentClassesService } from '../services/studentClassesService';
 import type { StudentClassSummary } from '../types/studentClass';
@@ -70,16 +71,14 @@ const AuswertungenKlassen: React.FC = () => {
       })
       .catch((err) => {
         if (cancelled) return;
-        if (err instanceof ApiError) {
-          setError(err);
-          setErrorText(err.message);
-        } else {
-          setErrorText(
-            err instanceof Error
-              ? err.message
-              : t('auswertungen.klassen.loadError'),
-          );
-        }
+        if (err instanceof ApiError) setError(err);
+        setErrorText(
+          translateError(
+            appErrorFromApiError(err, 'student_classes_list_failed'),
+            t,
+            'auswertungen.klassen.loadError',
+          ),
+        );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -104,7 +103,13 @@ const AuswertungenKlassen: React.FC = () => {
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err);
-        setErrorText(err.message);
+        setErrorText(
+          translateError(
+            appErrorFromApiError(err, 'student_classes_delete_failed'),
+            t,
+            'auswertungen.klassen.deleteError',
+          ),
+        );
       }
     }
   };

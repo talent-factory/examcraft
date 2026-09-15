@@ -17,9 +17,15 @@ import { readParams, selectCode } from './errorBody';
  * (TF-772) precisely so this function can prefer them over the fallback,
  * exactly like the other two constructors. TF-773 has since wired
  * `org_units.py` onto `api_error()`, so `orgUnitsService`'s calls already send
- * a real code where one exists (see `errors/codes/orgUnits.ts`); the other six
- * services this constructor also serves migrate onto specific codes as their
- * own routers do.
+ * a real code where one exists (see `errors/codes/orgUnits.ts`).
+ *
+ * TF-772 PR 7 extended this to the whole ApiError family — every parser that
+ * builds an `ApiError` now fills the two fields (`services/apiErrorBody.ts`),
+ * including `activityService`'s separate class, which is why the check below
+ * is structural. There the conversion moved one level further up again, into
+ * the component: those consumers branch on `status` and `kind` (402 quota
+ * banner, 409 duplicate) before anything is rendered, and `AppError` carries
+ * neither. They call this function at the moment they render a message.
  *
  * `ApiError.message` survives as `AppError.detail` — log-only, never rendered.
  * That single move is the whole point: the text is still there when someone

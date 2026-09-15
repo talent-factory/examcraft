@@ -19,7 +19,6 @@ jest.mock('../../services/ComposerService', () => ({
     listExams: jest.fn(),
     getExam: jest.fn(),
   },
-  getErrorMessage: (e: unknown, fb: string) => (e instanceof Error ? e.message : fb),
 }));
 jest.mock('../../components/auswertungen/ImportDialog', () => ({
   __esModule: true,
@@ -111,14 +110,33 @@ describe('Auswertungen overview', () => {
     expect(screen.getByTestId('import-dialog-stub-1')).toBeInTheDocument();
   });
 
-  test('shows error alert when listExams fails', async () => {
+  test('shows the list fallback, not the raw message, when listExams fails', async () => {
     mockComposerService.listExams.mockRejectedValue(
       new Error('Backend down'),
     );
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Backend down')).toBeInTheDocument();
+      expect(screen.getByText('Prüfungen konnten nicht geladen werden.')).toBeInTheDocument();
     });
+    expect(screen.queryByText('Backend down')).not.toBeInTheDocument();
+  });
+
+  test('renders an error_code from the axios response translated', async () => {
+    mockComposerService.listExams.mockRejectedValue(
+      Object.assign(new Error('Request failed with status code 422'), {
+        response: {
+          status: 422,
+          data: { detail: 'roh', error_code: 'validation_error' },
+        },
+      }),
+    );
+    renderPage();
+    await waitFor(() => {
+      expect(
+        screen.getByText('Die Anfrage ist ungültig. Bitte prüf deine Eingaben.'),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Request failed/)).not.toBeInTheDocument();
   });
 
   test('listExams limit stays within backend cap (≤500)', async () => {

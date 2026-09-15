@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { appErrorFromAxios, translateError } from '../errors';
 import {
     paymentService,
     SubscriptionDetails,
@@ -86,7 +87,13 @@ export const SubscriptionManagementPage: React.FC = () => {
             }
         } catch (err: any) {
             console.error('Error loading subscription data:', err);
-            setError(err.response?.data?.detail || t('pages.subscription.loadError'));
+            setError(
+                translateError(
+                    appErrorFromAxios(err, 'billing_subscription_load_failed'),
+                    t,
+                    'pages.subscription.loadError',
+                ),
+            );
         } finally {
             setLoading(false);
         }
@@ -99,7 +106,13 @@ export const SubscriptionManagementPage: React.FC = () => {
             window.location.href = session.url;
         } catch (err: any) {
             console.error('Error opening customer portal:', err);
-            setError(err.response?.data?.detail || 'Failed to open subscription management');
+            setError(
+                translateError(
+                    appErrorFromAxios(err, 'billing_portal_failed'),
+                    t,
+                    'pages.subscription.portalError',
+                ),
+            );
             setPortalLoading(false);
         }
     };
@@ -137,78 +150,95 @@ export const SubscriptionManagementPage: React.FC = () => {
             <div className="bg-white shadow rounded-lg p-6 mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-semibold text-gray-900">{t('pages.subscription.currentPlan')}</h2>
-                    <div className="flex items-center space-x-2">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${tierConfig.color}`}>
-                            {tierConfig.name}
-                        </span>
-                        {subscription?.status !== 'free' && (
-                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusConfig.color}`}>
-                                {statusConfig.label}
+                    {/* `subscription &&`: after a failed load it is null. Showing the Free
+                        badge here would misreport a load failure as "you are on Free". */}
+                    {subscription && (
+                        <div className="flex items-center space-x-2">
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${tierConfig.color}`}>
+                                {tierConfig.name}
                             </span>
-                        )}
-                    </div>
+                            {subscription.status !== 'free' && (
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusConfig.color}`}>
+                                    {statusConfig.label}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
-                {subscription?.tier !== 'free' && subscription?.status !== 'free' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <div>
-                            <p className="text-sm text-gray-500">{t('pages.subscription.period')}</p>
-                            <p className="text-gray-900">
-                                {formatDate(subscription.current_period_start)} - {formatDate(subscription.current_period_end)}
+                {subscription ? (
+                    subscription.tier !== 'free' && subscription.status !== 'free' ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <p className="text-sm text-gray-500">{t('pages.subscription.period')}</p>
+                                <p className="text-gray-900">
+                                    {formatDate(subscription.current_period_start)} - {formatDate(subscription.current_period_end)}
+                                </p>
+                            </div>
+                            {subscription.plan && (
+                                <div>
+                                    <p className="text-sm text-gray-500">{t('pages.subscription.price')}</p>
+                                    <p className="text-gray-900">
+                                        {formatCurrency(subscription.plan.amount || 0, subscription.plan.currency)} / {subscription.plan.interval || 'month'}
+                                    </p>
+                                </div>
+                            )}
+                            {subscription.cancel_at_period_end && (
+                                <div className="col-span-2">
+                                    <p className="text-sm text-red-600">
+                                        {t('pages.subscription.cancelWarning')}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="mb-6">
+                            <p className="text-gray-600">
+                                {t('pages.subscription.freePlanMessage')}
                             </p>
                         </div>
-                        {subscription.plan && (
-                            <div>
-                                <p className="text-sm text-gray-500">{t('pages.subscription.price')}</p>
-                                <p className="text-gray-900">
-                                    {formatCurrency(subscription.plan.amount || 0, subscription.plan.currency)} / {subscription.plan.interval || 'month'}
-                                </p>
-                            </div>
-                        )}
-                        {subscription.cancel_at_period_end && (
-                            <div className="col-span-2">
-                                <p className="text-sm text-red-600">
-                                    {t('pages.subscription.cancelWarning')}
-                                </p>
-                            </div>
-                        )}
-                    </div>
+                    )
                 ) : (
+                    // Load failed: `error` above already carries the translated reason.
+                    // No tier/status is known, so none is claimed here — showing the Free
+                    // defaults would read as "you lost your plan" instead of "load failed".
                     <div className="mb-6">
                         <p className="text-gray-600">
-                            {t('pages.subscription.freePlanMessage')}
+                            {t('pages.subscription.statusUnavailable')}
                         </p>
                     </div>
                 )}
 
-                <div className="flex space-x-4">
-                    {subscription?.tier === 'free' || subscription?.status === 'free' ? (
-                        <button
-                            onClick={handleUpgrade}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                        >
-                            {t('pages.subscription.upgradePlan')}
-                        </button>
-                    ) : (
-                        <>
-                            {subscription?.is_billing_owner && (
-                                <button
-                                    onClick={handleManageSubscription}
-                                    disabled={portalLoading}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-                                >
-                                    {portalLoading ? t('pages.subscription.loading') : t('pages.subscription.manageSubscription')}
-                                </button>
-                            )}
+                {subscription && (
+                    <div className="flex space-x-4">
+                        {subscription.tier === 'free' || subscription.status === 'free' ? (
                             <button
                                 onClick={handleUpgrade}
-                                className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                             >
-                                {t('pages.subscription.changePlan')}
+                                {t('pages.subscription.upgradePlan')}
                             </button>
-                        </>
-                    )}
-                </div>
+                        ) : (
+                            <>
+                                {subscription.is_billing_owner && (
+                                    <button
+                                        onClick={handleManageSubscription}
+                                        disabled={portalLoading}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                                    >
+                                        {portalLoading ? t('pages.subscription.loading') : t('pages.subscription.manageSubscription')}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleUpgrade}
+                                    className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                                >
+                                    {t('pages.subscription.changePlan')}
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Payment Methods - Only visible to billing owner */}

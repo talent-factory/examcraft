@@ -20,6 +20,7 @@ import {
   TextField,
 } from '@mui/material';
 
+import { appErrorFromApiError, translateError } from '../../errors';
 import { ApiError } from '../../services/submissionsService';
 import { MoodleConnectionsService } from '../../services/moodleConnectionsService';
 
@@ -87,10 +88,14 @@ const SyncMoodleIdsDialog: React.FC<Props> = ({
         setError(
           t('auswertungen.moodleSync.notVisible', { id: quizId }),
         );
-      } else if (err instanceof ApiError) {
-        setError(err.message);
       } else {
-        setError(t('auswertungen.moodleSync.error'));
+        setError(
+          translateError(
+            appErrorFromApiError(err, 'moodle_roundtrip_sync_failed'),
+            t,
+            'auswertungen.moodleSync.error',
+          ),
+        );
       }
     } finally {
       setSubmitting(false);

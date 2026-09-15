@@ -11,7 +11,8 @@ import {
   Autocomplete,
   Chip,
 } from '@mui/material';
-import { ComposerService, getErrorMessage } from '../../services/ComposerService';
+import { appErrorFromAxios, translateError } from '../../errors';
+import { ComposerService } from '../../services/ComposerService';
 import { getDateLocale } from '../../utils/dateLocale';
 import { useAuth } from '../../contexts/AuthContext';
 import type { CreateExamRequest, DocumentWithQuestions } from '../../types/composer';
@@ -73,7 +74,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
       onSelectExam(exam.id);
     },
     onError: (err) => {
-      setError(getErrorMessage(err, t('composer.examList.errorCreate')));
+      setError(translateError(appErrorFromAxios(err, 'exams_create_failed'), t, 'composer.examList.errorCreate'));
     },
   });
 
@@ -81,7 +82,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
     mutationFn: ComposerService.deleteExam,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exams'] }),
     onError: (err) => {
-      setError(getErrorMessage(err, t('composer.examList.errorDelete')));
+      setError(translateError(appErrorFromAxios(err, 'delete_exam_failed'), t, 'composer.examList.errorDelete'));
     },
   });
 
@@ -95,7 +96,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
       setArchiveReason('');
     },
     onError: (err) => {
-      setError(getErrorMessage(err, t('composer.examList.errorArchive')));
+      setError(translateError(appErrorFromAxios(err, 'exam_archive_failed'), t, 'composer.examList.errorArchive'));
     },
   });
 
@@ -103,7 +104,7 @@ const ExamListView: React.FC<ExamListViewProps> = ({ onSelectExam }) => {
     mutationFn: ComposerService.restoreExam,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exams'] }),
     onError: (err) => {
-      setError(getErrorMessage(err, t('composer.examList.errorRestore')));
+      setError(translateError(appErrorFromAxios(err, 'exam_restore_failed'), t, 'composer.examList.errorRestore'));
     },
   });
 

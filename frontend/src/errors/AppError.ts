@@ -1,16 +1,29 @@
+import { ACTIVITY_ERROR_CODES } from './codes/activity';
 import { ADMIN_ERROR_CODES } from './codes/admin';
+import { AUDIT_ERROR_CODES } from './codes/audit';
 import { AUTH_ERROR_CODES } from './codes/auth';
+import { BILLING_ERROR_CODES } from './codes/billing';
 import { CHAT_ERROR_CODES } from './codes/chat';
+import { COMPETENCY_FRAMEWORKS_ERROR_CODES } from './codes/competencyFrameworks';
 import { DASHBOARD_ERROR_CODES } from './codes/dashboard';
 import { DOCUMENT_ERROR_CODES } from './codes/documents';
+import { EXAMS_ERROR_CODES } from './codes/exams';
 import { GRADES_ERROR_CODES } from './codes/grades';
+import { GRADING_SCHEMES_ERROR_CODES } from './codes/gradingSchemes';
 import { HELP_ERROR_CODES } from './codes/help';
 import { LEGACY_ERROR_CODES } from './codes/legacy';
+import { MOODLE_CONNECTIONS_ERROR_CODES } from './codes/moodleConnections';
+import { MOODLE_FEEDBACK_PUSH_ERROR_CODES } from './codes/moodleFeedbackPush';
+import { MOODLE_ROUNDTRIP_ERROR_CODES } from './codes/moodleRoundtrip';
 import { ORG_UNITS_ERROR_CODES } from './codes/orgUnits';
 import { PROMPTS_ERROR_CODES } from './codes/prompts';
 import { RBAC_ERROR_CODES } from './codes/rbac';
 import { RESERVED_ERROR_CODES } from './codes/reserved';
 import { REVIEW_ERROR_CODES } from './codes/review';
+import { STUDENT_CLASSES_ERROR_CODES } from './codes/studentClasses';
+import { STUDENTS_ERROR_CODES } from './codes/students';
+import { SUBMISSIONS_ERROR_CODES } from './codes/submissions';
+import { VISIBILITY_ERROR_CODES } from './codes/visibility';
 import { WIZARD_ERROR_CODES } from './codes/wizard';
 
 /**
@@ -40,17 +53,30 @@ import { WIZARD_ERROR_CODES } from './codes/wizard';
 export const APP_ERROR_CODES = [
   ...LEGACY_ERROR_CODES,
   ...RESERVED_ERROR_CODES,
+  ...ACTIVITY_ERROR_CODES,
   ...ADMIN_ERROR_CODES,
+  ...AUDIT_ERROR_CODES,
   ...AUTH_ERROR_CODES,
+  ...BILLING_ERROR_CODES,
   ...CHAT_ERROR_CODES,
+  ...COMPETENCY_FRAMEWORKS_ERROR_CODES,
   ...DASHBOARD_ERROR_CODES,
   ...DOCUMENT_ERROR_CODES,
+  ...EXAMS_ERROR_CODES,
   ...GRADES_ERROR_CODES,
+  ...GRADING_SCHEMES_ERROR_CODES,
   ...HELP_ERROR_CODES,
+  ...MOODLE_CONNECTIONS_ERROR_CODES,
+  ...MOODLE_FEEDBACK_PUSH_ERROR_CODES,
+  ...MOODLE_ROUNDTRIP_ERROR_CODES,
   ...ORG_UNITS_ERROR_CODES,
   ...PROMPTS_ERROR_CODES,
   ...RBAC_ERROR_CODES,
   ...REVIEW_ERROR_CODES,
+  ...STUDENT_CLASSES_ERROR_CODES,
+  ...STUDENTS_ERROR_CODES,
+  ...SUBMISSIONS_ERROR_CODES,
+  ...VISIBILITY_ERROR_CODES,
   ...WIZARD_ERROR_CODES,
 ] as const;
 

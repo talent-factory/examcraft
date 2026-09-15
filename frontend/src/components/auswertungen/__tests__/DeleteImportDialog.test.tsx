@@ -99,7 +99,7 @@ describe('DeleteImportDialog', () => {
     expect(deleteImport).not.toHaveBeenCalled();
   });
 
-  test('surfaces a delete error and keeps the dialog open', async () => {
+  test('surfaces a coded delete error translated and keeps the dialog open', async () => {
     getImportSummary.mockResolvedValue(summary);
     deleteImport.mockRejectedValueOnce(
       new ApiError({
@@ -108,6 +108,8 @@ describe('DeleteImportDialog', () => {
         message: 'Keine Berechtigung',
         detail: null,
         issues: [],
+        errorCode: 'auth_permission_required',
+        errorParams: { permission: 'submissions:delete' },
       }),
     );
     const { onClose } = renderDialog();
@@ -115,9 +117,10 @@ describe('DeleteImportDialog', () => {
     await screen.findByTestId('delete-import-attempt-count');
     fireEvent.click(screen.getByTestId('delete-import-confirm'));
 
-    expect(await screen.findByTestId('delete-import-error')).toHaveTextContent(
-      'Keine Berechtigung',
-    );
+    const alert = await screen.findByTestId('delete-import-error');
+    expect(alert).toHaveTextContent('Berechtigung «submissions:delete» erforderlich');
+    // TF-772: ApiError.message is log-only.
+    expect(alert).not.toHaveTextContent('Keine Berechtigung');
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -133,9 +136,10 @@ describe('DeleteImportDialog', () => {
     );
     renderDialog();
 
-    expect(await screen.findByTestId('delete-import-error')).toHaveTextContent(
-      'Kein Zugriff',
-    );
+    // No error_code on the ApiError → the operation fallback, not its message.
+    const alert = await screen.findByTestId('delete-import-error');
+    expect(alert).toHaveTextContent('Zusammenfassung konnte nicht geladen werden.');
+    expect(alert).not.toHaveTextContent('Kein Zugriff');
     // No summary loaded → confirm stays disabled, delete never attempted.
     expect(screen.getByTestId('delete-import-confirm')).toBeDisabled();
     expect(deleteImport).not.toHaveBeenCalled();

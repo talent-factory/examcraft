@@ -276,6 +276,32 @@ describe('ExamListView', () => {
       });
     });
 
+    // TF-772 PR 7: the composer renders the backend's error_code, never the
+    // raw `detail` that getErrorMessage() used to pass through.
+    it('renders a coded restore error translated', async () => {
+      mockComposerService.listExams.mockResolvedValue({
+        total: 1,
+        exams: [archived({ id: 9 })],
+      });
+      mockComposerService.restoreExam.mockRejectedValue(
+        Object.assign(new Error('Request failed with status code 409'), {
+          response: {
+            status: 409,
+            data: { detail: 'ROHER BACKEND-TEXT', error_code: 'exam_archive_not_archived' },
+          },
+        }),
+      );
+
+      render(<ExamListView onSelectExam={mockOnSelectExam} />, {
+        wrapper: createWrapper(),
+      });
+
+      fireEvent.click(await screen.findByLabelText('Wiederherstellen'));
+
+      expect(await screen.findByText('Prüfung ist nicht archiviert')).toBeInTheDocument();
+      expect(screen.queryByText('ROHER BACKEND-TEXT')).not.toBeInTheDocument();
+    });
+
     it('restores an archived exam', async () => {
       mockComposerService.listExams.mockResolvedValue({
         total: 1,

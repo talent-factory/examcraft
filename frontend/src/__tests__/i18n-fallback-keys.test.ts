@@ -46,8 +46,15 @@ const LOCALES: Array<[string, Record<string, unknown>]> = [
   ['it', itLocale],
 ];
 
-/** `translateError(err, t, 'some.key')` — the direct shape. */
-const TRANSLATE_ERROR_LITERAL = /translateError\(\s*[^,()]+,\s*[^,()]+,\s*'([^']+)'\s*\)/g;
+/**
+ * `translateError(err, t, 'some.key')` — the direct shape. The first argument
+ * may itself be one call deep, `translateError(appErrorFromApiError(err,
+ * 'code'), t, 'some.key')`: TF-772 PR 7 converts at the call site, and without
+ * the nested group every such call would read as dynamic. The optional comma
+ * before `)` is Prettier's trailing comma once the call spans several lines.
+ */
+const TRANSLATE_ERROR_LITERAL =
+  /translateError\(\s*(?:[^,()]|\([^()]*\))+,\s*[^,()]+,\s*'([^']+)'\s*,?\s*\)/g;
 
 /** Any translateError call, literal third argument or not. */
 const TRANSLATE_ERROR_ANY = /translateError\(/g;

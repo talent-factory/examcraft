@@ -270,6 +270,31 @@ describe('ExportDialog', () => {
       });
     });
 
+    // TF-772 PR 7: the export response is a Blob, so its error body is a JSON
+    // Blob too. The backend's error_code must be read out of it and rendered
+    // translated — never the raw `detail`.
+    it('renders the error_code from a JSON Blob error body', async () => {
+      mockComposerService.downloadExport.mockRejectedValue(
+        Object.assign(new Error('Request failed with status code 400'), {
+          response: {
+            status: 400,
+            data: new Blob(
+              [JSON.stringify({ detail: 'ROHER BACKEND-TEXT', error_code: 'exams_must_finalize_before_export' })],
+              { type: 'application/json' },
+            ),
+          },
+        }),
+      );
+
+      render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
+      fireEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
+
+      expect(
+        await screen.findByText('Prüfung muss vor dem Export abgeschlossen werden'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('ROHER BACKEND-TEXT')).not.toBeInTheDocument();
+    });
+
     it('does NOT call onClose when download fails', async () => {
       const onClose = jest.fn();
       mockComposerService.downloadExport.mockRejectedValue(new Error('Server error'));

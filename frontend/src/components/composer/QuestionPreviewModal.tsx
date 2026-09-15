@@ -9,7 +9,8 @@ import {
   Button,
   CircularProgress,
 } from '@mui/material';
-import { ComposerService, getErrorMessage } from '../../services/ComposerService';
+import { appErrorFromAxios, translateError } from '../../errors';
+import { ComposerService } from '../../services/ComposerService';
 import MarkdownRenderer from '../MarkdownRenderer';
 import type { ApprovedQuestionDetail } from '../../types/composer';
 
@@ -79,7 +80,7 @@ const QuestionPreviewModal: React.FC<QuestionPreviewModalProps> = ({
 
         {isError && (
           <p className="text-sm text-red-600 py-6">
-            {getErrorMessage(error, t('composer.questionPool.previewError'))}
+            {translateError(appErrorFromAxios(error, 'exams_approved_question_load_failed'), t, 'composer.questionPool.previewError')}
           </p>
         )}
 

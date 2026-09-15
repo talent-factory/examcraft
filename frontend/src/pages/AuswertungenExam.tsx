@@ -36,6 +36,7 @@ import {
   Upload as UploadIcon,
 } from '@mui/icons-material';
 
+import { appErrorFromApiError, appErrorFromAxios, translateError } from '../errors';
 import { SubmissionsService } from '../services/submissionsService';
 import { ComposerService } from '../services/ComposerService';
 import {
@@ -105,20 +106,23 @@ const AuswertungenExam: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      // Converted per promise, not in the catch below: `getExam` is axios,
+      // `listForExam` throws `ApiError`, and only here is it certain which
+      // of the two rejected.
       const [examDetail, list] = await Promise.all([
-        ComposerService.getExam(examId),
-        SubmissionsService.listForExam(examId),
+        ComposerService.getExam(examId).catch((e: unknown) => {
+          throw appErrorFromAxios(e, 'exams_load_failed');
+        }),
+        SubmissionsService.listForExam(examId).catch((e: unknown) => {
+          throw appErrorFromApiError(e, 'submissions_list_failed');
+        }),
       ]);
       setExam(examDetail);
       setItems(list.items);
       setSubmissionTotal(list.total);
       setSubmissionPending(list.pending_count);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : t('auswertungen.exam.loadError'),
-      );
+      setError(translateError(err, t, 'auswertungen.exam.loadError'));
     } finally {
       setLoading(false);
     }
@@ -140,9 +144,11 @@ const AuswertungenExam: React.FC = () => {
       // Surface the failure inside the drawer where the user clicked,
       // not in the page-level alert at the top.
       setDrawerError(
-        err instanceof Error
-          ? err.message
-          : t('auswertungen.exam.detailError'),
+        translateError(
+          appErrorFromApiError(err, 'submissions_detail_load_failed'),
+          t,
+          'auswertungen.exam.detailError',
+        ),
       );
     } finally {
       setDrawerLoading(false);

@@ -54,6 +54,19 @@ in `AppError.ts` grows by one import line.
    paths TF-773 did not reach (network failure, an endpoint with no specific
    code of its own).
 
+   TF-772 PR 7 added one file per router whose consumers rendered the raw
+   backend text — the ApiError family on `httpClient` and the other parsers
+   (Auswertungen, admin, audit), and the axios pages that showed
+   `response.data.detail` (composer, competency frameworks, subscription).
+   `studentClasses.ts`, `submissions.ts`, `exams.ts`, `gradingSchemes.ts`,
+   `competencyFrameworks.ts` and `billing.ts` mix real backend codes with
+   operation fallbacks; `visibility.ts` holds only backend codes shared by
+   several routers; `students.ts`, `activity.ts`, `audit.ts`,
+   `moodleConnections.ts`, `moodleRoundtrip.ts` and `moodleFeedbackPush.ts` are
+   fallback-only because their routers raise plain `HTTPException`s. Each file
+   names the sentences that were visible before and are lost until its router
+   is migrated.
+
 ## What belongs in the registry
 
 Two kinds of code, and the distinction matters when reading `documents.ts`:

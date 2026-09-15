@@ -10,7 +10,8 @@ import {
   TextField,
   Button,
 } from '@mui/material';
-import { ComposerService, getErrorMessage } from '../../services/ComposerService';
+import { appErrorFromAxios, translateError } from '../../errors';
+import { ComposerService } from '../../services/ComposerService';
 import { competencyFrameworksApi } from '../../api/competencyFrameworksApi';
 import type {
   ApprovedQuestion,
@@ -261,7 +262,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       onInvalidate();
     },
     onError: (err) => {
-      setAutoFillError(getErrorMessage(err, t('composer.questionPool.autoFillFailed')));
+      setAutoFillError(translateError(appErrorFromAxios(err, 'exams_auto_fill_failed'), t, 'composer.questionPool.autoFillFailed'));
     },
   });
 
@@ -313,7 +314,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
       }
     },
     onError: (err) => {
-      setAutoFillError(getErrorMessage(err, t('composer.questionPool.compositionFailed')));
+      setAutoFillError(translateError(appErrorFromAxios(err, 'exams_compose_failed'), t, 'composer.questionPool.compositionFailed'));
     },
   });
 
@@ -506,7 +507,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
           className="mb-2 px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm"
           role="alert"
         >
-          {getErrorMessage(docsError, t('composer.questionPool.errorLoadingDocuments'))}
+          {translateError(appErrorFromAxios(docsError, 'exams_documents_load_failed'), t, 'composer.questionPool.errorLoadingDocuments')}
         </div>
       )}
       {!isDocsError && availableDocs.length > 0 && (
@@ -927,7 +928,7 @@ const QuestionPoolPanel: React.FC<QuestionPoolPanelProps> = ({
             className="mx-auto my-4 max-w-sm px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm text-center"
             role="alert"
           >
-            {getErrorMessage(questionsError, t('composer.questionPool.errorLoadingQuestions'))}
+            {translateError(appErrorFromAxios(questionsError, 'exams_approved_questions_load_failed'), t, 'composer.questionPool.errorLoadingQuestions')}
           </div>
         ) : !data?.questions.length ? (
           <div className="text-center py-8 text-gray-400 text-sm">

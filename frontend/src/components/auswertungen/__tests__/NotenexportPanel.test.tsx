@@ -45,10 +45,15 @@ jest.mock('../../../services/submissionsService', () => ({
   ApiError: class ApiError extends Error {
     kind: string;
     status: number;
-    constructor(opts: { kind: string; status: number; message: string }) {
+    errorCode?: string;
+    constructor(opts: { kind: string; status: number; message: string; errorCode?: string }) {
       super(opts.message);
+      // appErrorFromApiError identifies an ApiError by name, as the real
+      // constructor sets it.
+      this.name = 'ApiError';
       this.kind = opts.kind;
       this.status = opts.status;
+      this.errorCode = opts.errorCode;
     }
   },
 }));
@@ -174,19 +179,37 @@ describe('NotenexportPanel', () => {
     );
   });
 
-  it('surfaces backend 409 detail (not the generic kind message)', async () => {
+  it('renders the backend 409 error_code (not the generic kind message)', async () => {
     mockedDownload.mockRejectedValueOnce(
       new ApiError({
         kind: 'conflict',
         status: 409,
-        message: 'Notenexport gesperrt: Review zuerst abarbeiten.',
+        message: 'ROHER BACKEND-TEXT',
+        errorCode: 'submissions_grade_export_blocked_pending_review',
       }),
     );
     renderPanel({ pendingCount: 0 });
     fireEvent.click(screen.getByRole('button', { name: /Herunterladen/ }));
     expect(
-      await screen.findByText(/Review zuerst abarbeiten/),
+      await screen.findByText(
+        'Notenexport gesperrt: Bitte zuerst die Review-Queue abarbeiten — alle Bewertungen müssen abgeschlossen sein.',
+      ),
     ).toBeInTheDocument();
+    expect(screen.queryByText('ROHER BACKEND-TEXT')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the export sentence for a 409 without a registered code', async () => {
+    mockedDownload.mockRejectedValueOnce(
+      new ApiError({ kind: 'conflict', status: 409, message: 'ROHER BACKEND-TEXT' }),
+    );
+    renderPanel({ pendingCount: 0 });
+    fireEvent.click(screen.getByRole('button', { name: /Herunterladen/ }));
+    expect(
+      await screen.findByText(
+        'Notenexport fehlgeschlagen — bitte erneut versuchen oder Support kontaktieren.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('ROHER BACKEND-TEXT')).not.toBeInTheDocument();
   });
 
   // --- TF-432: per-exam grading scheme picker -----------------------------
@@ -379,6 +402,8 @@ describe('NotenexportPanel', () => {
   });
 
   it('surfaces an ApiError from the push as a user-facing error', async () => {
+    // moodle_feedback_push.py sends no error_code yet (TF-772 PR 7): the
+    // push fallback renders, never the backend message.
     mockedPushStart.mockRejectedValueOnce(
       new ApiError({
         kind: 'validation',
@@ -389,9 +414,27 @@ describe('NotenexportPanel', () => {
     renderPanel({ pendingCount: 0 });
     fireEvent.click(screen.getByTestId('moodle-push-button'));
     expect(
-      await screen.findByText(/Keine Moodle-Verbindung konfiguriert/),
+      await screen.findByText(
+        'Die Übertragung konnte nicht gestartet werden. Bitte später erneut versuchen.',
+      ),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/Keine Moodle-Verbindung konfiguriert/)).not.toBeInTheDocument();
     expect(screen.queryByTestId('moodle-push-result')).not.toBeInTheDocument();
+  });
+
+  it('renders a coded push error translated', async () => {
+    mockedPushStart.mockRejectedValueOnce(
+      new ApiError({
+        kind: 'permission',
+        status: 403,
+        message: 'ROHER BACKEND-TEXT',
+        errorCode: 'auth_account_not_active',
+      }),
+    );
+    renderPanel({ pendingCount: 0 });
+    fireEvent.click(screen.getByTestId('moodle-push-button'));
+    expect(await screen.findByText('Dein Konto ist nicht aktiv')).toBeInTheDocument();
+    expect(screen.queryByText('ROHER BACKEND-TEXT')).not.toBeInTheDocument();
   });
 
   it('paints a completed-with-failures push as a warning, not success', async () => {

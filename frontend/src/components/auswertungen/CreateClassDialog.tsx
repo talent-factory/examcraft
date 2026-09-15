@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 
+import { appErrorFromApiError, translateError } from '../../errors';
 import { ApiError } from '../../services/submissionsService';
 import { StudentClassesService } from '../../services/studentClassesService';
 import type { StudentClassSummary } from '../../types/studentClass';
@@ -66,10 +67,19 @@ const CreateClassDialog: React.FC<Props> = ({
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError(t('auswertungen.klassen.createDialog.duplicate'));
-      } else if (err instanceof ApiError) {
-        setError(err.message);
       } else {
-        setError(t('auswertungen.klassen.createDialog.error'));
+        setError(
+          translateError(
+            appErrorFromApiError(
+              err,
+              mode === 'rename' && classId
+                ? 'student_classes_rename_failed'
+                : 'student_classes_create_failed',
+            ),
+            t,
+            'auswertungen.klassen.createDialog.error',
+          ),
+        );
       }
     } finally {
       setLoading(false);

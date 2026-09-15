@@ -284,11 +284,18 @@ describe('GradingSchemeEditor — edit mode', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it('shows server error message when update fails', async () => {
+  // TF-772 PR 7: the editor renders the backend's error_code, or the
+  // operation fallback — never ApiError.message.
+  it('renders a coded update error translated', async () => {
     const { ApiError } = jest.requireActual('../../../services/submissionsService');
     const scheme = makeScheme();
     mocked.update.mockRejectedValue(
-      new ApiError({ kind: 'server', status: 500, message: 'Datenbankfehler', detail: null, issues: [] }),
+      new ApiError({
+        kind: 'conflict',
+        status: 409,
+        message: 'ROHER BACKEND-TEXT',
+        errorCode: 'grading_schemes_uniqueness_violated',
+      }),
     );
 
     render(
@@ -298,6 +305,27 @@ describe('GradingSchemeEditor — edit mode', () => {
     );
 
     fireEvent.click(screen.getByTestId('gs-editor-save'));
-    await screen.findByTestId('gs-editor-error');
+    const alert = await screen.findByTestId('gs-editor-error');
+    expect(alert).toHaveTextContent('Grading-Scheme-Update verletzt eine Eindeutigkeit');
+    expect(alert).not.toHaveTextContent('ROHER BACKEND-TEXT');
+  });
+
+  it('renders the update fallback when the error carries no code', async () => {
+    const { ApiError } = jest.requireActual('../../../services/submissionsService');
+    const scheme = makeScheme();
+    mocked.update.mockRejectedValue(
+      new ApiError({ kind: 'server', status: 500, message: 'ROHER BACKEND-TEXT', detail: null, issues: [] }),
+    );
+
+    render(
+      <Wrapper>
+        <GradingSchemeEditor open scheme={scheme} onClose={noop} onSaved={noop} />
+      </Wrapper>,
+    );
+
+    fireEvent.click(screen.getByTestId('gs-editor-save'));
+    const alert = await screen.findByTestId('gs-editor-error');
+    expect(alert).toHaveTextContent('Bewertungsschema konnte nicht aktualisiert werden.');
+    expect(alert).not.toHaveTextContent('ROHER BACKEND-TEXT');
   });
 });

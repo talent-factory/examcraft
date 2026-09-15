@@ -53,20 +53,6 @@ export function parseContentDispositionFilename(
   return fallback;
 }
 
-/**
- * Extracts a human-readable error message from an Axios error response.
- * Falls back to the provided fallback string if no detail is available.
- */
-export const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const axiosError = error as { response?: { data?: { detail?: string } } };
-    if (axiosError.response?.data?.detail) {
-      return axiosError.response.data.detail;
-    }
-  }
-  return fallback;
-};
-
 export class ComposerService {
   static async listExams(params?: {
     status?: string;

@@ -9,6 +9,7 @@
  */
 
 import { ApiError, statusToKind } from './submissionsService';
+import { ErrorEnvelope, readErrorEnvelope } from './apiErrorBody';
 import {
   GradingSchemeCreate,
   GradingSchemeListOut,
@@ -34,8 +35,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
   let detail: unknown;
   let issues: string[] = [];
+  let envelope: ErrorEnvelope = {};
   try {
     const body = await response.json();
+    envelope = readErrorEnvelope(body);
     detail = body.detail;
     if (Array.isArray(body.detail)) {
       issues = (body.detail as Array<{ msg?: string }>)
@@ -74,6 +77,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
     message,
     detail,
     issues,
+    ...envelope,
   });
 }
 

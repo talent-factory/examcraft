@@ -25,7 +25,7 @@ import {
   Alert,
 } from '@mui/material';
 import { RolesService } from '../../services/rolesService';
-import { ApiError } from '../../services/httpClient';
+import { appErrorFromApiError, translateError } from '../../errors';
 import { RoleOut, PermissionOut } from '../../types/role';
 
 interface RolePermissionsEditorProps {
@@ -114,15 +114,23 @@ const RolePermissionsEditor: React.FC<RolePermissionsEditorProps> = ({
       }
       onSaved();
     } catch (e) {
-      // On 409 (duplicate) / 422 (unknown permission) the backend returns
-      // a meaningful detail message — we show that instead of the generic
-      // fallback. Network errors (no `.detail`) still fall back to the
-      // generic i18n string (TF-603 Finding 4).
-      if (e instanceof ApiError && typeof e.detail === 'string' && e.detail) {
-        setError(e.detail);
-      } else {
-        setError(isEdit ? t('admin.roles.failedUpdate') : t('admin.roles.failedCreate'));
-      }
+      // On 409 (duplicate) / 422 (unknown permission) the backend sends a
+      // specific error_code (admin_role_already_exists,
+      // admin_unknown_permissions) — rendered translated instead of the
+      // generic fallback, but never as ApiError.detail (TF-772 PR 7).
+      setError(
+        isEdit
+          ? translateError(
+              appErrorFromApiError(e, 'admin_role_update_failed'),
+              t,
+              'admin.roles.failedUpdate',
+            )
+          : translateError(
+              appErrorFromApiError(e, 'admin_role_create_failed'),
+              t,
+              'admin.roles.failedCreate',
+            ),
+      );
     } finally {
       setSaving(false);
     }

@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 
 import { ComposerService } from '../services/ComposerService';
+import { appErrorFromAxios, translateError } from '../errors';
 import { ApiError } from '../services/submissionsService';
 import { Exam } from '../types/composer';
 import ImportDialog from '../components/auswertungen/ImportDialog';
@@ -62,17 +63,14 @@ const Auswertungen: React.FC = () => {
       })
       .catch((err) => {
         if (cancelled) return;
-        if (err instanceof ApiError) {
-          setError(err.message);
-          setErrorIssues(err.issues);
-        } else {
-          setError(
-            err instanceof Error
-              ? err.message
-              : t('auswertungen.overview.loadError'),
-          );
-          setErrorIssues([]);
-        }
+        setError(
+          translateError(
+            appErrorFromAxios(err, 'exams_list_failed'),
+            t,
+            'auswertungen.overview.loadError',
+          ),
+        );
+        setErrorIssues(err instanceof ApiError ? err.issues : []);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

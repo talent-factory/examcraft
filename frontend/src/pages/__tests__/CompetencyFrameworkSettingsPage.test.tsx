@@ -91,3 +91,33 @@ it('öffnet das Formular beim Klick auf "Neuer Kompetenzrahmen"', async () => {
   fireEvent.click(screen.getByRole('button', { name: /Neuer Kompetenzrahmen/i }));
   expect(await screen.findByTestId('framework-form')).toBeInTheDocument();
 });
+
+// TF-772 PR 7: the page used to render `response.data.detail` through a local
+// extractApiDetail(). It now renders the backend's error_code translated, and
+// the operation fallback without one — never the raw detail.
+const axiosError = (status: number, data: Record<string, unknown>) =>
+  Object.assign(new Error(`Request failed with status code ${status}`), {
+    response: { status, data },
+  });
+
+it('zeigt einen Archiv-Fehler über den error_code, nicht über detail', async () => {
+  mockArchive.mockRejectedValue(
+    axiosError(403, { detail: 'ROHER BACKEND-TEXT', error_code: 'competency_frameworks_access_denied' }),
+  );
+  renderPage();
+  await screen.findByText(/Modul A/);
+  fireEvent.click(screen.getByRole('button', { name: /Archivieren/i }));
+
+  expect(await screen.findByText('Zugriff verweigert.')).toBeInTheDocument();
+  expect(screen.queryByText('ROHER BACKEND-TEXT')).not.toBeInTheDocument();
+});
+
+it('zeigt beim Ladefehler ohne Code den Operationssatz, nicht detail', async () => {
+  mockList.mockRejectedValue(axiosError(500, { detail: 'ROHER BACKEND-TEXT' }));
+  renderPage();
+
+  expect(
+    await screen.findByText('Kompetenzrahmen konnten nicht geladen werden.'),
+  ).toBeInTheDocument();
+  expect(screen.queryByText('ROHER BACKEND-TEXT')).not.toBeInTheDocument();
+});

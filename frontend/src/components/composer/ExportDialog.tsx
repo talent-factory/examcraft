@@ -13,6 +13,7 @@ import {
   RadioGroup,
   Radio,
 } from '@mui/material';
+import { appErrorFromAxios, translateError } from '../../errors';
 import { ComposerService } from '../../services/ComposerService';
 
 interface ExportDialogProps {
@@ -29,6 +30,36 @@ type ExportFormat = 'md' | 'json' | 'moodle' | 'pdf';
 // sample-solution variant. JSON and Moodle XML always ship the solution
 // data as part of their payload, so the toggle is meaningless there.
 const SOLUTION_CAPABLE_FORMATS: ExportFormat[] = ['md', 'pdf'];
+
+/**
+ * `downloadExport` requests a Blob, so axios hands a failed response's body
+ * over as a Blob as well. `appErrorFromAxios` only reads a parsed body; this
+ * reads the JSON Blob first so the backend's `error_code` is visible to it
+ * (TF-772 PR 7). Anything else — a non-JSON Blob, an unreadable one, no
+ * response at all — is passed on unchanged and lands on the fallback.
+ *
+ * Read through `FileReader`, not `Blob.text()`: jsdom's Blob has no `text()`,
+ * so a test of the coded path would silently exercise only the fallback.
+ */
+async function withParsedBlobBody(err: unknown): Promise<unknown> {
+  const response = (err as { response?: { data?: unknown } } | null)?.response;
+  const data = response?.data;
+  if (!(data instanceof Blob) || data.type !== 'application/json') return err;
+  try {
+    return { response: { ...response, data: JSON.parse(await readBlobText(data)) } };
+  } catch {
+    return err;
+  }
+}
+
+function readBlobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
+}
 
 const ExportDialog: React.FC<ExportDialogProps> = ({
   open,
@@ -72,26 +103,14 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
       onClose();
     } catch (err) {
       console.error('Export failed:', err);
-      // Try to extract detail from blob response for better error messages
-      let message = t('composer.exportDialog.errorExport');
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axiosError = err as { response?: { data?: Blob | { detail?: string }; headers?: Record<string, string> } };
-        const responseData = axiosError.response?.data;
-        if (responseData instanceof Blob && responseData.type === 'application/json') {
-          try {
-            const text = await responseData.text();
-            const parsed = JSON.parse(text) as { detail?: string };
-            if (parsed.detail) {
-              message = parsed.detail;
-            }
-          } catch {
-            // ignore parse errors, keep fallback message
-          }
-        } else if (responseData && typeof responseData === 'object' && 'detail' in responseData && responseData.detail) {
-          message = responseData.detail as string;
-        }
-      }
-      setError(message);
+      const parsed = await withParsedBlobBody(err);
+      setError(
+        translateError(
+          appErrorFromAxios(parsed, 'exams_export_failed'),
+          t,
+          'composer.exportDialog.errorExport',
+        ),
+      );
     } finally {
       setIsDownloading(false);
     }

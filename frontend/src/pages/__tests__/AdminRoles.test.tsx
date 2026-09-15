@@ -97,7 +97,9 @@ describe('AdminRoles', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('shows the backend detail message when loading roles fails', async () => {
+  // TF-772 PR 7: ApiError.detail is never rendered — a code renders
+  // translated, anything else the list fallback.
+  it('renders the list fallback, not the backend detail, when loading roles fails', async () => {
     mockedService.list.mockRejectedValueOnce(
       new ApiError({
         kind: 'validation',
@@ -108,16 +110,16 @@ describe('AdminRoles', () => {
     );
     renderPage();
 
-    expect(await screen.findByText('DB down')).toBeInTheDocument();
-    expect(screen.queryByText('Rollen konnten nicht geladen werden.')).not.toBeInTheDocument();
+    expect(await screen.findByText('Rollen konnten nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText('DB down')).not.toBeInTheDocument();
   });
 
-  it('falls back to the generic message when loading roles fails without a detail', async () => {
+  it('falls back to the list sentence when loading roles fails with an untyped error', async () => {
     mockedService.list.mockRejectedValueOnce(new Error('network down'));
     renderPage();
 
     expect(
-      await screen.findByText('Rollen konnten nicht geladen werden.'),
+      await screen.findByText('Rollen konnten nicht geladen werden'),
     ).toBeInTheDocument();
   });
 
@@ -143,14 +145,16 @@ describe('AdminRoles', () => {
     await waitFor(() => expect(mockedService.remove).toHaveBeenCalledWith(2));
   });
 
-  it('shows the backend detail message when delete fails with a 409', async () => {
+  it('renders the backend error_code when delete fails with a 409', async () => {
     mockedService.list.mockResolvedValue([customRole]);
     mockedService.remove.mockRejectedValueOnce(
       new ApiError({
         kind: 'validation',
         status: 409,
-        message: 'Rolle ist noch 3 Benutzer(n) zugewiesen',
-        detail: 'Rolle ist noch 3 Benutzer(n) zugewiesen',
+        message: 'ROHER BACKEND-TEXT',
+        detail: 'ROHER BACKEND-TEXT',
+        errorCode: 'admin_role_has_users',
+        errorParams: { count: 3 },
       }),
     );
     renderPage();
@@ -165,6 +169,7 @@ describe('AdminRoles', () => {
     expect(
       screen.queryByText('Rolle konnte nicht gelöscht werden.'),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText('ROHER BACKEND-TEXT')).not.toBeInTheDocument();
   });
 
   it('resets a stale delete error when reopening the dialog for another role', async () => {

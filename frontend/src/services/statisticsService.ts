@@ -4,6 +4,7 @@
  */
 
 import { ApiError } from './submissionsService';
+import { ErrorEnvelope, readErrorEnvelope } from './apiErrorBody';
 import {
   OverviewStats,
   PerQuestionList,
@@ -22,8 +23,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
     return (await response.json()) as T;
   }
   let detail: unknown;
+  let envelope: ErrorEnvelope = {};
   try {
     const body = await response.json();
+    envelope = readErrorEnvelope(body);
     detail = body.detail;
   } catch {
     // Non-JSON error body — keep raw text so an HTML error page
@@ -56,6 +59,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
     message:
       typeof detail === 'string' ? detail : `Request failed (${response.status})`,
     detail,
+    ...envelope,
   });
 }
 

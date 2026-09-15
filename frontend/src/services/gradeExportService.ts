@@ -8,6 +8,7 @@
  */
 
 import { ApiError, statusToKind } from './submissionsService';
+import { ErrorEnvelope, readErrorEnvelope } from './apiErrorBody';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -28,8 +29,10 @@ export class GradeExportService {
 
     if (!response.ok) {
       let detail: unknown;
+      let envelope: ErrorEnvelope = {};
       try {
         const body = await response.json();
+        envelope = readErrorEnvelope(body);
         detail = body.detail;
       } catch {
         // Non-JSON error body — capture the raw text so we have *some*
@@ -59,6 +62,7 @@ export class GradeExportService {
             ? detail
             : `Export failed (${response.status})`,
         detail,
+        ...envelope,
       });
     }
 

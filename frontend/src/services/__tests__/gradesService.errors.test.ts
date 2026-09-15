@@ -93,12 +93,16 @@ describe('GradesService', () => {
   });
 
   it('verwirft einen nicht registrierten error_code zugunsten des Fallbacks', async () => {
-    // `exams_not_found` steht in den Backend-Locales, ist im Frontend aber
-    // nicht registriert. Ein roher Schlüssel `errors.exams_not_found` auf dem
-    // Bildschirm wäre schlechter als der generische Satz.
+    // `documents_patch_no_fields` steht in den Backend-Locales, ist im
+    // Frontend aber bewusst nicht registriert (toter Schlüssel, siehe
+    // codes/documents.ts). Ein roher Schlüssel auf dem Bildschirm wäre
+    // schlechter als der generische Satz. Bis TF-772 PR 7 diente
+    // `exams_not_found` als Beispiel — der ist inzwischen registriert.
     global.fetch = jest
       .fn()
-      .mockResolvedValue(failing(404, { detail: 'Prüfung nicht gefunden', error_code: 'exams_not_found' }));
+      .mockResolvedValue(
+        failing(400, { detail: 'Keine Felder', error_code: 'documents_patch_no_fields' }),
+      );
     jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     const err = await thrownBy(GradesService.getReviewQueue(7));

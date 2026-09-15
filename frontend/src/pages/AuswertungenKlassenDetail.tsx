@@ -51,6 +51,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import { appErrorFromApiError, translateError } from '../errors';
 import { ApiError } from '../services/submissionsService';
 import { StudentClassesService } from '../services/studentClassesService';
 import type {
@@ -95,7 +96,13 @@ const AuswertungenKlassenDetail: React.FC = () => {
           setDetail(detailRes.value);
         } else if (detailRes.reason instanceof ApiError) {
           setError(detailRes.reason);
-          setErrorText(detailRes.reason.message);
+          setErrorText(
+            translateError(
+              appErrorFromApiError(detailRes.reason, 'student_classes_load_failed'),
+              t,
+              'auswertungen.klassen.detail.loadError',
+            ),
+          );
         }
         if (historyRes.status === 'fulfilled') {
           setHistory(historyRes.value);
@@ -105,7 +112,16 @@ const AuswertungenKlassenDetail: React.FC = () => {
           if (historyRes.reason.status === 402) {
             setError(historyRes.reason);
           } else if (detailRes.status === 'fulfilled') {
-            setErrorText(historyRes.reason.message);
+            setErrorText(
+              translateError(
+                appErrorFromApiError(
+                  historyRes.reason,
+                  'student_classes_history_load_failed',
+                ),
+                t,
+                'auswertungen.klassen.detail.historyLoadError',
+              ),
+            );
           }
         }
       })
@@ -115,7 +131,7 @@ const AuswertungenKlassenDetail: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [classId, reloadKey]);
+  }, [classId, reloadKey, t]);
 
   const handleRemoveMember = async (studentId: number) => {
     try {
@@ -123,7 +139,13 @@ const AuswertungenKlassenDetail: React.FC = () => {
       reload();
     } catch (err) {
       if (err instanceof ApiError) {
-        setErrorText(err.message);
+        setErrorText(
+          translateError(
+            appErrorFromApiError(err, 'student_classes_remove_member_failed'),
+            t,
+            'auswertungen.klassen.detail.removeMemberError',
+          ),
+        );
       }
     }
   };

@@ -25,7 +25,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { ApiError } from '../../services/submissionsService';
+import { appErrorFromApiError, translateError } from '../../errors';
 import { MoodleConnectionsService } from '../../services/moodleConnectionsService';
 import type {
   MoodleConnection,
@@ -68,9 +68,11 @@ const MoodleConnectionForm: React.FC = () => {
       .catch((err) => {
         if (!cancelled) {
           setError(
-            err instanceof ApiError
-              ? err.message
-              : 'Verbindungen konnten nicht geladen werden.',
+            translateError(
+              appErrorFromApiError(err, 'moodle_connections_list_failed'),
+              t,
+              'admin.moodle.loadError',
+            ),
           );
         }
       })
@@ -80,8 +82,8 @@ const MoodleConnectionForm: React.FC = () => {
     return () => {
       cancelled = true;
     };
-    // ``t`` is unstable in tests; we have no dynamic i18n switching
-    // on this page, the string above is sufficient as a fallback.
+    // ``t`` is kept out of the deps: it is unstable in some test mocks, and
+    // re-fetching the connection on a language switch buys nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey]);
 
@@ -110,7 +112,11 @@ const MoodleConnectionForm: React.FC = () => {
       reload();
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : t('admin.moodle.saveError'),
+        translateError(
+          appErrorFromApiError(err, 'moodle_connections_save_failed'),
+          t,
+          'admin.moodle.saveError',
+        ),
       );
     }
   };
@@ -124,7 +130,11 @@ const MoodleConnectionForm: React.FC = () => {
       reload();
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : t('admin.moodle.deleteError'),
+        translateError(
+          appErrorFromApiError(err, 'moodle_connections_delete_failed'),
+          t,
+          'admin.moodle.deleteError',
+        ),
       );
     }
   };
@@ -139,7 +149,11 @@ const MoodleConnectionForm: React.FC = () => {
       setTestResult(res);
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : t('admin.moodle.testError'),
+        translateError(
+          appErrorFromApiError(err, 'moodle_connections_test_failed'),
+          t,
+          'admin.moodle.testError',
+        ),
       );
     } finally {
       setTesting(false);

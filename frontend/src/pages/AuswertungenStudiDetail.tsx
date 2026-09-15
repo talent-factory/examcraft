@@ -40,6 +40,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import { appErrorFromApiError, translateError } from '../errors';
 import { ApiError } from '../services/submissionsService';
 import { StudentsService } from '../services/studentsService';
 import type { StudentHistoryStats } from '../types/student';
@@ -70,16 +71,14 @@ const AuswertungenStudiDetail: React.FC = () => {
       })
       .catch((err) => {
         if (cancelled) return;
-        if (err instanceof ApiError) {
-          setError(err);
-          setErrorText(err.message);
-        } else {
-          setErrorText(
-            err instanceof Error
-              ? err.message
-              : t('auswertungen.studierende.detail.loadError'),
-          );
-        }
+        if (err instanceof ApiError) setError(err);
+        setErrorText(
+          translateError(
+            appErrorFromApiError(err, 'students_history_load_failed'),
+            t,
+            'auswertungen.studierende.detail.loadError',
+          ),
+        );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

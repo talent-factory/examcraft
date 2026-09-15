@@ -30,7 +30,58 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+const { ApiError } = jest.requireActual('../../../services/submissionsService');
+
 describe('MoodleConnectionForm', () => {
+  // TF-772 PR 7: ApiError.message is log-only; the form renders the code's
+  // translation or the operation fallback.
+  it('renders the list fallback, not the backend text, when loading fails', async () => {
+    mocked.list.mockRejectedValue(
+      new ApiError({ kind: 'server', status: 500, message: 'ROHER BACKEND-TEXT' }),
+    );
+
+    render(
+      <Wrapper>
+        <MoodleConnectionForm />
+      </Wrapper>,
+    );
+
+    const alert = await screen.findByTestId('moodle-form-error');
+    expect(alert).toHaveTextContent(
+      'Moodle-Verbindungen konnten nicht geladen werden — bitte später erneut versuchen.',
+    );
+    expect(alert).not.toHaveTextContent('ROHER BACKEND-TEXT');
+  });
+
+  it('renders a coded save error translated', async () => {
+    mocked.list.mockResolvedValue({ items: [], total: 0 });
+    mocked.create.mockRejectedValue(
+      new ApiError({
+        kind: 'permission',
+        status: 403,
+        message: 'ROHER BACKEND-TEXT',
+        errorCode: 'auth_permission_required',
+        errorParams: { permission: 'moodle:configure' },
+      }),
+    );
+
+    render(
+      <Wrapper>
+        <MoodleConnectionForm />
+      </Wrapper>,
+    );
+
+    fireEvent.change(await screen.findByTestId('moodle-base-url'), {
+      target: { value: 'https://moodle.example.org' },
+    });
+    fireEvent.change(screen.getByTestId('moodle-token'), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByTestId('moodle-save'));
+
+    const alert = await screen.findByTestId('moodle-form-error');
+    expect(alert).toHaveTextContent('Berechtigung «moodle:configure» erforderlich');
+    expect(alert).not.toHaveTextContent('ROHER BACKEND-TEXT');
+  });
+
   it('renders the create form when no connection exists', async () => {
     mocked.list.mockResolvedValue({ items: [], total: 0 });
 

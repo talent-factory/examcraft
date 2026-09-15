@@ -16,7 +16,8 @@ import {
   Select,
   ListSubheader,
 } from '@mui/material';
-import { ComposerService, getErrorMessage } from '../../services/ComposerService';
+import { appErrorFromAxios, translateError } from '../../errors';
+import { ComposerService } from '../../services/ComposerService';
 import { GradingSchemesService } from '../../services/gradingSchemesService';
 import { getDateLocale } from '../../utils/dateLocale';
 import type { ExamDetail, UpdateExamRequest, DocumentWithQuestions } from '../../types/composer';
@@ -112,7 +113,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       onInvalidate();
     },
     onError: (err) => {
-      setFinalizeError(getErrorMessage(err, t('composer.examMetadata.errorSave')));
+      setFinalizeError(translateError(appErrorFromAxios(err, 'exams_update_failed'), t, 'composer.examMetadata.errorSave'));
     },
   });
 
@@ -123,7 +124,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       onInvalidate();
     },
     onError: (err) => {
-      setFinalizeError(getErrorMessage(err, t('composer.examMetadata.errorFinalize')));
+      setFinalizeError(translateError(appErrorFromAxios(err, 'exams_finalize_failed'), t, 'composer.examMetadata.errorFinalize'));
     },
   });
 
@@ -134,7 +135,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       onInvalidate();
     },
     onError: (err) => {
-      setFinalizeError(getErrorMessage(err, t('composer.examMetadata.errorUnfinalize')));
+      setFinalizeError(translateError(appErrorFromAxios(err, 'exams_unfinalize_failed'), t, 'composer.examMetadata.errorUnfinalize'));
     },
   });
 
@@ -152,7 +153,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       onInvalidate();
     },
     onError: (err) => {
-      setFinalizeError(getErrorMessage(err, t('composer.examMetadata.errorArchive')));
+      setFinalizeError(translateError(appErrorFromAxios(err, 'exam_archive_failed'), t, 'composer.examMetadata.errorArchive'));
     },
   });
 
@@ -163,7 +164,7 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
       onInvalidate();
     },
     onError: (err) => {
-      setFinalizeError(getErrorMessage(err, t('composer.examMetadata.errorRestore')));
+      setFinalizeError(translateError(appErrorFromAxios(err, 'exam_restore_failed'), t, 'composer.examMetadata.errorRestore'));
     },
   });
 

@@ -44,6 +44,18 @@ const impersonatedRow: AuditLogListResponse = {
 describe('AuditLogView', () => {
   afterEach(() => jest.restoreAllMocks());
 
+  // TF-772 PR 7. The echoing t-mock above makes every key look untranslated,
+  // so translateError always lands on the fallback key here; this test can
+  // only prove that the raw message is gone, which is the point of the change.
+  it('never renders the raw error message when loading fails', async () => {
+    jest
+      .spyOn(auditService, 'fetchAuditLogs')
+      .mockRejectedValue(new Error('date_from must be <= date_to'));
+    render(<AuditLogView isSuperuser={false} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('pages.admin.audit.loadError');
+    expect(screen.queryByText(/date_from must be/)).toBeNull();
+  });
+
   it('fetches and renders an audit row', async () => {
     jest.spyOn(auditService, 'fetchAuditLogs').mockResolvedValue(oneRow);
     render(<AuditLogView isSuperuser={false} />);

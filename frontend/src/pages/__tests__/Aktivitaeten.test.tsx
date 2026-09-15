@@ -32,12 +32,14 @@ jest.mock('../../services/activityService', () => {
     status: number;
     detail: unknown;
     issues: string[];
+    errorCode?: string;
     constructor(p: {
       kind: string;
       status: number;
       message: string;
       detail?: unknown;
       issues?: string[];
+      errorCode?: string;
     }) {
       super(p.message);
       this.name = 'ApiError';
@@ -45,6 +47,7 @@ jest.mock('../../services/activityService', () => {
       this.status = p.status;
       this.detail = p.detail;
       this.issues = p.issues ?? [];
+      this.errorCode = p.errorCode;
     }
   }
   return {
@@ -277,6 +280,23 @@ describe('Aktivitäten page', () => {
     expect(screen.queryByText('doc.pdf')).not.toBeInTheDocument();
   });
 
+  test('a coded error from the service renders translated', async () => {
+    mockList.mockRejectedValue(
+      new ApiError({
+        kind: 'permission',
+        status: 403,
+        message: 'ROHER BACKEND-TEXT',
+        errorCode: 'auth_account_not_active',
+      }),
+    );
+
+    renderPage();
+
+    expect(await screen.findByTestId('aktivitaeten-error')).toBeInTheDocument();
+    expect(screen.getByText('Dein Konto ist nicht aktiv')).toBeInTheDocument();
+    expect(screen.queryByText('ROHER BACKEND-TEXT')).not.toBeInTheDocument();
+  });
+
   test('error from the service surfaces an alert with reload button', async () => {
     // First call rejects, all later calls resolve to data so the
     // reload button can verify the recovery path. Using
@@ -297,8 +317,10 @@ describe('Aktivitäten page', () => {
 
     renderPage();
 
+    // TF-772 PR 7: no error_code → the list fallback, never ApiError.message.
     expect(await screen.findByTestId('aktivitaeten-error')).toBeInTheDocument();
-    expect(screen.getByText('Bad Gateway')).toBeInTheDocument();
+    expect(screen.getByText('Aktivitäten konnten nicht geladen werden.')).toBeInTheDocument();
+    expect(screen.queryByText('Bad Gateway')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('aktivitaeten-reload'));
     expect(await screen.findByText('doc.pdf')).toBeInTheDocument();

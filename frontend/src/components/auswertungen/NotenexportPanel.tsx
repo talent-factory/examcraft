@@ -48,6 +48,7 @@ import {
 import { ComposerService } from '../../services/ComposerService';
 import { GradingSchemesService } from '../../services/gradingSchemesService';
 import { GradingSchemeOut } from '../../types/gradingScheme';
+import { appErrorFromApiError, translateError } from '../../errors';
 import { ApiError } from '../../services/submissionsService';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -216,9 +217,9 @@ const NotenexportPanel: React.FC<NotenexportPanelProps> = ({
       if (err instanceof ApiError) {
         // Branch on err.kind so the teacher sees an actionable
         // message instead of "Export failed (500)". Conflict (409)
-        // surfaces the backend's translated detail directly because
-        // it carries the specific reason (pending review vs. draft
-        // status vs. "something else").
+        // renders the backend's error_code because it carries the
+        // specific reason (pending review vs. draft status); a 409
+        // without a registered code gets the export fallback.
         switch (err.kind) {
           case 'auth':
             setError(t('auswertungen.export.errorAuth'));
@@ -230,15 +231,19 @@ const NotenexportPanel: React.FC<NotenexportPanelProps> = ({
             setError(t('auswertungen.export.errorNotFound'));
             break;
           case 'conflict':
-            setError(err.message);
+            setError(
+              translateError(
+                appErrorFromApiError(err, 'submissions_grade_export_failed'),
+                t,
+                'auswertungen.export.errorServer',
+              ),
+            );
             break;
           default:
             setError(t('auswertungen.export.errorServer'));
         }
-      } else if (err instanceof Error) {
-        setError(err.message);
       } else {
-        setError(t('auswertungen.export.unexpectedError'));
+        setError(translateError(err, t, 'auswertungen.export.unexpectedError'));
       }
     } finally {
       setDownloading(false);
@@ -275,11 +280,13 @@ const NotenexportPanel: React.FC<NotenexportPanelProps> = ({
         );
       }
     } catch (err) {
-      if (err instanceof ApiError) {
-        setPushError(err.message);
-      } else {
-        setPushError(t('auswertungen.moodlePush.errorServer'));
-      }
+      setPushError(
+        translateError(
+          appErrorFromApiError(err, 'moodle_feedback_push_failed'),
+          t,
+          'auswertungen.moodlePush.errorServer',
+        ),
+      );
     } finally {
       setPushing(false);
     }

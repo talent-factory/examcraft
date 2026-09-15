@@ -27,8 +27,6 @@ jest.mock('../../services/ComposerService', () => ({
   ComposerService: {
     getExam: jest.fn(),
   },
-  getErrorMessage: (e: unknown, fb: string) =>
-    e instanceof Error ? e.message : fb,
 }));
 jest.mock('../../services/submissionsService', () => ({
   SubmissionsService: {
@@ -264,13 +262,14 @@ describe('AuswertungenExam', () => {
     expect(await screen.findByTestId('submission-row-42')).toBeInTheDocument();
   });
 
-  test('shows error alert when list load fails', async () => {
+  test('shows the submissions fallback, not the raw message, when list load fails', async () => {
     mockSubs.listForExam.mockRejectedValue(new Error('listForExam down'));
 
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('listForExam down')).toBeInTheDocument();
+      expect(screen.getByText('Submissions konnten nicht geladen werden.')).toBeInTheDocument();
     });
+    expect(screen.queryByText('listForExam down')).not.toBeInTheDocument();
   });
 
   test('shows drawer-local error alert when row-detail load fails', async () => {
@@ -285,8 +284,9 @@ describe('AuswertungenExam', () => {
     // the page-level alert at the top.
     await waitFor(() => {
       expect(screen.getByTestId('drawer-error')).toHaveTextContent(
-        'detail down',
+        'Submission-Detail konnte nicht geladen werden.',
       );
     });
+    expect(screen.getByTestId('drawer-error')).not.toHaveTextContent('detail down');
   });
 });
