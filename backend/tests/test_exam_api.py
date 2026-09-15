@@ -2453,6 +2453,179 @@ class TestExamExportApi(
         assert "_moodle.xml" in response.headers["content-disposition"]
         assert "<quiz>" in response.text
 
+    def test_export_ilias_format(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """GET /export/ilias returns QTI 1.2.1 XML (TF-782)."""
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="ILIAS Export",
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/ilias")
+        assert response.status_code == 200
+        assert "application/xml" in response.headers["content-type"]
+        assert "_ilias_qti.xml" in response.headers["content-disposition"]
+        assert "<questestinterop>" in response.text
+
+    def test_export_ilias_without_ilias_use_permission_returns_403(
+        self, exam_client, exam_db, exam_institution, exam_user, mock_user
+    ):
+        """The ILIAS export additionally requires the opt-in ``ilias:use``
+        permission (TF-782) — unlike the other formats, ``create_exams``
+        alone is not enough."""
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="ILIAS Forbidden",
+        )
+        mock_user.has_permission = lambda permission: permission != "ilias:use"
+
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/ilias")
+        assert response.status_code == 403
+        # The message must interpolate the actual permission string, not
+        # leave the literal "%{permission}" placeholder in the response
+        # (TF-782 review: the raise was missing the `permission=` kwarg).
+        detail = response.json()["detail"]
+        assert "ilias:use" in detail
+        assert "%{permission}" not in detail
+
+    def test_export_ilias_reports_skipped_questions_via_header(
+        self, exam_client, exam_db, exam_institution, exam_user, monkeypatch
+    ):
+        """If the exporter skips unscoreable questions, the endpoint must
+        surface their positions via a response header instead of silently
+        returning a shorter-than-expected file (TF-782 review)."""
+        import api.exams as exams_api
+
+        monkeypatch.setattr(
+            exams_api.IliasQtiExporter,
+            "export_with_skipped",
+            staticmethod(
+                lambda exam_data: ("<questestinterop></questestinterop>", [2, 5])
+            ),
+        )
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="ILIAS Skipped",
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/ilias")
+        assert response.status_code == 200
+        assert response.headers["x-export-skipped-positions"] == "2,5"
+
+    def test_export_ilias_reports_skipped_questions_end_to_end(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """Same as test_export_ilias_reports_skipped_questions_via_header,
+        but exercises the real chain (DB question -> exam_data ->
+        IliasQtiExporter) instead of monkeypatching the exporter — locks in
+        that a genuinely unscoreable question (correct_answer matches no
+        option) actually produces the header end-to-end, not just that the
+        endpoint forwards whatever the exporter returns (review follow-up)."""
+        from models.question_review import QuestionReview
+
+        create_resp = exam_client.post(
+            "/api/v1/exams/", json={"title": "ILIAS Real Skip"}
+        )
+        exam_id = create_resp.json()["id"]
+
+        good_q = self._create_approved_question(
+            exam_db, exam_institution.id, exam_user.id, text="Bewertbare Frage"
+        )
+        broken_q = QuestionReview(
+            question_text="Unbewertbare Frage",
+            question_type="single_choice",
+            difficulty="medium",
+            topic="Test",
+            review_status="approved",
+            options=["A", "B", "C", "D"],
+            correct_answer="X",  # matches no option
+            institution_id=exam_institution.id,
+            created_by=exam_user.id,
+        )
+        exam_db.add(broken_q)
+        exam_db.commit()
+        exam_db.refresh(broken_q)
+
+        exam_client.post(
+            f"/api/v1/exams/{exam_id}/questions",
+            json={"question_ids": [good_q.id, broken_q.id]},
+        )
+        fin_resp = exam_client.post(f"/api/v1/exams/{exam_id}/finalize")
+        assert fin_resp.status_code == 200
+
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/ilias")
+        assert response.status_code == 200
+        assert response.headers["x-export-skipped-positions"] == "2"
+        assert "Bewertbare Frage" in response.text
+        assert "Unbewertbare Frage" not in response.text
+
+    def test_export_all_questions_unscoreable_returns_400(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """If every question in the exam is unscoreable, the endpoint must
+        fail loudly (400) instead of returning 200 with a near-empty file
+        and marking the exam EXPORTED (review follow-up: a full skip is
+        worse than the original silent-skip bug it replaced)."""
+        from models.question_review import QuestionReview
+
+        create_resp = exam_client.post(
+            "/api/v1/exams/", json={"title": "ILIAS All Skipped"}
+        )
+        exam_id = create_resp.json()["id"]
+
+        broken_q = QuestionReview(
+            question_text="Unbewertbare Frage",
+            question_type="single_choice",
+            difficulty="medium",
+            topic="Test",
+            review_status="approved",
+            options=["A", "B", "C", "D"],
+            correct_answer="X",  # matches no option
+            institution_id=exam_institution.id,
+            created_by=exam_user.id,
+        )
+        exam_db.add(broken_q)
+        exam_db.commit()
+        exam_db.refresh(broken_q)
+
+        exam_client.post(
+            f"/api/v1/exams/{exam_id}/questions",
+            json={"question_ids": [broken_q.id]},
+        )
+        fin_resp = exam_client.post(f"/api/v1/exams/{exam_id}/finalize")
+        assert fin_resp.status_code == 200
+
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/ilias")
+        assert response.status_code == 400
+
+        from models.exam import Exam, ExamStatus
+
+        exam = exam_db.query(Exam).filter(Exam.id == exam_id).one()
+        assert exam.status == ExamStatus.FINALIZED.value
+
+    def test_export_ilias_omits_skipped_header_when_nothing_skipped(
+        self, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """No skipped questions -> no skipped-positions header at all."""
+        exam_id = self._create_exam_with_question(
+            exam_client,
+            exam_db,
+            exam_institution.id,
+            exam_user.id,
+            title="ILIAS Complete",
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/ilias")
+        assert response.status_code == 200
+        assert "x-export-skipped-positions" not in response.headers
+
     def test_export_sets_status_to_exported(
         self, exam_client, exam_db, exam_institution, exam_user
     ):

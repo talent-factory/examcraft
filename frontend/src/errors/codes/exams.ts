@@ -73,6 +73,7 @@ export const EXAMS_ERROR_CODES = [
   'exams_distribution_sum_invalid',
   'exams_documents_load_failed',
   'exams_exam_question_not_found',
+  'exams_export_all_questions_unscoreable',
   'exams_export_failed',
   'exams_export_internal_error',
   'exams_finalize_failed',

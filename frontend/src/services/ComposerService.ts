@@ -204,7 +204,11 @@ export class ComposerService {
     return response.data;
   }
 
-  static async downloadExport(examId: number, format: string, includeSolutions = false): Promise<void> {
+  static async downloadExport(
+    examId: number,
+    format: string,
+    includeSolutions = false
+  ): Promise<{ skippedPositions: number[] }> {
     const params = new URLSearchParams();
     if (includeSolutions) params.set('include_solutions', 'true');
     const response = await apiClient.get(
@@ -224,5 +228,17 @@ export class ComposerService {
     link.click();
     link.remove();
     window.URL.revokeObjectURL(url);
+
+    // ILIAS (TF-782) can silently drop unscoreable questions from the
+    // export; the backend reports them via this header instead of a
+    // shorter-than-expected 200 OK so the caller can warn the Dozent.
+    const skippedHeader = response.headers['x-export-skipped-positions'];
+    const skippedPositions = skippedHeader
+      ? skippedHeader
+          .split(',')
+          .map((p: string) => parseInt(p, 10))
+          .filter((p: number) => !Number.isNaN(p))
+      : [];
+    return { skippedPositions };
   }
 }

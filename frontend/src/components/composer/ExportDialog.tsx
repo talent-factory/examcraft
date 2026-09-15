@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { appErrorFromAxios, translateError } from '../../errors';
 import { ComposerService } from '../../services/ComposerService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ExportDialogProps {
   open: boolean;
@@ -24,11 +25,11 @@ interface ExportDialogProps {
   hasQuestions: boolean;
 }
 
-type ExportFormat = 'md' | 'json' | 'moodle' | 'pdf';
+type ExportFormat = 'md' | 'json' | 'moodle' | 'ilias' | 'pdf';
 
 // Formats that render the exam for humans and can therefore carry a
-// sample-solution variant. JSON and Moodle XML always ship the solution
-// data as part of their payload, so the toggle is meaningless there.
+// sample-solution variant. JSON and Moodle/ILIAS XML always ship the
+// solution data as part of their payload, so the toggle is meaningless there.
 const SOLUTION_CAPABLE_FORMATS: ExportFormat[] = ['md', 'pdf'];
 
 /**
@@ -69,38 +70,60 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   hasQuestions,
 }) => {
   const { t, i18n } = useTranslation();
+  const { hasPermission } = useAuth();
   const [format, setFormat] = useState<ExportFormat>('md');
   const [includeSolutions, setIncludeSolutions] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [skippedPositions, setSkippedPositions] = useState<number[] | null>(null);
 
   const FORMAT_LABELS: Record<ExportFormat, string> = {
     md: t('composer.exportDialog.formatMd'),
     pdf: t('composer.exportDialog.formatPdf'),
     json: t('composer.exportDialog.formatJson'),
     moodle: t('composer.exportDialog.formatMoodle'),
+    ilias: t('composer.exportDialog.formatIlias'),
   };
 
   const supportsSolutions = SOLUTION_CAPABLE_FORMATS.includes(format);
+
+  // ILIAS is a pilot-customer feature gated behind the opt-in "ilias:use"
+  // permission (TF-782) — reviewers without it never see an option that
+  // would 403 on download (same reasoning as the Moodle feedback push
+  // button in NotenexportPanel).
+  const canUseIlias = hasPermission('ilias:use');
+  const visibleFormats = (Object.keys(FORMAT_LABELS) as ExportFormat[]).filter(
+    (f) => f !== 'ilias' || canUseIlias
+  );
 
   // Sorted by what the user actually reads, not by key order — an
   // alphabetical list is quicker to scan than an editorial one. Sorting on
   // the translated label (rather than a fixed order) keeps it alphabetical
   // in every locale, using that locale's collation rules.
-  const orderedFormats = (Object.keys(FORMAT_LABELS) as ExportFormat[]).sort(
-    (a, b) => FORMAT_LABELS[a].localeCompare(FORMAT_LABELS[b], i18n.language)
+  const orderedFormats = visibleFormats.sort((a, b) =>
+    FORMAT_LABELS[a].localeCompare(FORMAT_LABELS[b], i18n.language)
   );
 
   const handleDownload = async () => {
     setIsDownloading(true);
     setError(null);
+    setSkippedPositions(null);
     try {
-      await ComposerService.downloadExport(
+      const { skippedPositions: skipped } = await ComposerService.downloadExport(
         examId,
         format,
         supportsSolutions ? includeSolutions : false
       );
-      onClose();
+      if (skipped.length > 0) {
+        // Keep the dialog open so the warning is actually seen instead of
+        // vanishing with the rest of the dialog (TF-782 review). Show the
+        // actual positions, not just a count, so the Dozent knows which
+        // questions to check without hunting through the whole exam
+        // (review follow-up).
+        setSkippedPositions(skipped);
+      } else {
+        onClose();
+      }
     } catch (err) {
       console.error('Export failed:', err);
       const parsed = await withParsedBlobBody(err);
@@ -119,6 +142,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
   const handleClose = () => {
     if (!isDownloading) {
       setError(null);
+      setSkippedPositions(null);
       onClose();
     }
   };
@@ -137,7 +161,13 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
           </FormLabel>
           <RadioGroup
             value={format}
-            onChange={(e) => setFormat(e.target.value as ExportFormat)}
+            onChange={(e) => {
+              setFormat(e.target.value as ExportFormat);
+              // A stale ILIAS/Moodle skip warning shouldn't linger once
+              // the user has moved on to a different format (review
+              // follow-up).
+              setSkippedPositions(null);
+            }}
           >
             {orderedFormats.map((f) => (
               <FormControlLabel
@@ -168,6 +198,15 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
         {!hasQuestions && (
           <p className="text-amber-600 text-sm mt-3">
             {t('composer.exportDialog.noQuestionsWarning')}
+          </p>
+        )}
+
+        {skippedPositions !== null && (
+          <p className="text-amber-600 text-sm mt-2">
+            {t('composer.exportDialog.skippedQuestionsWarning', {
+              count: skippedPositions.length,
+              positions: skippedPositions.join(', '),
+            })}
           </p>
         )}
 

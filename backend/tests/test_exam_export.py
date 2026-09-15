@@ -15,6 +15,7 @@ from services.exam_export_service import (
     MarkdownExporter,
     JsonExporter,
     MoodleXmlExporter,
+    IliasQtiExporter,
 )
 
 
@@ -177,6 +178,85 @@ class TestMoodleXmlExporter:
         }
         xml = MoodleXmlExporter.export(exam_data)
         assert 'type="truefalse"' in xml
+
+    def test_true_false_recognizes_grader_synonym_tokens(self):
+        """true_false must recognize the same DE/EN synonym set as
+        DeterministicGrader._to_bool (e.g. "ja"), not just wahr/true/richtig
+        (TF-822: mirrors the bug fixed in the ILIAS exporter by TF-782 —
+        the exported key used to be inverted for tokens like "ja")."""
+        exam_data = {
+            "title": "TF Synonym Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 2.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 2.0,
+                    "question_text": "Ist Python interpretiert?",
+                    "question_type": "true_false",
+                    "difficulty": "easy",
+                    "options": None,
+                    "correct_answer": "ja",
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = MoodleXmlExporter.export(exam_data)
+        true_index = xml.index("<text>true</text>")
+        false_index = xml.index("<text>false</text>")
+        fraction_100 = xml.index('fraction="100"')
+        # "true" must come first and be the option scoring 100.
+        assert true_index < false_index
+        assert fraction_100 < false_index
+
+    def test_true_false_unrecognized_token_skips_with_warning(self, monkeypatch):
+        """A correct_answer that matches neither token set is a
+        question-bank bug — skip the question and log loudly rather than
+        exporting a guessed answer key (review follow-up: an earlier
+        version guessed "falsch" and exported it anyway, which is worse
+        than a visibly missing question — a guessed key used for real
+        grading is more dangerous)."""
+        import services.exam_export_service as ees
+
+        captured: list = []
+        monkeypatch.setattr(
+            ees.logger,
+            "warning",
+            lambda fmt, *args, **kwargs: captured.append((fmt, args)),
+        )
+        exam_data = {
+            "title": "TF Unrecognized Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 2.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 2.0,
+                    "question_text": "Unklare Antwort",
+                    "question_type": "true_false",
+                    "difficulty": "easy",
+                    "options": None,
+                    "correct_answer": "vielleicht",
+                    "explanation": None,
+                }
+            ],
+        }
+        xml, skipped = MoodleXmlExporter.export_with_skipped(exam_data)
+        assert 'type="truefalse"' not in xml
+        assert skipped == [1]
+        assert captured  # warning emitted
 
     def test_mc_correct_answer_fraction(self, sample_exam_data):
         """Correct MC answer has fraction=100, others have fraction=0."""
@@ -411,6 +491,654 @@ class TestMoodleXmlExporter:
         # generalfeedback (explanation) is converted too.
         assert "&lt;strong&gt;wichtiger&lt;/strong&gt;" in xml
         assert "**wichtiger**" not in xml
+
+    def test_single_choice_letter_prefixed_option_matches_normalized_answer(self):
+        """single_choice must match on the same grader-normalized token as
+        multiple_choice (review follow-up): a letter-prefixed option like
+        "A) Bern" now matches a plain correct_answer of "Bern", where a
+        raw string comparison previously left every option scoring 0 with
+        no warning."""
+        exam_data = _single_question_exam(
+            {
+                "position": 1,
+                "points": 3.0,
+                "question_type": "single_choice",
+                "question_text": "Hauptstadt der Schweiz?",
+                "options": ["A) Zürich", "B) Bern", "C) Genf"],
+                "correct_answer": "Bern",
+            }
+        )
+        xml = MoodleXmlExporter.export(exam_data)
+        assert 'type="multichoice"' in xml
+        assert xml.count('fraction="100"') == 1
+        assert xml.count('fraction="0"') == 2
+
+    def test_single_choice_skips_unscoreable_question(self, monkeypatch):
+        """No option matches correct_answer -> skip with a warning, mirroring
+        the multiple_choice safety net (review follow-up: single_choice
+        used to have no such guard at all)."""
+        import services.exam_export_service as ees
+
+        captured: list = []
+        monkeypatch.setattr(
+            ees.logger,
+            "warning",
+            lambda fmt, *args, **kwargs: captured.append((fmt, args)),
+        )
+        exam_data = _single_question_exam(
+            {
+                "position": 1,
+                "points": 3.0,
+                "question_type": "single_choice",
+                "question_text": "Unbewertbare Frage",
+                "options": ["A) Zürich", "B) Bern"],
+                "correct_answer": "Lausanne",
+                "explanation": None,
+            }
+        )
+        xml = MoodleXmlExporter.export(exam_data)
+        assert 'type="multichoice"' not in xml
+        assert "Unbewertbare Frage" not in xml
+        assert captured
+
+    def test_legacy_dict_shaped_options_render_the_option_text_not_the_keys(self):
+        """Same guard as the PDF/ILIAS exporters (review follow-up):
+        ``Question.options`` has historically also been persisted as a
+        ``Dict[str, str]``, which un-normalized would silently print
+        'A'/'B'/'C' instead of the real answer text."""
+        exam_data = _single_question_exam(
+            {
+                "position": 1,
+                "points": 2.0,
+                "question_text": "Welche Aussage stimmt?",
+                "question_type": "single_choice",
+                "options": {"A": "Alpha", "B": "Beta", "C": "Gamma"},
+                "correct_answer": "Beta",
+            }
+        )
+        xml = MoodleXmlExporter.export(exam_data)
+        assert "Alpha" in xml and "Beta" in xml and "Gamma" in xml
+
+    def test_slot_mapping_excludes_skipped_questions(self):
+        """A skipped question must not consume a phantom slot — Moodle
+        itself only numbers the questions actually present in the XML, so
+        slot_mapping must track that or the later
+        sync-moodle-question-ids round-trip desyncs from question 2 onward
+        (review follow-up: the old unconditional enumerate() would have
+        assigned slot 2 to a question that was never written)."""
+        exam_data = {
+            "title": "Slot Mapping Skip Test",
+            "total_points": 7.0,
+            "passing_percentage": 50.0,
+            "questions": [
+                {
+                    "exam_question_id": 10,
+                    "position": 1,
+                    "points": 3.0,
+                    "question_type": "single_choice",
+                    "question_text": "Unbewertbare Frage",
+                    "options": ["A", "B"],
+                    "correct_answer": "X",
+                },
+                {
+                    "exam_question_id": 20,
+                    "position": 2,
+                    "points": 4.0,
+                    "question_type": "true_false",
+                    "question_text": "Bewertbare Frage",
+                    "correct_answer": "wahr",
+                },
+            ],
+        }
+        xml, slot_mapping = MoodleXmlExporter.export_with_slot_mapping(exam_data)
+        assert slot_mapping == [
+            {"exam_question_id": 20, "position": 2, "slot": 1},
+        ]
+        assert "Bewertbare Frage" in xml
+        assert "Unbewertbare Frage" not in xml
+
+
+class TestIliasQtiExporter:
+    """QTI 1.2.1 export for ILIAS (TF-782).
+
+    Format verified against a real ILIAS-10.11 sample export from the
+    pilot customer (Linear TF-782/TF-781): root element
+    ``<questestinterop>``, ILIAS's ``QUESTIONTYPE`` metadata field
+    (``assSingleChoice``/``assMultipleChoice``/``assTextQuestion``), and
+    ``<response_lid rcardinality="Single|Multiple">`` for choice
+    questions. ``true_false`` has no confirmed dedicated ILIAS type in
+    the sample — mapped as a best-effort ``assSingleChoice`` with two
+    options, pending the customer's test-import round-trip.
+    """
+
+    def test_export_valid_xml(self, sample_exam_data):
+        """Output is a well-formed QTI 1.2.1 document, one <item> per question."""
+        xml = IliasQtiExporter.export(sample_exam_data)
+        assert "<?xml" in xml
+        assert "<questestinterop>" in xml
+        assert xml.count("<item ") == len(sample_exam_data["questions"])
+        assert "Heapify" in xml
+
+    def test_single_choice_question_type(self, sample_exam_data):
+        """single_choice maps to ILIAS assSingleChoice, single response cardinality."""
+        xml = IliasQtiExporter.export(sample_exam_data)
+        assert "<fieldentry>assSingleChoice</fieldentry>" in xml
+        assert 'rcardinality="Single"' in xml
+
+    def test_open_ended_question_type(self, sample_exam_data):
+        """open_ended maps to ILIAS assTextQuestion, human-graded."""
+        xml = IliasQtiExporter.export(sample_exam_data)
+        assert "<fieldentry>assTextQuestion</fieldentry>" in xml
+        assert 'scoremodel="HumanRater"' in xml
+
+    def test_multiple_choice_question_type(self):
+        """multiple_choice maps to ILIAS assMultipleChoice, multiple cardinality."""
+        exam_data = {
+            "title": "Multi Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 4.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 4.0,
+                    "question_type": "multiple_choice",
+                    "question_text": "Welche zwei treffen zu?",
+                    "difficulty": "medium",
+                    "options": ["A", "B", "C", "D"],
+                    "correct_answer": '["A", "C"]',
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = IliasQtiExporter.export(exam_data)
+        assert "<fieldentry>assMultipleChoice</fieldentry>" in xml
+        assert 'rcardinality="Multiple"' in xml
+
+    def test_true_false_question_type(self):
+        """true_false has no confirmed dedicated ILIAS type — best-effort mapped
+        to assSingleChoice with two options (Wahr/Falsch)."""
+        exam_data = {
+            "title": "TF Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 2.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 2.0,
+                    "question_text": "Python ist eine kompilierte Sprache.",
+                    "question_type": "true_false",
+                    "difficulty": "easy",
+                    "options": None,
+                    "correct_answer": "Falsch",
+                    "explanation": "Python ist interpretiert.",
+                }
+            ],
+        }
+        xml = IliasQtiExporter.export(exam_data)
+        assert "<fieldentry>assSingleChoice</fieldentry>" in xml
+        assert "Wahr" in xml and "Falsch" in xml
+
+    def test_correct_single_choice_option_awarded_full_points(self, sample_exam_data):
+        """The correct option's respcondition adds the question's full point
+        value. Whole numbers are formatted without a trailing ``.0`` — the
+        verified ILIAS sample shows plain ``maxvalue="4"``, not ``"4.0"``,
+        and some QTI fields there are declared ``vartype="Integer"``."""
+        xml = IliasQtiExporter.export(sample_exam_data)
+        assert '<setvar action="Add">4</setvar>' in xml
+        assert '<setvar action="Add">4.0</setvar>' not in xml
+
+    def test_markdown_question_text_rendered_as_html(self):
+        """Markdown in question text is converted to HTML, same as the Moodle
+        exporter (TF-404) — ILIAS mattext is texttype="text/xhtml" too."""
+        exam_data = {
+            "title": "MD Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 6.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 6.0,
+                    "question_text": "**Wichtig:** Erklären Sie den Algorithmus.",
+                    "question_type": "open_ended",
+                    "difficulty": "hard",
+                    "options": None,
+                    "correct_answer": "",
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = IliasQtiExporter.export(exam_data)
+        assert "&lt;strong&gt;Wichtig:&lt;/strong&gt;" in xml
+        assert "**Wichtig:**" not in xml
+
+    def test_multiple_choice_skips_unscoreable_question(self, monkeypatch):
+        """No option matches correct_answer → skip with a warning, same
+        safety net as MoodleXmlExporter (TF-403)."""
+        import services.exam_export_service as ees
+
+        captured: list = []
+        monkeypatch.setattr(
+            ees.logger,
+            "warning",
+            lambda fmt, *args, **kwargs: captured.append((fmt, args)),
+        )
+        exam_data = {
+            "title": "Multi Broken",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 4.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 4.0,
+                    "question_type": "multiple_choice",
+                    "question_text": "Unbewertbare Frage",
+                    "difficulty": "medium",
+                    "options": ["A) 2", "B) 4", "C) 3", "D) 6"],
+                    "correct_answer": '["X", "Y"]',  # matches no option
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = IliasQtiExporter.export(exam_data)
+        assert "<fieldentry>assMultipleChoice</fieldentry>" not in xml
+        assert "Unbewertbare Frage" not in xml
+        assert captured  # warning emitted
+
+    def test_single_choice_letter_prefixed_option_matches_normalized_answer(self):
+        """single_choice must match on the same grader-normalized token as
+        multiple_choice (TF-782 review): a letter-prefixed option like
+        "A) Bern" has to be recognized as correct when correct_answer is
+        the plain "Bern", exactly like DeterministicGrader._mc_match and
+        the Moodle exporter already do. Before the fix this compared raw
+        strings, so the option never matched and every option scored 0."""
+        exam_data = {
+            "title": "SC Prefix Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 3.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 3.0,
+                    "question_type": "single_choice",
+                    "question_text": "Hauptstadt der Schweiz?",
+                    "difficulty": "easy",
+                    "options": ["A) Zürich", "B) Bern", "C) Genf"],
+                    "correct_answer": "Bern",
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = IliasQtiExporter.export(exam_data)
+        assert "<fieldentry>assSingleChoice</fieldentry>" in xml
+        assert '<setvar action="Add">3</setvar>' in xml
+        # Every option must NOT score 0 — the previous bug scored all of
+        # them 0, including the correct one.
+        assert xml.count('<setvar action="Add">0</setvar>') == 2
+
+    def test_single_choice_skips_unscoreable_question(self, monkeypatch):
+        """No option matches correct_answer → skip with a warning, mirroring
+        the multiple_choice safety net (TF-782 review: single_choice used
+        to have no such guard at all)."""
+        import services.exam_export_service as ees
+
+        captured: list = []
+        monkeypatch.setattr(
+            ees.logger,
+            "warning",
+            lambda fmt, *args, **kwargs: captured.append((fmt, args)),
+        )
+        exam_data = {
+            "title": "SC Broken",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 3.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 3.0,
+                    "question_type": "single_choice",
+                    "question_text": "Unbewertbare Frage",
+                    "difficulty": "easy",
+                    "options": ["A) Zürich", "B) Bern"],
+                    "correct_answer": "Lausanne",  # matches no option
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = IliasQtiExporter.export(exam_data)
+        assert "<fieldentry>assSingleChoice</fieldentry>" not in xml
+        assert "Unbewertbare Frage" not in xml
+        assert captured  # warning emitted
+
+    def test_multiple_choice_wrong_option_scores_negative(self):
+        """Wrong options must subtract points, mirroring
+        DeterministicGrader._grade_multiple_response and the Moodle
+        multi-select exporter, so selecting every option can never net
+        full marks (TF-782 review: wrong options previously scored a flat
+        0, so ticking every box scored full marks in ILIAS)."""
+        exam_data = {
+            "title": "Penalty Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 4.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 4.0,
+                    "question_type": "multiple_choice",
+                    "question_text": "Welche zwei treffen zu?",
+                    "difficulty": "medium",
+                    "options": ["A", "B", "C", "D"],
+                    "correct_answer": '["A", "C"]',
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = IliasQtiExporter.export(exam_data)
+        # k=2 correct, n_wrong=2 -> +2 per correct option, -2 per wrong one.
+        assert '<setvar action="Add">2</setvar>' in xml
+        assert '<setvar action="Add">-2</setvar>' in xml
+        assert '<setvar action="Add">0</setvar>' not in xml
+
+    def test_multiple_choice_point_split_is_rounded(self):
+        """An uneven point split (1 point over 3 correct options) must not
+        leak a 16-digit float into the XML (TF-782 review)."""
+        exam_data = {
+            "title": "Rounding Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 1.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 1.0,
+                    "question_type": "multiple_choice",
+                    "question_text": "Drei von vier korrekt?",
+                    "difficulty": "medium",
+                    "options": ["A", "B", "C", "D"],
+                    "correct_answer": '["A", "B", "C"]',
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = IliasQtiExporter.export(exam_data)
+        assert "0.3333333333333333" not in xml
+        assert '<setvar action="Add">0.3333</setvar>' in xml
+
+    def test_true_false_recognizes_grader_synonym_tokens(self):
+        """true_false must recognize the same DE/EN synonym set as
+        DeterministicGrader._to_bool (e.g. "ja"), not just wahr/true/richtig
+        (TF-782 review: the exported key used to be inverted for tokens
+        like "ja")."""
+        exam_data = {
+            "title": "TF Synonym Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 2.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 2.0,
+                    "question_text": "Ist Python interpretiert?",
+                    "question_type": "true_false",
+                    "difficulty": "easy",
+                    "options": None,
+                    "correct_answer": "ja",
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = IliasQtiExporter.export(exam_data)
+        # "Wahr" (idx 0) must be the option that is awarded the points.
+        wahr_index = xml.index("Wahr")
+        falsch_index = xml.index("Falsch")
+        add_two = xml.index('<setvar action="Add">2</setvar>')
+        add_zero = xml.index('<setvar action="Add">0</setvar>')
+        assert wahr_index < falsch_index
+        # The first respcondition (for "Wahr") must be the one scoring 2.
+        assert add_two < add_zero
+
+    def test_true_false_unrecognized_token_skips_with_warning(self, monkeypatch):
+        """A correct_answer that matches neither the true nor false token set
+        is a question-bank bug — skip the question and log loudly rather
+        than exporting a guessed answer key (TF-782 review, revised: an
+        earlier version of this fix guessed "falsch" and exported it
+        anyway, which is worse than the silent-skip bug it replaced — a
+        guessed key used for real grading is more dangerous than a
+        visibly missing question). Same "skip and report" contract as the
+        choice-question safety net."""
+        import services.exam_export_service as ees
+
+        captured: list = []
+        monkeypatch.setattr(
+            ees.logger,
+            "warning",
+            lambda fmt, *args, **kwargs: captured.append((fmt, args)),
+        )
+        exam_data = {
+            "title": "TF Unrecognized Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 2.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 2.0,
+                    "question_text": "Unklare Antwort",
+                    "question_type": "true_false",
+                    "difficulty": "easy",
+                    "options": None,
+                    "correct_answer": "vielleicht",
+                    "explanation": None,
+                }
+            ],
+        }
+        xml, skipped = IliasQtiExporter.export_with_skipped(exam_data)
+        assert "<fieldentry>assSingleChoice</fieldentry>" not in xml
+        assert "Unklare Antwort" not in xml
+        assert skipped == [1]
+        assert captured  # warning emitted
+
+    def test_true_false_option_labels_follow_exam_language(self):
+        """Option labels are candidate-facing text and must follow the
+        exam's own language, not a hardcoded German default (TF-782
+        review). ``correct_answer`` itself stays a DE/EN canonical token
+        regardless of exam language — DeterministicGrader only recognizes
+        DE/EN synonyms (see its module docstring), so a French exam still
+        stores "wahr"/"falsch" and only the *displayed* option labels
+        localize to "Vrai"/"Faux"."""
+        exam_data = {
+            "title": "TF French Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 2.0,
+            "language": "fr",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 2.0,
+                    "question_text": "Python est un langage interprété.",
+                    "question_type": "true_false",
+                    "difficulty": "easy",
+                    "options": None,
+                    "correct_answer": "wahr",
+                    "explanation": None,
+                }
+            ],
+        }
+        xml = IliasQtiExporter.export(exam_data)
+        assert "Vrai" in xml and "Faux" in xml
+        assert "Wahr" not in xml and "Falsch" not in xml
+
+    def test_export_with_skipped_reports_unscoreable_question_positions(self):
+        """export_with_skipped surfaces skipped positions so the caller can
+        warn the user instead of silently shipping a shorter file (TF-782
+        review). export() itself stays backwards-compatible (XML only)."""
+        exam_data = {
+            "title": "Skip Reporting Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 4.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 4.0,
+                    "question_type": "single_choice",
+                    "question_text": "Unbewertbare Frage",
+                    "difficulty": "medium",
+                    "options": ["A) 2", "B) 4"],
+                    "correct_answer": "Lausanne",
+                    "explanation": None,
+                },
+                {
+                    "position": 2,
+                    "points": 4.0,
+                    "question_type": "open_ended",
+                    "question_text": "Bewertbare Frage",
+                    "difficulty": "medium",
+                    "options": None,
+                    "correct_answer": "",
+                    "explanation": None,
+                },
+            ],
+        }
+        xml, skipped = IliasQtiExporter.export_with_skipped(exam_data)
+        assert skipped == [1]
+        assert "Bewertbare Frage" in xml
+        assert "Unbewertbare Frage" not in xml
+
+    def test_duplicate_position_produces_unique_item_idents(self):
+        """Two questions sharing a "position" must not produce two <item>
+        elements with the same ident — invalid/ambiguous QTI (TF-782
+        review: ident used to be derived straight from "position")."""
+        import xml.etree.ElementTree as ET
+
+        exam_data = {
+            "title": "Duplicate Position Test",
+            "course": None,
+            "exam_date": None,
+            "time_limit_minutes": None,
+            "allowed_aids": None,
+            "instructions": None,
+            "passing_percentage": 50.0,
+            "total_points": 8.0,
+            "language": "de",
+            "questions": [
+                {
+                    "position": 1,
+                    "points": 4.0,
+                    "question_type": "open_ended",
+                    "question_text": "Erste Frage",
+                    "difficulty": "medium",
+                    "options": None,
+                    "correct_answer": "",
+                    "explanation": None,
+                },
+                {
+                    "position": 1,
+                    "points": 4.0,
+                    "question_type": "open_ended",
+                    "question_text": "Zweite Frage",
+                    "difficulty": "medium",
+                    "options": None,
+                    "correct_answer": "",
+                    "explanation": None,
+                },
+            ],
+        }
+        xml_str = IliasQtiExporter.export(exam_data)
+        root = ET.fromstring(xml_str)
+        idents = [item.get("ident") for item in root.iter("item")]
+        assert len(idents) == 2
+        assert len(set(idents)) == 2
+
+    def test_legacy_dict_shaped_options_render_the_option_text_not_the_keys(self):
+        """``Question.options`` has historically also been persisted as a
+        ``Dict[str, str]`` keyed 'A'/'B'/'C' (see utils/question_options.py).
+        Iterating a dict yields its keys, so an un-normalized dict here
+        would silently print 'A'/'B'/'C' instead of the real answer text —
+        and every option's normalized token would be the single-letter key,
+        which the grader-normalized ``correct_answer`` almost certainly
+        doesn't match either, so the question would additionally get
+        skipped as unscoreable (review follow-up, mirrors the same
+        pre-existing guard in PdfExporter)."""
+        exam_data = _single_question_exam(
+            {
+                "position": 1,
+                "points": 2.0,
+                "question_text": "Welche Aussage stimmt?",
+                "question_type": "single_choice",
+                "options": {"A": "Alpha", "B": "Beta", "C": "Gamma"},
+                "correct_answer": "Beta",
+            }
+        )
+        xml = IliasQtiExporter.export(exam_data)
+        assert "Alpha" in xml and "Beta" in xml and "Gamma" in xml
+        assert '<setvar action="Add">2</setvar>' in xml
 
 
 # ---------------------------------------------------------------------------

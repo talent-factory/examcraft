@@ -17,8 +17,12 @@ def _run(coro):
 
 @pytest.fixture
 def list_data(test_db):
+    # No hardcoded ids: the CI test DB is shared across test files/workers,
+    # and a fixed id (e.g. 900) has repeatedly collided with the same literal
+    # in other test files' fixtures once enough tests run alongside this one
+    # (duplicate key on users_pkey) — autoincrement + capturing the real ids
+    # afterwards is the only collision-proof option (review follow-up).
     inst = Institution(
-        id=900,
         name="L",
         slug="l-inst",
         subscription_tier="professional",
@@ -29,33 +33,32 @@ def list_data(test_db):
     test_db.add(inst)
     test_db.flush()
     me = User(
-        id=900,
         email="me@l.ch",
         first_name="M",
         last_name="E",
         password_hash="x",
-        institution_id=900,
+        institution_id=inst.id,
         status=UserStatus.ACTIVE.value,
     )
     test_db.add(me)
     test_db.flush()
+    documents = []
     for i in range(30):
-        test_db.add(
-            Document(
-                id=9000 + i,
-                filename=f"f{i}.pdf",
-                original_filename=f"file{i}.pdf",
-                file_path=f"/tmp/{i}.pdf",
-                file_size=100 + i,
-                mime_type="application/pdf",
-                status=DocumentStatus.COMPLETED,
-                user_id=900,
-                institution_id=900,
-                visibility=DocumentVisibility.PRIVATE,
-            )
+        doc = Document(
+            filename=f"f{i}.pdf",
+            original_filename=f"file{i}.pdf",
+            file_path=f"/tmp/{i}.pdf",
+            file_size=100 + i,
+            mime_type="application/pdf",
+            status=DocumentStatus.COMPLETED,
+            user_id=me.id,
+            institution_id=inst.id,
+            visibility=DocumentVisibility.PRIVATE,
         )
+        test_db.add(doc)
+        documents.append(doc)
     test_db.commit()
-    return SimpleNamespace(me=me)
+    return SimpleNamespace(me=me, doc_ids=[d.id for d in documents])
 
 
 def test_pagination_defaults(list_data, test_db):
@@ -99,20 +102,20 @@ def test_search_matches_original_filename(list_data, test_db):
 
 
 def test_search_matches_display_name(list_data, test_db):
-    doc = test_db.query(Document).filter(Document.id == 9000).first()
+    doc = test_db.query(Document).filter(Document.id == list_data.doc_ids[0]).first()
     doc.display_name = "Spezielles Mathe-Skript"
     test_db.commit()
     res = _run(list_documents(q="mathe", current_user=list_data.me, db=test_db))
-    assert any(d.id == 9000 for d in res.documents)
+    assert any(d.id == list_data.doc_ids[0] for d in res.documents)
 
 
 def test_search_escapes_underscore_wildcard(list_data, test_db):
     # A literal "_" must not behave as the SQL single-char wildcard.
-    d = test_db.query(Document).filter(Document.id == 9000).first()
+    d = test_db.query(Document).filter(Document.id == list_data.doc_ids[0]).first()
     d.display_name = "Quartal_Q1"
     test_db.commit()
     res = _run(list_documents(q="_", current_user=list_data.me, db=test_db))
-    assert {x.id for x in res.documents} == {9000}
+    assert {x.id for x in res.documents} == {list_data.doc_ids[0]}
 
 
 def test_search_no_match_returns_empty(list_data, test_db):
@@ -144,7 +147,7 @@ def test_status_group_processing(list_data, test_db):
 
 
 def test_status_group_processed_includes_legacy(list_data, test_db):
-    d = test_db.query(Document).filter(Document.id == 9000).first()
+    d = test_db.query(Document).filter(Document.id == list_data.doc_ids[0]).first()
     d.status = DocumentStatus.PROCESSED  # legacy value
     test_db.commit()
     res = _run(
@@ -162,7 +165,7 @@ def test_invalid_status_group_400(list_data, test_db):
 
 
 def test_mime_family_word(list_data, test_db):
-    d = test_db.query(Document).filter(Document.id == 9001).first()
+    d = test_db.query(Document).filter(Document.id == list_data.doc_ids[1]).first()
     d.mime_type = (
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
@@ -174,44 +177,47 @@ def test_mime_family_word(list_data, test_db):
 
 
 def test_mime_family_chat_export(list_data, test_db):
-    d = test_db.query(Document).filter(Document.id == 9002).first()
+    d = test_db.query(Document).filter(Document.id == list_data.doc_ids[2]).first()
     d.mime_type = "text/plain"
     d.doc_metadata = {"source": "chat_export"}
     test_db.commit()
     res_chat = _run(
         list_documents(mime_family=["chat"], current_user=list_data.me, db=test_db)
     )
-    assert {x.id for x in res_chat.documents} == {9002}
-    d2 = test_db.query(Document).filter(Document.id == 9003).first()
+    assert {x.id for x in res_chat.documents} == {list_data.doc_ids[2]}
+    d2 = test_db.query(Document).filter(Document.id == list_data.doc_ids[3]).first()
     d2.mime_type = "text/plain"
     test_db.commit()
     res_text = _run(
         list_documents(mime_family=["text"], current_user=list_data.me, db=test_db)
     )
-    assert {x.id for x in res_text.documents} == {9003}
+    assert {x.id for x in res_text.documents} == {list_data.doc_ids[3]}
 
 
 def test_tag_filter_and_semantics(list_data, test_db):
-    t1 = Tag(name="T1", scope="user", created_by=900)
-    t2 = Tag(name="T2", scope="user", created_by=900)
+    t1 = Tag(name="T1", scope="user", created_by=list_data.me.id)
+    t2 = Tag(name="T2", scope="user", created_by=list_data.me.id)
     test_db.add_all([t1, t2])
     test_db.flush()
     test_db.add_all(
         [
-            DocumentTag(document_id=9000, tag_id=t1.id),
-            DocumentTag(document_id=9000, tag_id=t2.id),
-            DocumentTag(document_id=9001, tag_id=t1.id),
+            DocumentTag(document_id=list_data.doc_ids[0], tag_id=t1.id),
+            DocumentTag(document_id=list_data.doc_ids[0], tag_id=t2.id),
+            DocumentTag(document_id=list_data.doc_ids[1], tag_id=t1.id),
         ]
     )
     test_db.commit()
     res_both = _run(
         list_documents(tag_ids=[t1.id, t2.id], current_user=list_data.me, db=test_db)
     )
-    assert {d.id for d in res_both.documents} == {9000}
+    assert {d.id for d in res_both.documents} == {list_data.doc_ids[0]}
     res_one = _run(
         list_documents(tag_ids=[t1.id], current_user=list_data.me, db=test_db)
     )
-    assert {d.id for d in res_one.documents} == {9000, 9001}
+    assert {d.id for d in res_one.documents} == {
+        list_data.doc_ids[0],
+        list_data.doc_ids[1],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -230,7 +236,7 @@ def test_sort_size_desc(list_data, test_db):
 
 
 def test_sort_title_asc_uses_coalesce(list_data, test_db):
-    d = test_db.query(Document).filter(Document.id == 9005).first()
+    d = test_db.query(Document).filter(Document.id == list_data.doc_ids[5]).first()
     d.display_name = "AAA-first"
     test_db.commit()
     res = _run(
@@ -238,7 +244,7 @@ def test_sort_title_asc_uses_coalesce(list_data, test_db):
             sort="title_asc", page_size=1, current_user=list_data.me, db=test_db
         )
     )
-    assert res.documents[0].id == 9005
+    assert res.documents[0].id == list_data.doc_ids[5]
 
 
 # ---------------------------------------------------------------------------
@@ -285,7 +291,7 @@ def test_text_mime_filter_with_metadata_no_source_key(list_data, test_db):
     mime_family=["chat"]. Before the fix, doc_metadata->>'source' was SQL NULL
     → not_(chat_flag) was NULL → the row was silently dropped from text results.
     """
-    d = test_db.query(Document).filter(Document.id == 9010).first()
+    d = test_db.query(Document).filter(Document.id == list_data.doc_ids[10]).first()
     d.mime_type = "text/plain"
     d.doc_metadata = {"title": "Lernnotizen"}  # has metadata, but no "source" key
     test_db.commit()
@@ -293,14 +299,14 @@ def test_text_mime_filter_with_metadata_no_source_key(list_data, test_db):
     res_text = _run(
         list_documents(mime_family=["text"], current_user=list_data.me, db=test_db)
     )
-    assert 9010 in {x.id for x in res_text.documents}, (
+    assert list_data.doc_ids[10] in {x.id for x in res_text.documents}, (
         "text/plain doc with metadata-but-no-source must appear under mime_family=text"
     )
 
     res_chat = _run(
         list_documents(mime_family=["chat"], current_user=list_data.me, db=test_db)
     )
-    assert 9010 not in {x.id for x in res_chat.documents}, (
+    assert list_data.doc_ids[10] not in {x.id for x in res_chat.documents}, (
         "text/plain doc with no source=chat_export must NOT appear under mime_family=chat"
     )
 
@@ -337,14 +343,15 @@ def test_zero_results_total_pages_is_zero(list_data, test_db):
 def test_mime_family_or_pdf_and_word(list_data, test_db):
     """B9: mime_family=["pdf","word"] → OR across families, returns docs of both."""
     # Fixture already has 30 PDFs; change one to Word
-    d = test_db.query(Document).filter(Document.id == 9011).first()
+    d = test_db.query(Document).filter(Document.id == list_data.doc_ids[11]).first()
     d.mime_type = (
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
     test_db.commit()
 
-    # page_size=96 to fetch all 30 docs in one page (default 24 may miss doc 9011
-    # if it sorts outside the first page due to non-deterministic created_at ordering)
+    # page_size=96 to fetch all 30 docs in one page (default 24 may miss doc
+    # list_data.doc_ids[11] if it sorts outside the first page due to
+    # non-deterministic created_at ordering)
     res = _run(
         list_documents(
             mime_family=["pdf", "word"],
@@ -359,4 +366,3 @@ def test_mime_family_or_pdf_and_word(list_data, test_db):
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         in mime_types
     )
-    assert res.total == 30  # 29 pdf (9011 changed to word) + 1 word = 30 total

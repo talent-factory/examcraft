@@ -36,6 +36,7 @@ from services.exam_export_service import (
     MarkdownExporter,
     JsonExporter,
     MoodleXmlExporter,
+    IliasQtiExporter,
     PdfExporter,
 )
 import logging
@@ -2016,7 +2017,7 @@ async def export_exam(
     current_user: User = Depends(require_permission("create_exams")),
     db: Session = Depends(get_db),
 ):
-    """Export exam in specified format (md, pdf, json, moodle)."""
+    """Export exam in specified format (md, pdf, json, moodle, ilias)."""
     locale = get_request_locale(request, current_user)
     exam = _get_exam_or_404(
         exam_id, db, current_user, locale, allow_read_all_bypass=False
@@ -2042,6 +2043,21 @@ async def export_exam(
         else ""
     )
 
+    extra_headers: dict[str, str] = {}
+    all_skipped_positions: list[int] = []
+
+    def _record_skipped(positions: list[int]) -> None:
+        all_skipped_positions.extend(positions)
+        if positions:
+            # Surfaced so the frontend can warn the Dozent that some
+            # questions were dropped from the download rather than the
+            # 200 OK silently implying a complete export (TF-782 review;
+            # applies to both Moodle and ILIAS since both exporters skip
+            # unscoreable questions the same way).
+            extra_headers["X-Export-Skipped-Positions"] = ",".join(
+                str(p) for p in positions
+            )
+
     try:
         if format == "md":
             content = MarkdownExporter.export(
@@ -2058,9 +2074,34 @@ async def export_exam(
             media_type = "application/json"
             filename = f"{safe_title}.json"
         elif format == "moodle":
-            content = MoodleXmlExporter.export(exam_data)
+            content, moodle_skipped_positions = MoodleXmlExporter.export_with_skipped(
+                exam_data
+            )
+            _record_skipped(moodle_skipped_positions)
             media_type = "application/xml"
             filename = f"{safe_title}_moodle.xml"
+        elif format == "ilias":
+            # TF-782: opt-in permission on top of the general "create_exams"
+            # gate above — ILIAS is a pilot-customer feature, not available
+            # to every institution (see utils/permissions.py ilias:use).
+            if not current_user.has_permission("ilias:use"):
+                from services.audit_service import AuditService
+
+                AuditService.log_permission_denied(
+                    db,
+                    current_user.id,
+                    action="access_endpoint",
+                    required_permission="ilias:use",
+                )
+                raise api_error(
+                    403, "auth_permission_required", locale, permission="ilias:use"
+                )
+            content, ilias_skipped_positions = IliasQtiExporter.export_with_skipped(
+                exam_data
+            )
+            _record_skipped(ilias_skipped_positions)
+            media_type = "application/xml"
+            filename = f"{safe_title}_ilias_qti.xml"
         else:
             raise api_error(400, "exams_unsupported_format", locale)
     except HTTPException:
@@ -2070,6 +2111,15 @@ async def export_exam(
         logger.exception("Exam export failed: format=%s exam_id=%d", format, exam_id)
         raise api_error(500, "exams_export_internal_error", locale)
 
+    if all_skipped_positions and len(all_skipped_positions) == len(
+        exam_data["questions"]
+    ):
+        # Every question was unscoreable — a near-empty file marked as a
+        # successful, "exported" 200 OK would be worse than the original
+        # silent-skip bug (review follow-up): fail loudly instead of
+        # handing the Dozent a file with nothing in it.
+        raise api_error(400, "exams_export_all_questions_unscoreable", locale)
+
     # Update status to exported if currently finalized
     if exam.status == ExamStatus.FINALIZED.value:
         exam.status = ExamStatus.EXPORTED.value
@@ -2078,5 +2128,8 @@ async def export_exam(
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": content_disposition(filename)},
+        headers={
+            "Content-Disposition": content_disposition(filename),
+            **extra_headers,
+        },
     )

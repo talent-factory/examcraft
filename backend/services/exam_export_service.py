@@ -1,6 +1,6 @@
 """
 Exam Export Service for ExamCraft AI
-Exports exams to Markdown, PDF, JSON, and Moodle XML formats.
+Exports exams to Markdown, PDF, JSON, Moodle XML, and ILIAS QTI formats.
 """
 
 import json
@@ -201,7 +201,9 @@ class MoodleXmlExporter:
         """Backwards-compatible: returns just the XML.
 
         Callers that need the slot mapping for the round-trip (TF-336)
-        use ``export_with_slot_mapping`` instead.
+        use ``export_with_slot_mapping``; callers that need to warn about
+        skipped/unscoreable questions use ``export_with_skipped`` (review
+        follow-up, mirrors ``IliasQtiExporter.export_with_skipped``).
         """
         xml, _ = MoodleXmlExporter.export_with_slot_mapping(exam_data)
         return xml
@@ -213,14 +215,40 @@ class MoodleXmlExporter:
         """Return ``(xml, slot_mapping)`` for the round-trip.
 
         ``slot_mapping`` lists, in export order, dicts with the keys
-        ``exam_question_id``, ``position`` and ``slot`` (which equals
-        ``position`` because Moodle assigns slots 1..N in the order the
-        XML lists them, and we don't reorder). The mapping is the
+        ``exam_question_id``, ``position`` and ``slot`` — one entry per
+        *exported* question only. A skipped/unscoreable question (see
+        ``export_with_skipped``) gets no slot, matching the slot numbers
+        Moodle itself assigns on import (1..N over the questions actually
+        present in the XML) rather than a phantom slot for a question that
+        was never written (review follow-up — the old unconditional
+        ``enumerate`` would have desynced the mapping from Moodle's real
+        slots as soon as any question was skipped). The mapping is the
         anchor for the later
         ``POST /api/v1/exams/{id}/sync-moodle-question-ids`` round-trip.
         """
+        xml, slot_mapping, _ = MoodleXmlExporter._export(exam_data)
+        return xml, slot_mapping
+
+    @staticmethod
+    def export_with_skipped(exam_data: dict) -> tuple[str, list[int]]:
+        """Return ``(xml, skipped_positions)``.
+
+        A question is skipped — omitted from the XML, its ``position``
+        recorded here — when its ``correct_answer`` matches none of its
+        options/tokens: it would otherwise export as an item nobody can
+        score. Mirrors ``IliasQtiExporter.export_with_skipped`` (review
+        follow-up: the Moodle exporter has quietly skipped unscoreable
+        ``multiple_choice`` questions since TF-403, and now
+        ``single_choice``/``true_false`` too, but never surfaced that to
+        the caller before — the export endpoint now warns the Dozent for
+        Moodle exports exactly like it already does for ILIAS)."""
+        xml, _, skipped_positions = MoodleXmlExporter._export(exam_data)
+        return xml, skipped_positions
+
+    @staticmethod
+    def _export(exam_data: dict) -> tuple[str, list[dict], list[int]]:
         try:
-            return MoodleXmlExporter._export_with_mapping(exam_data)
+            return MoodleXmlExporter._export_impl(exam_data)
         except Exception:
             logger.exception(
                 "Export failed for exam '%s'",
@@ -229,27 +257,36 @@ class MoodleXmlExporter:
             raise
 
     @staticmethod
-    def _export_with_mapping(exam_data: dict) -> tuple[str, list[dict]]:
+    def _export_impl(exam_data: dict) -> tuple[str, list[dict], list[int]]:
         quiz = Element("quiz")
         slot_mapping: list[dict] = []
+        skipped_positions: list[int] = []
+        slot = 0
 
-        for slot, q in enumerate(exam_data["questions"], start=1):
+        for order, q in enumerate(exam_data["questions"], start=1):
             qtype = q["question_type"]
             if qtype == "single_choice":
-                _add_mc_question(quiz, q)
+                skipped = _add_mc_question(quiz, q)
             elif qtype == "multiple_choice":
-                _add_multichoice_multi_question(quiz, q)
+                skipped = _add_multichoice_multi_question(quiz, q)
             elif qtype == "true_false":
-                _add_tf_question(quiz, q)
+                skipped = _add_tf_question(quiz, q)
             else:
                 _add_essay_question(quiz, q)
+                skipped = False
+
+            if skipped:
+                skipped_positions.append(q.get("position", order))
+                continue
+
             # Record the slot the question lands on. Defaults are
             # forgiving so the exporter still works on payload shapes
             # that don't include the FK (legacy callers/tests).
+            slot += 1
             slot_mapping.append(
                 {
                     "exam_question_id": q.get("exam_question_id"),
-                    "position": q.get("position", slot),
+                    "position": q.get("position", order),
                     "slot": slot,
                 }
             )
@@ -262,7 +299,295 @@ class MoodleXmlExporter:
         if lines[0].startswith("<?xml"):
             lines = lines[1:]
         xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + "\n".join(lines)
-        return xml, slot_mapping
+        return xml, slot_mapping, skipped_positions
+
+
+class IliasQtiExporter:
+    """QTI 1.2.1 export for ILIAS (TF-782).
+
+    Structure verified against a real ILIAS-10.11 sample export from the
+    pilot customer (Linear TF-781/TF-782): root element
+    ``<questestinterop>``, ILIAS's ``QUESTIONTYPE`` metadata field
+    (``assSingleChoice``/``assMultipleChoice``/``assTextQuestion``), and
+    ``<response_lid rcardinality="Single|Multiple">`` for choice
+    questions. Produces a standalone document (not ILIAS's full
+    Container-Export ZIP with manifest.xml + components/) — per the
+    documented workflow, a plain QTI file is reimportable via a
+    Fragenpool's "Fragen" tab, which is the smaller-scope target.
+
+    ``true_false`` has no confirmed dedicated ILIAS type in the sample —
+    mapped as a best-effort ``assSingleChoice`` with two options
+    (using the exam's own true/false wording), pending the customer's
+    test-import round-trip.
+    """
+
+    @staticmethod
+    def export(exam_data: dict) -> str:
+        """Backwards-compatible: returns just the XML.
+
+        Callers that need to warn the user about unscoreable/skipped
+        questions use ``export_with_skipped`` instead (TF-782 review)."""
+        xml, _ = IliasQtiExporter.export_with_skipped(exam_data)
+        return xml
+
+    @staticmethod
+    def export_with_skipped(exam_data: dict) -> tuple[str, list[int]]:
+        """Return ``(xml, skipped_positions)``.
+
+        A question is skipped — omitted from the XML, its ``position``
+        recorded here — when its ``correct_answer`` matches none of its
+        ``options``: it would otherwise export as an item nobody can
+        score. Exporting that silently made the data loss invisible to
+        the user (TF-782 review); the caller (the export endpoint)
+        surfaces ``skipped_positions`` back to the frontend so the
+        Dozent finds out before submitting the file to ILIAS."""
+        try:
+            return IliasQtiExporter._export(exam_data)
+        except Exception:
+            logger.exception(
+                "ILIAS QTI export failed for exam '%s'",
+                exam_data.get("title", "unknown"),
+            )
+            raise
+
+    @staticmethod
+    def _export(exam_data: dict) -> tuple[str, list[int]]:
+        questestinterop = Element("questestinterop")
+        assessment = SubElement(
+            questestinterop, "assessment", title=exam_data.get("title") or ""
+        )
+        section = SubElement(assessment, "section", ident="root_section")
+        locale = _exam_locale(exam_data)
+        skipped_positions: list[int] = []
+
+        for order, q in enumerate(exam_data["questions"], start=1):
+            qtype = q["question_type"]
+            if qtype == "single_choice":
+                skipped = _add_ilias_choice_item(section, q, order, multiple=False)
+            elif qtype == "multiple_choice":
+                skipped = _add_ilias_multiple_choice_item(section, q, order)
+            elif qtype == "true_false":
+                skipped = _add_ilias_true_false_item(section, q, order, locale)
+            else:
+                _add_ilias_text_item(section, q, order)
+                skipped = False
+            if skipped:
+                skipped_positions.append(q.get("position", order))
+
+        raw_xml = tostring(questestinterop, encoding="unicode")
+        dom = parseString(raw_xml)
+        pretty = dom.toprettyxml(indent="  ")
+        lines = pretty.split("\n")
+        if lines[0].startswith("<?xml"):
+            lines = lines[1:]
+        xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + "\n".join(lines)
+        return xml, skipped_positions
+
+
+def _format_ilias_points(value: float) -> str:
+    """Format a point value for ILIAS QTI numeric fields: whole numbers
+    without a trailing ``.0`` (``"4"``, not ``"4.0"``) — the verified
+    sample shows plain integers even where the field is declared
+    ``vartype="Integer"``, which a stray ``.0`` might not parse against.
+    Rounded to 4 decimal places first (mirrors
+    ``DeterministicGrader._grade_multiple_response``'s own rounding) so an
+    uneven point split (e.g. 1 point over 3 correct options) doesn't leak
+    a 16-digit float into the XML (TF-782 review)."""
+    rounded = round(value, 4)
+    return str(int(rounded)) if rounded == int(rounded) else str(rounded)
+
+
+def _ilias_item(section: Element, q: dict, question_type: str, order: int) -> Element:
+    """New ``<item>`` with ILIAS's ``QUESTIONTYPE`` metadata field set and
+    the question text as ``<presentation>`` material. ``ident`` uses the
+    question's export order rather than its own ``position`` field —
+    positions aren't guaranteed unique across an exam's questions, and a
+    duplicate/missing position would otherwise produce two ``<item>``
+    elements sharing an ``ident``, which is invalid/ambiguous QTI
+    (TF-782 review). Returns the item so callers can append
+    ``<response_*>``/``<resprocessing>``."""
+    item = SubElement(
+        section,
+        "item",
+        ident=f"exam_q_{order}",
+        title=f"Frage {q.get('position', order)}",
+    )
+    itemmetadata = SubElement(item, "itemmetadata")
+    qtimetadata = SubElement(itemmetadata, "qtimetadata")
+    field = SubElement(qtimetadata, "qtimetadatafield")
+    SubElement(field, "fieldlabel").text = "QUESTIONTYPE"
+    SubElement(field, "fieldentry").text = question_type
+
+    presentation = SubElement(item, "presentation")
+    flow = SubElement(presentation, "flow")
+    material = SubElement(flow, "material")
+    SubElement(material, "mattext", texttype="text/xhtml").text = _md_to_html(
+        q["question_text"]
+    )
+    return item
+
+
+def _ilias_flow(item: Element) -> Element | None:
+    return item.find("presentation/flow")
+
+
+def _add_ilias_choice_item(
+    section: Element, q: dict, order: int, *, multiple: bool
+) -> bool:
+    """Single- or multi-answer choice item (``assSingleChoice`` /
+    ``assMultipleChoice``).
+
+    Correct-option membership is decided on grader-normalized tokens (see
+    ``_normalized_option_token``) for *both* single and multiple choice —
+    so the export marks exactly the options ``DeterministicGrader`` scores
+    as correct (TF-782 review: the single-choice branch used to compare
+    raw option strings, so a letter-prefixed option like ``"A) Bern"``
+    never matched a plain ``correct_answer`` of ``"Bern"`` and every
+    option silently scored 0, with no warning).
+
+    Wrong options score 0 for single choice (only one option can be
+    selected, so no penalty is needed) and a symmetric negative fraction
+    for multiple choice — mirroring ``DeterministicGrader.
+    _grade_multiple_response`` and the Moodle multi-select exporter
+    (``_add_multichoice_multi_question``) — so selecting every option can
+    never net full marks (TF-782 review: wrong options previously scored
+    a flat 0 here too, so ticking every box scored full marks in ILIAS
+    unlike in ExamCraft/Moodle).
+
+    Returns ``True`` if the question had no scoreable option and was
+    skipped (nothing is appended to ``section`` in that case) — the
+    caller collects skipped positions to warn the user instead of
+    silently shipping an unscoreable question."""
+    # options has historically also been persisted as a legacy
+    # Dict[str, str] (see utils/question_options.py) — normalizing here
+    # avoids silently iterating the dict's keys ('A'/'B'/'C') instead of
+    # its values and therefore matching nothing (review follow-up: the PDF
+    # exporter already guards against this the same way).
+    options = normalize_options(q.get("options")) or []
+    raw_correct = q.get("correct_answer", "") or ""
+    option_tokens = [(_normalized_option_token(opt), opt) for opt in options]
+
+    if multiple:
+        correct_set = DeterministicGrader._parse_answer_set(raw_correct)
+    else:
+        token = _normalized_option_token(raw_correct)
+        correct_set = {token} if token else set()
+
+    k = sum(1 for tok, _ in option_tokens if tok in correct_set)
+    if k == 0:
+        logger.warning(
+            "ILIAS %s question at position %s: keine Option passt zur "
+            "correct_answer %r — Frage wird NICHT exportiert (unbewertbar).",
+            "multi-choice" if multiple else "single-choice",
+            q.get("position"),
+            raw_correct,
+        )
+        return True
+
+    is_correct = [tok in correct_set for tok, _ in option_tokens]
+    n_wrong = len(options) - k
+    points_per_correct = q["points"] / k
+    points_per_wrong = -(q["points"] / n_wrong) if multiple and n_wrong else 0.0
+
+    item = _ilias_item(
+        section, q, "assMultipleChoice" if multiple else "assSingleChoice", order
+    )
+    flow = _ilias_flow(item)
+    response_lid = SubElement(
+        flow,
+        "response_lid",
+        ident="MCSR",
+        rcardinality="Multiple" if multiple else "Single",
+    )
+    # No shuffle: options are frequently letter-prefixed ("A) …", "B) …"),
+    # matching the Moodle exporter's shuffleanswers="0" so ILIAS doesn't
+    # scramble an already-lettered list (TF-782 review).
+    render_choice = SubElement(response_lid, "render_choice", shuffle="No")
+
+    resprocessing = SubElement(item, "resprocessing")
+    SubElement(SubElement(resprocessing, "outcomes"), "decvar")
+
+    for idx, (_tok, opt) in enumerate(option_tokens):
+        label = SubElement(render_choice, "response_label", ident=str(idx))
+        material = SubElement(label, "material")
+        SubElement(material, "mattext", texttype="text/xhtml").text = _md_to_html(opt)
+
+        respcondition = SubElement(resprocessing, "respcondition", {"continue": "Yes"})
+        conditionvar = SubElement(respcondition, "conditionvar")
+        SubElement(conditionvar, "varequal", respident="MCSR").text = str(idx)
+        points = points_per_correct if is_correct[idx] else points_per_wrong
+        SubElement(respcondition, "setvar", action="Add").text = _format_ilias_points(
+            points
+        )
+    return False
+
+
+def _add_ilias_multiple_choice_item(section: Element, q: dict, order: int) -> bool:
+    return _add_ilias_choice_item(section, q, order, multiple=True)
+
+
+def _add_ilias_true_false_item(
+    section: Element, q: dict, order: int, locale: str
+) -> bool:
+    """Best-effort mapping (no confirmed dedicated ILIAS type, see class
+    docstring): a two-option ``assSingleChoice``.
+
+    Token recognition reuses ``DeterministicGrader._to_bool`` — the same
+    DE/EN synonym set the grading engine itself uses (``wahr``/``true``/
+    ``richtig``/``ja``/``yes``/``1``/``stimmt``/``korrekt``/``t`` vs.
+    ``falsch``/``false``/``nein``/``no``/``0``/...) — so the exported
+    answer key always matches what ExamCraft itself grades (TF-782
+    review: a hardcoded ``wahr``/``true``/``richtig``-only check silently
+    inverted the key for tokens like ``"ja"``). Option labels follow the
+    exam's own language via ``t("export_true"/"export_false")`` since
+    they are candidate-facing text, not Moodle's internal true/false
+    values (TF-782 review: previously hardcoded to German
+    "Wahr"/"Falsch" regardless of exam language).
+
+    Returns ``True`` (skipped) if ``correct_answer`` matches neither the
+    true nor the false token set — the same "skip and report" contract as
+    ``_add_ilias_choice_item`` (review follow-up: a first version of this
+    fix guessed "falsch" and exported it anyway, which is worse than the
+    original silent-skip bug it replaced — a guessed answer key used for
+    real grading is more dangerous than a visibly missing question)."""
+    is_true = DeterministicGrader._to_bool(q.get("correct_answer"))
+    if is_true is None:
+        logger.warning(
+            "ILIAS true_false question at position %s: correct_answer %r "
+            "not recognized as wahr/falsch — Frage wird NICHT exportiert "
+            "(unbewertbar).",
+            q.get("position"),
+            q.get("correct_answer"),
+        )
+        return True
+    label_true = t("export_true", locale=locale)
+    label_false = t("export_false", locale=locale)
+    synthetic_q = dict(q)
+    synthetic_q["options"] = [label_true, label_false]
+    synthetic_q["correct_answer"] = label_true if is_true else label_false
+    return _add_ilias_choice_item(section, synthetic_q, order, multiple=False)
+
+
+def _add_ilias_text_item(section: Element, q: dict, order: int) -> None:
+    """``assTextQuestion`` (open_ended) — free-text response, human-graded
+    in ILIAS (``scoremodel="HumanRater"``), same as ExamCraft's own model."""
+    item = _ilias_item(section, q, "assTextQuestion", order)
+    flow = _ilias_flow(item)
+    response_str = SubElement(
+        flow, "response_str", ident="TEXT", rcardinality="Ordered"
+    )
+    render_fib = SubElement(response_str, "render_fib", fibtype="String", prompt="Box")
+    SubElement(render_fib, "response_label", ident="A")
+
+    resprocessing = SubElement(item, "resprocessing", scoremodel="HumanRater")
+    SubElement(
+        SubElement(resprocessing, "outcomes"),
+        "decvar",
+        varname="WritingScore",
+        vartype="Integer",
+        minvalue="0",
+        maxvalue=_format_ilias_points(q["points"]),
+    )
 
 
 def _exam_locale(exam_data: dict) -> str:
@@ -296,7 +621,33 @@ def _type_label(question_type: str, locale: str = DEFAULT_LOCALE) -> str:
     return t(f"export_type_{question_type}", locale=locale)
 
 
-def _add_mc_question(quiz: Element, q: dict):
+def _add_mc_question(quiz: Element, q: dict) -> bool:
+    """single_choice -> Moodle ``multichoice``/``<single>true</single>``.
+
+    Matches on the same grader-normalized token as ``_normalized_option_token``
+    uses for ``multiple_choice``/the ILIAS exporter (review follow-up): a
+    letter-prefixed option like ``"A) Bern"`` now matches a plain
+    ``correct_answer`` of ``"Bern"``, where a raw string comparison
+    previously left every option scoring 0 with no warning. options is
+    normalized the same way the PDF exporter already does — the column has
+    historically also held a legacy ``Dict[str, str]`` shape.
+
+    Returns ``True`` (skipped) if no option matches — same "skip and
+    report" contract as the sibling ``_add_multichoice_multi_question``,
+    rather than shipping an unscoreable question."""
+    options = normalize_options(q.get("options")) or []
+    correct_token = _normalized_option_token(q.get("correct_answer") or "")
+    option_tokens = [(_normalized_option_token(opt), opt) for opt in options]
+
+    if not correct_token or not any(tok == correct_token for tok, _ in option_tokens):
+        logger.warning(
+            "MC question at position %s: correct_answer %r matches no "
+            "option — Frage wird NICHT exportiert (unbewertbar).",
+            q.get("position"),
+            q.get("correct_answer"),
+        )
+        return True
+
     question = SubElement(quiz, "question", type="multichoice")
     name = SubElement(question, "name")
     SubElement(name, "text").text = f"Frage {q['position']}"
@@ -306,16 +657,9 @@ def _add_mc_question(quiz: Element, q: dict):
     SubElement(question, "single").text = "true"
     SubElement(question, "shuffleanswers").text = "0"
 
-    correct = q.get("correct_answer", "")
-    if correct and correct not in (q.get("options") or []):
-        logger.warning(
-            "MC question at position %s: correct_answer '%s' does not match any option",
-            q.get("position"),
-            correct,
-        )
-    for opt in q.get("options", []):
+    for tok, opt in option_tokens:
         answer = SubElement(
-            question, "answer", fraction="100" if opt == correct else "0"
+            question, "answer", fraction="100" if tok == correct_token else "0"
         )
         SubElement(answer, "text").text = opt
         feedback = SubElement(answer, "feedback")
@@ -324,6 +668,7 @@ def _add_mc_question(quiz: Element, q: dict):
     if q.get("explanation"):
         gf = SubElement(question, "generalfeedback", format="html")
         SubElement(gf, "text").text = _md_to_html(q["explanation"])
+    return False
 
 
 def _format_fraction(value: float) -> str:
@@ -336,7 +681,7 @@ def _format_fraction(value: float) -> str:
     return f"{rounded:.5f}"
 
 
-def _add_multichoice_multi_question(quiz: Element, q: dict):
+def _add_multichoice_multi_question(quiz: Element, q: dict) -> bool:
     """Export a multi-answer ``multiple_choice`` question as a Moodle
     multichoice with ``<single>false</single>`` and partial fractions.
 
@@ -350,8 +695,13 @@ def _add_multichoice_multi_question(quiz: Element, q: dict):
     ``DeterministicGrader`` scores as correct. If no option matches the
     correct set (``k == 0`` — malformed/letter-mismatched data) the
     question would export with every option negative and be unscoreable,
-    so it is skipped with a loud warning rather than shipped broken."""
-    options = q.get("options") or []
+    so it is skipped with a loud warning rather than shipped broken.
+    Returns ``True`` if skipped."""
+    # options has historically also been persisted as a legacy
+    # Dict[str, str] (see utils/question_options.py) — normalizing here
+    # avoids silently iterating the dict's keys instead of its values
+    # (review follow-up, mirrors the same fix in the ILIAS exporter).
+    options = normalize_options(q.get("options")) or []
     raw_correct = q.get("correct_answer", "") or ""
     # Same parser the grader uses: JSON-array canonical form, comma/
     # semicolon legacy fallback, trim + lowercase + letter-prefix strip.
@@ -367,7 +717,7 @@ def _add_multichoice_multi_question(quiz: Element, q: dict):
             q.get("position"),
             raw_correct,
         )
-        return
+        return True
 
     question = SubElement(quiz, "question", type="multichoice")
     name = SubElement(question, "name")
@@ -392,9 +742,33 @@ def _add_multichoice_multi_question(quiz: Element, q: dict):
     if q.get("explanation"):
         gf = SubElement(question, "generalfeedback", format="html")
         SubElement(gf, "text").text = _md_to_html(q["explanation"])
+    return False
 
 
-def _add_tf_question(quiz: Element, q: dict):
+def _add_tf_question(quiz: Element, q: dict) -> bool:
+    """Token recognition reuses ``DeterministicGrader._to_bool`` — the same
+    DE/EN synonym set the grading engine itself uses — so the exported
+    answer key always matches what ExamCraft itself grades (TF-822: a
+    hardcoded wahr/true/richtig-only check silently inverted the key for
+    tokens like "ja", mirroring the bug fixed in the ILIAS exporter by
+    TF-782).
+
+    Returns ``True`` (skipped) if ``correct_answer`` matches neither the
+    true nor the false token set — never export a guessed answer key for
+    real grading (review follow-up: an earlier version guessed "falsch"
+    and exported it anyway, which is worse than a visibly missing
+    question)."""
+    is_true = DeterministicGrader._to_bool(q.get("correct_answer"))
+    if is_true is None:
+        logger.warning(
+            "Moodle true_false question at position %s: correct_answer %r "
+            "not recognized as wahr/falsch — Frage wird NICHT exportiert "
+            "(unbewertbar).",
+            q.get("position"),
+            q.get("correct_answer"),
+        )
+        return True
+
     question = SubElement(quiz, "question", type="truefalse")
     name = SubElement(question, "name")
     SubElement(name, "text").text = f"Frage {q['position']}"
@@ -402,12 +776,11 @@ def _add_tf_question(quiz: Element, q: dict):
     SubElement(qtext, "text").text = _md_to_html(q["question_text"])
     SubElement(question, "defaultgrade").text = str(q["points"])
 
-    correct_answer = (q.get("correct_answer") or "").lower()
-    is_true = correct_answer in ("wahr", "true", "richtig")
     answer_true = SubElement(question, "answer", fraction="100" if is_true else "0")
     SubElement(answer_true, "text").text = "true"
     answer_false = SubElement(question, "answer", fraction="0" if is_true else "100")
     SubElement(answer_false, "text").text = "false"
+    return False
 
 
 def _add_essay_question(quiz: Element, q: dict):

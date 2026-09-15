@@ -15,6 +15,14 @@ jest.mock('axios', () => ({
 jest.mock('../../../services/ComposerService');
 const mockComposerService = ComposerService as jest.Mocked<typeof ComposerService>;
 
+// ILIAS is gated behind the opt-in "ilias:use" permission (TF-782). Default
+// to granting it so the happy-path tests see the full format list; the
+// dedicated permission test flips it to false.
+const mockHasPermission = jest.fn<boolean, [string]>(() => true);
+jest.mock('../../../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: mockHasPermission }),
+}));
+
 const theme = createTheme();
 
 const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -32,6 +40,7 @@ const defaultProps = {
 describe('ExportDialog', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHasPermission.mockReturnValue(true);
   });
 
   // -------------------------------------------------------------------------
@@ -49,12 +58,13 @@ describe('ExportDialog', () => {
       expect(screen.getByText('Informatik Prüfung')).toBeInTheDocument();
     });
 
-    it('renders all four format options', () => {
+    it('renders all five format options when ilias:use is granted', () => {
       render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
       expect(screen.getByLabelText('Markdown (.md)')).toBeInTheDocument();
       expect(screen.getByLabelText('PDF (druckfertig)')).toBeInTheDocument();
       expect(screen.getByLabelText('JSON (.json)')).toBeInTheDocument();
       expect(screen.getByLabelText('Moodle XML (.xml)')).toBeInTheDocument();
+      expect(screen.getByLabelText('ILIAS QTI (.xml)')).toBeInTheDocument();
     });
 
     it('lists the formats alphabetically by their visible label', () => {
@@ -64,7 +74,7 @@ describe('ExportDialog', () => {
         .getAllByRole('radio')
         .map((radio) => (radio as HTMLInputElement).value);
 
-      expect(order).toEqual(['json', 'md', 'moodle', 'pdf']);
+      expect(order).toEqual(['ilias', 'json', 'md', 'moodle', 'pdf']);
     });
 
     it('has Markdown selected by default', () => {
@@ -82,6 +92,47 @@ describe('ExportDialog', () => {
     it('does not render when open=false', () => {
       render(<ExportDialog {...defaultProps} open={false} />, { wrapper: Wrapper });
       expect(screen.queryByText('Prüfung exportieren')).not.toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // ILIAS format — gated behind the opt-in "ilias:use" permission (TF-782),
+  // so reviewers without it never see an option that would 403 on download.
+  // -------------------------------------------------------------------------
+
+  describe('ILIAS format visibility', () => {
+    it('hides the ILIAS option when ilias:use is not granted', () => {
+      mockHasPermission.mockImplementation((permission) => permission !== 'ilias:use');
+
+      render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
+
+      expect(screen.queryByLabelText('ILIAS QTI (.xml)')).not.toBeInTheDocument();
+      // The other four formats are unaffected.
+      expect(screen.getByLabelText('Markdown (.md)')).toBeInTheDocument();
+      expect(screen.getByLabelText('Moodle XML (.xml)')).toBeInTheDocument();
+    });
+
+    it('calls downloadExport with ilias when the ILIAS format is selected', async () => {
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [] });
+
+      render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByLabelText('ILIAS QTI (.xml)'));
+      fireEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
+
+      await waitFor(() => {
+        expect(mockComposerService.downloadExport).toHaveBeenCalledWith(1, 'ilias', false);
+      });
+    });
+
+    it('hides the solutions checkbox when ILIAS is selected', async () => {
+      render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByLabelText('ILIAS QTI (.xml)'));
+
+      await waitFor(() => {
+        expect(screen.queryByLabelText(/Lösungen einschliessen/)).not.toBeInTheDocument();
+      });
     });
   });
 
@@ -174,7 +225,7 @@ describe('ExportDialog', () => {
 
   describe('download', () => {
     it('calls downloadExport with correct examId and format', async () => {
-      mockComposerService.downloadExport.mockResolvedValue(undefined);
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [] });
 
       render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
 
@@ -190,7 +241,7 @@ describe('ExportDialog', () => {
     });
 
     it('passes includeSolutions=true when checkbox is checked', async () => {
-      mockComposerService.downloadExport.mockResolvedValue(undefined);
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [] });
 
       render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
 
@@ -203,7 +254,7 @@ describe('ExportDialog', () => {
     });
 
     it('passes includeSolutions=false for json even if checkbox was checked', async () => {
-      mockComposerService.downloadExport.mockResolvedValue(undefined);
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [] });
 
       render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
 
@@ -217,7 +268,7 @@ describe('ExportDialog', () => {
     });
 
     it('calls downloadExport with pdf when PDF is selected', async () => {
-      mockComposerService.downloadExport.mockResolvedValue(undefined);
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [] });
 
       render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
 
@@ -230,7 +281,7 @@ describe('ExportDialog', () => {
     });
 
     it('passes includeSolutions=true for pdf when the checkbox is checked', async () => {
-      mockComposerService.downloadExport.mockResolvedValue(undefined);
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [] });
 
       render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
 
@@ -245,7 +296,7 @@ describe('ExportDialog', () => {
 
     it('calls onClose after successful download', async () => {
       const onClose = jest.fn();
-      mockComposerService.downloadExport.mockResolvedValue(undefined);
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [] });
 
       render(<ExportDialog {...defaultProps} onClose={onClose} />, { wrapper: Wrapper });
 
@@ -307,6 +358,84 @@ describe('ExportDialog', () => {
         expect(screen.getByText(/Export fehlgeschlagen/)).toBeInTheDocument();
       });
       expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Skipped-questions warning (TF-782) — the ILIAS exporter can silently
+  // drop unscoreable questions; the dialog must surface that instead of
+  // quietly closing on a shorter-than-expected download.
+  // -------------------------------------------------------------------------
+
+  describe('skipped-questions warning', () => {
+    it('shows a warning and keeps the dialog open when questions were skipped', async () => {
+      const onClose = jest.fn();
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [2, 5] });
+
+      render(<ExportDialog {...defaultProps} onClose={onClose} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByLabelText('ILIAS QTI (.xml)'));
+      fireEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/2 Fragen \(Nr\. 2, 5\) konnten nicht exportiert werden/)
+        ).toBeInTheDocument();
+      });
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('does NOT show the warning and closes the dialog when nothing was skipped', async () => {
+      const onClose = jest.fn();
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [] });
+
+      render(<ExportDialog {...defaultProps} onClose={onClose} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByLabelText('ILIAS QTI (.xml)'));
+      fireEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
+
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalled();
+      });
+      expect(
+        screen.queryByText(/konnten nicht exportiert werden/)
+      ).not.toBeInTheDocument();
+    });
+
+    it('uses the singular translation and shows the position when exactly one question was skipped', async () => {
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [3] });
+
+      render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByLabelText('ILIAS QTI (.xml)'));
+      fireEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Frage 3 konnte nicht exportiert werden/)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('clears the skip warning when the format is changed', async () => {
+      mockComposerService.downloadExport.mockResolvedValue({ skippedPositions: [2, 5] });
+
+      render(<ExportDialog {...defaultProps} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByLabelText('ILIAS QTI (.xml)'));
+      fireEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/konnten nicht exportiert werden/)
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByLabelText('Markdown (.md)'));
+
+      expect(
+        screen.queryByText(/konnten nicht exportiert werden/)
+      ).not.toBeInTheDocument();
     });
   });
 

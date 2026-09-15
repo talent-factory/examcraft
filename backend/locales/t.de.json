@@ -108,6 +108,7 @@
     "exams_already_draft": "Prüfung ist bereits im Entwurfsstatus",
     "exams_must_finalize_before_export": "Prüfung muss vor dem Export abgeschlossen werden",
     "exams_cannot_export_empty": "Leere Prüfung kann nicht exportiert werden",
+    "exams_export_all_questions_unscoreable": "Export nicht möglich: Keine der Fragen konnte einer gültigen Antwortoption zugeordnet werden. Bitte die Musterlösungen prüfen.",
     "exams_distribution_sum_invalid": "%{name} muss in Summe 100 ergeben (erhalten: %{total})",
     "exams_distribution_invalid_keys": "Ungültige %{name}-Schlüssel: %{keys}",
     "exams_composition_constraint_error": "Kompositionsfehler: Mindestens ein Budget-Constraint (Punkte oder Dauer) ist erforderlich",

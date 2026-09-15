@@ -108,6 +108,7 @@
     "exams_already_draft": "L'examen est déjà en état de brouillon",
     "exams_must_finalize_before_export": "L'examen doit être finalisé avant l'export",
     "exams_cannot_export_empty": "Impossible d'exporter un examen vide",
+    "exams_export_all_questions_unscoreable": "Export impossible : aucune question n'a pu être associée à une réponse valide. Merci de vérifier les solutions types.",
     "exams_distribution_sum_invalid": "%{name} doit totaliser 100 (obtenu : %{total})",
     "exams_distribution_invalid_keys": "Clés %{name} invalides : %{keys}",
     "exams_composition_constraint_error": "Erreur de composition : au moins une contrainte budgétaire (points ou durée) est requise",

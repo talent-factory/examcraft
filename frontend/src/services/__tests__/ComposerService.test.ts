@@ -561,6 +561,48 @@ describe('ComposerService', () => {
 
       expect(mockCapturedLink?.download).toBe('exam_export.json');
     });
+
+    it('parses X-Export-Skipped-Positions into skippedPositions (TF-782)', async () => {
+      fakeClient.get.mockResolvedValueOnce({
+        data: new Blob(['content']),
+        headers: { 'x-export-skipped-positions': '2,5,7' },
+      });
+      jest.spyOn(document, 'createElement').mockReturnValue(
+        { href: '', download: '', click: mockClick, remove: jest.fn() } as unknown as HTMLAnchorElement
+      );
+
+      const result = await ComposerService.downloadExport(1, 'ilias', false);
+
+      expect(result.skippedPositions).toEqual([2, 5, 7]);
+    });
+
+    it('returns an empty skippedPositions array when the header is absent', async () => {
+      fakeClient.get.mockResolvedValueOnce({
+        data: new Blob(['content']),
+        headers: {},
+      });
+      jest.spyOn(document, 'createElement').mockReturnValue(
+        { href: '', download: '', click: mockClick, remove: jest.fn() } as unknown as HTMLAnchorElement
+      );
+
+      const result = await ComposerService.downloadExport(1, 'ilias', false);
+
+      expect(result.skippedPositions).toEqual([]);
+    });
+
+    it('drops non-numeric tokens from a malformed X-Export-Skipped-Positions header', async () => {
+      fakeClient.get.mockResolvedValueOnce({
+        data: new Blob(['content']),
+        headers: { 'x-export-skipped-positions': '2,abc,5,' },
+      });
+      jest.spyOn(document, 'createElement').mockReturnValue(
+        { href: '', download: '', click: mockClick, remove: jest.fn() } as unknown as HTMLAnchorElement
+      );
+
+      const result = await ComposerService.downloadExport(1, 'ilias', false);
+
+      expect(result.skippedPositions).toEqual([2, 5]);
+    });
   });
 
 
