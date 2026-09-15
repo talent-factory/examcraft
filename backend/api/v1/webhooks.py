@@ -79,14 +79,18 @@ async def stripe_webhook(
             await handle_subscription_deleted(event_object, db)
     except ValueError as e:
         # Return 200 to prevent Stripe from retrying — this is a config/data error
-        # that won't resolve on retry (e.g., unknown price_id, missing metadata)
+        # that won't resolve on retry (e.g., unknown price_id, missing metadata).
+        # The message names internal ids, so it stays in the log; the response
+        # only carries a static, non-sensitive marker so an operator looking at
+        # the Stripe dashboard's "Response" panel can still correlate it to the
+        # matching log line (TF-773 PR 2a review fix).
         logger.critical(
             "Webhook data error for %s (acknowledged, no retry): %s",
             event_type,
             e,
             exc_info=True,
         )
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "error_code": "webhook_data_error"}
     except stripe.error.StripeError as e:
         logger.error(
             "Stripe API error during webhook %s: %s", event_type, e, exc_info=True

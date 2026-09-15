@@ -45,7 +45,7 @@ from services.grading_service import (
     GradingService,
 )
 from utils.auth_utils import require_permission
-from errors import AppHTTPException, api_error
+from errors import api_error
 from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
 
@@ -331,9 +331,10 @@ async def approve_grade(
             grade_id=grade_id, reviewer_id=current_user.id
         )
     except GradeNotFoundError as exc:
-        raise AppHTTPException(
-            404, str(exc), error_code="grades_approve_failed"
-        ) from exc
+        # The service text names internal ids and is German-only; it goes to
+        # the log, the client gets the translated sentence for the code.
+        logger.warning("approve_grade rejected: grade_id=%s: %s", grade_id, exc)
+        raise api_error(404, "grades_approve_failed", locale) from exc
     db.commit()
     db.refresh(grade)
     return _grade_to_action_out(grade)
@@ -362,13 +363,11 @@ async def override_grade(
             reviewer_note=payload.reviewer_note,
         )
     except GradeNotFoundError as exc:
-        raise AppHTTPException(
-            404, str(exc), error_code="grades_override_not_found"
-        ) from exc
+        logger.warning("override_grade rejected: grade_id=%s: %s", grade_id, exc)
+        raise api_error(404, "grades_override_not_found", locale) from exc
     except ValueError as exc:
-        raise AppHTTPException(
-            422, str(exc), error_code="grades_override_invalid"
-        ) from exc
+        logger.warning("override_grade rejected: grade_id=%s: %s", grade_id, exc)
+        raise api_error(422, "grades_override_invalid", locale) from exc
     db.commit()
     db.refresh(grade)
     return _grade_to_action_out(grade)
@@ -400,9 +399,8 @@ async def bulk_approve(
             grade_ids=payload.grade_ids,
         )
     except ValueError as exc:
-        raise AppHTTPException(
-            422, str(exc), error_code="grades_bulk_approve_invalid"
-        ) from exc
+        logger.warning("bulk_approve rejected: exam_id=%s: %s", payload.exam_id, exc)
+        raise api_error(422, "grades_bulk_approve_invalid", locale) from exc
     db.commit()
     return BulkApproveOut(
         approved_count=len(approved),

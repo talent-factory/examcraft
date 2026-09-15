@@ -9,6 +9,8 @@ Design: docs/superpowers/specs/2026-08-07-org-unit-hierarchie-design.md
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -127,7 +129,9 @@ def test_create_without_permission_returns_403(test_db: Session) -> None:
     assert response.status_code == 403
 
 
-def test_create_duplicate_sibling_name_returns_409(test_db: Session) -> None:
+def test_create_duplicate_sibling_name_returns_409(
+    test_db: Session, caplog: pytest.LogCaptureFixture
+) -> None:
     inst = _make_institution(test_db, slug="orgunit-api-409")
     user = _make_user_with_perms(
         test_db, inst.id, permissions=["manage_org_units"], email="dup@orgunit-api.ch"
@@ -139,14 +143,21 @@ def test_create_duplicate_sibling_name_returns_409(test_db: Session) -> None:
         "/api/v1/org-units",
         json={"unit_type": "abteilung", "name": "IT", "parent_org_unit_id": None},
     )
-    response = client.post(
-        "/api/v1/org-units",
-        json={"unit_type": "abteilung", "name": "IT", "parent_org_unit_id": None},
-    )
+    with caplog.at_level(logging.WARNING):
+        response = client.post(
+            "/api/v1/org-units",
+            json={"unit_type": "abteilung", "name": "IT", "parent_org_unit_id": None},
+        )
     assert response.status_code == 409
+    assert response.json()["error_code"] == "org_units_create_conflict"
+    # The service text names the sibling; it must be logged, not sent (TF-773 PR 2a).
+    assert "IT' existiert bereits" not in response.json()["detail"]
+    assert "IT' existiert bereits" in caplog.text
 
 
-def test_rename_to_existing_sibling_name_returns_409(test_db: Session) -> None:
+def test_rename_to_existing_sibling_name_returns_409(
+    test_db: Session, caplog: pytest.LogCaptureFixture
+) -> None:
     inst = _make_institution(test_db, slug="orgunit-api-rename-409")
     user = _make_user_with_perms(
         test_db,
@@ -166,11 +177,16 @@ def test_rename_to_existing_sibling_name_returns_409(test_db: Session) -> None:
         json={"unit_type": "abteilung", "name": "B", "parent_org_unit_id": None},
     ).json()
 
-    response = client.patch(
-        f"/api/v1/org-units/{abteilung_b['id']}",
-        json={"name": abteilung_a["name"]},
-    )
+    with caplog.at_level(logging.WARNING):
+        response = client.patch(
+            f"/api/v1/org-units/{abteilung_b['id']}",
+            json={"name": abteilung_a["name"]},
+        )
     assert response.status_code == 409
+    assert response.json()["error_code"] == "org_units_update_conflict"
+    # The service text names the sibling; it must be logged, not sent (TF-773 PR 2a).
+    assert "A' existiert bereits" not in response.json()["detail"]
+    assert "A' existiert bereits" in caplog.text
 
 
 def test_move_org_unit_updates_parent(test_db: Session) -> None:
@@ -238,6 +254,7 @@ def test_patch_null_parent_without_move_to_root_returns_422(test_db: Session) ->
         json={"parent_org_unit_id": None},
     )
     assert response.status_code == 422
+    assert response.json()["error_code"] == "org_units_null_parent_ambiguous"
 
 
 def test_patch_move_to_root_with_null_parent_returns_200(test_db: Session) -> None:
@@ -272,7 +289,9 @@ def test_patch_move_to_root_with_null_parent_returns_200(test_db: Session) -> No
     assert response.json()["parent_org_unit_id"] is None
 
 
-def test_move_org_unit_rejecting_cycle_returns_409(test_db: Session) -> None:
+def test_move_org_unit_rejecting_cycle_returns_409(
+    test_db: Session, caplog: pytest.LogCaptureFixture
+) -> None:
     inst = _make_institution(test_db, slug="orgunit-api-move-cycle")
     user = _make_user_with_perms(
         test_db,
@@ -296,11 +315,16 @@ def test_move_org_unit_rejecting_cycle_returns_409(test_db: Session) -> None:
         },
     ).json()
 
-    response = client.patch(
-        f"/api/v1/org-units/{abteilung['id']}",
-        json={"parent_org_unit_id": team["id"]},
-    )
+    with caplog.at_level(logging.WARNING):
+        response = client.patch(
+            f"/api/v1/org-units/{abteilung['id']}",
+            json={"parent_org_unit_id": team["id"]},
+        )
     assert response.status_code == 409
+    assert response.json()["error_code"] == "org_units_move_conflict"
+    # The service text ("Ring in der Hierarchie") must be logged, not sent (TF-773 PR 2a).
+    assert "Ring in der Hierarchie" not in response.json()["detail"]
+    assert "Ring in der Hierarchie" in caplog.text
 
 
 def test_delete_org_unit_cascades_and_returns_204(test_db: Session) -> None:
@@ -401,15 +425,18 @@ def test_get_org_unit_from_other_institution_returns_404_not_403(
         f"/api/v1/org-units/{foreign_unit['id']}", json={"name": "Hijacked"}
     )
     assert patch_response.status_code == 404
+    assert patch_response.json()["error_code"] == "org_units_not_found"
 
     delete_response = client_b.delete(f"/api/v1/org-units/{foreign_unit['id']}")
     assert delete_response.status_code == 404
+    assert delete_response.json()["error_code"] == "org_units_not_found"
 
     member_response = client_b.post(
         f"/api/v1/org-units/{foreign_unit['id']}/members",
         json={"user_id": user_b.id, "role": None},
     )
     assert member_response.status_code == 404
+    assert member_response.json()["error_code"] == "org_units_not_found"
 
 
 def test_update_delete_move_assign_remove_without_permission_return_403(
@@ -520,6 +547,7 @@ def test_patch_move_to_root_with_non_null_parent_returns_422(test_db: Session) -
         json={"parent_org_unit_id": abteilung_a["id"], "move_to_root": True},
     )
     assert response.status_code == 422
+    assert response.json()["error_code"] == "org_units_move_to_root_ambiguous"
     # The parent must remain unchanged -- the earlier (fixed) behaviour was to
     # silently drop it and detach to root instead of rejecting.
     assert (
@@ -547,6 +575,7 @@ def test_create_org_unit_rejects_unknown_unit_type(test_db: Session) -> None:
         json={"unit_type": "abteilnug", "name": "Typo", "parent_org_unit_id": None},
     )
     assert response.status_code == 422
+    assert response.json()["error_code"] == "validation_error"
 
 
 def test_assign_member_from_other_institution_returns_404(test_db: Session) -> None:
@@ -580,9 +609,12 @@ def test_assign_member_from_other_institution_returns_404(test_db: Session) -> N
         json={"user_id": foreign_user.id, "role": None},
     )
     assert response.status_code == 404
+    assert response.json()["error_code"] == "org_units_user_not_found"
 
 
-def test_assign_duplicate_member_returns_409(test_db: Session) -> None:
+def test_assign_duplicate_member_returns_409(
+    test_db: Session, caplog: pytest.LogCaptureFixture
+) -> None:
     inst = _make_institution(test_db, slug="orgunit-api-member-dup")
     admin = _make_user_with_perms(
         test_db,
@@ -611,11 +643,16 @@ def test_assign_duplicate_member_returns_409(test_db: Session) -> None:
         json={"user_id": member.id, "role": None},
     )
 
-    response = client.post(
-        f"/api/v1/org-units/{abteilung['id']}/members",
-        json={"user_id": member.id, "role": None},
-    )
+    with caplog.at_level(logging.WARNING):
+        response = client.post(
+            f"/api/v1/org-units/{abteilung['id']}/members",
+            json={"user_id": member.id, "role": None},
+        )
     assert response.status_code == 409
+    assert response.json()["error_code"] == "org_units_assign_conflict"
+    # The service text must be logged, not sent (TF-773 PR 2a).
+    assert "bereits zugeordnet" not in response.json()["detail"]
+    assert "bereits zugeordnet" in caplog.text
 
 
 def test_remove_unknown_member_returns_404(test_db: Session) -> None:
@@ -647,6 +684,7 @@ def test_remove_unknown_member_returns_404(test_db: Session) -> None:
         f"/api/v1/org-units/{abteilung['id']}/members/{never_assigned.id}"
     )
     assert response.status_code == 404
+    assert response.json()["error_code"] == "org_units_membership_not_found"
 
 
 def test_delete_org_unit_with_active_member_cascades_membership(
@@ -699,7 +737,9 @@ def test_delete_org_unit_with_active_member_cascades_membership(
     assert remaining is None
 
 
-def test_delete_org_unit_referenced_by_document_returns_409(test_db: Session) -> None:
+def test_delete_org_unit_referenced_by_document_returns_409(
+    test_db: Session, caplog: pytest.LogCaptureFixture
+) -> None:
     """API-layer counterpart to
     test_tf620_team_org_unit_visibility.test_delete_org_unit_referenced_by_document_raises
     -- that test only exercises the service function's ValueError; this one
@@ -737,9 +777,14 @@ def test_delete_org_unit_referenced_by_document_returns_409(test_db: Session) ->
     test_db.add(doc)
     test_db.commit()
 
-    delete_response = client.delete(f"/api/v1/org-units/{abteilung['id']}")
+    with caplog.at_level(logging.WARNING):
+        delete_response = client.delete(f"/api/v1/org-units/{abteilung['id']}")
     assert delete_response.status_code == 409
-    assert "Dokumente" in delete_response.json()["detail"]
+    assert delete_response.json()["error_code"] == "org_units_delete_conflict"
+    # The specific reason (documents still scoped to this unit) is German-only
+    # service text naming the unit; it is logged, not sent (TF-773 PR 2a).
+    assert "Dokumente" not in delete_response.json()["detail"]
+    assert "Dokumente" in caplog.text
 
     # The org unit must still exist -- the failed delete didn't half-apply.
     assert (

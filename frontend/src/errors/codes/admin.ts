@@ -50,12 +50,10 @@
  * Its third refusal reuses the backend's `impersonation_already_active`, which
  * says the same thing.
  *
- * REGISTER-WORDING NOTE. `impersonation_no_password_set` and
- * `impersonation_rate_limit_exceeded` address the user formally ("Ihr Konto",
- * "Bitte versuchen Sie", "Veuillez") where every neighbouring string is
- * informal. Copied verbatim anyway — TF-772 transports existing texts, it does
- * not re-edit them, and changing them here would put the frontend and backend
- * wording out of sync for the same code.
+ * `impersonation_no_password_set` and `impersonation_rate_limit_exceeded`
+ * exist in both `translation.json` and `core/backend/locales/t.*.json` with
+ * identical wording. Edit them in both places together, or the same code
+ * reads differently depending on which side rendered it.
  */
 export const ADMIN_ERROR_CODES = [
   'admin_cannot_deactivate_self',

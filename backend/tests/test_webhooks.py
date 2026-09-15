@@ -413,3 +413,44 @@ async def test_subscription_deleted_unknown_sub_logs_warning(test_db):
         "not found locally" in str(call.args[0])
         for call in mock_logger.warning.call_args_list
     )
+
+
+def test_stripe_webhook_data_error_is_logged_not_echoed(monkeypatch, caplog):
+    """A ValueError from a handler is acknowledged with 200 (no Stripe retry).
+    Its message names internal ids (subscription, price, institution); it
+    belongs in the log, not in the response body sent back to Stripe."""
+    import logging
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    import api.v1.webhooks as webhooks
+    from database import get_db
+
+    message = "Stripe subscription sub_internal_123 has no items"
+    event = SimpleNamespace(
+        type="checkout.session.completed", data=SimpleNamespace(object=object())
+    )
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_test")
+
+    app = FastAPI()
+    app.include_router(webhooks.router, prefix="/api/v1/webhooks")
+    app.dependency_overrides[get_db] = lambda: MagicMock()
+
+    async def _raise(*_args, **_kwargs):
+        raise ValueError(message)
+
+    with (
+        patch.object(webhooks.stripe.Webhook, "construct_event", return_value=event),
+        patch.object(webhooks, "handle_checkout_session_completed", _raise),
+        caplog.at_level(logging.CRITICAL, logger=webhooks.logger.name),
+    ):
+        response = TestClient(app).post(
+            "/api/v1/webhooks/stripe",
+            content=b"{}",
+            headers={"stripe-signature": "t=1,v1=x"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "error", "error_code": "webhook_data_error"}
+    assert message in caplog.text

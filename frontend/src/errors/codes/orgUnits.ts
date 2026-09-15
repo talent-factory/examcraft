@@ -22,9 +22,12 @@
  * static `t()` key on the backend too — their sentences below are copied
  * verbatim from `core/backend/locales/t.*.json`, not independently written.
  * The other six (`create_conflict`, `move_conflict`, `update_conflict`,
- * `delete_conflict`, `assign_conflict`, `membership_not_found`) are raised as
- * `detail=str(exc)` from a service-layer `ValueError` with no locale key
- * behind it — the sentences below are frontend-original.
+ * `delete_conflict`, `assign_conflict`, `membership_not_found`) used to be
+ * raised as `detail=str(exc)` from a service-layer `ValueError` with no
+ * locale key behind it. TF-773 PR 2a moved them onto `api_error()` too, so
+ * they now exist in both `translation.json` and `core/backend/locales/t.*.json`
+ * with identical wording. Edit them in both places together, or the same code
+ * reads differently depending on which side rendered it.
  *
  * WHY THIS ONE MATTERED ENOUGH TO DO NOW. PR 3 converted
  * `OrgUnitAssignmentDialog.loadData`, whose single `catch` awaits

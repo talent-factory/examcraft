@@ -47,9 +47,9 @@
   "auswertungen": {
     "overview": {
       "title": "Évaluations",
-      "subtitle": "Importez les résultats d'examen et évaluez-les.",
+      "subtitle": "Importe les résultats d'examen et évalue-les.",
       "loadError": "Impossible de charger les examens.",
-      "emptyHint": "Aucun examen pour le moment. Créez-en un dans le compositeur d'examen.",
+      "emptyHint": "Aucun examen pour le moment. Crées-en un dans le compositeur d'examen.",
       "colTitle": "Examen",
       "colCourse": "Cours",
       "colDate": "Date",
@@ -72,7 +72,7 @@
       "tabReview": "Révision",
       "tabStatistik": "Statistiques",
       "tabExport": "Export des notes",
-      "emptyHint": "Aucun résultat importé pour l'instant. Téléversez dès maintenant un export JSON Moodle.",
+      "emptyHint": "Aucun résultat importé pour l'instant. Téléverse dès maintenant un export JSON Moodle.",
       "colExternalId": "Identifiant",
       "colDisplayName": "Nom",
       "colAttempts": "Tentatives",
@@ -377,12 +377,12 @@
     "tierBanner": {
       "title": "Limite de l'offre atteinte",
       "upgradeAction": "Passer à {{tier}}",
-      "auswertung_driver_not_in_tier": "L'offre {{tier}} n'inclut pas le driver « {{driver}} ». Passez à Professional ou supérieur.",
+      "auswertung_driver_not_in_tier": "L'offre {{tier}} n'inclut pas le driver « {{driver}} ». Passe à Professional ou supérieur.",
       "auswertung_class_history_enterprise_only": "L'historique des classes et des étudiants est réservé à l'offre Enterprise.",
       "auswertung_review_bulk_pro_only": "Les actions de révision groupée sont disponibles à partir de Professional.",
       "auswertung_custom_grading_schemes_enterprise_only": "Les barèmes de notation personnalisés font partie de l'offre Enterprise.",
-      "auswertung_exam_monthly_quota_exceeded": "Limite mensuelle atteinte : {{used}} évaluations sur {{limit}} utilisées. Passez à Starter ou supérieur.",
-      "auswertung_submission_quota_exceeded": "Limite de soumissions par examen atteinte ({{limit}}). Passez à Professional."
+      "auswertung_exam_monthly_quota_exceeded": "Limite mensuelle atteinte : {{used}} évaluations sur {{limit}} utilisées. Passe à Starter ou supérieur.",
+      "auswertung_submission_quota_exceeded": "Limite de soumissions par examen atteinte ({{limit}}). Passe à Professional."
     },
     "moodleSync": {
       "actionLabel": "Saisir les ID Moodle",
@@ -396,18 +396,18 @@
       "success_one": "{{count}} question liée au quiz Moodle {{quiz}}.",
       "success_other": "{{count}} questions liées au quiz Moodle {{quiz}}.",
       "error": "La synchronisation a échoué.",
-      "notVisible": "Le quiz {{id}} n'est pas visible pour le token enregistré — vérifiez les droits du token."
+      "notVisible": "Le quiz {{id}} n'est pas visible pour le token enregistré — vérifie les droits du token."
     }
   },
   "aktivitaeten": {
     "title": "Activité",
-    "subtitle": "Tous les événements en un coup d'œil — choisissez la portée et filtrez par type.",
+    "subtitle": "Tous les événements en un coup d'œil — choisis la portée et filtre par type.",
     "scopeAria": "Visibilité",
     "scopeOwn": "Mes activités",
     "scopeInstitution": "Toutes",
     "reload": "Recharger",
     "errorLoad": "Impossible de charger les activités.",
-    "emptyFresh": "Aucune activité pour l'instant — téléchargez un document ou générez des questions.",
+    "emptyFresh": "Aucune activité pour l'instant — télécharge un document ou génère des questions.",
     "emptyFiltered": "Aucune activité correspondant aux filtres.",
     "resetFilters": "Réinitialiser les filtres",
     "shortcutDocuments": "Documents",
@@ -727,21 +727,21 @@
     "dashboard": {
       "welcome": "Bienvenue ! 👋",
       "welcomeName": "Bienvenue, {{name}} ! 👋",
-      "subtitle": "Créez des questions d'examen intelligentes avec l'aide de l'IA",
+      "subtitle": "Crée des questions d'examen intelligentes avec l'aide de l'IA",
       "quickAccess": "Accès rapide",
       "documents": "Documents",
       "documentsDescription": "Télécharge des supports de cours et gère ta bibliothèque de documents",
       "generateQuestions": "Générer des questions",
-      "generateQuestionsDescription": "Créez automatiquement des questions d'examen avec l'IA",
+      "generateQuestionsDescription": "Crée automatiquement des questions d'examen avec l'IA",
       "reviewQueue": "File de révision",
-      "reviewQueueDescription": "Révisez et validez les questions générées",
+      "reviewQueueDescription": "Révise et valide les questions générées",
       "exams": "Examens",
-      "examsDescription": "Composez et exportez des examens",
+      "examsDescription": "Compose et exporte des examens",
       "statistics": "Statistiques",
       "generatedQuestions": "Questions générées",
       "validatedQuestions": "Questions validées",
       "recentActivity": "Activité récente",
-      "noActivity": "Aucune activité pour le moment. Commencez par télécharger des documents !",
+      "noActivity": "Aucune activité pour le moment. Commence par télécharger des documents !",
       "activityTypes": {
         "document_uploaded": "Document téléchargé",
         "questions_generated": "Questions générées",
@@ -762,15 +762,15 @@
     },
     "review": {
       "title": "Révision des questions",
-      "subtitle": "Révisez et validez les questions d'examen générées"
+      "subtitle": "Révise et valide les questions d'examen générées"
     },
     "exams": {
       "title": "Génération d'examens",
-      "subtitle": "Créez des questions d'examen intelligentes avec l'aide de l'IA"
+      "subtitle": "Crée des questions d'examen intelligentes avec l'aide de l'IA"
     },
     "admin": {
       "title": "Panneau d'administration",
-      "subtitle": "Gérez les utilisateurs, les paramètres et la configuration système",
+      "subtitle": "Gère les utilisateurs, les paramètres et la configuration système",
       "subtitlePlatform": "Paramètres valables pour toutes les institutions de la plateforme",
       "tabUsers": "Gestion des utilisateurs",
       "tabInstitutions": "Institutions",
@@ -801,7 +801,7 @@
       "platformBanner": {
         "text": "Mode plateforme actif — les modifications concernent toutes les institutions",
         "exit": "Retour à {{institution}}",
-        "exitFallback": "Retour à votre institution"
+        "exitFallback": "Retour à ton institution"
       },
       "systemHealth": {
         "title": "État du système",
@@ -844,7 +844,7 @@
           "placeholder": "Poser une question sur l'état du système…",
           "inputLabel": "Message à l'assistant Ops-Chat",
           "send": "Envoyer",
-          "error": "Échec de la requête — veuillez réessayer."
+          "error": "Échec de la requête — réessaie."
         }
       },
       "audit": {
@@ -873,7 +873,7 @@
       }
     },
     "promptLibrary": {
-      "subtitle": "Gérez les prompts système et utilisateur pour les agents IA"
+      "subtitle": "Gère les prompts système et utilisateur pour les agents IA"
     },
     "billing": {
       "title": "Plans tarifaires",
@@ -972,7 +972,7 @@
       "tokenLabel": "Token du service web",
       "tokenHelper": "Depuis Moodle : Administration du site → Serveur → Services web → Gérer les jetons.",
       "tokenRotateLabel": "Nouveau token (facultatif)",
-      "tokenRotateHelper": "Laissez vide pour conserver le token existant.",
+      "tokenRotateHelper": "Laisse vide pour conserver le token existant.",
       "actionSave": "Enregistrer",
       "actionUpdate": "Actualiser",
       "actionTest": "Tester la connexion",
@@ -1191,7 +1191,7 @@
       "active": "Actif",
       "inactive": "Inactif",
       "emptyTitle": "Aucun rôle trouvé",
-      "emptySubtitle": "Créez un nouveau rôle pour commencer.",
+      "emptySubtitle": "Crée un nouveau rôle pour commencer.",
       "btnCreateFirst": "Créer le premier rôle",
       "failedLoad": "Impossible de charger les rôles"
     },
@@ -1255,7 +1255,7 @@
       "subtitle": "Aperçu de tous les niveaux d'abonnement disponibles avec les prix et les limites de ressources.",
       "perMonth": "par mois",
       "perYear": "/ an",
-      "save": "Économisez {{amount}}",
+      "save": "Économise {{amount}}",
       "available": "Disponible",
       "notAvailable": "Non disponible",
       "unlimited": "Illimité",
@@ -1292,7 +1292,7 @@
       "btnVersions": "Versions",
       "btnDelete": "Supprimer",
       "emptyTitle": "Aucun prompt trouvé",
-      "emptySearch": "Essayez une autre recherche",
+      "emptySearch": "Essaie une autre recherche",
       "emptyCreate": "Crée ton premier prompt",
       "btnCreateFirst": "Créer le premier prompt",
       "confirmDelete": "Veux-tu vraiment supprimer ce prompt ?",
@@ -1418,7 +1418,7 @@
     },
     "semanticSearch": {
       "title": "Testeur de recherche sémantique",
-      "subtitle": "Testez la recherche sémantique dans la base de connaissances de prompts",
+      "subtitle": "Teste la recherche sémantique dans la base de connaissances de prompts",
       "queryLabel": "Requête de recherche",
       "queryPlaceholder": "ex., 'Générer des questions à choix multiples pour l'informatique'",
       "categoryLabel": "Catégorie (optionnel)",
@@ -1435,7 +1435,7 @@
       "btnSearching": "Recherche en cours...",
       "resultsTitle": "Résultats de recherche ({{count}})",
       "emptyTitle": "Aucun résultat trouvé",
-      "emptySubtitle": "Essayez une autre requête ou ajustez les filtres",
+      "emptySubtitle": "Essaie une autre requête ou ajuste les filtres",
       "errorEmpty": "Saisis une requête de recherche",
       "failedSearch": "Erreur de recherche"
     },
@@ -1639,7 +1639,7 @@
         "unknown_error": "Erreur de traitement inattendue. Voir l'aperçu pour les détails."
       },
       "noDocuments": "Aucun document disponible",
-      "noDocumentsHint": "Téléchargez des documents pour commencer à créer des examens basés sur RAG.",
+      "noDocumentsHint": "Télécharge des documents pour commencer à créer des examens basés sur RAG.",
       "vectorsAvailable": "Embeddings vectoriels disponibles",
       "processingRunning": "Traitement en cours...",
       "ocr": {
@@ -1684,8 +1684,8 @@
       "originalErrorAuth": "Session expirée — reconnecte-toi.",
       "originalErrorPermission": "Tu n'as pas l'autorisation de consulter ce document.",
       "originalErrorMissing": "Fichier original introuvable — il a peut-être été supprimé.",
-      "originalErrorThrottled": "Service de stockage saturé — réessayez dans quelques secondes.",
-      "originalErrorServer": "Erreur serveur lors du chargement de l'aperçu — réessayez ou téléchargez le fichier.",
+      "originalErrorThrottled": "Service de stockage saturé — réessaie dans quelques secondes.",
+      "originalErrorServer": "Erreur serveur lors du chargement de l'aperçu — réessaie ou télécharge le fichier.",
       "originalPdfFallback": "L'aperçu PDF intégré n'est pas pris en charge par ce navigateur.",
       "originalOpenInNewTab": "Ouvrir le PDF dans un nouvel onglet",
       "originalDocxPending": "Un aperçu intégré pour les fichiers DOCX arrive dans une version ultérieure. Le texte extrait se trouve dans l'onglet Chunks.",
@@ -1778,7 +1778,7 @@
       "tagEditor": {
         "label": "Tags",
         "heading": "Tags",
-        "createHint": "Créer une nouvelle étiquette : saisissez-la et appuyez sur Entrée.",
+        "createHint": "Créer une nouvelle étiquette : saisis-la et appuie sur Entrée.",
         "institutionTagDisabled": "Uniquement pour les documents partagés avec l'institution",
         "ownerOnlyTagDisabled": "Seul le propriétaire peut modifier les tags partagés",
         "saveError": "Les tags n'ont pas pu être enregistrés."
@@ -1827,9 +1827,9 @@
       "viewPlans": "Voir les plans Premium"
     },
     "documentUpload": {
-      "dropActive": "Déposez les fichiers ici...",
+      "dropActive": "Dépose les fichiers ici...",
       "dropTitle": "Télécharger des documents",
-      "dropHint": "Faites glisser des fichiers ici ou cliquez pour sélectionner",
+      "dropHint": "Fais glisser des fichiers ici ou clique pour sélectionner",
       "dropFormats": "Formats pris en charge : {{formats}} • Max. {{max}} fichiers",
       "queueTitle": "File d'attente de téléchargement ({{count}})",
       "uploading": "Téléchargement...",
@@ -1888,7 +1888,7 @@
     },
     "reviewQueue": {
       "title": "File de révision des questions",
-      "subtitle": "Révisez et approuvez les questions d'examen générées par l'IA",
+      "subtitle": "Révise et approuve les questions d'examen générées par l'IA",
       "statsTotal": "Total",
       "statsPending": "En attente",
       "statsApproved": "Approuvé",
@@ -1959,7 +1959,7 @@
       "templateNotRecorded": "Modèle non enregistré",
       "showComments": "Afficher les commentaires",
       "hideComments": "Masquer les commentaires",
-      "noComments": "Aucun commentaire pour l'instant. Cliquez sur l'icône commentaire pour en ajouter un.",
+      "noComments": "Aucun commentaire pour l'instant. Clique sur l'icône commentaire pour en ajouter un.",
       "reviewedBy": "Révisé par {{name}} le {{date}}",
       "startReview": "Démarrer la révision",
       "approveBtn": "Approuver",
@@ -2064,7 +2064,7 @@
     },
     "basicExamCreator": {
       "title": "Générer des questions d'examen",
-      "subtitle": "Créez des questions d'examen basées sur un sujet",
+      "subtitle": "Crée des questions d'examen basées sur un sujet",
       "topicRequired": "Saisis un sujet",
       "generationError": "Erreur lors de la génération",
       "successMessage": "Questions d'examen générées avec succès !",
@@ -2105,23 +2105,23 @@
     "featureGate": {
       "ragExamCreator": {
         "name": "Générateur d'examens RAG",
-        "description": "Générez des questions d'examen grâce à la génération augmentée par récupération et à la recherche sémantique."
+        "description": "Génère des questions d'examen grâce à la génération augmentée par récupération et à la recherche sémantique."
       },
       "documentChat": {
         "name": "Chat documentaire",
-        "description": "Discutez avec vos documents grâce à des conversations assistées par IA."
+        "description": "Discute avec tes documents grâce à des conversations assistées par IA."
       },
       "promptManagement": {
         "name": "Gestion des prompts",
-        "description": "Gérez et personnalisez vos modèles de prompts avec des fonctionnalités avancées."
+        "description": "Gère et personnalise tes modèles de prompts avec des fonctionnalités avancées."
       },
       "promptTemplateSelector": {
         "name": "Sélecteur de modèles de prompts",
-        "description": "Sélectionnez et personnalisez des modèles de prompts pour la génération de questions."
+        "description": "Sélectionne et personnalise des modèles de prompts pour la génération de questions."
       },
       "advancedPromptManagement": {
         "name": "Gestion avancée des prompts",
-        "description": "Importez et gérez vos propres modèles de prompts avec la recherche sémantique."
+        "description": "Importe et gère tes propres modèles de prompts avec la recherche sémantique."
       }
     },
     "tags": {
@@ -2197,13 +2197,13 @@
       "errorReorder": "Impossible d'enregistrer l'ordre."
     },
     "examList": {
-      "subtitle": "Composez des examens à partir de questions approuvées",
+      "subtitle": "Compose des examens à partir de questions approuvées",
       "newExam": "+ Nouvel examen",
       "closeError": "Fermer l'erreur",
       "searchPlaceholder": "Rechercher des examens...",
       "loading": "Chargement des examens...",
       "loadError": "Erreur lors du chargement des examens. Recharge la page.",
-      "empty": "Aucun examen créé. Cliquez sur \"Nouvel examen\" pour commencer.",
+      "empty": "Aucun examen créé. Clique sur \"Nouvel examen\" pour commencer.",
       "statusDraft": "Brouillon",
       "statusFinalized": "Finalisé",
       "statusExported": "Exporté",
@@ -2291,7 +2291,7 @@
       "questionCount_one": "{{count}} question",
       "questionCount_other": "{{count}} questions",
       "emptyLine1": "Aucune question ajoutée.",
-      "emptyLine2": "Sélectionnez des questions dans le pool à gauche.",
+      "emptyLine2": "Sélectionne des questions dans le pool à gauche.",
       "total": "Total",
       "points": "points",
       "dragHandle": "Déplacer",
@@ -2308,7 +2308,7 @@
       "formatJson": "JSON (.json)",
       "formatMoodle": "Moodle XML (.xml)",
       "includeSolutions": "Inclure les solutions",
-      "noQuestionsWarning": "L'examen n'a pas encore de questions. Ajoutez d'abord des questions.",
+      "noQuestionsWarning": "L'examen n'a pas encore de questions. Ajoute d'abord des questions.",
       "cancel": "Annuler",
       "exporting": "Exportation...",
       "download": "Télécharger",
@@ -2390,7 +2390,7 @@
       "tagsShowLess": "voir moins",
       "preview": "Aperçu",
       "previewAria": "Ouvrir l'aperçu de la question",
-      "previewHint": "Double-cliquez pour l'aperçu",
+      "previewHint": "Double-clique pour l'aperçu",
       "previewTitle": "Aperçu de la question",
       "previewError": "Impossible de charger la question.",
       "previewBloom": "Bloom {{level}}",
@@ -2626,7 +2626,7 @@
       "newGeneration": "Nouvelle génération",
       "quickRepeat": "Répétition rapide",
       "step1Label": "Sélectionner les documents",
-      "step1Description": "Sélectionnez les documents à partir desquels les questions d'examen doivent être générées.",
+      "step1Description": "Sélectionne les documents à partir desquels les questions d'examen doivent être générées.",
       "noDocuments": "Aucun document traité disponible. Télécharge d'abord des documents et fais-les traiter.",
       "staleRestoredDocs_one": "{{count}} document restauré n'est plus disponible (p. ex. supprimé) et a été retiré de la sélection. Complète la sélection si nécessaire.",
       "staleRestoredDocs_other": "{{count}} documents restaurés ne sont plus disponibles (p. ex. supprimés) et ont été retirés de la sélection. Complète la sélection si nécessaire.",
@@ -2641,9 +2641,9 @@
       "languageLabel": "Langue",
       "questionTypeLabel": "Type de question :",
       "promptTemplatesLabel": "Modèles de prompts (Optionnel) :",
-      "promptTemplatesDescription": "Sélectionnez un modèle de prompt spécifique dans la bibliothèque. Si aucun modèle n'est sélectionné, les prompts par défaut seront utilisés.",
+      "promptTemplatesDescription": "Sélectionne un modèle de prompt spécifique dans la bibliothèque. Si aucun modèle n'est sélectionné, les prompts par défaut seront utilisés.",
       "step3Label": "Analyse du contexte",
-      "step3Description": "Vérifiez le contexte trouvé et les recommandations avant la génération.",
+      "step3Description": "Vérifie le contexte trouvé et les recommandations avant la génération.",
       "loadingPreview": "Analyse du contexte…",
       "loadContextPreview": "Analyser le contexte",
       "foundContext": "Contexte trouvé",
@@ -2766,7 +2766,7 @@
       "defaultTitle": "Document sans titre",
       "startChat": "Démarrer le chat",
       "chatTitleLabel": "Titre du chat",
-      "chatTitlePlaceholder": "Saisissez un titre pour le chat..."
+      "chatTitlePlaceholder": "Saisis un titre pour le chat..."
     },
     "promptWizard": {
       "tab": {
@@ -2775,7 +2775,7 @@
         "errorCreatingSession": "Erreur lors de la création de la session",
         "errorDeleting": "Erreur lors de la suppression",
         "confirmDelete": "Veux-tu vraiment supprimer cette session de l'assistant ?",
-        "selectOrCreateSession": "Sélectionnez une session ou créez-en une nouvelle."
+        "selectOrCreateSession": "Sélectionne une session ou crées-en une nouvelle."
       },
       "chat": {
         "sessionExpired": "Session expirée. Reconnecte-toi.",
@@ -2854,9 +2854,9 @@
       },
       "uploadZone": {
         "title": "Télécharger des modèles de prompts",
-        "description": "Téléchargez des fichiers de prompts avec un frontmatter YAML (.md ou .txt). Sélection multiple possible (max. 50 fichiers).",
-        "dropHere": "Déposez les fichiers ici...",
-        "dragOrClick": "Glissez les fichiers ici ou cliquez pour sélectionner",
+        "description": "Télécharge des fichiers de prompts avec un frontmatter YAML (.md ou .txt). Sélection multiple possible (max. 50 fichiers).",
+        "dropHere": "Dépose les fichiers ici...",
+        "dragOrClick": "Glisse les fichiers ici ou clique pour sélectionner",
         "supportedFormats": "Formats supportés : .md, .txt",
         "uploading": "Téléchargement en cours... {{progress}}%",
         "uploadResult": "{{successful}} sur {{total}} fichiers téléchargés avec succès",
@@ -3017,13 +3017,13 @@
     "documents_not_found": "Document introuvable",
     "documents_not_processed": "Le document n'a pas encore été traité",
     "documents_page_out_of_range": "Numéro de page hors plage",
-    "documents_preview_failed": "Impossible de charger l'aperçu — essayez de télécharger ou réessayez plus tard.",
+    "documents_preview_failed": "Impossible de charger l'aperçu — essaie de télécharger ou réessaie plus tard.",
     "documents_processing_failed": "Échec du traitement du document",
     "documents_reindex_failed": "Le document n'a pas pu être réindexé",
     "documents_rename_failed": "Échec du renommage du document",
     "documents_rename_owner_only": "Seul le propriétaire peut renommer ce document",
     "documents_status_failed": "Échec de la récupération du statut du document",
-    "documents_storage_unavailable": "Service de stockage temporairement indisponible — réessayez dans quelques secondes.",
+    "documents_storage_unavailable": "Service de stockage temporairement indisponible — réessaie dans quelques secondes.",
     "documents_tag_exists": "Une étiquette portant ce nom existe déjà.",
     "documents_tag_failed": "Impossible d'enregistrer les étiquettes du document.",
     "documents_tag_institution_admin_only": "Seuls les administrateurs peuvent créer des étiquettes d'institution.",
@@ -3056,9 +3056,9 @@
     "impersonation_already_active": "Une session d'impersonation est déjà active",
     "impersonation_end_failed": "Impossible de terminer la session d'impersonation",
     "impersonation_no_admin_session": "L'impersonation ne peut pas être démarrée sans session d'administrateur active",
-    "impersonation_no_password_set": "Aucun mot de passe n'est défini pour votre compte. Veuillez d'abord définir un mot de passe dans votre profil pour pouvoir utiliser l'impersonation.",
+    "impersonation_no_password_set": "Aucun mot de passe n'est défini pour ton compte. Définis d'abord un mot de passe dans ton profil pour pouvoir utiliser l'impersonation.",
     "impersonation_not_active": "Aucune session d'impersonation n'est actuellement active",
-    "impersonation_rate_limit_exceeded": "Trop de sessions d'impersonation démarrées. Veuillez réessayer plus tard.",
+    "impersonation_rate_limit_exceeded": "Trop de sessions d'impersonation démarrées. Réessaie plus tard.",
     "impersonation_self_not_allowed": "L'auto-impersonation n'est pas possible",
     "impersonation_snapshot_failed": "Impersonation non démarrée : le stockage du navigateur est plein ou restreint, le retour au compte administrateur ne serait pas garanti.",
     "impersonation_start_failed": "Échec du démarrage de la session d'impersonation",
@@ -3453,7 +3453,7 @@
       "cancel": "Annuler"
     },
     "title": "Référentiels de compétences",
-    "subtitle": "Gérez les compétences opérationnelles par module. Le texte intégral est intégré littéralement dans la génération de questions.",
+    "subtitle": "Gère les compétences opérationnelles par module. Le texte intégral est intégré littéralement dans la génération de questions.",
     "editTitle": "Modifier le référentiel",
     "empty": "Aucun référentiel de compétences enregistré.",
     "errorLoad": "Impossible de charger les référentiels de compétences.",

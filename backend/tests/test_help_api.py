@@ -1,6 +1,9 @@
 """Tests für Help Widget API (TF-308)."""
 
-from unittest.mock import patch, AsyncMock
+import logging
+from unittest.mock import patch, AsyncMock, MagicMock
+
+import pytest
 from fastapi.testclient import TestClient
 
 # Fixtures help_db, help_client, admin_client are defined in conftest.py
@@ -221,6 +224,51 @@ class TestAdminEndpoints:
         data = response.json()
         assert "total_questions" in data
         assert "positive_feedback_pct" in data
+
+    @pytest.mark.parametrize(
+        ("error_cls", "message", "status", "code"),
+        [
+            (
+                "IndexingInProgressError",
+                "Docs indexing is already in progress (lock held)",
+                409,
+                "help_reindex_conflict",
+            ),
+            (
+                "IndexingLockUnavailableError",
+                "Cannot acquire docs-indexing lock: Redis unreachable (boom)",
+                503,
+                "help_reindex_unavailable",
+            ),
+        ],
+    )
+    def test_reindex_failure_logs_reason_and_sends_translated_code(
+        self, admin_client, caplog, error_cls, message, status, code
+    ):
+        import services.docs_indexer_service as indexer
+
+        exc = getattr(indexer, error_cls)(message)
+        with (
+            patch(
+                "services.vector_service_factory.vector_service",
+                MagicMock(client=object()),
+            ),
+            patch.object(
+                indexer.DocsIndexerService,
+                "run_index",
+                AsyncMock(side_effect=exc),
+            ),
+            caplog.at_level(logging.WARNING),
+        ):
+            response = admin_client.post("/api/v1/help/admin/reindex")
+
+        assert response.status_code == status
+        body = response.json()
+        assert body["error_code"] == code
+        # The service text is English, technical and may carry the Redis
+        # error; it is logged, not sent (TF-773 PR 2a).
+        assert message not in body["detail"]
+        assert message in caplog.text
 
 
 class TestSkipOnboardingStep:

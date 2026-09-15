@@ -80,7 +80,7 @@ describe.skip('DocumentUpload', () => {
       );
 
       expect(screen.getByText('Dokumente hochladen')).toBeInTheDocument();
-      expect(screen.getByText('Ziehen Sie Dateien hierher oder klicken Sie zum Auswählen')).toBeInTheDocument();
+      expect(screen.getByText('Zieh Dateien hierher oder klicke zum Auswählen')).toBeInTheDocument();
       expect(screen.getByText(/Unterstützte Formate:/)).toBeInTheDocument();
     });
 

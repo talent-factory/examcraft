@@ -5,6 +5,7 @@ Design: docs/superpowers/specs/2026-08-07-org-unit-hierarchie-design.md
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -26,9 +27,11 @@ from services.org_unit_service import (
     validate_sibling_name_unique,
 )
 from utils.auth_utils import get_current_active_user, require_permission
-from errors import AppHTTPException, api_error
+from errors import api_error
 from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
+
+logger = logging.getLogger(__name__)
 
 _STRICT_OUT = ConfigDict(extra="forbid")
 
@@ -260,9 +263,11 @@ async def create_org_unit_endpoint(
             role_id=body.role_id,
         )
     except ValueError as exc:
-        raise AppHTTPException(
-            409, str(exc), error_code="org_units_create_conflict"
-        ) from exc
+        # org_unit_service raises German-only ValueErrors that name the unit
+        # and the conflict. They go to the log; the client gets the translated
+        # sentence for the code (TF-773 PR 2a).
+        logger.warning("create_org_unit rejected: %s", exc)
+        raise api_error(409, "org_units_create_conflict", locale) from exc
 
     if body.role_id is not None:
         AuditService.log_event_best_effort(
@@ -327,9 +332,8 @@ async def update_org_unit_endpoint(
         try:
             move_org_unit(db, org_unit, None)
         except ValueError as exc:
-            raise AppHTTPException(
-                409, str(exc), error_code="org_units_move_conflict"
-            ) from exc
+            logger.warning("move_org_unit rejected: id=%s: %s", org_unit_id, exc)
+            raise api_error(409, "org_units_move_conflict", locale) from exc
     elif "parent_org_unit_id" in fields_set and body.parent_org_unit_id is not None:
         _load_org_unit_for_user(
             db=db, user=current_user, org_unit_id=body.parent_org_unit_id, locale=locale
@@ -337,9 +341,8 @@ async def update_org_unit_endpoint(
         try:
             move_org_unit(db, org_unit, body.parent_org_unit_id)
         except ValueError as exc:
-            raise AppHTTPException(
-                409, str(exc), error_code="org_units_move_conflict"
-            ) from exc
+            logger.warning("move_org_unit rejected: id=%s: %s", org_unit_id, exc)
+            raise api_error(409, "org_units_move_conflict", locale) from exc
     elif "parent_org_unit_id" in fields_set and body.parent_org_unit_id is None:
         # Explicitly sent null without move_to_root is ambiguous -- rather
         # than silently having no effect, reject it (a silent no-op instead
@@ -356,9 +359,8 @@ async def update_org_unit_endpoint(
                     exclude_id=org_unit.id,
                 )
             except ValueError as exc:
-                raise AppHTTPException(
-                    409, str(exc), error_code="org_units_update_conflict"
-                ) from exc
+                logger.warning("update_org_unit rejected: id=%s: %s", org_unit_id, exc)
+                raise api_error(409, "org_units_update_conflict", locale) from exc
         db.commit()
         db.refresh(org_unit)
 
@@ -405,9 +407,8 @@ async def delete_org_unit_endpoint(
     try:
         delete_org_unit(db, org_unit)
     except ValueError as exc:
-        raise AppHTTPException(
-            409, str(exc), error_code="org_units_delete_conflict"
-        ) from exc
+        logger.warning("delete_org_unit rejected: id=%s: %s", org_unit_id, exc)
+        raise api_error(409, "org_units_delete_conflict", locale) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -438,9 +439,13 @@ async def assign_member_endpoint(
             db, user_id=body.user_id, org_unit_id=org_unit_id, role=body.role
         )
     except ValueError as exc:
-        raise AppHTTPException(
-            409, str(exc), error_code="org_units_assign_conflict"
-        ) from exc
+        logger.warning(
+            "assign_user_to_org_unit rejected: id=%s user_id=%s: %s",
+            org_unit_id,
+            body.user_id,
+            exc,
+        )
+        raise api_error(409, "org_units_assign_conflict", locale) from exc
 
     # TF-637 review fix: audited unconditionally (not only when
     # org_unit.role_id is set) -- a Granted Role can be attached to this
@@ -476,9 +481,13 @@ async def remove_member_endpoint(
     try:
         remove_user_from_org_unit(db, user_id=user_id, org_unit_id=org_unit_id)
     except ValueError as exc:
-        raise AppHTTPException(
-            404, str(exc), error_code="org_units_membership_not_found"
-        ) from exc
+        logger.warning(
+            "remove_user_from_org_unit rejected: id=%s user_id=%s: %s",
+            org_unit_id,
+            user_id,
+            exc,
+        )
+        raise api_error(404, "org_units_membership_not_found", locale) from exc
 
     AuditService.log_event_best_effort(
         db=db,

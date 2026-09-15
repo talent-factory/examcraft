@@ -6,8 +6,10 @@ The re-grading endpoint has its own test.
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -217,6 +219,7 @@ def test_review_queue_invalid_range_returns_400(test_db: Session) -> None:
         params={"confidence_min": 0.9, "confidence_max": 0.1},
     )
     assert response.status_code == 400
+    assert response.json()["error_code"] == "grades_confidence_range_invalid"
 
 
 def test_review_queue_blocks_foreign_institution(test_db: Session) -> None:
@@ -229,6 +232,7 @@ def test_review_queue_blocks_foreign_institution(test_db: Session) -> None:
     response = client.get(f"/api/v1/exams/{exam_a.id}/review-queue")
     # 404 instead of 403 — no information leak.
     assert response.status_code == 404
+    assert response.json()["error_code"] == "grades_exam_not_found"
 
 
 # ---------------------------------------------------------------------------
@@ -266,17 +270,27 @@ def test_override_grade_writes_points_and_note(test_db: Session) -> None:
     assert body["reviewer_note"] == "Vererbung erwähnt"
 
 
-def test_override_rejects_points_above_max(test_db: Session) -> None:
+def test_override_rejects_points_above_max(
+    test_db: Session, caplog: pytest.LogCaptureFixture
+) -> None:
     inst = _make_institution(test_db, "ovmax")
     user = _make_user(test_db, inst, email="ovmax@rq.org")
     _, grades = _seed_exam_with_proposed_grades(test_db, inst, count=1)
     client = _client(test_db, user)
 
-    response = client.post(
-        f"/api/v1/grades/{grades[0].id}/override",
-        json={"points_awarded": 99.0},
-    )
+    with caplog.at_level(logging.WARNING):
+        response = client.post(
+            f"/api/v1/grades/{grades[0].id}/override",
+            json={"points_awarded": 99.0},
+            headers={"Accept-Language": "en"},
+        )
     assert response.status_code == 422
+    body = response.json()
+    assert body["error_code"] == "grades_override_invalid"
+    # The service's German range message stays server-side (TF-773 PR 2a):
+    # the client gets the translated sentence, the log keeps the reason.
+    assert "ausserhalb" not in body["detail"]
+    assert "ausserhalb" in caplog.text
 
 
 def test_grade_action_blocks_foreign_institution(test_db: Session) -> None:
@@ -288,6 +302,7 @@ def test_grade_action_blocks_foreign_institution(test_db: Session) -> None:
 
     response = client.post(f"/api/v1/grades/{grades_a[0].id}/approve")
     assert response.status_code == 404
+    assert response.json()["error_code"] == "grades_not_found"
 
 
 def test_bulk_approve_by_confidence_min(test_db: Session) -> None:
@@ -339,6 +354,8 @@ def test_bulk_approve_rejects_both_filters(test_db: Session) -> None:
         json={"exam_id": exam.id, "confidence_min": 0.5, "grade_ids": [1]},
     )
     assert r1.status_code == 422
+    # Caught by BulkApproveIn's model validator, before the endpoint runs.
+    assert r1.json()["error_code"] == "validation_error"
 
     # neither filter set
     r2 = client.post(
@@ -346,6 +363,66 @@ def test_bulk_approve_rejects_both_filters(test_db: Session) -> None:
         json={"exam_id": exam.id},
     )
     assert r2.status_code == 422
+    assert r2.json()["error_code"] == "validation_error"
+
+
+def test_bulk_approve_service_rejection_carries_code(test_db: Session) -> None:
+    """The one body that passes BulkApproveIn but not the service's own XOR
+    check: an empty ``grade_ids`` list counts as "no ids" for the validator
+    (``bool([])``) but as "ids given" for the service (``is not None``). That
+    is the path that reaches ``grades_bulk_approve_invalid``."""
+    inst = _make_institution(test_db, "bulkempty")
+    user = _make_user(test_db, inst, email="bulkempty@rq.org")
+    exam, _ = _seed_exam_with_proposed_grades(test_db, inst, count=1)
+    client = _client(test_db, user)
+
+    response = client.post(
+        "/api/v1/grades/bulk-approve",
+        json={"exam_id": exam.id, "confidence_min": 0.5, "grade_ids": []},
+    )
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "grades_bulk_approve_invalid"
+
+
+@pytest.mark.parametrize(
+    ("action", "body", "code"),
+    [
+        ("approve", None, "grades_approve_failed"),
+        ("override", {"points_awarded": 1.0}, "grades_override_not_found"),
+    ],
+)
+def test_grade_vanishing_after_ownership_check_carries_code(
+    test_db: Session,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    action: str,
+    body: dict | None,
+    code: str,
+) -> None:
+    """``GradeNotFoundError`` from the service is only reachable when the grade
+    disappears between the router's ownership check and the service call — a
+    race, simulated here. The service text names the internal grade id; it
+    must reach the log, not the response."""
+    from services.grading_service import GradeNotFoundError, GradingService
+
+    inst = _make_institution(test_db, f"race{action}")
+    user = _make_user(test_db, inst, email=f"race-{action}@rq.org")
+    _, grades = _seed_exam_with_proposed_grades(test_db, inst, count=1)
+    client = _client(test_db, user)
+    grade_id = grades[0].id
+
+    def _vanished(self, *, grade_id, **_kwargs):
+        raise GradeNotFoundError(f"Grade {grade_id} nicht gefunden")
+
+    monkeypatch.setattr(GradingService, f"{action}_grade", _vanished)
+
+    with caplog.at_level(logging.WARNING):
+        response = client.post(f"/api/v1/grades/{grade_id}/{action}", json=body)
+    assert response.status_code == 404
+    payload = response.json()
+    assert payload["error_code"] == code
+    assert str(grade_id) not in payload["detail"]
+    assert f"Grade {grade_id} nicht gefunden" in caplog.text
 
 
 def test_bulk_approve_blocks_foreign_grade_ids(test_db: Session) -> None:

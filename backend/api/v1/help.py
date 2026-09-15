@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from utils.auth_utils import get_current_active_user
 from models.auth import User
-from errors import AppHTTPException, api_error
+from errors import api_error
 from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
 logger = logging.getLogger(__name__)
@@ -688,12 +688,19 @@ async def trigger_reindex(
     except IndexingInProgressError as e:
         # 409 Conflict: another indexing run holds the lock (startup task or
         # a prior /admin/reindex call). Caller can retry once the lock expires.
-        raise AppHTTPException(409, str(e), error_code="help_reindex_conflict")
+        # The service text is English and technical; it goes to the log, the
+        # client gets the translated sentence for the code (TF-773 PR 2a).
+        logger.warning("reindex rejected: %s", e)
+        raise api_error(409, "help_reindex_conflict", locale) from e
     except IndexingLockUnavailableError as e:
         # 503 Service Unavailable: Redis is down so we can't safely serialize
         # against concurrent indexing. Refuse rather than risk a Qdrant-clear
-        # race; operator should retry once Redis is healthy.
-        raise AppHTTPException(503, str(e), error_code="help_reindex_unavailable")
+        # race; operator should retry once Redis is healthy. The message
+        # embeds the Redis error, which must not reach the client. Redis being
+        # unreachable is an infra outage, not a routine rejection — log at
+        # error level so it surfaces distinctly from the 409 case above.
+        logger.error("reindex refused: %s", e)
+        raise api_error(503, "help_reindex_unavailable", locale) from e
     return {"status": "completed", **result}
 
 
