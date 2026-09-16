@@ -1,22 +1,32 @@
 /**
- * Error codes reachable through the premium `WizardService` (TF-772 PR 4).
+ * Error codes reachable through the premium `WizardService`.
  *
- * Frontend-only, like `prompts.ts` and `chat.ts`: `premium/backend/api/v1/
- * wizard.py` sits outside the localized backend and sends no `error_code`.
- *
- * The loss is smallest here of the three. Every endpoint in `wizard.py` answers
- * a failure in one of exactly two ways: `HTTPException(400 | 404, detail=str(e))`
- * — a Python exception string, not written copy, and half the time English —
- * or the literal "Interner Serverfehler. Bitte versuche es spaeter erneut."
- * (sic, no umlaut) for the catch-all 500. Neither is text worth preserving, so
- * one code per operation is a strict improvement rather than a trade.
+ * Until TF-773 PR 2b every endpoint in `premium/backend/api/v1/wizard.py`
+ * answered with `detail=str(e)` — a mix of German and English exception text —
+ * or "Interner Serverfehler. Bitte versuche es spaeter erneut." for the 500, so
+ * TF-772 PR 4 registered one fallback per operation and lost nothing worth
+ * keeping. The service now raises `WizardServiceError(code, …)` with its own
+ * HTTP status, and the router's 500s reuse the seven operation names below;
+ * the nine specific codes (AI unavailable, invalid AI response, session not
+ * found / not active, template already saved / not generated, author missing /
+ * without institution, malformed reference prompt id) are the sentences the
+ * user can now actually act on.
  */
 export const WIZARD_ERROR_CODES = [
+  'wizard_ai_invalid_response',
+  'wizard_ai_unavailable',
   'wizard_create_session_failed',
   'wizard_delete_session_failed',
   'wizard_generate_failed',
+  'wizard_no_institution',
+  'wizard_reference_prompt_invalid',
   'wizard_save_template_failed',
   'wizard_send_message_failed',
   'wizard_session_load_failed',
+  'wizard_session_not_active',
+  'wizard_session_not_found',
   'wizard_sessions_load_failed',
+  'wizard_template_already_saved',
+  'wizard_template_not_generated',
+  'wizard_user_not_found',
 ] as const;

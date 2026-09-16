@@ -1,32 +1,32 @@
 /**
- * Error codes reachable through `promptsApi` — core and premium (TF-772 PR 4).
+ * Error codes reachable through `promptsApi` — core and premium.
  *
- * ALL OF THEM ARE FRONTEND-ONLY. That is the exception to the pattern
- * `documents.ts` and `auth.ts` set, and it is not a shortcut: the prompts
- * router lives in `premium/backend/api/v1/prompts.py`, and the premium backend
- * has no `locales/` directory at all. There is no `prompts_*` key in
- * `core/backend/locales/t.*.json` to copy, and no endpoint that can send an
- * `error_code` for the accept-list to accept. The identity rule has nothing to
- * be identical to here, so the names below follow its *shape* — flat
- * snake_case, prefix = router — so that they need no renaming on the day the
- * premium backend gets localized codes.
+ * TWO KINDS, AND THE LIST MIXES THEM. TF-772 PR 4 registered one fallback per
+ * operation (`prompts_list_failed`, `prompts_create_failed`, …) because
+ * `premium/backend/api/v1/prompts.py` had no localized codes to accept. TF-773
+ * PR 2b gave the premium backend its own `premium/backend/locales/` (ADR 0006)
+ * and a code at every raise site, so the specific sentences that TF-772 had to
+ * trade away — "Nur Superuser dürfen systemweite Prompts verwalten.", "Ein
+ * Prompt mit dem Namen '…' existiert in dieser Institution bereits.", "Team-
+ * Prompts erfordern eine Org-Unit …" — now arrive as
+ * `prompts_system_superuser_only`, `prompts_name_exists`,
+ * `prompts_team_org_unit_required` and so on.
  *
- * THE COST, STATED PLAINLY. `prompts.py` distinguishes about a dozen rejection
- * reasons in German prose ("Nur Superuser dürfen systemweite Prompts
- * verwalten.", "Ein Prompt mit dem Namen 'X' existiert in dieser Institution
- * bereits.", "Team-Prompts erfordern eine Org-Unit (org_unit_id)."), and until
- * TF-772 the components rendered exactly that text. One fallback per operation
- * cannot say any of it — the same regression `documents.ts` argues against at
- * length. It is unavoidable here rather than chosen: the registry is an
- * accept-list, and registering codes no endpoint can produce would put a dozen
- * permanently-unreachable keys under the i18n guard. The other half of the
- * trade is real too — the same helper also raises English ("Failed to list
- * prompts: …", "Prompt not found", "Either prompt_id or prompt_content must be
- * provided"), and that text stops reaching the UI.
- *
- * Reported for the premium backend rather than worked around here: string
- * matching on German prose to recover the distinction would be worse than the
- * generic sentence.
+ * * **Backend codes** (identity rule, copied from
+ *   `premium/backend/locales/t.*.json`): every entry below except the eight
+ *   listed next. That includes generic operation names: the backend answers an
+ *   unexpected 500 with exactly the fallback's name and sentence, so e.g.
+ *   `prompts_list_failed` is both a fallback and a backend code, deliberately.
+ *   `prompts_upload_*` come from `PromptUploadService`; the bulk endpoint still
+ *   answers 200 and reports per-file failures in its body, which
+ *   `PromptUploadZone` renders verbatim — those never pass through here.
+ * * **Frontend-only (8)**: `prompts_not_available_in_core`,
+ *   `prompts_validation_failed` and `prompts_use_case_invalid` (see below);
+ *   `prompts_download_failed`, `prompts_toggle_active_failed` and
+ *   `prompts_versions_load_failed`, whose endpoints raise specific codes but
+ *   have no generic 500 of their own; `prompts_template_load_failed` and
+ *   `prompts_usage_load_failed`, whose routes (`/templates/{id}`,
+ *   `/{id}/usage`) do not exist in `prompts.py` at all.
  *
  * `prompts_not_available_in_core` is the one code with no HTTP request behind
  * it. `core/frontend/src/api/promptsApi.ts` is a stub that refuses every call
@@ -51,24 +51,65 @@
  * match regex".
  */
 export const PROMPTS_ERROR_CODES = [
+  'prompts_access_denied',
+  'prompts_bulk_too_many_files',
   'prompts_bulk_upload_failed',
   'prompts_create_failed',
   'prompts_delete_failed',
   'prompts_download_failed',
+  'prompts_edit_forbidden',
+  'prompts_institution_default_admin_only',
+  'prompts_institution_default_requires_institution',
   'prompts_list_failed',
   'prompts_load_failed',
+  'prompts_name_exists',
+  'prompts_name_not_found',
   'prompts_not_available_in_core',
+  'prompts_not_found',
   'prompts_render_failed',
+  'prompts_render_invalid_syntax',
+  'prompts_render_missing_variables',
+  'prompts_render_source_required',
+  'prompts_render_undefined_variable',
   'prompts_search_failed',
+  'prompts_search_unavailable',
+  'prompts_system_institution_missing',
+  'prompts_system_not_institution_default',
+  'prompts_system_superuser_only',
+  'prompts_tag_conflict',
+  'prompts_tags_invalid',
+  'prompts_team_org_unit_not_member',
+  'prompts_team_org_unit_required',
   'prompts_template_load_failed',
   'prompts_templates_load_failed',
   'prompts_toggle_active_failed',
   'prompts_update_failed',
+  'prompts_upload_content_empty',
+  'prompts_upload_duplicate',
   'prompts_upload_failed',
+  'prompts_upload_field_invalid',
+  'prompts_upload_field_missing',
+  'prompts_upload_filename_missing',
+  'prompts_upload_frontmatter_invalid',
+  'prompts_upload_frontmatter_missing',
+  'prompts_upload_frontmatter_not_mapping',
+  'prompts_upload_frontmatter_unclosed',
+  'prompts_upload_invalid_category',
+  'prompts_upload_invalid_file_type',
+  'prompts_upload_invalid_institution',
+  'prompts_upload_invalid_language',
+  'prompts_upload_invalid_name',
+  'prompts_upload_invalid_tags',
+  'prompts_upload_invalid_use_case',
+  'prompts_upload_no_institution',
+  'prompts_upload_not_utf8',
   'prompts_usage_load_failed',
   'prompts_use_case_invalid',
   'prompts_validation_failed',
   'prompts_variables_load_failed',
+  'prompts_version_conflict',
   'prompts_version_create_failed',
+  'prompts_version_name_too_long',
   'prompts_versions_load_failed',
+  'prompts_versions_not_found',
 ] as const;

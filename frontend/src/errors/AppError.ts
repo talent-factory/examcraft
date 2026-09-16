@@ -23,6 +23,7 @@ import { REVIEW_ERROR_CODES } from './codes/review';
 import { STUDENT_CLASSES_ERROR_CODES } from './codes/studentClasses';
 import { STUDENTS_ERROR_CODES } from './codes/students';
 import { SUBMISSIONS_ERROR_CODES } from './codes/submissions';
+import { VECTOR_SEARCH_ERROR_CODES } from './codes/vectorSearch';
 import { VISIBILITY_ERROR_CODES } from './codes/visibility';
 import { WIZARD_ERROR_CODES } from './codes/wizard';
 
@@ -76,6 +77,7 @@ export const APP_ERROR_CODES = [
   ...STUDENT_CLASSES_ERROR_CODES,
   ...STUDENTS_ERROR_CODES,
   ...SUBMISSIONS_ERROR_CODES,
+  ...VECTOR_SEARCH_ERROR_CODES,
   ...VISIBILITY_ERROR_CODES,
   ...WIZARD_ERROR_CODES,
 ] as const;

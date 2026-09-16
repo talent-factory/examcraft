@@ -38,11 +38,15 @@ in `AppError.ts` grows by one import line.
    it is the one kind of code that can silently drift out of sync with the
    backend. See the `documents.ts` block comment for the original three.
 
-   `prompts.ts`, `chat.ts` and `wizard.ts` are fallback-only end to end: the
-   premium routers behind them (`prompts.py`, `chat.py`, `wizard.py`) sit
-   outside the localized backend entirely and have no `locales/` directory, so
-   there is no `error_code` to accept — only the operation-level fallback.
-   `dashboard.ts` is fallback-only for the same reason `dashboard.py` raises no
+   `prompts.ts`, `chat.ts` and `wizard.ts` were fallback-only when TF-772 PR 4
+   wrote them: the premium routers behind them had no `locales/` directory.
+   TF-773 PR 2b added `premium/backend/locales/` (ADR 0006); all three files
+   now mix backend codes — copied verbatim from `premium/backend/locales/
+   t.*.json` — with the fallbacks, and the premium routers' generic 500s reuse
+   the fallback names on purpose. `vectorSearch.ts` holds the one premium
+   vector-search code a frontend service can receive. The MCP OAuth codes
+   (`mcp_auth_*`) are not registered: no frontend code calls those endpoints.
+   `dashboard.ts` is fallback-only because `dashboard.py` raises no
    `HTTPException` at all today.
 
    `grades.ts`, `orgUnits.ts` and `help.ts` were fallback-only when TF-772 PR 4

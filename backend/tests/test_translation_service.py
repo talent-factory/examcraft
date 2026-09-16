@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+
 
 class TestTranslationService:
     """Test translation service initialization and key lookup."""
@@ -70,6 +72,88 @@ class TestTranslationService:
         from services.translation_service import DEFAULT_LOCALE
 
         assert DEFAULT_LOCALE == "de"
+
+
+@pytest.fixture
+def isolated_load_path(monkeypatch):
+    """Snapshot and restore the module- and i18n-level load path state.
+
+    ``register_locale_dir`` mutates two globals — the service's
+    ``_extra_locale_dirs`` and python-i18n's ``load_path`` — which every other
+    test in the process shares.
+    """
+    import i18n
+
+    import services.translation_service as ts
+
+    ts.init_translations()
+    saved = list(i18n.get("load_path"))
+    monkeypatch.setattr(ts, "_extra_locale_dirs", list(ts._extra_locale_dirs))
+    yield ts
+    i18n.set("load_path", saved)
+
+
+def _write_locale_dir(root, key: str, texts: dict[str, str]):
+    import json
+
+    root.mkdir(parents=True, exist_ok=True)
+    for lang, text in texts.items():
+        (root / f"t.{lang}.json").write_text(
+            json.dumps({lang: {key: text}}), encoding="utf-8"
+        )
+    return root
+
+
+class TestRegisterLocaleDir:
+    """Additional tier locale directories (ADR 0006)."""
+
+    def test_key_from_registered_dir_resolves(self, isolated_load_path, tmp_path):
+        ts = isolated_load_path
+        locale_dir = _write_locale_dir(
+            tmp_path / "locales",
+            "tf773_probe_registered",
+            {"de": "Probe registriert", "en": "Probe registered"},
+        )
+
+        ts.register_locale_dir(locale_dir)
+
+        assert ts.t("tf773_probe_registered", "de") == "Probe registriert"
+        assert ts.t("tf773_probe_registered", "en") == "Probe registered"
+        # Core keys still resolve next to it.
+        assert (
+            ts.t("auth_email_taken", "de") == "E-Mail-Adresse ist bereits registriert"
+        )
+
+    def test_registration_before_init_survives_init(
+        self, isolated_load_path, monkeypatch, tmp_path
+    ):
+        """A tier may register before main.py's init_translations() runs."""
+        ts = isolated_load_path
+        locale_dir = _write_locale_dir(
+            tmp_path / "early", "tf773_probe_early", {"de": "Früh registriert"}
+        )
+        monkeypatch.setattr(ts, "_initialized", False)
+
+        ts.register_locale_dir(locale_dir)
+        ts.init_translations()
+
+        assert ts.t("tf773_probe_early", "de") == "Früh registriert"
+
+    def test_is_idempotent(self, isolated_load_path, tmp_path):
+        import i18n
+
+        ts = isolated_load_path
+        locale_dir = _write_locale_dir(tmp_path / "twice", "tf773_probe_twice", {})
+
+        ts.register_locale_dir(locale_dir)
+        ts.register_locale_dir(str(locale_dir) + "/")
+
+        assert list(i18n.get("load_path")).count(str(locale_dir)) == 1
+
+    def test_missing_directory_raises(self, isolated_load_path, tmp_path):
+        ts = isolated_load_path
+        with pytest.raises(FileNotFoundError):
+            ts.register_locale_dir(tmp_path / "does-not-exist")
 
 
 def _make_request(locale=None):

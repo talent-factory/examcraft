@@ -17,11 +17,17 @@
  * have been a regression, not a translation: the four-eyes message, the
  * owner-only message and the quota message would all have collapsed into one.
  *
- * FRONTEND-ONLY FALLBACKS — three codes below have no backend counterpart:
+ * FRONTEND-ONLY FALLBACKS — two codes below have no backend counterpart, and a
+ * third was one until TF-773 PR 2b:
  *
  *   documents_reindex_failed          POST /api/v1/search/reindex/{id} lives in
- *                                     the premium vector-search router, which
- *                                     has no localized error codes at all.
+ *                                     the premium vector-search router. Since
+ *                                     TF-773 PR 2b that router sends this very
+ *                                     name for its generic failure (identity
+ *                                     beats the router prefix, ADR 0006), so it
+ *                                     is now a backend code as well; its one
+ *                                     specific precondition is in
+ *                                     `vectorSearch.ts`.
  *   documents_tags_load_failed        GET /api/v1/documents/tags has no error
  *                                     handler; a failure arrives as a framework
  *                                     500, i.e. `internal_error`.
@@ -52,7 +58,8 @@
  *
  * They exist so a network failure or a bodyless 500 still produces a sentence
  * about the operation the user actually attempted. If the backend later grows
- * real codes for these three, replace them here and drop the locale entries.
+ * real codes for the remaining two, replace them here and drop the locale
+ * entries.
  *
  * Not included, deliberately: `documents_patch_no_fields`,
  * `documents_rename_invalid_chars` and `documents_rename_too_long` exist in the

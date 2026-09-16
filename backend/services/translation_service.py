@@ -13,6 +13,9 @@ Usage:
 Locale files live in packages/core/backend/locales/ using a project-specific
 naming convention: t.{locale}.json with root key = locale code. This overrides
 the python-i18n default ({locale}.{namespace}.{format}) via filename_format config.
+Tiers with their own user-facing messages (premium/backend/locales/) add their
+directory via register_locale_dir() — same layout, same "t" namespace, disjoint
+keys (docs/adr/0006).
 
 Log messages stay in English — only user-facing response strings are translated.
 """
@@ -45,6 +48,44 @@ _initialized = False
 
 _LOCALES_DIR = os.path.join(os.path.dirname(__file__), "..", "locales")
 
+# Additional tier locale directories (premium/backend/locales, ...), in
+# registration order. Kept here as well as in i18n's load_path so that
+# init_translations() can rebuild the full list if a tier registers first.
+_extra_locale_dirs: list[str] = []
+
+
+def register_locale_dir(path: str | os.PathLike[str]) -> None:
+    """Add a tier's locale directory next to core's (ADR 0006).
+
+    The directory must use core's layout: ``t.{locale}.json`` with the locale
+    as root key. Keys land in the same ``t`` namespace, so an ``error_code``
+    stays verbatim the locale key regardless of which tier defines it.
+
+    python-i18n has no precedence between load paths, only order: on a cache
+    miss it loads the file from *every* directory and the last one overwrites.
+    A key present in two directories would therefore be silently shadowed —
+    which is why the key sets must be disjoint (enforced by a test, not here).
+
+    Loading is lazy, so registering after init_translations() is fine as long
+    as it happens before the first request for one of the tier's keys.
+    Idempotent per directory.
+
+    Raises:
+        FileNotFoundError: if ``path`` is not a directory. A missing tier
+            locale directory is a packaging bug; failing loudly beats every
+            message of that tier degrading to the generic fallback sentence.
+    """
+    normalized = os.path.normpath(os.fspath(path))
+    if not os.path.isdir(normalized):
+        raise FileNotFoundError(f"Locale directory not found: {normalized}")
+    if normalized in _extra_locale_dirs:
+        return
+
+    _extra_locale_dirs.append(normalized)
+    if _initialized:
+        i18n.set("load_path", [*i18n.get("load_path"), normalized])
+    logger.info("Registered additional locale directory %s", normalized)
+
 
 def init_translations() -> None:
     """Initialize python-i18n settings.
@@ -56,7 +97,7 @@ def init_translations() -> None:
         return
 
     locales_path = os.path.normpath(_LOCALES_DIR)
-    i18n.set("load_path", [locales_path])
+    i18n.set("load_path", [locales_path, *_extra_locale_dirs])
     i18n.set("file_format", "json")
     i18n.set("filename_format", "{namespace}.{locale}.{format}")
     i18n.set("fallback", DEFAULT_LOCALE)

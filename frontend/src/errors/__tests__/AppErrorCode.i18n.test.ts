@@ -56,3 +56,18 @@ for (const [locale, translations] of LOCALES) {
 it('APP_ERROR_CODES ist nicht leer (Sanity-Check gegen einen kaputten Import)', () => {
   expect(APP_ERROR_CODES.length).toBeGreaterThan(0);
 });
+
+it('kein Code kommt in mehr als einer codes/*.ts-Datei vor', () => {
+  // The backend has an equivalent guard for its own tiers
+  // (test_locale_parity.py::test_tier_schluessel_sind_disjunkt) — this is
+  // the frontend counterpart. A duplicate string across two `codes/*.ts`
+  // files would silently let one file's entry shadow the other's without
+  // TypeScript ever noticing (both are just `string` at that point).
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const code of APP_ERROR_CODES) {
+    if (seen.has(code)) duplicates.add(code);
+    seen.add(code);
+  }
+  expect([...duplicates]).toEqual([]);
+});

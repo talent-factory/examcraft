@@ -220,6 +220,26 @@ async def lifespan(app: FastAPI):
     if is_full_deployment:
         print("\n🌟 Loading Premium/Enterprise Features...")
 
+        # Premium: locale directory (ADR 0006). Registered before any premium
+        # router is loaded, so api_error() with a premium key never resolves
+        # to the generic fallback sentence. premium.__path__ rather than a
+        # fixed path: the package lives at /app/premium on Fly and at
+        # /packages/premium under Compose.
+        # register_locale_dir() raises FileNotFoundError when the directory is
+        # missing — that's a packaging bug and must crash startup here rather
+        # than degrade every premium error message to the generic fallback
+        # sentence, so only the "premium package not installed" case (Core
+        # deployment misconfigured as full) is swallowed.
+        try:
+            import premium
+        except ImportError as e:
+            print(f"⚠️  Premium locales not available: {e}")
+        else:
+            from services.translation_service import register_locale_dir
+
+            register_locale_dir(os.path.join(premium.__path__[0], "locales"))
+            print("✅ Premium locales registered")
+
         # Premium: RAG Service (replace Core placeholder with Premium implementation)
         # IMPORTANT: This must happen BEFORE loading API routers that use rag_service
         try:
@@ -506,6 +526,7 @@ async def lifespan(app: FastAPI):
             )
 
             mcp_app = create_mcp_app()
+            install_error_envelope_handlers(mcp_app)
             app.mount("/mcp", mcp_app)
 
             # Redirect /mcp → /mcp/ (FastAPI mount only handles /mcp/*)
@@ -786,6 +807,25 @@ async def app_validation_exception_handler(
             "error_code": "validation_error",
         },
         status_code=422,
+    )
+
+
+def install_error_envelope_handlers(sub_app: FastAPI) -> None:
+    """Give a mounted sub-application the ``error_code`` envelope (ADR 0006).
+
+    Exception handlers do not cross ``app.mount()``: a mounted FastAPI app has
+    its own ExceptionMiddleware and renders an ``AppHTTPException`` with
+    Starlette's default handler — ``{"detail": ...}`` only, the code silently
+    dropped. The MCP sub-app (``premium/backend/mcp``) is the one mount that
+    raises coded errors.
+
+    Only the HTTPException and validation handlers are copied. The 500 handler
+    is deliberately not: an uncaught error inside the MCP transport keeps its
+    current behaviour rather than changing shape as a side effect of TF-773.
+    """
+    sub_app.add_exception_handler(StarletteHTTPException, app_http_exception_handler)
+    sub_app.add_exception_handler(
+        RequestValidationError, app_validation_exception_handler
     )
 
 

@@ -109,9 +109,29 @@ def _collect_codes():
 TRANSLATED, PASSTHROUGH, DYNAMIC = _collect_codes()
 
 
+def _locale_dirs() -> list[pathlib.Path]:
+    """Core plus every tier that ships its own ``backend/locales`` (ADR 0006).
+
+    A premium endpoint's ``api_error`` code lives in ``premium/backend/
+    locales``, not in core's — the union is what ``translation_service.t()``
+    resolves against at runtime once the tier is registered. Missing tier
+    directories are skipped for the same reason as in ``_iter_source_files``:
+    the core mirror has neither the code nor the locales.
+    """
+    dirs = [LOCALES_DIR]
+    for tier in TIERS:
+        candidate = REPO_ROOT / tier / "backend" / "locales"
+        if tier != "core" and candidate.is_dir():
+            dirs.append(candidate)
+    return dirs
+
+
 def _locale_keys(lang: str) -> set[str]:
-    doc = json.loads((LOCALES_DIR / f"t.{lang}.json").read_text(encoding="utf-8"))
-    return set(doc[lang])
+    keys: set[str] = set()
+    for locale_dir in _locale_dirs():
+        doc = json.loads((locale_dir / f"t.{lang}.json").read_text(encoding="utf-8"))
+        keys |= set(doc[lang])
+    return keys
 
 
 def test_es_gibt_ueberhaupt_codes():
@@ -145,7 +165,9 @@ def test_jeder_api_error_code_hat_einen_schluessel():
         f"t.{_REFERENCE_LANG}.json:\n"
         + "\n".join(f"  {c}  ({', '.join(s[:3])})" for c, s in missing.items())
         + "\nDer Code IST der Locale-Schlüssel (docs/adr/0005) — lege den "
-        "Schlüssel in allen vier Sprachen an, statt den Code umzubenennen. "
+        "Schlüssel in allen vier Sprachen an, statt den Code umzubenennen: "
+        "Core-Codes in core/backend/locales, Premium-Codes in "
+        "premium/backend/locales (docs/adr/0006). "
         "Ob alle vier gleichziehen, prüft test_locale_parity.py."
     )
 
@@ -171,6 +193,7 @@ def test_keine_dynamischen_codes_ohne_konstante():
     ERLAUBT = {
         "core/backend/api/admin.py",  # TransferError.code
         "core/backend/utils/document_visibility.py",  # detail_key-Parameter
+        "premium/backend/api/v1/wizard.py",  # WizardServiceError.code
     }
     unerwartet = [d for d in DYNAMIC if d.rsplit(":", 1)[0] not in ERLAUBT]
     assert not unerwartet, (
@@ -252,6 +275,49 @@ def test_erlaubte_dynamische_quellen_liefern_nur_echte_schluessel():
         + ", ".join(override_sites)
         + " — den tatsächlichen Wert hier ergänzen und gegen die "
         "Locale-Datei prüfen, statt dies weiterhin ungeprüft zu lassen."
+    )
+
+
+def test_wizard_service_error_liefert_nur_echte_schluessel():
+    """``premium/backend/api/v1/wizard.py`` wirft ``api_error(e.http_status,
+    e.code, …)`` — derselbe Fall wie ``TransferError`` oben, nur im
+    Premium-Tier (TF-773 PR 2b). Jeder ``WizardServiceError(...)``-Aufruf muss
+    einen Literal-Code tragen, sonst wäre der Wert für diesen Test unsichtbar.
+
+    Im ``core/``-Mirror fehlt ``premium/`` — dann gibt es auch keinen Aufrufer.
+    """
+    service = REPO_ROOT / "premium/backend/services/prompt_wizard_service.py"
+    if not service.is_file():
+        return
+
+    keys = _locale_keys(_REFERENCE_LANG)
+    tree = ast.parse(service.read_text(encoding="utf-8"))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "WizardServiceError"
+    ]
+    assert calls, "WizardServiceError-Scan hat nichts gefunden — Klasse umbenannt?"
+
+    nicht_literal = [
+        node.lineno
+        for node in calls
+        if not (
+            node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        )
+    ]
+    assert not nicht_literal, (
+        f"WizardServiceError ohne Literal-Code in Zeile(n) {nicht_literal}"
+    )
+
+    fehlend = sorted({n.args[0].value for n in calls} - keys)
+    assert not fehlend, (
+        f"WizardServiceError-Code(s) ohne Schlüssel in t.{_REFERENCE_LANG}.json: "
+        f"{fehlend}"
     )
 
 
