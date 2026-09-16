@@ -286,6 +286,28 @@ def test_admin_update_user_is_audited(test_db: Session) -> None:
     assert data["changed_fields"] == ["first_name"]
 
 
+def test_admin_update_user_rejects_email_already_in_use(test_db: Session) -> None:
+    """update_user's email-conflict check (TF-389) had zero coverage: the
+    only data-integrity-relevant branch in the endpoint — without it, two
+    users could silently end up sharing the same login email."""
+    inst = _institution(test_db)
+    actor = _actor(test_db, inst.id)
+    target = _target_user(test_db, inst.id)
+    other = _target_user(test_db, inst.id, email="taken@tf502.ch")
+    test_db.commit()
+
+    resp = _client(test_db, actor).patch(
+        f"/api/admin/users/{target.id}",
+        json={"email": other.email},
+    )
+
+    assert resp.status_code == 400
+    assert resp.json()["error_code"] == "admin_email_already_in_use"
+
+    test_db.refresh(target)
+    assert target.email != other.email
+
+
 def test_admin_update_user_status_is_audited(test_db: Session) -> None:
     inst = _institution(test_db)
     actor = _actor(test_db, inst.id)

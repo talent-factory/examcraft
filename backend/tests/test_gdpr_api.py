@@ -20,6 +20,7 @@ from database import get_db
 from main import app
 from models.auth import Institution, User, UserStatus
 from services.auth_service import AuthService
+from tests.conftest import login_headers as _login_headers
 
 client = TestClient(app)
 
@@ -117,15 +118,6 @@ def gdpr_test_user(db):
     db.commit()
     db.refresh(user)
     return user
-
-
-def _login_headers(test_client, email: str, password: str) -> dict:
-    response = test_client.post(
-        "/api/auth/login", json={"email": email, "password": password}
-    )
-    assert response.status_code == 200, response.text
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
 
 
 def test_export_data_returns_200(test_client, gdpr_test_user):
@@ -250,3 +242,123 @@ def test_delete_account_now_returns_500_when_fail_closed_audit_log_fails(
 
     db.expire_all()
     assert db.get(User, user_id) is not None
+
+
+# ============================================================================
+# Generischer-Exception-Fallback pro Endpoint (TF-389 — bisher ungetestet)
+# ============================================================================
+
+
+def test_export_data_continues_when_question_export_fails(
+    test_client, gdpr_test_user, db, monkeypatch
+):
+    """Der Fragen-Export ist ein separat abgefangener Teilschritt (nicht der
+    äussere 500-Handler): schlägt er fehl, liefert /export-data trotzdem 200
+    mit einer leeren `questions`-Liste statt den ganzen Export platzen zu
+    lassen."""
+    from models.question_review import QuestionReview
+
+    real_query = db.query
+
+    def failing_query(model, *args, **kwargs):
+        if model is QuestionReview:
+            raise RuntimeError("question export boom")
+        return real_query(model, *args, **kwargs)
+
+    monkeypatch.setattr(db, "query", failing_query)
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+
+    import api.gdpr as gdpr_module
+
+    with patch.object(gdpr_module.logger, "error") as mock_error:
+        response = test_client.get("/api/v1/gdpr/export-data", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["data"]["questions"] == []
+    # The failure must actually be observable (Sentry only forwards ERROR+,
+    # see main.py's Sentry setup) — not silently swallowed as a warning.
+    # caplog is unreliable in the full suite (propagation gets disabled by
+    # another test), so patch the module logger directly instead.
+    mock_error.assert_called_once()
+    assert mock_error.call_args.kwargs.get("exc_info") is True
+
+
+def test_export_data_returns_500_on_unexpected_error(
+    test_client, gdpr_test_user, monkeypatch
+):
+    import api.gdpr as gdpr_module
+
+    # Login itself calls AuditService.log_action, so patch only after
+    # authenticating — otherwise the login call fails instead of export-data.
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+    monkeypatch.setattr(
+        gdpr_module.AuditService,
+        "log_action",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("audit boom")),
+    )
+
+    response = test_client.get("/api/v1/gdpr/export-data", headers=headers)
+
+    assert response.status_code == 500
+    assert response.json()["error_code"] == "gdpr_export_failed"
+
+
+def test_request_deletion_returns_500_on_unexpected_error(
+    test_client, gdpr_test_user, db, monkeypatch
+):
+    # Login itself calls db.commit(), so patch only after authenticating.
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+
+    def failing_commit():
+        raise RuntimeError("commit boom")
+
+    monkeypatch.setattr(db, "commit", failing_commit)
+
+    response = test_client.post("/api/v1/gdpr/request-deletion", headers=headers)
+
+    assert response.status_code == 500
+    assert response.json()["error_code"] == "gdpr_deletion_request_failed"
+
+
+def test_cancel_deletion_returns_500_on_unexpected_error(
+    test_client, gdpr_test_user, db, monkeypatch
+):
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+    test_client.post("/api/v1/gdpr/request-deletion", headers=headers)
+
+    def failing_commit():
+        raise RuntimeError("commit boom")
+
+    monkeypatch.setattr(db, "commit", failing_commit)
+
+    response = test_client.post("/api/v1/gdpr/cancel-deletion", headers=headers)
+
+    assert response.status_code == 500
+    assert response.json()["error_code"] == "gdpr_cancellation_failed"
+
+
+def test_delete_account_now_returns_500_on_unexpected_non_runtime_error(
+    test_client, gdpr_test_user, monkeypatch
+):
+    """Der generische `except Exception`-Fallback (nicht der Fail-Closed-
+    RuntimeError-Pfad, siehe test_delete_account_now_returns_500_when_fail_closed_audit_log_fails
+    oben) wird durch einen andersartigen Fehler in
+    `delete_user_and_gdpr_data` selbst ausgelöst."""
+    import api.gdpr as gdpr_module
+
+    monkeypatch.setattr(
+        gdpr_module,
+        "delete_user_and_gdpr_data",
+        lambda *a, **k: (_ for _ in ()).throw(ValueError("unexpected boom")),
+    )
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+
+    response = test_client.request(
+        "DELETE",
+        "/api/v1/gdpr/delete-account-now",
+        params={"password": "testpassword123"},
+        headers=headers,
+    )
+
+    assert response.status_code == 500
+    assert response.json()["error_code"] == "gdpr_deletion_failed"

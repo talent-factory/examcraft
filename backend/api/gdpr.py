@@ -104,7 +104,11 @@ async def export_user_data(
                 for q in questions
             ]
         except Exception as e:
-            logger.warning(f"Could not export questions: {e}")
+            # Sentry's LoggingIntegration only forwards ERROR+, and a broken
+            # question export should page on-call like any other partial
+            # GDPR export failure (see main.py's Sentry setup) rather than
+            # vanish into an app-log-only warning.
+            logger.error(f"Could not export questions: {e}", exc_info=True)
 
         # Export audit logs
         from models.auth import AuditLog

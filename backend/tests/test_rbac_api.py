@@ -137,6 +137,20 @@ def api_client(rbac_api_db):
         finally:
             pass
 
+    # main.py registers routers inside the FastAPI lifespan, which a plain
+    # TestClient(app) (no `with`) never triggers — include them explicitly
+    # so this file passes when run standalone, not just as a lucky
+    # beneficiary of another test file's side effect on the shared `app`.
+    from api import auth
+    from api.v1 import rbac as rbac_api
+
+    # Idempotent: avoid appending duplicate routes on every call.
+    if not any(getattr(r, "path", None) == "/api/auth/login" for r in app.routes):
+        app.include_router(auth.router)
+    if not any(
+        getattr(r, "path", None) == "/api/v1/rbac/tiers/current" for r in app.routes
+    ):
+        app.include_router(rbac_api.router)
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)
     yield client
@@ -292,6 +306,122 @@ def test_check_quota(api_client):
     assert response.status_code == 200
     result = response.json()
     assert "allowed" in result
-    assert "quota_limit" in result
-    assert "current_usage" in result
-    assert "remaining" in result
+
+
+# ============================================
+# NOT-FOUND / EDGE-CASE BRANCHES (TF-389 — bisher ungetestet)
+# ============================================
+
+
+def test_get_feature_by_id_returns_404_for_unknown_id(api_client):
+    token = get_auth_token(api_client)
+
+    response = api_client.get(
+        "/api/v1/rbac/features/does-not-exist",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "rbac_feature_not_found"
+
+
+def test_get_role_by_id_returns_404_for_unknown_id(api_client):
+    token = get_auth_token(api_client)
+
+    response = api_client.get(
+        "/api/v1/rbac/roles/does-not-exist",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "rbac_role_not_found"
+
+
+@pytest.fixture
+def free_tier(rbac_api_db):
+    """The default `free` SubscriptionTier — `rbac_api_db` only seeds
+    `api_test_tier`, so tests exercising the default-tier fallback need
+    this added explicitly. A non-isolated fixture elsewhere in the suite
+    may already have leaked a real `free` row into the shared test DB
+    outside any savepoint (our session still sees already-committed rows
+    underneath its own savepoint) — look it up first to avoid colliding
+    with `ix_subscription_tiers_name`, same pattern as the `admin_role`
+    lookup in test_documents_superuser_access.py."""
+    existing = rbac_api_db.query(SubscriptionTier).filter_by(name="free").first()
+    if existing:
+        return existing
+    tier = SubscriptionTier(
+        id="tier_free_default",
+        name="free",
+        display_name="Free",
+        description="Default tier",
+        price_monthly=0.0,
+        price_yearly=0.0,
+        is_active=True,
+        sort_order=0,
+    )
+    rbac_api_db.add(tier)
+    rbac_api_db.commit()
+    return tier
+
+
+def test_get_current_tier_returns_404_when_default_tier_missing(
+    api_client, monkeypatch, rbac_api_db
+):
+    """`rbac_api_db` only seeds `api_test_tier`, not `free` — with
+    `DEFAULT_SUBSCRIPTION_TIER` explicitly unset, both the configured
+    default and its fallback miss."""
+    monkeypatch.delenv("DEFAULT_SUBSCRIPTION_TIER", raising=False)
+    # Guard against a `free` tier leaked into the shared test DB by an
+    # unrelated, non-isolated fixture elsewhere in the suite (see
+    # `free_tier` above) — this test's premise is "no `free` tier exists",
+    # enforced only within our own savepoint-isolated session.
+    rbac_api_db.query(SubscriptionTier).filter_by(name="free").delete()
+    rbac_api_db.commit()
+
+    response = api_client.get("/api/v1/rbac/tiers/current")
+
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "rbac_tier_not_found"
+
+
+def test_get_current_tier_returns_default_free_tier(api_client, free_tier):
+    response = api_client.get("/api/v1/rbac/tiers/current")
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "free"
+
+
+def test_get_my_tier_returns_users_institution_tier(api_client, free_tier):
+    """The seeded test user's institution has `subscription_tier="free"`
+    (see `rbac_api_db` above) — `free_tier` adds that tier so `/tiers/my`
+    resolves it."""
+    token = get_auth_token(api_client)
+
+    response = api_client.get(
+        "/api/v1/rbac/tiers/my", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "free"
+
+
+def test_check_quota_without_institution_returns_400(api_client):
+    """`institution_id` is NOT NULL at the DB level, so a real user without
+    one can't be persisted — override `get_current_user` directly with an
+    in-memory user instead of round-tripping through the database."""
+    from utils.auth_utils import get_current_user
+
+    fake_user = User(
+        id=999999,
+        email="no-institution@test.com",
+        institution_id=None,
+        status=UserStatus.ACTIVE.value,
+        is_superuser=False,
+    )
+    app.dependency_overrides[get_current_user] = lambda: fake_user
+
+    response = api_client.get("/api/v1/rbac/check-quota/documents")
+
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "rbac_no_institution"

@@ -24,57 +24,53 @@ from models.document import Document, DocumentStatus
 def stage_data(test_db):
     """Owner + Superuser + Doc in derselben Institution."""
     inst = Institution(
-        id=200,
         name="Stage",
-        slug="stage",
+        slug="stage-tsua",
         subscription_tier="professional",
         max_users=10,
         max_documents=100,
         max_questions_per_month=1000,
     )
     test_db.add(inst)
+    test_db.flush()
     owner = User(
-        id=200,
         email="owner@s.ch",
         first_name="O",
         last_name="W",
         password_hash="x",
-        institution_id=200,
+        institution_id=inst.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=False,
     )
     admin = User(
-        id=201,
         email="admin@s.ch",
         first_name="A",
         last_name="D",
         password_hash="x",
-        institution_id=200,
+        institution_id=inst.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=True,
     )
     other = User(
-        id=202,
         email="other@s.ch",
         first_name="X",
         last_name="Y",
         password_hash="x",
-        institution_id=200,
+        institution_id=inst.id,
         status=UserStatus.ACTIVE.value,
         is_superuser=False,
     )
     test_db.add_all([owner, admin, other])
     test_db.flush()
     doc = Document(
-        id=500,
         filename="d.pdf",
         original_filename="d.pdf",
         file_path="/tmp/d.pdf",
         file_size=10,
         mime_type="application/pdf",
         status=DocumentStatus.PROCESSED,
-        institution_id=200,
-        user_id=200,
+        institution_id=inst.id,
+        user_id=owner.id,
     )
     test_db.add(doc)
     test_db.commit()
@@ -146,11 +142,11 @@ def test_process_foreign_doc_as_superuser_logs_bypass(stage_data, test_db):
     )
     assert len(bypass_logs) == 1
     log = bypass_logs[0]
-    assert log.user_id == 201
-    assert log.resource_id == "500"
+    assert log.user_id == s.admin.id
+    assert log.resource_id == str(s.doc.id)
     extra = json.loads(log.additional_data)
     assert extra["bypassed_action"] == "process"
-    assert extra["owner_user_id"] == 200
+    assert extra["owner_user_id"] == s.owner.id
     assert extra["superuser_email"] == "admin@s.ch"
 
 
@@ -193,7 +189,6 @@ def test_delete_foreign_doc_as_same_institution_admin_logs_admin_cross_owner(
     admin_role = test_db.query(Role).filter_by(name="admin").first()
     if admin_role is None:
         admin_role = Role(
-            id=900,
             name="admin",
             display_name="Admin",
             permissions='["delete_documents"]',
@@ -290,7 +285,6 @@ def test_delete_foreign_doc_as_admin_aborts_when_audit_fails(
     admin_role = test_db.query(Role).filter_by(name="admin").first()
     if admin_role is None:
         admin_role = Role(
-            id=901,
             name="admin",
             display_name="Admin",
             permissions='["delete_documents"]',

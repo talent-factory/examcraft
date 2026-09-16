@@ -344,6 +344,7 @@ class TransferUserResponse(BaseModel):
 
 @router.get("/users", response_model=UserListResponse)
 async def list_users(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
@@ -354,11 +355,20 @@ async def list_users(
     db: Session = Depends(get_db),
 ):
     """
-    List users with institution-scoped access.
+    List users with institution-scoped access (Superuser or Institution-Admin).
 
     - Superuser: sees all users, can filter by institution
-    - Admin/Others: sees only users of own institution
+    - Admin: sees only users of own institution
+
+    This is the bulk directory used by the admin user-management UI; unlike
+    the single-user detail endpoint below, it lets any caller enumerate every
+    member of an institution (email, roles, status, last login), so it needs
+    the same admin gate as the roles catalog above, not just an institution
+    filter.
     """
+    locale = get_request_locale(request, current_user)
+    _require_admin_or_superuser(current_user, locale)
+
     # Build query
     query = db.query(User)
 

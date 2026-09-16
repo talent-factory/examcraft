@@ -59,7 +59,6 @@ import models.org_unit  # noqa: F401
 # Skip test files that need major fixture updates for current DB schema
 collect_ignore_glob = [
     "test_rbac.py",
-    "test_rbac_api.py",
     "test_multi_tenancy.py",
     "test_document_model.py",
 ]
@@ -397,3 +396,17 @@ def admin_client(help_db):
     client = TestClient(app, raise_server_exceptions=True)
     yield client
     app.dependency_overrides.clear()
+
+
+def login_headers(test_client, email: str, password: str) -> dict:
+    """POST /api/auth/login and return an Authorization header dict.
+
+    Shared by test files that exercise real HTTP auth (as opposed to
+    dependency-override mock users) so they don't each redefine it.
+    """
+    response = test_client.post(
+        "/api/auth/login", json={"email": email, "password": password}
+    )
+    assert response.status_code == 200, response.text
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
