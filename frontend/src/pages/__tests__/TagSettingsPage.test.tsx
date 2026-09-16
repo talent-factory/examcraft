@@ -25,6 +25,12 @@ jest.mock('../../components/tags/TagCreateForm', () => ({ existingTags }: any) =
 jest.mock('../../components/tags/TagRenameInline', () => () => <div />);
 jest.mock('../../components/tags/TagMergeModal', () => () => <div />);
 
+// TF-838 (PR #286 review): mocked so this suite doesn't fire real, unmocked
+// heartbeat POSTs as a side effect on every render.
+jest.mock('../../hooks/useActivityHeartbeat', () => ({
+  useActivityHeartbeat: jest.fn(),
+}));
+
 const makeTags = () => [
   { id: 1, name: 'EigenTag', scope: 'institution', is_own: true,  is_archived: false, usage_count: 2, institution_id: 10 },
   { id: 2, name: 'KollegeTag', scope: 'institution', is_own: false, is_archived: false, usage_count: 5, institution_id: 10 },

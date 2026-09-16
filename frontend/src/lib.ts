@@ -64,6 +64,7 @@ export { GenerationTasksProvider, useGenerationTasks } from './contexts/Generati
 
 export { default as useDebounce } from './hooks/useDebounce';
 export { useRoleBasedNavigation } from './hooks/useRoleBasedNavigation';
+export { useActivityHeartbeat } from './hooks/useActivityHeartbeat';
 
 // ============================================================================
 // API Client

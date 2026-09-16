@@ -40,9 +40,13 @@ import { GradingSchemesService } from '../services/gradingSchemesService';
 import { appErrorFromApiError, isAppErrorCode, translateError } from '../errors';
 import { ApiError } from '../services/submissionsService';
 import GradingSchemeEditor from '../components/admin/GradingSchemeEditor';
+import { useActivityHeartbeat } from '../hooks/useActivityHeartbeat';
 
 const AdminGradingSchemes: React.FC = () => {
   const { t } = useTranslation();
+  // TF-838: "admin_reference_data_edit" bucket (Admin-tab only, no separate
+  // route for this one — TF-824 spec).
+  useActivityHeartbeat('admin_reference_data_edit');
 
   const [schemes, setSchemes] = useState<GradingSchemeOut[]>([]);
   const [loading, setLoading] = useState(true);

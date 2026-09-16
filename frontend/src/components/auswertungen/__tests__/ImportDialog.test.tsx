@@ -16,11 +16,20 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import ImportDialog from '../ImportDialog';
 import { SubmissionsService } from '../../../services/submissionsService';
 import { ImportJob, ImportPreview } from '../../../types/submission';
+import { useActivityHeartbeat } from '../../../hooks/useActivityHeartbeat';
 
 jest.mock('../../../services/submissionsService');
 const mockSubmissionsService = SubmissionsService as jest.Mocked<
   typeof SubmissionsService
 >;
+
+// TF-838 (PR #286 review): mocked so pre-existing tests don't fire real,
+// unmocked heartbeat POSTs as a side effect — and so the "open vs. closed"
+// wiring below can assert on it directly.
+jest.mock('../../../hooks/useActivityHeartbeat', () => ({
+  useActivityHeartbeat: jest.fn(),
+}));
+const mockUseActivityHeartbeat = useActivityHeartbeat as jest.Mock;
 
 const theme = createTheme();
 const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -453,5 +462,27 @@ describe('ImportDialog', () => {
       expect(screen.getByTestId('import-result')).toBeInTheDocument();
     });
     expect(onImported).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------
+  // Live-Activity heartbeat wiring (TF-838, PR #286 review): the hook's own
+  // tests cover its internal behavior — this only verifies ImportDialog
+  // passes the *correct* bucket-or-null value for `open`, since an inverted
+  // condition here wouldn't be caught anywhere else (the component stays
+  // mounted across open/close, controlled by the `open` prop).
+  // ---------------------------------------------------------------------
+
+  describe('Live-Activity heartbeat wiring', () => {
+    it('passes "exam_results_import" while the dialog is open', () => {
+      renderDialog({ open: true });
+
+      expect(mockUseActivityHeartbeat).toHaveBeenLastCalledWith('exam_results_import');
+    });
+
+    it('passes null (not "exam_results_import") while the dialog is closed', () => {
+      renderDialog({ open: false });
+
+      expect(mockUseActivityHeartbeat).toHaveBeenLastCalledWith(null);
+    });
   });
 });

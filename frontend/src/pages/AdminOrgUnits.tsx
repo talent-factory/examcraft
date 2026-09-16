@@ -38,9 +38,13 @@ import { OrgUnitOut } from '../types/orgUnit';
 import { OrgUnitsService } from '../services/orgUnitsService';
 import { translateError } from '../errors';
 import OrgUnitEditor from '../components/admin/OrgUnitEditor';
+import { useActivityHeartbeat } from '../hooks/useActivityHeartbeat';
 
 const AdminOrgUnits: React.FC = () => {
   const { t } = useTranslation();
+  // TF-838: "admin_reference_data_edit" bucket (Admin-tab only, no separate
+  // route for this one — TF-824 spec).
+  useActivityHeartbeat('admin_reference_data_edit');
 
   const [units, setUnits] = useState<OrgUnitOut[]>([]);
   const [loading, setLoading] = useState(true);

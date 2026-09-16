@@ -19,6 +19,12 @@ import { GradingSchemeOut } from '../../types/gradingScheme';
 jest.mock('../../services/gradingSchemesService');
 const mocked = GradingSchemesService as jest.Mocked<typeof GradingSchemesService>;
 
+// TF-838 (PR #286 review): mocked so this suite doesn't fire real, unmocked
+// heartbeat POSTs as a side effect on every render.
+jest.mock('../../hooks/useActivityHeartbeat', () => ({
+  useActivityHeartbeat: jest.fn(),
+}));
+
 const RAW = 'ROHER BACKEND-TEXT';
 
 const scheme: GradingSchemeOut = {

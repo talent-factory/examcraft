@@ -7,6 +7,15 @@ import { ExamComposer } from '../ExamComposer';
 import { ComposerService } from '../../services/ComposerService';
 import type { ExamListResponse, ExamDetail } from '../../types/composer';
 import { ExamStatus } from '../../types/composer';
+import { useActivityHeartbeat } from '../../hooks/useActivityHeartbeat';
+
+// TF-838 (PR #286 review): mocked so pre-existing tests don't fire real,
+// unmocked heartbeat POSTs as a side effect — and so the "which bucket did
+// we pass" wiring below can assert on it directly.
+jest.mock('../../hooks/useActivityHeartbeat', () => ({
+  useActivityHeartbeat: jest.fn(),
+}));
+const mockUseActivityHeartbeat = useActivityHeartbeat as jest.Mock;
 
 // Mock axios to prevent ESM parse errors (ComposerService imports axios)
 jest.mock('axios', () => ({
@@ -201,6 +210,58 @@ describe('ExamComposer', () => {
         expect(screen.getByTestId('exam-builder-view')).toBeInTheDocument();
         expect(screen.getByTestId('exam-builder-exam-id')).toHaveTextContent('99');
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Live-Activity heartbeat wiring (TF-838, PR #286 review): the hook's own
+  // tests cover its internal behavior — this only verifies ExamComposer
+  // passes the *correct* bucket-or-null value at each state transition,
+  // since an inverted condition here wouldn't be caught anywhere else.
+  // -------------------------------------------------------------------------
+
+  describe('Live-Activity heartbeat wiring', () => {
+    it('passes null (not "exam_compose") while browsing the exam list', async () => {
+      mockComposerService.listExams.mockResolvedValue(emptyListResponse);
+
+      render(<ExamComposer />, { wrapper: createWrapper() });
+
+      expect(mockUseActivityHeartbeat).toHaveBeenLastCalledWith(null);
+    });
+
+    it('passes "exam_compose" only once an exam is actually selected for editing', async () => {
+      const exam = {
+        id: 42,
+        title: 'Test Exam',
+        course: null,
+        exam_date: null,
+        time_limit_minutes: null,
+        allowed_aids: null,
+        instructions: null,
+        passing_percentage: 50,
+        total_points: 0,
+        status: ExamStatus.DRAFT,
+        language: 'de',
+        created_at: '2025-01-01T00:00:00Z',
+        updated_at: '2025-01-01T00:00:00Z',
+        question_count: 0,
+      };
+      mockComposerService.listExams.mockResolvedValue({ total: 1, exams: [exam] });
+
+      render(<ExamComposer />, { wrapper: createWrapper() });
+
+      await screen.findByText('Test Exam');
+      expect(mockUseActivityHeartbeat).toHaveBeenLastCalledWith(null);
+
+      fireEvent.click(screen.getByText('Test Exam').closest('div')!);
+
+      await screen.findByTestId('exam-builder-view');
+      expect(mockUseActivityHeartbeat).toHaveBeenLastCalledWith('exam_compose');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Zurück' }));
+
+      await waitFor(() => expect(screen.queryByTestId('exam-builder-view')).not.toBeInTheDocument());
+      expect(mockUseActivityHeartbeat).toHaveBeenLastCalledWith(null);
     });
   });
 });

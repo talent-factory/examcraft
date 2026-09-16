@@ -42,6 +42,12 @@ jest.mock('../../contexts/AuthContext', () => ({
   }),
 }));
 
+// TF-838 (PR #286 review): mocked so this suite doesn't fire real, unmocked
+// heartbeat POSTs as a side effect on every render.
+jest.mock('../../hooks/useActivityHeartbeat', () => ({
+  useActivityHeartbeat: jest.fn(),
+}));
+
 const axiosDetailError = (detail: string) => ({ response: { data: { detail } } });
 const networkError = () => new Error('Network Error');
 

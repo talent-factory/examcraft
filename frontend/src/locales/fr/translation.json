@@ -784,6 +784,7 @@
       "tabGradingSchemes": "Schèmes de notation",
       "tabOrgUnits": "Unités organisationnelles",
       "tabSystemHealth": "État du système",
+      "tabLiveActivity": "Activité en direct",
       "auditPlaceholder": "Journaux d'audit — Bientôt disponible",
       "categories": {
         "userAccess": "Utilisateurs et accès",
@@ -849,6 +850,27 @@
           "inputLabel": "Message à l'assistant Ops-Chat",
           "send": "Envoyer",
           "error": "Échec de la requête — réessaie."
+        }
+      },
+      "liveActivity": {
+        "title": "Activité en direct",
+        "subtitle": "Aperçu en direct des activités en cours — actualisation automatique toutes les 10 secondes.",
+        "lastUpdated": "Dernière actualisation : {{time}}",
+        "loadError": "Impossible de charger les données d'activité en direct.",
+        "staleError": "Échec de l'actualisation — les données affichées sont peut-être obsolètes.",
+        "retry": "Réessayer",
+        "lessThan": "< {{value}}",
+        "unavailable": "Indisponible",
+        "bucket": {
+          "documents_upload": "Téléversement de documents",
+          "questions_generate_rag": "Génération de questions (RAG)",
+          "questions_review": "Révision des questions",
+          "exam_compose": "Composition d'examen",
+          "exam_results_import": "Import des résultats",
+          "prompt_template_edit": "Édition de modèle",
+          "prompt_wizard_chat": "Assistant de prompt",
+          "document_chat_session": "Chat de documents",
+          "admin_reference_data_edit": "Édition des données de référence"
         }
       },
       "audit": {

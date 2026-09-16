@@ -784,6 +784,7 @@
       "tabGradingSchemes": "Bewertungsschemata",
       "tabOrgUnits": "Organisationseinheiten",
       "tabSystemHealth": "System Health",
+      "tabLiveActivity": "Live Activity",
       "auditPlaceholder": "Audit Logs — Demnächst verfügbar",
       "categories": {
         "userAccess": "Benutzer & Zugriff",
@@ -849,6 +850,27 @@
           "inputLabel": "Nachricht an den Ops-Chat-Assistenten",
           "send": "Senden",
           "error": "Anfrage fehlgeschlagen — bitte erneut versuchen."
+        }
+      },
+      "liveActivity": {
+        "title": "Live Activity",
+        "subtitle": "Live-Übersicht aktiver Vorgänge — aktualisiert automatisch alle 10 Sekunden.",
+        "lastUpdated": "Zuletzt aktualisiert: {{time}}",
+        "loadError": "Live-Activity-Daten konnten nicht geladen werden.",
+        "staleError": "Aktualisierung fehlgeschlagen — angezeigte Daten sind möglicherweise veraltet.",
+        "retry": "Erneut versuchen",
+        "lessThan": "< {{value}}",
+        "unavailable": "Nicht verfügbar",
+        "bucket": {
+          "documents_upload": "Dokumenten-Upload",
+          "questions_generate_rag": "Fragen generieren (RAG)",
+          "questions_review": "Fragen-Review",
+          "exam_compose": "Prüfung zusammenstellen",
+          "exam_results_import": "Ergebnisimport",
+          "prompt_template_edit": "Vorlage bearbeiten",
+          "prompt_wizard_chat": "Prompt-Assistent",
+          "document_chat_session": "Dokumenten-Chat",
+          "admin_reference_data_edit": "Referenzdaten bearbeiten"
         }
       },
       "audit": {

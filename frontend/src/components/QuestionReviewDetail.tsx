@@ -19,12 +19,16 @@ import { useAuth } from '../contexts/AuthContext';
 import MarkdownRenderer from './MarkdownRenderer';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import { QuestionReview, ReviewStatus } from '../types/review';
+import { useActivityHeartbeat } from '../hooks/useActivityHeartbeat';
 
 const QuestionReviewDetail: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
+  // TF-838: same "questions_review" bucket as the queue (ReviewQueue.tsx) —
+  // this detail view is the other trigger for that bucket (TF-824 spec).
+  useActivityHeartbeat('questions_review');
 
   const [question, setQuestion] = useState<QuestionReview | null>(null);
   const [loading, setLoading] = useState(true);

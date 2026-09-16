@@ -46,6 +46,10 @@ jest.mock('../../components/admin/SystemHealthPanel', () => ({
   __esModule: true,
   default: () => <div data-testid="system-health-panel" />,
 }));
+jest.mock('../../components/admin/LiveActivityPanel', () => ({
+  __esModule: true,
+  default: () => <div data-testid="live-activity-panel" />,
+}));
 jest.mock('../../components/admin/OpsChatWidget', () => ({
   __esModule: true,
   default: () => <div data-testid="ops-chat-widget" />,
@@ -478,6 +482,39 @@ describe('Admin Page', () => {
       switchToPlatformScope();
 
       expect(screen.queryByText('System Health')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Live Activity tab', () => {
+    it('hides the Live Activity tab for non-superusers', () => {
+      mockHasRole.mockReturnValue(true);
+
+      render(<Admin />);
+
+      expect(screen.queryByText('Live Activity')).not.toBeInTheDocument();
+    });
+
+    it('shows and switches to the Live Activity tab for superusers in Full deployment', () => {
+      mockUser.is_superuser = true;
+
+      render(<Admin />);
+      switchToPlatformScope();
+
+      expect(screen.getByText('Live Activity')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Live Activity'));
+
+      expect(screen.getByTestId('admin-tab-content-live-activity')).toBeInTheDocument();
+      expect(screen.getByTestId('live-activity-panel')).toBeInTheDocument();
+    });
+
+    it('hides the Live Activity tab for superusers in Core deployment (GET /api/v1/ops/activity does not exist there)', () => {
+      mockUser.is_superuser = true;
+      mockIsFullDeployment.mockReturnValue(false);
+
+      render(<Admin />);
+      switchToPlatformScope();
+
+      expect(screen.queryByText('Live Activity')).not.toBeInTheDocument();
     });
   });
 });

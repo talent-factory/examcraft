@@ -22,6 +22,7 @@ import type {
 } from '../types/competencyFramework';
 import CompetencyFrameworkCard from '../components/competencyFrameworks/CompetencyFrameworkCard';
 import CompetencyFrameworkForm from '../components/competencyFrameworks/CompetencyFrameworkForm';
+import { useActivityHeartbeat } from '../hooks/useActivityHeartbeat';
 
 type FilterMode = 'all' | 'active' | 'archived';
 const FILTER_KEY = 'competencyFrameworks.filter';
@@ -35,6 +36,10 @@ const loadFilter = (): FilterMode => {
 const CompetencyFrameworkSettingsPage: React.FC = () => {
   const { t } = useTranslation();
   const { user, hasPermission } = useAuth();
+  // TF-838: shared "admin_reference_data_edit" bucket — same component
+  // rendered via `/settings/competency-frameworks` and the `/admin`
+  // "competency-frameworks" tab (doubled surface, TF-824 spec).
+  useActivityHeartbeat('admin_reference_data_edit');
   const queryClient = useQueryClient();
   const [filter, setFilterState] = useState<FilterMode>(loadFilter);
   const [dialogOpen, setDialogOpen] = useState(false);

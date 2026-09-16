@@ -57,6 +57,7 @@ import {
   ImportPreview,
   ImportRowError,
 } from '../../types/submission';
+import { useActivityHeartbeat } from '../../hooks/useActivityHeartbeat';
 
 interface ImportDialogProps {
   open: boolean;
@@ -133,6 +134,11 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 }) => {
   const { t } = useTranslation();
+
+  // TF-838: Live-Activity presence for "exam_results_import" — only while
+  // the dialog is actually open, not just mounted (the component stays
+  // mounted across open/close, controlled by MUI's `open` prop).
+  useActivityHeartbeat(open ? 'exam_results_import' : null);
 
   const [step, setStep] = useState<WizardStep>('source');
   const [driverName, setDriverName] = useState<DriverName>('moodle_json');

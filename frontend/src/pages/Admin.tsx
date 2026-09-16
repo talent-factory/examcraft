@@ -30,10 +30,11 @@ import AdminGradingSchemes from './AdminGradingSchemes';
 import AdminOrgUnits from './AdminOrgUnits';
 import AuditLogView from '../components/admin/AuditLogView';
 import SystemHealthPanel from '../components/admin/SystemHealthPanel';
+import LiveActivityPanel from '../components/admin/LiveActivityPanel';
 import OpsChatWidget from '../components/admin/OpsChatWidget';
 import { isFullDeployment } from '../utils/deploymentMode';
 
-type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'competency-frameworks' | 'grading-schemes' | 'org-units' | 'system-health';
+type AdminTab = 'users' | 'institutions' | 'roles' | 'audit' | 'subscription' | 'help-feedback' | 'tags' | 'competency-frameworks' | 'grading-schemes' | 'org-units' | 'system-health' | 'live-activity';
 type AdminScope = 'institution' | 'platform';
 
 // Closed set of sidebar section ids. Kept as a literal union (rather than
@@ -87,6 +88,11 @@ export const Admin: React.FC = () => {
   // Fly/RabbitMQ/Celery, which don't exist in Core) — hide the tab in Core
   // instead of showing a permanently-erroring, endlessly-polling panel.
   const showSystemHealth = isSuperuser && isFullDeployment();
+  // GET /api/v1/ops/activity has the same Full-deployment-only registration
+  // (core/backend/main.py's `is_full_deployment` block, which is what
+  // conditionally includes premium/backend/api/v1/ops.py's router) — same
+  // gate as system-health.
+  const showLiveActivity = isSuperuser && isFullDeployment();
 
   const categoryLabels: Record<AdminCategoryId, string> = {
     userAccess: t('pages.admin.categories.userAccess', 'Benutzer & Zugriff'),
@@ -110,6 +116,7 @@ export const Admin: React.FC = () => {
     { key: 'institutions', label: t('pages.admin.tabInstitutions'), visible: isSuperuser, scope: 'platform', categoryId: 'tenants' },
     { key: 'roles', label: t('pages.admin.tabRoles'), visible: isSuperuser, scope: 'platform', categoryId: 'security' },
     { key: 'system-health', label: t('pages.admin.tabSystemHealth'), visible: showSystemHealth, scope: 'platform', categoryId: 'system' },
+    { key: 'live-activity', label: t('pages.admin.tabLiveActivity'), visible: showLiveActivity, scope: 'platform', categoryId: 'system' },
     { key: 'help-feedback', label: 'Help Feedback', visible: isSuperuser, scope: 'platform', categoryId: 'support' },
   ].filter((tab): tab is TabConfig => tab.visible);
 
@@ -361,6 +368,11 @@ export const Admin: React.FC = () => {
             <div data-testid="admin-tab-content-system-health">
               <SystemHealthPanel />
               <OpsChatWidget />
+            </div>
+          )}
+          {effectiveTab === 'live-activity' && (
+            <div data-testid="admin-tab-content-live-activity">
+              <LiveActivityPanel />
             </div>
           )}
           {effectiveTab === 'audit' && (

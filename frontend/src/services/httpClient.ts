@@ -90,6 +90,26 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
 }
 
 
+export async function postVoid(
+  path: string,
+  body: unknown,
+  options: { retryAuth?: boolean } = {}
+): Promise<void> {
+  const makeRequest = () =>
+    safeFetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    });
+  // retryAuth: false skips withAuthRetry's refresh-or-logout side effect —
+  // for a background ping (e.g. the Live-Activity heartbeat) where a stale
+  // token should just make this one call fail quietly, not force-logout a
+  // user mid-workflow (PR #286 review finding).
+  const response = options.retryAuth === false ? await makeRequest() : await withAuthRetry(makeRequest);
+  await ensureOk(response);
+}
+
+
 export async function patchJson<T>(path: string, body: unknown): Promise<T> {
   const response = await withAuthRetry(() =>
     safeFetch(`${API_BASE_URL}${path}`, {

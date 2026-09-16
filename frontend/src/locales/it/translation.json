@@ -784,6 +784,7 @@
       "tabGradingSchemes": "Schemi di valutazione",
       "tabOrgUnits": "Unità organizzative",
       "tabSystemHealth": "Stato del sistema",
+      "tabLiveActivity": "Attività in tempo reale",
       "auditPlaceholder": "Log di audit — Prossimamente disponibile",
       "categories": {
         "userAccess": "Utenti e accesso",
@@ -849,6 +850,27 @@
           "inputLabel": "Messaggio all'assistente Ops-Chat",
           "send": "Invia",
           "error": "Richiesta non riuscita — riprova."
+        }
+      },
+      "liveActivity": {
+        "title": "Attività in tempo reale",
+        "subtitle": "Panoramica in tempo reale delle attività in corso — si aggiorna automaticamente ogni 10 secondi.",
+        "lastUpdated": "Ultimo aggiornamento: {{time}}",
+        "loadError": "Impossibile caricare i dati di attività in tempo reale.",
+        "staleError": "Aggiornamento non riuscito — i dati mostrati potrebbero non essere aggiornati.",
+        "retry": "Riprova",
+        "lessThan": "< {{value}}",
+        "unavailable": "Non disponibile",
+        "bucket": {
+          "documents_upload": "Caricamento documenti",
+          "questions_generate_rag": "Generazione domande (RAG)",
+          "questions_review": "Revisione domande",
+          "exam_compose": "Composizione esame",
+          "exam_results_import": "Importazione risultati",
+          "prompt_template_edit": "Modifica modello",
+          "prompt_wizard_chat": "Assistente prompt",
+          "document_chat_session": "Chat documenti",
+          "admin_reference_data_edit": "Modifica dati di riferimento"
         }
       },
       "audit": {

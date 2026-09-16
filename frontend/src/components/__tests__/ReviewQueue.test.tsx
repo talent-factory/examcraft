@@ -6,6 +6,12 @@ import ReviewQueue from '../ReviewQueue';
 import { ReviewService } from '../../services/ReviewService';
 import { QuestionReview, ReviewStatus } from '../../types/review';
 
+// TF-838 (PR #286 review): mocked so this suite doesn't fire real, unmocked
+// heartbeat POSTs as a side effect on every render.
+jest.mock('../../hooks/useActivityHeartbeat', () => ({
+  useActivityHeartbeat: jest.fn(),
+}));
+
 // Mock ReviewService
 jest.mock('../../services/ReviewService');
 const mockReviewService = ReviewService as jest.Mocked<typeof ReviewService>;

@@ -49,10 +49,13 @@ import {
 } from '../types/review';
 import QuestionReviewCard from './QuestionReviewCard';
 import QuestionEditor from './QuestionEditor';
+import { useActivityHeartbeat } from '../hooks/useActivityHeartbeat';
 
 const ReviewQueue: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  // TF-838: Live-Activity presence for the "questions_review" bucket.
+  useActivityHeartbeat('questions_review');
   const [questions, setQuestions] = useState<QuestionReview[]>([]);
   const [loading, setLoading] = useState(false);
   // The failure itself plus the key to fall back to — not the rendered

@@ -6,6 +6,12 @@ import AdminOrgUnits from '../AdminOrgUnits';
 import { OrgUnitsService } from '../../services/orgUnitsService';
 
 jest.mock('../../services/orgUnitsService');
+
+// TF-838 (PR #286 review): mocked so this suite doesn't fire real, unmocked
+// heartbeat POSTs as a side effect on every render.
+jest.mock('../../hooks/useActivityHeartbeat', () => ({
+  useActivityHeartbeat: jest.fn(),
+}));
 const mockedService = OrgUnitsService as jest.Mocked<typeof OrgUnitsService>;
 
 // Local override of the global react-i18next mock (src/setupTests.ts): that

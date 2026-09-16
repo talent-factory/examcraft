@@ -31,6 +31,12 @@ jest.mock('../../components/competencyFrameworks/CompetencyFrameworkForm', () =>
   <div data-testid="framework-form" />
 ));
 
+// TF-838 (PR #286 review): mocked so this suite doesn't fire real, unmocked
+// heartbeat POSTs as a side effect on every render.
+jest.mock('../../hooks/useActivityHeartbeat', () => ({
+  useActivityHeartbeat: jest.fn(),
+}));
+
 const makeFrameworks = (): CompetencyFramework[] => [
   {
     id: 1, name: 'Modul A – Mitarbeitende führen', module_code: 'A', description: null,

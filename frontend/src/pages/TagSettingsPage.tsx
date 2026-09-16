@@ -25,6 +25,7 @@ import TagRenameInline from '../components/tags/TagRenameInline';
 import TagMergeModal from '../components/tags/TagMergeModal';
 import TagCreateForm from '../components/tags/TagCreateForm';
 import { apiDetail, translateError } from '../errors';
+import { useActivityHeartbeat } from '../hooks/useActivityHeartbeat';
 
 type FilterMode = 'all' | 'active' | 'archived';
 
@@ -39,6 +40,10 @@ const loadFilter = (): FilterMode => {
 const TagSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  // TF-838: shared "admin_reference_data_edit" bucket — same component
+  // rendered via `/settings/tags` and the `/admin` "tags" tab (doubled
+  // surface, TF-824 spec) — mounting the heartbeat here covers both.
+  useActivityHeartbeat('admin_reference_data_edit');
   const { hasPermission, user } = useAuth();
   const isAdmin = hasPermission('manage_settings');
   const isSuperuser = user?.is_superuser === true;

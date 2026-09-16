@@ -784,6 +784,7 @@
       "tabGradingSchemes": "Grading Schemes",
       "tabOrgUnits": "Organizational Units",
       "tabSystemHealth": "System Health",
+      "tabLiveActivity": "Live Activity",
       "auditPlaceholder": "Audit Logs — Coming soon",
       "categories": {
         "userAccess": "Users & Access",
@@ -849,6 +850,27 @@
           "inputLabel": "Message to the Ops-Chat assistant",
           "send": "Send",
           "error": "Request failed — please try again."
+        }
+      },
+      "liveActivity": {
+        "title": "Live Activity",
+        "subtitle": "Live overview of active workflows — refreshes automatically every 10 seconds.",
+        "lastUpdated": "Last updated: {{time}}",
+        "loadError": "Could not load Live-Activity data.",
+        "staleError": "Refresh failed — the data shown may be out of date.",
+        "retry": "Retry",
+        "lessThan": "< {{value}}",
+        "unavailable": "Unavailable",
+        "bucket": {
+          "documents_upload": "Document upload",
+          "questions_generate_rag": "Question generation (RAG)",
+          "questions_review": "Question review",
+          "exam_compose": "Exam composition",
+          "exam_results_import": "Result import",
+          "prompt_template_edit": "Template editing",
+          "prompt_wizard_chat": "Prompt assistant",
+          "document_chat_session": "Document chat",
+          "admin_reference_data_edit": "Reference data editing"
         }
       },
       "audit": {
