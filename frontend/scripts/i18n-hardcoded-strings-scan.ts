@@ -86,8 +86,9 @@ const VISIBLE_PROP =
 // argument, and reports *every* string literal inside it.
 //
 // Matching `new Error(` rather than `throw new Error(` additionally covers
-// `reject(new Error('…'))`, the shape `WS_ERRORS` reaches the UI through
-// (premium RAGService, TF-772 PR 5).
+// `reject(new Error('…'))`. The original example, `WS_ERRORS` in the premium
+// RAGService, was dead code and is gone since TF-772 PR 5; the shape stays
+// covered because nothing else keeps a Promise-based service from using it.
 const NEW_ERROR = /\bnew Error\(/g;
 
 /** Minimum literal length, matching the `{3,}` of the regex this replaced. */

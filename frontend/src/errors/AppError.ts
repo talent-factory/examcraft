@@ -17,6 +17,7 @@ import { MOODLE_FEEDBACK_PUSH_ERROR_CODES } from './codes/moodleFeedbackPush';
 import { MOODLE_ROUNDTRIP_ERROR_CODES } from './codes/moodleRoundtrip';
 import { ORG_UNITS_ERROR_CODES } from './codes/orgUnits';
 import { PROMPTS_ERROR_CODES } from './codes/prompts';
+import { RAG_ERROR_CODES } from './codes/rag';
 import { RBAC_ERROR_CODES } from './codes/rbac';
 import { RESERVED_ERROR_CODES } from './codes/reserved';
 import { REVIEW_ERROR_CODES } from './codes/review';
@@ -72,6 +73,7 @@ export const APP_ERROR_CODES = [
   ...MOODLE_ROUNDTRIP_ERROR_CODES,
   ...ORG_UNITS_ERROR_CODES,
   ...PROMPTS_ERROR_CODES,
+  ...RAG_ERROR_CODES,
   ...RBAC_ERROR_CODES,
   ...REVIEW_ERROR_CODES,
   ...STUDENT_CLASSES_ERROR_CODES,

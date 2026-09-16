@@ -2139,14 +2139,6 @@
         "name": "Dokument-Chat",
         "description": "Chatte mit deinen Dokumenten mittels KI-gestützter Unterhaltungen."
       },
-      "promptManagement": {
-        "name": "Prompt-Verwaltung",
-        "description": "Verwalte und passe deine Prompt-Vorlagen mit erweiterten Funktionen an."
-      },
-      "promptTemplateSelector": {
-        "name": "Prompt-Vorlagen-Auswahl",
-        "description": "Wähle und passe Prompt-Vorlagen für die Fragengenerierung an."
-      },
       "advancedPromptManagement": {
         "name": "Erweiterte Prompt-Verwaltung",
         "description": "Lade eigene Prompt-Vorlagen hoch und verwalte sie mit semantischer Suche."
@@ -2678,10 +2670,17 @@
       "loadingPreview": "Analysiere Kontext…",
       "loadContextPreview": "Kontext analysieren",
       "foundContext": "Gefundener Kontext",
+      "previewSources": "Gefundene Quellen: {{sources}}",
+      "previewChunks": "Relevante Textabschnitte: {{chunks}}",
+      "previewAverageSimilarity": "Durchschnittliche Ähnlichkeit: {{similarity}}",
+      "previewEstimatedQuestions": "Geschätzte Fragen: {{questions}}",
       "recommendations": "Empfehlungen",
       "recommendedQuestionCount": "Empfohlene Anzahl Fragen:",
       "recommendedDifficulty": "Empfohlener Schwierigkeitsgrad:",
       "recommendedQuestionTypes": "Empfohlene Fragetypen:",
+      "qualityWarningLowSimilarity": "Niedrige Ähnlichkeitswerte — Fragen könnten weniger relevant sein",
+      "qualityWarningFewChunks": "Wenige Textabschnitte verfügbar — begrenzte Fragenvielfalt",
+      "qualityWarningSingleDocument": "Nur ein Dokument mit wenigen Abschnitten — erwäge weitere Dokumente",
       "generateAnother": "Weitere Fragen generieren",
       "generateExam": "Fragen generieren",
       "step4Label": "Prüfungsfragen generiert",
@@ -3270,6 +3269,13 @@
     "prompts_versions_load_failed": "Versionsverlauf konnte nicht geladen werden",
     "prompts_versions_not_found": "Keine Versionen für Prompt '{{name}}' gefunden.",
     "rag_get_documents_failed": "Dokumente konnten nicht abgerufen werden",
+    "rag_validation_document_required": "Mindestens ein Dokument muss ausgewählt werden",
+    "rag_validation_invalid_difficulty": "Ungültiger Schwierigkeitsgrad",
+    "rag_validation_invalid_language": "Ungültige Sprache",
+    "rag_validation_invalid_question_types": "Ungültige Fragetypen: {{types}}",
+    "rag_validation_question_count_range": "Anzahl Fragen muss zwischen 1 und 20 liegen",
+    "rag_validation_question_type_required": "Mindestens ein Fragetyp muss ausgewählt werden",
+    "rag_validation_topic_too_short": "Thema muss mindestens 3 Zeichen lang sein",
     "rbac_feature_load_failed": "Feature konnte nicht geladen werden",
     "rbac_feature_not_found": "Feature nicht gefunden",
     "rbac_features_load_failed": "Features konnten nicht geladen werden",

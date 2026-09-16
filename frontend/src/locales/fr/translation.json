@@ -2139,14 +2139,6 @@
         "name": "Chat documentaire",
         "description": "Discute avec tes documents grâce à des conversations assistées par IA."
       },
-      "promptManagement": {
-        "name": "Gestion des prompts",
-        "description": "Gère et personnalise tes modèles de prompts avec des fonctionnalités avancées."
-      },
-      "promptTemplateSelector": {
-        "name": "Sélecteur de modèles de prompts",
-        "description": "Sélectionne et personnalise des modèles de prompts pour la génération de questions."
-      },
       "advancedPromptManagement": {
         "name": "Gestion avancée des prompts",
         "description": "Importe et gère tes propres modèles de prompts avec la recherche sémantique."
@@ -2678,10 +2670,17 @@
       "loadingPreview": "Analyse du contexte…",
       "loadContextPreview": "Analyser le contexte",
       "foundContext": "Contexte trouvé",
+      "previewSources": "Sources trouvées : {{sources}}",
+      "previewChunks": "Passages de texte pertinents : {{chunks}}",
+      "previewAverageSimilarity": "Similarité moyenne : {{similarity}}",
+      "previewEstimatedQuestions": "Questions estimées : {{questions}}",
       "recommendations": "Recommandations",
       "recommendedQuestionCount": "Nombre de questions recommandé :",
       "recommendedDifficulty": "Niveau de difficulté recommandé :",
       "recommendedQuestionTypes": "Types de questions recommandés :",
+      "qualityWarningLowSimilarity": "Scores de similarité faibles — les questions pourraient être moins pertinentes",
+      "qualityWarningFewChunks": "Peu de passages de texte disponibles — variété de questions limitée",
+      "qualityWarningSingleDocument": "Un seul document avec peu de passages — envisage d'ajouter d'autres documents",
       "generateAnother": "Générer d'autres questions",
       "generateExam": "Générer les questions",
       "step4Label": "Questions d'examen générées",
@@ -3270,6 +3269,13 @@
     "prompts_versions_load_failed": "Impossible de charger l'historique des versions",
     "prompts_versions_not_found": "Aucune version trouvée pour le prompt « {{name}} ».",
     "rag_get_documents_failed": "Échec de la récupération des documents",
+    "rag_validation_document_required": "Au moins un document doit être sélectionné",
+    "rag_validation_invalid_difficulty": "Niveau de difficulté non valide",
+    "rag_validation_invalid_language": "Langue non valide",
+    "rag_validation_invalid_question_types": "Types de questions non valides : {{types}}",
+    "rag_validation_question_count_range": "Le nombre de questions doit être compris entre 1 et 20",
+    "rag_validation_question_type_required": "Au moins un type de question doit être sélectionné",
+    "rag_validation_topic_too_short": "Le sujet doit comporter au moins 3 caractères",
     "rbac_feature_load_failed": "Impossible de charger la fonctionnalité",
     "rbac_feature_not_found": "Fonctionnalité introuvable",
     "rbac_features_load_failed": "Impossible de charger les fonctionnalités",

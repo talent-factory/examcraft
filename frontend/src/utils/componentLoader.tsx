@@ -10,7 +10,7 @@
  * - The user has access to them (subscription tier)
  */
 
-import React, { lazy, Suspense, ComponentType } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { isFullDeployment } from './deploymentMode';
@@ -18,8 +18,13 @@ import { withFeatureGate } from '../components/common/withFeatureGate';
 
 /**
  * Feature unavailable component
+ *
+ * Takes an i18n key, not a display name: the loaders below run outside any
+ * component body and cannot call `t()`, and the English literals they used to
+ * pass ended up interpolated into an otherwise translated sentence
+ * ("RAG Exam Creator ist nicht verfügbar").
  */
-const FeatureUnavailable: React.FC<{ featureName: string }> = ({ featureName }) => {
+const FeatureUnavailable: React.FC<{ featureNameKey: string }> = ({ featureNameKey }) => {
   const { t } = useTranslation();
   return (
     <Box
@@ -31,7 +36,7 @@ const FeatureUnavailable: React.FC<{ featureName: string }> = ({ featureName }) 
       sx={{ p: 3 }}
     >
       <Typography variant="h6" color="textSecondary" gutterBottom>
-        {t('components.featureUnavailable.title', { feature: featureName })}
+        {t('components.featureUnavailable.title', { feature: t(featureNameKey) })}
       </Typography>
       <Typography variant="body2" color="textSecondary" align="center">
         {t('components.featureUnavailable.body')}
@@ -43,9 +48,10 @@ const FeatureUnavailable: React.FC<{ featureName: string }> = ({ featureName }) 
 };
 
 /**
- * Loading fallback component
+ * Loading fallback component. `componentNameKey` is an i18n key, for the same
+ * reason as `FeatureUnavailable`.
  */
-const LoadingFallback: React.FC<{ componentName?: string }> = ({ componentName }) => {
+const LoadingFallback: React.FC<{ componentNameKey?: string }> = ({ componentNameKey }) => {
   const { t } = useTranslation();
   return (
     <Box
@@ -56,30 +62,14 @@ const LoadingFallback: React.FC<{ componentName?: string }> = ({ componentName }
       minHeight="200px"
     >
       <CircularProgress />
-      {componentName && (
+      {componentNameKey && (
         <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
-          {t('components.componentLoader.loading', { component: componentName })}
+          {t('components.componentLoader.loading', { component: t(componentNameKey) })}
         </Typography>
       )}
     </Box>
   );
 };
-
-/**
- * Generic component loader with error handling
- * DEPRECATED: Use specific loader functions instead (loadRAGExamCreator, loadDocumentChat, etc.)
- * This function is kept for backward compatibility but should not be used for new code.
- */
-export const loadComponent = <P extends object>(
-  componentPath: string,
-  componentName: string,
-  FallbackComponent?: ComponentType<P>
-): ComponentType<P> => {
-  console.warn(`loadComponent is deprecated. Use specific loader functions instead.`);
-  return (FallbackComponent || (() => <FeatureUnavailable featureName={componentName} />)) as ComponentType<P>;
-};
-
-
 
 /**
  * Load RAG Exam Creator (Premium Feature)
@@ -94,7 +84,7 @@ export const loadRAGExamCreator = () => {
   // Check deployment mode first
   if (!isFullDeployment()) {
     console.warn('[componentLoader] RAG Exam Creator not available in Core deployment');
-    return () => <FeatureUnavailable featureName="RAG Exam Creator" />;
+    return () => <FeatureUnavailable featureNameKey="components.featureGate.ragExamCreator.name" />;
   }
 
   const LazyComponent = lazy(() =>
@@ -113,12 +103,18 @@ export const loadRAGExamCreator = () => {
       })
       .catch((error) => {
         console.error('[componentLoader] Failed to load RAG Exam Creator:', error);
-        return { default: () => <FeatureUnavailable featureName="RAG Exam Creator" /> };
+        return {
+          default: () => (
+            <FeatureUnavailable featureNameKey="components.featureGate.ragExamCreator.name" />
+          ),
+        };
       })
   );
 
   return (props: any) => (
-    <Suspense fallback={<LoadingFallback componentName="RAG Exam Creator" />}>
+    <Suspense
+      fallback={<LoadingFallback componentNameKey="components.featureGate.ragExamCreator.name" />}
+    >
       <LazyComponent {...props} />
     </Suspense>
   );
@@ -134,7 +130,7 @@ export const loadRAGExamCreator = () => {
 export const loadDocumentChat = () => {
   if (!isFullDeployment()) {
     console.warn('[componentLoader] Document Chat not available in Core deployment');
-    return () => <FeatureUnavailable featureName="Document Chat" />;
+    return () => <FeatureUnavailable featureNameKey="components.featureGate.documentChat.name" />;
   }
 
   const LazyComponent = lazy(() =>
@@ -147,71 +143,6 @@ export const loadDocumentChat = () => {
     'professional',
     'components.featureGate.documentChat.name',
     'components.featureGate.documentChat.description'
-  );
-};
-
-/**
- * Load Prompt Management (Premium Feature)
- *
- * Checks:
- * 1. Deployment Mode: Must be Full deployment
- * 2. RBAC: User must have 'advanced_prompt_management' feature (Professional tier)
- */
-export const loadPromptManagement = () => {
-  if (!isFullDeployment()) {
-    console.warn('[componentLoader] Prompt Management not available in Core deployment');
-    return () => <FeatureUnavailable featureName="Prompt Management" />;
-  }
-
-  const LazyComponent = lazy(() =>
-    import('@examcraft/premium').then(module => ({ default: module.PromptLibraryWithUpload }))
-  );
-
-  return withFeatureGate(
-    LazyComponent,
-    'advanced_prompt_management',
-    'professional',
-    'components.featureGate.promptManagement.name',
-    'components.featureGate.promptManagement.description'
-  );
-};
-
-/**
- * Load Prompt Template Selector (Premium Feature)
- *
- * Checks:
- * 1. Deployment Mode: Must be Full deployment
- * 2. RBAC: User must have 'prompt_templates' feature (via withFeatureGate)
- */
-export const loadPromptTemplateSelector = () => {
-  if (!isFullDeployment()) {
-    console.warn('[componentLoader] Prompt Template Selector not available in Core deployment');
-    return () => <FeatureUnavailable featureName="Prompt Template Selector" />;
-  }
-
-  const LazyComponent = lazy(() =>
-    import(/* webpackChunkName: "premium-prompt-template-selector" */ '@examcraft/premium')
-      .then((module) => {
-        // Wrap with feature gate for RBAC check
-        const ProtectedComponent = withFeatureGate(
-          module.PromptTemplateSelector,
-          'prompt_templates',
-          'starter',
-          'components.featureGate.promptTemplateSelector.name',
-          'components.featureGate.promptTemplateSelector.description'
-        );
-        return { default: ProtectedComponent };
-      })
-      .catch((error) => {
-        console.error('[componentLoader] Failed to load Prompt Template Selector:', error);
-        return { default: () => <FeatureUnavailable featureName="Prompt Template Selector" /> };
-      })
-  );
-
-  return (props: any) => (
-    <Suspense fallback={<LoadingFallback componentName="Prompt Template Selector" />}>
-      <LazyComponent {...props} />
-    </Suspense>
   );
 };
 
@@ -255,49 +186,15 @@ export const loadPromptLibraryWithUpload = () => {
 
   return (props: any) => (
     <div data-testid="prompts-content">
-      <Suspense fallback={<LoadingFallback componentName="Prompt Library" />}>
+      <Suspense
+        fallback={
+          <LoadingFallback componentNameKey="components.featureGate.advancedPromptManagement.name" />
+        }
+      >
         <LazyComponent {...props} />
       </Suspense>
     </div>
   );
-};
-
-/**
- * Load Custom Branding (Enterprise Feature)
- *
- * Checks:
- * 1. Deployment Mode: Must be Full deployment
- * 2. RBAC: User must have 'custom_branding' feature (checked in component)
- */
-export const loadCustomBranding = () => {
-  if (!isFullDeployment()) {
-    console.warn('[componentLoader] Custom Branding not available in Core deployment');
-    return () => <FeatureUnavailable featureName="Custom Branding" />;
-  }
-
-  // A CustomBranding component existed as an unwired placeholder but was
-  // never lazy-loaded from here; it was removed as dead code in TF-671.
-  // Implementing this feature means building the component from scratch.
-  return () => <FeatureUnavailable featureName="Custom Branding" />;
-};
-
-/**
- * Load SSO Configuration (Enterprise Feature)
- *
- * Checks:
- * 1. Deployment Mode: Must be Full deployment
- * 2. RBAC: User must have 'sso_integration' feature (checked in component)
- */
-export const loadSSOConfiguration = () => {
-  if (!isFullDeployment()) {
-    console.warn('[componentLoader] SSO Configuration not available in Core deployment');
-    return () => <FeatureUnavailable featureName="SSO Configuration" />;
-  }
-
-  // An SSOConfiguration component existed as an unwired placeholder but was
-  // never lazy-loaded from here; it was removed as dead code in TF-671.
-  // Implementing this feature means building the component from scratch.
-  return () => <FeatureUnavailable featureName="SSO Configuration" />;
 };
 
 /**
