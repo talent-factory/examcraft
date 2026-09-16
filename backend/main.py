@@ -480,6 +480,23 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"❌ Error loading Premium Ops Health API: {e}")
 
+        # Premium: Activity Heartbeat API (TF-833). Aliased to
+        # activity_heartbeat_api, not activity_api like its siblings above —
+        # activity_api is already bound above (line ~334) to the unrelated,
+        # pre-existing core "activity feed" module (api.activity, TF-337).
+        # Reusing the name would silently rebind it without erroring, so a
+        # future consistency pass renaming this back to activity_api could
+        # mask that this is a different router entirely.
+        try:
+            from premium.api.v1 import activity as activity_heartbeat_api
+
+            app.include_router(activity_heartbeat_api.router)
+            print("✅ Premium Activity Heartbeat API loaded")
+        except ImportError as e:
+            print(f"⚠️  Premium Activity Heartbeat API not available: {e}")
+        except Exception as e:
+            print(f"❌ Error loading Premium Activity Heartbeat API: {e}")
+
         # Premium: MCP Facade Server (Fly.io Management Tools)
         try:
             from premium.mcp import create_mcp_app

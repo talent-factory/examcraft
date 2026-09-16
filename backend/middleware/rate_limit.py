@@ -48,6 +48,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             "/docs",
             "/redoc",
             "/openapi.json",
+            # TF-833/ADR-0007: JWT-authentifiziert, ~4 Heartbeats/Min/Person —
+            # Institutionen hinter gemeinsamer NAT-IP würden sonst schnell an
+            # das IP-Limit stossen. UserRateLimiter im Endpoint bleibt als
+            # zweite Verteidigungslinie.
+            "/api/v1/activity/heartbeat",
         ] or request.url.path.startswith("/mcp"):
             return await call_next(request)
 

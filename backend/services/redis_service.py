@@ -34,11 +34,13 @@ REDIS_DB_SESSIONS = 0  # Database 0 for sessions
 # reconnect. All four non-session databases below therefore now share DB 0
 # with sessions — isolation is via key prefix only (``session:*``/
 # ``user_sessions:*``, ``blacklist:*``, ``ratelimit:*``, ``mcp:*``,
-# ``ops_alert:state:*`` — all disjoint, verified in TF-816).
+# ``ops_alert:state:*``, ``activity:presence:*`` (TF-833) — all disjoint,
+# verified in TF-816).
 REDIS_DB_BLACKLIST = REDIS_DB_SESSIONS  # was DB 1 pre-TF-816
 REDIS_DB_RATELIMIT = REDIS_DB_SESSIONS  # was DB 2 pre-TF-816
 REDIS_DB_MCP_OAUTH = REDIS_DB_SESSIONS  # was DB 3 pre-TF-816 (TF-726)
 REDIS_DB_OPS_ALERTS = REDIS_DB_SESSIONS  # was DB 3/4 pre-TF-815-follow-up
+REDIS_DB_ACTIVITY = REDIS_DB_SESSIONS  # TF-833, shares DB 0 from day one
 
 
 class RedisService:
@@ -49,6 +51,7 @@ class RedisService:
     _ratelimit_client: Optional[redis.Redis] = None
     _mcp_oauth_client: Optional[redis.Redis] = None
     _ops_alert_client: Optional[redis.Redis] = None
+    _activity_client: Optional[redis.Redis] = None
 
     @classmethod
     def get_session_client(cls) -> redis.Redis:
@@ -133,6 +136,24 @@ class RedisService:
         return cls._ops_alert_client
 
     @classmethod
+    def get_activity_client(cls) -> redis.Redis:
+        """Get Redis client for the Live-Activity presence sorted sets (TF-833).
+
+        Backs ``activity:presence:{bucket_id}`` — one sorted set per
+        Kategorie-2-Bucket, member ``user_id``, score = last-heartbeat Unix
+        timestamp (see ``premium/backend/services/activity_count_service.py``).
+        Shares physical DB 0 with sessions/blacklist/rate-limiting/MCP-OAuth/
+        ops-alerts (TF-816) — prod's Upstash instance only supports DB 0.
+        Isolated from them purely by key prefix (``activity:presence:*``).
+        """
+        if cls._activity_client is None:
+            cls._activity_client = redis.from_url(
+                REDIS_URL, db=REDIS_DB_ACTIVITY, decode_responses=True
+            )
+            logger.info("Redis activity client initialized")
+        return cls._activity_client
+
+    @classmethod
     def close_all(cls):
         """Close all Redis connections"""
         if cls._session_client:
@@ -150,6 +171,9 @@ class RedisService:
         if cls._ops_alert_client:
             cls._ops_alert_client.close()
             cls._ops_alert_client = None
+        if cls._activity_client:
+            cls._activity_client.close()
+            cls._activity_client = None
         logger.info("All Redis clients closed")
 
 
