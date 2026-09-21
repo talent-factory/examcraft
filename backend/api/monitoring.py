@@ -14,7 +14,7 @@ der Login-Seite) — abgesichert über die bereits global registrierte `RateLimi
 (gilt für die gesamte API ausser `/health`), kein neuer Ratenlimit-Mechanismus nötig.
 
 `sanitize_url()`/`strip_control_chars()` sind bewusst LOKAL implementiert statt aus
-`specula-client-python` importiert (obwohl dort seit TF-892 verfügbar): `core/` wird
+`specula-client-python` importiert (obwohl dort seit TF-892/TF-895 verfügbar): `core/` wird
 unverändert als Open-Source-Mirror veröffentlicht und darf nie hart von einem privaten Paket
 abhängen (siehe `config/observability.py`s "package-fail-open" für Tracing/Logging). Für eine
 Sicherheitskontrolle wie diese hier wäre Fail-Open aber keine akzeptable Degradierung, sondern
@@ -38,18 +38,31 @@ router = APIRouter(prefix="/api/v1/monitoring", tags=["monitoring"])
 _SIGN_TOKEN_PATH = re.compile(r"/sign/[^/?#]+")
 _CONTROL_CHARS = re.compile(r"[\r\n\x00-\x08\x0b\x0c\x0e-\x1f]")
 
+# Matcht ein optionales Schema gefolgt von `user[:pass]@` in der URL-Autorität (TF-895).
+# `[^/]*` (statt `[^/@]*`) ist bewusst gewählt: greedy über ALLE "@" hinweg bis zum LETZTEN
+# "@" vor dem ersten "/" — genau wie WHATWG-URL-Parser (Browser) die Autorität trennen. Ein
+# erster Versuch mit `[^/@]*` (stoppt am ERSTEN "@") liess ein Passwort mit eingebettetem "@"
+# (z. B. "user:p@ss@host") nur bis zum ersten "@" redigieren und "ss@host" unredigiert als
+# scheinbaren Host im Log stehen — ein Parser-Differential-Bug derselben Klasse wie die
+# Browser-Obfuskationstechnik "user@fake.example@real-host.example". Der Pfad bleibt trotzdem
+# geschützt: `[^/]*` kann "/" nie konsumieren, ein "@" NACH dem ersten "/" (z. B.
+# "/path@2x.png") liegt also ausserhalb des möglichen Matches.
+_USERINFO = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*://)?[^/]*@")
+
 
 def _sanitize_url(url: str) -> str:
     """Redigiert `payload.url` vor dem Loggen (Defense-in-Depth).
 
     Das Frontend saniert bereits clientseitig, aber das Backend darf Client-Input nie
     vertrauen (alter gecachter Bundle, künftiger Bypass). Query-String pauschal strippen
-    (kann Capability-Token tragen, z. B. `/verify-email?token=...`/`/reset-password?token=...`)
-    und den `/sign/:token`-Pfad selbst redigieren (Signatur-Capability steckt dort direkt im
-    Pfad, nicht im Query-String).
+    (kann Capability-Token tragen, z. B. `/verify-email?token=...`/`/reset-password?token=...`),
+    Userinfo-Credentials aus der URL-Autorität entfernen (`https://user:pass@host/...`,
+    TF-895) und den `/sign/:token`-Pfad selbst redigieren (Signatur-Capability steckt dort
+    direkt im Pfad, nicht im Query-String).
     """
     without_query = url.split("?", 1)[0].split("#", 1)[0]
-    return _SIGN_TOKEN_PATH.sub("/sign/<redacted>", without_query)
+    without_userinfo = _USERINFO.sub(r"\1", without_query)
+    return _SIGN_TOKEN_PATH.sub("/sign/<redacted>", without_userinfo)
 
 
 def _strip_control_chars(text: str) -> str:

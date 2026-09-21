@@ -132,6 +132,60 @@ def test_client_error_endpoint_redacts_query_string_tokens_from_logged_url(
     assert "https://example.com/reset-password" in record.getMessage()
 
 
+def test_client_error_endpoint_redacts_userinfo_credentials_from_logged_url(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # TF-895: Userinfo-Credentials in der URL-Autorität (https://user:pass@host/...) sind ein
+    # Log-Leak-Vektor, den Query-String- und /sign/:token-Redacting allein nicht abdecken.
+    with caplog.at_level(logging.ERROR, logger="api.monitoring"):
+        client.post(
+            ENDPOINT,
+            json={
+                "message": "boom",
+                "stack": "",
+                "url": "https://user:secret@example.com/dashboard",
+                "userAgent": "pytest-agent",
+            },
+        )
+
+    record = next(
+        r
+        for r in caplog.records
+        if getattr(r, "specula_signal_type", None) == "frontend_error"
+    )
+    assert "secret" not in record.getMessage()
+    assert "https://example.com/dashboard" in record.getMessage()
+
+
+def test_client_error_endpoint_redacts_userinfo_with_at_sign_embedded_in_password(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Parser-Differential-Regressionstest: ein Passwort mit eingebettetem "@" darf nicht nur
+    # bis zum ERSTEN "@" redigiert werden (das würde den Rest des Passworts als scheinbaren
+    # Host im Log stehen lassen) — Browser/WHATWG-URL-Parser trennen die Autorität am
+    # LETZTEN "@" vor dem ersten "/", das muss api.monitoring auch tun.
+    with caplog.at_level(logging.ERROR, logger="api.monitoring"):
+        client.post(
+            ENDPOINT,
+            json={
+                "message": "boom",
+                "stack": "",
+                "url": "https://user:p@ss@example.com/path",
+                "userAgent": "pytest-agent",
+            },
+        )
+
+    record = next(
+        r
+        for r in caplog.records
+        if getattr(r, "specula_signal_type", None) == "frontend_error"
+    )
+    rendered = record.getMessage()
+    assert "p@ss" not in rendered
+    assert "ss@example.com" not in rendered
+    assert "https://example.com/path" in rendered
+
+
 def test_client_error_endpoint_redacts_sign_token_path_from_logged_url(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
