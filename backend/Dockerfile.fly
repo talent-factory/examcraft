@@ -17,7 +17,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     libmupdf-dev \
     git \
-    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -26,15 +25,36 @@ WORKDIR /app
 # Copy requirements first (for better layer caching)
 COPY core/backend/requirements.txt ./
 
-# Install Python dependencies
-# Use build secret for private GitHub repo access (subscribeflow SDK)
-RUN --mount=type=secret,id=GITHUB_TOKEN \
-    pip install --no-cache-dir --upgrade pip && \
-    if [ -f /run/secrets/GITHUB_TOKEN ]; then \
-        GITHUB_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
-        git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"; \
-    fi && \
+# Install Python dependencies. requirements.txt itself needs no credentials
+# (see its own comment on why specula-client isn't listed there).
+RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
+
+# Optional: TF-865 observability (specula-client, private repo, not on PyPI
+# yet, see requirements.txt). Only attempted when a GITHUB_TOKEN build secret
+# is supplied (deploy.yml always supplies MIRROR_GITHUB_TOKEN here, so a real
+# Fly.io deploy always gets it); config/observability.py and
+# middleware/observability_context.py degrade to a fully functional,
+# tracing-less no-op when the package isn't importable, so this stays a
+# working image even in a build that somehow lacks the secret. This is also
+# the mechanism a real (currently dormant) subscribeflow SDK private release
+# would reuse.
+#
+# `-s` (not `-f`): BuildKit still mounts an EMPTY file at
+# /run/secrets/GITHUB_TOKEN when the secret isn't supplied at all -- `-f`
+# alone would be true for that empty file too, attempting an anonymous
+# `https://@github.com/...` clone of a private repo (guaranteed to fail).
+#
+# The token is embedded directly in the pip install URL argument, not
+# written to disk via `git config --global` -- nothing to clean up
+# afterwards, and no risk of it persisting in a shipped image layer (this
+# stage's layers are discarded anyway; the runtime stage below only copies
+# the installed site-packages, not this stage's filesystem history).
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    if [ -s /run/secrets/GITHUB_TOKEN ]; then \
+        GITHUB_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
+        pip install --no-cache-dir "specula-client[fastapi,celery] @ git+https://${GITHUB_TOKEN}@github.com/talent-factory/specula-client-python.git@v0.1.0"; \
+    fi
 
 # =========================
 # Stage 2: Runtime Stage
@@ -57,9 +77,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# PyMuPDFs get_textpage_ocr verlangt eine gesetzte TESSDATA_PREFIX. Pfad gilt
-# für Debian Bookworm (python:3.12-slim, Tesseract 5); bei abweichender Basis
-# anpassen. Identisch zum lokalen core/backend/Dockerfile.
+# PyMuPDFs get_textpage_ocr verlangt eine gesetzte TESSDATA_PREFIX. Pfad ist
+# nach Tesseract-Major-Version versioniert (aktuell 5.x), nicht nach Debian-
+# Codename (python:3.12-slim zeigt inzwischen auf Debian Trixie statt
+# Bookworm, ohne dass sich dieser Pfad geändert hätte -- empirisch verifiziert,
+# TF-865). Bei abweichender Tesseract-Major-Version anpassen. Identisch zum
+# lokalen core/backend/Dockerfile.
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
 
 # Create non-root user for security

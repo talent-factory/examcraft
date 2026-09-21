@@ -142,8 +142,9 @@ def test_generate_questions_task_returns_correct_format():
 
     mock_rag_service = MagicMock()
 
-    # TF-359: capture the Sentry scope tags set by the task so a regression that
-    # drops user_id/topic tagging fails here (the lines execute either way).
+    # TF-359/TF-865: capture the OTel span tags set by the task so a
+    # regression that drops user_id/topic tagging fails here (the lines
+    # execute either way).
     captured_tags: dict[str, str] = {}
 
     with (
@@ -152,7 +153,7 @@ def test_generate_questions_task_returns_correct_format():
         patch("tasks.question_tasks._persist_questions", return_value=[1]),
         patch("tasks.question_tasks._safe_update_job_status"),
         patch(
-            "tasks.question_tasks.sentry_sdk.set_tag",
+            "tasks.question_tasks.set_span_tag",
             side_effect=lambda key, value: captured_tags.__setitem__(key, value),
         ),
     ):
@@ -657,7 +658,7 @@ def test_update_job_status_recovers_on_fourth_attempt():
 
 
 def test_job_status_update_error_carries_structured_fields():
-    """JobStatusUpdateError exposes task_id, status, attempts, last_err for Sentry tagging."""
+    """JobStatusUpdateError exposes task_id, status, attempts, last_err for observability tagging."""
     from tasks.question_tasks import JobStatusUpdateError
 
     cause = RuntimeError("simulated")

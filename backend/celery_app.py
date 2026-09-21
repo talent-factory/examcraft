@@ -14,23 +14,24 @@ logger = logging.getLogger(__name__)
 
 
 @celeryd_init.connect
-def _init_worker_sentry(**_kwargs):
-    """Initialize Sentry in the Celery worker process (TF-359).
+def _init_worker_observability(**_kwargs):
+    """Initialize observability in the Celery worker process (TF-359, TF-865).
 
-    The FastAPI process calls ``init_sentry()`` in ``main.py``; the worker
-    runs ``celery -A celery_app worker`` and never imports ``main``, so without
-    this hook the worker was blind to all task exceptions.
+    The FastAPI process calls ``init_observability()`` in ``main.py``; the
+    worker runs ``celery -A celery_app worker`` and never imports ``main``, so
+    without this hook the worker was blind to all task exceptions.
 
     ``celeryd_init`` fires once when the worker daemon boots, before the prefork
-    pool spawns its children — the fork-safe entry point. ``CeleryIntegration``
-    (added in ``config/sentry.py``) then propagates the SDK across forked
-    children and on ``worker_max_tasks_per_child`` recycles. ``init_sentry()``
-    is a no-op unless ``ENABLE_SENTRY=true`` and ``SENTRY_DSN`` are set, so
-    booting a worker locally without those stays silent.
+    pool spawns its children — the fork-safe entry point. Celery instrumentation
+    (``instrument_celery=True`` in ``config/observability.py``) then propagates
+    across forked children and on ``worker_max_tasks_per_child`` recycles.
+    ``init_worker_observability()`` is a no-op unless ``OTEL_EXPORTER_ENDPOINT``
+    and ``SPECULA_TEAM_API_KEY`` are set, so booting a worker locally without
+    those stays silent.
     """
-    from config.sentry import init_sentry
+    from config.observability import init_worker_observability
 
-    init_sentry()
+    init_worker_observability()
 
 
 @celeryd_init.connect
@@ -41,7 +42,7 @@ def _validate_claude_model(**_kwargs):
     Mirrors the FastAPI lifespan check on the worker — the process that runs
     question generation — so a retired model is caught at restart time and falls
     back to a curated alternative, instead of looping on the first job (the
-    TF-437 incident). Registered after the Sentry hook so its alert is captured.
+    TF-437 incident). Registered after the observability hook so its alert is captured.
     ``celeryd_init`` runs in the main worker process before the prefork pool
     spawns, in a plain sync context, so ``asyncio.run`` is safe. Fail-open.
     """
@@ -140,7 +141,7 @@ celery_app = Celery(
         "tasks.session_cleanup",
         "tasks.feedback_tasks",
         "tasks.maintenance_tasks",
-        "tasks.diagnostics_tasks",  # TF-359 Sentry worker-pipeline verification
+        "tasks.diagnostics_tasks",  # TF-359 worker-pipeline verification
         "tasks.import_submissions_task",  # TF-412 async result import
         "tasks.moodle_feedback_push_task",  # TF-435 feedback push back to Moodle
         "tasks.gdpr_tasks",  # TF-745 GDPR scheduled deletion

@@ -59,6 +59,8 @@ services:
     build:
       context: .
       dockerfile: ./backend/Dockerfile
+      secrets:
+        - GITHUB_TOKEN
     restart: unless-stopped
     env_file:
       - path: ../.env
@@ -93,6 +95,8 @@ services:
     build:
       context: .
       dockerfile: ./backend/Dockerfile
+      secrets:
+        - GITHUB_TOKEN
     restart: unless-stopped
     env_file:
       - path: ../.env
@@ -151,3 +155,12 @@ volumes:
   redis_data:
   rabbitmq_data:
   backend_storage:
+
+# TF-865: build-time secret for the api/celery-worker Dockerfile's
+# specula-client git+ssh:// dependency (see backend/Dockerfile). Sourced from
+# the GITHUB_TOKEN env var; unset locally is fine (empty secret -> same
+# no-op fallback the retired --mount=type=ssh already had for anyone without
+# an agent-forwarded key).
+secrets:
+  GITHUB_TOKEN:
+    environment: GITHUB_TOKEN

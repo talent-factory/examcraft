@@ -26,10 +26,10 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Initialize Sentry (must be done before FastAPI app creation)
-from config.sentry import init_sentry  # noqa: E402
+# Initialize Observability (must be done before FastAPI app creation, TF-865)
+from config.observability import init_observability  # noqa: E402
 
-init_sentry()
+init_observability()
 
 # Initialize Celery App (for async task processing)
 try:
@@ -57,7 +57,8 @@ def _log_task_exception(task: asyncio.Task) -> None:
     - `CancelledError` is `BaseException` (not `Exception`), so the inner
       `try/except Exception` inside the task body does not catch it.
     - Without proper exception retrieval, asyncio emits "Task exception was
-      never retrieved" warnings to stderr, bypassing our logger and Sentry.
+      never retrieved" warnings to stderr, bypassing our logger and
+      observability backend.
     """
     if task.cancelled():
         logger.warning("Background task cancelled (likely app shutdown)")
@@ -423,20 +424,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         # print() here previously meant a broken webhook receiver could
         # boot the app "successfully" (health checks pass) with zero
-        # logged error and zero Sentry event -- every SubscribeFlow
+        # logged error and zero observability event -- every SubscribeFlow
         # delivery-status call would then 404 with nothing pointing at why.
-        # logger.error reaches Sentry (config/sentry.py's LoggingIntegration
-        # sends ERROR+ as events); this is still a soft-continue rather than
-        # a fatal startup failure, since email deliverability tracking
-        # shouldn't take down exam-generation with it.
+        # logger.error reaches Specula (config/observability.py's
+        # SpeculaLogHandler forwards ERROR+, TF-865); this is still a
+        # soft-continue rather than a fatal startup failure, since email
+        # deliverability tracking shouldn't take down exam-generation with it.
         logger.error(f"Error loading email webhooks: {e}", exc_info=True)
 
-    # Sentry Test Router (only in development)
+    # Sentry Test Router (only in development) -- module/route names kept as
+    # "sentry"/"Sentry" post-TF-865; the rename is deliberately deferred to
+    # TF-868 (see api/sentry_test.py's module docstring).
     if os.getenv("ENVIRONMENT", "development") == "development":
         app.include_router(sentry_test.router)
 
-    # SuperAdmin Sentry worker-pipeline trigger (TF-359): registered in ALL
-    # environments so the worker -> Sentry path can be verified in production.
+    # SuperAdmin worker-pipeline trigger (TF-359): registered in ALL
+    # environments so the worker -> observability-backend path can be
+    # verified in production.
     # Access is locked to SuperAdmins via get_current_superuser.
     app.include_router(sentry_test.admin_router)
 
@@ -671,10 +675,16 @@ app = FastAPI(
     redirect_slashes=False,  # Prevent 307 redirects to HTTP behind proxy
 )
 
-# Sentry Context Middleware
-from middleware.sentry_context import SentryContextMiddleware  # noqa: E402
+# Observability Context Middleware (TF-865)
+from middleware.observability_context import ObservabilityContextMiddleware  # noqa: E402
 
-app.add_middleware(SentryContextMiddleware)
+app.add_middleware(ObservabilityContextMiddleware)
+
+# Request tracing (TF-865): instruments the now-fully-constructed app for
+# request spans. No-op if OTEL_EXPORTER_ENDPOINT/SPECULA_TEAM_API_KEY are unset.
+from config.observability import instrument_app  # noqa: E402
+
+instrument_app(app)
 
 # Impersonation Context Middleware (TF-741) - resets the request-scoped
 # impersonation ContextVar so it can never leak between requests.
@@ -833,10 +843,13 @@ def install_error_envelope_handlers(sub_app: FastAPI) -> None:
 async def app_unhandled_exception_handler(request: Request, exc: Exception):
     """Last resort: an uncaught exception must not leak a stack trace.
 
-    Sentry's Starlette integration captures in ServerErrorMiddleware before
-    dispatching here, so registering this handler does not cost reporting; the
-    explicit ``logger.exception`` keeps the trace in the container logs, which
-    is where it is looked for locally.
+    The explicit ``logger.exception`` call below is the actual reporting path
+    (TF-865): ``config/observability.py``'s ``SpeculaLogHandler`` forwards
+    ERROR+ records to Specula regardless of whatever OTel's
+    ``FastAPIInstrumentor`` (``instrument_app()``) does with this exception at
+    the span level -- registering this handler does not cost reporting. It
+    also keeps the trace in the container logs, which is where it is looked
+    for locally.
     """
     logger.exception(
         "Unhandled exception on %s %s", request.method, request.url.path, exc_info=exc

@@ -42,7 +42,6 @@ docs = [
 dev = [
     "authlib>=1.6.9",
     "pytest>=8.4.2",
-    "sentry-sdk>=2.55.0",
 ]
 
 [tool.uv.workspace]

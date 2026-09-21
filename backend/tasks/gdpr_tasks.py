@@ -78,8 +78,8 @@ def process_scheduled_deletions() -> dict:
         return {"dispatched": dispatched}
     except Exception:
         # Ausdrücklich mit critical loggen statt den Fehler nur via
-        # Celery-FAILURE-State/Sentry propagieren zu lassen: in
-        # Self-Hosted-Deployments ohne SENTRY_DSN ist das sonst die
+        # Celery-FAILURE-State/Observability propagieren zu lassen: in
+        # Self-Hosted-Deployments ohne OTEL_EXPORTER_ENDPOINT ist das sonst die
         # einzige Sichtbarkeit für den Ausfall des gesamten täglichen
         # DSGVO-Sweeps — eine fristgebundene Compliance-Pflicht (Art. 17).
         logger.critical(
@@ -169,7 +169,7 @@ def execute_gdpr_deletion(self, user_id: int) -> dict:
         if is_final_attempt:
             # Bewusst NICHT fail-closed (kein `raise` bei None): die
             # ursprüngliche Exception wird unten ohnehin re-raised und
-            # propagiert zu Celery (FAILURE-State) bzw. Sentry — das
+            # propagiert zu Celery (FAILURE-State) bzw. an Specula — das
             # Fehlschlags-Audit-Log ist damit best effort, nicht die einzige
             # Sichtbarkeit. Ein fail-closed `raise` wie in
             # `gdpr_deletion_service.delete_user_and_gdpr_data` würde hier

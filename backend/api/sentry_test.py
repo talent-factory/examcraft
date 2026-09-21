@@ -5,16 +5,21 @@ Two routers:
 - ``router``: public dev-only smoke tests (API process), 403 outside development.
   Registered in main.py only when ENVIRONMENT == development.
 - ``admin_router``: SuperAdmin-gated, registered in ALL environments. Lets the
-  team verify the Celery worker -> Sentry pipeline in production (TF-359), which
-  the dev-only endpoints above cannot do.
+  team verify the Celery worker -> observability pipeline in production
+  (TF-359), which the dev-only endpoints above cannot do.
+
+TF-865: internals migrated off sentry_sdk onto specula-client-python/OTel so
+this module still imports once sentry-sdk is removed from the dependency
+tree. Renaming the routes/module itself to a "Specula smoke test" identity is
+tracked separately (TF-868) — out of scope here.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from opentelemetry import trace
 from pydantic import BaseModel
 import logging
 import os
-import sentry_sdk
-from config.sentry import capture_exception_with_context, capture_message_with_context
+from config.observability import record_exception, set_span_tag
 from models.auth import User
 from utils.auth_utils import get_current_superuser
 
@@ -38,18 +43,18 @@ class SentryTestResponse(BaseModel):
 @router.get("/status", response_model=SentryTestResponse)
 async def sentry_status():
     """
-    Check if Sentry is enabled and configured.
+    Check if the observability backend is enabled and configured.
 
     Returns:
-        SentryTestResponse: Sentry configuration status
+        SentryTestResponse: Observability configuration status
     """
     environment = os.getenv("ENVIRONMENT", "development")
-    enable_sentry = os.getenv("ENABLE_SENTRY", "false").lower() == "true"
-    dsn = os.getenv("SENTRY_DSN")
+    otel_exporter_endpoint = os.getenv("OTEL_EXPORTER_ENDPOINT")
+    specula_team_api_key = os.getenv("SPECULA_TEAM_API_KEY")
 
     return SentryTestResponse(
-        message="Sentry configuration status",
-        sentry_enabled=enable_sentry and dsn is not None,
+        message="Observability configuration status",
+        sentry_enabled=bool(otel_exporter_endpoint) and bool(specula_team_api_key),
         environment=environment,
     )
 
@@ -57,13 +62,13 @@ async def sentry_status():
 @router.post("/error", response_model=SentryTestResponse)
 async def trigger_error():
     """
-    Trigger a test error to verify Sentry error tracking.
+    Trigger a test error to verify observability error tracking.
 
     Only available in development environment.
 
     Raises:
         HTTPException: If not in development environment
-        Exception: Test exception to be captured by Sentry
+        Exception: Test exception to be recorded on the current OTel span
     """
     environment = os.getenv("ENVIRONMENT", "development")
 
@@ -77,9 +82,9 @@ async def trigger_error():
     try:
         raise Exception("🧪 Sentry Test Error: This is a test error triggered manually")
     except Exception as e:
-        # Capture with context
-        capture_exception_with_context(
-            exception=e,
+        # Record with context
+        record_exception(
+            e,
             extra_context={
                 "test_type": "manual_error_trigger",
                 "endpoint": "/api/sentry-test/error",
@@ -95,9 +100,11 @@ async def trigger_error():
 @router.post("/message", response_model=SentryTestResponse)
 async def trigger_message():
     """
-    Send a test message to Sentry.
+    Send a test message to the observability backend.
 
-    Only available in development environment.
+    Only available in development environment. Logged at ERROR level so it
+    clears the SpeculaLogHandler's level gate (see config/observability.py) —
+    a lower level would silently never reach the collector.
 
     Returns:
         SentryTestResponse: Success message
@@ -113,22 +120,20 @@ async def trigger_message():
             detail="Sentry test endpoints are only available in development",
         )
 
-    # Send a test message
-    capture_message_with_context(
-        message="🧪 Sentry Test Message: This is a test message sent manually",
-        level="info",
-        extra_context={
-            "test_type": "manual_message_trigger",
-            "endpoint": "/api/sentry-test/message",
-        },
-        tags={
-            "test": "true",
-            "feature": "sentry_integration",
+    # Send a test message. `specula_*` extras are forwarded as OTLP log
+    # attributes by SpeculaLogHandler (see specula_client.logging).
+    logger.error(
+        "🧪 Sentry Test Message: This is a test message sent manually",
+        extra={
+            "specula_test_type": "manual_message_trigger",
+            "specula_endpoint": "/api/sentry-test/message",
         },
     )
+    set_span_tag("test", "true")
+    set_span_tag("feature", "sentry_integration")
 
     return SentryTestResponse(
-        message="Test message sent to Sentry successfully",
+        message="Test message sent successfully",
         sentry_enabled=True,
         environment=environment,
     )
@@ -137,7 +142,7 @@ async def trigger_message():
 @router.post("/performance", response_model=SentryTestResponse)
 async def trigger_performance():
     """
-    Trigger a performance transaction to test Sentry performance monitoring.
+    Trigger a nested-span trace to test observability performance monitoring.
 
     Only available in development environment.
 
@@ -155,19 +160,20 @@ async def trigger_performance():
             detail="Sentry test endpoints are only available in development",
         )
 
-    # Create a performance transaction
-    with sentry_sdk.start_transaction(op="test", name="sentry_performance_test"):
+    # Create a nested-span trace
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span("sentry_performance_test"):
         # Simulate some work
         import time
 
-        with sentry_sdk.start_span(op="db", description="Simulated DB Query"):
+        with tracer.start_as_current_span("db.Simulated DB Query"):
             time.sleep(0.1)
 
-        with sentry_sdk.start_span(op="http", description="Simulated API Call"):
+        with tracer.start_as_current_span("http.Simulated API Call"):
             time.sleep(0.2)
 
     return SentryTestResponse(
-        message="Performance transaction sent to Sentry successfully",
+        message="Performance trace sent successfully",
         sentry_enabled=True,
         environment=environment,
     )
@@ -185,15 +191,17 @@ class WorkerErrorResponse(BaseModel):
 async def trigger_worker_error(
     current_user: User = Depends(get_current_superuser),
 ) -> WorkerErrorResponse:
-    """Dispatch a Celery task that fails on purpose, to verify worker -> Sentry.
+    """Dispatch a Celery task that fails on purpose, to verify worker -> observability.
 
     SuperAdmin-only and available in production (TF-359 acceptance criterion:
     "ein absichtlich provozierter Worker-Fehler erscheint in Sentry mit
     Stacktrace + Task-Kontext"). The dispatched task raises
-    ``SentryPipelineTestError`` in the worker; ``CeleryIntegration`` captures it.
+    ``SentryPipelineTestError`` in the worker; OTel's Celery instrumentation
+    (TF-865, ``instrument_celery=True`` in ``config/observability.py``)
+    captures it as a span exception.
 
-    Returns the Celery task id so the resulting Sentry event can be correlated
-    (search ``diagnostic:true`` or the task id in the Sentry issue).
+    Returns the Celery task id so the resulting trace can be correlated
+    (search ``diagnostic:true`` or the task id in the observability backend).
     """
     from celery_app import celery_app
 
@@ -206,7 +214,7 @@ async def trigger_worker_error(
             kwargs={
                 "user_id": current_user.id,
                 "message": (
-                    f"TF-359 Sentry worker pipeline verification "
+                    f"TF-359 observability worker pipeline verification "
                     f"(triggered by SuperAdmin user {current_user.id})"
                 ),
             },
@@ -216,9 +224,9 @@ async def trigger_worker_error(
         # A diagnostic endpoint is most likely to be hit when the broker is
         # already degraded — return an actionable 503 (mirrors the production
         # dispatch path in api/rag_exams.py) instead of an opaque 500 that
-        # can't be told apart from a broken Sentry pipeline.
+        # can't be told apart from a broken observability pipeline.
         logger.error(
-            "Sentry worker-test dispatch failed (broker unreachable?): %s",
+            "Observability worker-test dispatch failed (broker unreachable?): %s",
             broker_error,
         )
         raise HTTPException(
@@ -228,8 +236,9 @@ async def trigger_worker_error(
 
     return WorkerErrorResponse(
         message=(
-            "Worker error dispatched. Check Sentry for a SentryPipelineTestError "
-            "event tagged diagnostic=true with this task_id."
+            "Worker error dispatched. Check the observability backend for a "
+            "SentryPipelineTestError event tagged diagnostic=true with this "
+            "task_id."
         ),
         task_id=result.id,
         environment=os.getenv("ENVIRONMENT", "development"),

@@ -10,10 +10,11 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
 
-import sentry_sdk
 from celery.exceptions import Ignore, Reject
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, ProgrammingError, SQLAlchemyError
+
+from config.observability import set_span_tag
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -598,13 +599,17 @@ def generate_questions_task(
     Returns:
         Dict with exam_id, topic, questions, generation_time, quality_metrics, review_question_ids
     """
-    # TF-359: tag the Sentry scope so a generation failure lands in Sentry with
-    # the task context the on-call needs to triage. CeleryIntegration already
-    # attaches the task id; user_id/topic do not (send_default_pii=False keeps
-    # task kwargs off the event). No-op when Sentry is disabled. user_id is set
-    # first so even an early Reject (Premium RAGService missing) or a
-    # ValidationError on request_data carries it; topic follows once parsed.
-    sentry_sdk.set_tag("user_id", str(user_id))
+    # TF-359/TF-865: tag the current OTel span so a generation failure carries
+    # the task context the on-call needs to triage. Celery instrumentation
+    # attaches the task id automatically, but not arbitrary task kwargs like
+    # user_id/topic -- those need tagging explicitly, same reasoning as the
+    # retired sentry_sdk setup (which additionally kept them off the event
+    # body via send_default_pii=False; OTel span attributes have no such
+    # blanket body-capture to opt out of in the first place). No-op when
+    # observability is disabled. user_id is set first so even an early Reject
+    # (Premium RAGService missing) or a ValidationError on request_data
+    # carries it; topic follows once parsed.
+    set_span_tag("user_id", str(user_id))
 
     if RAGService is None:
         _safe_update_job_status(self.request.id, "FAILURE")
@@ -624,7 +629,7 @@ def generate_questions_task(
 
     # Re-raised "No context available" ValueError from TF-358 is raised later in
     # the service call below; topic is known now, so tag it here.
-    sentry_sdk.set_tag("topic", rag_request.topic)
+    set_span_tag("topic", rag_request.topic)
     # Progress in N+2 steps:
     #   Step 0:      task start (emitted by the task)
     #   Step 1:      context loaded (emitted via callback)

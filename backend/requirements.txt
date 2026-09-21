@@ -71,8 +71,30 @@ python-multipart==0.0.32            # pydantic-ai 1.x / mcp floor (war 0.0.6)
 authlib==1.3.0                      # OAuth2 Client Library
 itsdangerous==2.1.2                 # Secure Token Generation for OAuth State
 
-# Error Tracking & Monitoring
-sentry-sdk[fastapi]==2.42.1         # Sentry SDK with FastAPI Integration
+# Error Tracking & Monitoring (TF-865: OTel traces + structured logs via
+# specula-client, replacing sentry-sdk) is deliberately NOT listed here.
+#
+# specula-client-python is a private repo, not on PyPI yet (pinned to the
+# v0.1.0 tag, TF-852) -- an unconditional `... @ git+ssh://...` line here
+# would make `pip install -r requirements.txt` (and therefore this whole
+# file) unconditionally require private GitHub access, which breaks both:
+# - the public/OSS mirror of core/ (CLAUDE.md: core/ must never hard-depend
+#   on proprietary code -- external contributors have no access at all), and
+# - any local/CI build without a GITHUB_TOKEN configured.
+#
+# Instead, `Dockerfile`/`Dockerfile.fly` install it as a SEPARATE, optional
+# `pip install` step, gated on a `GITHUB_TOKEN` build secret (see either
+# file's comment on that step) -- present for private/full builds, absent
+# and silently skipped for a public/OSS build. `config/observability.py` and
+# `middleware/observability_context.py` degrade to a fully functional,
+# tracing-less no-op when the package isn't importable (their own
+# "package-fail-open" docstring section), so a build without the secret is a
+# working image, not a broken one.
+#
+# Local dev / `uv run pytest` outside Docker: install it manually once via
+# `pip install "specula-client[fastapi,celery] @ git+ssh://git@github.com/talent-factory/specula-client-python.git@v0.1.0"`
+# (requires GitHub SSH access to the private repo) if you want real
+# tracing/log-forwarding locally -- everything else works without it.
 
 # CORS (built into FastAPI)
 # No additional package needed
