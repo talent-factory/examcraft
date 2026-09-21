@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { de, enUS, fr, it } from 'date-fns/locale';
-import * as Sentry from '@sentry/react';
+import { reportHandledError } from '../utils/errorReporting';
 import {
   Alert,
   Box,
@@ -108,20 +108,20 @@ const Aktivitaeten: React.FC = () => {
           // suppress them rather than rendering a red alert.
           if (err.kind === 'aborted') return;
           console.error('ActivityService.list failed', err);
-          // Surface non-network errors to Sentry. The Sentry config
-          // already filters NetworkError / cancelled requests, so
-          // a kind=='network' will be dropped by beforeSend.
-          Sentry.captureException(err, {
-            tags: { feature: 'aktivitaeten', kind: err.kind },
-            extra: { status: err.status, detail: err.detail },
+          // Surface non-network errors to error reporting. Unlike the
+          // former Sentry config, there's no beforeSend-style filtering
+          // here — network/cancelled kinds already returned above.
+          reportHandledError(err, {
+            feature: 'aktivitaeten',
+            kind: err.kind,
+            status: err.status,
+            detail: err.detail,
           });
         } else {
           console.error('ActivityService.list failed (non-ApiError)', err);
           // Non-ApiError throwables are programming bugs (TypeError
-          // in the parser, etc.) — always escalate to Sentry.
-          Sentry.captureException(err, {
-            tags: { feature: 'aktivitaeten', kind: 'non-api-error' },
-          });
+          // in the parser, etc.) — always escalate.
+          reportHandledError(err, { feature: 'aktivitaeten', kind: 'non-api-error' });
         }
         setError(
           translateError(

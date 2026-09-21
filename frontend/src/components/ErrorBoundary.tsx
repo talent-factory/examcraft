@@ -1,17 +1,20 @@
 /**
- * Error Boundary Component with Sentry Integration
+ * Error Boundary Component mit lokalem Fehler-Reporting (TF-866)
  *
- * Catches React errors and displays a user-friendly fallback UI.
- * Automatically reports errors to Sentry.
+ * Faengt React-Render-Fehler ab und zeigt eine benutzerfreundliche
+ * Fallback-UI. Meldet Fehler automatisch an `utils/errorReporting`
+ * (Backend-Proxy `/api/v1/monitoring/client-errors`) statt, wie zuvor, an
+ * Sentry — siehe dessen Moduldoc, warum das lokal statt via
+ * `@talent-factory/specula-client` implementiert ist.
  */
 
 import React from 'react';
-import * as Sentry from '@sentry/react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { reportClientError } from '../utils/errorReporting';
 
 interface ErrorFallbackProps {
-  error: Error | unknown;
+  error: Error;
   resetError: () => void;
 }
 
@@ -44,9 +47,9 @@ function TranslatedErrorFallback(props: ErrorFallbackProps) {
 
 function ErrorFallback(props: ErrorFallbackProps) {
   return (
-    <Sentry.ErrorBoundary fallback={<ErrorFallbackInner {...props} strings={FALLBACK_STRINGS} />}>
+    <ErrorBoundary fallback={() => <ErrorFallbackInner {...props} strings={FALLBACK_STRINGS} />}>
       <TranslatedErrorFallback {...props} />
-    </Sentry.ErrorBoundary>
+    </ErrorBoundary>
   );
 }
 
@@ -55,7 +58,7 @@ function ErrorFallbackInner({ error, resetError, strings }: ErrorFallbackProps &
 
   const isDevelopment = process.env.REACT_APP_ENVIRONMENT === 'development';
 
-  const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+  const errorMessage = error.message || 'An unexpected error occurred';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -115,21 +118,84 @@ function ErrorFallbackInner({ error, resetError, strings }: ErrorFallbackProps &
   );
 }
 
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  /** Fallback-Renderer, erhaelt den gefangenen Fehler + eine
+   * `resetError`-Funktion (setzt die Boundary zurueck, kein automatisches
+   * Retry des vorherigen Fehlers). */
+  fallback: (info: { error: Error; resetError: () => void }) => React.ReactNode;
+  /** Wird bei einem gefangenen Render-Fehler mit dem Fehler + dessen
+   * React-Component-Stack aufgerufen — i. d. R. `reportClientError`.
+   * Bewusst als expliziter Callback statt eines eingebauten Reporters:
+   * entkoppelt die Komponente von einer konkreten Reporter-Konfiguration
+   * und haelt sie in Tests trivial isolierbar (gleiches Design wie
+   * specula-client-js' `ErrorBoundary`-Helper). */
+  onError?: (error: Error, componentStack: string) => void;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+/**
+ * Wiederverwendbarer React-Error-Boundary. `hasError`/`error` sind ein
+ * Einweg-Riegel bis zum expliziten `resetError()`-Aufruf (kein automatisches
+ * Retry).
+ */
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    try {
+      this.props.onError?.(error, info.componentStack ?? '');
+    } catch (onErrorFailure) {
+      // Ein werfender onError-Callback darf die Boundary nicht selbst zum
+      // Absturz bringen — das waere genau der Fall, vor dem diese
+      // Komponente eigentlich schuetzen soll.
+      console.error('[ErrorBoundary] onError-Callback ist fehlgeschlagen:', onErrorFailure);
+    }
+  }
+
+  resetError = (): void => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render(): React.ReactNode {
+    const { hasError, error } = this.state;
+    if (hasError && error) {
+      return this.props.fallback({ error, resetError: this.resetError });
+    }
+    return this.props.children;
+  }
+}
+
 /**
  * Error Boundary Component
  *
- * Wraps the application and catches React errors.
- * Integrates with Sentry for automatic error reporting.
+ * Wraps the application and catches React errors. Meldet gefangene Fehler
+ * (inkl. `component_stack`/`user_agent`, Paritaet zum bisherigen
+ * Sentry-Verhalten) an den `/client-errors`-Proxy-Endpoint.
  */
 export const AppErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <Sentry.ErrorBoundary
-      fallback={({ error, resetError }) => (
-        <ErrorFallback error={error} resetError={resetError} />
-      )}
-      showDialog={false} // Don't show Sentry's default dialog
+    <ErrorBoundary
+      fallback={({ error, resetError }) => <ErrorFallback error={error} resetError={resetError} />}
+      onError={(error, componentStack) => {
+        void reportClientError({
+          message: error.message,
+          stack: error.stack ?? '',
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          componentStack,
+        });
+      }}
     >
       {children}
-    </Sentry.ErrorBoundary>
+    </ErrorBoundary>
   );
 };

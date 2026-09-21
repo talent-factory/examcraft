@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import * as Sentry from '@sentry/react';
 import { useAuth } from '../../contexts/AuthContext';
 import { helpService, HelpStatus, OnboardingStatus, ContextHint } from '../../services/HelpService';
+import { reportHandledError } from '../../utils/errorReporting';
 
 /**
  * Hints the user has acknowledged with "Verstanden" in this tab.
@@ -149,7 +149,7 @@ export function useHelpContext() {
   // the user mid-tour rather than just leaving the server-side progress one
   // write behind — it catches up on the next successful call. But a swallowed
   // failure that leaves no trace anywhere is exactly the TF-604 bug class
-  // (a whole broken tour hidden behind a "completed" flag); Sentry.captureException
+  // (a whole broken tour hidden behind a "completed" flag); reportHandledError
   // here matches the visibility skipAndAdvance already gives an unreachable step.
   const completeStep = useCallback(
     async (step: number) => {
@@ -159,9 +159,7 @@ export function useHelpContext() {
         setOnboardingStatus(updated);
       } catch (err) {
         console.warn('Failed to complete onboarding step:', err);
-        Sentry.captureException(err, {
-          tags: { feature: 'onboarding', action: 'completeStep', step },
-        });
+        reportHandledError(err, { feature: 'onboarding', action: 'completeStep', step });
       }
     },
     [accessToken]
@@ -175,9 +173,7 @@ export function useHelpContext() {
         setOnboardingStatus(updated);
       } catch (err) {
         console.warn('Failed to skip onboarding step:', err);
-        Sentry.captureException(err, {
-          tags: { feature: 'onboarding', action: 'skipStep', step },
-        });
+        reportHandledError(err, { feature: 'onboarding', action: 'skipStep', step });
       }
     },
     [accessToken]
@@ -199,9 +195,7 @@ export function useHelpContext() {
         setOnboardingStatus(updated);
       } catch (err) {
         console.warn('Failed to update onboarding track step:', err);
-        Sentry.captureException(err, {
-          tags: { feature: 'onboarding', action: 'updateTrackStep', trackId, step },
-        });
+        reportHandledError(err, { feature: 'onboarding', action: 'updateTrackStep', trackId, step });
       }
     },
     [accessToken]

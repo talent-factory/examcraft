@@ -21,7 +21,7 @@ import {
   Button,
   Typography,
 } from '@mui/material';
-import * as Sentry from '@sentry/react';
+import { reportHandledError } from '../../utils/errorReporting';
 import { OnboardingStatus } from '../../services/HelpService';
 import { requestSidebarNavReveal } from '../layout/sidebarNavReveal';
 import OnboardingPopover from './OnboardingPopover';
@@ -266,7 +266,7 @@ const HelpOnboarding: React.FC<HelpOnboardingProps> = ({
    *   - anything else — the element should have been there and was not. That
    *     used to be completely silent, which is how TF-604 hid a whole broken
    *     tour behind a "completed" flag. console.warn makes it visible to
-   *     anyone with devtools open; Sentry.captureMessage (same pattern as
+   *     anyone with devtools open; reportHandledError (same pattern as
    *     Aktivitaeten.tsx) makes it visible without anyone needing to be
    *     looking — the BWZ-Lyss workshop bug went unnoticed precisely because
    *     nobody was.
@@ -278,10 +278,10 @@ const HelpOnboarding: React.FC<HelpOnboardingProps> = ({
         console.debug(`[onboarding] Step ${step?.step} not applicable: ${reason}`);
       } else {
         console.warn(`[onboarding] Step ${step?.step} skipped: ${reason}`);
-        Sentry.captureMessage('[onboarding] step skipped', {
-          level: 'warning',
-          tags: { feature: 'onboarding', step: step?.step },
-          extra: { reason },
+        reportHandledError('[onboarding] step skipped', {
+          feature: 'onboarding',
+          step: step?.step,
+          reason,
         });
       }
       onSkipStep(step.step).then(() => {

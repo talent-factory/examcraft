@@ -14,8 +14,8 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import * as Sentry from '@sentry/react';
 import { useTranslation } from 'react-i18next';
+import { reportHandledError } from '../../utils/errorReporting';
 import { LegalPageLayout } from './LegalPageLayout';
 import {
   AVV_PDF_URL,
@@ -45,7 +45,7 @@ export const CompliancePage: React.FC = () => {
         // this is the only place a broken deploy of a public, unauthenticated
         // page would otherwise go unnoticed.
         console.error('[CompliancePage] ComplianceService.getContent failed', err);
-        Sentry.captureException(err, { tags: { feature: 'compliance-page' } });
+        reportHandledError(err, { feature: 'compliance-page' });
         setError(true);
       });
     return () => {

@@ -2,11 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import { AppWithAuth } from './AppWithAuth';
-import { initSentry } from './config/sentry';
+import { initErrorReporting } from './utils/errorReporting';
 import './i18n';
 
-// Initialize Sentry before rendering the app
-initSentry();
+// Initialize client-side error reporting before rendering the app (TF-866)
+initErrorReporting();
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
