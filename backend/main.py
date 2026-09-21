@@ -361,7 +361,7 @@ async def lifespan(app: FastAPI):
     auth = _load_api_module("api.auth", "auth.py")
     admin = _load_api_module("api.admin", "admin.py")
     gdpr = _load_api_module("api.gdpr", "gdpr.py")
-    sentry_test = _load_api_module("api.sentry_test", "sentry_test.py")
+    specula_test = _load_api_module("api.specula_test", "specula_test.py")
 
     rbac_api = _load_api_module("api.v1.rbac", "v1", "rbac.py")
     billing_api = _load_api_module("api.v1.billing", "v1", "billing.py")
@@ -436,17 +436,15 @@ async def lifespan(app: FastAPI):
         # deliverability tracking shouldn't take down exam-generation with it.
         logger.error(f"Error loading email webhooks: {e}", exc_info=True)
 
-    # Sentry Test Router (only in development) -- module/route names kept as
-    # "sentry"/"Sentry" post-TF-865; the rename is deliberately deferred to
-    # TF-868 (see api/sentry_test.py's module docstring).
+    # Specula Smoke-Test Router (only in development), TF-868.
     if os.getenv("ENVIRONMENT", "development") == "development":
-        app.include_router(sentry_test.router)
+        app.include_router(specula_test.router)
 
     # SuperAdmin worker-pipeline trigger (TF-359): registered in ALL
     # environments so the worker -> observability-backend path can be
     # verified in production.
     # Access is locked to SuperAdmins via get_current_superuser.
-    app.include_router(sentry_test.admin_router)
+    app.include_router(specula_test.admin_router)
 
     # Premium/Enterprise Features: Load additional Premium APIs
     if is_full_deployment:

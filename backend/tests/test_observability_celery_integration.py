@@ -43,7 +43,7 @@ class _FakeSpan:
 def _app_routers_registered():
     """Enter the app lifespan once so the admin routers exist.
 
-    /api/admin/sentry-test/worker-error is registered during startup, not at
+    /api/admin/specula-test/worker-error is registered during startup, not at
     import time. Without this the three endpoint tests below only pass when
     some earlier test file happened to trigger a lifespan first — they 404 in
     any run order that puts this file early (TF-660).
@@ -453,7 +453,7 @@ def test_celeryd_init_signal_invokes_init_worker_observability(monkeypatch):
 def test_trigger_test_error_raises_with_task_context(monkeypatch):
     """The diagnostic task must raise and tag user_id/topic so the verification
     event exercises the same triage path as a real worker failure."""
-    from tasks.diagnostics_tasks import SentryPipelineTestError, trigger_test_error
+    from tasks.diagnostics_tasks import SpeculaPipelineTestError, trigger_test_error
 
     tags: dict[str, str] = {}
     monkeypatch.setattr(
@@ -461,16 +461,16 @@ def test_trigger_test_error_raises_with_task_context(monkeypatch):
         lambda k, v: tags.__setitem__(k, v),
     )
 
-    with pytest.raises(SentryPipelineTestError):
+    with pytest.raises(SpeculaPipelineTestError):
         trigger_test_error.apply(kwargs={"user_id": 42}, throw=True)
 
     assert tags["user_id"] == "42"
-    assert tags["topic"] == "sentry-pipeline-test"
+    assert tags["topic"] == "specula-pipeline-test"
     assert tags["diagnostic"] == "true"
 
 
 # ---------------------------------------------------------------------------
-# api/sentry_test.py — SuperAdmin worker-error endpoint (prod-safe)
+# api/specula_test.py — SuperAdmin worker-error endpoint (prod-safe)
 # ---------------------------------------------------------------------------
 
 
@@ -493,7 +493,7 @@ def test_worker_error_endpoint_dispatches_for_superadmin(monkeypatch):
     )
 
     client = TestClient(app, raise_server_exceptions=True)
-    resp = client.post("/api/admin/sentry-test/worker-error")
+    resp = client.post("/api/admin/specula-test/worker-error")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -518,7 +518,7 @@ def test_worker_error_endpoint_forbidden_for_non_superadmin(monkeypatch):
     )
 
     client = TestClient(app, raise_server_exceptions=True)
-    resp = client.post("/api/admin/sentry-test/worker-error")
+    resp = client.post("/api/admin/specula-test/worker-error")
 
     assert resp.status_code == 403
 
@@ -538,6 +538,6 @@ def test_worker_error_endpoint_returns_503_when_broker_unreachable(monkeypatch):
     )
 
     client = TestClient(app, raise_server_exceptions=True)
-    resp = client.post("/api/admin/sentry-test/worker-error")
+    resp = client.post("/api/admin/specula-test/worker-error")
 
     assert resp.status_code == 503
