@@ -378,6 +378,9 @@ async def lifespan(app: FastAPI):
     # module to be reachable under its canonical name.
     legal_api = _load_api_module("api.legal", "legal.py")
 
+    # Frontend-Fehler-Proxy (TF-864, ADR-012-Pattern). Unauthentifiziert, siehe api/monitoring.py.
+    monitoring_api = _load_api_module("api.monitoring", "monitoring.py")
+
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(gdpr.router)
@@ -412,6 +415,7 @@ async def lifespan(app: FastAPI):
     app.include_router(websocket_api.router)
     app.include_router(help_api.router)
     app.include_router(legal_api.router)
+    app.include_router(monitoring_api.router)
 
     # Email Webhooks (SubscribeFlow)
     try:
