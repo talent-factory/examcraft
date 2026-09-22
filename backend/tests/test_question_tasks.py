@@ -13,6 +13,8 @@ if "magic" not in sys.modules:
 
 from unittest.mock import patch
 
+import pytest
+
 
 def test_generate_questions_task_importable():
     """Task can be imported"""
@@ -1830,3 +1832,274 @@ def test_persist_questions_falls_back_to_filename_matching_without_source_docume
     )
 
     assert session.merged == [(1, 7)]
+
+
+# ---------------------------------------------------------------------------
+# TF-736: the outcome of a SUCCESS run is persisted on the job row, so an
+# under-filled generation stays explainable after the Celery result expired.
+# ---------------------------------------------------------------------------
+
+
+_TF736_REQUEST = {
+    "topic": "Knappes Material",
+    "question_count": 15,
+    "question_types": ["single_choice"],
+    "difficulty": "medium",
+    "language": "de",
+    "document_ids": None,
+    "context_chunks_per_question": 3,
+    "prompt_config": None,
+}
+
+
+def _tf736_result(generated: int, quality_metrics: dict):
+    @dataclasses.dataclass
+    class FakeQuestion:
+        question_text: str
+
+    @dataclasses.dataclass
+    class FakeContextSummary:
+        query: str
+
+    result = MagicMock()
+    result.exam_id = "rag_exam_tf736"
+    result.topic = "Knappes Material"
+    result.questions = [FakeQuestion(question_text=f"q{i}") for i in range(generated)]
+    result.context_summary = FakeContextSummary(query="Knappes Material")
+    result.generation_time = 1.0
+    result.quality_metrics = quality_metrics
+    return result
+
+
+def _run_task_with(result, task_id: str):
+    from tasks.question_tasks import generate_questions_task
+
+    generate_questions_task.update_state = MagicMock()
+    generate_questions_task.push_request(id=task_id)
+    try:
+        with (
+            patch("tasks.question_tasks.run_async", return_value=result),
+            patch("tasks.question_tasks.RAGService", return_value=MagicMock()),
+            patch("tasks.question_tasks._persist_questions", return_value=[1]),
+        ):
+            return generate_questions_task.run(_TF736_REQUEST, "42")
+    finally:
+        generate_questions_task.pop_request()
+
+
+@pytest.fixture
+def tf736_job_session(test_db):
+    """A real job row plus a SessionLocal bound to the test transaction, so
+    the task's own sessions read and write the same row the test inspects."""
+    from sqlalchemy.orm import sessionmaker
+
+    from models.auth import Institution, User
+    from models.question_generation_job import QuestionGenerationJob
+
+    institution = Institution(
+        name="TF-736 University",
+        slug="tf736-uni",
+        subscription_tier="free",
+        max_users=10,
+        max_documents=50,
+        max_questions_per_month=100,
+    )
+    test_db.add(institution)
+    test_db.flush()
+    user = User(
+        email="tf736@example.com",
+        first_name="TF",
+        last_name="736",
+        institution_id=institution.id,
+        status="active",
+    )
+    test_db.add(user)
+    test_db.flush()
+    test_db.add(
+        QuestionGenerationJob(
+            task_id="tf736-task",
+            user_id=user.id,
+            topic="Knappes Material",
+            question_count=15,
+        )
+    )
+    test_db.commit()
+
+    bound = sessionmaker(
+        bind=test_db.get_bind(), join_transaction_mode="create_savepoint"
+    )
+    with patch("database.SessionLocal", bound):
+        yield test_db
+
+
+def _tf736_job(session):
+    from models.question_generation_job import QuestionGenerationJob
+
+    session.expire_all()
+    return session.query(QuestionGenerationJob).filter_by(task_id="tf736-task").one()
+
+
+def test_underfilled_generation_persists_outcome_on_job(tf736_job_session):
+    """TF-736 test case 7: 6 of 15 → generated_question_count=6,
+    context_limited=True on question_generation_jobs, status SUCCESS."""
+    metrics = {
+        "requested_question_count": 15,
+        "generated_question_count": 6,
+        "context_limited": True,
+        "context_limited_notice": "Es konnten nur 6 von 15 …",
+    }
+
+    _run_task_with(_tf736_result(6, metrics), "tf736-task")
+
+    job = _tf736_job(tf736_job_session)
+    assert job.status == "SUCCESS"
+    assert job.generated_question_count == 6
+    assert job.context_limited is True
+
+
+def test_complete_generation_persists_unlimited_outcome(tf736_job_session):
+    """TF-736 test case 8: 15 of 15 → context_limited=False,
+    generated_question_count == question_count."""
+    metrics = {"requested_question_count": 15, "generated_question_count": 15}
+
+    _run_task_with(_tf736_result(15, metrics), "tf736-task")
+
+    job = _tf736_job(tf736_job_session)
+    assert job.status == "SUCCESS"
+    assert job.context_limited is False
+    assert job.generated_question_count == job.question_count == 15
+
+
+def test_outcome_write_failure_keeps_task_success_and_logs_critical(mocker):
+    """TF-736 test case 9: a SQLAlchemyError while recording the outcome, on
+    both attempts, must neither turn the finished generation into a FAILURE
+    nor keep the SUCCESS status from being written — only a CRITICAL log
+    after the retry is exhausted."""
+    from sqlalchemy.exc import OperationalError
+
+    from tasks.question_tasks import _GENERATION_OUTCOME_BACKOFF_S
+
+    mock_logger = mocker.patch("tasks.question_tasks.logger")
+    mock_sleep = mocker.patch("tasks.question_tasks.time.sleep")
+    mock_span_tag = mocker.patch("tasks.question_tasks.set_span_tag")
+    failing_session = MagicMock()
+    failing_session.query.side_effect = OperationalError(
+        "UPDATE question_generation_jobs", {}, Exception("column does not exist")
+    )
+    metrics = {"generated_question_count": 6, "context_limited": True}
+
+    with (
+        patch("database.SessionLocal", return_value=failing_session),
+        patch("tasks.question_tasks._safe_update_job_status") as mock_status,
+    ):
+        result = _run_task_with(_tf736_result(6, metrics), "tf736-fail")
+
+    assert result["exam_id"] == "rag_exam_tf736"
+    mock_status.assert_called_once_with("tf736-fail", "SUCCESS")
+    # Two attempts (initial + one retry), each opening/closing its own session.
+    assert failing_session.rollback.call_count == 2
+    assert failing_session.close.call_count == 2
+    mock_sleep.assert_called_once_with(_GENERATION_OUTCOME_BACKOFF_S)
+    mock_logger.warning.assert_called_once()
+    mock_logger.critical.assert_called_once()
+    # Surfaced on the span too, so a failed outcome write is searchable in
+    # Specula next to the task's other tags, not only in the log stream.
+    mock_span_tag.assert_any_call("generation_outcome_persisted", "false")
+    call = mock_logger.critical.call_args
+    rendered = call.args[0] % call.args[1:]
+    assert "tf736-fail" in rendered
+    assert call.kwargs.get("exc_info") is True
+
+
+def test_outcome_write_recovers_on_retry(mocker):
+    """A transient failure on the first attempt must not prevent the second,
+    successful attempt from persisting the outcome."""
+    from sqlalchemy.exc import OperationalError
+
+    from tasks.question_tasks import (
+        _GENERATION_OUTCOME_BACKOFF_S,
+        _safe_record_generation_outcome,
+    )
+
+    mock_sleep = mocker.patch("tasks.question_tasks.time.sleep")
+    ok_session = MagicMock()
+    job = MagicMock()
+    ok_session.query.return_value.filter_by.return_value.first.return_value = job
+
+    failing_session = MagicMock()
+    failing_session.query.side_effect = OperationalError(
+        "UPDATE question_generation_jobs", {}, Exception("connection reset")
+    )
+
+    with patch("database.SessionLocal", side_effect=[failing_session, ok_session]):
+        ok = _safe_record_generation_outcome(
+            "tf736-retry", 6, {"context_limited": True}
+        )
+
+    assert ok is True
+    mock_sleep.assert_called_once_with(_GENERATION_OUTCOME_BACKOFF_S)
+    assert job.generated_question_count == 6
+    assert job.context_limited is True
+    ok_session.commit.assert_called_once()
+
+
+def test_record_outcome_does_not_retry_programmer_errors(mocker):
+    """A programmer error (AttributeError/TypeError/...) is not transient —
+    must be swallowed (this function never raises), logged distinctly from
+    a DB/OS error, and NOT retried. Mirrors
+    test_update_job_status_does_not_retry_programmer_errors's contract."""
+    from tasks.question_tasks import _safe_record_generation_outcome
+
+    mock_logger = mocker.patch("tasks.question_tasks.logger")
+    mock_sleep = mocker.patch("tasks.question_tasks.time.sleep")
+    failing_session = MagicMock()
+    failing_session.query.side_effect = AttributeError("simulated programmer error")
+
+    with patch("database.SessionLocal", return_value=failing_session):
+        ok = _safe_record_generation_outcome("tf736-bug", 6, {"context_limited": True})
+
+    assert ok is False
+    mock_sleep.assert_not_called()
+    mock_logger.warning.assert_not_called()
+    mock_logger.critical.assert_called_once()
+    rendered = (
+        mock_logger.critical.call_args.args[0] % mock_logger.critical.call_args.args[1:]
+    )
+    assert "Unexpected (non-retriable)" in rendered
+
+
+def test_record_outcome_missing_row_is_swallowed_and_logged(mocker):
+    """No job row → CRITICAL, no exception, no retry (same contract as the
+    status write — a missing row is a data-integrity issue, not transient)."""
+    from tasks.question_tasks import _safe_record_generation_outcome
+
+    mock_logger = mocker.patch("tasks.question_tasks.logger")
+    mock_sleep = mocker.patch("tasks.question_tasks.time.sleep")
+    session = MagicMock()
+    session.query.return_value.filter_by.return_value.first.return_value = None
+
+    with patch("database.SessionLocal", return_value=session):
+        ok = _safe_record_generation_outcome("ghost", 6, {"context_limited": True})
+
+    assert ok is False
+    session.commit.assert_not_called()
+    mock_logger.critical.assert_called_once()
+    mock_sleep.assert_not_called()
+
+
+def test_underfilled_generation_with_zero_generated_questions(tf736_job_session):
+    """Boundary: 0 of 15 generated must persist generated_question_count=0,
+    not be treated as falsy/None (contextLimitOf on the frontend relies on
+    the same `??`-not-`||` distinction)."""
+    metrics = {
+        "requested_question_count": 15,
+        "generated_question_count": 0,
+        "context_limited": True,
+    }
+
+    _run_task_with(_tf736_result(0, metrics), "tf736-task")
+
+    job = _tf736_job(tf736_job_session)
+    assert job.status == "SUCCESS"
+    assert job.generated_question_count == 0
+    assert job.context_limited is True

@@ -234,7 +234,8 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
           // previous recovery pass would get overwritten here with `null`
           // and would stay unreachable until the (possibly failing) refetch
           // further below.
-          const existingResult = tasksRef.current[task.task_id]?.result ?? null;
+          const existingTask = tasksRef.current[task.task_id];
+          const existingResult = existingTask?.result ?? null;
           recovered[task.task_id] = {
             taskId: task.task_id,
             status: task.status as GenerationTaskState['status'],
@@ -244,6 +245,11 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
             questionCount: task.question_count,
             createdAt: task.created_at,
             result: existingResult,
+            // TF-736: carried over alongside `result` for the same reason —
+            // a silent token refresh must not wipe out an under-fill notice
+            // that a previous recovery pass already fetched from the job row.
+            generatedQuestionCount: existingTask?.generatedQuestionCount ?? null,
+            contextLimited: existingTask?.contextLimited ?? false,
           };
 
           if (TERMINAL_STATUSES.has(task.status)) {
@@ -282,6 +288,12 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
                         ...prev[taskId],
                         result: detail.result ?? null,
                         message: detail.error ?? prev[taskId].message,
+                        // TF-736: kept from the job row so the under-fill
+                        // notice survives an expired Celery result.
+                        questionCount:
+                          detail.requested_question_count ?? prev[taskId].questionCount,
+                        generatedQuestionCount: detail.generated_question_count ?? null,
+                        contextLimited: detail.context_limited === true,
                       },
                     }
                   : prev

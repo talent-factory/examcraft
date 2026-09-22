@@ -2067,7 +2067,10 @@
       "connectionLost": "Connection lost – status unknown",
       "clickToView": "Click to view",
       "errorOccurred": "Error occurred",
-      "retry": "Retry"
+      "retry": "Retry",
+      "contextLimitedTitle": "Fewer questions than requested",
+      "contextLimitedBody": "Only {{generated}} of {{requested}} requested questions could be created because the selected documents contain too little searchable content.",
+      "contextLimitedAction": "For more questions, select additional or larger documents."
     },
     "questionEditor": {
       "title": "Edit Question #{{id}}",

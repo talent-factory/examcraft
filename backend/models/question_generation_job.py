@@ -6,7 +6,16 @@ immer einen Eintrag findet.
 
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    false,
+)
 
 from database import Base
 
@@ -24,6 +33,13 @@ class QuestionGenerationJob(Base):
     question_count = Column(Integer, nullable=True)
     status = Column(String, default="PENDING", server_default="PENDING", nullable=False)
     request_data = Column(JSON, nullable=True)
+    # TF-736: outcome of a SUCCESS run, so an under-filled generation (fewer
+    # questions than `question_count`) stays explainable after the Celery
+    # result has expired. NULL = not recorded (older rows, or the write failed).
+    generated_question_count = Column(Integer, nullable=True)
+    context_limited = Column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
 
     def __init__(self, **kwargs: object) -> None:
         kwargs.setdefault("status", "PENDING")

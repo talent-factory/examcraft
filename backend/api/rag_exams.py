@@ -1059,9 +1059,17 @@ async def get_task_result(
         )
 
     status = celery_state if celery_state in TERMINAL_STATUSES else job.status
+    # TF-736: the DB row keeps the counts after the Celery result expired, so
+    # an under-filled generation stays explainable after a reload. Always
+    # populated for SUCCESS regardless of whether the Celery result is still
+    # live, so a client reads the same three fields either way.
+    is_success = status == "SUCCESS"
     return TaskResultResponse(
         task_id=job.task_id,
         status=status,
         result=payload,
         error=error,
+        requested_question_count=job.question_count if is_success else None,
+        generated_question_count=job.generated_question_count if is_success else None,
+        context_limited=bool(job.context_limited) if is_success else False,
     )

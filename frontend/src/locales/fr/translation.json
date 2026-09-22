@@ -2067,7 +2067,10 @@
       "connectionLost": "Connexion perdue – statut inconnu",
       "clickToView": "Cliquer pour afficher",
       "errorOccurred": "Une erreur s'est produite",
-      "retry": "Réessayer"
+      "retry": "Réessayer",
+      "contextLimitedTitle": "Moins de questions que demandé",
+      "contextLimitedBody": "Le nombre de questions créées ({{generated}}) est inférieur aux {{requested}} demandées, car les documents sélectionnés contiennent trop peu de contenu exploitable.",
+      "contextLimitedAction": "Pour obtenir plus de questions, sélectionne des documents supplémentaires ou plus volumineux."
     },
     "questionEditor": {
       "title": "Modifier la question n°{{id}}",

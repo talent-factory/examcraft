@@ -2067,7 +2067,10 @@
       "connectionLost": "Verbindung verloren – Status unbekannt",
       "clickToView": "Klicken zum Anzeigen",
       "errorOccurred": "Fehler aufgetreten",
-      "retry": "Erneut versuchen"
+      "retry": "Erneut versuchen",
+      "contextLimitedTitle": "Weniger Fragen als angefordert",
+      "contextLimitedBody": "Es konnten nur {{generated}} von {{requested}} angeforderten Fragen erstellt werden, weil die ausgewählten Dokumente zu wenig durchsuchbaren Inhalt enthalten.",
+      "contextLimitedAction": "Wähle für mehr Fragen zusätzliche oder umfangreichere Dokumente aus."
     },
     "questionEditor": {
       "title": "Frage #{{id}} bearbeiten",

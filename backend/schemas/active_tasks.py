@@ -42,6 +42,18 @@ class TaskResultResponse(BaseModel):
     status: TaskStatus
     result: Optional[Any] = None
     error: Optional[str] = None
+    # TF-736: the job row's own record of the outcome, set on SUCCESS. Same
+    # names as the keys in ``result["quality_metrics"]``, so a client reads
+    # the numbers the same way whether they came from Celery or from the DB.
+    # They are what survives once ``result`` has expired; while ``result`` is
+    # there, its quality_metrics are the fresher source.
+    # ``generated_question_count`` is None for rows written before the
+    # migration or when recording the outcome failed. ``requested_question_count``
+    # mirrors ``job.question_count``, which was already nullable pre-TF-736
+    # for unrelated reasons — its nullability isn't a TF-736 concern.
+    requested_question_count: Optional[int] = None
+    generated_question_count: Optional[int] = None
+    context_limited: bool = False
 
     @model_validator(mode="after")
     def validate_status_fields(self) -> "TaskResultResponse":

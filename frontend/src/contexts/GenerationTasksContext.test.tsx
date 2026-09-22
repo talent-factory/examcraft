@@ -2,9 +2,12 @@ import { render, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { GenerationTasksProvider, useGenerationTasks } from './GenerationTasksContext';
 
-// Mock the AuthContext to provide a stable token
+// Mock the AuthContext to provide a stable token by default; overridable
+// per-test (mockUseAuth.mockReturnValue(...)) to simulate a silent token
+// refresh, which changes `accessToken` and re-runs the recovery effect.
+const mockUseAuth = jest.fn(() => ({ isAuthenticated: true, accessToken: 'test-token' }));
 jest.mock('./AuthContext', () => ({
-  useAuth: () => ({ isAuthenticated: true, accessToken: 'test-token' }),
+  useAuth: () => mockUseAuth(),
 }));
 
 // Mock i18n to bypass translations
@@ -77,6 +80,8 @@ beforeEach(() => {
   mockGetTaskResult.mockImplementation((taskId: string) =>
     Promise.resolve({ task_id: taskId, status: 'SUCCESS', result: null, error: null }),
   );
+  mockUseAuth.mockReset();
+  mockUseAuth.mockReturnValue({ isAuthenticated: true, accessToken: 'test-token' });
 });
 
 // Helper component exposes context to tests
@@ -256,6 +261,69 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
     await waitFor(() => expect(captured!.getTask('task-expired')?.status).toBe('SUCCESS'));
     expect(captured!.getTask('task-expired')?.result).toBeNull();
     expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  // TF-736: once the Celery result has expired, `result` is null — the
+  // under-fill must then still be known from the job row.
+  it('keeps the job-row outcome when the Celery result has expired', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-limited')] });
+    mockGetTaskResult.mockResolvedValue({
+      task_id: 'task-limited',
+      status: 'SUCCESS',
+      result: null,
+      error: null,
+      requested_question_count: 15,
+      generated_question_count: 6,
+      context_limited: true,
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(captured!.getTask('task-limited')?.contextLimited).toBe(true));
+    const task = captured!.getTask('task-limited')!;
+    expect(task.result).toBeNull();
+    expect(task.questionCount).toBe(15);
+    expect(task.generatedQuestionCount).toBe(6);
+  });
+
+  // Regression: the recovery effect re-runs on every accessToken change
+  // (silent token refresh), not only on mount, and used to rebuild each
+  // task from scratch — carrying over `result` but dropping
+  // `contextLimited`/`generatedQuestionCount`. If the second refetch then
+  // fails (eg the Celery result really has expired by then), the under-fill
+  // notice used to be lost for the rest of the session.
+  it('does not lose the recovered under-fill flags on a silent token refresh', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-limited')] });
+    mockGetTaskResult.mockResolvedValueOnce({
+      task_id: 'task-limited',
+      status: 'SUCCESS',
+      result: null,
+      error: null,
+      requested_question_count: 15,
+      generated_question_count: 6,
+      context_limited: true,
+    });
+
+    const { rerender } = renderProvider();
+    await waitFor(() => expect(captured!.getTask('task-limited')?.contextLimited).toBe(true));
+
+    mockGetTaskResult.mockRejectedValueOnce(new Error('HTTP 404'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockUseAuth.mockReturnValue({ isAuthenticated: true, accessToken: 'refreshed-token' });
+    rerender(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+
+    await waitFor(() => expect(mockGetActiveTasks).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(warn).toHaveBeenCalled());
+
+    // Without the fix, the rebuild step would have reset these to
+    // undefined/false before the (here: failed) refetch could restore them.
+    expect(captured!.getTask('task-limited')?.contextLimited).toBe(true);
+    expect(captured!.getTask('task-limited')?.generatedQuestionCount).toBe(6);
     warn.mockRestore();
   });
 

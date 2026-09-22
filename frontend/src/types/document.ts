@@ -308,6 +308,11 @@ export interface GenerationTaskState {
   questionCount: number | null;
   createdAt: string;
   result: RAGExamResponse | null;
+  // TF-736: the job row's record of the outcome, from
+  // GET /tasks/{task_id}/result. The only source left once the Celery result
+  // (and with it `result.quality_metrics`) has expired.
+  generatedQuestionCount?: number | null;
+  contextLimited?: boolean;
 }
 
 /**
@@ -344,6 +349,12 @@ export interface TaskResultResponse {
   status: string;
   result: RAGExamResponse | null;
   error: string | null;
+  // TF-736: read from the job row, set on SUCCESS. Same names as in
+  // `quality_metrics`; `generated_question_count` is null for jobs recorded
+  // before TF-736.
+  requested_question_count?: number | null;
+  generated_question_count?: number | null;
+  context_limited?: boolean;
 }
 
 /** Context value exposed by GenerationTasksContext */

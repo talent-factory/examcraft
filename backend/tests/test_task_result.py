@@ -65,12 +65,23 @@ def auth_client(mock_user, mock_db):
     app.dependency_overrides.clear()
 
 
-def _make_job(task_id: str = "task-1", status: str = "SUCCESS", user_id: int = 7):
+def _make_job(
+    task_id: str = "task-1",
+    status: str = "SUCCESS",
+    user_id: int = 7,
+    question_count: int = 15,
+    generated_question_count: int | None = None,
+    context_limited: bool = False,
+):
     job = Mock()
     job.id = 1
     job.task_id = task_id
     job.status = status
     job.user_id = user_id
+    # TF-736: set explicitly — a bare Mock attribute is truthy and not an int.
+    job.question_count = question_count
+    job.generated_question_count = generated_question_count
+    job.context_limited = context_limited
     # QuestionGenerationJob has no institution_id column; without this `del`
     # the mock would invent one, and enforce_resource_access' tenant check
     # would test against a value that doesn't exist in production.
@@ -114,6 +125,11 @@ class TestGetTaskResult:
         assert data["status"] == "SUCCESS"
         assert data["result"] == EXAM_RESULT
         assert data["error"] is None
+        # TF-736: a row written before the migration (or one whose outcome
+        # write failed) defaults to None/False, not an error — _make_job's
+        # defaults stand in for that pre-migration/failed-write row here.
+        assert data["generated_question_count"] is None
+        assert data["context_limited"] is False
 
     @pytest.mark.parametrize("state", ["FAILURE", "REVOKED"])
     def test_returns_error_for_failed_task(self, auth_client, mock_db, state):
@@ -194,6 +210,85 @@ class TestGetTaskResult:
         data = response.json()
         assert data["status"] == "SUCCESS"
         assert data["result"] is None
+
+    def test_fresh_result_also_reports_db_outcome(self, auth_client, mock_db):
+        """TF-736: the outcome fields are populated for SUCCESS regardless of
+        whether the Celery result is still live — not only once it has
+        expired. A client reads the same three fields either way (see
+        schemas.active_tasks.TaskResultResponse's docstring)."""
+        _wire_job(
+            mock_db,
+            _make_job(
+                status="SUCCESS",
+                question_count=15,
+                generated_question_count=6,
+                context_limited=True,
+            ),
+        )
+
+        with patch("celery.result.AsyncResult") as mock_ar_cls:
+            mock_result = Mock()
+            mock_result.state = "SUCCESS"
+            mock_result.result = EXAM_RESULT
+            mock_ar_cls.return_value = mock_result
+
+            response = auth_client.get("/api/v1/rag/tasks/task-1/result")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["result"] == EXAM_RESULT
+        assert data["requested_question_count"] == 15
+        assert data["generated_question_count"] == 6
+        assert data["context_limited"] is True
+
+    def test_expired_celery_result_falls_back_to_db_outcome(self, auth_client, mock_db):
+        """TF-736: once the Celery result has expired, the under-fill is
+        still explainable — the counts come from the job row."""
+        _wire_job(
+            mock_db,
+            _make_job(
+                status="SUCCESS",
+                question_count=15,
+                generated_question_count=6,
+                context_limited=True,
+            ),
+        )
+
+        with patch("celery.result.AsyncResult") as mock_ar_cls:
+            mock_result = Mock()
+            mock_result.state = "PENDING"  # Result entry already discarded
+            mock_result.result = None
+            mock_ar_cls.return_value = mock_result
+
+            response = auth_client.get("/api/v1/rag/tasks/task-1/result")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["result"] is None
+        assert data["requested_question_count"] == 15
+        assert data["generated_question_count"] == 6
+        assert data["context_limited"] is True
+
+    def test_db_outcome_is_not_reported_for_failed_task(self, auth_client, mock_db):
+        """The counts describe a finished generation; a FAILURE carries none,
+        even if the row happened to hold some."""
+        _wire_job(
+            mock_db,
+            _make_job(
+                status="FAILURE", generated_question_count=6, context_limited=True
+            ),
+        )
+
+        with patch(
+            "celery.result.AsyncResult", side_effect=Exception("Broker unreachable")
+        ):
+            response = auth_client.get("/api/v1/rag/tasks/task-1/result")
+
+        data = response.json()
+        assert data["status"] == "FAILURE"
+        assert data["requested_question_count"] is None
+        assert data["generated_question_count"] is None
+        assert data["context_limited"] is False
 
     def test_broker_failure_does_not_break_endpoint(self, auth_client, mock_db):
         """Broker outage: 200 with DB status instead of 5xx, so the progress

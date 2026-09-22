@@ -27,6 +27,36 @@ import type { GenerationTaskState } from '../types';
 
 const AUTO_HIDE_DELAY_MS = 30_000;
 
+interface ContextLimit {
+  requested: number | null;
+  generated: number | null;
+}
+
+/**
+ * TF-736: requested and generated question counts of a SUCCESS that produced
+ * fewer questions than asked for, because the document material ran out.
+ * `null` for every other task. Decided by the `context_limited` boolean,
+ * never by the presence of a notice text. The live result's quality_metrics
+ * win; the job-row values from the result endpoint cover an expired Celery
+ * result. Relies on `result` and `contextLimited`/`generatedQuestionCount`
+ * always being refreshed together (true today — see GenerationTasksContext's
+ * recovery effect) — do not update one without the other.
+ */
+const contextLimitOf = (task: GenerationTaskState): ContextLimit | null => {
+  if (task.status !== 'SUCCESS') return null;
+  const metrics = task.result?.quality_metrics;
+  if (metrics?.context_limited === true) {
+    return {
+      requested: metrics.requested_question_count ?? task.questionCount,
+      generated: metrics.generated_question_count ?? null,
+    };
+  }
+  if (task.contextLimited === true) {
+    return { requested: task.questionCount, generated: task.generatedQuestionCount ?? null };
+  }
+  return null;
+};
+
 const GenerationTasksBar: React.FC = () => {
   const { t } = useTranslation();
   const { activeTasks, completedTasks, dismissTask, retryTask } = useGenerationTasks();
@@ -68,18 +98,28 @@ const GenerationTasksBar: React.FC = () => {
     });
   }, [completedTasks]);
 
-  // Auto-hide 30s after all tasks complete — but never auto-hide when a FAILURE
-  // is present so the user sees the error until they explicitly dismiss it.
+  // Auto-hide 30s after all tasks complete — but never while a task needs the
+  // user's attention: a FAILURE/REVOKED, or a SUCCESS that produced fewer
+  // questions than requested (TF-736). Those stay until explicitly dismissed.
+  // `mustStayVisible` is a dependency because on recovery after a reload the
+  // result arrives in a second step, without changing either list length —
+  // the timer started for the bare task must then be cancelled.
+  const mustStayVisible = completedTasks.some(
+    (task) => task.status === 'FAILURE' || task.status === 'REVOKED' || contextLimitOf(task) !== null
+  );
   useEffect(() => {
-    const hasFailures = completedTasks.some(
-      (t) => t.status === 'FAILURE' || t.status === 'REVOKED'
-    );
-    if (activeTasks.length === 0 && completedTasks.length > 0 && !hasFailures) {
+    if (activeTasks.length === 0 && completedTasks.length > 0 && !mustStayVisible) {
       hideTimerRef.current = setTimeout(() => {
         setVisible(false);
       }, AUTO_HIDE_DELAY_MS);
-    } else if (activeTasks.length > 0) {
-      // Reset visibility and clear timer when new active task appears
+    } else if (activeTasks.length > 0 || mustStayVisible) {
+      // Reset visibility and clear timer when a new active task appears, or
+      // when a stay-visible reason (eg the context-limited notice) shows up
+      // AFTER the panel already auto-hid — the second recovery roundtrip can
+      // land past AUTO_HIDE_DELAY_MS, and the notice must still surface.
+      // Safe to always bring back: an explicit dismiss (`dismissTask`) drops
+      // the task from `completedTasks`, so a user-closed panel can't be
+      // reopened by this branch.
       setVisible(true);
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current);
@@ -93,7 +133,7 @@ const GenerationTasksBar: React.FC = () => {
         hideTimerRef.current = null;
       }
     };
-  }, [activeTasks.length, completedTasks.length]);
+  }, [activeTasks.length, completedTasks.length, mustStayVisible]);
 
   const handleTaskClick = (task: GenerationTaskState) => {
     if (task.status === 'SUCCESS') {
@@ -156,6 +196,7 @@ const GenerationTasksBar: React.FC = () => {
             const isSuccess = task.status === 'SUCCESS';
             const isFailure = task.status === 'FAILURE' || task.status === 'REVOKED';
             const isUnknown = task.status === 'UNKNOWN';
+            const contextLimit = contextLimitOf(task);
 
             return (
               <Box
@@ -245,15 +286,36 @@ const GenerationTasksBar: React.FC = () => {
                         {t('components.generationTasks.clickToView')}
                       </Typography>
                     </Box>
-                    {/* TF-358: Notice shown when the question count was coupled to
-                        the available document material (fewer questions than
-                        requested). Text comes from the backend. */}
-                    {task.result?.quality_metrics?.context_limited_notice && (
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mt: 0.5 }}>
+                    {/* TF-358/TF-736: fewer questions than requested because the
+                        document material ran out. Built from the counts in the
+                        user's language — the backend's context_limited_notice
+                        is German only. */}
+                    {contextLimit && (
+                      <Box
+                        data-testid="generation-task-context-limited"
+                        sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mt: 0.5 }}
+                      >
                         <WarningIcon fontSize="small" color="warning" sx={{ mt: '2px' }} />
-                        <Typography variant="caption" color="warning.main">
-                          {task.result.quality_metrics.context_limited_notice}
-                        </Typography>
+                        <Box>
+                          <Typography
+                            variant="caption"
+                            color="warning.main"
+                            sx={{ display: 'block', fontWeight: 600 }}
+                          >
+                            {t('components.generationTasks.contextLimitedTitle')}
+                          </Typography>
+                          {contextLimit.generated !== null && contextLimit.requested !== null && (
+                            <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
+                              {t('components.generationTasks.contextLimitedBody', {
+                                generated: contextLimit.generated,
+                                requested: contextLimit.requested,
+                              })}
+                            </Typography>
+                          )}
+                          <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
+                            {t('components.generationTasks.contextLimitedAction')}
+                          </Typography>
+                        </Box>
                       </Box>
                     )}
                   </>

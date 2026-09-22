@@ -2067,7 +2067,10 @@
       "connectionLost": "Connessione persa – stato sconosciuto",
       "clickToView": "Clicca per visualizzare",
       "errorOccurred": "Si è verificato un errore",
-      "retry": "Riprova"
+      "retry": "Riprova",
+      "contextLimitedTitle": "Meno domande del richiesto",
+      "contextLimitedBody": "È stato possibile creare solo {{generated}} delle {{requested}} domande richieste, perché i documenti selezionati contengono troppo poco contenuto ricercabile.",
+      "contextLimitedAction": "Per ottenere più domande, seleziona documenti aggiuntivi o più ampi."
     },
     "questionEditor": {
       "title": "Modifica domanda #{{id}}",

@@ -4,6 +4,7 @@ Sends per-question progress updates via ProgressTask.update_progress().
 Automatically persists generated questions to question_reviews (status: pending).
 """
 
+import contextlib
 import dataclasses
 import json
 import logging
@@ -217,6 +218,134 @@ def _safe_update_job_status(task_id: str, status: str) -> bool:
             exc_info=True,
         )
         return False
+
+
+# Single retry for a transient outcome-write blip, 1s later. This write
+# isn't status-critical like _update_job_status (hence far fewer attempts
+# than _JOB_STATUS_UPDATE_BACKOFFS), but a bare zero-retry attempt turns any
+# transient DB hiccup into a permanent, invisible-to-the-user loss of the
+# under-fill notice — worth one bounded extra attempt.
+_GENERATION_OUTCOME_BACKOFF_S: float = 1.0
+
+
+def _try_record_generation_outcome(
+    task_id: str, generated_question_count: int, context_limited: bool
+) -> None:
+    """Single-attempt outcome write. Opens a fresh SessionLocal per attempt
+    for the same pool_pre_ping reason as `_try_update_job_status`. Raises
+    JobNotFoundError if no matching row exists (not retriable — a
+    data-integrity issue, not a transient one). Lets other exceptions
+    (SQLAlchemyError, OSError, ...) bubble for the retry loop in
+    `_safe_record_generation_outcome` to decide.
+    """
+    from database import SessionLocal
+
+    session = SessionLocal()
+    try:
+        job = session.query(QuestionGenerationJob).filter_by(task_id=task_id).first()
+        if job is None:
+            raise JobNotFoundError(task_id, "SUCCESS")
+        job.generated_question_count = generated_question_count
+        job.context_limited = context_limited
+        session.commit()
+    except Exception:
+        # A broken connection can fail the rollback too; that must not
+        # escape either.
+        with contextlib.suppress(Exception):
+            session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def _safe_record_generation_outcome(
+    task_id: str, generated_question_count: int, quality_metrics: Any
+) -> bool:
+    """Persist how many questions a SUCCESS run produced and whether the
+    count was limited by the document material (TF-736).
+
+    Without this, the only record of an under-filled generation is the
+    Celery result, which expires. Deliberately a separate write from the
+    SUCCESS status: the status is what the UI and the TF-329 watchdog depend
+    on, and it must not be lost because these informational columns failed.
+    Note this failure mode isn't limited to this write: since the ORM model
+    declares these columns, ANY query against QuestionGenerationJob —
+    including `_try_update_job_status`'s — fails on an unmigrated DB. That's
+    a deploy-ordering requirement (migration before worker rollout), not
+    something this function can work around; `AUTO_MIGRATE=true` in
+    production covers the normal case.
+
+    Unlike `_safe_update_job_status` this swallows every exception, not just
+    the DB/row-missing ones — a finished generation must never end as
+    FAILURE because of this write. One retry after `_GENERATION_OUTCOME_BACKOFF_S`
+    for transient (SQLAlchemyError/OSError) failures; JobNotFoundError is not
+    retried, matching `_safe_update_job_status`'s split between transient and
+    data-integrity failures. Even after both attempts fail, the Celery result
+    still carries the same numbers until it expires.
+
+    Returns:
+        True if the row was updated, False on any swallowed failure.
+    """
+    context_limited = (
+        isinstance(quality_metrics, dict)
+        and quality_metrics.get("context_limited") is True
+    )
+    attempts = 2
+    for attempt in range(1, attempts + 1):
+        try:
+            _try_record_generation_outcome(
+                task_id, generated_question_count, context_limited
+            )
+            return True
+        except JobNotFoundError:
+            logger.critical(
+                "Cannot persist generation outcome for task %s: no "
+                "QuestionGenerationJob row found (data-integrity issue — "
+                "possible row deletion or stale task_id)",
+                task_id,
+                exc_info=True,
+            )
+            return False
+        except (SQLAlchemyError, OSError):
+            if attempt < attempts:
+                logger.warning(
+                    "Generation outcome write attempt %d/%d failed for task "
+                    "%s, retrying",
+                    attempt,
+                    attempts,
+                    task_id,
+                    exc_info=True,
+                )
+                time.sleep(_GENERATION_OUTCOME_BACKOFF_S)
+                continue
+            logger.critical(
+                "Could not persist generation outcome for task %s "
+                "(generated_question_count=%s) after %d attempts — the "
+                "under-fill notice will be lost once the Celery result "
+                "expires",
+                task_id,
+                generated_question_count,
+                attempts,
+                exc_info=True,
+            )
+            return False
+        except Exception:
+            # Programmer errors (TypeError, AttributeError, ...) are not
+            # transient — retrying would just waste `_GENERATION_OUTCOME_BACKOFF_S`
+            # before failing the same way again. Still never re-raised: this
+            # function's whole contract is that a finished generation must
+            # never end as FAILURE because of this write.
+            logger.critical(
+                "Unexpected (non-retriable) error persisting generation "
+                "outcome for task %s (generated_question_count=%s) — the "
+                "under-fill notice will be lost once the Celery result "
+                "expires",
+                task_id,
+                generated_question_count,
+                exc_info=True,
+            )
+            return False
+    return False  # unreachable — satisfies static type checkers
 
 
 def _coerce_ln_level(value) -> Optional[int]:
@@ -688,6 +817,16 @@ def generate_questions_task(
             f"Fragen persistiert: {len(review_question_ids)} Reviews für Exam {result.exam_id}"
         )
 
+        # TF-736: before the status, so a reader that sees SUCCESS on the row
+        # also sees the counts. Never raises (see the helper).
+        outcome_persisted = _safe_record_generation_outcome(
+            self.request.id, len(result.questions), result.quality_metrics
+        )
+        if not outcome_persisted:
+            # Already logged CRITICAL inside the helper; tag the span too so
+            # a failed outcome write is searchable/aggregatable in Specula
+            # next to this task's other tags, not only in the log stream.
+            set_span_tag("generation_outcome_persisted", "false")
         _safe_update_job_status(self.request.id, "SUCCESS")
 
         # Premium RAGQuestion/RAGContext are @dataclass — use .model_dump() if switching to Pydantic
