@@ -258,3 +258,44 @@ async def trigger_worker_error(
         task_id=result.id,
         environment=os.getenv("ENVIRONMENT", "development"),
     )
+
+
+class SpeculaUnhandledTestError(RuntimeError):
+    """Raised on purpose by ``trigger_unhandled_error`` to validate that an
+    uncaught API-process exception reaches ``main.py``'s global
+    ``app_unhandled_exception_handler`` (TF-871).
+
+    A dedicated type so the verification event is trivially identifiable in
+    the observability backend and can never be confused with a genuine
+    production failure — mirrors ``SpeculaPipelineTestError`` in
+    ``tasks/diagnostics_tasks.py``, which validates the worker path instead.
+    """
+
+
+@admin_router.post("/unhandled-error", status_code=500)
+async def trigger_unhandled_error(
+    current_user: User = Depends(get_current_superuser),
+) -> None:
+    """Raise an unhandled exception to verify the API -> observability
+    pipeline in production (TF-871).
+
+    SuperAdmin-only and available in production, mirroring
+    ``trigger_worker_error`` above but for the API process instead of the
+    Celery worker. Deliberately raises a plain, uncaught exception — no
+    local try/except — so it propagates to ``main.py``'s global
+    ``app_unhandled_exception_handler``, which is the actual production
+    code path for unhandled exceptions (``logger.exception`` ->
+    ``SpeculaLogHandler`` -> OTel collector). The dev-only
+    ``/api/specula-test/error`` endpoint above calls ``record_exception()``
+    directly instead and is 403'd outside development, so it cannot
+    exercise this handler in production.
+    """
+    logger.warning(
+        "specula_test.trigger_unhandled_error: raising on purpose "
+        "(user_id=%s) — this is an intentional observability test, not a bug",
+        current_user.id,
+    )
+    raise SpeculaUnhandledTestError(
+        f"TF-871 API unhandled-exception observability pipeline verification "
+        f"(triggered by SuperAdmin user {current_user.id})"
+    )

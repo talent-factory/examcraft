@@ -546,3 +546,39 @@ def test_worker_error_endpoint_returns_503_when_broker_unreachable(monkeypatch):
     # Passthrough (TF-295): english, no locale key, detail is the wire contract.
     assert body["detail"] == "Task queue unreachable — check broker/worker."
     assert "broker unreachable" not in body["detail"]
+
+
+# ---------------------------------------------------------------------------
+# api/specula_test.py — SuperAdmin unhandled-error endpoint (prod-safe, TF-871)
+# ---------------------------------------------------------------------------
+
+
+def test_unhandled_error_endpoint_reaches_global_handler_for_superadmin():
+    """SuperAdmin can trigger a deliberately uncaught exception; it must NOT
+    be swallowed by any endpoint-level try/except and must reach main.py's
+    global app_unhandled_exception_handler — the actual production code path
+    (logger.exception -> SpeculaLogHandler) for the examcraft-unhandled-
+    exception trigger rule, which the dev-only /api/specula-test/error
+    endpoint above cannot exercise in production."""
+    app.dependency_overrides[get_current_superuser] = lambda: SimpleNamespace(
+        id=7, is_superuser=True
+    )
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post("/api/admin/specula-test/unhandled-error")
+
+    assert resp.status_code == 500
+    assert resp.json()["error_code"] == "internal_error"
+
+
+def test_unhandled_error_endpoint_forbidden_for_non_superadmin():
+    """A normal authenticated user must be rejected with 403 — the real
+    get_current_superuser guard runs because only get_current_user is faked."""
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id=11, is_superuser=False
+    )
+
+    client = TestClient(app, raise_server_exceptions=True)
+    resp = client.post("/api/admin/specula-test/unhandled-error")
+
+    assert resp.status_code == 403
