@@ -2,9 +2,9 @@
  * Guard: every seeded context hint has a text in all four locales.
  *
  * The hint text is resolved with `t(hint.i18n_key)` — a DYNAMIC key. The
- * literal-only scan in `i18n-keys.test.ts` cannot see it, so without this test
- * a hint whose key is missing from translation.json would render its raw key
- * ("help.hints.examsCompose") in the panel, and nothing would fail.
+ * literal-only scan in `scripts/check-i18n-keys.ts` cannot see it, so without
+ * this test a hint whose key is missing from translation.json would render
+ * its raw key ("help.hints.examsCompose") in the panel, and nothing would fail.
  *
  * All four locales, not just DE+EN: the hints were the last help surface whose
  * language the server decided, and the FR/IT gap in that surface was invisible

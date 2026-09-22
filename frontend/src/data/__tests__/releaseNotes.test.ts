@@ -7,10 +7,11 @@ import {
   resolveScreenshotSrc,
 } from '../releaseNotes';
 
-// Review fix: the existing "translation completeness" test in
-// ReleaseNotesDialog.test.tsx only compares the de/en/fr/it translation.json
-// files against *each other* — it never reads RELEASE_NOTES at all, so a
-// typo'd `item.id` or `group.kind` (which the renderer resolves to
+// Review fix: locale parity (now `scripts/check-i18n-keys.ts`, formerly a
+// "translation completeness" block in ReleaseNotesDialog.test.tsx) only
+// compares the de/en/fr/it translation.json files against *each other* — it
+// never reads RELEASE_NOTES at all, so a typo'd `item.id` or `group.kind`
+// (which the renderer resolves to
 // `t(`releaseNotes.entries.${item.id}`)` / `t(`releaseNotes.groups.${group.kind}`)`)
 // passes every existing check and then silently renders the raw i18n key to
 // users. This file closes that gap by checking the manifest itself, plus a

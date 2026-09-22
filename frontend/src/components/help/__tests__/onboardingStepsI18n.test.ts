@@ -49,11 +49,9 @@ const resolve = (bundle: Record<string, unknown>, dotted: string): unknown =>
  * language must be a decision, and until then a partially translated locale
  * should fall back rather than fail the build.
  *
- * Note this is stricter than the repo-wide `i18n-keys.test.ts`, which still
- * excludes fr/it because a broader, pre-existing translation gap remains
- * there (unrelated to this feature — see that file's own comment for the
- * current scope). The tour is simply already complete, so it can be held to
- * the higher bar now.
+ * Parity of the four locale files as a whole is the job of
+ * `scripts/check-i18n-keys.ts`; this list only says which locales must carry
+ * the keys the steps file references, which that scan cannot see.
  */
 const LOCALES_WITH_TOUR = ['de', 'en', 'fr', 'it'];
 

@@ -169,8 +169,8 @@ const OrgUnitEditor: React.FC<OrgUnitEditorProps> = ({
       onSaved();
       onClose();
     } catch (err) {
-      // Two call sites rather than one with a conditional key: the guard in
-      // `i18n-fallback-keys.test.ts` only sees a literal third argument, and a
+      // Two call sites rather than one with a conditional key: the i18n gate
+      // (`scripts/check-i18n-keys.ts`) only sees a literal third argument, and a
       // key it cannot see is a key nobody checks for FR/IT.
       setError(
         isEdit

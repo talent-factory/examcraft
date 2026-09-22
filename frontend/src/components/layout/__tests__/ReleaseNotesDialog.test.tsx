@@ -20,8 +20,8 @@ jest.mock('../../../contexts/AuthContext', () => ({
 // stable `t`/`i18n` references across renders). So rendered text in these
 // tests is always German, and clicking a language pill is verified by
 // asserting the *call*, not by re-rendering in another language — actual
-// per-language content is instead covered by the translation-completeness
-// check below, which reads all four locale files directly.
+// per-language content is covered by the i18n gate
+// (`scripts/check-i18n-keys.ts`), which reads all four locale files directly.
 
 const theme = createTheme();
 
@@ -152,47 +152,6 @@ describe('ReleaseNotesDialog', () => {
       fireEvent.click(screen.getByRole('button', { name: label }));
       const { i18n: mockI18n } = jest.requireMock('react-i18next').useTranslation();
       expect(mockI18n.changeLanguage).toHaveBeenCalledWith(code);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Translation completeness — real i18n files, no react-i18next involved.
-// ---------------------------------------------------------------------------
-
-describe('releaseNotes translation completeness', () => {
-  const LANGS = ['de', 'en', 'fr', 'it'];
-  const SECTIONS = ['dialog', 'groups', 'entries'] as const;
-
-  const releaseNotesByLang = Object.fromEntries(
-    LANGS.map((lang) => [
-      lang,
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      require(`../../../locales/${lang}/translation.json`).releaseNotes,
-    ])
-  );
-
-  it('has a releaseNotes namespace in every supported locale', () => {
-    LANGS.forEach((lang) => {
-      expect(releaseNotesByLang[lang]).toBeDefined();
-    });
-  });
-
-  it.each(SECTIONS)('has identical %s keys across de/en/fr/it', (section) => {
-    const referenceKeys = Object.keys(releaseNotesByLang.de[section]).sort();
-    LANGS.filter((lang) => lang !== 'de').forEach((lang) => {
-      expect(Object.keys(releaseNotesByLang[lang][section]).sort()).toEqual(referenceKeys);
-    });
-  });
-
-  it('has no empty translated strings', () => {
-    LANGS.forEach((lang) => {
-      SECTIONS.forEach((section) => {
-        Object.entries(releaseNotesByLang[lang][section]).forEach(([key, value]) => {
-          expect(typeof value).toBe('string');
-          expect((value as string).trim().length).toBeGreaterThan(0);
-        });
-      });
     });
   });
 });

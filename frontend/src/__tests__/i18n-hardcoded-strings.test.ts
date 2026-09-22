@@ -101,6 +101,21 @@
  * email`. The gap itself is not closed, though: it is structural (the scan
  * still cannot see a component-level throw), so a future PR reintroducing a
  * raw literal there would again go undetected by this guard.
+ *
+ * KNOWN GAP 4 — visible props written as object keys. VISIBLE_PROP matches the
+ * JSX attribute form `aria-label="…"`, not a quoted key inside an object:
+ * `inputProps={{ 'aria-label': 'select grade' }}` passes unseen (ReviewQueue's
+ * grade picker shipped exactly that until TF-772 PR 2 translated it). MUI's
+ * `inputProps` and `slotProps` take this shape. Checked in TF-772 PR 6 with a
+ * probe component: the object-key form stays green, the attribute form with
+ * the same text fails.
+ *
+ * KNOWN GAP 5 — hard-coded fallback literals in components. A literal on the
+ * right of `||` / `??` that ends up rendered — `labels[level] || 'Unknown'` in
+ * QuestionReviewCard.tsx — is neither a JSX text node nor a visible prop nor
+ * inside `new Error(...)`, so the scan does not report it. Same probe: stays
+ * green. The literal only shows when the lookup misses, which is exactly the
+ * case nobody tests by looking at the screen.
  */
 import {
   PERMANENT_EXCEPTIONS,
@@ -122,11 +137,11 @@ describe('i18n hardcoded-string ratchet', () => {
   // make the guard vacuously green for that tier — and the failure would surface
   // misleadingly via the "erledigte Einträge" test below instead of pointing at
   // the real cause: a broken scan, not a finished cleanup. Thresholds are well
-  // below the actual file counts (core ~205, premium ~27) so normal churn
-  // doesn't make this flaky. enterprise/frontend/src dropped from ~4 files to
-  // just index.ts (an intentionally empty barrel) once its three dead-code
-  // placeholders were removed in TF-671, so its threshold only guards against
-  // a totally broken scan (0 files), not against churn.
+  // below the actual file counts (core > 250, premium > 25 as of TF-772 PR 6) so
+  // normal churn doesn't make this flaky. enterprise/frontend/src dropped from
+  // ~4 files to just index.ts (an intentionally empty barrel) once its three
+  // dead-code placeholders were removed in TF-671, so its threshold only guards
+  // against a totally broken scan (0 files), not against churn.
   const SANITY_ROOTS: Array<{ label: string; root: string; min: number }> = [
     { label: 'core/frontend/src', root: SCAN_ROOTS[0].dir, min: 50 },
     { label: 'premium/frontend/src', root: SCAN_ROOTS[1].dir, min: 15 },

@@ -115,7 +115,8 @@
     "test:all": "bun run test:unit && bun run test:e2e",
     "lint": "eslint src scripts --ext .ts,.tsx,.js,.jsx",
     "lint:fix": "eslint src scripts --ext .ts,.tsx,.js,.jsx --fix",
-    "i18n:check": "bun run scripts/check-i18n-keys.ts",
+    "scripts:test": "bun test ./scripts",
+    "i18n:check": "bun run scripts:test && bun run scripts/check-i18n-keys.ts",
     "clean": "rm -rf dist",
     "eject": "react-scripts eject"
   },
