@@ -189,9 +189,18 @@ def test_nicht_umgestellter_pfad_bleibt_unveraendert(envelope_db):
     Teil B ein Stichtag sein statt paketweise laufen zu können.
 
     Zwei Belege statt einem (TF-773 review): Starlettes eigener Router-404
-    (unabhängig davon, wie viele der 619 Stellen bereits migriert sind) UND
-    ein echter Business-Endpunkt, den dieses PR nicht angefasst hat
-    (``students.py`` gehört zu den verbleibenden 219 Stellen aus Teil B).
+    (unabhängig davon, wie viele Stellen bereits migriert sind) UND ein
+    Endpunkt, der eine nackte ``HTTPException`` wirft.
+
+    Letzterer war bis TF-773 PR 2d ``api/students.py`` — bis dieses Paket ihn
+    migrierte und der Test rot wurde. Ein echter Router als Messpunkt macht
+    diese Zusage zu einem Wanderpokal: sie gilt für *jede* unmigrierte Stelle,
+    aber der Test hängt an der einen, die als Nächstes drankommt, und muss bei
+    jedem Paket umgehängt werden. Der Endpunkt unten wird deshalb hier
+    definiert. Er kann nicht migriert werden, weil ihn niemand ausliefert, und
+    misst trotzdem genau das, worum es geht: was ``main.py``s Handler mit einer
+    Exception ohne ``error_code`` macht.
+
     Beide Assertions prüfen Bytegleichheit, nicht nur die Abwesenheit von
     ``error_code`` — sonst würde ein neues drittes Feld unbemerkt
     durchrutschen.
@@ -205,21 +214,17 @@ def test_nicht_umgestellter_pfad_bleibt_unveraendert(envelope_db):
     assert response.status_code == 404
     assert response.json() == {"detail": "Not Found"}
 
-    # 2. Ein echter, unmigrierter Business-Endpunkt.
-    import api.students as students_module
-    from utils.auth_utils import get_current_user
+    # 2. Eine nackte HTTPException durch denselben Handler.
+    from fastapi import HTTPException
 
-    if "/api/v1/students/{student_id}" not in [r.path for r in app.routes]:
-        app.include_router(students_module.router)
-    # require_permission() hängt an get_current_user, nicht an
-    # get_current_active_user (_client() überschreibt nur Letzteres), und
-    # is_superuser umgeht die RBAC-Prüfung, die nicht Gegenstand dieses
-    # Tests ist.
-    app.dependency_overrides[get_current_user] = lambda: user
-    user.is_superuser = True
-    envelope_db.commit()
+    path = "/__envelope-probe__/unmigriert"
+    if path not in [r.path for r in app.routes]:
 
-    response = client.get("/api/v1/students/999999")
+        @app.get(path)
+        def _unmigrated_probe():  # pragma: no cover - über den Client gerufen
+            raise HTTPException(status_code=404, detail="Studi nicht gefunden")
+
+    response = client.get(path)
     assert response.status_code == 404
     assert response.json() == {"detail": "Studi nicht gefunden"}
 

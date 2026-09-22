@@ -614,8 +614,14 @@ class TestRAGAPI:
 
         assert response.status_code == 503
         data = response.json()
-        assert data["detail"]["status"] == "unhealthy"
-        assert data["detail"]["service"] == "RAG Service"
+        # TF-773 PR 2d: ``detail`` war hier ein dict — genau die Form, die ADR
+        # 0005 ausschliesst und die ``AppHTTPException`` deshalb ablehnt. Die
+        # beiden Felder sind nicht weg, sie stehen jetzt in ``error_params``,
+        # wo ein Monitor sie ohne Parsen einer Meldung findet.
+        assert data["error_code"] == "rag_service_unhealthy"
+        assert data["error_params"]["status"] == "unhealthy"
+        assert data["error_params"]["service"] == "RAG Service"
+        assert isinstance(data["detail"], str)
 
     def test_rag_service_health_claude_unavailable(self):
         """Test RAG Service Health Check - Claude Unavailable"""
@@ -700,6 +706,7 @@ class TestRAGAPI:
         )
 
         assert response.status_code == 422
+        assert response.json()["error_code"] == "rag_tag_ids_invalid"
 
     def test_generate_rag_exam_with_foreign_institution_tag_returns_422(
         self, auth_client, mock_db
@@ -749,7 +756,10 @@ class TestRAGAPI:
         )
 
         assert response.status_code == 422
-        assert "Archiviert" in response.json()["detail"]
+        body = response.json()
+        assert body["error_code"] == "rag_tag_archived"
+        assert "Archiviert" in body["detail"]
+        assert body["error_params"] == {"name": "Archiviert"}
 
 
 class TestRAGAPIIntegration:

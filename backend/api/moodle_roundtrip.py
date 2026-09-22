@@ -37,7 +37,7 @@ import logging
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session, joinedload
 
@@ -45,6 +45,8 @@ from database import get_db
 from models.auth import User
 from models.exam import Exam
 from models.submission import MoodleConnection
+from errors import api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 from utils.auth_utils import require_permission
 from utils.exam_visibility import assert_exam_visible_for
 from utils.secret_encryption import SecretEncryptionError, decrypt_secret
@@ -133,7 +135,9 @@ class SyncMoodleQuestionIdsOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _load_exam(db: Session, user: User, exam_id: int) -> Exam:
+def _load_exam(
+    db: Session, user: User, exam_id: int, locale: str = DEFAULT_LOCALE
+) -> Exam:
     """Load exam by id, 404 unless institution matches AND ``user`` has
     ExamVisibility access (TF-643) — syncing Moodle question ids is a
     mutation, so this is gated exactly like every other exam-mutation
@@ -146,7 +150,7 @@ def _load_exam(db: Session, user: User, exam_id: int) -> Exam:
         .one_or_none()
     )
     if exam is None:
-        raise HTTPException(status_code=404, detail="Prüfung nicht gefunden")
+        raise api_error(404, "exams_not_found", locale)
     assert_exam_visible_for(
         user,
         exam,
@@ -163,9 +167,10 @@ async def _verify_moodle_quiz(
     base_url: str,
     token: str,
     quiz_id: int,
+    locale: str = DEFAULT_LOCALE,
 ) -> dict[str, Any] | None:
     """Verify the quiz exists in Moodle. Returns the metadata dict or
-    raises an ``HTTPException``.
+    raises an ``AppHTTPException``.
 
     We want a *fail-fast* check before we update DB rows so the
     operator hears about a wrong quiz id immediately rather than after
@@ -183,45 +188,51 @@ async def _verify_moodle_quiz(
                 },
             )
     except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Moodle-API nicht erreichbar: {exc}",
-        ) from exc
+        # The transport error names the internal endpoint host — log it,
+        # send the generic sentence (TF-773: no raw exception text on screen).
+        logger.warning("Moodle-API nicht erreichbar (%s): %s", endpoint, exc)
+        raise api_error(502, "moodle_roundtrip_api_unreachable", locale) from exc
 
     if response.status_code >= 500:
-        raise HTTPException(
-            status_code=502, detail=f"Moodle-API HTTP {response.status_code}"
-        )
+        logger.warning("Moodle-API antwortete HTTP %s", response.status_code)
+        raise api_error(502, "moodle_roundtrip_api_error", locale)
     if 400 <= response.status_code < 500:
-        # Surface the real upstream status so the operator can act on
-        # the response (401/403 → token, 404 → endpoint, 429 → retry).
-        # Without this branch the JSON parse below tries to read an
-        # HTML error body and 502s with a misleading message.
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                f"Moodle-API HTTP {response.status_code} — "
-                "Token-Berechtigung oder Endpoint prüfen."
-            ),
+        # The branch still earns its place without the status in the response:
+        # without it the JSON parse below reads an HTML error body and 502s
+        # with a misleading message. The status itself is what the operator
+        # acts on (401/403 → token, 404 → endpoint, 429 → retry), so it goes
+        # to the log; the caller gets the "check token or endpoint" sentence,
+        # which covers all three.
+        logger.warning(
+            "Moodle-API lehnte die Anfrage ab: HTTP %s", response.status_code
         )
+        raise api_error(502, "moodle_roundtrip_api_rejected", locale)
     try:
         data = response.json()
     except ValueError as exc:
-        raise HTTPException(
-            status_code=502, detail="Moodle-API antwortete nicht mit JSON"
-        ) from exc
+        logger.warning("Moodle-API antwortete nicht mit JSON: %s", exc)
+        raise api_error(502, "moodle_roundtrip_api_invalid_response", locale) from exc
 
     if isinstance(data, dict) and "exception" in data:
-        # Surface the Moodle error verbatim — operators recognise the
-        # canonical errorcodes (invalidtoken, accessexception, …).
+        # The Moodle error text is upstream content and may name the token,
+        # the endpoint or an internal course id, so it goes to the log where
+        # operators still recognise the canonical errorcodes (invalidtoken,
+        # accessexception, …) — never into the response (TF-773).
         message = data.get("message") or "unbekannter Moodle-Fehler"
-        raise HTTPException(status_code=400, detail=f"Moodle: {message}")
+        logger.warning(
+            "Moodle-API meldete eine Exception: errorcode=%s message=%s",
+            data.get("errorcode"),
+            message,
+        )
+        raise api_error(400, "moodle_roundtrip_api_exception", locale)
 
     if not isinstance(data, dict):
-        raise HTTPException(
-            status_code=502,
-            detail="Moodle: 'mod_quiz_get_quizzes_by_courses' lieferte kein Objekt",
+        logger.warning(
+            "Moodle-API: 'mod_quiz_get_quizzes_by_courses' lieferte %s statt eines "
+            "Objekts",
+            type(data).__name__,
         )
+        raise api_error(502, "moodle_roundtrip_api_invalid_response", locale)
 
     for quiz in data.get("quizzes", []) or []:
         try:
@@ -229,13 +240,7 @@ async def _verify_moodle_quiz(
                 return quiz
         except (TypeError, ValueError):
             continue
-    raise HTTPException(
-        status_code=404,
-        detail=(
-            f"Moodle-Quiz {quiz_id} ist für den gespeicherten Token "
-            "nicht sichtbar — Token-Berechtigung oder Course-Zugriff prüfen."
-        ),
-    )
+    raise api_error(404, "moodle_roundtrip_quiz_not_visible", locale, quiz_id=quiz_id)
 
 
 # ---------------------------------------------------------------------------
@@ -250,6 +255,7 @@ async def _verify_moodle_quiz(
 async def sync_moodle_question_ids(
     exam_id: int,
     body: SyncMoodleQuestionIdsIn,
+    http_request: Request,
     current_user: User = Depends(require_permission("submissions:import")),
     db: Session = Depends(get_db),
 ) -> SyncMoodleQuestionIdsOut:
@@ -262,23 +268,21 @@ async def sync_moodle_question_ids(
     Slot-Voraussetzung passt zum Default-Verhalten von Moodle nach
     XML-Import; Umordnungen erfordern erneutes Sync.
     """
-    exam = _load_exam(db, current_user, exam_id)
+    locale = get_request_locale(http_request, current_user)
+    exam = _load_exam(db, current_user, exam_id, locale)
     questions = sorted(exam.questions, key=lambda q: q.position)
     if not questions:
-        raise HTTPException(
-            status_code=400,
-            detail="Diese Prüfung hat keine Fragen — Sync nicht möglich.",
-        )
+        raise api_error(400, "moodle_roundtrip_exam_has_no_questions", locale)
 
     if body.moodle_question_ids is not None and len(body.moodle_question_ids) != len(
         questions
     ):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"moodle_question_ids hat {len(body.moodle_question_ids)} "
-                f"Einträge, Prüfung hat aber {len(questions)} Fragen."
-            ),
+        raise api_error(
+            400,
+            "moodle_roundtrip_question_ids_count_mismatch",
+            locale,
+            given=len(body.moodle_question_ids),
+            expected=len(questions),
         )
 
     # Verify the Moodle quiz exists (best-effort; allows the operator
@@ -294,14 +298,21 @@ async def sync_moodle_question_ids(
         try:
             token = decrypt_secret(connection.token_encrypted)
         except SecretEncryptionError as exc:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Token-Verschlüsselung defekt: {exc}",
+            # The exception text can carry key material hints — log it,
+            # respond with the generic operations sentence (TF-773).
+            logger.error(
+                "Konnte Moodle-Token für connection_id=%s nicht entschlüsseln: %s",
+                connection.id,
+                exc,
+            )
+            raise api_error(
+                500, "moodle_roundtrip_token_decryption_failed", locale
             ) from exc
         quiz_meta = await _verify_moodle_quiz(
             base_url=connection.base_url,
             token=token,
             quiz_id=body.moodle_quiz_id,
+            locale=locale,
         )
 
     out_questions: list[SyncedQuestionOut] = []

@@ -13,12 +13,13 @@ TF-868 completes the cleanup by renaming the module/routes themselves off the
 retired "sentry" identity.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from opentelemetry import trace
 from pydantic import BaseModel
 import logging
 import os
 from config.observability import record_exception, set_span_tag
+from errors import AppHTTPException
 from models.auth import User
 from utils.auth_utils import get_current_superuser
 
@@ -67,15 +68,16 @@ async def trigger_error():
     Only available in development environment.
 
     Raises:
-        HTTPException: If not in development environment
+        AppHTTPException: If not in development environment
         Exception: Test exception to be recorded on the current OTel span
     """
     environment = os.getenv("ENVIRONMENT", "development")
 
     if environment != "development":
-        raise HTTPException(
-            status_code=403,
-            detail="Specula test endpoints are only available in development",
+        raise AppHTTPException(
+            403,
+            "Specula test endpoints are only available in development",
+            error_code="specula_test_dev_only",
         )
 
     # Trigger a test error
@@ -112,14 +114,15 @@ async def trigger_message():
         SpeculaTestResponse: Success message
 
     Raises:
-        HTTPException: If not in development environment
+        AppHTTPException: If not in development environment
     """
     environment = os.getenv("ENVIRONMENT", "development")
 
     if environment != "development":
-        raise HTTPException(
-            status_code=403,
-            detail="Specula test endpoints are only available in development",
+        raise AppHTTPException(
+            403,
+            "Specula test endpoints are only available in development",
+            error_code="specula_test_dev_only",
         )
 
     # Send a test message. `specula_*` extras are forwarded as OTLP log
@@ -152,14 +155,15 @@ async def trigger_performance():
         SpeculaTestResponse: Success message
 
     Raises:
-        HTTPException: If not in development environment
+        AppHTTPException: If not in development environment
     """
     environment = os.getenv("ENVIRONMENT", "development")
 
     if environment != "development":
-        raise HTTPException(
-            status_code=403,
-            detail="Specula test endpoints are only available in development",
+        raise AppHTTPException(
+            403,
+            "Specula test endpoints are only available in development",
+            error_code="specula_test_dev_only",
         )
 
     # Create a nested-span trace
@@ -206,6 +210,9 @@ async def trigger_worker_error(
 
     Returns the Celery task id so the resulting trace can be correlated
     (search ``diagnostic:true`` or the task id in the observability backend).
+
+    Raises:
+        AppHTTPException: If the broker/worker is unreachable
     """
     from celery_app import celery_app
 
@@ -233,9 +240,13 @@ async def trigger_worker_error(
             "Observability worker-test dispatch failed (broker unreachable?): %s",
             broker_error,
         )
-        raise HTTPException(
-            status_code=503,
-            detail="Task-Queue nicht erreichbar — Broker/Worker prüfen.",
+        # Deliberately English and untranslated (TF-295 developer-error
+        # exemption, same as the sibling passthrough codes in this PR): this
+        # is a SuperAdmin-only diagnostic endpoint, not a user-facing flow.
+        raise AppHTTPException(
+            503,
+            "Task queue unreachable — check broker/worker.",
+            error_code="specula_test_queue_unavailable",
         ) from broker_error
 
     return WorkerErrorResponse(

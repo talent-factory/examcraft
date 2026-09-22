@@ -273,6 +273,7 @@ def test_export_cross_tenant_returns_404(test_db: Session) -> None:
     client = _client(test_db, user_a)
     response = client.get(f"/api/v1/exams/{exam_b.id}/grades/export/csv")
     assert response.status_code == 404
+    assert response.json()["error_code"] == "exams_not_found"
 
 
 def test_export_falls_back_to_institution_default_scheme(test_db: Session) -> None:

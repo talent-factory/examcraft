@@ -246,7 +246,13 @@ def test_test_endpoint_invalid_token(test_db: Session) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["ok"] is False
-    assert "Invalid token" in (body["error"] or "")
+    # Moodle's own exception text may name the token/endpoint/course id — it
+    # belongs in the log, not the response (mirrors moodle_roundtrip.py).
+    assert "Invalid token" not in (body["error"] or "")
+    assert (
+        body["error"]
+        == "Moodle hat die Anfrage abgelehnt — Token-Berechtigung oder Endpoint prüfen."
+    )
 
 
 def test_test_endpoint_network_error(test_db: Session) -> None:
@@ -267,4 +273,86 @@ def test_test_endpoint_network_error(test_db: Session) -> None:
         )
         resp = client.post(f"/api/v1/admin/moodle-connections/{cid}/test")
     assert resp.status_code == 200
-    assert resp.json()["ok"] is False
+    body = resp.json()
+    assert body["ok"] is False
+    # The transport error can name the configured endpoint host — it belongs
+    # in the log, not the response (mirrors moodle_roundtrip.py).
+    assert "connection refused" not in (body["error"] or "")
+    assert body["error"] == "Verbindung fehlgeschlagen — Basis-URL prüfen."
+
+
+def test_test_endpoint_server_error(test_db: Session) -> None:
+    inst = _make_institution(test_db, slug="tf336-mc-test-5xx")
+    user = _make_user(test_db, inst.id)
+    test_db.commit()
+    client = _client(test_db, user)
+
+    created = client.post(
+        "/api/v1/admin/moodle-connections",
+        json={"base_url": "https://moodle.example.org", "token": "token5xxABCDE"},
+    )
+    cid = created.json()["id"]
+
+    with respx.mock(assert_all_called=True) as mock:
+        mock.post("https://moodle.example.org/webservice/rest/server.php").mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+        resp = client.post(f"/api/v1/admin/moodle-connections/{cid}/test")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False
+    assert (
+        body["error"]
+        == "Moodle hat mit einem Fehler geantwortet. Bitte später erneut versuchen."
+    )
+
+
+def test_test_endpoint_rejected(test_db: Session) -> None:
+    inst = _make_institution(test_db, slug="tf336-mc-test-4xx")
+    user = _make_user(test_db, inst.id)
+    test_db.commit()
+    client = _client(test_db, user)
+
+    created = client.post(
+        "/api/v1/admin/moodle-connections",
+        json={"base_url": "https://moodle.example.org", "token": "token4xxABCDE"},
+    )
+    cid = created.json()["id"]
+
+    with respx.mock(assert_all_called=True) as mock:
+        mock.post("https://moodle.example.org/webservice/rest/server.php").mock(
+            return_value=httpx.Response(403, text="Forbidden")
+        )
+        resp = client.post(f"/api/v1/admin/moodle-connections/{cid}/test")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False
+    assert body["error"] == (
+        "Moodle hat die Anfrage abgelehnt — Token-Berechtigung oder Endpoint prüfen."
+    )
+
+
+def test_test_endpoint_invalid_response(test_db: Session) -> None:
+    inst = _make_institution(test_db, slug="tf336-mc-test-html")
+    user = _make_user(test_db, inst.id)
+    test_db.commit()
+    client = _client(test_db, user)
+
+    created = client.post(
+        "/api/v1/admin/moodle-connections",
+        json={"base_url": "https://moodle.example.org", "token": "tokenHTMLABCDE"},
+    )
+    cid = created.json()["id"]
+
+    with respx.mock(assert_all_called=True) as mock:
+        mock.post("https://moodle.example.org/webservice/rest/server.php").mock(
+            return_value=httpx.Response(200, text="<html>nope</html>")
+        )
+        resp = client.post(f"/api/v1/admin/moodle-connections/{cid}/test")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False
+    assert body["error"] == "Moodle hat keine verwertbare Antwort geliefert."

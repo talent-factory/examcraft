@@ -29,7 +29,7 @@ from schemas.active_tasks import (
     ActiveTasksResponse,
     TaskResultResponse,
 )
-from services.translation_service import t, get_request_locale
+from services.translation_service import DEFAULT_LOCALE, t, get_request_locale
 from utils.auth_utils import (
     get_current_active_user,
     require_permission,
@@ -266,16 +266,10 @@ async def generate_rag_exam(
                 .all()
             )
             if len(visible) != len(set(request.tag_ids)):
-                raise HTTPException(
-                    status_code=422,
-                    detail="Ungültige Tag-IDs.",
-                )
+                raise api_error(422, "rag_tag_ids_invalid", locale)
             for tag in visible:
                 if tag.is_archived:
-                    raise HTTPException(
-                        status_code=422,
-                        detail=f"Tag '{tag.name}' ist archiviert.",
-                    )
+                    raise api_error(422, "rag_tag_archived", locale, name=tag.name)
 
         # Serialize the request
         prompt_config_dict = None
@@ -810,11 +804,19 @@ async def rag_service_health():
         }
 
     except Exception as e:
-        logger.error(f"RAG service health check failed: {str(e)}")
-        raise HTTPException(
-            status_code=503,
-            detail={"status": "unhealthy", "service": "RAG Service"},
-        )
+        logger.error(f"RAG service health check failed: {str(e)}", exc_info=True)
+        # The dict ``detail`` this used to send violates the envelope's
+        # string-``detail`` rule (ADR 0005). ``status`` and ``service`` are
+        # not lost — they move to ``error_params``, which is where a monitor
+        # should have been reading them anyway. No request-scoped locale is
+        # available here: the endpoint takes no ``Request`` and needs no auth.
+        raise api_error(
+            503,
+            "rag_service_unhealthy",
+            DEFAULT_LOCALE,
+            service="RAG Service",
+            status="unhealthy",
+        ) from e
 
 
 TERMINAL_STATUSES = {"SUCCESS", "FAILURE", "REVOKED"}

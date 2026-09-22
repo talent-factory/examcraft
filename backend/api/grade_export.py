@@ -15,7 +15,7 @@ Multi-Tenancy via Exam-Institution-Check; RBAC: ``submissions:read``.
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -33,10 +33,10 @@ from services.grade_export_service import (
 from services.grading_scheme_resolver import (
     resolve_scheme_config as _resolve_scheme_config,
 )
-from services.translation_service import get_request_locale
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 from utils.auth_utils import require_permission
 from utils.download_filename import content_disposition, filename_stem
-from errors import api_error
+from errors import AppHTTPException, api_error
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,9 @@ def _download_filename(title: str, prefix: str, ext: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _ensure_exam_for_user(db: Session, user: User, exam_id: int) -> Exam:
+def _ensure_exam_for_user(
+    db: Session, user: User, exam_id: int, locale: str = DEFAULT_LOCALE
+) -> Exam:
     exam = (
         db.query(Exam)
         .filter(
@@ -70,7 +72,7 @@ def _ensure_exam_for_user(db: Session, user: User, exam_id: int) -> Exam:
         .one_or_none()
     )
     if exam is None:
-        raise HTTPException(status_code=404, detail="Prüfung nicht gefunden")
+        raise api_error(404, "exams_not_found", locale)
     return exam
 
 
@@ -160,7 +162,7 @@ async def export_grades(
     db: Session = Depends(get_db),
 ):
     locale = get_request_locale(request, current_user)
-    exam = _ensure_exam_for_user(db, current_user, exam_id)
+    exam = _ensure_exam_for_user(db, current_user, exam_id, locale)
     _ensure_exportable(db, exam, locale)
 
     data = _build_export_data(db, exam)
@@ -168,8 +170,19 @@ async def export_grades(
     exporter_entry = _EXPORTERS.get(export_format)
     if exporter_entry is None:
         # Unreachable thanks to the Literal, but FastAPI lets a malformed
-        # path slip past in some test setups.
-        raise HTTPException(status_code=400, detail="Unsupported export format")
+        # path slip past in some test setups. English and untranslated for
+        # that reason (TF-295); the passthrough form keeps the code in the
+        # contract without inventing a locale key nobody can ever see.
+        #
+        # Deliberately NOT named submissions_grade_export_* like this
+        # router's other codes: TF-773 PR 2c owns the submissions_ prefix in
+        # the locale files, and a passthrough code needs no key there at all,
+        # so this name stays out of that branch's line range entirely.
+        raise AppHTTPException(
+            400,
+            "Unsupported export format",
+            error_code="grade_export_unsupported_format",
+        )
 
     exporter_cls, media_type, prefix, ext = exporter_entry
     try:

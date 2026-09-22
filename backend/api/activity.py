@@ -20,13 +20,15 @@ import logging
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models.auth import AuditLog, User
 from utils.audit_title import extract_audit_title
+from errors import AppHTTPException, api_error
+from services.translation_service import get_request_locale
 from utils.auth_utils import get_current_active_user
 
 
@@ -119,7 +121,18 @@ def _to_utc(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
-def _parse_types(types_csv: str | None) -> list[str] | None:
+def _parse_types(
+    types_csv: str | None,
+    *,
+    # ``request``/``user`` instead of a ready-made ``locale``: resolving it
+    # means reading ``user.preferred_language``, and that buys nothing on the
+    # requests that do not raise — which is nearly all of them. Passing the
+    # inputs also lets the caller hand in a user that is not bound to a
+    # session, which is how ``test_scope_institution_rejects_user_without_
+    # institution`` reaches the defence-in-depth branch in the endpoint.
+    request: Request | None = None,
+    user: User | None = None,
+) -> list[str] | None:
     """Parse ``types=document_uploaded,exam_created`` → list of actions.
 
     Returns:
@@ -129,9 +142,9 @@ def _parse_types(types_csv: str | None) -> list[str] | None:
         into a ``WHERE action IN (...)`` clause.
 
     Raises:
-        HTTPException(422) if any token is unknown — fail loud rather
-        than silently returning empty results, which would look like a
-        backend bug to the caller.
+        ``AppHTTPException(422, error_code="activity_unknown_type")`` if any
+        token is unknown — fail loud rather than silently returning empty
+        results, which would look like a backend bug to the caller.
     """
     if types_csv is None:
         return None
@@ -150,14 +163,22 @@ def _parse_types(types_csv: str | None) -> list[str] | None:
         # Surface to ops at WARNING so a frontend regression emitting
         # bad tokens stands out from normal traffic, not just in 422
         # response bodies.
-        logger.warning("Activity types filter rejected unknown tokens: %s", unknown)
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "message": "Unbekannter Activity-Type",
-                "unknown_types": unknown,
-                "supported_types": list(SUPPORTED_TYPES),
-            },
+        logger.warning(
+            "Activity types filter rejected unknown tokens: %s (supported: %s)",
+            unknown,
+            list(SUPPORTED_TYPES),
+        )
+        # The dict ``detail`` this used to send is not an option any more:
+        # AppHTTPException requires a string so the envelope stays readable
+        # for the clients that treat ``detail`` as one (ADR 0005). The two
+        # lists survive as ``error_params`` — machine-readable in the same
+        # place as the code, instead of nested inside a human-facing field.
+        raise api_error(
+            422,
+            "activity_unknown_type",
+            get_request_locale(request, user),
+            unknown_types=", ".join(unknown),
+            supported_types=", ".join(SUPPORTED_TYPES),
         )
     return actions
 
@@ -198,6 +219,7 @@ def _row_to_item(log: AuditLog, *, include_actor: bool) -> ActivityItemOut | Non
 
 @router.get("", response_model=ActivityListOut)
 def list_activity(
+    http_request: Request,
     scope: Literal["own", "institution"] = Query(default="own"),
     types: str | None = Query(
         default=None,
@@ -219,7 +241,7 @@ def list_activity(
     are unreachable. ``scope=institution`` is intentionally not
     RBAC-gated; institution-internal visibility is by-design.
     """
-    actions_filter = _parse_types(types)
+    actions_filter = _parse_types(types, request=http_request, user=current_user)
 
     # Always restrict to the supported actions: an action like
     # ``login`` would otherwise leak through the implicit "all
@@ -243,9 +265,17 @@ def list_activity(
         # User.institution_id NOT NULL constraint already blocks this,
         # but an explicit 403 keeps the contract checkable.
         if current_user.institution_id is None:
-            raise HTTPException(
-                status_code=403,
-                detail="scope=institution requires institution membership",
+            # Deliberately English and untranslated: the branch above shows
+            # this is unreachable while User.institution_id stays NOT NULL, so
+            # it is a contract assertion for API clients, not a sentence any
+            # user can provoke — the TF-295 "developer errors stay English"
+            # exemption. It still carries a code, because the code is the
+            # outward contract even where the text is not (see
+            # test_error_codes_contract.py's passthrough rules).
+            raise AppHTTPException(
+                403,
+                "scope=institution requires institution membership",
+                error_code="activity_scope_institution_forbidden",
             )
         # JOIN users and filter on the caller's institution. The JOIN
         # strips audit rows whose user_id is NULL (FK ON DELETE SET

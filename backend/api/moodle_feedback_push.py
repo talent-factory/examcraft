@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
@@ -27,6 +27,8 @@ from models.exam import Exam, ExamQuestion
 from models.submission import MoodleConnection, MoodleFeedbackPushJob
 from services.audit_service import AuditService
 from tasks.moodle_feedback_push_task import push_moodle_feedback
+from errors import api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 from utils.auth_utils import require_permission
 from utils.exam_visibility import assert_exam_visible_for
 
@@ -62,7 +64,9 @@ class PushJobOut(BaseModel):
 PushJobOut.model_rebuild()
 
 
-def _ensure_exam_for_user(db: Session, user: User, exam_id: int) -> Exam:
+def _ensure_exam_for_user(
+    db: Session, user: User, exam_id: int, locale: str = DEFAULT_LOCALE
+) -> Exam:
     """Load exam by id, 404 unless institution matches AND ``user`` has
     ExamVisibility access (TF-643) — pushing feedback is a mutation, so this
     is gated exactly like every other exam-mutation endpoint
@@ -70,7 +74,7 @@ def _ensure_exam_for_user(db: Session, user: User, exam_id: int) -> Exam:
     ``api.exams._get_exam_or_404``)."""
     exam = db.query(Exam).filter(Exam.id == exam_id).one_or_none()
     if exam is None:
-        raise HTTPException(status_code=404, detail="Prüfung nicht gefunden")
+        raise api_error(404, "exams_not_found", locale)
     assert_exam_visible_for(
         user,
         exam,
@@ -102,7 +106,8 @@ def push_feedback(
     current_user: User = Depends(require_permission(_PERMISSION)),
     db: Session = Depends(get_db),
 ) -> PushJobOut:
-    exam = _ensure_exam_for_user(db, current_user, exam_id)
+    locale = get_request_locale(request, current_user)
+    exam = _ensure_exam_for_user(db, current_user, exam_id, locale)
 
     connection = (
         db.query(MoodleConnection)
@@ -110,18 +115,9 @@ def push_feedback(
         .one_or_none()
     )
     if connection is None:
-        raise HTTPException(
-            status_code=412,
-            detail="Keine Moodle-Verbindung für diese Institution konfiguriert.",
-        )
+        raise api_error(412, "moodle_feedback_push_no_connection", locale)
     if not _exam_has_quiz_id(db, exam.id):
-        raise HTTPException(
-            status_code=412,
-            detail=(
-                "Diese Prüfung ist keinem Moodle-Quiz zugeordnet. Bitte zuerst "
-                "die Moodle-Fragen-IDs synchronisieren."
-            ),
-        )
+        raise api_error(412, "moodle_feedback_push_no_quiz_id", locale)
 
     job = MoodleFeedbackPushJob(
         institution_id=current_user.institution_id,
@@ -155,9 +151,7 @@ def push_feedback(
             {"scope": "job", "reason": "Hintergrund-Dienst nicht erreichbar."}
         ]
         db.commit()
-        raise HTTPException(
-            status_code=503, detail="Push konnte nicht gestartet werden."
-        ) from exc
+        raise api_error(503, "moodle_feedback_push_queue_unavailable", locale) from exc
 
     return PushJobOut.model_validate(job)
 
@@ -169,6 +163,7 @@ def push_feedback(
 def get_push_job(
     exam_id: int,
     job_id: int,
+    request: Request,
     current_user: User = Depends(require_permission(_PERMISSION)),
     db: Session = Depends(get_db),
 ) -> PushJobOut:
@@ -182,5 +177,9 @@ def get_push_job(
         .one_or_none()
     )
     if job is None:
-        raise HTTPException(status_code=404, detail="Push-Job nicht gefunden")
+        raise api_error(
+            404,
+            "moodle_feedback_push_job_not_found",
+            get_request_locale(request, current_user),
+        )
     return PushJobOut.model_validate(job)

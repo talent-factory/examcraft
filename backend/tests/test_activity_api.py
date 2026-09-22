@@ -337,6 +337,10 @@ class TestActivityScope:
         try:
             resp = client.get("/api/v1/activity?scope=institution")
             assert resp.status_code == 403
+            # Stays English and untranslated (TF-295 exemption) but carries a
+            # code, so an API client can branch on it — see the passthrough
+            # rules in test_error_codes_contract.py.
+            assert resp.json()["error_code"] == "activity_scope_institution_forbidden"
         finally:
             app.dependency_overrides.clear()
 
@@ -403,9 +407,15 @@ class TestActivityTypeFilter:
             resp = client.get("/api/v1/activity?types=does_not_exist")
             assert resp.status_code == 422
             body = resp.json()
-            # FastAPI wraps the HTTPException's structured detail in `detail`.
-            assert body["detail"]["unknown_types"] == ["does_not_exist"]
-            assert "supported_types" in body["detail"]
+            # TF-773 PR 2d: the structured detail moved into `error_params`.
+            # `detail` is now the translated sentence, which ADR 0005 requires
+            # to be a plain string; the two lists that used to be nested inside
+            # it are machine-readable next to the code instead.
+            assert body["error_code"] == "activity_unknown_type"
+            assert body["error_params"]["unknown_types"] == "does_not_exist"
+            assert "question_approved" in body["error_params"]["supported_types"]
+            assert isinstance(body["detail"], str)
+            assert "does_not_exist" in body["detail"]
         finally:
             app.dependency_overrides.clear()
 

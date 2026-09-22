@@ -72,11 +72,23 @@ in `AppError.ts` grows by one import line.
    `studentClasses.ts`, `submissions.ts`, `exams.ts`, `gradingSchemes.ts`,
    `competencyFrameworks.ts` and `billing.ts` mix real backend codes with
    operation fallbacks; `visibility.ts` holds only backend codes shared by
-   several routers; `students.ts`, `activity.ts`, `audit.ts`,
-   `moodleConnections.ts`, `moodleRoundtrip.ts` and `moodleFeedbackPush.ts` are
-   fallback-only because their routers raise plain `HTTPException`s. Each file
-   names the sentences that were visible before and are lost until its router
-   is migrated.
+   several routers.
+
+   The six files PR 7 created for routers that still raised plain
+   `HTTPException`s were fallback-only at the time, and that is worth reading
+   carefully before reusing one of their names: a backend code named after an
+   operation fallback renders with the fallback's generic sentence, so sending
+   it changes nothing on screen. TF-773 PR 2d migrated all six routers and
+   split them by what the UI can actually show:
+
+   * `moodleRoundtrip.ts`, `moodleConnections.ts`, `moodleFeedbackPush.ts` and
+     `students.ts` now mix backend codes with their operation fallbacks — their
+     consumers hand every failure to `translateError` without branching first,
+     so a registered code reaches the screen.
+   * `activity.ts` and `audit.ts` stay fallback-only *by decision*, not for
+     lack of codes. Their routers' throw sites are either unreachable from the
+     UI or a frontend bug, and the English ones are passthrough codes with no
+     locale key at all. Each file states which, and why.
 
 ## What belongs in the registry
 

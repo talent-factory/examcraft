@@ -22,7 +22,7 @@ import logging
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -30,6 +30,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.auth import User
 from models.submission import MoodleConnection
+from errors import api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale, t
 from utils.auth_utils import require_permission
 from utils.secret_encryption import (
     SecretEncryptionError,
@@ -127,7 +129,7 @@ def _to_out(
     )
 
 
-def _decrypt_or_500(connection: MoodleConnection) -> str:
+def _decrypt_or_500(connection: MoodleConnection, locale: str = DEFAULT_LOCALE) -> str:
     try:
         return decrypt_secret(connection.token_encrypted)
     except SecretEncryptionError as exc:
@@ -136,17 +138,14 @@ def _decrypt_or_500(connection: MoodleConnection) -> str:
             connection.id,
             exc,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Token-Verschlüsselung defekt. Operations-Team "
-                "kontaktieren — vermutlich Schlüssel-Rotation ohne "
-                "Re-Encryption."
-            ),
+        raise api_error(
+            500, "moodle_connections_token_decryption_failed", locale
         ) from exc
 
 
-def _load_for_user(*, db: Session, user: User, connection_id: int) -> MoodleConnection:
+def _load_for_user(
+    *, db: Session, user: User, connection_id: int, locale: str = DEFAULT_LOCALE
+) -> MoodleConnection:
     connection = (
         db.query(MoodleConnection)
         .filter(
@@ -156,7 +155,7 @@ def _load_for_user(*, db: Session, user: User, connection_id: int) -> MoodleConn
         .one_or_none()
     )
     if connection is None:
-        raise HTTPException(status_code=404, detail="Moodle-Verbindung nicht gefunden")
+        raise api_error(404, "moodle_connections_not_found", locale)
     return connection
 
 
@@ -167,17 +166,19 @@ def _load_for_user(*, db: Session, user: User, connection_id: int) -> MoodleConn
 
 @router.get("", response_model=MoodleConnectionListOut)
 async def list_connections(
+    http_request: Request,
     current_user: User = Depends(require_permission("moodle:configure")),
     db: Session = Depends(get_db),
 ) -> MoodleConnectionListOut:
     """Returns the (at most one) connection of the institution."""
+    locale = get_request_locale(http_request, current_user)
     rows = (
         db.query(MoodleConnection)
         .filter(MoodleConnection.institution_id == current_user.institution_id)
         .order_by(MoodleConnection.id)
         .all()
     )
-    items = [_to_out(c, token_plaintext=_decrypt_or_500(c)) for c in rows]
+    items = [_to_out(c, token_plaintext=_decrypt_or_500(c, locale)) for c in rows]
     return MoodleConnectionListOut(items=items, total=len(items))
 
 
@@ -188,10 +189,12 @@ async def list_connections(
 )
 async def create_connection(
     body: MoodleConnectionCreateIn,
+    http_request: Request,
     current_user: User = Depends(require_permission("moodle:configure")),
     db: Session = Depends(get_db),
 ) -> MoodleConnectionOut:
     """Create a connection. 409 if one already exists."""
+    locale = get_request_locale(http_request, current_user)
     encrypted = encrypt_secret(body.token)
     connection = MoodleConnection(
         institution_id=current_user.institution_id,
@@ -203,10 +206,7 @@ async def create_connection(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Es existiert bereits eine Moodle-Verbindung für diese Institution.",
-        ) from exc
+        raise api_error(409, "moodle_connections_already_exists", locale) from exc
     db.refresh(connection)
     return _to_out(connection, token_plaintext=body.token)
 
@@ -214,11 +214,15 @@ async def create_connection(
 @router.get("/{connection_id}", response_model=MoodleConnectionOut)
 async def get_connection(
     connection_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("moodle:configure")),
     db: Session = Depends(get_db),
 ) -> MoodleConnectionOut:
-    connection = _load_for_user(db=db, user=current_user, connection_id=connection_id)
-    token = _decrypt_or_500(connection)
+    locale = get_request_locale(http_request, current_user)
+    connection = _load_for_user(
+        db=db, user=current_user, connection_id=connection_id, locale=locale
+    )
+    token = _decrypt_or_500(connection, locale)
     return _to_out(connection, token_plaintext=token)
 
 
@@ -226,34 +230,41 @@ async def get_connection(
 async def update_connection(
     connection_id: int,
     body: MoodleConnectionUpdateIn,
+    http_request: Request,
     current_user: User = Depends(require_permission("moodle:configure")),
     db: Session = Depends(get_db),
 ) -> MoodleConnectionOut:
     """Change the token / base URL. At least one field must be set."""
+    locale = get_request_locale(http_request, current_user)
     if body.base_url is None and body.token is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Mindestens ein Feld (base_url, token) ist nötig.",
-        )
+        raise api_error(400, "moodle_connections_no_fields", locale)
 
-    connection = _load_for_user(db=db, user=current_user, connection_id=connection_id)
+    connection = _load_for_user(
+        db=db, user=current_user, connection_id=connection_id, locale=locale
+    )
     if body.base_url is not None:
         connection.base_url = str(body.base_url).rstrip("/")
     if body.token is not None:
         connection.token_encrypted = encrypt_secret(body.token)
     db.commit()
     db.refresh(connection)
-    token_plain = body.token or _decrypt_or_500(connection)
+    token_plain = body.token or _decrypt_or_500(connection, locale)
     return _to_out(connection, token_plaintext=token_plain)
 
 
 @router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_connection(
     connection_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("moodle:configure")),
     db: Session = Depends(get_db),
 ) -> Response:
-    connection = _load_for_user(db=db, user=current_user, connection_id=connection_id)
+    connection = _load_for_user(
+        db=db,
+        user=current_user,
+        connection_id=connection_id,
+        locale=get_request_locale(http_request, current_user),
+    )
     db.delete(connection)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -267,6 +278,7 @@ async def delete_connection(
 @router.post("/{connection_id}/test", response_model=MoodleConnectionTestOut)
 async def test_connection(
     connection_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("moodle:configure")),
     db: Session = Depends(get_db),
 ) -> MoodleConnectionTestOut:
@@ -276,13 +288,16 @@ async def test_connection(
     frontend can display the error message in the form state (instead
     of a 4xx, which would show up as a generic toast).
     """
-    connection = _load_for_user(db=db, user=current_user, connection_id=connection_id)
+    locale = get_request_locale(http_request, current_user)
+    connection = _load_for_user(
+        db=db, user=current_user, connection_id=connection_id, locale=locale
+    )
     # Decryption failure indicates server-side encryption corruption
     # (rotated key, manual DB tamper) — that's a 500-class problem the
     # operator must see, not a friendly "token wrong" message in the
     # form. Other errors (auth, network) still come back as 200/ok=false
     # so the form can render the structured banner.
-    token = _decrypt_or_500(connection)
+    token = _decrypt_or_500(connection, locale)
 
     endpoint = connection.base_url.rstrip("/") + "/webservice/rest/server.php"
     try:
@@ -296,36 +311,55 @@ async def test_connection(
                 },
             )
     except httpx.HTTPError as exc:
+        # The transport error can name the configured endpoint host — log it,
+        # send the generic sentence (mirrors the moodle_roundtrip.py fix).
+        logger.warning("Moodle connection test unreachable (%s): %s", endpoint, exc)
         return MoodleConnectionTestOut(
             ok=False,
-            error=f"Verbindung fehlgeschlagen: {exc}",
+            error=t("moodle_connections_test_unreachable", locale),
         )
 
     if response.status_code >= 500:
+        # The status is diagnostic, not sensitive — but it still belongs in
+        # the log, not hardcoded/untranslated in the response (TF-773).
+        logger.warning(
+            "Moodle connection test got HTTP %s from Moodle", response.status_code
+        )
         return MoodleConnectionTestOut(
-            ok=False, error=f"Moodle-Fehler HTTP {response.status_code}"
+            ok=False, error=t("moodle_connections_test_server_error", locale)
         )
     if 400 <= response.status_code < 500:
-        # Surface the real status so the operator can tell apart
-        # "token forbidden" (401/403) from "wrong endpoint" (404) and
-        # "rate limit" (429) — without this branch all three render as
-        # an opaque "response was not JSON".
+        # The status distinguishes "token forbidden" (401/403) from "wrong
+        # endpoint" (404) and "rate limit" (429) — logged for the operator,
+        # not embedded in the (translated) response sentence.
+        logger.warning(
+            "Moodle connection test was rejected: HTTP %s", response.status_code
+        )
         return MoodleConnectionTestOut(
             ok=False,
-            error=(
-                f"Moodle-Fehler HTTP {response.status_code} — "
-                "Token-Berechtigung oder Endpoint prüfen."
-            ),
+            error=t("moodle_connections_test_rejected", locale),
         )
     try:
         data = response.json()
     except ValueError:
-        return MoodleConnectionTestOut(ok=False, error="Antwort war kein JSON")
+        logger.warning("Moodle connection test response was not JSON")
+        return MoodleConnectionTestOut(
+            ok=False, error=t("moodle_connections_test_invalid_response", locale)
+        )
 
     if isinstance(data, dict) and "exception" in data:
+        # The Moodle error text is upstream content and may name the token,
+        # endpoint or an internal course id — log it, send the generic
+        # sentence (mirrors the moodle_roundtrip.py fix).
+        message = data.get("message") or "unknown error"
+        logger.warning(
+            "Moodle reported an exception during connection test: errorcode=%s message=%s",
+            data.get("errorcode"),
+            message,
+        )
         return MoodleConnectionTestOut(
             ok=False,
-            error=data.get("message") or "unbekannter Fehler",
+            error=t("moodle_connections_test_upstream_error", locale),
         )
 
     # Success: mark the connection as tested.

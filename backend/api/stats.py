@@ -12,7 +12,7 @@ needs runtime types for OpenAPI generation.
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,8 @@ from models.auth import User
 from models.exam import Exam
 from models.submission import Attempt, Submission
 from services.statistics_service import StatisticsService
+from errors import api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 from utils.auth_utils import require_permission
 
 logger = logging.getLogger(__name__)
@@ -129,7 +131,9 @@ class PerSubmissionStatOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _ensure_exam_for_user(db: Session, user: User, exam_id: int) -> Exam:
+def _ensure_exam_for_user(
+    db: Session, user: User, exam_id: int, locale: str = DEFAULT_LOCALE
+) -> Exam:
     exam = (
         db.query(Exam)
         .filter(
@@ -140,12 +144,12 @@ def _ensure_exam_for_user(db: Session, user: User, exam_id: int) -> Exam:
     )
     if exam is None:
         # 404 (instead of 403) prevents the cross-tenant existence leak.
-        raise HTTPException(status_code=404, detail="Prüfung nicht gefunden")
+        raise api_error(404, "exams_not_found", locale)
     return exam
 
 
 def _ensure_submission_for_user(
-    db: Session, user: User, submission_id: int
+    db: Session, user: User, submission_id: int, locale: str = DEFAULT_LOCALE
 ) -> Submission:
     submission = (
         db.query(Submission)
@@ -154,7 +158,7 @@ def _ensure_submission_for_user(
         .first()
     )
     if submission is None:
-        raise HTTPException(status_code=404, detail="Submission nicht gefunden")
+        raise api_error(404, "stats_submission_not_found", locale)
     # Cross-check via the exam's institution; a submission cannot exist
     # across multiple tenants via multiple attempts, but the exam is the
     # canonical multi-tenancy boundary.
@@ -167,7 +171,7 @@ def _ensure_submission_for_user(
         .one_or_none()
     )
     if exam is None:
-        raise HTTPException(status_code=404, detail="Submission nicht gefunden")
+        raise api_error(404, "stats_submission_not_found", locale)
     return submission
 
 
@@ -179,10 +183,13 @@ def _ensure_submission_for_user(
 @router_exam_stats.get("/{exam_id}/stats/overview", response_model=OverviewStatsOut)
 async def get_exam_stats_overview(
     exam_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("submissions:read")),
     db: Session = Depends(get_db),
 ) -> OverviewStatsOut:
-    _ensure_exam_for_user(db, current_user, exam_id)
+    _ensure_exam_for_user(
+        db, current_user, exam_id, get_request_locale(http_request, current_user)
+    )
     overview = StatisticsService(db).overview(exam_id=exam_id)
     return OverviewStatsOut(
         submission_count=overview.submission_count,
@@ -205,10 +212,13 @@ async def get_exam_stats_overview(
 )
 async def get_exam_stats_per_question(
     exam_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("submissions:read")),
     db: Session = Depends(get_db),
 ) -> PerQuestionListOut:
-    _ensure_exam_for_user(db, current_user, exam_id)
+    _ensure_exam_for_user(
+        db, current_user, exam_id, get_request_locale(http_request, current_user)
+    )
     items = StatisticsService(db).per_question(exam_id=exam_id)
     return PerQuestionListOut(
         items=[
@@ -239,13 +249,15 @@ async def get_exam_stats_per_question(
 )
 async def get_submission_stats(
     submission_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("submissions:read")),
     db: Session = Depends(get_db),
 ) -> PerSubmissionStatOut:
-    _ensure_submission_for_user(db, current_user, submission_id)
+    locale = get_request_locale(http_request, current_user)
+    _ensure_submission_for_user(db, current_user, submission_id, locale)
     stats = StatisticsService(db).per_submission(submission_id=submission_id)
     if stats is None:
-        raise HTTPException(status_code=404, detail="Submission nicht gefunden")
+        raise api_error(404, "stats_submission_not_found", locale)
     return PerSubmissionStatOut(
         submission_id=stats.submission_id,
         student_id=stats.student_id,

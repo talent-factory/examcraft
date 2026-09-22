@@ -17,7 +17,7 @@ brauchen reale Typen für die OpenAPI-Generierung).
 import logging
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func as sa_func, or_
 from sqlalchemy.orm import Session
@@ -29,6 +29,8 @@ from models.student import Student, StudentClass, StudentClassMembership
 from models.submission import Submission
 from services.auswertung_quotas import assert_class_history_allowed
 from services.statistics_service import StatisticsService
+from errors import api_error
+from services.translation_service import DEFAULT_LOCALE, get_request_locale
 from utils.auth_utils import require_permission
 
 
@@ -125,7 +127,9 @@ class StudentHistoryStatsOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _load_student_for_user(*, db: Session, user: User, student_id: int) -> Student:
+def _load_student_for_user(
+    *, db: Session, user: User, student_id: int, locale: str = DEFAULT_LOCALE
+) -> Student:
     student = (
         db.query(Student)
         .filter(
@@ -135,7 +139,7 @@ def _load_student_for_user(*, db: Session, user: User, student_id: int) -> Stude
         .one_or_none()
     )
     if student is None:
-        raise HTTPException(status_code=404, detail="Studi nicht gefunden")
+        raise api_error(404, "students_not_found", locale)
     return student
 
 
@@ -250,11 +254,17 @@ async def list_students(
 @router.get("/{student_id}", response_model=StudentDetailOut)
 async def get_student(
     student_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> StudentDetailOut:
     """Detail eines Studis: Klassen + Anzahl Submissions."""
-    student = _load_student_for_user(db=db, user=current_user, student_id=student_id)
+    student = _load_student_for_user(
+        db=db,
+        user=current_user,
+        student_id=student_id,
+        locale=get_request_locale(http_request, current_user),
+    )
     submission_count = (
         db.query(sa_func.count(Submission.id))
         .join(Exam, Exam.id == Submission.exam_id)
@@ -285,6 +295,7 @@ async def get_student(
 @router.get("/{student_id}/stats", response_model=StudentHistoryStatsOut)
 async def get_student_history(
     student_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("students:manage")),
     db: Session = Depends(get_db),
 ) -> StudentHistoryStatsOut:
@@ -295,14 +306,17 @@ async def get_student_history(
 
     Tier-Gate: nur Enterprise. 402 mit ``error_code`` für i18n-Banner.
     """
+    locale = get_request_locale(http_request, current_user)
     assert_class_history_allowed(current_user)
-    _load_student_for_user(db=db, user=current_user, student_id=student_id)
+    _load_student_for_user(
+        db=db, user=current_user, student_id=student_id, locale=locale
+    )
 
     stats = StatisticsService(db).student_history(
         student_id=student_id, institution_id=current_user.institution_id
     )
     if stats is None:
-        raise HTTPException(status_code=404, detail="Studi nicht gefunden")
+        raise api_error(404, "students_not_found", locale)
 
     return StudentHistoryStatsOut(
         student_id=stats.student_id,

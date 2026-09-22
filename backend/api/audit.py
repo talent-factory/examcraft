@@ -13,7 +13,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,7 @@ from database import get_db
 from models.auth import User
 from services.audit_query_service import query_audit_logs, resolve_scope
 from services.audit_service import AUDIT_CATEGORIES, AuditService, category_for_action
+from errors import AppHTTPException
 from utils.auth_utils import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -133,17 +134,30 @@ def list_audit_logs(
     """RBAC-scoped audit log listing. Scope derived from the caller's role."""
     scope = resolve_scope(current_user)  # raises 403 for non-admins
 
+    # The next two stay English and untranslated (TF-295 "developer errors
+    # stay English"): AuditLogView sends neither a date range nor a free-text
+    # category — its filters are a select over _VALID_CATEGORIES — so neither
+    # sentence can reach a screen. They are contract assertions for an API
+    # client, and carry a code for exactly that reason, via the passthrough
+    # form the contract test defines for messages that do not come from the
+    # locale files.
     if date_from and date_to and date_from > date_to:
-        raise HTTPException(status_code=400, detail="date_from must be <= date_to")
+        raise AppHTTPException(
+            400,
+            "date_from must be <= date_to",
+            error_code="audit_invalid_date_range",
+        )
 
     categories = None
     if category:
         categories = [c.strip() for c in category.split(",") if c.strip()]
         invalid = [c for c in categories if c not in _VALID_CATEGORIES]
         if invalid:
-            raise HTTPException(
-                status_code=400,
-                detail={"message": "Unknown category", "unknown": invalid},
+            raise AppHTTPException(
+                400,
+                "Unknown category",
+                error_code="audit_unknown_category",
+                error_params={"unknown": ", ".join(invalid)},
             )
 
     rows, total = query_audit_logs(

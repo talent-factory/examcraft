@@ -541,3 +541,8 @@ def test_worker_error_endpoint_returns_503_when_broker_unreachable(monkeypatch):
     resp = client.post("/api/admin/specula-test/worker-error")
 
     assert resp.status_code == 503
+    body = resp.json()
+    assert body["error_code"] == "specula_test_queue_unavailable"
+    # Passthrough (TF-295): english, no locale key, detail is the wire contract.
+    assert body["detail"] == "Task queue unreachable — check broker/worker."
+    assert "broker unreachable" not in body["detail"]

@@ -452,5 +452,8 @@ def test_stripe_webhook_data_error_is_logged_not_echoed(monkeypatch, caplog):
         )
 
     assert response.status_code == 200
-    assert response.json() == {"status": "error", "error_code": "webhook_data_error"}
+    assert response.json() == {
+        "status": "error",
+        "error_code": "webhooks_stripe_data_error",
+    }
     assert message in caplog.text

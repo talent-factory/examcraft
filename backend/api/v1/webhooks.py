@@ -1,9 +1,10 @@
 import stripe
-from fastapi import APIRouter, Request, Header, HTTPException, Depends
+from fastapi import APIRouter, Request, Header, Depends
 from sqlalchemy.orm import Session
 import os
 import logging
 from database import get_db
+from errors import AppHTTPException
 from models.subscription import Subscription, SubscriptionStatus
 from models.auth import Institution, User, Role, UserRole
 from utils.billing_utils import get_tier_from_price_id
@@ -54,14 +55,26 @@ async def stripe_webhook(
 
     if not endpoint_secret:
         logger.error("STRIPE_WEBHOOK_SECRET is not configured — rejecting webhook")
-        raise HTTPException(status_code=500, detail="Webhook endpoint not configured")
+        raise AppHTTPException(
+            500,
+            "Webhook endpoint not configured",
+            error_code="webhooks_stripe_not_configured",
+        )
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
+    except ValueError as e:
+        raise AppHTTPException(
+            400,
+            "Invalid payload",
+            error_code="webhooks_stripe_invalid_payload",
+        ) from e
+    except stripe.error.SignatureVerificationError as e:
+        raise AppHTTPException(
+            400,
+            "Invalid signature",
+            error_code="webhooks_stripe_invalid_signature",
+        ) from e
 
     event_type = event.type
     event_object = event.data.object
@@ -83,19 +96,27 @@ async def stripe_webhook(
         # The message names internal ids, so it stays in the log; the response
         # only carries a static, non-sensitive marker so an operator looking at
         # the Stripe dashboard's "Response" panel can still correlate it to the
-        # matching log line (TF-773 PR 2a review fix).
+        # matching log line (TF-773 PR 2a review fix). Deliberately outside the
+        # error_code contract (test_error_codes_contract.py / the AST scan in
+        # test_core_router_error_codes.py): it's a plain-dict 200 response, not
+        # an api_error()/AppHTTPException, so it needs no locale key and isn't
+        # registered in the frontend.
         logger.critical(
             "Webhook data error for %s (acknowledged, no retry): %s",
             event_type,
             e,
             exc_info=True,
         )
-        return {"status": "error", "error_code": "webhook_data_error"}
+        return {"status": "error", "error_code": "webhooks_stripe_data_error"}
     except stripe.error.StripeError as e:
         logger.error(
             "Stripe API error during webhook %s: %s", event_type, e, exc_info=True
         )
-        raise HTTPException(status_code=502, detail="Upstream payment provider error")
+        raise AppHTTPException(
+            502,
+            "Upstream payment provider error",
+            error_code="webhooks_stripe_upstream_error",
+        ) from e
     except Exception as e:
         logger.error(
             "Unexpected error handling webhook %s: %s: %s",
@@ -104,7 +125,11 @@ async def stripe_webhook(
             e,
             exc_info=True,
         )
-        raise HTTPException(status_code=500, detail="Webhook processing failed")
+        raise AppHTTPException(
+            500,
+            "Webhook processing failed",
+            error_code="webhooks_stripe_processing_failed",
+        ) from e
 
     return {"status": "success"}
 
