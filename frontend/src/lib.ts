@@ -85,6 +85,7 @@ export * from './utils/componentLoader';
 export * from './utils/deploymentMode';
 export * from './utils/sessionSnapshot';
 export * from './utils/ragWizardSnapshot';
+export * from './utils/competenciesTemplateVariable';
 
 // ============================================================================
 // Tags

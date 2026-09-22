@@ -12,6 +12,7 @@ import type {
   FrameworkCreatePayload,
 } from '../../types/competencyFramework';
 import { OrgUnitsService } from '../../services/orgUnitsService';
+import { COMPETENCIES_HELPER_I18N_OPTIONS } from '../../utils/competenciesTemplateVariable';
 import type { OrgUnitOut } from '../../types/orgUnit';
 
 export interface FrameworkFormValues {
@@ -126,7 +127,7 @@ const CompetencyFrameworkForm: React.FC<Props> = ({
         fullWidth
         multiline
         minRows={8}
-        helperText={t('competencyFrameworks.form.renderedTextHelper')}
+        helperText={t('competencyFrameworks.form.renderedTextHelper', COMPETENCIES_HELPER_I18N_OPTIONS)}
       />
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <TextField
